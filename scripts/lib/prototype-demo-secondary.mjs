@@ -59,9 +59,11 @@ export function secondaryDemo(url,state,request){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
-    const items=!demoHasEarningsHistory(state)?[]:demoSettledTasks(state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:['SDXL','Llama 3.1','Video generation'][i],client:'Demo Studio',rewardUsdt:task.amount,rewardNex:1,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
+    const items=demoSettledTasks(state,state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts')return {...proof,items,nextOffset:null,nextCursor:null,total:items.length};
-    return items.find(r=>r.receiptNo===p.split('/').pop());
+    const receipt=items.find(r=>r.receiptNo===p.split('/').pop());
+    if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
+    return receipt;
   }
   if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},assets:{USDT:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},UVT:{withdrawable:accountDeletionWallet(state)?.nexAvailable??(empty?0:1280),pending_review:accountDeletionWallet(state)||empty?0:10,bonus_locked:0}},releaseMode:'manual_only',attestedOnlineSeconds:0,requiredAttestationSeconds:0,clusterRestricted:false};
   if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};

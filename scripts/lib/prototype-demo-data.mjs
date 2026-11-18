@@ -18,7 +18,7 @@ import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
 import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { demoHasOpeningMilestone, demoLifetimeEarningsUsdt, demoStreakFacts, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoHasOpeningMilestone, demoLifetimeEarningsUsdt, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -506,12 +506,14 @@ export function demoFixture(url,locale,state,request) {
   const account=accountDemo(url,locale,state,request);if(account!==undefined)return account;
   const bank=bankDemo(url,state,request);if(bank!==undefined)return bank;
   const risk=riskDemo(url,locale,state,request);if(risk!==undefined)return risk;
+  const settledTasks=()=>computeMode?computeFacts().postedTasks:demoSettledTasks(state,state.previewFactsAt);
   if(pathname==='/api/app/home/overview') {
     const overview=structuredClone(base());
-    // A settlement lands every 20s, so each Home refresh brings new rows for the live feed to reveal.
-    const settlementPool=[['Pocket Studios','SDXL Turbo',.0031],['Helix Labs','Llama 70B',.0024],['Echo Earbuds','Whisper tiny',.00009],['Mosaic','Flux dev',.0042],['Vector Foundry','MobileBERT',.00007],['Atrium AI','Qwen 7B',.0018]],settlementSlot=Math.floor(now/20000);
-    const recentSettlements=Array.from({length:12},(_,i)=>{const slot=settlementSlot-i,[client,model,rewardUsdt]=settlementPool[slot%settlementPool.length];return {id:'DEMO-SETTLE-'+slot,client,model,rewardUsdt,completedAt:new Date(slot*20000).toISOString(),synthetic:false};});
-    overview.earningsLedger=empty?[]:[...recentSettlements,...[['DEMO-EARNING-1','Demo Studio','SDXL',2.34],['DEMO-EARNING-2','Demo Lab','Llama',.00032],['DEMO-EARNING-3','Demo Lab','Whisper',.00005]].map(([id,client,model,rewardUsdt],index)=>({id,client,model,rewardUsdt,completedAt:new Date(now-(index+1)*600000).toISOString(),synthetic:false}))];
+    const tasks=settledTasks();
+    overview.earnings=demoTaskPeriods(tasks,now);
+    overview.earningsLedger=tasks.slice().sort((a,b)=>b.completedAt-a.completedAt).slice(0,15)
+      .map(task=>({id:task.taskNo,client:task.client,model:task.model,rewardUsdt:task.amount,
+        completedAt:new Date(task.completedAt).toISOString(),synthetic:false}));
     if(!empty){
       overview.marketBoard={workloads:[
         {code:'IG',name:'SDXL Turbo',unit:null,price:.003,deltaPct:4.2,sparkline:[.4,.5,.42,.55,.6,.7,.72],flagshipDeltaPct:null},
@@ -538,7 +540,7 @@ export function demoFixture(url,locale,state,request) {
   const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request));if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
-  const walletBills=()=>demoWalletBills(state,now,state.previewFactsAt,computeMode?computeFacts().postedTasks:undefined);
+  const walletBills=()=>demoWalletBills(state,now,state.previewFactsAt,settledTasks());
   const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;

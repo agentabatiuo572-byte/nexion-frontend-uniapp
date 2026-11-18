@@ -11,11 +11,14 @@ const signed=row=>row.direction==='IN'?row.amount:-row.amount;
 const settled=row=>row.status==='SUCCESS';
 const reward=row=>row.direction==='IN'&&row.amount>0&&['bonus','refer','achievement'].includes(row.category);
 
-export function demoSettledTasks(at) {
+export function demoSettledTasks(state,at) {
+  if(!demoHasEarningsHistory(state))return [];
   return [['IG',2.34],['LL',8.5],['VG',5.4]].map(([taskClass,amount],index)=>{
     const completedAt=at-(index+1)*3600000;
     return {taskNo:'DEMO-TASK-'+(index+1),receiptNo:'DEMO-RECEIPT-'+(index+1),
-      batchNo:index===0?'DEMO-BATCH-1':null,taskClass,amount,completedAt,postedAt:completedAt+600000};
+      batchNo:index===0?'DEMO-BATCH-1':null,deviceId:41,taskClass,amount,
+      nex:state.walletLegacySeed?0:1,completedAt,postedAt:completedAt+600000,
+      client:'Demo Studio',model:['SDXL','Llama 3.1','Video generation'][index]};
   });
 }
 
@@ -39,11 +42,6 @@ export function initializeDemoWalletCheckpoint(state) {
   // An imported wallet already includes its old orders and any saved milestone credits.
   state.walletUsdtCheckpoint??=money(demoWalletUsdt(state)-(state.milestoneClaimReceipts??[])
     .filter(({result})=>result?.rewardType==='USDT').reduce((total,{result})=>total+result.rewardAmount,0));
-}
-
-export function postDemoWalletUsdt(state,amount) {
-  initializeDemoWalletCheckpoint(state);
-  state.walletBalance=money(demoWalletUsdt(state)+amount);
 }
 
 // Store the resulting balance at the write, including movements earlier in the same millisecond.
@@ -99,7 +97,7 @@ export function demoStreakFacts(state,now) {
     lastCheckInDate,checkedInToday:lastCheckInDate===today};
 }
 
-export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt)) {
+export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,seedAt)) {
   initializeDemoWalletCheckpoint(state);
   const commissions=demoCommissionEvents(seedAt).filter(event=>['unlocked','withdrawn'].includes(event.status));
   const seeds=!demoHasEarningsHistory(state)?[]:[
@@ -115,6 +113,8 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
     ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
     ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].map(([asset,amount])=>
       ['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-${asset}-RELEASE`])),
+    ...tasks.filter(task=>task.nex>0&&!task.deliveryCycle).map(task=>
+      ['COMPUTE_TASK_REWARD','UVT','IN',task.nex,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo],index)=>({
     id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
@@ -136,7 +136,7 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
     id:orderNo,bizNo:orderNo,bizType:'ORDER_PURCHASE',asset:'USDT',direction:'OUT',amount,at,
     status:'SUCCESS',category:'purchase',remark:'UVEL wallet order settlement',
   }));
-  const deliveries=tasks.filter(task=>task.deliveryCycle).map(({taskNo,amount,postedAt,batchNo})=>({
+  const deliveries=tasks.filter(task=>task.deliveryCycle&&!posted.has(task.taskNo)).map(({taskNo,amount,postedAt,batchNo})=>({
     id:taskNo,bizNo:taskNo,bizType:'COMPUTE_TASK_REWARD',asset:'USDT',direction:'IN',amount,at:postedAt,
     status:'SUCCESS',category:'bonus',remark:'',batchNo,
   }));
@@ -159,6 +159,27 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
     }
     return {...row,balanceAfter:money(batchBalances.get(key)??balances[row.asset]),createdAt:new Date(at).toISOString()};
   }).reverse();
+}
+
+export function demoTaskPeriods(tasks,now) {
+  const asOf=demoTeamBusinessDate(now);
+  const start=Date.parse(asOf);
+  const yesterday=new Date(start-day).toISOString().slice(0,10);
+  const weekStart=new Date(start-((new Date(start).getUTCDay()+6)%7)*day).toISOString().slice(0,10);
+  const dates=tasks.map(task=>({task,date:demoTeamBusinessDate(task.completedAt)}));
+  const periods={today:[],week:[],month:[],all:[],yesterday:[]};
+  for(const {task,date} of dates){
+    periods.all.push(task);
+    if(date>=weekStart)periods.week.push(task);
+    if(date.startsWith(asOf.slice(0,7)))periods.month.push(task);
+    if(date===asOf)periods.today.push(task);
+    if(date===yesterday)periods.yesterday.push(task);
+  }
+  const totals=rows=>({usdt:money(rows.reduce((sum,task)=>sum+task.amount,0)),
+    nex:money(rows.reduce((sum,task)=>sum+(task.nex??0),0)),jobCount:rows.length});
+  const {yesterday:previous,...views}=Object.fromEntries(Object.entries(periods).map(([name,rows])=>[name,totals(rows)]));
+  const delta=money(views.today.usdt-previous.usdt);
+  return {...views,todayVsYesterdayUsdt:delta,todayVsYesterdayPct:previous.usdt?money(delta/previous.usdt*100):0};
 }
 
 export function demoWalletBillSummary(bills,now) {
