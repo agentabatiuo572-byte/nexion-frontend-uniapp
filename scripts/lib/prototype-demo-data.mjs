@@ -17,7 +17,7 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
-import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
+import { demoBinaryLegMembers, demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
 import { demoCommissionEvents, demoReferralLedger, demoHasOpeningMilestone, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
@@ -30,7 +30,8 @@ const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(st
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
 const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||state.milestoneClaims?.includes(id)
-  ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id);
+  ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
+  ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -479,9 +480,12 @@ export function demoFixture(url,locale,state,request) {
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   const fleetDevices=()=>demoFleetFacts(url,locale,state).devices;
-  const computeMode=(state.computeState??'app')!=='app';
-  const computeFacts=()=>demoComputeFacts(state,now,fleetDevices);
-  if(computeMode){const compute=computeDemo(url,locale,state,request,fleetDevices);if(compute!==undefined)return compute;}
+  // Reconcile due cycles before any fixture response can read or change the wallet.
+  const computeFacts=(state.computeState??'app')==='app'?null:demoComputeFacts(state,now,fleetDevices);
+  if(computeFacts){
+    const compute=computeDemo(url,locale,state,request,now,computeFacts);
+    if(compute!==undefined)return compute;
+  }
   // USER_ONBOARDING_REQUIRED is the backend's shared write gate (HTTP 428, code 428).
   if(state.setupGateState==='setup-required'&&request.method()==='POST'&&(pathname==='/api/trial/start'||pathname.startsWith('/api/growth/day-one/page-observations/')||/^\/api\/content\/learning\/courses\/[^/]+\/start$/.test(pathname)))throw Object.assign(new Error('USER_ONBOARDING_REQUIRED'),{status:428});
   if(pathname.startsWith('/api/growth/day-one/page-observations/'))return {accepted:true,recorded:true};
@@ -514,6 +518,7 @@ export function demoFixture(url,locale,state,request) {
     if(!alreadyActive){
       if(clientMaxDevices>fleet.slotCap||fleet.slotsUsed>=fleet.slotCap)refuse('DEVICE_SLOT_CAP_EXCEEDED');
       (state.deviceActivations??={})[deviceId]={status:'ACTIVE',activatedAt:now,rowVersion:expectedVersion+1,runtimeStatus:'ONLINE'};
+      if(computeFacts)(state.computeCycleStarts??={})[deviceId]=now;
       if(state.stoppedDevices)state.stoppedDevices=state.stoppedDevices.filter(id=>id!==deviceId);
     }
     const receipt={deviceId,instanceNo:device.instanceNo,status:alreadyActive?device.status:'ACTIVE',
@@ -566,7 +571,7 @@ export function demoFixture(url,locale,state,request) {
   const account=accountDemo(url,locale,state,request);if(account!==undefined)return account;
   const bank=bankDemo(url,state,request);if(bank!==undefined)return bank;
   const risk=riskDemo(url,locale,state,request);if(risk!==undefined)return risk;
-  const settledTasks=()=>computeMode?computeFacts().postedTasks:demoSettledTasks(state,state.previewFactsAt);
+  const settledTasks=()=>computeFacts?.postedTasks??demoSettledTasks(state,state.previewFactsAt);
   if(pathname==='/api/app/home/overview') {
     const overview=structuredClone(base());
     const tasks=settledTasks();
@@ -610,7 +615,6 @@ export function demoFixture(url,locale,state,request) {
   const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
-  if(computeMode&&['/api/devices/earnings','/api/earnings/release-status'].includes(pathname))computeFacts();
   const secondary=secondaryDemo(url,state,request);
   if(secondary!==undefined){
     if(pathname==='/api/earnings/release-status')secondary.assets.UVT.withdrawable=demoWalletNex(state,now);
@@ -625,7 +629,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/team/rank') {
     const data=structuredClone(base());
     const {rank}=demoH4Account(state);
-    const members=demoTeamNetworkMembers(state,now);
+    const members=demoH4TeamMembers(state,now).filter(member=>member.layer<=7);
     const direct=members.filter(member=>member.layer===1);
     const directRefs=direct.filter(member=>member.lifetimeComputePoints>=demoV1SelfComputePoints).length;
     const vDownlineCounts={};
@@ -637,7 +641,8 @@ export function demoFixture(url,locale,state,request) {
     return {...data,rankCode:'V'+rank,progress:{...data.progress,directRefs,vDownlineCounts,selfComputePoints,teamComputePoints}};
   }
   if(pathname==='/api/team/binary'){
-    const members=demoTeamNetworkMembers(state,now,{withOrders:true});
+    const members=demoH4TeamMembers(state,now);
+    const legs=demoBinaryLegMembers(members);
     const direct=members.filter(member=>member.layer===1);
     const trackAMembers=direct.filter(member=>member.leg==='A').length;
     const trackBMembers=direct.filter(member=>member.leg==='B').length;
@@ -645,7 +650,7 @@ export function demoFixture(url,locale,state,request) {
     const monthEnd=new Date(Date.UTC(Number(asOfDate.slice(0,4)),Number(asOfDate.slice(5,7)),0)).getUTCDate();
     const matches=demoCommissionEvents(state,state.previewFactsAt).filter(event=>event.kind==='binary');
     const consumed=matches.reduce((total,match)=>total+match.orderAmountUSD,0);
-    const volume=leg=>Math.max(0,members.filter(member=>member.leg===leg).flatMap(member=>member.paidOrders)
+    const volume=leg=>Math.max(0,legs[leg].flatMap(member=>member.paidOrders)
       .filter(order=>order.paidAt<=now).reduce((sum,order)=>sum+order.amountUsdt,0)-consumed);
     const trackA=volume('A'),trackB=volume('B'),threshold=1000,matchRate=.1,dailyCap=5000;
     const periodCap=dailyCap*monthEnd;
@@ -653,7 +658,8 @@ export function demoFixture(url,locale,state,request) {
     if(trackAMembers+trackBMembers!==direct.length||!trackAMembers||!trackBMembers)blockedReason='BINARY_LEG_ASSIGNMENT_INCOMPLETE';
     else if(Math.min(trackA,trackB)<threshold)blockedReason='BINARY_THRESHOLD_NOT_MET';
     else if(Number(asOfDate.slice(8))!==monthEnd)blockedReason='F3_SETTLEMENT_NOT_DUE';
-    return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,autoPlacedMembers:0,
+    return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,
+      trackATotalMembers:legs.A.length,trackBTotalMembers:legs.B.length,autoPlacedMembers:0,
       matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:blockedReason?0:Number(Math.min(periodCap,Math.min(trackA,trackB)*matchRate).toFixed(6)),
       settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
       recentMatches:matches

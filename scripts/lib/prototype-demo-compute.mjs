@@ -3,6 +3,7 @@ import { demoHasEarningsHistory, postDemoWalletEntries } from './prototype-demo-
 
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
 const cycleMs = 60000;
+const maxBatchItems = 200;
 export function demoComputeFacts(state,now,fleetDevices) {
   const mode=state.computeState,simulated=mode==='cycles',pending=['pending','blocked'].includes(mode);
   if(!demoHasEarningsHistory(state))return {snapshots:{},devices:[],pending,postedTasks:[]};
@@ -26,12 +27,13 @@ export function demoComputeFacts(state,now,fleetDevices) {
         amount:device.monthlyTargetActive?(device.dailyUsdt*60/86400).toFixed(6)
           :({CLOUD:'0.000032',PHONE:'0.100000',MOBILE:'0.200000'}[device.deviceType]??'0.023456')};
     }
+    if(device.activatedAt===null)continue;
     const snapshot=snapshots[device.id];
     // Opening snapshots may be from a previous preview. Keep their completed
     // rewards and resume from the import time if the open cycle already expired.
     const resumedAt=state.computeResumeAt;
     const initial=snapshot.startedAt+cycleMs<=resumedAt?resumedAt:snapshot.startedAt;
-    starts[device.id]??=Math.max(initial,device.activatedAt??initial);
+    starts[device.id]??=Math.max(initial,device.activatedAt);
   }
 
   const due=[];
@@ -41,8 +43,8 @@ export function demoComputeFacts(state,now,fleetDevices) {
       const snapshot=snapshots[device.id];
       while(starts[device.id]+cycleMs<=now){
         const startedAt=starts[device.id],identity=`${device.id}-${startedAt}`;
-        due.push(describe(snapshot,startedAt,now,`DEMO-TASK-${identity}`,`DEMO-RECEIPT-${identity}`,
-          simulated?null:`DEMO-BATCH-${now}`,true));
+        const task=describe(snapshot,startedAt,now,`DEMO-TASK-${identity}`,`DEMO-RECEIPT-${identity}`,null,true);
+        due.push({...task,queuedAt:Math.max(device.activatedAt,startedAt-1000)});
         starts[device.id]+=cycleMs;
       }
     }
@@ -52,8 +54,12 @@ export function demoComputeFacts(state,now,fleetDevices) {
     amount:task.amount,at:task.postedAt,category:'bonus',batchNo:task.batchNo,detail:task});
   if(simulated){
     for(const task of due)postDemoWalletEntries(state,entry(task));
-  }else if(due.length){
-    postDemoWalletEntries(state,...due.map(entry));
+  }else{
+    for(let offset=0;offset<due.length;offset+=maxBatchItems){
+      const batchNo=`DEMO-BATCH-${now}-${offset/maxBatchItems+1}`;
+      const batch=due.slice(offset,offset+maxBatchItems).map(task=>entry({...task,batchNo}));
+      postDemoWalletEntries(state,...batch);
+    }
   }
 
   const opening=Object.values(snapshots).filter(snapshot=>!snapshot.deliveryCycle||snapshot.postedAt!=null).map(snapshot=>{
@@ -64,18 +70,19 @@ export function demoComputeFacts(state,now,fleetDevices) {
   });
   const posted=(state.walletMovements??[]).filter(row=>row.bizType==='COMPUTE_TASK_REWARD').map(row=>row.detail);
   const postedTasks=pending?[]:[...opening,...posted].sort((a,b)=>b.completedAt-a.completedAt);
-  const displaySnapshots=Object.fromEntries(Object.entries(snapshots).map(([id,snapshot])=>[id,{...snapshot,startedAt:starts[id]??snapshot.startedAt}]));
+  const displaySnapshots=Object.fromEntries(Object.entries(snapshots).map(([id,snapshot])=>[id,{...snapshot,startedAt:starts[id]??snapshot.startedAt,
+    liveActivatedAt:state.deviceActivations?.[id]?.activatedAt??snapshot.device.activatedAt}]));
   return {snapshots:displaySnapshots,devices:fleet.map(device=>device.id),pending,postedTasks};
 }
 
-export function computeDemo(url, locale, state, request, fleetDevices) {
+export function computeDemo(url, locale, state, request, now, facts) {
   const path = url.pathname;
   if (!path.startsWith('/api/tasks/')) return undefined;
-  const now = Date.now(), mode = state.computeState || 'cycles';
+  const mode = state.computeState || 'cycles';
   const simulated = mode === 'cycles', version = simulated ? 3 : 2;
   const text = (zh, en, vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
   const names = [text('图像生成周期', 'Image generation cycle', 'Chu kỳ tạo ảnh'), text('Cloud Share 收益周期', 'Cloud Share reward cycle', 'Chu kỳ thu nhập Cloud Share')];
-  const { snapshots, devices, pending, postedTasks } = demoComputeFacts(state, now, fleetDevices);
+  const { snapshots, devices, pending, postedTasks } = facts;
   const byId = new Map(Object.values(snapshots).map(snapshot=>[snapshot.device.id,snapshot.device]));
   const deviceType=id=>byId.get(id).deviceType;
   const deviceName=id=>byId.get(id).name;
@@ -92,7 +99,7 @@ export function computeDemo(url, locale, state, request, fleetDevices) {
     return { ...proof, ...execution, protocolVersion: version, taskNo:posted?.taskNo??`DEMO-TASK-${deviceId}-${start}`, deviceId,
       taskId: cloud ? 'cloud-cycle' : 'image-gen', taskName: ['PHONE','MOBILE'].includes(deviceType(deviceId))?`${deviceType(deviceId)} ${text('任务周期','task cycle','chu kỳ tác vụ')}`:names[index], taskClass: 'IG', model: simulated ? '' : cloud ? 'Cloud reward' : 'SDXL', client: 'UVEL', status,
       rewardUsdt: Number(amount(deviceId)), ...(simulated ? { rewardAsset: 'USDT', rewardAmount: amount(deviceId) } : {}),
-      requiredSeconds: 60, queuedAt: snapshot.deliveryCycle?Math.max(snapshot.device.activatedAt,start-1000):start-1000, startedAt: status === 'QUEUED' ? null : start, completableAt: ['QUEUED', 'RECOVERING'].includes(status) ? null : start + 60000,
+      requiredSeconds: 60, queuedAt: posted?.queuedAt??Math.max(history?snapshot.device.activatedAt:snapshot.liveActivatedAt,start-1000), startedAt: status === 'QUEUED' ? null : start, completableAt: ['QUEUED', 'RECOVERING'].includes(status) ? null : start + 60000,
       completedAt: history ? start + 60000 : null, actualDurationSec: status === 'QUEUED' ? null : history ? 60 : 30,
       receiptNo: posted?.receiptNo??null,
       settlementStatus: history ? mode === 'pending' ? 'PENDING' : mode === 'blocked' ? 'BLOCKED' : 'POSTED' : 'NONE',
@@ -137,7 +144,9 @@ export function computeDemo(url, locale, state, request, fleetDevices) {
     const { deviceId, expectedVersion } = request.postDataJSON();
     // expectedVersion is optional (decision 3: the App omits it); a stated version must still match.
     if (!devices.includes(deviceId) || (expectedVersion!=null&&expectedVersion!==(state.deviceActivations?.[deviceId]?.rowVersion??snapshots[deviceId].device.rowVersion))) throw Object.assign(new Error('DEVICE_VERSION_CONFLICT'), { status: 409 });
-    state.stoppedDevices ??= []; state.stoppedDevices.push(deviceId);
+    if(!state.stoppedDevices?.includes(deviceId))(state.stoppedDevices??=[]).push(deviceId);
+    // The shared request entry reconciled all work due through this cutoff.
+    delete state.computeCycleStarts[deviceId];
     return { deviceId, simulationState: 'STOPPED' };
   }
   return undefined;
