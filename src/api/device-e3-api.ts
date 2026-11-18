@@ -334,20 +334,27 @@ function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
       || entry.capacitySubsidyRemainingDays !== canonicalRemainingDays
       || entry.capacitySubsidized !== hasLiveDeadline;
   })) return invalid();
+  const slotsUsed = source.slotsUsed === undefined ? undefined : integer(source.slotsUsed);
+  const reservedSlotCount = source.reservedSlotCount === undefined ? undefined : integer(source.reservedSlotCount);
+  const trialSlotCount = source.trialSlotCount === undefined ? undefined : integer(source.trialSlotCount);
+  const realizedTodayUsdt = number(source.realizedTodayUsdt);
+  const realizedTodayNex = number(source.realizedTodayNex);
+  if (devices.length === 0 && (realizedTodayUsdt !== 0 || realizedTodayNex !== 0
+    || (slotsUsed !== undefined && slotsUsed !== (reservedSlotCount ?? 0) + (trialSlotCount ?? 0)))) return invalid();
   return {
     dailyUsdt: number(source.dailyUsdt),
     dailyNex: number(source.dailyNex),
-    realizedTodayUsdt: number(source.realizedTodayUsdt),
-    realizedTodayNex: number(source.realizedTodayNex),
+    realizedTodayUsdt,
+    realizedTodayNex,
     walletUsdt: number(source.walletUsdt),
     walletNex: number(source.walletNex),
     userJoinedAt: integer(source.userJoinedAt),
     serverNow,
     timezone: string(source.timezone),
     slotCap: integer(source.slotCap, 1),
-    slotsUsed: source.slotsUsed === undefined ? undefined : integer(source.slotsUsed),
-    reservedSlotCount: source.reservedSlotCount === undefined ? undefined : integer(source.reservedSlotCount),
-    trialSlotCount: source.trialSlotCount === undefined ? undefined : integer(source.trialSlotCount),
+    slotsUsed,
+    reservedSlotCount,
+    trialSlotCount,
     devices,
     capacitySchedule: stringMap(source.capacitySchedule),
     source: string(source.source),

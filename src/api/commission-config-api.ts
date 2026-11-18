@@ -226,6 +226,11 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
       unlockAt,
     };
   });
+  const [trackATotalMembers, trackBTotalMembers] = [source.trackATotalMembers, source.trackBTotalMembers].map((total) => {
+    if (total === undefined) return undefined;
+    if (typeof total === "string" && !/^\d+$/.test(total.trim())) return invalid();
+    return integer(total);
+  });
   return {
     source: text(source.source),
     serverCanonical: true,
@@ -236,8 +241,8 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
     trackB,
     trackAMembers: integer(source.trackAMembers),
     trackBMembers: integer(source.trackBMembers),
-    trackATotalMembers: source.trackATotalMembers === undefined ? undefined : integer(source.trackATotalMembers),
-    trackBTotalMembers: source.trackBTotalMembers === undefined ? undefined : integer(source.trackBTotalMembers),
+    trackATotalMembers,
+    trackBTotalMembers,
     autoPlacedMembers: integer(source.autoPlacedMembers),
     matchRate,
     threshold,
