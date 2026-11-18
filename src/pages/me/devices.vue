@@ -73,13 +73,13 @@
              「去商店」主按钮常驻底部固定栏,这里不再给第二个同义 CTA。 -->
         <EmptyState v-if="inventoryEmpty" kind="no-owned-asset" compact :title="t.empty.devicesTitle" :desc="t.empty.devicesDesc" />
         <!-- Trial and activated devices share one list; the count describes rows, not capacity. -->
-        <view v-if="activeDevices.length > 0 || trialPresentation.active.value" class="device-inventory-section" data-inventory-section="devices">
+        <view v-if="activeDevices.length > 0 || trialListed" class="device-inventory-section" data-inventory-section="devices">
           <view class="device-inventory-section__head">
             <text class="device-inventory-section__title">{{ t.myDevices.inventorySectionDevices }}</text>
-            <text class="device-inventory-section__count">{{ activeDevices.length + (trialPresentation.active.value ? 1 : 0) }}</text>
+            <text class="device-inventory-section__count">{{ activeDevices.length + (trialListed ? 1 : 0) }}</text>
           </view>
           <view class="device-inventory-list">
-            <TrialDeviceRow v-if="trialPresentation.active.value" id="device-card-trial" key="trial:current" variant="inventory" show-cancel :cancel-busy="cancelTrialBusy" @cancel="handleCancelTrial" />
+            <TrialDeviceRow v-if="trialListed" id="device-card-trial" key="trial:current" variant="inventory" show-cancel :cancel-busy="cancelTrialBusy" @cancel="handleCancelTrial" />
             <DeviceInventoryRow
               v-for="d in activeDevices"
               :key="d.id"
@@ -259,9 +259,13 @@ useAutoRecovery({
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
 const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
+// The separately cached trial is listed unless this account's confirmed fleet says no trial holds a slot.
+// Older fleets without trialSlotCount keep the trial read as the only source.
+const trialListed = computed(() => trialPresentation.active.value
+  && !(remoteApiEnabled && app.remoteFleetHasSnapshot && app.remoteSlotUsage?.trialSlotCount === 0));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0
   && inactiveDevices.value.length === 0
-  && unconfirmedDevices.value.length === 0 && !trialPresentation.active.value);
+  && unconfirmedDevices.value.length === 0 && !trialListed.value);
 const phoneNeedsActivation = computed(() => {
   const phones = app.visibleDevices.filter((device) => device.kind === "phone");
   if (phones.some(requiresActivationConfirmation)) return true;
@@ -293,13 +297,13 @@ type Bay = { key: string; kind: "device" | "trial" | "reserved" | "empty" | "loa
 const deviceOnline = (d: Device) => deviceOnlineState(d, Date.now(), !remoteApiEnabled || app.remoteFleetStatus === "ready" || app.remoteFleetStatus === "loading") === "online";
 // With a known count the tag counts the drawn bays, so it matches the grid.
 const onlineCount = computed(() => slotsUsed.value === null
-  ? activeDevices.value.filter(deviceOnline).length + (trialPresentation.active.value && trial.status === "active" ? 1 : 0)
+  ? activeDevices.value.filter(deviceOnline).length + (trialListed.value && trial.status === "active" ? 1 : 0)
   : bays.value.filter((bay) => bay.online).length);
 const bays = computed<Bay[]>(() => {
   const blank = (kind: Bay["kind"], i: number): Bay => ({ key: `${kind}:${i}`, kind, name: "", online: false, label: "", target: "" });
   if (slotsUsed.value === null) return Array.from({ length: app.slotCap }, (_, i) => blank("loading", i));
   let list: Bay[] = [];
-  if (trialPresentation.active.value) {
+  if (trialListed.value) {
     const name = trialPresentation.deviceName.value || "—";
     const online = trial.status === "active";
     list.push({ key: "trial", kind: "trial", image: getProductMedia(trialPresentation.productId.value)?.src, name, online,
@@ -310,10 +314,11 @@ const bays = computed<Bay[]>(() => {
     list.push({ key: d.id, kind: "device", device: d, name, online, label: online ? `${name} · ${t.value.earn.online}` : name, target: d.id });
   }
   // The fleet's count decides exactly how many bays are free, in both directions (as in use-fleet-slots).
-  // More drawn items than used slots means a stale snapshot: the separately read trial goes first.
+  // Its order reservations are kept first; more drawn items than the rest means a stale snapshot,
+  // and the separately read trial goes first.
   const used = Math.min(slotsUsed.value, app.slotCap);
-  if (list.length > used) list = list.filter((bay) => bay.kind !== "trial").slice(0, used);
-  const reserved = Math.min(app.remoteSlotUsage?.reservedSlotCount ?? 0, used - list.length);
+  const reserved = Math.min(app.remoteSlotUsage?.reservedSlotCount ?? 0, used);
+  if (list.length > used - reserved) list = list.filter((bay) => bay.kind !== "trial").slice(0, used - reserved);
   for (let i = 0; i < reserved; i++) list.push(blank("reserved", i));
   // Occupied but not yet classified (e.g. the trial read is pending): a placeholder, never a clickable empty slot.
   while (list.length < used) list.push(blank("loading", list.length));
