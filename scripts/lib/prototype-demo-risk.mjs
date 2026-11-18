@@ -12,25 +12,22 @@ export function riskDemo(url, locale, state, request) {
   const base = auxiliaryDemo(new URL(currentPath, url.origin), locale, state, { method: () => 'GET' });
   state.riskDemo ??= { accepted: state.riskState !== 'unread' };
   const sample = state.riskDemo;
-  const tokens = sample.tokens ??= {};
   if (url.pathname === acknowledgmentPath && request.method() === 'POST') {
     const body = request.postDataJSON() || {};
-    const reading = tokens[body.acknowledgmentToken];
+    const reading = sample.reading;
     if (body.confirmed !== true || body.jurisdiction !== base.jurisdiction || body.version !== base.version
-      || !reading || reading.jurisdiction !== base.jurisdiction || reading.version !== base.version
+      || sample.accepted || !reading || body.acknowledgmentToken !== reading.token
+      || reading.jurisdiction !== base.jurisdiction || reading.version !== base.version
       || now - reading.issuedAt < base.minimumReadingSeconds * 1000 || now - reading.issuedAt >= readTokenLifetime) {
       throw Object.assign(new Error('DEMO_READING_REQUIRED'), { status: 409 });
     }
     sample.accepted = true;
     sample.acceptedAt = new Date(now).toISOString();
-    sample.tokens = {};
+    delete sample.reading;
   }
   if (sample.accepted) return { ...base, acknowledgedAt: sample.acceptedAt || base.acknowledgedAt };
-  for (const [token, reading] of Object.entries(tokens)) {
-    if (now - reading.issuedAt >= readTokenLifetime) delete tokens[token];
-  }
   const acknowledgmentToken = randomUUID();
-  tokens[acknowledgmentToken] = { issuedAt: now, jurisdiction: base.jurisdiction, version: base.version };
+  sample.reading = { token: acknowledgmentToken, issuedAt: now, jurisdiction: base.jurisdiction, version: base.version };
   return { ...base, acknowledged: false, acknowledgedAt: null, acknowledgmentToken,
     acknowledgmentTokenExpiresAt: new Date(now + readTokenLifetime).toISOString() };
 }
