@@ -1,5 +1,7 @@
 // Shared facts for the managed activities in the loopback preview.
 const day=86400000;
+const teamCalendar=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'});
+export const demoTeamBusinessDate=at=>teamCalendar.format(at);
 const localized=(locale,zh,en,vi)=>locale==='zh'?zh:locale==='vi'?vi:en;
 const date=ms=>new Date(ms).toISOString();
 const reject=(message,status=409)=>{throw Object.assign(new Error(message),{status});};
@@ -99,17 +101,39 @@ const hasInviteSample=state=>['claimable','claimed'].includes(state.eventState)&
 export function demoH4TeamMembers(state,now) {
   if(state.dataState==='empty')return [];
   const {createdAt}=demoH4Account(state);
-  const members=['Maya','Linh','Sam','Rin','Jo','Noah','Mina','Leo'].map((name,i)=>({
-    id:String(100+i),name,avatarUrl:null,vRank:i%4,layer:i<3?1:i<6?2:3,leg:i%2?'A':'B',
-    joinedAt:date(createdAt+(i+2)*day),monthComputePoints:[160,240,320,360,440,480,560,640][i],
-    lifetimeComputePoints:[640,960,1280,1440,1760,1920,2240,2560][i],status:i===6?'OFFLINE':i===7?'IDLE':'ACTIVE',region:['SG','VN','JP'][i%3],
-  }));
+  const sampleAt=state.previewFactsAt??now;
+  const month=demoTeamBusinessDate(now).slice(0,7);
+  const members=[];
+  for(const [i,name] of ['Maya','Linh','Sam','Rin','Jo','Noah','Mina','Leo'].entries()){
+    const parent=members[[null,null,null,1,0,1,4,5][i]];
+    const joinedAt=createdAt+(i+2)*day;
+    // Both point fields come from the member's paid self-purchases. The older purchase still counts for rank.
+    const points=[160,240,320,360,440,480,560,640][i];
+    const orders=[{paidAt:joinedAt,points:3*points},{paidAt:sampleAt,points}];
+    members.push({id:String(100+i),name,avatarUrl:null,vRank:i%4,layer:parent?parent.layer+1:1,
+      sponsorUserId:parent?.id??'900001',leg:parent?.leg??(i%2?'A':'B'),joinedAt:date(joinedAt),
+      monthComputePoints:orders.filter(order=>demoTeamBusinessDate(order.paidAt).slice(0,7)===month)
+        .reduce((sum,order)=>sum+order.points,0),
+      lifetimeComputePoints:orders.reduce((sum,order)=>sum+order.points,0),
+      status:i<6?'ACTIVE':'FROZEN',region:['SG','VN','JP'][i%3]});
+  }
   if(hasInviteSample(state)){
     const {at}=scene(state,now);
     members.push(...['An','Bao','Chi','Dara','Emi'].map((name,i)=>({
-      id:String(108+i),name,avatarUrl:null,vRank:0,layer:1,leg:i%2?'A':'B',
+      id:String(108+i),name,avatarUrl:null,vRank:0,layer:1,sponsorUserId:'900001',leg:i%2?'A':'B',
       joinedAt:date(at-day+i*3600000),monthComputePoints:0,lifetimeComputePoints:0,status:'ACTIVE',region:['SG','VN','JP'][i%3],
     })));
+  }
+  return members;
+}
+
+export function demoTeamNetworkMembers(state,now) {
+  const members=[];
+  const eligibleSponsors=new Set(['900001']);
+  for(const {sponsorUserId,...member} of demoH4TeamMembers(state,now)){
+    if(member.status!=='ACTIVE'||!eligibleSponsors.has(sponsorUserId))continue;
+    members.push(member);
+    eligibleSponsors.add(member.id);
   }
   return members;
 }

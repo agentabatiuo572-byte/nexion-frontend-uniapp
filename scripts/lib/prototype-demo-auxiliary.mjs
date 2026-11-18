@@ -1,7 +1,10 @@
 // Read-only samples for auxiliary screens. Never imported by production source.
+import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
+import { demoLifetimeEarningsUsdt, demoSettledTasks } from './prototype-demo-wallet.mjs';
+
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
-export function auxiliaryDemo(url,locale,state,request) {
+export function auxiliaryDemo(url,locale,state,request,read,walletBills) {
   if(request.method()!=='GET')return undefined;
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty';
   const lang=(url.searchParams.get('locale')||url.searchParams.get('language')||locale).split('-')[0];
@@ -12,8 +15,20 @@ export function auxiliaryDemo(url,locale,state,request) {
   if(p==='/api/config/commission/rates'&&url.searchParams.get('schemaVersion')==='2')return {...proof,source:'Local prototype demo: src/store/commission.ts',serverCanonical:true,runId:null,schemaVersion:2,unilevel:[10,5,3,2,1,.5,.5].map((usdtPct,i)=>({level:'L'+(i+1),usdtPct,nexReward:[50,20,10,5,2.5,1,1][i]})),unilevelPaused:Object.fromEntries([1,2,3,4,5,6,7].map(i=>['L'+i,false])),partnerTiersJson:{standard:0,verified:5000,premium:50000,diamond:500000},influenceClampMin:1,influenceClampMax:5,coolingDays:null,promoMultiplier:1};
   const sample=text('原型演示资料，正式内容以发布版本为准。','Prototype sample. Refer to the published version for formal content.','Tài liệu nguyên mẫu. Nội dung chính thức theo phiên bản công bố.');
   if(p==='/api/app/proof') {
-    const streak=empty?0:state.saverUsed?(state.checkedIn?8:7):state.streakState==='broken'?(state.checkedIn?1:0):(state.checkedIn?3:2);
-    return {...proof,serverCanonical:true,generatedAt:iso,serverTime:iso,asOf:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(now),provenance:{source:'server',environment:'PRODUCTION',runId:'',timeZone:'Asia/Ho_Chi_Minh',streakRule:'PROTOTYPE_SAMPLE',percentileRule:'PROTOTYPE_SAMPLE'},joinedAt:'2026-01-01T00:00:00Z',activeDays:empty?0:100,onlineDevices:empty?0:2,currentStreak:streak,longestStreak:empty?0:Math.max(state.streakState==='broken'||state.saverUsed?7:5,streak),topPercentile:empty?null:7,earningsTotalUsdt:empty?0:128.5,referralCode:'UVELDEMO',referral:{invitedCount:empty?0:12,lifetimeInviterNex:empty?0:100},team:{totalMembers:empty?0:8,activeMembers:empty?0:6},availability:{status:empty?'EMPTY':'READY'}};
+    const {createdAt:joinedAt}=read('/api/app/profile');
+    const {devices}=read('/api/devices/earnings');
+    const {totalMembers,activeMembers}=read('/api/app/team/network');
+    const {streak}=read('/api/points/state');
+    const {referralCode,invitedCount,lifetimeInviterNex}=read('/api/app/referral-rewards');
+    const earningsTotalUsdt=demoLifetimeEarningsUsdt(walletBills());
+    const onlineDevices=devices.filter(device=>device.activatedAt!==null
+      &&['ONLINE','BUSY','ACTIVE','RUNNING'].includes(device.runtimeStatus??device.status)).length;
+    return {...proof,serverCanonical:true,generatedAt:iso,serverTime:iso,asOf:demoTeamBusinessDate(now),
+      provenance:{source:'server',environment:'PRODUCTION',runId:'',timeZone:'Asia/Ho_Chi_Minh',streakRule:'PROTOTYPE_SAMPLE',percentileRule:'PROTOTYPE_SAMPLE'},
+      joinedAt,activeDays:Math.max(0,Math.floor((now-Date.parse(joinedAt))/day)),onlineDevices,
+      currentStreak:streak.currentStreak,longestStreak:streak.longestStreak,topPercentile:empty?null:7,earningsTotalUsdt,
+      referralCode,referral:{invitedCount,lifetimeInviterNex},team:{totalMembers,activeMembers},
+      availability:empty?{status:'PARTIAL',percentile:'UNAVAILABLE'}:{status:'READY'}};
   }
   if(p==='/api/config/commission/direct-referral')return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',nexUsdtPrice:empty?null:.128,purchase:{enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays:7},deviceEarning:{enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,coolingDays:0}};
   if(p==='/api/app/team/insights/direct-referral') {
@@ -25,16 +40,24 @@ export function auxiliaryDemo(url,locale,state,request) {
   // Like the backend, v2 is the v1 read plus settlement fields and the unposted totals; with no devices it is 404.
   if(p==='/api/tasks/v2/assignments'&&empty)throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
   if(p==='/api/tasks/assignments'||p==='/api/tasks/v2/assignments') {
-    const v2=p.includes('/v2/'),posted=new Date(now-3000000).toISOString();
-    const task=(id,status,taskClass)=>({...proof,serverCanonical:true,...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,settlementStatus:status==='COMPLETED'?'POSTED':'NONE',settlementBatchNo:status==='COMPLETED'?'DEMO-BATCH-1':null,settledAt:status==='COMPLETED'?posted:null}),taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:text('图像生成','Image generation','Tạo hình ảnh'),taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:2.34,requiredSeconds:600,startedAt:new Date(now-(status==='RUNNING'?300000:4200000)).toISOString(),completableAt:new Date(now+(status==='RUNNING'?300000:-3600000)).toISOString(),completedAt:status==='COMPLETED'?new Date(now-3600000).toISOString():null,receiptNo:status==='COMPLETED'?'DEMO-RECEIPT-1':null,proofNonce:null,proofExpiresAt:null});
+    const v2=p.includes('/v2/'),[settlement]=demoSettledTasks(state.previewFactsAt??now);
+    const posted=new Date(settlement.postedAt).toISOString();
+    const task=(id,status,taskClass)=>({...proof,serverCanonical:true,...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,settlementStatus:status==='COMPLETED'?'POSTED':'NONE',settlementBatchNo:status==='COMPLETED'?settlement.batchNo:null,settledAt:status==='COMPLETED'?posted:null}),taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:text('图像生成','Image generation','Tạo hình ảnh'),taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:settlement.amount,requiredSeconds:600,startedAt:new Date(status==='RUNNING'?now-300000:settlement.completedAt-600000).toISOString(),completableAt:new Date(status==='RUNNING'?now+300000:settlement.completedAt).toISOString(),completedAt:status==='COMPLETED'?new Date(settlement.completedAt).toISOString():null,receiptNo:status==='COMPLETED'?settlement.receiptNo:null,proofNonce:null,proofExpiresAt:null});
     return {...proof,serverCanonical:true,serverNow:iso,devices:empty?[]:[{deviceId:41,instanceNo:'REVIEW-S1',deviceType:'GPU',lockUntil:null,currentTask:task(4,'RUNNING','IG'),recentTasks:[task(1,'COMPLETED','IG')],...(v2&&{recoveryPending:false,recoveryReason:null})}],
       ...(v2&&{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]})};
   }
   // P-62 Task Center: one posted settlement batch so the "Settlement batch" entry can be previewed.
   if(p==='/api/tasks/v2/settlements'||p==='/api/tasks/v2/settlements/DEMO-BATCH-1') {
-    const batch={batchNo:'DEMO-BATCH-1',asset:'USDT',amount:'2.340000',taskCount:1,status:'POSTED',windowStart:now-7200000,windowEnd:now-3600000,postedAt:now-3000000};
-    if(p.endsWith('/DEMO-BATCH-1'))return {...proof,serverCanonical:true,...batch,items:[{taskNo:'DEMO-TASK-1',receiptNo:'DEMO-RECEIPT-1',deviceId:41,taskType:'IG',amount:'2.340000',completedAt:now-3600000}]};
-    return {...proof,serverCanonical:true,records:empty?[]:[batch],nextCursor:null};
+    const [task]=demoSettledTasks(state.previewFactsAt??now);
+    const hasSettlement=!empty&&(!state.accountDeletionState||state.accountDeletionState==='follow');
+    const batch={batchNo:task.batchNo,asset:'USDT',amount:task.amount.toFixed(6),taskCount:1,status:'POSTED',
+      windowStart:task.completedAt-3600000,windowEnd:task.completedAt,postedAt:task.postedAt};
+    if(p.endsWith('/DEMO-BATCH-1')){
+      if(!hasSettlement)throw Object.assign(new Error('COMPUTE_V2_SETTLEMENT_NOT_FOUND'),{status:404});
+      return {...proof,serverCanonical:true,...batch,items:[{taskNo:task.taskNo,receiptNo:task.receiptNo,
+        deviceId:41,taskType:'IG',amount:batch.amount,completedAt:task.completedAt}]};
+    }
+    return {...proof,serverCanonical:true,records:hasSettlement?[batch]:[],nextCursor:null};
   }
   if(p==='/api/app/support/faqs'||p==='/api/app/support/faqs/page') {
     const surface=(url.searchParams.get('surface')??'Help Center').trim().toLowerCase();

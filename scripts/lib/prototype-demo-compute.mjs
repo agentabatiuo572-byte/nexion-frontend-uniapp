@@ -1,12 +1,6 @@
 // Loopback-only task-cycle, v2 and receipt scenarios. Never imported by src.
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
-export function computeDemo(url, locale, state, request, fleetDevices) {
-  const path = url.pathname;
-  if (!path.startsWith('/api/tasks/')) return undefined;
-  const now = Date.now(), mode = state.computeState || 'cycles';
-  const simulated = mode === 'cycles', version = simulated ? 3 : 2;
-  const text = (zh, en, vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
-  const names = [text('图像生成周期', 'Image generation cycle', 'Chu kỳ tạo ảnh'), text('Cloud Share 收益周期', 'Cloud Share reward cycle', 'Chu kỳ thu nhập Cloud Share')];
+export function demoComputeFacts(state, now, fleetDevices) {
   const anchor=state.computeAnchor??=now;
   // Tasks run on the fleet the account actually holds, as the fleet read shows it: activated devices with their own
   // ids, kinds and names (Lite phones by their PHONE/MOBILE identity), plus devices the user stopped, which keep their
@@ -21,7 +15,25 @@ export function computeDemo(url, locale, state, request, fleetDevices) {
       : ({CLOUD:'0.000032',PHONE:'0.100000',MOBILE:'0.200000'}[device.deviceType] ?? '0.023456'),
     startedAt: anchor - 30000, completedStartedAt: anchor - 600000,
   };
-  const byId = new Map(fleet.map(device => [device.id, snapshots[device.id].device])), devices = fleet.map(device => device.id);
+  const devices = fleet.map(device => device.id);
+  const pending = ['pending', 'blocked'].includes(state.computeState);
+  const postedTasks = pending ? [] : devices.map(deviceId => ({ deviceId,
+    taskNo: `DEMO-TASK-${deviceId}-DONE`, receiptNo: `DEMO-RECEIPT-${deviceId}`,
+    amount: Number(snapshots[deviceId].amount), completedAt: snapshots[deviceId].completedStartedAt+60000,
+    postedAt: anchor-60000,
+  }));
+  return { anchor, snapshots, devices, pending, postedTasks };
+}
+
+export function computeDemo(url, locale, state, request, fleetDevices) {
+  const path = url.pathname;
+  if (!path.startsWith('/api/tasks/')) return undefined;
+  const now = Date.now(), mode = state.computeState || 'cycles';
+  const simulated = mode === 'cycles', version = simulated ? 3 : 2;
+  const text = (zh, en, vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
+  const names = [text('图像生成周期', 'Image generation cycle', 'Chu kỳ tạo ảnh'), text('Cloud Share 收益周期', 'Cloud Share reward cycle', 'Chu kỳ thu nhập Cloud Share')];
+  const { anchor, snapshots, devices, pending, postedTasks } = demoComputeFacts(state, now, fleetDevices);
+  const byId = new Map(devices.map(deviceId => [deviceId, snapshots[deviceId].device]));
   const deviceType=id=>byId.get(id).deviceType;
   const deviceName=id=>byId.get(id).name;
   const instance=id=>byId.get(id).instanceNo;
@@ -38,23 +50,28 @@ export function computeDemo(url, locale, state, request, fleetDevices) {
       rewardUsdt: Number(amount(deviceId)), ...(simulated ? { rewardAsset: 'USDT', rewardAmount: amount(deviceId) } : {}),
       requiredSeconds: 60, queuedAt: start - 1000, startedAt: status === 'QUEUED' ? null : start, completableAt: ['QUEUED', 'RECOVERING'].includes(status) ? null : start + 60000,
       completedAt: history ? start + 60000 : null, actualDurationSec: status === 'QUEUED' ? null : history ? 60 : 30,
-      receiptNo: history && !['pending', 'blocked'].includes(mode) ? `DEMO-RECEIPT-${deviceId}` : null,
+      receiptNo: history && !pending ? `DEMO-RECEIPT-${deviceId}` : null,
       settlementStatus: history ? mode === 'pending' ? 'PENDING' : mode === 'blocked' ? 'BLOCKED' : 'POSTED' : 'NONE',
-      settlementBatchNo: history && !simulated && !['pending', 'blocked'].includes(mode) ? 'DEMO-BATCH-1' : null,
-      settledAt: history ? anchor - 60000 : null, configVersion: 'compute-demo-3', proofNonce: null, proofExpiresAt: null, pausedAt: null, pausedSeconds: 0 };
+      settlementBatchNo: history && !simulated && !pending ? 'DEMO-BATCH-1' : null,
+      settledAt: history && !pending ? anchor - 60000 : null, configVersion: 'compute-demo-3', proofNonce: null, proofExpiresAt: null, pausedAt: null, pausedSeconds: 0 };
   };
   const status = ({ queued: 'QUEUED', verifying: 'VERIFYING', recovering: 'RECOVERING', failed: 'FAILED', cancelled: 'CANCELLED' })[mode] || 'RUNNING';
   if (path === '/api/tasks/assignments' || path === '/api/tasks/v2/assignments') return { ...proof, protocolVersion: version, serverNow: now,
-    pendingEarned: [{ asset: 'USDT', amount: ['pending','blocked'].includes(mode) ? total : '0.000000', taskCount: ['pending','blocked'].includes(mode) ? devices.length : 0 }],
+    pendingEarned: [{ asset: 'USDT', amount: pending ? total : '0.000000', taskCount: pending ? devices.length : 0 }],
     devices: devices.map(deviceId => ({ deviceId, instanceNo: instance(deviceId), deviceType: deviceType(deviceId), lockUntil: null,
       recoveryPending: mode === 'recovering', recoveryReason: mode === 'recovering' ? 'LEGACY_COMPLETE_OUTCOME_UNKNOWN' : null,
       simulationState: state.stoppedDevices?.includes(deviceId) ? 'STOPPED' : 'RUNNING',
       currentTask: state.stoppedDevices?.includes(deviceId) || mode === 'recovering' ? null : task(deviceId, status), recentTasks: [task(deviceId, 'COMPLETED', true)] })) };
   // App 99cf4991's minute-batch fixture, extended to cover hardware and Cloud Share together.
   const batch = { batchNo: 'DEMO-BATCH-1', asset: 'USDT', amount: total, taskCount: devices.length, status: 'POSTED', windowStart: anchor - 600000, windowEnd: anchor - 540000, postedAt: anchor - 60000 };
-  if (path === '/api/tasks/v2/settlements') return { ...proof, records: devices.length ? [batch] : [], nextCursor: null };
-  if (path === '/api/tasks/v2/settlements/DEMO-BATCH-1') return { ...proof, ...batch, items: devices.map(deviceId => ({ taskNo: `DEMO-TASK-${deviceId}-DONE`, receiptNo: `DEMO-RECEIPT-${deviceId}`, deviceId, taskType: 'IG', amount: amount(deviceId), completedAt: anchor - 540000 })) };
-  const receipts = devices.map(deviceId => {
+  if (path === '/api/tasks/v2/settlements') return { ...proof, records: postedTasks.length ? [batch] : [], nextCursor: null };
+  if (path === '/api/tasks/v2/settlements/DEMO-BATCH-1') {
+    if (!postedTasks.length) throw Object.assign(new Error('COMPUTE_V2_SETTLEMENT_NOT_FOUND'), { status: 404 });
+    return { ...proof, ...batch, items: postedTasks.map(({taskNo,receiptNo,deviceId,completedAt}) => ({
+      taskNo,receiptNo,deviceId,completedAt,taskType:'IG',amount:amount(deviceId),
+    })) };
+  }
+  const receipts = postedTasks.map(({deviceId}) => {
     const done = task(deviceId, 'COMPLETED', true);
     return { ...done, settledAt: simulated?done.settledAt:done.completedAt, receiptNo: `DEMO-RECEIPT-${deviceId}`, deviceInstanceNo: instance(deviceId), deviceName: deviceName(deviceId), deviceType: deviceType(deviceId), deviceGpu: byId.get(deviceId).gpuModel, vramTotalGb: byId.get(deviceId).vramTotalGb,
       rewardNex: 0, earningStatus: 'POSTED', proofHash: simulated ? null : 'a'.repeat(64), durationSec: 60 };
