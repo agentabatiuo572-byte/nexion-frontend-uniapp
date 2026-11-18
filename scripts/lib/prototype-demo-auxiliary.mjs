@@ -1,10 +1,10 @@
 // Read-only samples for auxiliary screens. Never imported by production source.
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoLifetimeEarningsUsdt, demoSettledTasks } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoCommissionTotals, demoLifetimeEarningsUsdt, demoSettledTasks, demoTeamPeriod } from './prototype-demo-wallet.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
-export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices) {
+export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts) {
   if(request.method()!=='GET')return undefined;
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty';
   const lang=(url.searchParams.get('locale')||url.searchParams.get('language')||locale).split('-')[0];
@@ -19,7 +19,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
     const devices=fleetDevices();
     const {totalMembers,activeMembers}=read('/api/app/team/network');
     const {streak}=read('/api/points/state');
-    const {referralCode,invitedCount,lifetimeInviterNex}=read('/api/app/referral-rewards');
+    const {referralCode,invitedCount,lifetimeInviterNex}=referralFacts();
     const earningsTotalUsdt=demoLifetimeEarningsUsdt(walletBills());
     const onlineDevices=devices.filter(device=>device.activatedAt!==null
       &&['ONLINE','BUSY','ACTIVE','RUNNING'].includes(device.runtimeStatus??device.status)).length;
@@ -32,10 +32,29 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   }
   if(p==='/api/config/commission/direct-referral')return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',nexUsdtPrice:empty?null:.128,purchase:{enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays:7},deviceEarning:{enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,coolingDays:0}};
   if(p==='/api/app/team/insights/direct-referral') {
-    const kind=url.searchParams.get('kind')==='device_earning'?'direct_device_earning':'direct_purchase';
-    const events=empty||state.accountDeletionState==='clear'?[]:[{id:'DEMO-DIRECT-1',kind,sourceUserName:'Maya',sourceRef:'DEMO-ORDER-004',sourceDeviceId:kind==='direct_device_earning'?'REVIEW-S1':null,policyVersion:3,basisUsdt:100,nexUsdtPrice:.128,amountUSDT:3.5,amountNEX:11.71875,ts:now-day,unlockAt:now-day,status:'unlocked',recoveryPendingUSDT:0,recoveryPendingNEX:0}];
-    const totals={amountUSDT:events[0]?.amountUSDT??0,amountNEX:events[0]?.amountNEX??0,count:events.length},zero={amountUSDT:0,amountNEX:0,count:0};
-    return {...proof,serverCanonical:true,period:url.searchParams.get('period')||'month',page:Number(url.searchParams.get('page')||1),pageSize:Number(url.searchParams.get('pageSize')||20),totalRows:events.length,events,split:{purchase:kind==='direct_purchase'?totals:zero,deviceEarning:kind==='direct_device_earning'?totals:zero},generatedAt:iso,snapshotAt:url.searchParams.get('snapshotAt')||iso};
+    const version=Number(url.searchParams.get('schemaVersion')??1);
+    const filter=version===2?url.searchParams.get('kind')??'all':'all';
+    const period=url.searchParams.get('period')??'month';
+    const page=Number(url.searchParams.get('page')??1),pageSize=Number(url.searchParams.get('pageSize')??20);
+    if(![1,2].includes(version)||!['all','purchase','device_earning','direct_device_earning'].includes(filter)
+      ||!['today','week','month','all'].includes(period)||!Number.isInteger(page)||page<1||page>2147483647
+      ||!Number.isInteger(pageSize)||pageSize<1||pageSize>100){
+      throw Object.assign(new Error('DIRECT_REFERRAL_QUERY_INVALID'),{status:422});
+    }
+    const window=demoTeamPeriod(period,now,url.searchParams.get('snapshotAt'));
+    const all=demoCommissionEvents(state,state.previewFactsAt??now).filter(event=>
+      event.kind.startsWith('direct_')&&window.contains(event.ts));
+    const kind=filter==='purchase'?'direct_purchase':'direct_device_earning';
+    const selected=filter==='all'?all:all.filter(event=>event.kind===kind);
+    const events=selected.slice((page-1)*pageSize,page*pageSize).map(event=>({...event,settlementNo:event.id,
+      sourceDeviceId:event.sourceDeviceId??null,basisUsdt:event.orderAmountUSD,policyVersion:3,nexUsdtPrice:.128,
+      recoveryPendingUSDT:0,recoveryPendingNEX:0,
+    }));
+    return {...proof,serverCanonical:true,period,page,pageSize,totalRows:selected.length,events,
+      split:{purchase:demoCommissionTotals(selected.filter(row=>row.kind==='direct_purchase')),
+        deviceEarning:demoCommissionTotals(selected.filter(row=>row.kind==='direct_device_earning'))},
+      ...(version===2&&{schemaVersion:2,kind:filter,summary:demoCommissionTotals(selected)}),
+      generatedAt:iso,snapshotAt:window.snapshotAt};
   }
   // Like the backend, v2 is the v1 read plus settlement fields and the unposted totals; with no devices it is 404.
   if(p==='/api/tasks/v2/assignments'&&fleetDevices().length===0)throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
