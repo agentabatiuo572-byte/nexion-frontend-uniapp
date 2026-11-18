@@ -371,6 +371,7 @@ async function performLoad() {
         startState.value = "unconfirmed";
         startFailure.value = { reason: "network", kind: "network" };
       } else {
+        course.value = null;
         coursePresentation.value = null;
         error.value = cause instanceof ApiError && cause.kind === "network" ? "courseOffline" : "courseUnavailable";
       }
