@@ -230,7 +230,10 @@ const session = useSession();
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 const trial = useFreeTrial();
-onShow(() => { void trial.refreshVisible(); });
+onShow(() => {
+  void trial.refreshVisible();
+  if (remoteApiEnabled) void app.refreshRemoteFleet(undefined, { coalesce: true });
+});
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
