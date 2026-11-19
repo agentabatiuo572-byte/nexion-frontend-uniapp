@@ -38,7 +38,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const sync = () => { if (epoch !== state.scenarioEpoch) { epoch = state.scenarioEpoch; quotes.clear(); intents.clear(); } };
   // A state sample is adopted into the account's writable orders first, so its payment and delivery facts are kept
   // as delivered (paid total with fees, channel, payment number, times) instead of being regenerated on the next read.
-  function settle(orderNo, status, intent) {
+  function settle(orderNo, status, intent, hardwareQuotaUsedAt=null) {
     if (!orderNo) return null;
     let order = state.createdOrders?.find(row => row.orderNo === orderNo);
     if (!order) {
@@ -46,7 +46,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!order) return null;
       (state.createdOrders ||= []).push(order);
     }
-    if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: intent.paidAt, activatedAt: Date.now(), quotaUsedAt: Date.now()});
+    if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: intent.paidAt, activatedAt: Date.now(), inventoryUsedAt: Date.now(), hardwareQuotaUsedAt});
     else Object.assign(order, demoTimedOutOrder);
     return order;
   }
@@ -116,14 +116,15 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (!demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
       order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity})), intent.orderNo))
       return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CAPACITY_REPLACEMENT_REQUIRED'});
+    let hardwareQuotaUsedAt;
     try {
-      requireDemoPurchase(state,demoProducts(state,intent.origin),
+      hardwareQuotaUsedAt=requireDemoPurchase(state,demoProducts(state,intent.origin),
         order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),now,true);
     } catch (error) {
       if(error.status!==409&&error.status!==404)throw error;
       return Object.assign(intent,{status:'MANUAL_REVIEW',reason:error.message});
     }
-    settle(intent.orderNo, 'activated', intent);
+    settle(intent.orderNo, 'activated', intent, hardwareQuotaUsedAt);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
       ...(order?.promotionQuoteId ? order : {}),
       orderNo: intent.orderNo, paymentNo: intent.intentNo, paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', canonicalStatus: 'activated',
