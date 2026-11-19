@@ -39,7 +39,6 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
 let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void } | null = null;
-let tradeinReadOnly = false;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
 let quoteTimer: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<typeof setTimeout> | undefined;
 const releaseListeners = new Set<(accountKey: string, commandKey: string) => void>();
@@ -150,7 +149,6 @@ function waitForChoice(): Promise<PurchaseChoice | null> {
 export function prepareTradeinPaymentRecovery(accountKey: string, commandKey: string, unsubmitted: boolean): Promise<PurchaseChoice | null> | null {
   if (!state.open || state.accountKey !== accountKey || account() !== accountKey) return null;
   if (state.pending?.kind === 'TRADE_IN' && state.pending.commandKey === commandKey) {
-    tradeinReadOnly = true;
     return activeChoice?.promise ?? null;
   }
   if (unsubmitted && !state.pending && context?.tradeinKey === commandKey && !context.current()) finish(null);
@@ -162,7 +160,7 @@ export function hasTradeinPurchaseIntent(accountKey: string, commandKey: string)
 }
 
 function readPendingPayment() {
-  return state.unavailable && !tradeinReadOnly ? submitOriginal() : query();
+  return state.unavailable ? submitOriginal() : query();
 }
 // A checkout owner may defer navigation until its payment operation releases
 // the page leave guard. Cold resumes use ordinary navigation directly.
@@ -311,7 +309,7 @@ async function query() {
 async function submitOriginal() {
   const pending = state.pending;
   if (!pending || state.busy || state.concluded) return;
-  if (pending.lookupOnly) return query();
+  if (pending.intentNo || pending.lookupOnly) return query();
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false, lookup = false;
   state.busy = true; state.unavailable = false;
@@ -432,7 +430,6 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'orderNo'
   const accountKey = account();
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
   reviewedQuote = confirmedQuote = null;
-  tradeinReadOnly = false;
   Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null, policy: null, notice: '', cashier: false,
     pausedPaymentMethod: null, quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });
@@ -470,11 +467,7 @@ export function usePurchasePayment() {
     notify: (notice: PurchaseNotice) => { state.notice = notice; },
     openCashier: () => { if (state.intent?.paymentUrl && purchasePaymentTiming(state.intent, Date.now(), state.deadlineAt).canPay) state.cashier = true; },
     closeCashier: () => { state.cashier = false; paused = false; if (!state.busy) void query(); },
-    pause: () => {
-      paused = true;
-      if (state.open && state.pending?.kind === 'TRADE_IN') tradeinReadOnly = true;
-      clearTimeout(pollTimer); pollTimer = undefined;
-    },
+    pause: () => { paused = true; clearTimeout(pollTimer); pollTimer = undefined; },
     wake: () => { paused = false; if (state.open && state.pending && !state.busy && !settled(state.intent) && !state.concluded) void readPendingPayment(); },
     topup: (shortfall: number) => {
       const { orderNo, amount, deadlineAt, summary } = state;
