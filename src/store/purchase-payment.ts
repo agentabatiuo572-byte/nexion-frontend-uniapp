@@ -54,6 +54,13 @@ function save(pending: PendingExternal, accountKey = state.accountKey) {
   if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: pending } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
   state.revision++;
 }
+/** Records the server's expiry of the original trade-in payment without reopening it. */
+export function markTradeinPurchaseExpired(accountKey: string, commandKey: string) {
+  const pending = rows(accountKey).records[commandKey];
+  if (pending?.kind === 'TRADE_IN' && pending.lastStatus !== 'EXPIRED') {
+    save({ ...pending, lastStatus: 'EXPIRED' }, accountKey);
+  }
+}
 function retire(pending: PendingExternal, accountKey: string) {
   const records = { ...rows(accountKey).records }; delete records[pending.commandKey];
   if (!writeAccountRow(TABLE, accountKey, { records })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');

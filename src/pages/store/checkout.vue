@@ -325,6 +325,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
+import { markTradeinPurchaseExpired } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -2008,7 +2009,10 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
     if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
     const result = await readPaymentCommand(apiClient, 'trade-in', key);
     if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
-    if (result.status === 'REJECTED') return null;
+    if (result.status === 'REJECTED') {
+      if (result.message === 'PURCHASE_PAYMENT_EXPIRED') markTradeinPurchaseExpired(submissionScope.accountKey, key);
+      return null;
+    }
     if (result.status === 'SUCCEEDED') recoveredResult = parseCanonicalTradeinResult(result.receipt);
     else if (result.status === 'NOT_SEEN' && result.canResumeSameKey) remoteTradeinRecoveryError.value = false;
     else throw new Error('PAYMENT_RESULT_UNRESOLVED');
@@ -2126,14 +2130,10 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
     if (!result) {
       if (!isCurrentCheckoutRoute(scope)) return true;
       finishCheckoutTradein(scope.accountKey, recovery);
-      remoteTradeinRecoveryRequired.value = false;
-      remoteTradeinRecoveryError.value = false;
-      step.value = "select-payment";
       if (tradein.appliedTradein?.canonicalQuote?.sourceDeviceId === recovery.tradeinQuote.sourceDeviceId
           && tradein.appliedTradein.canonicalQuote.sourceRowVersion === recovery.tradeinQuote.sourceRowVersion) tradein.clearApplied();
       toast.warn(purchaseRecoveryCopy(locale.code).rejected);
-      await retryCheckoutCapacity();
-      return true;
+      throw new Error('PAYMENT_CANCELLED');
     }
     if (navigate && isCurrentCheckoutRoute(scope)) {
       const navigated = await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(result.orderNo)}`);
