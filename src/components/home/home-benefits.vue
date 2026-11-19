@@ -19,7 +19,7 @@
         </view>
         <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="status" role="button" :tabindex="trialOfferEnabled ? 0 : -1" :aria-disabled="trialOfferEnabled ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
           <template v-if="offerCount === 2">
-            <view class="hb-half__top"><image class="hb-half__art" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
+            <view class="hb-half__top"><image class="hb-half__art hb-half__art--device" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
             <view class="hb-rule" aria-hidden="true" />
             <view class="hb-half__foot">
@@ -29,9 +29,11 @@
             </view>
           </template>
           <template v-else>
-            <image class="hb-wt__art" :src="trialArt" mode="aspectFit" aria-hidden="true" />
+            <view class="hb-wt__media">
+              <image class="hb-wt__art" :src="trialArt" mode="aspectFit" aria-hidden="true" />
+              <text class="hb-tag hb-wt__tag">{{ fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
+            </view>
             <view class="hb-wt__txt">
-              <text class="hb-tag">{{ fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
               <text class="hb-amount hb-wt__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text>
               <text class="hb-sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text>
               <view class="hb-wt__row">
@@ -250,6 +252,8 @@ function retryEligibility() {
 .hb-half { display:flex;flex-direction:column;min-height:208px; }
 .hb-half__top { height:76px;padding:8px 0 0 6px;box-sizing:border-box; }
 .hb-half__art { display:block;width:84px;height:84px;margin-top:-6px; }
+/* Device art from the pedestal set carries wide transparent margins for tier framing, so it renders at 1.5× its slot to keep the device the size the board draws. */
+.hb-half__art--device { width:126px;height:126px;margin:-30px 0 0 -21px; }
 .hb-half__main { flex:1;padding:4px 14px 12px; }
 .hb-half__amount { font-size:32px;line-height:38px; }
 .hb-half__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
@@ -273,9 +277,11 @@ function retryEligibility() {
 
 /* Full-width trial offer */
 .hb-wt { display:flex;align-items:center;gap:6px;min-height:136px;padding:8px 12px 8px 4px; }
-.hb-wt__art { flex:none;width:124px;height:124px; }
+.hb-wt__media { position:relative;flex:none;width:124px;height:124px; }
+.hb-wt__art { display:block;width:186px;height:186px;margin:-31px; }
+.hb-wt__tag { position:absolute;top:2px;left:8px; }
 .hb-wt__txt { flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start; }
-.hb-wt__amount { margin-top:8px;font-size:28px;line-height:34px; }
+.hb-wt__amount { font-size:28px;line-height:34px; }
 .hb-wt__row { display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:6px; }
 
 /* Claimed (pending) cards */
@@ -308,6 +314,7 @@ function retryEligibility() {
 @media (max-width:350px) {
   .hb-half__top { height:66px;padding:6px 0 0 4px; }
   .hb-half__art { width:72px;height:72px; }
+  .hb-half__art--device { width:108px;height:108px;margin:-26px 0 0 -18px; }
   .hb-half__main,.hb-half__foot { padding-left:12px; }
   .hb-half__foot { gap:4px;padding-right:8px; }
   .hb-half__foot .hb-pill { padding-inline:11px; }
