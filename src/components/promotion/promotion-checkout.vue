@@ -137,7 +137,7 @@ import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { PromotionItem } from '@/api/promotion-api';
 import { validatePromotionItems } from '@/api/promotion-api';
-import type { LocalizedText,RewardDisclosure,Quote } from '@/api/promotion-contracts';
+import type { RewardDisclosure,Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
@@ -283,7 +283,7 @@ async function changeQuantity(productNo:string,delta:-1|1,event?:KeyboardEvent):
   selection.value=next;
   await loadQuote();
 }
-function disclosure(r:ExpectedReward):RewardDisclosure|null {const d=r.disclosure;return d&&[d.title,d.terms,d.refundTerms,d.benefitDescription].every(x=>x&&['zh','en','vi'].every(l=>typeof x[l as keyof LocalizedText]==='string'&&x[l as keyof LocalizedText].trim()))?d:null;}
+function disclosure(r:ExpectedReward):RewardDisclosure|null {const d=r.disclosure;return d&&[d.title,d.terms,d.refundTerms,d.benefitDescription].every(x=>x&&(['zh','en','vi'] as const).every(l=>typeof x[l]==='string'&&x[l].trim()))?d:null;}
 const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is RewardDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
 const hasRewardTerms=computed(()=>auth.isAuthenticated&&!loading.value&&disclosures.value.length>0);
 // The compact gift row is only for a simple, eligible buyer gift before order

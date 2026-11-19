@@ -196,8 +196,19 @@
           </view>
         </view></NxSheet>
     <NxSheet :open="deletionSheetOpen" :title="t.security.deleteAccount" @close="closeDeletionSheet" class="security-half-sheet"><view class="security-sheet-form"><text class="security-sheet-note">{{ t.security.deleteAccountHint }}</text><template v-if="remoteApiEnabled && !deletionPending">
+          <!-- Optional reason before the password. A retry after an unknown result resends the submitted reason, so it shows read-only. -->
+          <view v-if="deletionSubmittedReason !== null" class="security-reason-sent" role="group" :aria-label="t.security.deletionReasonSubmitted">
+            <view class="security-reason-head"><text class="security-reason-label">{{ t.security.deletionReasonSubmitted }}</text><svg class="security-reason-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg></view>
+            <text class="security-reason-sent__text" :class="{ 'security-reason-sent__text--empty': !deletionSubmittedReason.trim() }">{{ deletionSubmittedReason.trim() || t.security.deletionReasonNone }}</text>
+            <text class="security-reason-hint">{{ t.security.deletionReasonLocked }}</text>
+          </view>
+          <view v-else class="security-reason-field">
+            <view class="security-reason-head"><text class="security-reason-label">{{ t.security.deletionReasonLabel }}</text><text id="security-deletion-reason-count" class="security-reason-count" :class="{ 'security-reason-count--over': !deletionReasonValidation.ok }">{{ deletionReason.length }}/{{ ACCOUNT_DELETION_REASON_MAX_LENGTH }}</text></view>
+            <textarea class="security-reason-input" :value="deletionReason" :placeholder="t.security.deletionReasonPlaceholder" placeholder-class="security-reason-ph" :aria-label="t.security.deletionReasonLabel" :aria-invalid="deletionReasonValidation.ok ? 'false' : 'true'" :aria-describedby="deletionReasonValidation.ok ? 'security-deletion-reason-count' : 'security-deletion-reason-error'" :maxlength="-1" :disabled="securityBusy" @input="deletionReason = detailVal($event)" />
+            <text v-if="!deletionReasonValidation.ok" id="security-deletion-reason-error" class="block" :style="errStyle" role="alert">{{ fmt(t.security.deletionReasonTooLong, { n: ACCOUNT_DELETION_REASON_MAX_LENGTH }) }}</text>
+          </view>
           <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.deletionPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
-        </template></view><template #footer><NxButton variant="primary" :busy="securityBusy" @click="handleDeleteAccount">{{ t.security.deleteAccount }}</NxButton></template></NxSheet>
+        </template></view><template #footer><NxButton variant="primary" :busy="securityBusy" :disabled="deletionSubmittedReason === null && !deletionReasonValidation.ok" @click="handleDeleteAccount">{{ t.security.deleteAccount }}</NxButton></template></NxSheet>
     <!-- Wallet debt blocks deletion: top up is the way forward, support stays one tap away, cancel only closes. -->
     <NxNoticeDialog :open="deletionDebtOpen" :title="t.security.deleteAccount" :body="fmt(t.security.deleteAccountBlockedByDebt, { usdt: formatAmount(-app.user.usdtBalance, 'full') })"
       :primary="t.security.deleteAccountTopUp" :secondary="t.ui.cancel" @primary="leaveForDebt('/pages/me/wallet-topup')" @secondary="deletionDebtOpen = false">
@@ -243,13 +254,14 @@ import { requireAccountPhone } from "@/lib/require-account-phone";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import { deleteMockAuthAccount } from "@/api/mock-auth-api";
 import type { SecurityState } from "@/api/contracts";
-import type { AccountDeletionStatus, PhoneNumberChangePolicy, PhoneNumberChangeChallenge } from "@/api/account-api";
-import { ApiError } from "@/api/errors";
+import { ACCOUNT_DELETION_REASON_MAX_LENGTH, validateAccountDeletionReason, type AccountDeletionStatus, type PhoneNumberChangePolicy, type PhoneNumberChangeChallenge } from "@/api/account-api";
+import { ApiError, isApiRefusal } from "@/api/errors";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 import { accountErrorMessageKey } from "@/lib/account-error-message";
-import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey } from "@/store/account-scoped-storage";
+import { acquireAccountCommand, acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, type AccountCommandRow } from "@/store/account-scoped-storage";
 
 const SECURITY_COMMAND_TABLE = "nexgrid-security-command-accounts-v1";
+const DELETION_REQUEST_INTENT = "account-deletion-request";
 
 const t = useT();
 const retiredFlow = ref(false);
@@ -339,7 +351,18 @@ async function leaveForDebt(url: string) {
   if (!(await navTo(url))) toast.error(t.value.ui.navigationFailed);
 }
 const deletionPassword = ref("");
-const deletionCommandKey = ref("");
+const deletionReason = ref("");
+const deletionReasonValidation = computed(() => validateAccountDeletionReason(deletionReason.value));
+const deletionSubmittedReason = ref<string | null>(null);
+
+function syncDeletionSubmittedReason(accountKey: string) {
+  const row = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey);
+  const key = row?.commands?.[DELETION_REQUEST_INTENT];
+  deletionSubmittedReason.value = typeof key === "string" && key.trim()
+    ? row?.payloads?.[DELETION_REQUEST_INTENT] ?? ""
+    : null;
+}
+
 const remoteSecurityLoading = ref(false);
 const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
@@ -463,7 +486,8 @@ function clearSecurityAccountState(keepPresentation = false) {
   twoFactorPhoneMasked.value = "";
   twoFactorTarget.value = null;
   deletionPassword.value = "";
-  deletionCommandKey.value = "";
+  deletionReason.value = "";
+  deletionSubmittedReason.value = null;
   err.value = "";
 }
 
@@ -1044,18 +1068,19 @@ async function handleDeleteAccount() {
     if (ok) {
       if (remoteApiEnabled) {
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        const intent = "account-deletion-request";
-        deletionCommandKey.value = acquireAccountCommandKey(
-          SECURITY_COMMAND_TABLE,
-          accountKey,
-          intent,
-          "app-security:account-deletion",
-        );
+        let command: ReturnType<typeof acquireAccountCommand> | undefined;
         try {
-          const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
+          const retainedKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey, true)
+            ?.commands?.[DELETION_REQUEST_INTENT];
+          if (!retainedKey && !deletionReasonValidation.value.ok) return;
+          command = acquireAccountCommand(
+            SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, "app-security:account-deletion", deletionReason.value,
+          );
+          // An older stored key was created without a reason field.
+          const request = await accountApi.requestAccountDeletion(deletionPassword.value, command.key, command.payload);
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-          releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, deletionCommandKey.value);
-          deletionCommandKey.value = "";
+          releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, command.key);
+          syncDeletionSubmittedReason(accountKey);
           if (request.status === "CANCELLED") {
             deletionStatus.value = request;
             toast.info(t.value.security.deleteAccountCancelledReplay);
@@ -1080,7 +1105,12 @@ async function handleDeleteAccount() {
           if (sessionVault.read()) return; // A newer login won the logout CAS.
         } catch (cause) {
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+          if (command && !command.reused && (isApiRefusal(cause, 401, "CURRENT_PASSWORD_INVALID")
+            || isApiRefusal(cause, 429, "USER_SECURITY_VERIFICATION_RATE_LIMITED"))) {
+            releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, command.key);
+          }
+          if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+          syncDeletionSubmittedReason(accountKey);
           toast.error(securityErrorMessage(cause));
           return;
         }
@@ -1140,10 +1170,10 @@ async function handleCancelAccountDeletion() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (deletionStatus.value.status !== "CANCELLED") throw new Error("SECURITY_READBACK_FAILED");
     releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, key);
-    const requestKey = readAccountRow<{ commands: Record<string, string> }>(SECURITY_COMMAND_TABLE, accountKey)
-      ?.commands["account-deletion-request"];
-    if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "account-deletion-request", requestKey);
-    deletionCommandKey.value = "";
+    const requestKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)
+      ?.commands?.[DELETION_REQUEST_INTENT];
+    if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, requestKey);
+    syncDeletionSubmittedReason(accountKey);
     toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -1176,9 +1206,11 @@ function closeDeletionSheet() {
   deletionSheetOpen.value = false;
   deletionDebtOpen.value = false;
   deletionPassword.value = "";
+  deletionReason.value = "";
 }
 function openDeletionSheet() {
   if (securityBusy.value || deletionPending.value) return;
+  if (remoteApiEnabled) syncDeletionSubmittedReason(auth.accountId);
   deletionSheetOpen.value = true;
 }
 watch(twoFactorEnabled, (value) => { if (value === requestedTwoFactor.value) twoFactorSheetOpen.value = false; });
@@ -1404,6 +1436,20 @@ const dangerLabelStyle: CSSProperties = {
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
 .security-sheet-note { font-size:13px; line-height:20px; color:var(--v5-ink-3); }
+.security-reason-field, .security-reason-sent { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.security-reason-sent { padding:12px; border-radius:8px; background:var(--v5-surface-2); }
+.security-reason-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-width:0; }
+.security-reason-label { min-width:0; font:600 13px/18px var(--font-v5); color:var(--v5-ink-2); }
+.security-reason-count { flex:none; font:500 12px/16px var(--font-jet-mono); color:var(--v5-ink-3); }
+.security-reason-count--over { color:var(--v5-danger); }
+.security-reason-lock { flex:none; align-self:center; color:var(--v5-ink-3); }
+.security-reason-input { display:block; box-sizing:border-box; width:100%; height:88px; padding:10px 12px; border-radius:8px; background:var(--v5-surface-2); font-family:var(--font-v5); font-size:var(--ui-type-input); line-height:20px; color:var(--v5-ink); overflow-wrap:break-word; }
+.security-reason-input[aria-invalid="true"] { box-shadow:inset 0 0 0 1px var(--v5-danger); }
+.security-reason-input:focus-within { outline:2px solid var(--v5-brand); outline-offset:2px; }
+.security-reason-ph { color:var(--v5-ink-4); }
+.security-reason-sent__text { font:400 14px/20px var(--font-v5); color:var(--v5-ink); white-space:pre-wrap; overflow-wrap:anywhere; }
+.security-reason-sent__text--empty { color:var(--v5-ink-3); }
+.security-reason-hint { font-size:12px; line-height:16px; color:var(--v5-ink-3); }
 .security-debt-support { display:flex; align-items:center; justify-content:center; min-height:44px; margin-top:8px; padding:0 12px; border-radius:var(--v5-radius-full); font:400 14px/20px var(--font-v5); color:var(--v5-ink-2); text-decoration:underline; text-underline-offset:3px; }
 .security-debt-support:active { opacity:.7; }
 .security-debt-support:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
