@@ -47,6 +47,10 @@
     <template v-else-if="type === 'unstake'">
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
     </template>
+    <!-- clawback: voucher ticket with a return arrow (a used reward voucher taken back) -->
+    <template v-else-if="type === 'clawback'">
+      <path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a3 3 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a3 3 0 0 0 0-6Z" /><path d="m10 9.5-2 2 2 2" /><path d="M8 11.5h5a2 2 0 0 1 0 4h-1" />
+    </template>
     <!-- other: canonical ledger row without a narrower product category -->
     <template v-else><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h10" /></template>
   </svg>

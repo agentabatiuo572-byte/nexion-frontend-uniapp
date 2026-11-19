@@ -35,7 +35,7 @@
             <view class="pp-opt" :class="{ on: s.method === 'WALLET' }" role="radio" :tabindex="s.method === 'WALLET' ? 0 : -1" :aria-checked="s.method === 'WALLET'" @click="payment.choose('WALLET')" @keydown.enter.prevent="payment.choose('WALLET')">
               <view class="pp-opt__row">
                 <view class="pp-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg></view>
-                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.wallet }}</text><text class="pp-opt__h">{{ balanceKnown ? fill(copy.walletAvailable, { amt: walletAmount(app.user.usdtBalance) }) : copy.walletUnavailable }}</text></view>
+                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.wallet }}</text><text class="pp-opt__h">{{ !balanceKnown ? copy.walletUnavailable : app.user.usdtBalance < 0 ? fill(copy.walletDebt, { amt: walletAmount(-app.user.usdtBalance) }) : fill(copy.walletAvailable, { amt: walletAmount(app.user.usdtBalance) }) }}</text></view>
                 <view class="pp-radio" aria-hidden="true" />
               </view>
               <view v-if="shortfall > 0" class="pp-short" @click.stop>
@@ -447,7 +447,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-opt.on .pp-radio, .pp-tab.on .pp-radio { box-shadow: inset 0 0 0 6px var(--v5-brand); }
 .pp-short { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--v5-border); }
 /* The 32px pill keeps its 44px hit area without adding visible space. */
-.pp-short :deep(.nx-button) { margin: -6px 0; }
+.pp-short :deep(.nx-button) { margin: -6px 0; flex-shrink: 0; white-space: nowrap; }
 .pp-short__t { min-width: 0; color: var(--v5-warning); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .pp-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: var(--v5-space-2); }
 .pp-tab { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; box-sizing: border-box; padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); box-shadow: inset 0 0 0 1px var(--v5-border); }

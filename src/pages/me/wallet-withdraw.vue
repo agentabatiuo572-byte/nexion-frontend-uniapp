@@ -73,6 +73,7 @@
           <view class="wd-locks__i"><text>{{ t.wallet.heldLockedChip }}</text><text class="wd-locks__v">${{ formatAmount(heldBuckets.locked) }}</text></view>
           <text>{{ t.wallet.heldNotYet }}</text>
         </view>
+        <view v-if="withdrawalFactsDisplayable && app.user.usdtBalance < 0" class="wd-debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ fmt(t.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
       </view>
 
       <!-- Amount on a liquid-glass slab over the aura; the minimum sits right under it. -->
@@ -293,6 +294,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { ref, computed, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
@@ -1634,6 +1636,8 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-bal__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 30px/36px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wd-locks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .wd-locks__i { display: inline-flex; align-items: center; gap: 4px; }
+.wd-debt { display: flex; align-items: flex-start; gap: 6px; margin-top: 10px; color: var(--v5-ink-2); font: 400 12px/18px var(--font-v5); overflow-wrap: anywhere; }
+.wd-debt svg { flex-shrink: 0; margin-top: 2px; color: var(--v5-warning-ink); }
 .wd-locks__v { color: var(--v5-ink-2); font: 500 12px/16px var(--font-metric); }
 .wd-stage { position: relative; margin-top: 12px; }
 .wd-aura { position: absolute; inset: -8px -6px; pointer-events: none; }
