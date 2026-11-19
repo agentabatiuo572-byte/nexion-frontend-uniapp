@@ -169,8 +169,8 @@ function bucketUserEarnings(
   const nextUser: UserState = { ...current, earningBuckets: nextBuckets };
   if (usdt <= 0 && nex <= 0) return nextUser;
   if (route === "withdrawable") {
-    nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(2);
-    nextBuckets.withdrawableUsdt = Math.min(+(nextBuckets.withdrawableUsdt + usdt).toFixed(2), Math.max(0, nextUser.usdtBalance));
+    nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(6);
+    nextBuckets.withdrawableUsdt = Math.min(+(nextBuckets.withdrawableUsdt + usdt).toFixed(6), Math.max(0, nextUser.usdtBalance));
     nextUser.nexBalance = +(nextUser.nexBalance + nex).toFixed(2);
   } else if (route === "pending_review") {
     nextBuckets.pendingReviewUsdt = +(nextBuckets.pendingReviewUsdt + usdt).toFixed(2);
@@ -1577,9 +1577,9 @@ export const useApp = defineStore("app", () => {
     // NEX 锁定 → 余额
     const relNex = Math.min(outcome.releasedPendingNex + outcome.releasedLockedNex, buckets.lockedNex);
     buckets.lockedNex = +(buckets.lockedNex - relNex).toFixed(2);
-    const relUsd = +(relPendUsd + relLockUsd).toFixed(2);
-    const usdtBalance = +(current.usdtBalance + relUsd).toFixed(2);
-    buckets.withdrawableUsdt = Math.min(+(buckets.withdrawableUsdt + relUsd).toFixed(2), Math.max(0, usdtBalance));
+    const relUsd = +(relPendUsd + relLockUsd).toFixed(6);
+    const usdtBalance = +(current.usdtBalance + relUsd).toFixed(6);
+    buckets.withdrawableUsdt = Math.min(+(buckets.withdrawableUsdt + relUsd).toFixed(6), Math.max(0, usdtBalance));
     return {
       ...current,
       earningBuckets: buckets,
@@ -1932,7 +1932,7 @@ export const useApp = defineStore("app", () => {
       : currentUser.usdtBalance;
     if (authoritativeBalance < amount) return false;
     const previousSnapshot = lastCloudSnapshot;
-    const nextUsdt = +(currentUser.usdtBalance - amount).toFixed(2);
+    const nextUsdt = +(currentUser.usdtBalance - amount).toFixed(6);
     const buckets = currentUser.earningBuckets;
     user.value = {
       ...currentUser,
@@ -2002,7 +2002,7 @@ export const useApp = defineStore("app", () => {
     const previousSnapshot = lastCloudSnapshot;
     user.value = {
       ...currentUser,
-      usdtBalance: +(currentUser.usdtBalance + amount).toFixed(2),
+      usdtBalance: +(currentUser.usdtBalance + amount).toFixed(6),
       appliedRewardKeys: { ...currentUser.appliedRewardKeys, [refundKey]: true },
     };
     if (!persistAccountSnapshot()) {
@@ -2032,7 +2032,7 @@ export const useApp = defineStore("app", () => {
     if (!Number.isFinite(amount) || amount < 0) return false;
     const previousSnapshot = lastCloudSnapshot;
     const before = moneyValues();
-    user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance + amount).toFixed(2) };
+    user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance + amount).toFixed(6) };
     const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
@@ -2046,7 +2046,7 @@ export const useApp = defineStore("app", () => {
     if (user.value.usdtBalance < amount) return false;
     const previousSnapshot = lastCloudSnapshot;
     const before = moneyValues();
-    const nextUsdt = +(user.value.usdtBalance - amount).toFixed(2);
+    const nextUsdt = +(user.value.usdtBalance - amount).toFixed(6);
     // 维护不变量 withdrawableUsdt ≤ usdtBalance:花钱先消耗不可提部分(如充值本金),
     // 花穿后才吃可提收益,可提额度随之收敛到剩余总余额。缺此 clamp,提现门(submitWithdrawal
     // 只看 withdrawableUsdt)会放行超过总余额的提现 → usdtBalance 变负(凭空取钱,原 P0)。
@@ -2169,9 +2169,9 @@ export const useApp = defineStore("app", () => {
     const previousSnapshot = lastCloudSnapshot;
     const before = moneyValues();
     const target = {
-      usdtBalance: +(before.usdtBalance - owedUsdt).toFixed(2),
+      usdtBalance: +(before.usdtBalance - owedUsdt).toFixed(6),
       nexBalance: +(before.nexBalance - owedNex).toFixed(2),
-      withdrawableUsdt: +(before.withdrawableUsdt - owedWithdrawable).toFixed(2),
+      withdrawableUsdt: +(before.withdrawableUsdt - owedWithdrawable).toFixed(6),
     };
     if (!Object.values(target).every((v) => Number.isFinite(v))) return false;
     target.withdrawableUsdt = Math.min(Math.max(0, target.withdrawableUsdt), Math.max(0, target.usdtBalance));
@@ -2206,7 +2206,7 @@ export const useApp = defineStore("app", () => {
     const previousSnapshot = lastCloudSnapshot;
     user.value = {
       ...user.value,
-      usdtBalance: +(user.value.usdtBalance + amount).toFixed(2),
+      usdtBalance: +(user.value.usdtBalance + amount).toFixed(6),
       cumulativeDepositUsdt: +(user.value.cumulativeDepositUsdt + amount).toFixed(2),
     };
     if (!persistAccountSnapshot()) {
@@ -2259,8 +2259,8 @@ export const useApp = defineStore("app", () => {
         : currentUser.appliedRewardKeys,
     };
     if (route === "withdrawable") {
-      nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(2);
-      nextBuckets.withdrawableUsdt = Math.min(+(nextBuckets.withdrawableUsdt + usdt).toFixed(2), Math.max(0, nextUser.usdtBalance));
+      nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(6);
+      nextBuckets.withdrawableUsdt = Math.min(+(nextBuckets.withdrawableUsdt + usdt).toFixed(6), Math.max(0, nextUser.usdtBalance));
       nextUser.nexBalance = +(nextUser.nexBalance + nex).toFixed(2);
     } else if (route === "pending_review") {
       nextBuckets.pendingReviewUsdt = +(nextBuckets.pendingReviewUsdt + usdt).toFixed(2);
