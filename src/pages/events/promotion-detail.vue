@@ -440,7 +440,7 @@ const bar = computed<Bar | null>(() => {
   if (phase.value === 'scheduled') return { hint: copy.orderAfterStart, label: copy.notStarted, variant: 'primary', disabled: true };
   if (phase.value === 'ended') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
   if (refused.value) {
-    if (k !== 'repurchase') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
+    if (k !== 'repurchase' || repurchaseInterval.value !== null) return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
     return firstOfferId.value ? { hint: copy.firstHint, label: copy.seeFirst, variant: 'primary', href: promotionLandingHref(firstOfferId.value) } : { wide: true, label: copy.goStore, variant: 'primary', href: promotionStoreHref() };
   }
   if (signInNeeded.value) return { label: copy.signInBuy, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) };
