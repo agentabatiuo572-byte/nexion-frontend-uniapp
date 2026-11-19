@@ -5,6 +5,11 @@ import { demoH4Account } from './prototype-demo-events.mjs';
 
 const pendingWithdrawalAmount = 100;
 
+// Java StringUtils.hasText and String.trim use different whitespace sets.
+const javaHasText = value => typeof value === 'string'
+  && /[^\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]/.test(value);
+const javaTrim = value => value.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, '');
+
 // One wallet fact for every read used by the account-deletion journey.
 export function accountDeletionWallet(state) {
   if (!state.accountDeletionState || state.accountDeletionState === 'follow') return null;
@@ -59,8 +64,9 @@ export function accountDemo(url, locale, state, request) {
     const current = history.requests.at(-1);
     if (method === 'GET' && path.endsWith('/account-deletion')) return current ?? { status: 'NONE' };
     if (method !== 'POST') reject('METHOD_NOT_ALLOWED', 405);
-    const key = request.headers()['idempotency-key'];
-    if (!key) reject('IDEMPOTENCY_KEY_INVALID', 422);
+    const rawKey = request.headers()['idempotency-key'];
+    if (!javaHasText(rawKey) || javaTrim(rawKey).length > 160) reject('IDEMPOTENCY_KEY_INVALID', 422);
+    const key = javaTrim(rawKey);
     const input = body();
     if (path.endsWith('/cancel')) {
       if (!current) reject('ACCOUNT_DELETION_REQUEST_NOT_FOUND', 404);
@@ -74,13 +80,15 @@ export function accountDemo(url, locale, state, request) {
       return response;
     }
     if (input.confirmation !== 'DELETE') reject('ACCOUNT_DELETION_CONFIRMATION_REQUIRED', 422);
-    if (input.currentPassword !== 'Local404Pass!') reject('USER_CURRENT_PASSWORD_INVALID', 422);
+    const originalReason = javaHasText(input.reason) ? javaTrim(input.reason) : null;
+    if (originalReason !== null && originalReason.length > 255) reject('ACCOUNT_DELETION_REASON_INVALID', 422);
+    if (input.currentPassword !== 'Local404Pass!') reject('CURRENT_PASSWORD_INVALID', 401);
     const retained = history.requests.find(row => row.requestNo === history.commands[key]);
     if (retained) return retained;
     if (current && ['REQUESTED', 'IN_REVIEW', 'BLOCKED', 'COMPLETED'].includes(current.status)) return current;
     const row = { requestNo: 'ADR-' + randomUUID().replaceAll('-', ''), status: 'REQUESTED', version: 0,
       requestedAt: new Date().toISOString(), reviewedAt: null, completedAt: null, cancelledAt: null,
-      reason: null, blockReason: null, originalReason: input.reason ?? null };
+      reason: null, blockReason: null, originalReason };
     history.requests.push(row);
     history.commands[key] = row.requestNo;
     return row;
