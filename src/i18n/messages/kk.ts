@@ -3323,6 +3323,7 @@ export const kk: Messages = {
       unknown: "Жеткізу расталмады",
       queued: "Кезекте",
       retry: "Қайта жіберу",
+      check: "Жіберілуін тексеру үшін түртіңіз",
     },
     recommendation: {
       product: "Тауарды қарау",

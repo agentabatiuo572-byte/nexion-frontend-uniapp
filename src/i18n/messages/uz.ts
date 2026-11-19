@@ -3323,6 +3323,7 @@ export const uz: Messages = {
       unknown: "Yetkazilgani noaniq",
       queued: "Navbatda",
       retry: "Qayta yuborish",
+      check: "Yuborilganini tekshirish uchun bosing",
     },
     recommendation: {
       product: "Mahsulot",

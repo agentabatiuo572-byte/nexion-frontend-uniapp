@@ -3323,6 +3323,7 @@ export const ms: Messages = {
       unknown: "Penghantaran belum disahkan",
       queued: "Menunggu dihantar",
       retry: "Hantar semula",
+      check: "Ketik untuk semak status penghantaran",
     },
     recommendation: {
       product: "Lihat produk",

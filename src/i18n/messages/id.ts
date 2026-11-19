@@ -3323,6 +3323,7 @@ export const id: Messages = {
       unknown: "Belum terkonfirmasi",
       queued: "Dalam antrean",
       retry: "Ketuk untuk kirim ulang",
+      check: "Ketuk untuk memeriksa status kirim",
     },
     recommendation: {
       product: "Lihat produk",

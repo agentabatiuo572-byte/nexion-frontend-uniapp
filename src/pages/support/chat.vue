@@ -78,6 +78,7 @@
       :failed-send-label="failedHumanLabel"
       :can-discard-send="failedHumanSend?.settled"
       :can-retry-send="isReplyAllowed && supportSessionReady && failedHumanSend?.retryable !== false && !humanSendBusy"
+      :can-check-send="canCheckHumanSend"
       :send-blocked="!supportSessionReady || !!failedHumanSend || humanSendBusy"
       @send="onSend"
       @draft-change="draftText = $event"
@@ -87,6 +88,7 @@
       @cancel-attachment="cancelSupportAttachment"
       @retry-image="retryPrivateImage"
       @retry-message="retryHumanSend"
+      @check-message="checkHumanSend"
       @edit-message="editHumanSend"
       @discard-message="discardHumanSend"
       @cta="onCta"
@@ -403,6 +405,29 @@ async function retryHumanSend() {
   humanSendBusy.value = true;
   try { await sendHumanMessage(failed.text, failed.attachmentId, undefined, failed.attempts + 1); }
   finally { humanSendBusy.value = false; }
+}
+let checkingHumanSend = false;
+async function checkHumanSend(message: ThreadMsg) {
+  const failed = failedHumanSend.value;
+  const page = humanRealtime.capture(cid.value);
+  if (!canCheckHumanSend.value || !page || !failed || checkingHumanSend) return;
+  const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
+  const current = () => humanRealtime.isCurrent(page.epoch, page.id) && supportSessionReady.value
+    && binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated;
+  checkingHumanSend = true;
+  try {
+    const key = await convStore.checkHumanReply(page.id, failed, () => current() && failedHumanSend.value === failed);
+    if (!current()) return;
+    if (key) {
+      localHumanSend.value = { ...message, clientMessageId: key, deliveryState: 'sent' };
+      return;
+    }
+  } catch {
+    // An inconclusive read leaves the original send pending.
+  } finally {
+    checkingHumanSend = false;
+  }
+  if (current() && failedHumanSend.value === failed) toast.warn(t.value.conversations.delivery.unknown);
 }
 function discardHumanSend() { if (failedHumanSend.value?.settled) failedHumanSend.value = null; }
 function editHumanSend() {
@@ -721,6 +746,8 @@ const transferredSessionNotice = computed(() => writableConversationNo.value
 const isReplyAllowed = computed(() => !awaitingHumanDetail.value && !isTransferredSession.value
   && (!conv.value || replyAllowedStatuses.has(conv.value.status)));
 const isClosedSession = computed(() => !!conv.value && !awaitingHumanDetail.value && !isReplyAllowed.value);
+const canCheckHumanSend = computed(() => isClosedSession.value && conv.value?.writeState?.canReply === false
+  && supportSessionReady.value && failedHumanSend.value?.settled === false && !humanSendBusy.value);
 // Account advisor identity belongs to new composition. Existing conversation
 // headers and waiting state use the server's owner for that exact conversation id.
 const advisorApplies = computed(() => !isClosedSession.value && !cid.value && !!startType.value);
@@ -851,7 +878,7 @@ const threadMessages = computed<ThreadMsg[]>(() => {
       clientMessageId: localHumanSend.value?.clientMessageId,
       imageSrc: failed.attachmentId ? imageDraft.value?.filePath : undefined,
       deliveryState: failed.settled ? 'failed' : 'unknown', localSend: true,
-    } : null;
+    } : localHumanSend.value?.deliveryState === 'sent' ? localHumanSend.value : null;
   if (!c) return pending ? [pending] : [];
   const lastUser = c.messages.map((m) => m.sender).lastIndexOf("user");
   const messages: ThreadMsg[] = c.messages.map((m, i) => ({

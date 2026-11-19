@@ -3323,6 +3323,7 @@ export const ru: Messages = {
       unknown: "Доставка не подтверждена",
       queued: "В очереди",
       retry: "Отправить снова",
+      check: "Нажмите, чтобы проверить отправку",
     },
     recommendation: {
       product: "Открыть товар",

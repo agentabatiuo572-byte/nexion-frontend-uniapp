@@ -121,7 +121,10 @@ export function createPurchasePaymentApi(client: ApiClient) {
     async create(paymentQuoteId: string, commandKey: string) {
       return parsePurchaseIntent(await client.request({ method: 'POST', path: `${base}-intents`, body: { paymentQuoteId }, idempotencyKey: commandKey, retryAfterAuth: false }));
     },
-    async get(intentNo: string) { return parsePurchaseIntent(await client.request({ path: `${base}-intents/${encodeURIComponent(intentNo)}` })); },
+    async get(intentNo: string) {
+      try { return parsePurchaseIntent(await client.request({ path: `${base}-intents/${encodeURIComponent(intentNo)}` })); }
+      catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
+    },
     async find(kind: PurchaseKind, commandKey: string) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents?kind=${encodeURIComponent(kind)}&commandKey=${encodeURIComponent(commandKey)}` })); }
       // Only the server's own not-found proves there is no intent; any other 404 keeps the original command.

@@ -307,12 +307,26 @@ export const useConversations = defineStore("conversations", () => {
     suspendedHumanAccount = null;
     reset();
   }
-  async function hasPendingHumanSend(key: string, failed: NonNullable<HumanComposer["failedSend"]>): Promise<boolean> {
-    await preparePendingRun();
+  function humanSendSlot(key: string, failed: NonNullable<HumanComposer["failedSend"]>): string {
     const intent = key.startsWith("start:")
       ? `conversation-create:${key.slice(6)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`
       : `conversation-reply:${key.slice(13)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`;
-    return pendingKeys.has(opaqueSupportIntentSlot(intent));
+    return opaqueSupportIntentSlot(intent);
+  }
+  async function hasPendingHumanSend(key: string, failed: NonNullable<HumanComposer["failedSend"]>): Promise<boolean> {
+    await preparePendingRun();
+    return pendingKeys.has(humanSendSlot(key, failed));
+  }
+  async function checkHumanReply(id: string, failed: NonNullable<HumanComposer["failedSend"]>, active: () => boolean): Promise<string | null> {
+    const scope = await commandScope();
+    const fingerprint = humanSendSlot(`conversation:${id}`, failed);
+    const key = scope.pending.get(fingerprint);
+    if (!active() || !key || scope.inFlight.has(fingerprint)) return null;
+    const result = await supportApi.commandResult(key);
+    if (!active() || !scopeIsCurrent(scope) || scope.pending.get(fingerprint) !== key
+        || scope.inFlight.has(fingerprint) || result?.kind !== "conversation" || result.conversation.id !== id) return null;
+    applyPendingConversation(scope, fingerprint, result.conversation);
+    return key;
   }
   let realtime: ConversationRealtime | null = null;
   let watchedId: string | null = null;
@@ -796,6 +810,16 @@ export const useConversations = defineStore("conversations", () => {
     }
   }
 
+  function applyPendingConversation(scope: CommandScope, fingerprint: string, conversation: Conversation): void {
+    replace(conversation);
+    if (scope.pending.has(fingerprint)) completePending(scope, fingerprint);
+    for (const [composerKey, saved] of Object.entries(humanComposers.value)) {
+      const failed = saved.failedSend;
+      if (!failed || failed.settled || humanSendSlot(composerKey, failed) !== fingerprint) continue;
+      saveComposer(composerKey, { ...saved, failedSend: null, recoveredId: composerKey.startsWith("start:") ? conversation.id : undefined });
+    }
+  }
+
   async function reconcilePending(): Promise<void> {
     const scope: CommandScope = { accountKey: accountKeyValue, epoch: accountEpoch, runId: pendingRunId, pending: pendingKeys, inFlight };
     for (const [fingerprint, key] of [...scope.pending]) {
@@ -809,18 +833,7 @@ export const useConversations = defineStore("conversations", () => {
         if (result.kind === 'conversation-user-clear') {
           applyUserClear(result.clearance); completePending(scope, fingerprint); continue;
         }
-        if (scopeIsCurrent(scope) && result.kind === "conversation") replace(result.conversation);
-        if (result.kind !== "conversation") continue;
-        completePending(scope, fingerprint);
-        for (const [composerKey, saved] of Object.entries(humanComposers.value)) {
-          const failed = saved.failedSend;
-          if (!failed || failed.settled) continue;
-          const intent = composerKey.startsWith("start:")
-            ? `conversation-create:${composerKey.slice(6)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`
-            : `conversation-reply:${composerKey.slice(13)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`;
-          if (opaqueSupportIntentSlot(intent) === fingerprint)
-            saveComposer(composerKey, { ...saved, failedSend: null, recoveredId: composerKey.startsWith("start:") ? result.conversation.id : undefined });
-        }
+        if (result.kind === "conversation") applyPendingConversation(scope, fingerprint, result.conversation);
       } catch (cause) {
         // A recorded refusal is terminal; other read failures still leave the original command unknown.
         if (isConversationUserClearRejected(cause) && scopeIsCurrent(scope)
@@ -929,5 +942,5 @@ export const useConversations = defineStore("conversations", () => {
     if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
-  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,hasPendingHumanSend,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
+  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,hasPendingHumanSend,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
 });

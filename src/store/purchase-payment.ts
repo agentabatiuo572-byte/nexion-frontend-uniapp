@@ -112,9 +112,13 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
 }
 /** The server holds no payment for this command: release it and its fences. Only the user may start another one, from the order. */
 function gone(pending: PendingExternal, accountKey: string) {
-  release(pending);
-  releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-  releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+  try {
+    release(pending);
+    releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+    releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+  } catch {
+    // Local cleanup can fail after the server has already answered definitively.
+  }
   Object.assign(state, { pending: null, intent: null, quote: null, error: false });
   conclude('gone');
 }
@@ -262,17 +266,11 @@ async function query() {
     if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
     if (result) accept(result, pending);
-    // The quote's 409 proved this command created no intent, and the server's own not-found agrees.
-    else if (pending.lookupOnly) gone(pending, accountKey);
+    else if (pending.intentNo || pending.lookupOnly) gone(pending, accountKey);
     else state.unavailable = true;
-  } catch (error) {
+  } catch {
     failed = true;
-    if (owns(version, accountKey) && !state.concluded) {
-      const cause = asApiError(error);
-      // The server no longer holds a payment it has shown us. Only the user may start another one, from the order.
-      if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') gone(pending, accountKey);
-      else state.error = true;
-    }
+    if (owns(version, accountKey) && !state.concluded) state.error = true;
   }
   finally { if (owns(version, accountKey)) { state.busy = false; schedule(version, accountKey, failed); } }
 }
