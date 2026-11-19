@@ -10,12 +10,12 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
 
-      <!-- Topping up for an unpaid order: what is missing, when the order closes, and the way back once funds arrive. -->
-      <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': orderTopupLeft <= 0 }" role="status">
-        <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ orderTopupLeft > 0 ? payCopy.topupFor : payCopy.topupDone }}</text></view>
-        <text v-if="orderTopupLeft > 0 && balanceKnown" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, app.user.usdtBalance < 0 ? 6 : 2) }} USDT</text>{{ payCopy.topupNeedTail }}</text>
-        <text v-else-if="orderTopupLeft <= 0" class="topup-order__d">{{ fillCopy(payCopy.topupEnough, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
-        <view v-if="orderTopupLeft > 0 && orderCloseLeft !== null" class="topup-order__cd">
+      <!-- Topping up for a purchase, with a return action when an existing order is covered. -->
+      <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': topupCovered }" role="status">
+        <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ topupCovered ? payCopy.topupDone : payCopy.topupFor }}</text></view>
+        <text v-if="orderTopupLeft !== null && orderTopupLeft > 0" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, shortfallPrecision) }} USDT</text>{{ payCopy.topupNeedTail }}</text>
+        <text v-else-if="topupCovered" class="topup-order__d">{{ fillCopy(payCopy.topupEnough, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
+        <view v-if="!topupCovered && orderCloseLeft !== null" class="topup-order__cd">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
           <text>{{ fillCopy(payCopy.topupCloses, { t: orderCloseLeft }) }}</text>
         </view>
@@ -88,24 +88,46 @@ onLoad((query) => {
   const channel = query?.channel ?? pending.get('channel');
   const allowed = visibleSegments.value.find(item => item.id === channel);
   if (allowed) seg.value = allowed.id;
-  const orderNo = query?.orderNo ?? pending.get('orderNo'), amount = Number(query?.amount ?? pending.get('amount')), deadline = Number(query?.deadline ?? pending.get('deadline'));
-  const shortfall = Number(query?.shortfall ?? pending.get('shortfall'));
-  if (orderNo && Number.isFinite(amount) && amount > 0) orderTopup.value = { orderNo, amount, shortfall: Number.isFinite(shortfall) && shortfall > 0 ? shortfall : amount, name: query?.name ?? pending.get('name') ?? '', deadlineAt: Number.isFinite(deadline) && deadline > 0 ? deadline : null };
+  const orderNo = query?.orderNo ?? pending.get('orderNo');
+  const amount = Number(query?.amount ?? pending.get('amount'));
+  const deadline = Number(query?.deadline ?? pending.get('deadline'));
+  const candidate = Number(query?.shortfall ?? pending.get('shortfall'));
+  const shortfall = Number.isFinite(candidate) && candidate > 0 ? candidate : null;
+  if (Number.isFinite(amount) && amount > 0 && (orderNo || shortfall !== null)) {
+    orderTopup.value = {
+      orderNo, amount, shortfall, name: query?.name ?? pending.get('name') ?? '',
+      deadlineAt: Number.isFinite(deadline) && deadline > 0 ? deadline : null,
+    };
+  }
 });
 const app = useApp();
 const payCopy = computed(() => purchasePaymentCopy(locale.code));
-const orderTopup = ref<{ orderNo: string; amount: number; shortfall: number; name: string; deadlineAt: number | null } | null>(null);
+const orderTopup = ref<{ orderNo: string | null; amount: number; shortfall: number | null; name: string; deadlineAt: number | null } | null>(null);
 const topupNow = ref(Date.now());
 useVisibleInterval(() => { if (orderTopup.value) topupNow.value = Date.now(); }, 1000);
-// Until the wallet snapshot arrives the shortfall is unknown, so the banner shows only the order and its deadline.
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
-const orderTopupLeft = computed(() => !orderTopup.value ? 0 : balanceKnown.value ? Math.max(0, orderTopup.value.amount - app.user.usdtBalance) : orderTopup.value.shortfall);
+const orderTopupLeft = computed(() => {
+  const topup = orderTopup.value;
+  if (!topup) return null;
+  return balanceKnown.value ? Math.max(0, topup.amount - app.user.usdtBalance) : topup.shortfall;
+});
+// With no fresh balance, a carried shortfall larger than the purchase amount includes wallet debt.
+const shortfallPrecision = computed(() => {
+  const topup = orderTopup.value;
+  const includesDebt = balanceKnown.value ? app.user.usdtBalance < 0
+    : topup && topup.shortfall !== null && topup.shortfall > topup.amount;
+  return includesDebt ? 6 : 2;
+});
+const topupCovered = computed(() => orderTopupLeft.value === 0);
 const orderCloseLeft = computed(() => {
   const left = orderTopup.value?.deadlineAt ? Math.max(0, Math.ceil((orderTopup.value.deadlineAt - topupNow.value) / 1000)) : null;
   return left === null ? null : `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
 });
-const orderFunded = computed(() => !!orderTopup.value && balanceKnown.value && orderTopupLeft.value <= 0);
-function backToOrder() { if (orderTopup.value) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderTopup.value.orderNo)}&pay=1`); }
+const orderFunded = computed(() => !!orderTopup.value?.orderNo && topupCovered.value);
+function backToOrder() {
+  const orderNo = orderTopup.value?.orderNo;
+  if (orderNo && orderFunded.value) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&pay=1`);
+}
 function segLabel(id: Seg): string {
   const tc = t.value.topupChrome;
   if (id === "crypto") return tc.segUsdt;

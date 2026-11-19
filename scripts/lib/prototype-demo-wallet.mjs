@@ -140,7 +140,8 @@ export function seedDemoRewardClawback(state, at) {
   postDemoWalletEntries(state, {
     id:'WL-515',bizNo:'F1-VRANKREWARD-REVERSE-PAYOUT-1-456',bizType:'VRANK_REWARD_PAYOUT_REVERSED',
     asset:'USDT',direction:'OUT',amount:172.123456,amountExact:'172.123456',
-    category:'clawback',presentationCode:'rewardClawback',publicReference:null,at,
+    category:'clawback',presentationCode:'rewardClawback',publicReference:null,
+    remark:'F1 V-Rank voucher clawback | rank=V1',at,
   });
   state.walletMovements.at(-1).balanceAfterExact=state.walletBalance.toFixed(6);
 }
