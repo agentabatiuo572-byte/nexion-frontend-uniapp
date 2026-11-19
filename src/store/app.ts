@@ -66,7 +66,7 @@ import type { ApiRuntimeConfig } from "@/api/runtime-config";
 import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
-import { ApiError, asApiError, isApiRefusal } from "@/api/errors";
+import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import type { UserSession } from "@/api/contracts";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
@@ -1019,8 +1019,19 @@ export const useApp = defineStore("app", () => {
             if (binding && isApiRefusal(cause, 422, "SIMULATED_E3_POLICY_HISTORY_MISSING")) {
               nativePhoneConfigWaitDeviceId.value = String(binding.deviceId);
               remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
-            } else if (asApiError(cause).retryable) {
-              remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
+            } else {
+              const error = asApiError(cause);
+              if (error.retryable) {
+                remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
+              } else if (binding && nativePhoneConfigWaitDeviceId.value === String(binding.deviceId)
+                && (error.kind === "business" || error.kind === "http")) {
+                // Phone-online reports definite runtime conflicts as canonical 409 refusals.
+                const phoneConflict = (error.message === "INSTALLATION_MISMATCH" || error.message.startsWith("SIMULATED_"))
+                  && isApiRefusal(error, 409, error.message);
+                if (phoneConflict || !isAmbiguousEnvelopeOutcome(error)) {
+                  nativePhoneConfigWaitDeviceId.value = null;
+                }
+              }
             }
           }
         }
