@@ -13,7 +13,7 @@ import { createWalletLedgerPager, type LedgerLoadStatus, type WalletLedgerPager 
 // rows; totals always come from the independent server summary, never this page.
 export type BillType =
   | "earn" | "refer" | "bonus" | "topup" | "withdraw"
-  | "purchase" | "refund" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "other";
+  | "purchase" | "refund" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "clawback" | "other";
 export type BillStatus = "posted" | "pending" | "failed";
 
 export interface Bill {
@@ -313,6 +313,7 @@ export const useBills = defineStore("bills", () => {
     withdrawFeeOffsetRefund: "withdrawFeeOffsetRefund",
     purchase: "purchase",
     orderRefund: "orderRefund",
+    rewardClawback: "rewardClawback",
     swap: "swap",
     verification: "verification",
     stake: "stake",
@@ -322,7 +323,7 @@ export const useBills = defineStore("bills", () => {
   };
   const CATEGORY_MEMO_KEYS: Record<BillType, string> = {
     earn: "earn", refer: "refer", bonus: "bonus", topup: "topup", withdraw: "withdraw", purchase: "purchase", refund: "orderRefund",
-    swap: "swap", verification: "verification", stake: "stake", unstake: "unstake", achievement: "achievement", other: "other",
+    swap: "swap", verification: "verification", stake: "stake", unstake: "unstake", achievement: "achievement", clawback: "rewardClawback", other: "other",
   };
   function legacyPresentation(bizType: string, bizNo: string): LegacyPresentation | undefined {
     const value = bizType.trim().toUpperCase();

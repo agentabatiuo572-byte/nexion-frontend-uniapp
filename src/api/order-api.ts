@@ -460,7 +460,7 @@ export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
       : source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC' || source.paymentMethod === 'CREGIS_USDT_ERC20' || source.paymentMethod === 'CREGIS_USDT_TRC20' ? source.paymentMethod : invalid();
   if ((paymentMethod === "VOUCHER") !== (amountUsdt === 0)) return invalid();
   const walletBalanceAfterUsdt = paymentMethod === "WALLET"
-    ? finiteNumber(source.walletBalanceAfterUsdt)
+    ? finiteNumber(source.walletBalanceAfterUsdt, -Infinity)
     : source.walletBalanceAfterUsdt === null ? null : invalid();
   return {
     orderNo: nonEmptyString(source.orderNo),

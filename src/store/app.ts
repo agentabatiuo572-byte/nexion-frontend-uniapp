@@ -112,7 +112,7 @@ const SETTLE_MIN_MS = 1800;
 
 function createEarningBuckets(withdrawableUsdt: number, now = Date.now()): UserState["earningBuckets"] {
   return {
-    withdrawableUsdt,
+    withdrawableUsdt: Math.max(0, withdrawableUsdt),
     pendingReviewUsdt: 0,
     bonusLockedUsdt: 0,
     lockedNex: 0,
@@ -167,8 +167,8 @@ function bucketUserEarnings(
   const nextUser: UserState = { ...current, earningBuckets: nextBuckets };
   if (usdt <= 0 && nex <= 0) return nextUser;
   if (route === "withdrawable") {
-    nextBuckets.withdrawableUsdt = +(nextBuckets.withdrawableUsdt + usdt).toFixed(2);
     nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(2);
+    nextBuckets.withdrawableUsdt = Math.min(+(nextBuckets.withdrawableUsdt + usdt).toFixed(2), Math.max(0, nextUser.usdtBalance));
     nextUser.nexBalance = +(nextUser.nexBalance + nex).toFixed(2);
   } else if (route === "pending_review") {
     nextBuckets.pendingReviewUsdt = +(nextBuckets.pendingReviewUsdt + usdt).toFixed(2);
@@ -1517,11 +1517,12 @@ export const useApp = defineStore("app", () => {
     const relNex = Math.min(outcome.releasedPendingNex + outcome.releasedLockedNex, buckets.lockedNex);
     buckets.lockedNex = +(buckets.lockedNex - relNex).toFixed(2);
     const relUsd = +(relPendUsd + relLockUsd).toFixed(2);
-    buckets.withdrawableUsdt = +(buckets.withdrawableUsdt + relUsd).toFixed(2);
+    const usdtBalance = +(current.usdtBalance + relUsd).toFixed(2);
+    buckets.withdrawableUsdt = Math.min(+(buckets.withdrawableUsdt + relUsd).toFixed(2), Math.max(0, usdtBalance));
     return {
       ...current,
       earningBuckets: buckets,
-      usdtBalance: +(current.usdtBalance + relUsd).toFixed(2),
+      usdtBalance,
       nexBalance: +(current.nexBalance + relNex).toFixed(2),
     };
   }
@@ -1876,7 +1877,7 @@ export const useApp = defineStore("app", () => {
       ...currentUser,
       usdtBalance: nextUsdt,
       // 与 debitBalance 同一条不变量:withdrawableUsdt ≤ usdtBalance(先吃不可提部分)。
-      earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
+      earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, Math.max(0, nextUsdt)) },
       appliedRewardKeys: { ...currentUser.appliedRewardKeys, [key]: true },
     };
     if (!persistAccountSnapshot()) {
@@ -1992,7 +1993,7 @@ export const useApp = defineStore("app", () => {
     user.value = {
       ...user.value,
       usdtBalance: nextUsdt,
-      earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
+      earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, Math.max(0, nextUsdt)) },
     };
     const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
@@ -2095,7 +2096,7 @@ export const useApp = defineStore("app", () => {
    * moneyApplied 的这段差值里(那些路径不走这四个原语),写绝对值时则会被一起回退。
    */
   function restoreMoney(snap: MoneySnapshot): boolean {
-    if (![snap.usdtBalance, snap.nexBalance, snap.withdrawableUsdt].every((v) => Number.isFinite(v) && v >= 0)) return false;
+    if (!Number.isFinite(snap.usdtBalance) || ![snap.nexBalance, snap.withdrawableUsdt].every((v) => Number.isFinite(v) && v >= 0)) return false;
     // 「我自己动了多少」= 现在的读数 − 快照那一刻的读数。别的标签页写多少都不进这个数。
     const owedUsdt = moneyApplied.usdtBalance - snap.applied.usdtBalance;
     const owedNex = moneyApplied.nexBalance - snap.applied.nexBalance;
@@ -2112,6 +2113,7 @@ export const useApp = defineStore("app", () => {
       withdrawableUsdt: +(before.withdrawableUsdt - owedWithdrawable).toFixed(2),
     };
     if (!Object.values(target).every((v) => Number.isFinite(v))) return false;
+    target.withdrawableUsdt = Math.min(Math.max(0, target.withdrawableUsdt), Math.max(0, target.usdtBalance));
     const current = withDefaultEarningBuckets(user.value);
     user.value = {
       ...current,
@@ -2196,8 +2198,8 @@ export const useApp = defineStore("app", () => {
         : currentUser.appliedRewardKeys,
     };
     if (route === "withdrawable") {
-      nextBuckets.withdrawableUsdt = +(nextBuckets.withdrawableUsdt + usdt).toFixed(2);
       nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(2);
+      nextBuckets.withdrawableUsdt = Math.min(+(nextBuckets.withdrawableUsdt + usdt).toFixed(2), Math.max(0, nextUser.usdtBalance));
       nextUser.nexBalance = +(nextUser.nexBalance + nex).toFixed(2);
     } else if (route === "pending_review") {
       nextBuckets.pendingReviewUsdt = +(nextBuckets.pendingReviewUsdt + usdt).toFixed(2);
@@ -2245,7 +2247,7 @@ export const useApp = defineStore("app", () => {
   ): boolean {
     if (!remoteApiEnabled || !["dev", "prod"].includes(expectedApiEnvironment)
         || !remoteAccountEpoch.isCurrent(receiptScope)
-        || !Number.isFinite(balanceAfterUsdt) || balanceAfterUsdt < 0) return false;
+        || !Number.isFinite(balanceAfterUsdt)) return false;
     // A committed wallet receipt must make the next fleet read bypass any
     // earlier in-flight wallet projection.
     invalidateRemoteFleet(receiptScope);
@@ -2254,7 +2256,7 @@ export const useApp = defineStore("app", () => {
     user.value = {
       ...current,
       usdtBalance: nextBalance,
-      earningBuckets: { ...current.earningBuckets, withdrawableUsdt: nextBalance },
+      earningBuckets: { ...current.earningBuckets, withdrawableUsdt: Math.max(0, nextBalance) },
     };
     remoteWalletReceiptHasSnapshot.value = true;
     return true;

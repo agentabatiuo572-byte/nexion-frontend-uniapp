@@ -13,7 +13,7 @@
       <!-- Topping up for an unpaid order: what is missing, when the order closes, and the way back once funds arrive. -->
       <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': orderTopupLeft <= 0 }" role="status">
         <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ orderTopupLeft > 0 ? payCopy.topupFor : payCopy.topupDone }}</text></view>
-        <text v-if="orderTopupLeft > 0 && balanceKnown" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft) }} USDT</text>{{ payCopy.topupNeedTail }}</text>
+        <text v-if="orderTopupLeft > 0 && balanceKnown" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, app.user.usdtBalance < 0 ? 6 : 2) }} USDT</text>{{ payCopy.topupNeedTail }}</text>
         <text v-else-if="orderTopupLeft <= 0" class="topup-order__d">{{ fillCopy(payCopy.topupEnough, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
         <view v-if="orderTopupLeft > 0 && orderCloseLeft !== null" class="topup-order__cd">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
@@ -89,16 +89,17 @@ onLoad((query) => {
   const allowed = visibleSegments.value.find(item => item.id === channel);
   if (allowed) seg.value = allowed.id;
   const orderNo = query?.orderNo ?? pending.get('orderNo'), amount = Number(query?.amount ?? pending.get('amount')), deadline = Number(query?.deadline ?? pending.get('deadline'));
-  if (orderNo && Number.isFinite(amount) && amount > 0) orderTopup.value = { orderNo, amount, name: query?.name ?? pending.get('name') ?? '', deadlineAt: Number.isFinite(deadline) && deadline > 0 ? deadline : null };
+  const shortfall = Number(query?.shortfall ?? pending.get('shortfall'));
+  if (orderNo && Number.isFinite(amount) && amount > 0) orderTopup.value = { orderNo, amount, shortfall: Number.isFinite(shortfall) && shortfall > 0 ? shortfall : amount, name: query?.name ?? pending.get('name') ?? '', deadlineAt: Number.isFinite(deadline) && deadline > 0 ? deadline : null };
 });
 const app = useApp();
 const payCopy = computed(() => purchasePaymentCopy(locale.code));
-const orderTopup = ref<{ orderNo: string; amount: number; name: string; deadlineAt: number | null } | null>(null);
+const orderTopup = ref<{ orderNo: string; amount: number; shortfall: number; name: string; deadlineAt: number | null } | null>(null);
 const topupNow = ref(Date.now());
 useVisibleInterval(() => { if (orderTopup.value) topupNow.value = Date.now(); }, 1000);
 // Until the wallet snapshot arrives the shortfall is unknown, so the banner shows only the order and its deadline.
-const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.user.usdtBalance >= 0 && app.remoteFleetHasSnapshot);
-const orderTopupLeft = computed(() => !orderTopup.value ? 0 : balanceKnown.value ? Math.max(0, orderTopup.value.amount - app.user.usdtBalance) : orderTopup.value.amount);
+const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
+const orderTopupLeft = computed(() => !orderTopup.value ? 0 : balanceKnown.value ? Math.max(0, orderTopup.value.amount - app.user.usdtBalance) : orderTopup.value.shortfall);
 const orderCloseLeft = computed(() => {
   const left = orderTopup.value?.deadlineAt ? Math.max(0, Math.ceil((orderTopup.value.deadlineAt - topupNow.value) / 1000)) : null;
   return left === null ? null : `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;

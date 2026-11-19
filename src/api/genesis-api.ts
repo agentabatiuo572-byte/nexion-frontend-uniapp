@@ -444,7 +444,7 @@ export function parseGenesisAccountState(
   const noSeries = row?.series === null && row.sale === null && row.eligibility === null;
   const series = noSeries ? null : parseSeries(row?.series);
   const sale = noSeries ? null : parseSale(row?.sale);
-  const walletBalanceUsdt = number(row?.walletBalanceUsdt);
+  const walletBalanceUsdt = number(row?.walletBalanceUsdt, -Infinity);
   const orders = row?.orders;
   if (!row || !validAuthority(row, mode) || (noSeries && row.marketEnabled !== false)
       || typeof row.marketEnabled !== "boolean"

@@ -206,7 +206,7 @@ function parseOrder(value: unknown): ExchangeOrder {
 function parseSnapshot(value: unknown, mode: ApiEnvironment): ExchangeSnapshot {
   const row = record(value);
   const wallet = record(row?.wallet);
-  const usdtAvailable = number(wallet?.usdtAvailable);
+  const usdtAvailable = number(wallet?.usdtAvailable, -Infinity);
   const nexAvailable = number(wallet?.nexAvailable);
   const todayUserUsedUsdt = number(row?.todayUserUsedUsdt);
   const todayPlatformUsedUsdt = number(row?.todayPlatformUsedUsdt);

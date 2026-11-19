@@ -134,6 +134,17 @@ export function postDemoWalletEntries(state,...entries) {
   return balances;
 }
 
+export function seedDemoRewardClawback(state, at) {
+  // Leave the earlier demo ledger funded before the clawback crosses zero.
+  state.walletBalance=160;
+  postDemoWalletEntries(state, {
+    id:'WL-515',bizNo:'F1-VRANKREWARD-REVERSE-PAYOUT-1-456',bizType:'VRANK_REWARD_PAYOUT_REVERSED',
+    asset:'USDT',direction:'OUT',amount:172.123456,amountExact:'172.123456',
+    category:'clawback',presentationCode:'rewardClawback',publicReference:null,at,
+  });
+  state.walletMovements.at(-1).balanceAfterExact=state.walletBalance.toFixed(6);
+}
+
 function savedNexBalance(state) {
   return accountDeletionWallet(state)?.nexAvailable??state.walletNexBalance??(state.dataState==='empty'?0:1280);
 }

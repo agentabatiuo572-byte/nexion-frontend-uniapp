@@ -120,7 +120,7 @@
           <view class="bills-sheet__fact"><text>{{ t.bills.detailSource }}</text><text class="bills-sheet__value">{{ billMemo(detail) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status)" /></view>
           <view v-if="detail.ref" class="bills-sheet__fact"><text>{{ t.bills.detailRef }}</text><view class="bills-sheet__ref"><text class="font-mono-code bills-sheet__value">{{ detail.ref }}</text><CopyCodeButton :value="detail.ref" :label="t.bills.detailRef" /></view></view>
-          <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums">{{ decimalLabel(detail.balanceAfterExact, detail.balanceAfter, detail.symbol) }}</text></view>
+          <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums">{{ formatWalletBillBalance(detail.balanceAfterExact, detail.balanceAfter, detail.symbol, dateLocale()) }}</text></view>
         </view>
         <view class="bills-sheet__close" role="button" tabindex="0" @click="detail = null" @keydown.enter.prevent="detail = null" @keydown.space.prevent="detail = null"><LiquidGlass :radius="24" tone="control" /><text>{{ t.bills.detailClose }}</text></view>
       </view>
@@ -147,7 +147,7 @@ import NxTag from "@/components/ui/nx-tag.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { walletBillClockLabel, walletBillDayKey, walletBillDayLabel, walletBillTimeLabel } from "@/lib/wallet-bill-date";
-import { WALLET_BILL_TYPE_COLOR, formatWalletBillDecimal, resolveWalletBillMemo, walletBillTypeTint } from "@/lib/wallet-bill-display";
+import { WALLET_BILL_TYPE_COLOR, formatWalletBillBalance, formatWalletBillDecimal, resolveWalletBillMemo, walletBillTypeTint } from "@/lib/wallet-bill-display";
 import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
@@ -352,7 +352,7 @@ function isDebit(b: Bill): boolean {
   return b.amountExact === undefined ? b.amount < 0 : b.amountExact.startsWith("-");
 }
 function runningBalanceLabel(b: Bill): string {
-  return `${t.value.bills.runningBalance} ${decimalLabel(b.balanceAfterExact, b.balanceAfter!, b.symbol)}`;
+  return `${t.value.bills.runningBalance} ${formatWalletBillBalance(b.balanceAfterExact, b.balanceAfter!, b.symbol, dateLocale())}`;
 }
 function fmtAmount(b: Bill): string {
   return decimalLabel(b.amountExact, b.amount, b.symbol);

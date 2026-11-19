@@ -1039,7 +1039,7 @@ const replaceView = computed(() => {
   }
   const lowest = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!lowest) return null; // snapshot device vanished — render nothing
-  const insufficient = s.newPrice > app.user.usdtBalance;
+  const insufficient = s.newPrice - app.user.usdtBalance > 0;
   return {
     warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
     lowestText: fmt(t.value.tradein.replaceLowestText, {
@@ -1328,7 +1328,7 @@ function onReplace() {
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1473,7 +1473,7 @@ function onKeepBuy() {
     // 新机已落盘(addDevice 只在落盘成功时给 id),撤销也必须落盘;撤不掉登记待对账(审计 R8 P1:直写内存不落盘 → 白得一台)
 
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1585,7 +1585,7 @@ function onForce() {
     app.patchDevice(lowest.id, { currentTask: taskSnapshot });
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
