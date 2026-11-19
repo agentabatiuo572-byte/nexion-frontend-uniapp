@@ -2125,6 +2125,10 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
     if (tracking) {
       await tracking;
       if (!isCurrentCheckoutRoute(scope)) return true;
+      const current = readCheckoutTradein(scope.accountKey, scope.productNo);
+      if (!current) throw new Error('PAYMENT_CANCELLED');
+      if (current.commandKey !== recovery.commandKey) return true;
+      recovery = current;
     }
     const result = await completeRemoteTradein(recovery, scope, false, navigate);
     if (!result) {
