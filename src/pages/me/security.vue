@@ -353,11 +353,16 @@ async function leaveForDebt(url: string) {
 const deletionPassword = ref("");
 const deletionReason = ref("");
 const deletionReasonValidation = computed(() => validateAccountDeletionReason(deletionReason.value));
-// PLACEHOLDER(Codex C2): the reason saved with the retained deletion command, shown read-only because a retry resends it.
-// Source: the persisted payload for DELETION_REQUEST_INTENT in SECURITY_COMMAND_TABLE. Set it whenever the sheet opens
-// (also after a reload) and after a failed or unknown submit that keeps the key; a legacy key without a payload is ""
-// (shown as 未填写). null means no key is retained; set it back to null when the key is released.
 const deletionSubmittedReason = ref<string | null>(null);
+
+function syncDeletionSubmittedReason(accountKey: string) {
+  const row = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey);
+  const key = row?.commands?.[DELETION_REQUEST_INTENT];
+  deletionSubmittedReason.value = typeof key === "string" && key.trim()
+    ? row?.payloads?.[DELETION_REQUEST_INTENT] ?? ""
+    : null;
+}
+
 const remoteSecurityLoading = ref(false);
 const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
@@ -482,6 +487,7 @@ function clearSecurityAccountState(keepPresentation = false) {
   twoFactorTarget.value = null;
   deletionPassword.value = "";
   deletionReason.value = "";
+  deletionSubmittedReason.value = null;
   err.value = "";
 }
 
@@ -1074,6 +1080,7 @@ async function handleDeleteAccount() {
           const request = await accountApi.requestAccountDeletion(deletionPassword.value, command.key, command.payload);
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
           releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, command.key);
+          syncDeletionSubmittedReason(accountKey);
           if (request.status === "CANCELLED") {
             deletionStatus.value = request;
             toast.info(t.value.security.deleteAccountCancelledReplay);
@@ -1103,6 +1110,7 @@ async function handleDeleteAccount() {
             releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, command.key);
           }
           if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+          syncDeletionSubmittedReason(accountKey);
           toast.error(securityErrorMessage(cause));
           return;
         }
@@ -1165,6 +1173,7 @@ async function handleCancelAccountDeletion() {
     const requestKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)
       ?.commands?.[DELETION_REQUEST_INTENT];
     if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, requestKey);
+    syncDeletionSubmittedReason(accountKey);
     toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -1201,6 +1210,7 @@ function closeDeletionSheet() {
 }
 function openDeletionSheet() {
   if (securityBusy.value || deletionPending.value) return;
+  if (remoteApiEnabled) syncDeletionSubmittedReason(auth.accountId);
   deletionSheetOpen.value = true;
 }
 watch(twoFactorEnabled, (value) => { if (value === requestedTwoFactor.value) twoFactorSheetOpen.value = false; });
