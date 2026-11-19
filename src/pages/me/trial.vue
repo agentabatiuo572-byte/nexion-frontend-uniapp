@@ -379,9 +379,8 @@ const totalSource = computed(() => (purchaseQuote.value && !authorityScreenUnava
 const totalCount = useViewCountUp(totalSource, "grouped", { follow: true });
 const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalSource.value ?? 0)));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
-const deviceName = computed(() => trialProduct.value?.name ?? cfg.value.trialProductName);
 const buyTitle = computed(() => {
-  if (earlyQuote.value) return fmt(detail.value.earlyTitle, { device: deviceName.value, amount: usdShort(earlyQuote.value.earlyDiscountUSD) });
+  if (earlyQuote.value) return fmt(detail.value.earlyTitle, { device: trialDeviceName.value, amount: usdShort(earlyQuote.value.earlyDiscountUSD) });
   return isGrace.value ? detail.value.graceTitle : purchase.value.accruedTitle;
 });
 // What arrives after purchase: USDT when there is some, otherwise the UVT (amounts never split across lines).
