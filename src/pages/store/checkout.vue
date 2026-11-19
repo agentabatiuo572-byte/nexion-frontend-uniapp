@@ -2136,6 +2136,8 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
         remoteTradeinRecoveryRequired.value = false;
         remoteTradeinRecoveryError.value = false;
         step.value = 'select-payment';
+        // The cold load can now continue its normal checkout initialization.
+        if (activeCheckoutLoad === scope) return false;
         await retryCheckoutCapacity();
       } else remoteTradeinRecoveryError.value = true;
     }
