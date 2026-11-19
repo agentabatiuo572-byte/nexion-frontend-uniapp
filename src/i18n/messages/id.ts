@@ -2335,7 +2335,7 @@ export const id: Messages = {
     faq: {
       location: {
         q: "Di mana perangkat akan ditempatkan?",
-        a: "Penempatan diatur secara dinamis berdasarkan kapasitas pusat data, sumber daya, dan kebutuhan operasional, bukan di lokasi tetap.",
+        a: "Saat pengiriman, perangkat ditempatkan di salah satu pusat data kami. Pusat data tersebut ditampilkan di pesanan Anda.",
       },
       withdraw: {
         q: "Bagaimana cara menarik pendapatan?",
@@ -2523,7 +2523,7 @@ export const id: Messages = {
     cardEstimateNote: "Hanya perkiraan; pembayaran aktual bisa berbeda.",
     shareReferenceAnnual: "Est. hadiah tahunan (%)",
     shareFlexibleDescription: "Beli porsi komputasi langsung, lebih fleksibel.",
-    shareDailyEstimateNote: "USDT diperkirakan dari harga saat ini, jumlah, dan persentase hadiah tahunan. Pembayaran aktual bisa berbeda.",
+    shareDailyEstimateNote: "Perkiraan mengikuti jumlah yang dipilih. Pembayaran aktual bisa berbeda.",
     shareAnnualUnavailable: "-",
     shareYieldDisclaimer: "Pembayaran aktual bisa berbeda.",
     cloudShareLowBarrierTagline: "Porsi komputasi cloud · mudah mulai",

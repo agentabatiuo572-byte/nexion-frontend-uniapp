@@ -27,7 +27,7 @@
         </view>
       </view>
       <view class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top:1px solid var(--v5-border);font-size:12px;color:var(--v5-ink-3);min-height:44px">
-        <text><text style="color:var(--v5-ink);font-weight:500">{{ activeDevicesText }}</text> {{ t.home.onGridOnline }}</text>
+        <text><text style="color:var(--v5-ink);font-weight:500"><NxTickNumber :value="activeDevices" /></text> {{ t.home.onGridOnline }}</text>
         <text style="color:var(--v5-success-ink);font-weight:500">{{ perSecText }}</text>
       </view>
     </view>
@@ -35,10 +35,8 @@
 </template>
 
 <script setup lang="ts">
-import { useLocaleStore } from "@/store/locale";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
-import { networkPopulationBand } from "@/lib/platform-stats";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
@@ -47,9 +45,9 @@ import { apiClient } from "@/api/runtime";
 import { createHomeDisplayPlayer, parseHomeDisplayBatch, type homeDisplayAt } from "@/lib/home-display-player";
 import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
 import { computed, ref, onMounted, onUnmounted } from "vue";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 
 const t = useT();
-const locale = useLocaleStore();
 const app = useApp();
 const cfg = useConfig();
 const displayValue = ref<ReturnType<typeof homeDisplayAt>>(null);
@@ -95,9 +93,8 @@ defineExpose({ refresh: () => player.refresh() });
 
 const gridClients = computed(() => (app.homeTruth?.onGrid.clients ?? [])
   .map((client) => ({ ...client, color: "var(--v5-brand)" })));
-const activeDevicesText = computed(() => {
-  return devicesBad.value ? "—" : networkPopulationBand(cfg.config.networkPulse!.onlineDevices!, locale.code);
-});
+// Whole number with the digit roll (BUG-531); still the config snapshot, not the per-second batch above.
+const activeDevices = computed(() => devicesBad.value ? null : cfg.config.networkPulse!.onlineDevices!);
 
 function companyInitial(value: string | null) {
   return value?.trim().charAt(0).toUpperCase() || "—";

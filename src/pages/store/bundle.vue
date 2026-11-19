@@ -325,10 +325,8 @@ function bundleProductYieldText(p: Product): string {
     const high = p.productType === "SHARE" ? formatPlainAmount(estimate.high, 6) : formatAmount(estimate.high);
     return `${t.value.bundle.estimatedDaily} · $${low === high ? low : `${low}–${high}`}`;
   }
-  const range = p.shareYieldMin != null && p.shareYieldMax != null
-    ? `${p.shareYieldMin}%–${p.shareYieldMax}%`
-    : t.value.store.shareAnnualUnavailable;
-  return `${t.value.store.shareReferenceAnnual}: ${range}`;
+  // No server estimate: "—", never an annual rate or a figure derived from one.
+  return `${t.value.bundle.estimatedDaily} · —`;
 }
 
 // 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。

@@ -128,7 +128,7 @@
                 <text>{{ shareDailyUsdt.min }}</text>
                 <text v-if="shareDailyUsdt.min !== shareDailyUsdt.max">– {{ shareDailyUsdt.max }}</text>
               </view>
-              <text v-else class="share-returns__unavailable">{{ t.store.specValueUnavailable }}</text>
+              <text v-else class="share-returns__unavailable">—</text>
             </view>
             <view class="share-returns__row">
               <text class="share-returns__currency">UVT</text>
@@ -138,10 +138,6 @@
               <text class="share-returns__currency">{{ t.store.detMonthly }}</text>
               <text class="share-returns__value font-mono-tabular">{{ monthlyYieldText }} USDT</text>
             </view>
-          </view>
-          <view class="share-returns__reference">
-            <text>{{ t.store.shareReferenceAnnual }}</text>
-            <text class="font-mono-tabular">{{ shareYieldText }}</text>
           </view>
           <text class="share-returns__note">{{ t.store.shareDailyEstimateNote }}</text>
         </view>
@@ -534,23 +530,14 @@ const computePointsLine = computed(() => {
   return { before, value: formatComputePoints(points, locale.code).split(" ")[0], after };
 });
 const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0));
-const shareYieldText = computed(() => product.value?.shareYieldMin != null && product.value?.shareYieldMax != null
-  ? `${product.value.shareYieldMin}%–${product.value.shareYieldMax}%`
-  : t.value.store.shareAnnualUnavailable);
 const shareDailyEstimate = computed(() => product.value && isShare.value ? productDailyEstimateRange(product.value) : null);
 const shareDailyUsdt = computed(() => {
+  // Only the server's daily estimate; without one the row shows "—", never a figure derived from an annual rate.
   const estimate = shareDailyEstimate.value;
-  if (estimate) return {
+  return estimate ? {
     min: formatPlainAmount(estimate.low * qty.value, 6),
     max: formatPlainAmount(estimate.high * qty.value, 6),
-  };
-  const current = product.value;
-  if (!current || current.shareYieldMin == null || current.shareYieldMax == null) return null;
-  const dailyBase = current.price * qty.value / 100 / 365;
-  return {
-    min: formatPlainAmount(dailyBase * current.shareYieldMin, 6),
-    max: formatPlainAmount(dailyBase * current.shareYieldMax, 6),
-  };
+  } : null;
 });
 const shareDailyUvtText = computed(() => formatPlainAmount((product.value?.dailyEarnNEX ?? 0) * qty.value, 6));
 const dailyYieldText = computed(() => formatAmount(dailyYield.value));
@@ -867,8 +854,7 @@ const faqQStyle: CSSProperties = {
 .share-returns__value { display: flex; flex-wrap: wrap; justify-content: flex-end; column-gap: var(--v5-space-1); min-width: 0; font-size: var(--v5-type-card-title); font-weight: 600; line-height: var(--v5-type-card-title-lh); color: var(--v5-brand); text-align: right; }
 .share-returns__value text { white-space: nowrap; }
 .share-returns__unavailable { font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }
-.share-returns__reference { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--v5-space-2); padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); font: 400 var(--v5-type-caption)/var(--v5-type-caption-lh) var(--font-v5); color: var(--v5-ink-3); }
-.share-returns__note { display: block; margin-top: var(--v5-space-1); font: 400 var(--v5-type-caption)/var(--v5-type-caption-lh) var(--font-v5); color: var(--v5-ink-3); }
+.share-returns__note { display: block; padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); font: 400 var(--v5-type-caption)/var(--v5-type-caption-lh) var(--font-v5); color: var(--v5-ink-3); }
 /* One outer corner clip; the catalog image and its pedestal keep their full size. */
 .detail-hero :deep(.detail-product-render) { border-radius:0 !important; }
 .detail-hero :deep(.detail-product-render > [aria-hidden]:not(:first-child)) {

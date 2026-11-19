@@ -1873,7 +1873,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     faq: {
       location: {
         q: "Thiết bị sẽ được triển khai ở đâu?",
-        a: "Địa điểm triển khai được phân bổ linh hoạt theo công suất còn trống của trung tâm dữ liệu, tài nguyên và nhu cầu vận hành thực tế, không cố định tại một địa điểm.",
+        a: "Khi bàn giao, thiết bị được phân bổ vào một trong các trung tâm dữ liệu của chúng tôi. Trung tâm dữ liệu sẽ hiển thị trên đơn hàng của bạn.",
       },
       withdraw: {
         q: "Làm thế nào để rút thu nhập?",
@@ -2065,7 +2065,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     cardEstimateNote: "Chỉ là ước tính; số thực nhận có thể khác.",
     shareReferenceAnnual: "Tỷ lệ thưởng năm tham khảo",
     shareFlexibleDescription: "Mua trực tiếp phần công suất tính toán, linh hoạt hơn.",
-    shareDailyEstimateNote: "USDT được ước tính theo giá hiện tại, số lượng và tỷ lệ thưởng năm. Số thực nhận có thể khác.",
+    shareDailyEstimateNote: "Ước tính theo số lượng đã chọn. Số thực nhận có thể khác.",
     shareAnnualUnavailable: "-",
     shareYieldDisclaimer: "Số thực nhận có thể khác.",
     cloudShareLowBarrierTagline: "Suất điện toán đám mây · dễ tham gia",

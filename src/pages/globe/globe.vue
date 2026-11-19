@@ -18,23 +18,9 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" />
 
-      <!-- Simulation is presentation-only, separate from API telemetry. -->
-      <view class="mx-4 mb-3 grid grid-cols-2 gap-2">
-        <view class="rounded-2xl" :style="statTileStyle">
-          <view class="flex items-center" style="gap: 6px; min-height: 36px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
-            <text style="font-size: 12px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeNodes }}</text>
-          </view>
-          <text class="block tabular-nums" :style="statValStyle">{{ activeNodesText }}</text>
-        </view>
-        <view class="rounded-2xl" :style="statTileStyle">
-          <view class="flex items-center" style="gap: 6px; min-height: 36px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
-            <text style="font-size: 12px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeJobs }}</text>
-          </view>
-          <text class="block tabular-nums" :style="statValStyle">{{ activeJobsText }}</text>
-        </view>
-      </view>
+      <!-- Same strip, labels and whole-number roll as the home network snapshot (BUG-531).
+           Simulation is presentation-only, separate from API telemetry. -->
+      <NetworkStatStrip class="mx-4 mb-3" :cells="topStats" />
 
       <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
            to clip the region glow halos at the rounded panel edge (functional). -->
@@ -185,8 +171,8 @@
           <view class="grid grid-cols-3 gap-2 mt-4">
             <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
-              <text class="block tabular-nums" :style="drawerStatValStyle">{{ regionNodeDisplay(selected) }}</text>
-              <text class="block" :style="drawerStatLabelStyle">{{ t.globe.activeNodes }}</text>
+              <text class="block tabular-nums" :style="drawerStatValStyle"><NxTickNumber :value="selected.devices" /></text>
+              <text class="block" :style="drawerStatLabelStyle">{{ t.home.networkDevices }}</text>
             </view>
             <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
@@ -206,12 +192,12 @@
 </template>
 
 <script setup lang="ts">
-import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useConfig } from "@/store/config";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
-import { networkPopulationBand } from "@/lib/platform-stats";
+import NetworkStatStrip, { type NetworkStatCell } from "@/components/home/network-stat-strip.vue";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 // #ifdef APP-PLUS
 import NativeSvg from "@/components/native-svg.vue";
 // #endif
@@ -230,7 +216,6 @@ import { onBackPress } from "@dcloudio/uni-app";
 import { globeSimulation, GLOBE_CENTERS } from "@/lib/globe-simulation";
 
 const t = useT();
-const locale = useLocaleStore();
 const cfg = useConfig();
 const app = useApp();
 // #ifndef APP-PLUS
@@ -251,8 +236,10 @@ const globeSettings = computed(() => cfg.config.publicStats.globeDisplay);
 const onlineTotal = computed(() => cfg.config.networkPulse?.onlineDevices ?? null);
 const centerStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0,
   globeSettings.value, onlineTotal.value, app.activeJobsDisplay));
-const activeNodesText = computed(() => onlineTotal.value?.toLocaleString() ?? '—');
-const activeJobsText = computed(() => app.activeJobsDisplay?.toLocaleString() ?? '—');
+const topStats = computed<NetworkStatCell[]>(() => [
+  { key: "devices", label: t.value.home.networkDevices, count: onlineTotal.value },
+  { key: "jobs", label: t.value.globe.activeJobs, count: app.activeJobsDisplay },
+]);
 // Display offsets separate nearby centers; leader lines preserve geographic anchors.
 const mapPositions: Record<string, readonly [number, number]> = {
   uk: [198, 37], fr: [212, 76], de: [244, 47], sg: [345, 136], vn: [335, 102],
@@ -308,7 +295,6 @@ function nativeNodeStyle(r: GlobeRegion): CSSProperties {
 // #endif
 
 function regionName(r: GlobeRegion): string { return r.displayName; }
-function regionNodeDisplay(r: GlobeRegion): string { return r.devices === null ? '—' : networkPopulationBand(r.devices, locale.code); }
 onMounted(() => {
   watch(() => globeSettings.value?.intervalMs, interval => {
     if (pulseTimer) clearInterval(pulseTimer);
@@ -387,17 +373,6 @@ function mulberry32(seed: number) {
 }
 
 // ── styles ──
-const statTileStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  padding: "12px",
-};
-const statValStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "20px",
-  fontWeight: 600,
-  marginTop: "4px",
-  color: "var(--v5-ink)",
-};
 const mapCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
   padding: "12px",

@@ -1877,7 +1877,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     faq: {
       location: {
         q: "设备会部署在哪里？",
-        a: "设备部署会根据机房可用配额、资源情况和实际运营需要动态安排，不固定于某个地点。",
+        a: "设备在交付时分配到我们的某个数据中心，所在机房会显示在订单上。",
       },
       withdraw: {
         q: "收益如何提现？",
@@ -2076,7 +2076,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     cardEstimateNote: "预估值，以实际到账为准。",
     shareReferenceAnnual: "参考年奖励率",
     shareFlexibleDescription: "直接购买算力份额，更加灵活。",
-    shareDailyEstimateNote: "USDT 按当前价格、份数及参考年奖励率折算，以实际到账为准。",
+    shareDailyEstimateNote: "预估按所选份数计算，以实际到账为准。",
     shareAnnualUnavailable: "-",
     shareYieldDisclaimer: "以实际到账为准。",
     cloudShareLowBarrierTagline: "云算力份额·低门槛",

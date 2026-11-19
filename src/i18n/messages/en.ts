@@ -1900,7 +1900,7 @@ chooseMethod: "Choose how to join the UVEL network",
     faq: {
       location: {
         q: "Where will the device be deployed?",
-        a: "Deployment is assigned dynamically based on available datacenter capacity, resources and operational needs, rather than a fixed location.",
+        a: "Each device is assigned to one of our data centers at delivery. The data center is shown on your order.",
       },
       withdraw: {
         q: "How can I withdraw earnings?",
@@ -2101,7 +2101,7 @@ chooseMethod: "Choose how to join the UVEL network",
     cardEstimateNote: "Estimates only; actual payouts may differ.",
     shareReferenceAnnual: "Est. annual reward rate",
     shareFlexibleDescription: "Buy computing shares directly for more flexibility.",
-    shareDailyEstimateNote: "USDT is estimated from the current price, quantity and annual reward rate. Actual payouts may differ.",
+    shareDailyEstimateNote: "Estimates follow the selected quantity. Actual payouts may differ.",
     shareAnnualUnavailable: "-",
     shareYieldDisclaimer: "Actual payouts may differ.",
     cloudShareLowBarrierTagline: "Cloud compute share · low entry barrier",

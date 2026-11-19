@@ -2335,7 +2335,7 @@ export const fil: Messages = {
     faq: {
       location: {
         q: "Saan ide-deploy ang device?",
-        a: "Ang deployment ay itinatakda batay sa available na kapasidad ng datacenter, resources at pangangailangan ng operasyon, at hindi sa iisang lokasyon.",
+        a: "Sa paghahatid, itatalaga ang device sa isa sa aming mga data center. Makikita ang data center sa iyong order.",
       },
       withdraw: {
         q: "Paano mag-withdraw ng kita?",
@@ -2523,7 +2523,7 @@ export const fil: Messages = {
     cardEstimateNote: "Tantiya lang; puwedeng mag-iba ang aktuwal na payout.",
     shareReferenceAnnual: "Tinatayang taunang rate ng reward",
     shareFlexibleDescription: "Direktang bumili ng compute share para mas flexible.",
-    shareDailyEstimateNote: "Ang USDT ay tinantiya mula sa kasalukuyang presyo, dami at taunang rate ng reward. Puwedeng mag-iba ang aktuwal na payout.",
+    shareDailyEstimateNote: "Batay sa napiling dami ang tantiya. Puwedeng mag-iba ang aktuwal na payout.",
     shareAnnualUnavailable: "-",
     shareYieldDisclaimer: "Batay sa aktuwal na payout.",
     cloudShareLowBarrierTagline: "Cloud compute share · mababang entry",

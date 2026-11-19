@@ -4,14 +4,7 @@
 -->
 <template>
   <NxSection v-if="compactView" :title="t.home.networkPulseTitle" :action="copy.details" action-icon-only @action="navTo('/pages/globe/globe')" data-home-section="network">
-    <view class="network-compact">
-      <view v-for="(m,i) in metrics" :key="m.k" class="network-compact__cell" :role="m.tap ? 'button' : undefined" :tabindex="m.tap ? 0 : -1" @click="activate(m.tap)" @keydown.enter.prevent="activate(m.tap)" @keydown.space.prevent="activate(m.tap)">
-        <text class="network-compact__label">{{ m.k }}</text>
-        <text class="network-compact__value" :style="m.vSize ? {fontSize:m.vSize} : {}">{{ m.v }}</text>
-
-
-      </view>
-    </view>
+    <NetworkStatStrip :cells="stripCells" />
   </NxSection>
   <view v-else-if="!compactView" data-home-section="network-pulse">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
@@ -62,6 +55,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
+import NetworkStatStrip, { type NetworkStatCell } from './network-stat-strip.vue';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 const props = defineProps<{compactView?:boolean;estimated?:boolean;registeredDisplay?:number|null}>();
 const copy = useAuditUiCopy();
@@ -102,6 +96,8 @@ interface Cell {
   subTone?: string;
   data?: number[] | null;
   color?: string;
+  /** Compact view: a whole count shown with thousands separators and the digit roll. */
+  count?: number;
   skeleton?: boolean; // 只属占位格:健康格有活数据,刷新期间保持旧值(stale-while-revalidate),不糊骨架
   tap?: () => void;
 }
@@ -127,27 +123,21 @@ const metrics = computed<Cell[]>(() => {
   const failed = cfg.syncFailed;
   const pulse = failed ? null : cfg.config.networkPulse;
   // H9 supplies the published counts and the server supplies the device estimate.
-  const displayCell = (label: string, value: number | null | undefined, color: string): Cell => {
+  // Online devices read as the whole number in the compact view (BUG-531); members keep the shared band.
+  const displayCell = (label: string, value: number | null | undefined, color: string, whole = false): Cell => {
     if (value === null || value === undefined || !Number.isSafeInteger(value) || value < 0) return placeholderCell(label);
+    if (whole && props.compactView) return { k: label, v: value.toLocaleString("en-US"), count: value, tone: "var(--v5-ink)", sub: "", data: null, color };
     return { k: label, v: props.compactView ? networkPopulationBand(value, locale.code) : compact(value), tone: "var(--v5-ink)", sub: "", data: null, color };
   };
   const memberValue = props.compactView && props.estimated ? props.registeredDisplay : pulse?.registeredUsers;
   const members = displayCell(t.value.home.networkMembers, memberValue, "var(--v5-brand)");
-  const devices = displayCell(t.value.home.networkDevices, pulse?.onlineDevices, "var(--v5-tech-cyan-ink)");
+  const devices = displayCell(t.value.home.networkDevices, pulse?.onlineDevices, "var(--v5-tech-cyan-ink)", true);
 
   return [members, devices];
 });
+const stripCells = computed<NetworkStatCell[]>(() => metrics.value.map(m => ({ key: m.k, label: m.k, count: m.count, text: m.v, vSize: m.vSize, tap: m.tap })));
 
 
 </script>
 <style scoped>
-.network-compact {position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:16px 0;border-radius:22px;border:1px solid var(--v5-border);background:var(--v5-surface);}
-.network-compact::before {content:'';position:absolute;inset:0;background-image:radial-gradient(color-mix(in srgb,var(--v5-brand) 10%,transparent) 1px,transparent 1.2px);background-size:10px 10px;mask-image:radial-gradient(80% 120% at 70% 50%,#000,transparent 75%);pointer-events:none;}
-.network-compact__cell {position:relative;min-width:0;padding:0 14px;border-left:1px solid var(--v5-border);}
-.network-compact__cell:first-child {border:0;padding-left:16px;}
-.network-compact__label,.network-compact__retry {display:block;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);}
-.network-compact__label {min-height:36px;}
-.network-compact__value {display:block;margin-top:4px;font:600 18px/24px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
-.network-compact__retry {font-size:11px;}
-.network-compact__retry[role='button'] {font:600 13px/20px var(--font-v5);}
 </style>
