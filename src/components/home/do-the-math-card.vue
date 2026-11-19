@@ -64,8 +64,7 @@ const baseShort = computed(() => calculator.value
   : "");
 // Phone and GPU bases are already named "your phone" / "your computer GPU"; only SKUs take "vs your {base}".
 const generalBase = computed(() => calculator.value?.base.kind === "phone" || calculator.value?.base.kind === "pc-gpu");
-// The projection names the base device by kind only; the target is an exact catalog product.
-const baseArt = useDeviceProductImage(() => ({ kind: calculator.value?.base.kind ?? "cloud-share", productCode: calculator.value?.base.kind ?? "", capacitySource: "server" }));
+const baseArt = useDeviceProductImage(() => ({ kind: calculator.value?.base.kind ?? "cloud-share", productCode: calculator.value?.base.productNo ?? "", capacitySource: "server" }));
 const targetArt = useDeviceProductImage(() => ({ kind: calculator.value?.target.kind ?? "cloud-share", productCode: calculator.value?.target.productNo ?? "", capacitySource: "server" }));
 
 // Hidden statistics use one neutral placeholder height so the ratio does not leak.
