@@ -153,7 +153,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     if((units(amount)+5000n)/10000n>units(expected,2))refuse('TRIAL_AMOUNT_MISMATCH');
     if(body.quoteVersion&&body.quoteVersion!==quote.quoteVersion)refuse('TRIAL_QUOTE_CHANGED');
     state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
-    requirePurchase(body.productNo);
+    const hardwareQuotaUsedAt=requirePurchase(body.productNo);
     if(!paid&&demoWalletUsdt(state)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
     const orderNo='TRC-DEMO'+now;
     if(!paid&&amount>0)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRIAL_CHARGE',
@@ -162,7 +162,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       asset:'USDT',direction:'IN',amount:quote.remainderUsdt,at:now,category:'bonus'});
     if(quote.rewardNex>0)postDemoWalletEntries(state,{bizNo:orderNo+':NEX',bizType:'TRIAL_BONUS',
       asset:'UVT',direction:'IN',amount:quote.rewardNex,at:now,category:'bonus'});
-    state.createdOrders??=[];state.createdOrders.unshift({...conversionOrder(orderNo,now,quote),quotaUsedAt:now,...(paid&&{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt})});state.trialOrderNo=orderNo;
+    state.createdOrders??=[];state.createdOrders.unshift({...conversionOrder(orderNo,now,quote),inventoryUsedAt:now,hardwareQuotaUsedAt,...(paid&&{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt})});state.trialOrderNo=orderNo;
     Object.assign(row,{state:'REDEEMED',finishedAt:now,version:(row.version||1)+1});
     const source='nx_trial_claim + nx_order + nx_order_item';
     return remember({...proof,orderNo,productNo:cfg.trialProductId,amountUsdt:amount,discountUsdt:number(units(current.priceUsdt)-units(amount)),paymentStatus:'PAID',orderStatus:'PAID',

@@ -6,14 +6,17 @@ export interface PhoneCountryProfile {
   selectable: boolean;
 }
 
-/**
- * The order is also the selector order. Vietnam is the formal market and
- * China is also available for the demonstration; the remaining rows stay visible
- * to explain coverage but cannot be selected or submitted.
- */
+const browserLocation = typeof window === "undefined" ? undefined : window.location;
+// Local same-origin previews also use the production build command.
+const localPreview = !import.meta.env.VITE_NEXGRID_API_BASE_URL?.trim()
+  && browserLocation?.protocol === "http:"
+  && ["127.0.0.1", "localhost", "[::1]"].includes(browserLocation.hostname);
+const vietnamOnly = import.meta.env.MODE === "production" && !localPreview;
+
+/** Order follows the selector. Unsupported countries stay visible and disabled. */
 export const PHONE_COUNTRIES: readonly PhoneCountryProfile[] = [
   { iso: "VN", dialCode: "+84", example: "0912 345 678", pattern: /^0?[35789]\d{8}$/, selectable: true },
-  { iso: "CN", dialCode: "+86", example: "138 0013 8000", pattern: /^1[3-9]\d{9}$/, selectable: true },
+  { iso: "CN", dialCode: "+86", example: "138 0013 8000", pattern: /^1[3-9]\d{9}$/, selectable: !vietnamOnly },
   { iso: "US", dialCode: "+1", example: "415 555 2671", pattern: /^(?:1)?[2-9]\d{2}[2-9]\d{6}$/, selectable: false },
   { iso: "GB", dialCode: "+44", example: "07123 456789", pattern: /^0?7\d{9}$/, selectable: false },
   { iso: "DE", dialCode: "+49", example: "0151 23456789", pattern: /^0?1[5-7]\d{8,9}$/, selectable: false },
@@ -50,6 +53,6 @@ export function phoneFormatHint(dialCode: string): string {
   return profile?.selectable ? profile.example : "";
 }
 
-export function dialCodeForLocale(locale: string, _development = import.meta.env.DEV): string {
-  return locale === "zh" ? "+86" : "+84";
+export function dialCodeForLocale(locale: string): string {
+  return !vietnamOnly && locale === "zh" ? "+86" : "+84";
 }
