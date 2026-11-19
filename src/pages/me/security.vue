@@ -322,6 +322,11 @@ const twoFactorCode = ref("");
 const twoFactorChallengeNo = ref("");
 const twoFactorPhoneMasked = ref("");
 const twoFactorTarget = ref<boolean | null>(null);
+const deletionBalanceBlock = computed(() => {
+  if (app.user.usdtBalance < 0) return "debt";
+  if (app.user.usdtBalance > 0 || app.user.nexBalance > 0) return "balance";
+  return null;
+});
 const deletionPassword = ref("");
 const deletionCommandKey = ref("");
 const remoteSecurityLoading = ref(false);
@@ -997,7 +1002,7 @@ async function handleDeleteAccount() {
         && isCurrentSecurityRequest(pageScope, accountScope, accountKey)) toast.error(t.value.ui.navigationFailed);
       return;
     }
-    if (app.user.usdtBalance > 0 || app.user.nexBalance > 0) {
+    if (deletionBalanceBlock.value) {
       const hasNex = app.user.nexBalance > 0;
       const view = await uiConfirm({
         title: t.value.security.deleteAccount,

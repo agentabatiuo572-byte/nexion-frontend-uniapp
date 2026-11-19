@@ -4,7 +4,7 @@ import { ApiError } from "./errors";
 export type WalletBillAsset = "USDT" | "UVT";
 export type WalletBillDirection = "IN" | "OUT";
 export type WalletBillStatus = "SUCCESS" | "PENDING" | "FAILED";
-export type WalletBillCategory = "earn" | "refer" | "bonus" | "topup" | "withdraw" | "purchase" | "refund" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "other";
+export type WalletBillCategory = "earn" | "refer" | "bonus" | "topup" | "withdraw" | "purchase" | "refund" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "clawback" | "other";
 
 export interface WalletBillRow {
   id: string;
@@ -72,17 +72,18 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function money(value: unknown): number | null {
+function money(value: unknown, signed = false): number | null {
   if ((typeof value !== "number" && typeof value !== "string") || value === "" || (typeof value === "string" && !value.trim())) return null;
   const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  return Number.isFinite(parsed) && (signed || parsed >= 0) ? parsed : null;
 }
 
-function exactMoney(value: unknown, legacy: unknown, parsed: number): string | undefined {
+function exactMoney(value: unknown, legacy: unknown, parsed: number, signed = false): string | undefined {
+  const decimal = signed ? /^-?\d+(?:\.\d+)?$/ : /^\d+(?:\.\d+)?$/;
   if (value === undefined) {
-    return typeof legacy === "string" && /^\d+(?:\.\d+)?$/.test(legacy.trim()) ? legacy.trim() : undefined;
+    return typeof legacy === "string" && decimal.test(legacy.trim()) ? legacy.trim() : undefined;
   }
-  if (typeof value !== "string" || !/^\d+(?:\.\d+)?$/.test(value) || Number(value) !== parsed) return invalid();
+  if (typeof value !== "string" || !decimal.test(value) || Number(value) !== parsed) return invalid();
   return value;
 }
 
@@ -94,7 +95,8 @@ function bill(value: unknown): WalletBillRow {
   const asset = text(row?.asset)?.toUpperCase();
   const direction = text(row?.direction)?.toUpperCase();
   const amount = money(row?.amount);
-  const balanceAfter = money(row?.balanceAfter);
+  const signedBalance = asset === "USDT";
+  const balanceAfter = money(row?.balanceAfter, signedBalance);
   const status = text(row?.status)?.toUpperCase();
   const createdAtRaw = text(row?.createdAt);
   const createdAt = createdAtRaw ? Date.parse(createdAtRaw) : Number.NaN;
@@ -113,7 +115,7 @@ function bill(value: unknown): WalletBillRow {
     amount,
     balanceAfter,
     amountExact: exactMoney(row.amountExact, row.amount, amount),
-    balanceAfterExact: exactMoney(row.balanceAfterExact, row.balanceAfter, balanceAfter),
+    balanceAfterExact: exactMoney(row.balanceAfterExact, row.balanceAfter, balanceAfter, signedBalance),
     status,
     remark: typeof row.remark === "string" ? row.remark : "",
     createdAt,
@@ -146,7 +148,7 @@ function optionalText(value: unknown): string | undefined {
 
 function category(value: unknown): WalletBillCategory | undefined {
   const candidate = optionalText(value);
-  return candidate && ["earn", "refer", "bonus", "topup", "withdraw", "purchase", "refund", "swap", "verification", "stake", "unstake", "achievement", "other"].includes(candidate)
+  return candidate && ["earn", "refer", "bonus", "topup", "withdraw", "purchase", "refund", "swap", "verification", "stake", "unstake", "achievement", "clawback", "other"].includes(candidate)
     ? candidate as WalletBillCategory : undefined;
 }
 

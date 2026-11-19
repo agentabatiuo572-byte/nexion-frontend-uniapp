@@ -226,7 +226,7 @@ function optionalText(row: Record<string, unknown>, key: string): string | undef
 
 function parseSnapshot(value: unknown, mode: ApiEnvironment): StakingSnapshot {
   const row = record(value);
-  const walletBalanceUsdt = number(row?.walletBalanceUsdt);
+  const walletBalanceUsdt = number(row?.walletBalanceUsdt, -Infinity);
   const serverTime = timestamp(row?.serverTime);
   const expectedSource = "nx_staking_product + nx_config_item + nx_emergency_control_setting";
   if (!row || row.serverCanonical !== true || !matchesRuntimeProvenance(row, mode, expectedSource)

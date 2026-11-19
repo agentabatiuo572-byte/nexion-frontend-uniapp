@@ -346,7 +346,7 @@ function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
     dailyNex: number(source.dailyNex),
     realizedTodayUsdt,
     realizedTodayNex,
-    walletUsdt: number(source.walletUsdt),
+    walletUsdt: number(source.walletUsdt, -Infinity),
     walletNex: number(source.walletNex),
     userJoinedAt: integer(source.userJoinedAt),
     serverNow,
@@ -406,7 +406,7 @@ function quote(value: unknown): CanonicalTradeinQuote {
     discountUsdt: number(source.discountUsdt),
     targetPriceUsdt: number(source.targetPriceUsdt),
     payableUsdt: number(source.payableUsdt),
-    walletBalanceUsdt: number(source.walletBalanceUsdt),
+    walletBalanceUsdt: number(source.walletBalanceUsdt, -Infinity),
     walletShortfallUsdt: number(source.walletShortfallUsdt),
     sufficientFunds: boolean(source.sufficientFunds),
     discountToWallet: false,
@@ -429,7 +429,10 @@ function purchaseReceiptRecord(value: unknown): Record<string, unknown> {
     for (const key of ['amountUsdt', 'walletDebitUsdt', 'walletBalanceAfterUsdt', 'discountUsdt']) {
       const raw = source[key];
       if (typeof raw === 'string') {
-        if (!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(raw)) return invalid();
+        const decimal = key === 'walletBalanceAfterUsdt'
+          ? /^-?(0|[1-9]\d{0,11})(\.\d{1,6})?$/
+          : /^(0|[1-9]\d{0,11})(\.\d{1,6})?$/;
+        if (!decimal.test(raw)) return invalid();
         source[key] = Number(raw);
       }
     }
@@ -459,7 +462,7 @@ export function parseCanonicalTradeinResult(value: unknown): CanonicalTradeinRes
     orderStatus: string(source.orderStatus).toUpperCase(),
     discountUsdt: number(source.discountUsdt),
     walletDebitUsdt: number(source.walletDebitUsdt),
-    walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt),
+    walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt, -Infinity),
   };
   if (parsed.applicationStatus !== "COMPLETED" || parsed.orderStatus !== "COMPLETED") return invalid();
   return parsed;
@@ -478,7 +481,7 @@ export function parseCanonicalCapacityKeepResult(value: unknown): CanonicalCapac
     deviceStatus: "ACTIVE",
     orderStatus: "COMPLETED",
     walletDebitUsdt: number(source.walletDebitUsdt),
-    walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt),
+    walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt, -Infinity),
   };
 }
 
@@ -606,7 +609,7 @@ function capacityQuote(value: unknown): CanonicalCapacityReplaceQuote {
     targetProductName: string(source.targetProductName),
     targetPriceUsdt: number(source.targetPriceUsdt),
     payableUsdt: number(source.payableUsdt),
-    walletBalanceUsdt: number(source.walletBalanceUsdt),
+    walletBalanceUsdt: number(source.walletBalanceUsdt, -Infinity),
     sufficientFunds: boolean(source.sufficientFunds),
     decisionSource: source.decisionSource === "server" ? "server" : invalid(),
   };

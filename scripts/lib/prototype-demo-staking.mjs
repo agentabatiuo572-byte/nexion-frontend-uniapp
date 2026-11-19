@@ -52,7 +52,7 @@ export function stakingDemo(url, state, request) {
   if (state.stakingState === "error") throw Object.assign(new Error("DEMO_STAKING_READ_UNAVAILABLE"), { status: 503 });
   // The stake sheet's balance is the account's wallet fact, the one every other wallet read and payment uses.
   const deletionWallet = accountDeletionWallet(state);
-  const fixture = createStakingDemoFixture({ empty: Boolean(deletionWallet) || state.dataState === "empty",
+  const fixture = createStakingDemoFixture({ empty: Boolean(deletionWallet) || state.dataState === "empty" || state.paymentState === "reward-clawback-debt",
     now: state.stakingNow, wallet: deletionWallet?.usdtAvailable ?? (state.dataState === "empty" ? 0 : state.walletBalance ?? 52800.64) });
   if (url.pathname === "/api/config/staking/pools") return fixture.pools;
   const stake = demoDeletionStake(state);

@@ -498,26 +498,20 @@ export function mergeAccountSnapshots(
   };
 }
 
-/** 资金不变量收口:余额类字段 clamp ≥0,且 withdrawableUsdt ≤ usdtBalance(可提额度 ⊆
- *  总余额)。ADDITIVE_NUMBER_KEYS 把余额字段当独立计数器做三路累加,多端并发扣款(各自
- *  本地合法)合并时两笔扣款都累加 → 总余额被扣穿为负 / 可提额度虚高于总余额(超卖)。真后端
- *  单事务天然不会;mock 层在写盘前统一收口,storage 与内存都不落负余额/虚高可提额度
- *  (与单会话 debitBalance clamp 同一不变量,补住 merge 层这条旁路)。 */
+/** USDT 可用余额保留欠款，其他资金桶保持非负，可提额度以上浮到零的可用余额为上限。 */
 function clampAccountFundInvariants(snapshot: AccountCloudSnapshot): AccountCloudSnapshot {
   const u = snapshot.user;
-  const usdtBalance = Math.max(0, u.usdtBalance);
   const nexBalance = Math.max(0, u.nexBalance);
   const b = u.earningBuckets;
-  if (!b) return { ...snapshot, user: { ...u, usdtBalance, nexBalance } };
+  if (!b) return { ...snapshot, user: { ...u, nexBalance } };
   return {
     ...snapshot,
     user: {
       ...u,
-      usdtBalance,
       nexBalance,
       earningBuckets: {
         ...b,
-        withdrawableUsdt: Math.min(Math.max(0, b.withdrawableUsdt), usdtBalance),
+        withdrawableUsdt: Math.min(Math.max(0, b.withdrawableUsdt), Math.max(0, u.usdtBalance)),
         pendingReviewUsdt: Math.max(0, b.pendingReviewUsdt),
         bonusLockedUsdt: Math.max(0, b.bonusLockedUsdt),
         lockedNex: Math.max(0, b.lockedNex),

@@ -5,7 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages } from './lib/design-review-fixture.mjs';
-import { initializeDemoWalletHistory, initializeLegacyStreakSavers } from './lib/prototype-demo-wallet.mjs';
+import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
@@ -119,7 +119,7 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/state') {
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
-        const accountPayment=value=>['low-balance','urgent','late'].includes(value)?value:'';
+        const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
         const paymentMode=()=>state.paymentState==='read-error'?state.paymentBeforeReadError:state.paymentState;
         const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPaymentMode=paymentMode(),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
         if(update.reset){
@@ -147,6 +147,7 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange&&state.bankDemo){Object.assign(state.bankDemo,{quotes:{},orders:{},commands:{},addresses:{}});delete state.bankDemo.addressOtp;}
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
         else if(scenarioChange&&state.paymentState==='low-balance')state.walletBalance=820.64;
+        else if((update.reset||scenarioChange)&&state.dataState!=='empty'&&state.paymentState==='reward-clawback-debt')seedDemoRewardClawback(state,Date.now());
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;

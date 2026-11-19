@@ -437,9 +437,9 @@ export function usePurchasePayment() {
     closeCashier: () => { state.cashier = false; paused = false; if (!state.busy) void query(); },
     pause: () => { paused = true; clearTimeout(pollTimer); pollTimer = undefined; },
     wake: () => { paused = false; if (state.open && state.pending && !state.busy && !settled(state.intent) && !state.concluded) void (state.unavailable ? submitOriginal() : query()); },
-    topup: () => {
+    topup: (shortfall: number) => {
       const orderNo = state.orderNo, total = Number(state.amount), deadlineAt = state.deadlineAt, summary = state.summary;
-      const query = orderNo ? `?orderNo=${encodeURIComponent(orderNo)}&amount=${total}&name=${encodeURIComponent(summary)}${deadlineAt ? `&deadline=${deadlineAt}` : ''}` : '';
+      const query = orderNo ? `?orderNo=${encodeURIComponent(orderNo)}&amount=${total}&shortfall=${shortfall.toFixed(6)}&name=${encodeURIComponent(summary)}${deadlineAt ? `&deadline=${deadlineAt}` : ''}` : '';
       closeAndNavigate(`/pages/me/wallet-topup${query}`);
     },
     openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); else finish(null); },

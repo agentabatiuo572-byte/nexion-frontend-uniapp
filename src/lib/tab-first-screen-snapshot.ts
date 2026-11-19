@@ -49,7 +49,7 @@ let context: Context | null = null, accepted = false, binding = 0;
 let restored = new Set<TabSnapshotKey>();
 
 // The storage boundary validates this new format once. No migration or whole-store hydration.
-type Schema = "number" | "count" | "percent" | "string" | "boolean" | { nullable: Schema } | { list: Schema } | { oneOf: readonly unknown[] } | { fields: Record<string, Schema> };
+type Schema = "signedNumber" | "number" | "count" | "percent" | "string" | "boolean" | { nullable: Schema } | { list: Schema } | { oneOf: readonly unknown[] } | { fields: Record<string, Schema> };
 const n: Schema = "number", c: Schema = "count", pct: Schema = "percent", s: Schema = "string", b: Schema = "boolean";
 const nullable = (value: Schema): Schema => ({ nullable: value });
 const fields = (value: Record<string, Schema>): Schema => ({ fields: value });
@@ -59,7 +59,7 @@ const period = fields({ usdt: nullable(n), nex: nullable(n), jobCount: nullable(
 const localized = fields({ zh: s, en: s, vi: s });
 const schemas: Record<TabSnapshotKey, Schema> = {
   home: fields({ earnings: fields({ today: period, week: period, month: period, all: period }), latest: nullable(fields({ id: s, client: s, model: s, rewardUsdt: n, completedAt: s, synthetic: b })) }),
-  wallet: fields({ usdt: n, nex: n, today: fields({ usdt: n, nex: n }) }),
+  wallet: fields({ usdt: "signedNumber", nex: n, today: fields({ usdt: n, nex: n }) }),
   commission: fields({ totalUSDT: n, contributorCount: c, directUSDT: n, extendedUSDT: n, monthUSDT: n, monthNEX: n, unlockedUSDT: n, coolingUSDT: n }),
   network: fields({ total: c, direct: c }),
   rank: fields({ rank: { oneOf: [0, 1, 2, 3, 4, 5, 6, 7, 8] }, next: nullable({ oneOf: [1, 2, 3, 4, 5, 6, 7, 8] }), missing: c, bars: list(fields({ key: s, kind: { oneOf: ["selfComputePoints", "directRefs", "teamComputePoints", "vDownlines"] }, vLevel: nullable(c), percent: nullable(pct) })) }),
@@ -75,6 +75,7 @@ const schemas: Record<TabSnapshotKey, Schema> = {
 };
 function record(value: unknown): value is Record<string, unknown> { return !!value && typeof value === "object" && !Array.isArray(value); }
 function valid(value: unknown, schema: Schema): boolean {
+  if (schema === "signedNumber") return typeof value === "number" && Number.isFinite(value);
   if (schema === "number" || schema === "count" || schema === "percent") return typeof value === "number" && Number.isFinite(value) && value >= 0
     && (schema !== "count" || Number.isSafeInteger(value)) && (schema !== "percent" || value <= 100);
   if (typeof schema === "string") return typeof value === schema;

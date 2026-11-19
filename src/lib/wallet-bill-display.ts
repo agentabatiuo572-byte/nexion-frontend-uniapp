@@ -42,6 +42,14 @@ export function resolveWalletBillMemo(bill: DisplayBill, memo: Record<string, st
 /** Unsigned bill amount in the ledger's own precision (USDT detail, UVT overview); Vietnamese swaps the separators. */
 export function formatWalletBillDecimal(exact: string | undefined, fallback: number, symbol: "USDT" | "UVT", locale: string): string {
   const amount = exact === undefined ? Math.abs(fallback) : exact.replace(/^-/, "");
+  return formatWalletBillValue(amount, symbol, locale);
+}
+
+export function formatWalletBillBalance(exact: string | undefined, fallback: number, symbol: "USDT" | "UVT", locale: string): string {
+  return formatWalletBillValue(exact ?? fallback, symbol, locale);
+}
+
+function formatWalletBillValue(amount: string | number, symbol: "USDT" | "UVT", locale: string): string {
   const formatted = formatUsd(amount, symbol === "USDT" ? "detail" : "overview").replace("$", "");
   return locale.startsWith("vi") ? formatted.replace(/[.,]/g, mark => mark === "." ? "," : ".") : formatted;
 }
@@ -60,12 +68,13 @@ export const WALLET_BILL_TYPE_COLOR: Record<BillType, string> = {
   stake: "var(--v5-warning)",
   unstake: "var(--v5-ink-3)",
   achievement: "var(--v5-warning)",
+  clawback: "var(--v5-ink-3)",
   other: "var(--v5-ink-3)",
 };
 
 /** Icon tile tint for a bill type: neutral types stay faint, warm accents a little stronger. */
 export function walletBillTypeTint(type: BillType): string {
-  const percent = type === "withdraw" || type === "unstake" || type === "other" ? 8
+  const percent = type === "withdraw" || type === "unstake" || type === "other" || type === "clawback" ? 8
     : type === "bonus" || type === "achievement" || type === "stake" ? 20
       : type === "refer" || type === "purchase" || type === "refund" || type === "verification" ? 18 : 16;
   return `color-mix(in srgb, ${WALLET_BILL_TYPE_COLOR[type]} ${percent}%, transparent)`;

@@ -35,12 +35,12 @@
             <view class="pp-opt" :class="{ on: s.method === 'WALLET' }" role="radio" :tabindex="s.method === 'WALLET' ? 0 : -1" :aria-checked="s.method === 'WALLET'" @click="payment.choose('WALLET')" @keydown.enter.prevent="payment.choose('WALLET')">
               <view class="pp-opt__row">
                 <view class="pp-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg></view>
-                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.wallet }}</text><text class="pp-opt__h">{{ balanceKnown ? fill(copy.walletAvailable, { amt: amount(app.user.usdtBalance) }) : copy.walletUnavailable }}</text></view>
+                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.wallet }}</text><text class="pp-opt__h">{{ balanceKnown ? fill(copy.walletAvailable, { amt: walletAmount(app.user.usdtBalance) }) : copy.walletUnavailable }}</text></view>
                 <view class="pp-radio" aria-hidden="true" />
               </view>
               <view v-if="shortfall > 0" class="pp-short" @click.stop>
-                <text class="pp-short__t">{{ fill(copy.short, { amt: amount(shortfall) }) }}</text>
-                <NxButton :label="copy.topup" variant="brand" size="small" @click="payment.topup" />
+                <text class="pp-short__t">{{ fill(copy.short, { amt: walletAmount(shortfall) }) }}</text>
+                <NxButton :label="copy.topup" variant="brand" size="small" @click="payment.topup(shortfall)" />
               </view>
             </view>
             <!-- Unconfigured channels are hidden, never shown as unavailable. -->
@@ -253,9 +253,9 @@ const records = computed(() => { app.accountKey; s.revision; return payment.reco
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().safeAreaInsets?.bottom ?? 0, 30); } catch { return 30; } })();
 
-const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.user.usdtBalance >= 0 && app.remoteFleetHasSnapshot);
+const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
 const walletEnough = computed(() => Number(s.amount) === 0 || balanceKnown.value && app.user.usdtBalance >= Number(s.amount));
-const shortfall = computed(() => balanceKnown.value ? Math.max(0, Number(s.amount) - app.user.usdtBalance) : 0);
+const shortfall = computed(() => balanceKnown.value && Number(s.amount) > 0 ? Math.max(0, Number(s.amount) - app.user.usdtBalance) : 0);
 const usdtAvailable = computed(() => payment.available('CREGIS_USDT_BSC') || payment.available('CREGIS_USDT_ERC20') || payment.available('CREGIS_USDT_TRC20'));
 const networks = computed(() => [
   { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
@@ -358,6 +358,7 @@ const conclusion = computed(() => networkPaused.value
   : noticeFor(purchaseConclusion(s.intent)));
 
 function amount(value: string | number) { return formatGroupedAmount(value); }
+function walletAmount(value: number) { return formatGroupedAmount(value, app.user.usdtBalance < 0 ? 6 : 2); }
 function clock(ms: number) { const total = Math.ceil(ms / 1000); return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`; }
 function pickNetwork(method: ExternalPaymentMethod) { if (s.method !== method) void payment.select(method); }
 function copyText(data: string, message: string) { uni.setClipboardData({ data, showToast: false, success: () => toast.success(message) }); }
