@@ -8,7 +8,7 @@ export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',regis
 export const authDemoOptions = {
   authState:[['signed-in','已登录'],['signed-out','未登录（验证登录/注册）']],
   oauthState:[['signup','第三方新账号'],['existing','第三方已有账号'],['lost-unissued','complete 丢失且过期：未签发'],['lost-issued','complete 回包丢失且过期：已签发，恢复暂时不可用'],['invite-refused','授权后邀请码被拒'],['device-limit','第三方注册设备上限'],['ip-limit','第三方注册 IP 上限']],
-  savedAttemptState:[['none','无旧尝试'],['legacy-empty','旧空安装 ID：恢复已签发会话'],['storage-cleared','旧浏览器 ID：恢复已签发会话'],['registration','手机号注册恢复（无回执）']],
+  savedAttemptState:[['none','无旧尝试'],['legacy-empty','旧空安装 ID：恢复已签发会话'],['storage-cleared','旧浏览器 ID：恢复已签发会话'],['registration','手机号注册恢复']],
   phoneBindingState:[['normal','正常绑定（验证码 123456）'],['captcha','绑定发码需滑块'],['used','手机号已被使用']],
   registrationState:[['normal','正常注册'],['captcha','发码需滑块'],['captcha-invalid','发码 ticket 无效后重新验证'],['device-limit','注册设备上限'],['ip-limit','注册 IP 上限']],
 };
@@ -47,8 +47,12 @@ export function createAuthDemo(state) {
       const attempt={loginAttemptId:randomBytes(16).toString('hex'),recoveryProof:randomBytes(32).toString('base64url'),
         installationId:state.savedAttemptState==='legacy-empty'?'':'preview-previous-browser-id',executionSupported:false,
         authMethod:'OTP',authReference:'LOGIN-'+randomBytes(16).toString('hex'),pending:true,context:{countryCode:'+86',phone:'13800000000'}};
-      if(state.savedAttemptState==='registration')Object.assign(attempt,{authMethod:'REGISTRATION',authReference:'+86:13800000000',context:{countryCode:'+86',phone:'13800000000',language:'en'}});
-      attempts.set(attempt.loginAttemptId,{...attempt,response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:existing}});
+      const registration=state.savedAttemptState==='registration';
+      const user=registration?{...existing,userId:900002,phone:'13800000001',onboardingComplete:false}:existing;
+      if(registration)Object.assign(attempt,{authMethod:'REGISTRATION',authReference:user.countryCode+':'+user.phone,
+        context:{countryCode:user.countryCode,phone:user.phone,language:'en',sponsorCode:null,challengeNo:'REG-'+randomBytes(16).toString('hex')}});
+      attempts.set(attempt.loginAttemptId,{...attempt,response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',
+        user,...(registration?{registrationReceipt:receipt(null)}:{})}});
       return attempt;
     },
     reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();delete state.authUser;delete state.captchaInvalidReturned;},
@@ -68,7 +72,9 @@ export function createAuthDemo(state) {
         const proofMatches=attempt.recoveryProof===body.recoveryProof&&attempt.recoveryProof===headers['x-nexgrid-login-recovery-key'];
         trace.at(-1).proofMatches=proofMatches;
         if(!proofMatches)return fail(401,'LOGIN_ATTEMPT_RECOVERY_INVALID');
-        if(attempt.installationId!==body.installationId||attempt.installationId!==(headers['x-nexgrid-installation-id']??'')||attempt.authMethod!==body.authMethod||attempt.authReference!==body.authReference)return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
+        if(attempt.installationId!==body.installationId||attempt.installationId!==(headers['x-nexgrid-installation-id']??'')
+          ||attempt.executionSupported!==body.executionSupported||String(attempt.executionSupported)!==headers['x-nexgrid-execution-supported']
+          ||attempt.authMethod!==body.authMethod||attempt.authReference!==body.authReference)return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
         if(attempt.waitForReplay&&!attempt.replayed)return fail(503,'PREVIEW_RECOVERY_UNAVAILABLE');
         state.authState='signed-in';state.authUser=attempt.response.user;
         return ok(attempt.response);
@@ -136,15 +142,25 @@ export function createAuthDemo(state) {
           flow.expired=true;
           if(state.oauthState==='lost-issued')attempts.set(headers['x-nexgrid-login-attempt-id'],{
             recoveryProof:headers['x-nexgrid-login-recovery-key'],installationId:headers['x-nexgrid-installation-id'],
-            authMethod:'OAUTH',authReference:flow.provider+':'+flow.flowId,waitForReplay:true,
+            executionSupported:false,authMethod:'OAUTH',authReference:flow.provider+':'+flow.flowId,waitForReplay:true,
             response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:existing}});
           // A gateway failure is deterministic here; a destroyed socket may be
           // transparently retried by Chromium before the UI observes the loss.
           return fail(504,'PREVIEW_COMPLETE_RESPONSE_LOST');
         }
-        // Current backend omits registrationReceipt for provider sign-up without
-        // a sponsor. Do not make the preview imply this dependency is delivered.
-        return session({...existing,countryCode:'',phone:'',nickname:'Preview identity',onboardingComplete:false},flow.sponsorCode?receipt(flow.sponsorCode):undefined);
+        const attemptId=headers['x-nexgrid-login-attempt-id'], recoveryProof=headers['x-nexgrid-login-recovery-key'];
+        if(!/^[A-Za-z0-9_-]{16,80}$/.test(attemptId??'')||!/^[A-Za-z0-9_-]{43,128}$/.test(recoveryProof??''))return fail(422,'LOGIN_ATTEMPT_INVALID');
+        const installationId=headers['x-nexgrid-installation-id'], authReference=flow.provider+':'+flow.flowId;
+        const retained=attempts.get(attemptId);
+        if(retained) {
+          if(retained.recoveryProof!==recoveryProof)return fail(401,'LOGIN_ATTEMPT_RECOVERY_INVALID');
+          if(retained.installationId!==installationId||retained.authMethod!=='OAUTH'||retained.authReference!==authReference)
+            return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
+          return session(retained.response.user,retained.response.registrationReceipt);
+        }
+        const response=session({...existing,userId:900003,countryCode:'',phone:'',nickname:'Preview identity',onboardingComplete:false},receipt(flow.sponsorCode));
+        attempts.set(attemptId,{recoveryProof,installationId,executionSupported:false,authMethod:'OAUTH',authReference,response:response.body.data});
+        return response;
       }
       if(path==='/api/auth/captcha/challenge') {
         const challengeId='PREVIEW-'+randomBytes(16).toString('hex');challenges.set(challengeId,body.scene);
@@ -169,6 +185,15 @@ export function createAuthDemo(state) {
       if(path==='/auth/users/login') {
         accountDemo(url, 'en', state, {method:()=>method,postDataJSON:()=>body});
         return session(existing);
+      }
+      if(path==='/auth/users/register') {
+        const attempt=attempts.get(headers['x-nexgrid-login-attempt-id']);
+        if(attempt?.authMethod==='REGISTRATION') {
+          if(attempt.recoveryProof!==headers['x-nexgrid-login-recovery-key'])return fail(401,'LOGIN_ATTEMPT_RECOVERY_INVALID');
+          if(attempt.installationId!==(headers['x-nexgrid-installation-id']??'')||headers['x-nexgrid-execution-supported']!=='false'
+            ||attempt.authReference!==body.countryCode+':'+body.phone)return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
+          return session(attempt.response.user,attempt.response.registrationReceipt);
+        }
       }
       if(['/auth/users/register','/auth/users/register/otp/verify','/auth/users/login/otp/verify','/auth/users/password-reset/otp/verify','/auth/users/password-reset/otp/complete'].includes(path)) {
         if(otps.get(body.challengeNo)!==body.countryCode+body.phone||body.code!=='123456')return fail(422,'USER_REGISTRATION_OTP_INVALID');
