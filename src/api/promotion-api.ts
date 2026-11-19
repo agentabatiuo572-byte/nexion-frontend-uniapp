@@ -1,11 +1,12 @@
 import type { ApiClient } from './api-client';
 import { ApiError } from './errors';
 import { readPaymentCommand } from './payment-command-api';
+import { parseServerTimestamp } from './server-time';
 import type { PublicPromotion, PublicPromotionPage, Quote, QuoteInput, Reward, RewardPage, ReferralProgress, OrderReceipt as ContractOrderReceipt, CommandReceipt } from './promotion-contracts';
 export type { PublicPromotion, Quote, Reward, ExpectedReward, PublicRewardSpec, RewardSpec, RewardState } from './promotion-contracts';
-// The shared order projection also carries these; the generated promotion OpenAPI types do not list them yet.
+// The shared order projection also carries paymentMethod, which the promotion OpenAPI omits.
 const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USDT_BSC','CREGIS_USDT_ERC20','CREGIS_USDT_TRC20'] as const;
-export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null;paidTotalUsdt?:string|null;recoveredQuoteId?:string};
+export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null};
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
 export type PromotionOperation='createOrder'|'createBundle'|'payOrder'|'cancelOrder';
@@ -39,7 +40,19 @@ function bannerImage(p:Record<string,unknown>):void {
   if(typeof p.bannerImageUrl!=='string'||!/^\/api\/promotions\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/banner\/[1-9][0-9]*$/.test(p.bannerImageUrl)
     ||p.bannerImageUrl!==`/api/promotions/${p.activityId}/banner/${p.version}`||p.state!=='ACTIVE')return invalid();
 }
-function promotion(value:unknown):PublicPromotion{const p=object(value);bannerImage(p);string(p.activityId);if(typeof p.version!=='number'||!Number.isSafeInteger(p.version)||p.version<1)return invalid();if(!['SKU_GIFT','FIRST_PURCHASE','DIRECT_REFERRAL','MULTI_PRODUCT','REPURCHASE'].includes(string(p.template))||!['DRAFT','SCHEDULED','ACTIVE','PAUSED','ENDED','ARCHIVED'].includes(string(p.state))||!['SIGN_IN_REQUIRED','ESTIMATE_ELIGIBLE','INELIGIBLE','UNKNOWN'].includes(string(p.eligibility)))return invalid();array(p.minimumClientCapabilities).forEach(c=>{if(!PROMOTION_CAPABILITIES.includes(c as typeof PROMOTION_CAPABILITIES[number]))return invalid();});time(p.serverTime);time(p.startsAt);time(p.endsAt);for(const key of ['title','terms']){const l=object(p[key]);['zh','en','vi'].forEach(lang=>string(l[lang]));}array(p.productNos).forEach(string);array(p.rewardRules).forEach(v=>{const r=object(v);string(r.ruleId);string(r.productNo);quantity(r.minBuyQty);if(!['PER_GROUP','ONCE_PER_ORDER'].includes(string(r.repeatMode)))return invalid();for(const key of ['maxGroups','maxGroupsPerPerson']){const limit=object(r[key]);if(limit.mode!=='UNLIMITED'&&(limit.mode!=='LIMITED'||typeof limit.value!=='number'||!Number.isSafeInteger(limit.value)||limit.value<1))return invalid();}rewardSpec(r.buyerReward);disclosure(object(r.buyerReward).disclosure,object(r.buyerReward).type==='DEVICE');if(r.inviterReward){rewardSpec(r.inviterReward);if(object(r.inviterReward).type==='DISCOUNT_USDT')return invalid();disclosure(object(r.inviterReward).disclosure,object(r.inviterReward).type==='DEVICE');}});return p as PublicPromotion;}
+function repurchaseFields(p: Record<string, unknown>): void {
+  if (p.repurchaseWindow != null) {
+    const window = object(p.repurchaseWindow);
+    for (const bound of [window.minDays, window.maxDays]) {
+      if (bound !== null && (typeof bound !== 'number' || !Number.isSafeInteger(bound) || bound < 0)) invalid();
+    }
+  }
+  if (p.lastValidPurchaseAt != null) {
+    const purchaseAt = string(p.lastValidPurchaseAt);
+    if (!/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(purchaseAt) || parseServerTimestamp(purchaseAt) === null) invalid();
+  }
+}
+function promotion(value:unknown):PublicPromotion{const p=object(value);bannerImage(p);repurchaseFields(p);string(p.activityId);if(typeof p.version!=='number'||!Number.isSafeInteger(p.version)||p.version<1)return invalid();if(!['SKU_GIFT','FIRST_PURCHASE','DIRECT_REFERRAL','MULTI_PRODUCT','REPURCHASE'].includes(string(p.template))||!['DRAFT','SCHEDULED','ACTIVE','PAUSED','ENDED','ARCHIVED'].includes(string(p.state))||!['SIGN_IN_REQUIRED','ESTIMATE_ELIGIBLE','INELIGIBLE','UNKNOWN'].includes(string(p.eligibility)))return invalid();array(p.minimumClientCapabilities).forEach(c=>{if(!PROMOTION_CAPABILITIES.includes(c as typeof PROMOTION_CAPABILITIES[number]))return invalid();});time(p.serverTime);time(p.startsAt);time(p.endsAt);for(const key of ['title','terms']){const l=object(p[key]);['zh','en','vi'].forEach(lang=>string(l[lang]));}array(p.productNos).forEach(string);array(p.rewardRules).forEach(v=>{const r=object(v);string(r.ruleId);string(r.productNo);quantity(r.minBuyQty);if(!['PER_GROUP','ONCE_PER_ORDER'].includes(string(r.repeatMode)))return invalid();for(const key of ['maxGroups','maxGroupsPerPerson']){const limit=object(r[key]);if(limit.mode!=='UNLIMITED'&&(limit.mode!=='LIMITED'||typeof limit.value!=='number'||!Number.isSafeInteger(limit.value)||limit.value<1))return invalid();}rewardSpec(r.buyerReward);disclosure(object(r.buyerReward).disclosure,object(r.buyerReward).type==='DEVICE');if(r.inviterReward){rewardSpec(r.inviterReward);if(object(r.inviterReward).type==='DISCOUNT_USDT')return invalid();disclosure(object(r.inviterReward).disclosure,object(r.inviterReward).type==='DEVICE');}});return p as PublicPromotion;}
 function quote(value:unknown):Quote{
   const p=object(value);string(p.quoteId);string(p.quoteHash);time(p.serverTime);time(p.expiresAt);
   ['subtotalUsdt','discountUsdt','amountUsdt'].forEach(k=>amount(p[k]));
