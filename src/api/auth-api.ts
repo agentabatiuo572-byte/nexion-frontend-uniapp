@@ -403,7 +403,7 @@ export function createAuthApi(
           attempts.challenge(attempt);
         else if (method === "OAUTH" && body?.flowId && cause instanceof ApiError
             && cause.message === "OAUTH_ACCOUNT_LINK_REQUIRED") attempts.complete(attempt);
-        else if (method === "REGISTRATION" && isSettledRegistrationConflict(cause)) attempts.complete(attempt);
+        else if ((method === "REGISTRATION" || method === "OAUTH") && isSettledRegistrationConflict(cause)) attempts.complete(attempt);
         else attempts.failed(attempt, cause);
       }
       throw cause;

@@ -12,9 +12,11 @@ import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { setTransferSampleOutcome } from './lib/prototype-demo-support.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
+import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
+const authDemo=createAuthDemo(state);
 // An optional local handoff preserves demo conversations across a preview rebuild.
 if(process.env.DEMO_STATE_FILE){
   const saved=JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state;
@@ -129,6 +131,8 @@ const server=http.createServer(async(req,res)=>{
         }
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(key!=='promotionRewardState'&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        if(update.reset||update.savedAttemptState)authDemo.reset();
+        if(update.savedAttemptState&&state.savedAttemptState!=='none')state.sessionState='signed-out';
         if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
         else delete state.paymentBeforeReadError;
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
@@ -214,9 +218,12 @@ const server=http.createServer(async(req,res)=>{
         if(response.drop){res.destroy();return;}
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
       }
-      // The signed-out switch refuses the refresh, so the App boots with no session at all.
-      if(url.pathname==='/auth/users/refresh'&&state.sessionState==='signed-out')return sendJson(res,{code:401,message:'AUTH_REQUIRED',data:null},401);
-      if(url.pathname==='/auth/users/refresh')return sendJson(res,{code:0,message:'OK',data:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:{userId:900001,countryCode:'+86',phone:'13800000000',nickname:'Alex',onboardingComplete:true}}});
+      if(req.method==='POST'&&authDemo.handles(url.pathname)){
+        let raw='';for await(const chunk of req)raw+=chunk;
+        if(staleWrite())return refuseStale();
+        const response=authDemo.handle(url.pathname,req.headers,raw?JSON.parse(raw):{});
+        return sendJson(res,response.body,response.status);
+      }
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
       const modeledBankTopup=req.method==='POST'&&/^\/api\/app\/deposits\/vietqr\/intents(?:\/[^/]+\/cancel)?$/.test(url.pathname);
       const bankTopupEndpoint=/^\/api\/app\/(payments\/(config|fx-quote)|deposits\/vietqr\/(receipts|intents(?:\/[^/]+(?:\/cancel)?)?))$/.test(url.pathname);
@@ -270,7 +277,10 @@ const server=http.createServer(async(req,res)=>{
     if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);return res.end();}
     if(url.pathname==='/'||(await stat(file).catch(()=>null))?.isDirectory())file=path.join(file,'index.html');
     const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
-    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed()+seed):bytes);
+    const savedAttempt=path.extname(file)==='.html'?authDemo.savedAttempt():null;
+    const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
+    const clearAuth=state.sessionState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'';
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed()+seed+attemptSeed+clearAuth):bytes);
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
