@@ -435,6 +435,7 @@ function clearSecurityAccountState(keepPresentation = false) {
   if (!keepPresentation) securityPresentation.value = null;
   twoFactorSheetOpen.value = false;
   deletionSheetOpen.value = false;
+  deletionDebtOpen.value = false;
   securityPageFence.invalidate();
   ui.clearConfirmsBy(securityConfirmOwner);
   securityBusy.value = false;
@@ -1173,6 +1174,7 @@ function closeTwoFactorSheet() {
 function closeDeletionSheet() {
   if (securityBusy.value) return;
   deletionSheetOpen.value = false;
+  deletionDebtOpen.value = false;
   deletionPassword.value = "";
 }
 function openDeletionSheet() {

@@ -5285,7 +5285,7 @@ openSeaErrorPool: {
     onboardingRecoveryCta: "Hoàn tất thiết lập ban đầu",
     termsRequired: "Vui lòng đọc và đồng ý điều khoản trước khi nạp tiền.",
     termsRecoveryCta: "Đọc và xác nhận điều khoản",
-    segBank: "Thanh toán thẻ ngân hàng",
+    segBank: "Thẻ ngân hàng",
     amountLabel: "Số tiền nạp (USDT)",
     amountFormatError: "Nhập số tiền nạp là số nguyên dương.",
     approx: "≈ {vnd}",

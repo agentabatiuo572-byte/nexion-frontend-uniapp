@@ -4,6 +4,7 @@
   三个动作等权、长得完全一样(主人 2026-07-31 终裁):同一实心 brand 底 + on-brand
   图标,无主次之分。**不给任何一个加 spotlight halo** —— feedback_no_icon_halo_glow
   规定 halo 仅限「唯一主 CTA」,三个平权后该豁免对谁都不成立,给三个都加正是它要防的。
+  例外(BUG-515):钱包欠款时「我的」紧凑卡的「充值」用 emphasis 品牌玻璃突出,其余状态三者仍等权。
   Icon 走默认 slot(inline SVG 用 stroke="currentColor")。跳 `href`(uni route),
   fail:()=>{} 兜未接入的目标。
 -->

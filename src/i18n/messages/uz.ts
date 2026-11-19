@@ -5600,7 +5600,7 @@ export const uz: Messages = {
     onboardingRecoveryCta: "Dastlabki sozlashni yakunlash",
     termsRequired: "Hisobni toʻldirishdan oldin shartlarni oʻqib, qabul qiling.",
     termsRecoveryCta: "Shartlarni oʻqib, qabul qilish",
-    segBank: "Bank kartasi bilan toʻlov",
+    segBank: "Bank kartasi",
     amountLabel: "Toʻldirish summasi (USDT)",
     amountFormatError: "Noldan katta butun son kiriting.",
     approx: "≈ {vnd}",
