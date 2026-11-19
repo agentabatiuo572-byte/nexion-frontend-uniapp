@@ -46,8 +46,9 @@ export function removeAccountRow(tableKey: string, accountKey: string): boolean 
   } catch { return false; }
 }
 
-interface AccountCommandRow {
+export interface AccountCommandRow {
   commands: Record<string, string>;
+  payloads?: Record<string, string>;
 }
 
 /**
@@ -63,6 +64,17 @@ export function acquireAccountCommandKey(
   prefix: string,
   createId: () => string = requireCryptoUuid,
 ): string {
+  return acquireAccountCommand(tableKey, accountKey, intent, prefix, undefined, createId).key;
+}
+
+export function acquireAccountCommand(
+  tableKey: string,
+  accountKey: string,
+  intent: string,
+  prefix: string,
+  payload?: string,
+  createId: () => string = requireCryptoUuid,
+): { key: string; payload?: string; reused: boolean } {
   const normalizedIntent = intent.trim();
   const normalizedPrefix = prefix.trim();
   if (!tableKey.trim() || !normalizedIntent || !normalizedPrefix) {
@@ -74,23 +86,28 @@ export function acquireAccountCommandKey(
     ? persisted.commands
     : {};
   const existing = commands[normalizedIntent];
-  if (typeof existing === "string" && existing.trim()) return existing;
+  if (typeof existing === "string" && existing.trim()) {
+    return { key: existing, payload: persisted?.payloads?.[normalizedIntent], reused: true };
+  }
 
   const generatedId = createId().trim();
   if (!generatedId) throw new Error("ACCOUNT_COMMAND_ID_UNAVAILABLE");
   const key = `${normalizedPrefix}:${generatedId}`;
   if (!writeAccountRow<AccountCommandRow>(tableKey, accountKey, {
+    ...persisted,
     commands: { ...commands, [normalizedIntent]: key },
+    ...(payload === undefined ? {} : { payloads: { ...persisted?.payloads, [normalizedIntent]: payload } }),
   })) {
     throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
   }
   // Read-after-write also converges same-intent races on the key that is
   // actually recoverable after a restart.
-  const committed = readAccountRow<AccountCommandRow>(tableKey, accountKey, true)?.commands?.[normalizedIntent];
-  if (typeof committed !== "string" || !committed.trim()) {
+  const committed = readAccountRow<AccountCommandRow>(tableKey, accountKey, true);
+  const committedKey = committed?.commands?.[normalizedIntent];
+  if (typeof committedKey !== "string" || !committedKey.trim()) {
     throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
   }
-  return committed;
+  return { key: committedKey, payload: committed?.payloads?.[normalizedIntent], reused: committedKey !== key };
 }
 
 /** Forget a completed command without deleting a newer retry. */
@@ -106,7 +123,11 @@ export function releaseAccountCommandKey(
   if (persisted?.commands?.[normalizedIntent] !== expectedKey) return false;
   const commands = { ...persisted.commands };
   delete commands[normalizedIntent];
-  if (!writeAccountRow<AccountCommandRow>(tableKey, accountKey, { commands })) return false;
+  const payloads = { ...persisted.payloads };
+  delete payloads[normalizedIntent];
+  if (!writeAccountRow<AccountCommandRow>(tableKey, accountKey, {
+    commands, ...(Object.keys(payloads).length ? { payloads } : {}),
+  })) return false;
   return readAccountRow<AccountCommandRow>(tableKey, accountKey)?.commands?.[normalizedIntent] === undefined;
 }
 
