@@ -5,6 +5,13 @@ export const MESSAGE_ACK_TIMEOUT_MS = 12_000;
 export const MESSAGE_READBACK_TIMEOUT_MS = 3_000;
 export const MESSAGE_SEND_WAIT_MS = MESSAGE_ACK_TIMEOUT_MS + MESSAGE_READBACK_TIMEOUT_MS;
 
+/** The original reply command was authoritatively rejected before sending. */
+export class SupportReplyRejected extends ApiError {
+  constructor(code: number, message: string) {
+    super({ kind: 'http', status: code, code, message });
+  }
+}
+
 /** The server checks the stored peer before writing any new message. */
 export function isConversationPeerChanged(cause: unknown): boolean {
   return cause instanceof ApiError && (cause.kind === 'http' || cause.kind === 'business')
@@ -20,7 +27,7 @@ export function isConversationUserClearRejected(cause: unknown): boolean {
 
 /** WebSocket ack codes use HTTP meanings; ordinary business codes remain explicit rejections. */
 export function isConversationDeliveryAmbiguous(cause: unknown): boolean {
-  if (isConversationPeerChanged(cause)) return false;
+  if (cause instanceof SupportReplyRejected || isConversationPeerChanged(cause)) return false;
   if (isAmbiguousOutcome(cause)) return true;
   if (!(cause instanceof ApiError) || cause.kind !== 'business') return false;
   const code = cause.status ?? cause.code ?? 0;

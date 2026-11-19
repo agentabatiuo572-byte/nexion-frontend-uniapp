@@ -125,6 +125,13 @@ export function createPurchasePaymentApi(client: ApiClient) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents/${encodeURIComponent(intentNo)}` })); }
       catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
     },
+    async activeByOrder(orderNo: string): Promise<string | null> {
+      const data = object(await client.request({ path: `${base}-intents/by-order/${encodeURIComponent(orderNo)}` }));
+      if (data.orderNo !== orderNo) throw invalid();
+      if (data.state === 'NONE' && data.intentNo === null) return null;
+      if (data.state === 'IN_PROGRESS') return text(data.intentNo);
+      throw invalid();
+    },
     async find(kind: PurchaseKind, commandKey: string) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents?kind=${encodeURIComponent(kind)}&commandKey=${encodeURIComponent(commandKey)}` })); }
       // Only the server's own not-found proves there is no intent; any other 404 keeps the original command.

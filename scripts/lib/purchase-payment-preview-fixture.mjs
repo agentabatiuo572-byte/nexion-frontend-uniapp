@@ -49,7 +49,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return order;
   }
   // Another open intent for the same order or the same non-order payload (PurchasePaymentService.activeIntents).
-  const openIntent = (subject, excluding) => [...intents.values()].some(row => row !== excluding && row.kind === subject.kind
+  const openIntent = (subject, excluding) => [...intents.values()].find(row => row !== excluding && row.kind === subject.kind
     && !['DELIVERED', 'EXPIRED'].includes(row.status) && (row.kind === 'ORDER_PAY' ? row.orderNo === subject.orderNo : row.payloadKey === subject.payloadKey));
   // Like PurchasePaymentService.expire: no funds by the deadline plus grace ends the intent and its order together,
   // unless a successor to a failed attempt now owns the order, or the order has already ended another way.
@@ -78,7 +78,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED' && intent.reason === 'PAYMENT_FAILED' && graceOver) return timeOut(intent);
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;
-    if (intent.status === 'AWAITING_PAYMENT' && ['waiting', 'urgent', 'read-error', 'late'].includes(scenario)) {
+    if (intent.status === 'AWAITING_PAYMENT' && ['waiting', 'urgent', 'read-error', 'late', 'remote-in-progress'].includes(scenario)) {
       if (!graceOver) return intent;
       timeOut(intent);
       // Funds that come in once the order has been cancelled stay with support: never delivery, refund or wallet credit.
@@ -161,6 +161,14 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   function handle(url, request) {
     sync();
     const path = url.pathname, method = request.method();
+    const byOrder = path.match(/^\/api\/app\/purchase-payment-intents\/by-order\/([^/]+)$/);
+    if (byOrder && method === 'GET') {
+      const orderNo = decodeURIComponent(byOrder[1]);
+      if (!ordersOf(url.origin).some(order => order.orderNo === orderNo)) return refused(404, 'ORDER_NOT_FOUND');
+      if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_LOOKUP_UNAVAILABLE');
+      const intent = openIntent({kind: 'ORDER_PAY', orderNo});
+      return {status: 200, message: 'OK', data: {orderNo, state: intent ? 'IN_PROGRESS' : 'NONE', intentNo: intent?.intentNo ?? null}};
+    }
     if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
     if (path === `${base}-quotes` && method === 'POST') {
       const body = request.postDataJSON(), order = ordersOf(url.origin).find(row => row.orderNo === body.payload?.orderNo);
@@ -253,5 +261,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     return {status: 404, message: 'PURCHASE_PAYMENT_NOT_MODELED', data: null};
   }
-  return {handles, handle, paymentCommand, sweep, openOrderPayment};
+  function seedRemoteOrderPayment(origin) {
+    const orderNo = 'DEMO-ORDER-001';
+    const request = (body, headers = {}) => ({method: () => 'POST', postDataJSON: () => body, headers: () => headers});
+    const quote = handle(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_BSC', payload: {orderNo}}));
+    if (quote.status !== 200) return quote;
+    return handle(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
+      {'idempotency-key': `wallet-pay:${orderNo}:other-device`}));
+  }
+  return {handles, handle, paymentCommand, sweep, openOrderPayment, seedRemoteOrderPayment};
 }

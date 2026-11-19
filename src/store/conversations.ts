@@ -9,8 +9,8 @@ import { conversationPeerKey, groupConversationThreads, type ConversationThread 
 import type { ConversationUserClear } from '@/api/conversation-management';
 import { remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError } from "@/api/errors";
-import { awaitMessageOutcome, isConversationDeliveryAmbiguous, isConversationPeerChanged, isConversationUserClearRejected, MESSAGE_ACK_TIMEOUT_MS, MESSAGE_READBACK_TIMEOUT_MS } from '@/lib/conversation-delivery-policy';
-import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAdvisor } from "@/api/support-api";
+import { awaitMessageOutcome, isConversationDeliveryAmbiguous, isConversationPeerChanged, isConversationUserClearRejected, MESSAGE_ACK_TIMEOUT_MS, MESSAGE_READBACK_TIMEOUT_MS, SupportReplyRejected } from '@/lib/conversation-delivery-policy';
+import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAdvisor, type SupportCommandResult } from "@/api/support-api";
 import type { Conversation, ConversationCategoryAvailability, ConversationType } from "@/domain/support";
 import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
 import { restoreSupportPending, persistSupportPending, clearSupportPending } from "@/lib/support-pending-storage";
@@ -39,7 +39,7 @@ export type CategoryAvailabilityStatus = "loading" | "ready" | "failed";
 export type HumanComposer = {
   text: string;
   imageDraft: { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean } | null;
-  failedSend: { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number; peerChanged?: true } | null;
+  failedSend: { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number; peerChanged?: true; replyRejected?: true } | null;
   recoveredId?: string;
   retainDraft?: boolean;
   /** Visibility boundary already observed when this draft/unknown was saved. */
@@ -91,9 +91,9 @@ function restoreHumanOutbox(account: string): Record<string, HumanComposer> {
         restored[key] = { ...clearVersion, text, imageDraft: null, failedSend: null, retainDraft: true };
         continue;
       }
-      const peerChanged = key.startsWith("conversation:") && failed?.peerChanged === true
+      const rejectedReply = key.startsWith("conversation:") && (failed?.peerChanged === true || failed?.replyRejected === true)
         && failed.settled === true && failed.kind === "failed" && failed.retryable === false;
-      if (!failed || (failed.settled && !peerChanged) || typeof failed.text !== "string" || !["unknown", "failed", "expired"].includes(failed.kind) || typeof failed.attempts !== "number"
+      if (!failed || (failed.settled && !rejectedReply) || typeof failed.text !== "string" || !["unknown", "failed", "expired"].includes(failed.kind) || typeof failed.attempts !== "number"
         || (failed.attachmentId !== undefined && typeof failed.attachmentId !== "string")) continue;
       restored[key] = { ...clearVersion, text, imageDraft: null, failedSend: failed };
     }
@@ -230,7 +230,7 @@ export const useConversations = defineStore("conversations", () => {
   function persistHumanOutbox(required = false) {
     if (!accountKeyValue.startsWith("user:")) return;
     const rows = Object.fromEntries(Object.entries(humanComposers.value)
-      .filter(([key, composer]) => (composer.failedSend && (!composer.failedSend.settled || composer.failedSend.peerChanged)) || (key.startsWith("start:") && composer.recoveredId) || (composer.retainDraft && composer.text))
+      .filter(([key, composer]) => (composer.failedSend && (!composer.failedSend.settled || composer.failedSend.peerChanged || composer.failedSend.replyRejected)) || (key.startsWith("start:") && composer.recoveredId) || (composer.retainDraft && composer.text))
       .map(([key, composer]) => [key, { text: composer.text, failedSend: composer.failedSend, recoveredId: composer.recoveredId, retainDraft: composer.retainDraft, userClearThrough: composer.userClearThrough }]));
     try {
       const storage = humanOutboxStorage();
@@ -275,7 +275,7 @@ export const useConversations = defineStore("conversations", () => {
   }
   function continueRejectedReply(sourceKey: string, targetKey: string) {
     const source = composer(sourceKey), failed = source.failedSend;
-    if (!failed?.peerChanged) return;
+    if (!failed?.peerChanged && !failed?.replyRejected) return;
     const target = composer(targetKey);
     // Leave the destination's draft and any unresolved command intact.
     if (target.text || target.imageDraft || target.failedSend || target.recoveredId) return;
@@ -317,16 +317,29 @@ export const useConversations = defineStore("conversations", () => {
     await preparePendingRun();
     return pendingKeys.has(humanSendSlot(key, failed));
   }
-  async function checkHumanReply(id: string, failed: NonNullable<HumanComposer["failedSend"]>, active: () => boolean): Promise<string | null> {
+  function matchesReplyRejection(result: SupportCommandResult | null, id: string, key: string): result is Extract<SupportCommandResult, { kind: 'reply-rejected' }> {
+    return result?.kind === 'reply-rejected' && result.conversationNo === id
+      && result.idempotencyKey === key && result.clientMessageId === key;
+  }
+  function applyPendingReplyRejection(scope: CommandScope, fingerprint: string, id: string): boolean {
+    const composerKey = `conversation:${id}`, saved = humanComposers.value[composerKey], failed = saved?.failedSend;
+    if (!saved || !failed || failed.settled || humanSendSlot(composerKey, failed) !== fingerprint) return false;
+    completePending(scope, fingerprint);
+    saveComposer(composerKey, { ...saved, failedSend: { ...failed, settled: true, retryable: false, kind: 'failed', replyRejected: true } });
+    return true;
+  }
+  async function checkHumanReply(id: string, failed: NonNullable<HumanComposer["failedSend"]>, active: () => boolean): Promise<{ status: 'sent' | 'rejected'; key: string } | null> {
     const scope = await commandScope();
     const fingerprint = humanSendSlot(`conversation:${id}`, failed);
     const key = scope.pending.get(fingerprint);
     if (!active() || !key || scope.inFlight.has(fingerprint)) return null;
     const result = await supportApi.commandResult(key);
     if (!active() || !scopeIsCurrent(scope) || scope.pending.get(fingerprint) !== key
-        || scope.inFlight.has(fingerprint) || result?.kind !== "conversation" || result.conversation.id !== id) return null;
+        || scope.inFlight.has(fingerprint)) return null;
+    if (matchesReplyRejection(result, id, key) && applyPendingReplyRejection(scope, fingerprint, id)) return { status: 'rejected', key };
+    if (result?.kind !== "conversation" || result.conversation.id !== id) return null;
     applyPendingConversation(scope, fingerprint, result.conversation);
-    return key;
+    return { status: 'sent', key };
   }
   let realtime: ConversationRealtime | null = null;
   let watchedId: string | null = null;
@@ -561,6 +574,10 @@ export const useConversations = defineStore("conversations", () => {
             const recovery = recover(key);
             adopted = await (humanSend ? awaitMessageOutcome(recovery, MESSAGE_READBACK_TIMEOUT_MS) : recovery);
           } catch (readbackError) {
+            if (readbackError instanceof SupportReplyRejected && scopeIsCurrent(scope) && scope.pending.get(fingerprint) === key) {
+              completePending(scope, fingerprint);
+              throw readbackError;
+            }
             // The readback endpoint exposes these reasons only for a retained terminal clear refusal.
             if (userClear && isConversationUserClearRejected(readbackError) && scopeIsCurrent(scope)
                 && scope.pending.get(fingerprint) === key) completePending(scope, fingerprint);
@@ -834,6 +851,9 @@ export const useConversations = defineStore("conversations", () => {
           applyUserClear(result.clearance); completePending(scope, fingerprint); continue;
         }
         if (result.kind === "conversation") applyPendingConversation(scope, fingerprint, result.conversation);
+        if (result.kind === 'reply-rejected' && scope.pending.get(fingerprint) === key
+            && matchesReplyRejection(result, result.conversationNo, key))
+          applyPendingReplyRejection(scope, fingerprint, result.conversationNo);
       } catch (cause) {
         // A recorded refusal is terminal; other read failures still leave the original command unknown.
         if (isConversationUserClearRejected(cause) && scopeIsCurrent(scope)
@@ -887,6 +907,7 @@ export const useConversations = defineStore("conversations", () => {
       conversation = await command(`conversation-reply:${id}:${attachmentId ?? "text"}:${text.trim()}`,
         key => supportApi.replyConversation(current, text, key, attachmentId), async key => {
           const result = await supportApi.commandResult(key);
+          if (matchesReplyRejection(result, id, key)) throw new SupportReplyRejected(result.businessCode, result.businessReason);
           return result?.kind === "conversation" ? result.conversation : null;
         }, account, undefined, onDispatch);
     } catch (cause) {

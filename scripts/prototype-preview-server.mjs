@@ -94,7 +94,7 @@ function previewTransferOutbox(run,sample) {
     delete outbox['conversation:'+previous.conversationNo];
     if(pending[previous.slot]===previous.key)delete pending[previous.slot];
   }
-  if(sample&&!sample.committed) {
+  if(sample&&!sample.committed&&!sample.rejected) {
     outbox['conversation:'+sample.conversationNo]={text:'',failedSend:{text:sample.text,kind:'unknown',settled:false,retryable:true,attempts:1}};
     pending[sample.slot]=sample.key;
   }
@@ -129,7 +129,7 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/state') {
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
-        const accountPayment=value=>['low-balance','urgent','late'].includes(value)?value:'';
+        const accountPayment=value=>['low-balance','urgent','late','remote-in-progress'].includes(value)?value:'';
         const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
         if(update.reset){
           const accountCreatedAt=state.accountCreatedAt;
@@ -199,6 +199,10 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         realtime.stateChanged(update);
         if('supportReadbackState' in update)setTransferSampleOutcome(state);
+        if(scenarioChange&&state.paymentState==='remote-in-progress') {
+          const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
+          if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
+        }
       }
       const options=state.dataState==='empty'
         ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}

@@ -133,7 +133,9 @@ function addTransferSample(state, nextMessageId, now) {
 export function setTransferSampleOutcome(state) {
   const sample=state.supportTransferSample;
   const outcome=state.supportReadbackState;
-  if(state.messageState!=='transferred'||!sample||sample.committed||!['sent','cleared'].includes(outcome))return;
+  if(state.messageState!=='transferred'||!sample||sample.committed||sample.rejected)return;
+  if(outcome==='rejected') { sample.rejected=true;return; }
+  if(!['sent','cleared'].includes(outcome))return;
   const detail=state.supportConversations.find(row=>row.conversation.conversationNo===sample.conversationNo);
   if(!detail)return;
   const nextId=prepareMessageIds(state), createdAt=new Date().toISOString();

@@ -24,6 +24,7 @@ export interface CurrentAdvisor {
 }
 export type SupportCommandResult =
   | { kind: "conversation-user-clear"; clearance: ConversationUserClear }
+  | { kind: "reply-rejected"; conversationNo: string; idempotencyKey: string; clientMessageId: string; businessCode: number; businessReason: string }
   | { kind: "conversation"; conversation: Conversation };
 export interface SupportApi {
   conversationManagement(): Promise<ConversationManagement>;
@@ -209,7 +210,17 @@ export function createSupportApi(client: ApiClient): SupportApi {
   async function supportPath(path: string): Promise<string> { return `${supportRoot}${path}`; }
   function parseCommandResult(value: unknown): SupportCommandResult | null {
     if (value == null) return null;
-    const v = row(value); const type = text(v?.resultType)?.toLowerCase();
+    const v = row(value);
+    if (v?.status === 'REJECTED') {
+      const conversationNo = text(v.conversationNo), idempotencyKey = text(v.idempotencyKey);
+      const clientMessageId = text(v.clientMessageId), businessReason = text(v.businessReason);
+      const businessCode = v.businessCode;
+      if (v.sent !== false || v.operation !== 'APP_CONVERSATION_REPLY' || !conversationNo || !idempotencyKey
+          || !clientMessageId || !businessReason || typeof businessCode !== 'number'
+          || !Number.isInteger(businessCode) || businessCode < 400 || businessCode >= 500) invalid("SUPPORT_COMMAND_RESULT_INVALID");
+      return { kind: 'reply-rejected', conversationNo, idempotencyKey, clientMessageId, businessCode, businessReason };
+    }
+    const type = text(v?.resultType)?.toLowerCase();
     if (!v || !type) invalid("SUPPORT_COMMAND_RESULT_INVALID");
     if (type === 'conversation_user_clear') return { kind: 'conversation-user-clear', clearance: parseConversationUserClear(v.result) };
     if (type === "conversation") return { kind: "conversation", conversation: parseConversationDetail(v.result) };
