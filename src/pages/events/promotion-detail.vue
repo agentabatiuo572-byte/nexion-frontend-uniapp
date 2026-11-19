@@ -153,7 +153,9 @@
               <text v-if="slab.fleetRow" class="lp-slab__foot">{{ slab.line[0] }}<text class="lp-keep" :class="slab.uvt ? 'lp-unit--uvt' : 'lp-strong'">{{ slab.rewardText }}</text>{{ slab.line[1] }}</text>
             </view>
           </view>
-          <view v-if="note" class="lp-note lp-rise lp-d2"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
+          <!-- Days since the last valid purchase and the offer's gap; whether the member qualifies stays with the tag above. -->
+          <view v-if="intervalLine" class="lp-note lp-rise lp-d2"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4.5h4.5" /><path d="M12 8v4l2.5 1.5" /></svg><view class="lp-note__stack"><text>{{ intervalLine.since }}</text><text class="lp-note__sub">{{ intervalLine.gap }}</text></view></view>
+          <view v-if="note" class="lp-note lp-rise lp-d2" :class="{ 'lp-note--tight': intervalLine }"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
         </template>
 
         <!-- Eligible devices: each opens the product page with this offer attached. -->
@@ -220,11 +222,12 @@ import { refreshProductCatalog } from '@/store/product-catalog';
 import { useT } from '@/i18n/use-t';
 import { fmt, fmtMoney } from '@/i18n/format';
 import { landingCopy } from '@/i18n/promotion-landing';
+import { ambassadorCount } from '@/i18n/ambassador';
 import { navReplace, navTo, takeNavigationQuery } from '@/lib/route';
 import { displayDeadline, localized } from '@/lib/promotion-display';
 import { formatDayMonth, formatDisplayDateTime, formatDisplayTime } from '@/lib/display-date';
 import { createPromotionReadFence, isPromotionActive, promotionDetailHref, promotionDisclosures, promotionStoreHref } from '@/lib/promotion-entry';
-import { landingKind, landingProduct, landingProductImage, landingProductName, promotionLandingHref, promotionRemaining, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
+import { landingKind, landingProduct, landingProductImage, landingProductName, promotionLandingHref, promotionRemaining, promotionRepurchaseInterval, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
 import { productCopy } from '@/lib/product-copy';
 import { getProductMedia } from '@/lib/product-media';
 
@@ -238,6 +241,17 @@ const fence = createPromotionReadFence();
 let activityId = '';
 
 const kind = computed(() => activity.value ? landingKind(activity.value) : null);
+const repurchaseInterval = computed(() => promotionRepurchaseInterval(activity.value));
+const intervalLine = computed(() => {
+  const interval = repurchaseInterval.value, copy = c.value;
+  if (!interval) return null;
+  const { minDays: min, maxDays: max } = interval;
+  const gap = min === null ? ambassadorCount(copy.gapMax, max!)
+    : max === null ? ambassadorCount(copy.gapMin, min)
+    : min === max ? ambassadorCount(copy.gapExact, min)
+    : fmt(ambassadorCount(copy.gapRange, max), { min });
+  return { since: ambassadorCount(copy.sinceLastPurchase, interval.daysSincePurchase), gap };
+});
 const rule = computed(() => activity.value?.rewardRules[0] ?? null);
 const phase = computed(() => activity.value?.state === 'ACTIVE' ? 'active' : activity.value?.state === 'SCHEDULED' ? 'scheduled' : 'ended');
 // A paused offer is closed like an ended one, so it keeps that layout; only its label and note say paused.
@@ -280,7 +294,7 @@ const eligibilityTag = computed(() => {
   const a = activity.value, k = kind.value;
   if (!a || !k || phase.value !== 'active') return null;
   if (a.eligibility === 'ESTIMATE_ELIGIBLE') return { tone: 'success' as const, text: k === 'gift' ? c.value.eligibleGift : k === 'first' ? c.value.eligibleFirst : c.value.eligibleRepurchase };
-  if (a.eligibility === 'INELIGIBLE') return { tone: 'neutral' as const, text: k === 'gift' ? c.value.ineligibleGift : k === 'first' ? c.value.ineligibleFirst : c.value.ineligibleRepurchase };
+  if (a.eligibility === 'INELIGIBLE') return { tone: 'neutral' as const, text: k === 'gift' || (k === 'repurchase' && repurchaseInterval.value) ? c.value.ineligibleGift : k === 'first' ? c.value.ineligibleFirst : c.value.ineligibleRepurchase };
   if (a.eligibility === 'SIGN_IN_REQUIRED') return { tone: 'neutral' as const, text: t.value.promotion.signIn };
   return null;
 });
@@ -407,7 +421,8 @@ const slab = computed(() => {
   if (!a || !r) return null;
   const parts = rewardParts(a, r.buyerReward), discount = parts.asset === 'DISCOUNT', owned = ownedDevices.value;
   const fleetRow = !!owned && owned.length > 0 && !refused.value;
-  const line = refused.value ? (discount ? c.value.emptyLineDiscount : c.value.emptyLine) : fmt(discount ? c.value.addLineDiscount : c.value.addLine, { n: r.minBuyQty, name: productName(r.productNo) });
+  // A refused member who already bought (the gap line shows) is told to meet the terms, not to make a first purchase.
+  const line = refused.value ? (repurchaseInterval.value ? (discount ? c.value.ownedLineDiscount : c.value.ownedLine) : discount ? c.value.emptyLineDiscount : c.value.emptyLine) : fmt(discount ? c.value.addLineDiscount : c.value.addLine, { n: r.minBuyQty, name: productName(r.productNo) });
   const [before, after = ''] = line.split('{reward}');
   return {
     // A refused member with devices gets no count: "N devices" would contradict the first-purchase prompt.
@@ -425,7 +440,7 @@ const bar = computed<Bar | null>(() => {
   if (phase.value === 'scheduled') return { hint: copy.orderAfterStart, label: copy.notStarted, variant: 'primary', disabled: true };
   if (phase.value === 'ended') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
   if (refused.value) {
-    if (k !== 'repurchase') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
+    if (k !== 'repurchase' || repurchaseInterval.value !== null) return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
     return firstOfferId.value ? { hint: copy.firstHint, label: copy.seeFirst, variant: 'primary', href: promotionLandingHref(firstOfferId.value) } : { wide: true, label: copy.goStore, variant: 'primary', href: promotionStoreHref() };
   }
   if (signInNeeded.value) return { label: copy.signInBuy, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) };
@@ -560,6 +575,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-line, .lp-note { display: flex; align-items: flex-start; gap: 10px; font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
 .lp-note { margin-top: 16px; }
 .lp-note--tight { margin-top: 8px; }
+.lp-note__stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lp-note__sub { color: var(--v5-ink-3); }
 .lp-line-icon { flex: none; margin-top: 1px; color: var(--v5-ink-3); }
 .lp-footnote { display: block; margin-top: 16px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 

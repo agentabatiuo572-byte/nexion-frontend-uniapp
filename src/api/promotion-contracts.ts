@@ -1,11 +1,12 @@
 // Generated from the reviewed OpenAPI. Run scripts/generate-promotion-contracts.mjs; no business calculations.
-// Source SHA256: 8767bca4c82abfc5810f152f9088582457d0a4fa2df322b73679c68950bcf3af
+// Source SHA256: b2ba40bf636e511f37a311957c696cb1aaf99364ba65cdaa7770961045e2f676
 export type Id = string;
 export type Revision = number;
 export type Template = "SKU_GIFT" | "FIRST_PURCHASE" | "DIRECT_REFERRAL" | "MULTI_PRODUCT" | "REPURCHASE";
 export type ActivityState = "DRAFT" | "SCHEDULED" | "ACTIVE" | "PAUSED" | "ENDED" | "ARCHIVED";
 export type Time = string;
-export type LocalizedText = { "zh": string; "en": string; "vi": string };
+export type LocalizedText = { "zh": string; "en": string; "vi": string; "id"?: string; "ms"?: string; "fil"?: string; "ru"?: string; "kk"?: string; "uz"?: string };
+export type DayRange = { "minDays": (number | null); "maxDays": (number | null) };
 export type Quantity = number;
 export type Limit = ({ "mode": "UNLIMITED" } | { "mode": "LIMITED"; "value": number });
 export type Role = "BUYER" | "DIRECT_INVITER";
@@ -13,7 +14,7 @@ export type RewardDisclosure = { "title": LocalizedText; "terms": LocalizedText;
 export type PositiveAmount = string;
 export type PublicRewardSpec = ({ "rewardRuleId": Id; "beneficiaryRole": Role; "type": "DEVICE"; "giftProductNo": Id; "quantity": Quantity; "disclosure": RewardDisclosure } | { "rewardRuleId": Id; "beneficiaryRole": Role; "type": "USDT" | "UVT"; "calculation": "FIXED"; "amount": PositiveAmount; "disclosure": RewardDisclosure } | { "rewardRuleId": Id; "beneficiaryRole": "BUYER"; "type": "DISCOUNT_USDT"; "calculation": "FIXED"; "amount": PositiveAmount; "disclosure": RewardDisclosure });
 export type PublicPurchaseRule = { "ruleId": Id; "productNo": Id; "minBuyQty": Quantity; "repeatMode": "PER_GROUP" | "ONCE_PER_ORDER"; "maxGroups": Limit; "maxGroupsPerPerson": Limit; "buyerReward": PublicRewardSpec; "inviterReward": (PublicRewardSpec | null) };
-export type PublicPromotion = { "bannerImageUrl"?: string | null; "activityId": Id; "version": Revision; "template": Template; "state": ActivityState; "startsAt": Time; "endsAt": Time; "serverTime": Time; "title": LocalizedText; "terms": LocalizedText; "placement": "home.purchase-promotion" | null; "target": "STORE"; "productNos": Array<Id>; "minimumClientCapabilities": Array<"PROMOTION_QUOTE_V1" | "ORDER_ITEM_QUANTITIES_V1" | "PROMOTION_REWARDS_V1">; "eligibility": "SIGN_IN_REQUIRED" | "ESTIMATE_ELIGIBLE" | "INELIGIBLE" | "UNKNOWN"; "eligibilityMessage": (LocalizedText | null); "rewardRules": Array<PublicPurchaseRule> };
+export type PublicPromotion = { "bannerImageUrl"?: string | null; "activityId": Id; "version": Revision; "template": Template; "state": ActivityState; "startsAt": Time; "endsAt": Time; "serverTime": Time; "title": LocalizedText; "terms": LocalizedText; "placement": "home.purchase-promotion" | null; "target": "STORE"; "productNos": Array<Id>; "minimumClientCapabilities": Array<"PROMOTION_QUOTE_V1" | "ORDER_ITEM_QUANTITIES_V1" | "PROMOTION_REWARDS_V1">; "eligibility": "SIGN_IN_REQUIRED" | "ESTIMATE_ELIGIBLE" | "INELIGIBLE" | "UNKNOWN"; "eligibilityMessage": (LocalizedText | null); "repurchaseWindow"?: (DayRange | null); "lastValidPurchaseAt"?: string | null; "rewardRules": Array<PublicPurchaseRule> };
 export type PublicPromotionPage = { "items": Array<PublicPromotion>; "nextCursor": (string | null); "hasMore": boolean };
 export type Hash = string;
 export type Amount = string;
@@ -33,7 +34,7 @@ export type Reward = { "obligationId": Id; "activityId": Id; "version": Revision
 export type RewardPage = { "items": Array<Reward>; "nextCursor": (string | null); "hasMore": boolean };
 export type ReferralProgress = { "activityId": Id; "qualifyingOrders": number; "ownRewards": Array<Reward>; "serverTime": Time };
 export type OrderReceiptItem = { "lineId": Id; "productNo": Id; "quantity": Quantity; "productName": string; "unitPriceUsdt"?: Amount; "subtotalUsdt"?: Amount; "discountUsdt"?: Amount; "promotionDiscountUsdt"?: Amount; "payableUsdt"?: Amount };
-export type OrderReceipt = { "orderNo": OrderNo; "orderType"?: "SINGLE" | "BUNDLE"; "itemCount"?: number; "quantity"?: Quantity; "amountUsdt"?: (Amount | number); "paymentStatus": "PENDING" | "PAID" | "CANCELLED" | "EXPIRED" | "REFUNDED"; "orderStatus": "PENDING_PAYMENT" | "COMPLETED" | "CANCELLED" | "EXPIRED" | "REFUNDED"; "payBy"?: Time; "promotionQuoteId"?: (Id | null); "rewards"?: Array<ExpectedReward>; "idempotent"?: boolean; "items"?: Array<OrderReceiptItem>; "subtotalUsdt"?: Amount; "discountUsdt"?: Amount; "promotionDiscountUsdt"?: Amount };
+export type OrderReceipt = { "orderNo": OrderNo; "orderType"?: "SINGLE" | "BUNDLE"; "itemCount"?: number; "quantity"?: Quantity; "amountUsdt"?: (Amount | number); "paidTotalUsdt"?: string | null; "paymentStatus": "PENDING" | "PAID" | "CANCELLED" | "EXPIRED" | "REFUNDED"; "orderStatus": "PENDING_PAYMENT" | "COMPLETED" | "CANCELLED" | "EXPIRED" | "REFUNDED"; "payBy"?: Time; "recoveredQuoteId"?: Id; "promotionQuoteId"?: (Id | null); "rewards"?: Array<ExpectedReward>; "idempotent"?: boolean; "items"?: Array<OrderReceiptItem>; "subtotalUsdt"?: Amount; "discountUsdt"?: Amount; "promotionDiscountUsdt"?: Amount };
 export type CommandKey = string;
 export type Resource = { "type": "PROMOTION" | "VERSION" | "POLICY" | "REWARD" | "ORDER" | "EXPORT" | "REFUND_HOLD"; "id": ExternalId; "revision": (Revision | null) };
 export type Error = { "code": number; "message": string; "data": ({ "commandId": (ExternalId | null); "retryable": boolean; "fieldErrors": Array<{ "field": string; "reason": string }> } | null) };

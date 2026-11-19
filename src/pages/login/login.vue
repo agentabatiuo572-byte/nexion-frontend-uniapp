@@ -162,7 +162,6 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
-import type { LocaleCode } from "@/i18n";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
@@ -171,12 +170,13 @@ import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { toast } from "@/store/ui";
 import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
+import { stageRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
 import { apiRuntimeConfig, authApi, h5RefreshCookieEnabled, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";
-import type { UserSession } from "@/api/contracts";
+import type { RegistrationReceipt, UserSession } from "@/api/contracts";
 import { dialCodeForLocale, isSelectablePhoneDialCode, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
 import { resolveRemoteLoginErrorKind } from "@/lib/remote-login-error";
 
@@ -270,6 +270,7 @@ function cancelLoginVerification() {
 }
 async function retryOriginalLogin(captchaTicket?: string) {
   if (loading.value) return;
+  const originalAuthMethod = retryContext.value?.authMethod;
   if (!retryContext.value) { await recoverLoginResult(); return; }
   if (!replayAvailable.value) return;
   if ((retryNeedsPassword.value && !retryPassword.value) || (retryNeedsCode.value && !/^\d{6}$/.test(retryCode.value))) return;
@@ -293,7 +294,9 @@ async function retryOriginalLogin(captchaTicket?: string) {
     if (result.kind === "challenge") {
       replayAvailable.value = true; retryCode.value = "";
     } else finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete,
-      serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+      serverProfile: result.user, serverSessionRevision: result.vaultRevision,
+      recoveredRegistration: originalAuthMethod === "REGISTRATION" || !!result.registrationReceipt,
+      registrationReceipt: result.registrationReceipt, originalAuthMethod });
   } catch (cause) { if (mounted && flowVersion === otpFlowVersion) {
     syncLoginRecovery();
     if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") { captchaPurpose.value = "replay"; showCaptcha.value = true; }
@@ -304,7 +307,7 @@ async function retryOriginalLogin(captchaTicket?: string) {
 async function recoverLoginResult() {
   if (loading.value || !authApi.pendingLogin()) return;
   const flowVersion = otpFlowVersion;
-  const originalContext = retryContext.value;
+  const originalAuthMethod = retryContext.value?.authMethod;
   error.value = null;
   loading.value = true;
   try {
@@ -316,7 +319,8 @@ async function recoverLoginResult() {
     syncLoginRecovery();
     if (result.kind === "authenticated") finishSignIn({ accountId: authenticatedAccountId(result.user),
       onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision,
-      initialOAuthLocale: originalContext?.authMethod === "OAUTH" && result.registrationReceipt ? useLocaleStore().code : undefined });
+      recoveredRegistration: originalAuthMethod === "REGISTRATION" || !!result.registrationReceipt,
+      registrationReceipt: result.registrationReceipt, originalAuthMethod });
   } catch (cause) {
     if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
@@ -585,22 +589,37 @@ function geoText(code: unknown): string | null {
 // snapshot, claims this carrier's session, then enters only a safe business
 // return target or Home. Registration and device setup own their own routes.
 function finishSignIn(
-  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number; initialOAuthLocale?: LocaleCode },
+  session: {
+    accountId: string;
+    signInIdempotencyKey?: string;
+    onboardingComplete: boolean;
+    serverProfile?: UserSession;
+    serverSessionRevision?: number;
+    recoveredRegistration?: boolean;
+    registrationReceipt?: RegistrationReceipt | null;
+    originalAuthMethod?: string;
+  },
   context: OtpFlowContext | null = null,
 ) {
   signInTimer = undefined;
   if (!mounted || (context && !isCurrentOtpFlow(context))) return;
+  const registrationDestination = "/pages/register/success";
   const result = completeSignIn({
     identity: session.accountId,
-    returnTo: returnParam.value,
+    returnTo: session.recoveredRegistration ? registrationDestination : returnParam.value,
     sponsorCode: refOnLogin.value,
     idempotencyKey: session.signInIdempotencyKey,
     onboardingComplete: session.onboardingComplete,
     serverProfile: session.serverProfile,
     serverSessionRevision: session.serverSessionRevision,
-    initialOAuthLocale: session.initialOAuthLocale,
+    deferNavigation: session.recoveredRegistration,
+    initialOAuthLocale: session.originalAuthMethod === "OAUTH" && session.registrationReceipt
+      ? useLocaleStore().code : undefined,
   });
-  if (!result.ok) {
+  if (result.ok && session.recoveredRegistration) {
+    stageRemoteRegistrationReceipt(session.registrationReceipt, session.accountId);
+    navReset({ url: registrationDestination, fail: () => {} });
+  } else if (!result.ok) {
     loading.value = false;
     error.value = geoText(result.error)
       ?? (result.error === "account_pending"

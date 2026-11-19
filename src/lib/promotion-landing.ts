@@ -1,4 +1,5 @@
 import type { PublicPromotion, PublicRewardSpec } from '@/api/promotion-contracts';
+import { parseServerTimestamp } from '@/api/server-time';
 import type { Messages } from '@/i18n/messages/en';
 import { fmt } from '@/i18n/format';
 import { sessionVault } from '@/api/runtime';
@@ -52,6 +53,36 @@ export function promotionRemaining(activity: Pick<PublicPromotion, 'endsAt' | 's
   const remaining = Date.parse(activity.endsAt) - Date.parse(activity.serverTime);
   if (!Number.isFinite(remaining) || remaining <= 0) return copy.ended;
   return remaining < 86400000 ? copy.endsToday : fmt(copy.daysRemaining, { n: Math.ceil(remaining / 86400000) });
+}
+
+function submillisecondNanoseconds(timestamp: string): number {
+  const fraction = /\.(\d{4,9})/.exec(timestamp)?.[1] ?? '';
+  return Number(fraction.slice(3).padEnd(6, '0'));
+}
+
+export function promotionRepurchaseInterval(activity: PublicPromotion | null) {
+  if (activity?.template !== 'REPURCHASE' || !activity.repurchaseWindow || !activity.lastValidPurchaseAt) return null;
+  const { minDays, maxDays } = activity.repurchaseWindow;
+  if (minDays === null && maxDays === null) return null;
+  const serverMs = parseServerTimestamp(activity.serverTime);
+  const purchaseMs = parseServerTimestamp(activity.lastValidPurchaseAt);
+  if (serverMs === null || purchaseMs === null) return null;
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const elapsedMs = serverMs - purchaseMs;
+  let daysSincePurchase = Math.floor(elapsedMs / dayMs);
+  // Java Instants can carry finer precision than Date at an exact day boundary.
+  if (elapsedMs % dayMs === 0 && submillisecondNanoseconds(activity.serverTime) < submillisecondNanoseconds(activity.lastValidPurchaseAt)) {
+    daysSincePurchase -= 1;
+  }
+  if (daysSincePurchase < 0) return null;
+
+  return {
+    daysSincePurchase,
+    minDays,
+    maxDays,
+    withinWindow: (minDays === null || daysSincePurchase >= minDays) && (maxDays === null || daysSincePurchase <= maxDays),
+  };
 }
 
 /** Rule summaries and terms for the shared PromotionTerms sheet. */
