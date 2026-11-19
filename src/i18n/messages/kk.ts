@@ -5594,7 +5594,7 @@ export const kk: Messages = {
     onboardingRecoveryCta: "Алғашқы баптауды аяқтау",
     termsRequired: "Толтырмас бұрын шарттарды оқып, қабылдаңыз.",
     termsRecoveryCta: "Шарттарды оқып, растау",
-    segBank: "Банк картасымен төлеу",
+    segBank: "Банк картасы",
     amountLabel: "Толтыру сомасы (USDT)",
     amountFormatError: "Оң бүтін толтыру сомасын енгізіңіз.",
     approx: "≈ {vnd}",

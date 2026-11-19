@@ -496,8 +496,10 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-overview__stat { display:flex;flex-direction:column;gap:var(--v5-space-1);min-width:0; }
 .bills-overview__stat-label { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-overview__stat-value { overflow:hidden;font-size:15px;font-weight:500;line-height:20px;text-overflow:ellipsis;white-space:nowrap; }
-.bills-filters { display:flex;gap:var(--v5-space-1);margin:0 16px 16px; }
-.bills-filter { display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 12px;border-radius:999px;font:500 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer; }
+/* Chips keep one line; when four labels do not fit (long languages at 320) the row scrolls sideways. */
+.bills-filters { display:flex;gap:var(--v5-space-1);margin:-6px 0 10px;padding:6px 16px;overflow-x:auto;scrollbar-width:none; }
+.bills-filters::-webkit-scrollbar { display:none; }
+.bills-filter { display:inline-flex;flex-shrink:0;white-space:nowrap;align-items:center;justify-content:center;height:32px;padding:0 12px;border-radius:999px;font:500 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer; }
 .bills-filter::after { content:"";position:absolute;inset:-6px 0; }
 .bills-filter { position:relative; }
 .bills-filter--on { background:color-mix(in srgb,var(--v5-ink) 10%,transparent);color:var(--v5-ink); }

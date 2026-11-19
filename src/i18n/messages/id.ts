@@ -5594,7 +5594,7 @@ export const id: Messages = {
     onboardingRecoveryCta: "Selesaikan pengaturan awal",
     termsRequired: "Baca dan setujui ketentuan sebelum top up.",
     termsRecoveryCta: "Baca dan setujui ketentuan",
-    segBank: "Pembayaran kartu bank",
+    segBank: "Kartu bank",
     amountLabel: "Jumlah top up (USDT)",
     amountFormatError: "Masukkan jumlah top up berupa bilangan bulat positif.",
     approx: "≈ {vnd}",

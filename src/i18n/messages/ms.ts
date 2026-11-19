@@ -3624,7 +3624,7 @@ export const ms: Messages = {
     typeStake: "Stake",
     typeUnstake: "Buka kunci",
     typeAchievement: "Pencapaian",
-    typeClawback: "Ganjaran ditarik balik",
+    typeClawback: "Penarikan balik ganjaran",
     typeOther: "Lain-lain",
     statusPosted: "Direkodkan",
     statusPending: "Diproses",

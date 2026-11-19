@@ -12,12 +12,11 @@
 -->
 <template>
   <view>
-    <view class="flex items-center" style="gap: 6px; padding: 0 0 0 2px; min-height: 44px">
+    <view class="flex flex-wrap items-center" style="gap: 0 6px; padding: 0 0 0 2px; min-height: 44px">
       <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
       <template v-if="status === 'ready'">
         <text :style="capStyle">{{ t.fx.rateLabel }}</text>
         <text class="whitespace-nowrap" :style="valueStyle">{{ rateLine }}</text>
-        <text :style="capStyle">{{ lockLine }}</text>
       </template>
       <view v-else-if="status === 'loading'" class="nx-fx-skel" />
       <template v-else-if="status === 'empty'">
@@ -26,6 +25,9 @@
       </template>
       <text v-else :style="capStyle">{{ t.fx.updating }}</text>
 
+      <!-- The lock note and the info button wrap together onto a second line when the first is full. -->
+      <view class="flex items-center" :style="tailStyle">
+      <text v-if="status === 'ready'" :style="lockStyle">{{ lockLine }}</text>
       <!-- 信息 icon:视觉 28px 圆,点击热区 44×44(负 margin 不撑行高) -->
       <view
         class="shrink-0 grid place-items-center"
@@ -36,6 +38,7 @@
         @click="sheetOpen = true"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9h.01" /></svg>
+      </view>
       </view>
     </view>
 
@@ -93,6 +96,9 @@ const capStyle: CSSProperties = {
   lineHeight: "18px",
   color: "var(--v5-ink-3)",
 };
+// When the row is too narrow the lock note and info button move to their own line, so the button never leaves the screen.
+const tailStyle: CSSProperties = { flex: "1 0 auto", maxWidth: "100%", gap: "6px" };
+const lockStyle: CSSProperties = { ...capStyle, minWidth: "0" };
 const valueStyle: CSSProperties = {
   fontFamily: "var(--font-metric)",
   fontSize: "13px",

@@ -5377,7 +5377,7 @@ openSeaErrorPool: {
     onboardingRecoveryCta: "Complete initial setup",
     termsRequired: "Please read and accept the terms before topping up.",
     termsRecoveryCta: "Read and acknowledge terms",
-    segBank: "Bank card payment",
+    segBank: "Bank card",
     amountLabel: "Top-up amount (USDT)",
     amountFormatError: "Enter a positive whole-number deposit amount.",
     approx: "≈ {vnd}",
