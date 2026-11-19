@@ -16,7 +16,15 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const data=structuredClone(fixture(new URL('/api/trial/state',url.origin),locale,{offers:true},request));
   if(mode==='read-error')refuse('TRIAL_STATE_UNAVAILABLE');
   const cfg=data.config;
-  cfg.shadowDailyUSD=String(products.find(product=>product.id===cfg.trialProductId).dailyEarn);
+  const product=products.find(product=>product.id===cfg.trialProductId);
+  const hasYield=product?.dailyEarn>0&&product.dailyEarnNEX>0;
+  const available=hasYield&&product.available&&product.productType==='DEVICE'&&product.inventoryMode==='FINITE'&&product.stock>0;
+  cfg.shadowDailyUSD=hasYield?String(product.dailyEarn):null;
+  cfg.shadowDailyNEX=hasYield?String(product.dailyEarnNEX):null;
+  if(product){
+    cfg.trialProductName=product.name;
+    cfg.trialPriceUSD=String(product.price);
+  }
   // FEAT-TRIAL05 mirror of the Java quote: inside the original term the full claimed term is
   // settled and a fixed discount comes off what is left to pay; 0 switches the rule off.
   cfg.earlyPurchaseDiscountUSD??=String(state.trialEarlyDiscount??'10');
@@ -26,14 +34,14 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   // BUG-081 samples keep their labelled early prices through a zero offset cap;
   // settled earnings are paid out after purchase and use the same catalog rate as a default claim.
   const precision=['precision','half-cent','precision-repriced'].includes(pricing);
-  if(!['default','historical-cap'].includes(pricing))Object.assign(cfg,{trialPriceUSD:pricing==='half-cent'?'402.135':precision?'402.123456':pricing==='excess-offset'?'15':'1000',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
+  if(!['default','historical-cap'].includes(pricing))Object.assign(cfg,{trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
   if(pricing==='precision-repriced')cfg.discountCapUSD='49.999999';
   const unclaimedConfig=structuredClone(cfg);
   // Claimed rates, terms and prices are snapshots; only the live promo cap can be repriced.
   if(state.trialRow?.claimConfig)Object.assign(cfg,state.trialRow.claimConfig,{discountCapUSD:unclaimedConfig.discountCapUSD});
   let duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
-  const scenario=mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
+  const scenario=!available?'available':mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
   if(!state.trialRow){
     const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day:scenario==='ended'?duration+grace+day:day);
     state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE':['ended','eligible-again'].includes(scenario)?'FAILED':['converted','refunded'].includes(scenario)?'REDEEMED':'ELIGIBLE',startedAt};
@@ -56,9 +64,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const {shadow,nex}=claimed?accruedAt(row.state==='REDEEMED'?row.finishedAt:now):{shadow:0n,nex:0n};
     const eligible=!claimed||(mode==='eligible-again'&&row.state==='FAILED');
     // capacity-full comes from the fleet facts alone; the capacity-full preset seeds a genuinely full fleet.
-    const canStart=eligible&&!capacityFull;
+    const canStart=eligible&&available&&!capacityFull;
     const quote=live?quoteFor(shadow,nex,row.state==='ACTIVE'&&now<row.startedAt+duration):undefined;
-    return {...data,state:row.state,canStart,eligibilityReason:eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
+    return {...data,state:row.state,canStart,eligibilityReason:eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?'DEMO-TRIAL':null,version:row.version||1,serverNowEpochMs:now,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,graceEndsAtEpochMs:claimed?row.startedAt+duration+grace:null,
       finishedAtEpochMs:['FAILED','CANCELLED','REDEEMED'].includes(row.state)?row.finishedAt||row.startedAt+duration+grace:null,
@@ -110,12 +118,21 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const remember=value=>{if(key){state.trialCommands??={};state.trialCommands[key]=structuredClone(value);}return value;};
   if(url.pathname==='/api/trial/start'){
     if(mode==='claim-error'&&!state.trialStartFailed){state.trialStartFailed=true;refuse('TRIAL_SERVICE_UNAVAILABLE');}
-    if(snapshot().eligibilityReason==='capacity-full')refuse('TRIAL_CAPACITY_FULL');
-    if(snapshot().canStart){
-      Object.assign(cfg,unclaimedConfig);
-      duration=Number(cfg.trialDays)*day;grace=Number(cfg.graceDays)*day;
-      Object.assign(row,{state:'ACTIVE',startedAt:now,claimConfig:structuredClone(cfg),version:(row.version||1)+1});
+    const current=snapshot();
+    if(!current.canStart){
+      if(current.eligibilityReason==='product-unavailable'){
+        if(product?.available===false)refuse('TRIAL_PRODUCT_NOT_RELEASED');
+        if(product?.stock>0&&!hasYield)refuse('TRIAL_DAILY_YIELD_INVALID');
+        refuse('TRIAL_PRODUCT_NOT_AVAILABLE');
+      }
+      if(current.eligibilityReason==='capacity-full')refuse('TRIAL_CAPACITY_FULL');
+      if(current.eligibilityReason==='in-progress')refuse('TRIAL_ALREADY_ACTIVE');
+      if(current.eligibilityReason==='converted')refuse('TRIAL_ALREADY_REDEEMED');
+      refuse('TRIAL_COOLDOWN_ACTIVE');
     }
+    Object.assign(cfg,unclaimedConfig);
+    duration=Number(cfg.trialDays)*day;grace=Number(cfg.graceDays)*day;
+    Object.assign(row,{state:'ACTIVE',startedAt:now,claimConfig:structuredClone(cfg),version:(row.version||1)+1});
     return remember(snapshot());
   }
   if(url.pathname==='/api/trial/cancel'){

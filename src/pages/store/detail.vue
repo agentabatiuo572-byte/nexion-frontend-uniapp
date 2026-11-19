@@ -500,8 +500,8 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
   const s = t.value.store;
   return [
     { k: s.specGpu, v: specText(t.value, p.gpu, "-") },
-    { k: s.specVram, v: specText(t.value, p.vram, "-") },
-    { k: s.specPower, v: specText(t.value, p.power, "-") },
+    { k: s.specVram, v: specText(t.value, p.vram, "-", "vram") },
+    { k: s.specPower, v: specText(t.value, p.power, "-", "power") },
     { k: s.specOnlineRate, v: specText(t.value, p.uptime, "-") },
     specRow(s.specWarranty, p.warranty),
   ].filter((r): r is SpecRow => r !== null);

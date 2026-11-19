@@ -1,3 +1,4 @@
+import { randomInt, randomUUID } from 'node:crypto';
 // Shared facts for the managed activities in the loopback preview.
 const day=86400000;
 const teamCalendar=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -22,7 +23,20 @@ const events=[
   ['season','seasonal','秋季算力季','Autumn compute season','Mùa tính toán thu','/pages/events/events'],
   ['welcome','onboarding','新用户成长礼','New member rewards','Quà thành viên mới','/pages/missions/missions'],
 ];
-const wheelSegments=[5,10,20,50,100,200].map((amount,index)=>({tierId:'demo-tier-'+index,rewardType:'UVT',rewardAmount:amount,rewardName:amount+' UVT',realOutflow:false,displayOrder:index}));
+const wheelTiers=[
+  ['comfort-nex-5','UVT',5,'+5 UVT',380],
+  ['points-50','UVT',10,'+10 UVT',240],
+  ['nex-30','UVT',30,'+30 UVT',180],
+  ['nex-150','UVT',150,'+150 UVT',110],
+  ['usdt-1','USDT',1,'$1 USDT',50],
+  ['coupon-50','COUPON',50,'$50 device coupon',30,200],
+  ['usdt-20','USDT',20,'$20 USDT',9,50],
+  ['usdt-500','USDT',100,'$100 USDT',1,5],
+].map(([tierId,rewardType,rewardAmount,rewardName,weight,dailyStock],displayOrder)=>({
+  weight,dailyStock,segment:{tierId,rewardType,rewardAmount,rewardName,realOutflow:rewardType==='USDT',displayOrder},
+}));
+const wheelSegments=wheelTiers.map(({segment})=>segment);
+export const wheelVoucherId='H4-WHEEL-DEVICE-50';
 const joinedPresetEvents=['upgrade','invite','weekend','season'];
 
 export function demoH4Account(state,now=Date.now(),presetDates=[]) {
@@ -39,9 +53,19 @@ export function demoH4Account(state,now=Date.now(),presetDates=[]) {
   return {createdAt:state.accountCreatedAt,rank:state.dataState==='empty'?0:state.ambassadorRank==='v5'?5:state.highestRank?8:2};
 }
 
-function wheelAward(at,sourceType) {
-  const {tierId,rewardType,rewardAmount,rewardName}=wheelSegments[2];
-  return {spinId:'demo-spin-'+at,eventId:'demo-spin',spinDate:date(at).slice(0,10),sourceType,tierId,rewardType,rewardAmount,rewardName,downgraded:false,downgradeReason:'NONE',source:'server',sourceEnvironment:'PRODUCTION'};
+function wheelAward(at,sourceType,spins=[],sample=false) {
+  let pick=sample?0:randomInt(1000);
+  const selected=wheelTiers.find(({weight})=>(pick-=weight)<0);
+  const spinDate=date(at).slice(0,10);
+  const today=spins.map(({result})=>result).filter(result=>result.spinDate===spinDate);
+  const {segment,dailyStock}=selected;
+  const outflow=today.filter(result=>result.rewardType==='USDT').reduce((total,result)=>total+result.rewardAmount,0);
+  const reason=dailyStock&&today.filter(result=>result.tierId===segment.tierId).length>=dailyStock
+    ?'TIER_DAILY_STOCK_EXHAUSTED'
+    :segment.realOutflow&&outflow+segment.rewardAmount>200?'DAILY_BUDGET_EXHAUSTED':'NONE';
+  const {tierId,rewardType,rewardAmount,rewardName}=reason==='NONE'?segment:wheelSegments[0];
+  return {spinId:'SPIN-'+randomUUID().replaceAll('-','').toUpperCase(),eventId:'demo-spin',spinDate,sourceType,
+    tierId,rewardType,rewardAmount,rewardName,downgraded:reason!=='NONE',downgradeReason:reason,source:'server',sourceEnvironment:'PRODUCTION'};
 }
 
 function scene(state,now) {
@@ -51,7 +75,7 @@ function scene(state,now) {
   // spin. They never grant onboarding eligibility or set a projected status.
   const candidates=['joined','claimable','claimed'].includes(mode)
     ? joinedPresetEvents : mode==='mixed'?['invite']:[];
-  const spins=mode==='ended'?[{result:wheelAward(now-2*day,'DAILY'),at:now-2*day}]:[];
+  const spins=mode==='ended'&&state.wheelState==='open'?[{result:wheelAward(now-2*day,'DAILY',[],true),at:now-2*day,historyOnly:true}]:[];
   const record=state.h4Events={at:now,joined:[],spins,reminders:[],claims:{}};
   record.joined=candidates.filter(code=>eventWindow(code,state,now).state!=='upcoming');
   return record;
@@ -85,7 +109,7 @@ export function initializeDemoH4State(state,now=Date.now()) {
     // establishes participation or consumes a daily opportunity.
     const spinDay=typeof result.spinDate==='string'&&Date.parse(result.spinDate+'T00:00:00Z');
     if(!Number.isFinite(spinDay)||spinDay>now||result.eventId!=='demo-spin'||!result.spinId
-        ||!['DAILY','BONUS'].includes(result.sourceType)||result.rewardType!=='UVT'
+        ||!['DAILY','BONUS'].includes(result.sourceType)||!['UVT','USDT','COUPON'].includes(result.rewardType)
         ||!Number.isFinite(result.rewardAmount)||result.rewardAmount<0
         ||record.spins.some(spin=>spin.result.spinId===result.spinId))continue;
     const awardedAtMs=Date.parse(awardedAt),at=Number.isFinite(awardedAtMs)?awardedAtMs:spinDay;
@@ -331,7 +355,9 @@ export function demoH4Credits(state,now) {
   const welcome=claims.welcome;
   return [
     ...(welcome?[{id:'DEMO-WELCOME',type:'EVENT_REWARD',status:'SUCCESS',amount:welcome.result.rewardAmount,at:welcome.at}]:[]),
-    ...spins.filter(spin=>!spin.historyOnly).map(({result,at,includedInBalance})=>({id:result.spinId,type:'WHEEL_REWARD',status:'POSTED',amount:result.rewardAmount,at,includedInBalance})),
+    ...spins.filter(({historyOnly,result})=>!historyOnly&&result.rewardType!=='COUPON').map(({result,at,includedInBalance})=>({
+      id:result.spinId,type:'WHEEL_REWARD',status:'POSTED',asset:result.rewardType,amount:result.rewardAmount,at,includedInBalance,
+    })),
   ].sort((a,b)=>a.at-b.at);
 }
 
@@ -346,8 +372,9 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
   const empty=state.dataState==='empty'||state.eventState==='empty';
   const entry=route&&events.find(([code])=>'demo-'+code===route[1]);
   const action=route?.[2],wheel=entry?.[1]==='wheel';
-  if(action?.startsWith('spin')&&(!wheel||empty))reject('WHEEL_EVENT_NOT_OPEN');
-  if(!list&&(!entry||empty))reject('EVENT_NOT_FOUND',404);
+  const wheelClosed=state.wheelState!=='open';
+  if(action?.startsWith('spin')&&(!wheel||empty||wheelClosed))reject('WHEEL_EVENT_NOT_OPEN');
+  if(!list&&(!entry||empty||wheel&&wheelClosed))reject('EVENT_NOT_FOUND',404);
   if(empty)return {events:[],serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
   const read=action==='detail'||action==='spin/state';
   if(!list&&request.method()!==(read?'GET':'POST'))reject('METHOD_NOT_ALLOWED',405);
@@ -356,7 +383,7 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
     if(!commandKey)reject('IDEMPOTENCY_KEY_REQUIRED',422);
     if(commandKey.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
   }
-  if(list)return {events:events.map(entry=>project(entry,locale,state,now).event),serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
+  if(list)return {events:events.filter(([,kind])=>kind!=='wheel'||!wheelClosed).map(entry=>project(entry,locale,state,now).event),serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
 
   const {code,rules,event,eligible}=project(entry,locale,state,now);
   const record=scene(state,now),id=event.eventCode,ongoing=event.state==='ongoing';
@@ -420,7 +447,7 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
   }
   if(!ongoing)reject('WHEEL_EVENT_NOT_OPEN');
   if(!freeAvailable&&!bonusTickets)reject('WHEEL_DAILY_LIMIT_REACHED');
-  const result=wheelAward(now,freeAvailable?'DAILY':'BONUS');
+  const result=wheelAward(now,freeAvailable?'DAILY':'BONUS',record.spins);
   record.spins.unshift({key:commandKey,result,at:now});
   return result;
 }

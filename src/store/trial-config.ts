@@ -28,9 +28,9 @@ export interface TrialConfig {
   trialProductName: string;
   /** Trial product price (conversion checkout subtotal) */
   trialPriceUSD: number;
-  /** Shadow accrual rates (S1 baseline per spec §3.1) */
-  shadowDailyUSD: number;
-  shadowDailyNEX: number;
+  /** Null when the selected SKU has no confirmed daily earnings. */
+  shadowDailyUSD: number | null;
+  shadowDailyNEX: number | null;
   /** Remaining free-trial offers displayed on the Earn hero card. */
   seatsLeftToday: number;
   /** Whether trial is open in the current product phase */
@@ -153,9 +153,13 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       return parseTrialBooleanConfig(raw[key]);
     };
     const discountRate = number("discountRate");
+    const shadowDailyUSD = raw.shadowDailyUSD === null ? null : number("shadowDailyUSD");
+    const shadowDailyNEX = raw.shadowDailyNEX === null ? null : number("shadowDailyNEX");
     const trialProductId = String(raw.trialProductId ?? "").trim();
     const trialProductName = String(raw.trialProductName ?? "").trim();
-    if (discountRate > 100 || !resolveTrialDeviceName(trialProductId, trialProductName)) {
+    if (discountRate > 100 || !resolveTrialCheckoutProductId(trialProductId)
+      || ((trialProductName || (shadowDailyUSD !== null && shadowDailyNEX !== null))
+        && !resolveTrialDeviceName(trialProductId, trialProductName))) {
       throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
     }
     config.value = {
@@ -167,8 +171,8 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       trialProductId,
       trialProductName,
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
-      shadowDailyUSD: number("shadowDailyUSD"),
-      shadowDailyNEX: number("shadowDailyNEX"),
+      shadowDailyUSD,
+      shadowDailyNEX,
       seatsLeftToday: integer("seatsLeftToday", 0, 1_000_000),
       phaseOpen: bool("phaseOpen"),
       autoPushEnabled: bool("autoPushEnabled"),

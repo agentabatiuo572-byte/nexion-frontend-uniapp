@@ -40,8 +40,8 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       ordersPage:{total:orders.length,pageNum,pageSize},
       orders:orders.slice((pageNum-1)*pageSize,pageNum*pageSize).map(({at,...order})=>({...order,createdAt:new Date(at).toISOString()}))};
   }
-  if (p === "/api/config/repurchase") return { ...repurchaseProof, product: "repurchase", asset: "USDT", pointsReward: false, apyPct: 35, lockDays: 90, nurtureMultiplier: 1, h1ReinvestMultiplier: 1, effectiveNurtureMultiplier: 1, ticketPerOrder: 1, presets: [50, 200, 1000], earlyPenaltyPct: 10, minAmountUsdt: 50, enabled: true, disclosureRequired: false, currentNexPriceUsdt: .125, g4LotteryCapacity: 1000, g4TicketsIssuedThisMonth: 1 };
-  if (p === "/api/repurchase/orders") return { ...repurchaseProof, walletBalanceUsdt: walletAmount, serverTime: iso, ordersPage: { total: accountDeletionWallet(state)||empty ? 0 : 1, pageNum: 1, pageSize: 50 }, orders: accountDeletionWallet(state)||empty ? [] : [{ orderNo: "RPS-DEMO123456", amountUsdt: 50.123456, apyPct: 35, earlyPenaltyPct: 10, lockDays: 90, lockedAt: new Date(now - 86400000).toISOString(), unlockAt: new Date(now + 89 * 86400000).toISOString(), estimatedInterestUsdt: 4.325671, status: "ACTIVE" }] };
+  if (p === "/api/config/repurchase") refuse(503, 'REPURCHASE_CONFIG_INVALID');
+  if (p === "/api/repurchase/orders") return { ...repurchaseProof, walletBalanceUsdt: walletAmount, serverTime: iso, ordersPage: { total: 0, pageNum: 1, pageSize: 50 }, orders: [] };
   const {withdrawals}=facts;
   if(state.accountDeletionState==='withdrawal-error'&&p==='/api/withdrawals')refuse(503,'DEMO_WITHDRAWAL_READ_UNAVAILABLE');
   if(p==='/api/withdrawals')return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawals,page:{pageNum:1,pageSize:50,total:withdrawals.length,hasMore:false}};

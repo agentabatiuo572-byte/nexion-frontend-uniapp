@@ -110,7 +110,7 @@
             <text class="trial-row__label">{{ lifecycle.availableOffsetLabel }}</text>
             <text class="trial-sum__discount">{{ visibility.mask(usd(trialOffset.offsetUSD)) }}</text>
           </view>
-          <view class="trial-row trial-legacy-row"><text class="trial-row__label">{{ lifecycle.estimateTotalLabel }}</text><text class="trial-row__value">≈ {{ usd(estimatedOffsetUSD) }}</text></view>
+          <view class="trial-row trial-legacy-row"><text class="trial-row__label">{{ lifecycle.estimateTotalLabel }}</text><text class="trial-row__value">{{ estimatedOffsetUSD === null ? "—" : `≈ ${usd(estimatedOffsetUSD)}` }}</text></view>
           <text class="trial-legacy-note">{{ lifecycle.earlyPurchaseNote }}</text>
           <text v-if="trialOffset.remainderUSD > 0" class="trial-legacy-note">{{ offsetRemainderNote }}</text>
         </view>
@@ -313,7 +313,8 @@ const remainingMsValue = computed(() => remainingMs(now.value));
 const trialOffset = computed(() => remoteApiEnabled
   ? { offsetUSD: freeTrial.authoritativeOffsetUSD ?? 0, remainderUSD: freeTrial.authoritativeRemainderUSD ?? 0 }
   : computeTrialOffset(cfg.value, shadowUSD.value));
-const estimatedOffsetUSD = computed(() => computeTrialOffset(cfg.value, cfg.value.shadowDailyUSD * cfg.value.trialDays).offsetUSD);
+const estimatedOffsetUSD = computed(() => cfg.value.shadowDailyUSD === null
+  ? null : computeTrialOffset(cfg.value, cfg.value.shadowDailyUSD * cfg.value.trialDays).offsetUSD);
 // FEAT-TRIAL05: the server quote convert() will settle. An early quote is shown only while
 // the original term is still running. App's boundary read supplies the next quote.
 const earlyQuoteLapsed = computed(() => {

@@ -117,7 +117,7 @@ import { useStaking } from "@/store/staking";
 import { useConfig } from "@/store/config";
 import { PRODUCTS } from "@/mock/products";
 import type { Product } from "@/mock/products";
-import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
+import { productCopy, specRow, specText } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { SupportFaq } from "@/domain/support";
@@ -220,8 +220,10 @@ const searchableProducts = computed(() => !remoteApiEnabled ? PRODUCTS
 
 function productSearchDetail(p: Product): string {
   if (!remoteApiEnabled) return productCopy(t.value, p).tagline;
-  return [specRow(t.value.store.specGpu, p.gpu), specRow(t.value.store.specVram, p.vram)]
-    .filter((row): row is SpecRow => row !== null).map((row) => specText(t.value, row.v)).join(" · ");
+  const gpu = specRow(t.value.store.specGpu, p.gpu);
+  const vram = specRow(t.value.store.specVram, p.vram);
+  return [gpu && specText(t.value, gpu.v), vram && specText(t.value, vram.v, undefined, "vram")]
+    .filter(Boolean).join(" · ");
 }
 
 // Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);

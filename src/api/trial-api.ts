@@ -239,9 +239,9 @@ function trialConfig(value: unknown): Record<string, TrialConfigValue> {
   if (!source) return invalid();
   const result: Record<string, TrialConfigValue> = {};
   for (const [key, item] of Object.entries(source)) {
-    // Only the documented offset cap can be null (the operator left it uncapped).
+    const nullable = key === "trialOffsetCapUSD" || key === "shadowDailyUSD" || key === "shadowDailyNEX";
     if ((typeof item !== "string" && typeof item !== "boolean"
-        && !(key === "trialOffsetCapUSD" && item === null)) || !key.trim()) return invalid();
+        && !(nullable && item === null)) || !key.trim()) return invalid();
     result[key] = item;
   }
   return result;

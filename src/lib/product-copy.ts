@@ -94,7 +94,17 @@ export function productCopy(t: Messages, p: Product, serverCatalog = false, loca
  * Every render of those fields goes through here; `spec-sentinel-render-gate.mjs`
  * fails the build on any unwrapped read in the store render face.
  */
-export function specText(t: Messages, value: string | null | undefined, fallback = t.store.specValueUnavailable): string {
+export function specText(
+  t: Messages,
+  value: string | null | undefined,
+  fallback = t.store.specValueUnavailable,
+  field?: "vram" | "power",
+): string {
+  if (value === "not_applicable") {
+    if (field === "vram") return t.store.specShareVramNotApplicable;
+    if (field === "power") return t.store.specSharePowerNotApplicable;
+    return fallback;
+  }
   if (value === "不适用（虚拟算力份额）") return t.store.specShareVramNotApplicable;
   if (value === "不适用（非独立设备）") return t.store.specSharePowerNotApplicable;
   const target = value?.match(/^目标\s*(\d+(?:\.\d+)?%)$/);

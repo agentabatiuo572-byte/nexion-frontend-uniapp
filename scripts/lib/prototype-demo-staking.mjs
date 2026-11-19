@@ -27,21 +27,17 @@ export function demoDeletionStake(state) {
   return state.accountDeletionState === "locked" ? demoStakePosition(state.stakingNow ?? state.previewFactsAt) : null;
 }
 
-export function createStakingDemoFixture({ empty = false, now = Date.now(), wallet } = {}) {
+export function createStakingDemoFixture({ now = Date.now(), wallet } = {}) {
   return {
     pools: {
       ...proof,
-      pools: [30, 90, 180, 365].map((termDays, index) => ({
-        poolId: index + 1, tierKey: `usdt${termDays}d`, currency: "USDT", termDays,
-        apyPct: [12, 15, 18, 20][index], penaltyPct: 5, minAmountUsdt: 20,
-        enabled: true, killed: false, status: "ACTIVE",
-      })),
+      pools: [],
     },
     snapshot: {
       ...proof, walletBalanceUsdt: wallet ?? 0,
       serverTime: new Date(now).toISOString(),
-      positions: empty ? [] : [demoStakePosition(now)],
-      positionsPage: { total: empty ? 0 : 1, pageNum: 1, pageSize: 50, snapshotId: "1" },
+      positions: [],
+      positionsPage: { total: 0, pageNum: 1, pageSize: 50, snapshotId: "1" },
     },
   };
 }
@@ -52,8 +48,7 @@ export function stakingDemo(url, state, request) {
   if (state.stakingState === "error") throw Object.assign(new Error("DEMO_STAKING_READ_UNAVAILABLE"), { status: 503 });
   // The stake sheet's balance is the account's wallet fact, the one every other wallet read and payment uses.
   const deletionWallet = accountDeletionWallet(state);
-  const fixture = createStakingDemoFixture({ empty: Boolean(deletionWallet) || state.dataState === "empty" || state.paymentState === "reward-clawback-debt",
-    now: state.stakingNow, wallet: deletionWallet?.usdtAvailable ?? (state.dataState === "empty" ? 0 : state.walletBalance ?? 52800.64) });
+  const fixture = createStakingDemoFixture({ now: state.stakingNow, wallet: deletionWallet?.usdtAvailable ?? (state.dataState === "empty" ? 0 : state.walletBalance ?? 52800.64) });
   if (url.pathname === "/api/config/staking/pools") return fixture.pools;
   const stake = demoDeletionStake(state);
   const positions = stake ? [stake] : fixture.snapshot.positions;

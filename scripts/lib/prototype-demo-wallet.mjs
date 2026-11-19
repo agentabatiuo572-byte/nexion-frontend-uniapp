@@ -153,14 +153,14 @@ function savedNexBalance(state) {
 export function demoWalletNex(state,now) {
   const posted=new Set(state.walletMovements?.map(row=>row.bizNo));
   return money(demoH4Credits(state,now).reduce((balance,row)=>
-    balance+(row.includedInBalance||posted.has(row.id)?0:row.amount),savedNexBalance(state)));
+    balance+(row.asset==='USDT'||row.includedInBalance||posted.has(row.id)?0:row.amount),savedNexBalance(state)));
 }
 
 export function postDemoActivityRewards(state,now) {
   const posted=new Set(state.walletMovements?.map(row=>row.bizNo));
   for(const credit of demoH4Credits(state,now)){
     if(credit.includedInBalance||posted.has(credit.id))continue;
-    postDemoWalletEntries(state,{bizType:credit.type,bizNo:credit.id,asset:'UVT',direction:'IN',
+    postDemoWalletEntries(state,{bizType:credit.type,bizNo:credit.id,asset:credit.asset??'UVT',direction:'IN',
       amount:credit.amount,at:credit.at,category:'bonus'});
   }
 }
@@ -270,8 +270,8 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
   ];
   seeds.push(...deletionEntries.map(([bizNo,asset,direction,amount,bizType,category,at])=>
     ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
-  const credits=demoH4Credits(state,now).filter(row=>!posted.has(row.id)).map(({id,type,amount,at,includedInBalance})=>({
-    id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
+  const credits=demoH4Credits(state,now).filter(row=>!posted.has(row.id)).map(({id,type,amount,at,includedInBalance,asset='UVT'})=>({
+    id,bizNo:id,bizType:type,asset,direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
   for(const {at,result} of state.milestoneClaimReceipts??[]){
     if(!result)continue;
