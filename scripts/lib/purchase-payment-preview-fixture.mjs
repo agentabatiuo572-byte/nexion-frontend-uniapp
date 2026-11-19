@@ -3,6 +3,7 @@
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
 import {demoAccountOrders,demoFixture,demoOrderFitsCapacity,demoProducts,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
@@ -17,10 +18,11 @@ const graceEnd = (method, deadline) => deadline + (method === 'CREGIS_USDT_BSC' 
 export function createPurchasePaymentPreviewFixture(state, locale) {
   const quotes = new Map(), intents = new Map();
   let sequence = 0;
+  const paymentMode = () => state.paymentState === 'read-error' ? state.paymentBeforeReadError ?? 'delivered' : state.paymentState ?? 'delivered';
   // D1 switch closure leaves fee configuration intact (PurchasePaymentPolicyService.current).
-  const configured = method => !(state.paymentState === 'bank-off' && method === 'HDPAY_BANK');
-  const networkOpen = method => !(state.paymentState === 'erc20-off' && method === 'CREGIS_USDT_ERC20'
-    || state.paymentState === 'usdt-off' && method !== 'HDPAY_BANK');
+  const configured = method => !(paymentMode() === 'bank-off' && method === 'HDPAY_BANK');
+  const networkOpen = method => !(paymentMode() === 'erc20-off' && method === 'CREGIS_USDT_ERC20'
+    || paymentMode() === 'usdt-off' && method !== 'HDPAY_BANK');
   const refused = (status, message) => ({status, message, data: null});
   const handles = path => path.startsWith(base);
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
@@ -68,12 +70,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
-    const now = Date.now(), age = now - intent.createdAt, scenario = state.paymentState ?? 'delivered', bank = intent.paymentMethod === 'HDPAY_BANK';
+    const now = Date.now(), age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
     if (scenario === 'intent-missing') return intent;
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED' && intent.reason === 'PAYMENT_FAILED' && graceOver) return timeOut(intent);
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;
-    if (intent.status === 'AWAITING_PAYMENT' && ['waiting', 'urgent', 'read-error', 'late', 'remote-in-progress'].includes(scenario)) {
+    if (intent.status === 'AWAITING_PAYMENT' && ['waiting', 'urgent', 'late', 'remote-in-progress'].includes(scenario)) {
       if (!graceOver) return intent;
       timeOut(intent);
       // Funds that come in once the order has been cancelled stay with support: never delivery, refund or wallet credit.
@@ -159,7 +161,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const byOrder = path.match(/^\/api\/app\/purchase-payment-intents\/by-order\/([^/]+)$/);
     if (byOrder && method === 'GET') {
       const orderNo = decodeURIComponent(byOrder[1]);
-      if (!ordersOf(url.origin).some(order => order.orderNo === orderNo)) return refused(404, 'ORDER_NOT_FOUND');
+      if (previewAccountId(state, request.headers?.() ?? {}) !== demoAccountId
+          || !ordersOf(url.origin).some(order => order.orderNo === orderNo)) return refused(404, 'ORDER_NOT_FOUND');
       if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_LOOKUP_UNAVAILABLE');
       const intent = openIntent({kind: 'ORDER_PAY', orderNo});
       return {status: 200, message: 'OK', data: {orderNo, state: intent ? 'IN_PROGRESS' : 'NONE', intentNo: intent?.intentNo ?? null}};
@@ -256,6 +259,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   function seedRemoteOrderPayment(origin) {
     const orderNo = 'DEMO-ORDER-001';
+    if (openOrderPayment(orderNo)) return {status: 200};
     const request = (body, headers = {}) => ({method: () => 'POST', postDataJSON: () => body, headers: () => headers});
     const quote = handle(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_BSC', payload: {orderNo}}));
     if (quote.status !== 200) return quote;

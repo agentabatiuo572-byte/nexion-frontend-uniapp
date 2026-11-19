@@ -455,11 +455,12 @@ export function acknowledgePurchasePayment(result: Extract<PurchaseChoice, { met
   if (pending) save({ ...pending, validated: true, businessDelivered: true }, result.accountKey);
 }
 /** The order detail asks whether this order already has an external payment underway. */
-export function pendingOrderPayment(accountKey: string, orderNo: string): PendingExternal | null {
+export function pendingOrderPayment(accountKey: string, orderNo: string, knownOnly = false): PendingExternal | null {
   try {
-    return Object.values(rows(accountKey).records).find(row => row.kind === 'ORDER_PAY' && JSON.parse(row.fingerprint)[1]?.orderNo === orderNo
+    const records = Object.values(rows(accountKey).records).filter(row => row.kind === 'ORDER_PAY' && JSON.parse(row.fingerprint)[1]?.orderNo === orderNo
       && !['EXPIRED', 'DELIVERED'].includes(row.lastStatus ?? '') && !row.businessDelivered
-      && (row.lastStatus !== 'MANUAL_REVIEW' || row.lookupOnly && !!row.intentNo)) ?? null;
+      && (row.lastStatus !== 'MANUAL_REVIEW' || row.lookupOnly && !!row.intentNo));
+    return records.find(row => row.intentNo) ?? (knownOnly ? null : records[0] ?? null);
   } catch { return null; }
 }
 
@@ -470,7 +471,7 @@ export async function discoverOrderPayment(accountKey: string, orderNo: string, 
     if (!intentNo || !current()) return;
     const intent = await api.get(intentNo);
     if (!current() || !intent || intent.intentNo !== intentNo || intent.kind !== 'ORDER_PAY'
-        || intent.status === 'EXPIRED' || intent.status === 'DELIVERED' || pendingOrderPayment(accountKey, orderNo)) return;
+        || intent.status === 'EXPIRED' || intent.status === 'DELIVERED' || pendingOrderPayment(accountKey, orderNo, true)) return;
     save({ fingerprint: JSON.stringify(['ORDER_PAY', { orderNo }]), kind: intent.kind, commandKey: intent.commandKey,
       paymentQuoteId: intent.paymentQuoteId, paymentMethod: intent.paymentMethod, network: intent.network, intentNo,
       summary, lastStatus: intent.status, lookupOnly: true }, accountKey);

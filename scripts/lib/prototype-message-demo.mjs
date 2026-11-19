@@ -1,6 +1,7 @@
 // Preview-only delivery scenarios. Both HTTP and WS execute the existing demoFixture.
 import { setTimeout as delay } from 'node:timers/promises';
 import { supportAccountId, supportUserView } from './prototype-demo-support.mjs';
+import { demoAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 
 const root='/api/app/support';
 const commandPath=/^\/api\/app\/support\/conversations(?:\/(DEMO-SUPPORT-\d+)\/(replies|read))?$/;
@@ -20,6 +21,11 @@ export function createPrototypeMessages({state,fixtureFor}) {
       if(receipt&&request.method()==='GET') {
         const key=decodeURIComponent(receipt[1]),saved=receipts.get(key);
         const transfer=state.supportTransferSample;
+        if(transfer?.key===key) {
+          const accountId=previewAccountId(state,request.headers?.()??{});
+          if(!accountId)return fail(401,'AUTH_REQUIRED');
+          if(accountId!==(transfer.accountId??demoAccountId))return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
+        }
         if(transfer?.key===key&&transfer.rejected)return ok({status:'REJECTED',sent:false,conversationNo:transfer.conversationNo,
           operation:'APP_CONVERSATION_REPLY',idempotencyKey:key,clientMessageId:key,businessCode:409,businessReason:'CONVERSATION_PEER_CHANGED'});
         if(transfer?.key===key&&!transfer.committed)return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
