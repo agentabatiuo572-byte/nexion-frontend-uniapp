@@ -243,13 +243,14 @@ import { requireAccountPhone } from "@/lib/require-account-phone";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import { deleteMockAuthAccount } from "@/api/mock-auth-api";
 import type { SecurityState } from "@/api/contracts";
-import type { AccountDeletionStatus, PhoneNumberChangePolicy, PhoneNumberChangeChallenge } from "@/api/account-api";
-import { ApiError } from "@/api/errors";
+import { validateAccountDeletionReason, type AccountDeletionStatus, type PhoneNumberChangePolicy, type PhoneNumberChangeChallenge } from "@/api/account-api";
+import { ApiError, isApiRefusal } from "@/api/errors";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 import { accountErrorMessageKey } from "@/lib/account-error-message";
-import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey } from "@/store/account-scoped-storage";
+import { acquireAccountCommand, acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, type AccountCommandRow } from "@/store/account-scoped-storage";
 
 const SECURITY_COMMAND_TABLE = "nexgrid-security-command-accounts-v1";
+const DELETION_REQUEST_INTENT = "account-deletion-request";
 
 const t = useT();
 const retiredFlow = ref(false);
@@ -339,7 +340,8 @@ async function leaveForDebt(url: string) {
   if (!(await navTo(url))) toast.error(t.value.ui.navigationFailed);
 }
 const deletionPassword = ref("");
-const deletionCommandKey = ref("");
+const deletionReason = ref("");
+const deletionReasonValidation = computed(() => validateAccountDeletionReason(deletionReason.value));
 const remoteSecurityLoading = ref(false);
 const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
@@ -463,7 +465,7 @@ function clearSecurityAccountState(keepPresentation = false) {
   twoFactorPhoneMasked.value = "";
   twoFactorTarget.value = null;
   deletionPassword.value = "";
-  deletionCommandKey.value = "";
+  deletionReason.value = "";
   err.value = "";
 }
 
@@ -1044,18 +1046,18 @@ async function handleDeleteAccount() {
     if (ok) {
       if (remoteApiEnabled) {
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        const intent = "account-deletion-request";
-        deletionCommandKey.value = acquireAccountCommandKey(
-          SECURITY_COMMAND_TABLE,
-          accountKey,
-          intent,
-          "app-security:account-deletion",
-        );
+        let command: ReturnType<typeof acquireAccountCommand> | undefined;
         try {
-          const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
+          const retainedKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey, true)
+            ?.commands?.[DELETION_REQUEST_INTENT];
+          if (!retainedKey && !deletionReasonValidation.value.ok) return;
+          command = acquireAccountCommand(
+            SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, "app-security:account-deletion", deletionReason.value,
+          );
+          // An older stored key was created without a reason field.
+          const request = await accountApi.requestAccountDeletion(deletionPassword.value, command.key, command.payload);
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-          releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, deletionCommandKey.value);
-          deletionCommandKey.value = "";
+          releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, command.key);
           if (request.status === "CANCELLED") {
             deletionStatus.value = request;
             toast.info(t.value.security.deleteAccountCancelledReplay);
@@ -1080,7 +1082,11 @@ async function handleDeleteAccount() {
           if (sessionVault.read()) return; // A newer login won the logout CAS.
         } catch (cause) {
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+          if (command && !command.reused && (isApiRefusal(cause, 401, "CURRENT_PASSWORD_INVALID")
+            || isApiRefusal(cause, 429, "USER_SECURITY_VERIFICATION_RATE_LIMITED"))) {
+            releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, command.key);
+          }
+          if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
           toast.error(securityErrorMessage(cause));
           return;
         }
@@ -1140,10 +1146,9 @@ async function handleCancelAccountDeletion() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (deletionStatus.value.status !== "CANCELLED") throw new Error("SECURITY_READBACK_FAILED");
     releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, key);
-    const requestKey = readAccountRow<{ commands: Record<string, string> }>(SECURITY_COMMAND_TABLE, accountKey)
-      ?.commands["account-deletion-request"];
-    if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "account-deletion-request", requestKey);
-    deletionCommandKey.value = "";
+    const requestKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)
+      ?.commands?.[DELETION_REQUEST_INTENT];
+    if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, requestKey);
     toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -1176,6 +1181,7 @@ function closeDeletionSheet() {
   deletionSheetOpen.value = false;
   deletionDebtOpen.value = false;
   deletionPassword.value = "";
+  deletionReason.value = "";
 }
 function openDeletionSheet() {
   if (securityBusy.value || deletionPending.value) return;

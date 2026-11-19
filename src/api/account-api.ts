@@ -13,7 +13,7 @@ export interface AccountApi {
   revokeSession(sessionId: string): Promise<SecurityMutation>;
   revokeOtherSessions(): Promise<SecurityMutation>;
   accountDeletionStatus(): Promise<AccountDeletionStatus>;
-  requestAccountDeletion(currentPassword: string, idempotencyKey: string): Promise<AccountDeletionRequest>;
+  requestAccountDeletion(currentPassword: string, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
   cancelAccountDeletion(expectedVersion: number, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
   phoneNumberPolicy(): Promise<PhoneNumberChangePolicy>;
   startPhoneNumberChange(currentPassword: string, countryCode: string, phone: string): Promise<PhoneNumberChangeChallenge>;
@@ -55,6 +55,20 @@ export interface AccountDeletionRequest {
 }
 
 export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
+
+export const ACCOUNT_DELETION_REASON_MAX_LENGTH = 255;
+export type AccountDeletionReasonValidation =
+  | { ok: true }
+  | { ok: false; code: "ACCOUNT_DELETION_REASON_INVALID" };
+
+export function validateAccountDeletionReason(reason: string): AccountDeletionReasonValidation {
+  // Match Java StringUtils.hasText and String.trim, which use different whitespace sets.
+  const hasText = /[^\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]/.test(reason);
+  const trimmed = hasText ? reason.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "") : "";
+  return trimmed.length <= ACCOUNT_DELETION_REASON_MAX_LENGTH
+    ? { ok: true }
+    : { ok: false, code: "ACCOUNT_DELETION_REASON_INVALID" };
+}
 
 let idempotencySequence = 0;
 
@@ -273,12 +287,16 @@ export function createAccountApi(client: ApiClient): AccountApi {
       method: "GET",
       path: "/api/app/security/account-deletion",
     })),
-    requestAccountDeletion: async (currentPassword, idempotencyKey) => parseAccountDeletion(await client.request({
-      method: "POST",
-      path: "/api/app/security/account-deletion",
-      body: { currentPassword, confirmation: "DELETE" },
-      idempotencyKey,
-    })),
+    requestAccountDeletion: async (currentPassword, idempotencyKey, reason) => {
+      const validation = validateAccountDeletionReason(reason ?? "");
+      if (!validation.ok) throw new ApiError({ kind: "business", message: validation.code, code: 422 });
+      return parseAccountDeletion(await client.request({
+        method: "POST",
+        path: "/api/app/security/account-deletion",
+        body: { currentPassword, confirmation: "DELETE", reason },
+        idempotencyKey,
+      }));
+    },
     cancelAccountDeletion: async (expectedVersion, idempotencyKey, reason = "USER_REQUESTED_CANCEL") => parseAccountDeletion(await client.request({
       method: "POST",
       path: "/api/app/security/account-deletion/cancel",
