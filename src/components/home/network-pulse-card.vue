@@ -70,6 +70,7 @@ import { useNetworkRank } from "@/store/network-rank";
 import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
 import { compactNumber as compact, networkPopulationBand } from "@/lib/platform-stats";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import { navTo } from "@/lib/route";
 
@@ -170,7 +171,7 @@ const metrics = computed<Cell[]>(() => {
   // Online devices read as the whole number in the compact view (BUG-531); members keep the shared band.
   const displayCell = (label: string, value: number | null | undefined, color: string, whole = false): Cell => {
     if (value === null || value === undefined || !Number.isSafeInteger(value) || value < 0) return placeholderCell(label);
-    if (whole && props.compactView) return { k: label, v: value.toLocaleString("en-US"), count: value, tone: "var(--v5-ink)", sub: "", data: null, color };
+    if (whole && props.compactView) return { k: label, v: formatGroupedAmount(value, "full"), count: value, tone: "var(--v5-ink)", sub: "", data: null, color };
     return { k: label, v: props.compactView ? networkPopulationBand(value, locale.code) : compact(value), tone: "var(--v5-ink)", sub: "", data: null, color };
   };
   const memberValue = props.compactView && props.estimated ? props.registeredDisplay : pulse?.registeredUsers;

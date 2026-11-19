@@ -1,6 +1,6 @@
 <!--
-  NxTickNumber — a whole count with thousands separators (en-US grouping on every page and in every
-  language, e.g. 2,968). When the value changes, only the digits that changed roll in from below; the
+  NxTickNumber — a whole count with thousands separators (comma grouping on every page and in every
+  language, e.g. 2,968; formatGroupedAmount, no Intl). When the value changes, only the digits that changed roll in from below; the
   rest stay put. Reduced motion shows the new figure without movement. Screen readers read the whole
   figure once instead of the separate digits. null renders "—".
 -->
@@ -10,9 +10,10 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { formatGroupedAmount } from "@/lib/amount-display";
 
 const props = defineProps<{ value: number | null }>();
-const text = computed(() => props.value === null ? "—" : props.value.toLocaleString("en-US"));
+const text = computed(() => props.value === null ? "—" : formatGroupedAmount(props.value, "full"));
 // Each character is keyed by its place counted from the right, so a changed digit is a new node and
 // replays the roll, while unchanged digits keep their node. The first figure and "—" never roll.
 const chars = ref<{ ch: string; key: string; roll: boolean }[]>([]);
