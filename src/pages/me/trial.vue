@@ -16,7 +16,7 @@
 <template>
   <AppChassis active="me">
     <view class="trial-page">
-      <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="t.trial.pageHeaderSubtitle" />
+      <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="trialDeviceName || undefined" />
 
       <view v-if="authorityScreenUnavailable" class="mx-4 trial-read-state" role="status" :aria-busy="freeTrial.authorityStatus === 'loading'">
         <view v-if="freeTrial.authorityStatus === 'loading'" class="trial-read-skeleton" aria-hidden="true"><view/><view/><view/></view>
@@ -136,7 +136,7 @@
           <NxTag class="trial-slot__tag" tone="brand">{{ fmt(detail.freeDays, { n: String(cfg.trialDays) }) }}</NxTag>
         </view>
         <view class="trial-terminal-copy trial-terminal-copy--claim trial-rise trial-rise--2">
-          <text class="trial-terminal-copy__title">{{ t.trial.idleTitleNew }}</text>
+          <text class="trial-terminal-copy__title">{{ fmt(t.trial.idleTitleNew, { device: trialDeviceNameKept }) }}</text>
           <text v-if="idleBody" class="trial-terminal-copy__body">{{ idleBody }}</text>
         </view>
       </view>
@@ -178,7 +178,7 @@
         </view>
         <view class="trial-terminal-copy trial-rise trial-rise--2">
           <text class="trial-terminal-copy__title">{{ t.trial.convertedTitle }}</text>
-          <text class="trial-terminal-copy__body">{{ t.trial.convertedDesc }}</text>
+          <text class="trial-terminal-copy__body">{{ fmt(t.trial.convertedDesc, { device: trialDeviceNameKept }) }}</text>
         </view>
       </view>
 
@@ -403,6 +403,14 @@ const conversionRefunded = computed(() => remoteApiEnabled && status.value === "
   && freeTrial.authoritativeConversion?.refunded === true);
 
 const w = computed(() => t.value.trial);
+// B53: the header, claim title and owned note name the confirmed trial product: the current
+// offer while claimable, the claimed product once running or bought. Nothing shows before the
+// first confirmed read, so the boot default never flashes in; local mock keeps its own config.
+const trialDeviceName = computed(() => (freeTrial.authorityStatus === "mock"
+  ? cfg.value.trialProductName
+  : freeTrial.authoritativeProductIdentity?.name ?? ""));
+// Inside sentences the name never splits across lines ("UVELBox / Pro v2").
+const trialDeviceNameKept = computed(() => trialDeviceName.value.replace(/ /g, "\u00A0"));
 const idleBody = computed(() => freeTrial.authorityStatus === "mock" || freeTrial.authorityServerState !== null
   ? fmt(w.value.idleBody, { n: String(cfg.value.trialDays) })
   : "");
@@ -617,8 +625,8 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-slot .trial-slot__tag { position:absolute;left:50%;bottom:-12px;padding:0 10px;transform:translateX(-50%); }
 .trial-terminal-copy { display:flex;flex-direction:column;align-items:center;margin-top:28px;padding:0 24px;text-align:center; }
 .trial-terminal-copy--claim { margin-top:36px; }
-.trial-terminal-copy__title { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);text-wrap:balance; }
-.trial-terminal-copy__body { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);text-wrap:pretty; }
+.trial-terminal-copy__title { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);text-wrap:balance;overflow-wrap:anywhere; }
+.trial-terminal-copy__body { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);text-wrap:pretty;overflow-wrap:anywhere; }
 .trial-terminal-copy__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-wrap:pretty; }
 
 /* ── Bottom action bar (DS-30): the shared glass bar ── */
