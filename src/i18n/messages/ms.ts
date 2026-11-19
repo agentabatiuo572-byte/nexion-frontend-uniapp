@@ -3632,6 +3632,7 @@ export const ms: Messages = {
     typeAchievement: "Pencapaian",
     typeClawback: "Penarikan balik ganjaran",
     typeOther: "Lain-lain",
+    statusDone: "Selesai",
     statusPosted: "Direkodkan",
     statusPending: "Diproses",
     statusFailed: "Gagal",

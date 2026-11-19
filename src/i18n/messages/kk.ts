@@ -3632,6 +3632,7 @@ export const kk: Messages = {
     typeAchievement: "Жетістік",
     typeClawback: "Сыйақыны қайтарып алу",
     typeOther: "Басқа",
+    statusDone: "Аяқталды",
     statusPosted: "Түсті",
     statusPending: "Өңделуде",
     statusFailed: "Сәтсіз",
