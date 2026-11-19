@@ -20,6 +20,8 @@ export function createPrototypeMessages({state,fixtureFor}) {
       if(receipt&&request.method()==='GET') {
         const key=decodeURIComponent(receipt[1]),saved=receipts.get(key);
         const transfer=state.supportTransferSample;
+        if(transfer?.key===key&&transfer.rejected)return ok({status:'REJECTED',sent:false,conversationNo:transfer.conversationNo,
+          operation:'APP_CONVERSATION_REPLY',idempotencyKey:key,clientMessageId:key,businessCode:409,businessReason:'CONVERSATION_PEER_CHANGED'});
         if(transfer?.key===key&&!transfer.committed)return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
         const clearance=state.supportClearCommands?.find(row=>row.accountId===supportAccountId(state)&&row.key===key);
         if(clearance)return ok({resultType:'CONVERSATION_USER_CLEAR',result:structuredClone(clearance.result)});

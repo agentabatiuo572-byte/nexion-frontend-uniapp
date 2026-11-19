@@ -458,6 +458,23 @@ export function acknowledgePurchasePayment(result: Extract<PurchaseChoice, { met
 export function pendingOrderPayment(accountKey: string, orderNo: string): PendingExternal | null {
   try {
     return Object.values(rows(accountKey).records).find(row => row.kind === 'ORDER_PAY' && JSON.parse(row.fingerprint)[1]?.orderNo === orderNo
-      && !['EXPIRED', 'DELIVERED', 'MANUAL_REVIEW'].includes(row.lastStatus ?? '') && !row.businessDelivered) ?? null;
+      && !['EXPIRED', 'DELIVERED'].includes(row.lastStatus ?? '') && !row.businessDelivered
+      && (row.lastStatus !== 'MANUAL_REVIEW' || row.lookupOnly && !!row.intentNo)) ?? null;
   } catch { return null; }
+}
+
+/** Attach the server's original payment to this order for the existing resume action. */
+export async function discoverOrderPayment(accountKey: string, orderNo: string, summary: string, current: () => boolean) {
+  try {
+    const intentNo = await api.activeByOrder(orderNo);
+    if (!intentNo || !current()) return;
+    const intent = await api.get(intentNo);
+    if (!current() || !intent || intent.intentNo !== intentNo || intent.kind !== 'ORDER_PAY'
+        || intent.status === 'EXPIRED' || intent.status === 'DELIVERED' || pendingOrderPayment(accountKey, orderNo)) return;
+    save({ fingerprint: JSON.stringify(['ORDER_PAY', { orderNo }]), kind: intent.kind, commandKey: intent.commandKey,
+      paymentQuoteId: intent.paymentQuoteId, paymentMethod: intent.paymentMethod, network: intent.network, intentNo,
+      summary, lastStatus: intent.status, lookupOnly: true }, accountKey);
+  } catch {
+    // Discovery is silent. A failed lookup cannot declare the original payment absent.
+  }
 }

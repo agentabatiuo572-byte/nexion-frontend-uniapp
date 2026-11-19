@@ -151,8 +151,8 @@
       <!-- The order's next actions sit in the thumb zone at the bottom of the page (DS-30), whatever its state. -->
       <view v-if="order && stickyActionsVisible" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
-          <NxButton class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
-          <NxButton v-if="remoteApiEnabled && !paymentExpired" class="order-hero__pay" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
+          <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
+          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
@@ -189,7 +189,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { pendingOrderPayment, usePurchasePayment, onPurchaseRecordReleased } from "@/store/purchase-payment";
+import { discoverOrderPayment, pendingOrderPayment, usePurchasePayment, onPurchaseRecordReleased } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue";
@@ -305,6 +305,7 @@ const remoteOrderAttempted = ref(false);
 let remoteOrderRefreshSequence = 0;
 let activeRemoteOrderScope: DetailRequestScope | null = null;
 let remoteOrderRead: Promise<void> | null = null;
+let paymentLookupScope: DetailRequestScope | null = null;
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
 async function refreshOrderWallet(): Promise<boolean> {
@@ -338,6 +339,12 @@ async function refreshOrder() {
       if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
         orderPresentation.value = result ?? null;
         remoteOrderError.value = false;
+        if (result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
+            && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo)) {
+          paymentLookupScope = scope;
+          await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, result.productName,
+            () => isCurrentDetailScope(scope) && liveOrder.value?.status === 'placed');
+        }
       }
     } catch {
       if (sequence !== remoteOrderRefreshSequence || !isCurrentDetailScope(scope)) return;
@@ -596,7 +603,8 @@ useAutoRecovery({
   retry: () => recoverOrderAction(false),
   repeatMs: 15_000,
 });
-const pendingOrderActionsVisible = computed(() => order.value?.status === "placed" && !order.value.promotionQuoteId && !walletPaymentConfirmed.value);
+const pendingOrderActionsVisible = computed(() => order.value?.status === "placed"
+  && (!order.value.promotionQuoteId || externalPayment.value) && !walletPaymentConfirmed.value);
 // Any state with a next action gets the bottom action bar.
 const stickyActionsVisible = computed(() => !!order.value && (pendingOrderActionsVisible.value || needsRecovery.value
   || order.value.status === 'activated' || order.value.status === 'inventory' || canBuyAgain.value));
@@ -661,6 +669,9 @@ const statusTone = computed(() => (order.value ? STATUS_TONES[order.value.status
 // An external payment for this order is underway: the hero says so and resumes it.
 const purchasePaymentState = usePurchasePayment().state;
 const externalPayment = computed(() => { purchasePaymentState.revision; return order.value?.status === 'placed' && !!pendingOrderPayment(app.accountKey, id.value); });
+watch(() => purchasePaymentState.notice, notice => {
+  if (notice === 'existing' && purchasePaymentState.orderNo === id.value) paymentLookupScope = null;
+});
 const heroImage = computed(() => order.value
   ? getOrderProductMedia(order.value.productId, order.value.lineItems)?.src
   : undefined);
@@ -835,6 +846,13 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     if (remoteOrderError.value || !liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
     let original = liveOrder.value;
     restoreOrderAction();
+    const originalPayment = original.status === 'placed' && pendingOrderPayment(scope.accountScope.accountKey, original.id);
+    if (originalPayment) {
+      autoPayRequested.value = false;
+      pendingPaymentIntentAccount = '';
+      void usePurchasePayment().resume(originalPayment);
+      return;
+    }
     if ((orderAction.value || orderCommandUnavailable.value) && !externalPayment.value) {
       await recoverOrderAction(false);
       if (!isCurrentDetailScope(scope) || orderAction.value || orderCommandUnavailable.value) return;
