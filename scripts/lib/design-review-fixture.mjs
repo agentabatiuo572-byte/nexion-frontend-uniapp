@@ -9,15 +9,74 @@ export function previewInterfaceLanguages(mode = 'all') {
 }
 
 const platform = { interfaceLanguages: previewInterfaceLanguages(), featureFlags: { computeShareEnabled: true, homeNewcomerTasksEnabled: true, homeWeeklyPromoEnabled: false }, share: { baseUrl: "https://ui-probe.invalid/ref/", channels: [], appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "", version: "", releaseNotes: { zh: "", en: "" }, source: "unavailable" } }, publicStats: { version: 1, ...authority, source: "server:nx_config_item,nx_user", realUserCount: 4, networkPulse: {registeredUsers:12480,onlineDevices:3206} }, onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 }, computerCompute: { domain: "E6", flags: [{ key: "computeShareEnabled", enabled: true }], coefficients: [{ key: "h5BaseFactor", value: 0.6 }, { key: "continuityFullHours", value: 24 }], yieldEstimate: [{ key: "topsBaseline", value: 100 }, { key: "dailyUsdtPerBaseline", value: 0.24 }, { key: "nexPerUsdt", value: 10 }], gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, i) => ({ id, label: `UI ${id}`, tops: (i + 1) * 100, keywords: [{ slot: "keyword1", value: `UI ${id}` }] })), download: { url: "https://ui-probe.invalid/agent-fixture.zip", zhTitle: "测试下载入口", zhGuide: "前端验收数据，不下载或安装", enTitle: "UI fixture download", enGuide: "Frontend fixture; no installer download or native execution" }, sources: ["e6.compute_config"] }, updatedAt: iso };
+export const previewDefaultTrialSku = 'stellarbox-s1';
+export const previewDefaultTrialName = 'UVELBox S1';
+
+export function previewTrialProductConfig(product) {
+  return {
+    trialProductId: product.id,
+    trialProductName: product.name,
+    trialPriceUSD: String(product.price),
+    shadowDailyUSD: String(product.dailyEarn),
+    shadowDailyNEX: String(product.dailyEarnNEX),
+  };
+}
+
 const products = [
-  { id: 'stellarbox-s1', name: 'UVEL Box S1', tier: 'Entry', imageUrl: '/static/img/products/uvel-pedestal/stellarbox-s1.webp', price: 1299, monthlyEstimateUsdt: 186, dailyEarn: 6.2, dailyEarnNEX: 3, gpu: 'NVIDIA RTX 4060', vram: '8 GB', power: '115 W' },
+  { id: previewDefaultTrialSku, name: previewDefaultTrialName, tier: 'Entry', imageUrl: '/static/img/products/uvel-pedestal/stellarbox-s1.webp', price: 1299, monthlyEstimateUsdt: 186, dailyEarn: 6.2, dailyEarnNEX: 3, gpu: 'NVIDIA RTX 4060', vram: '8 GB', power: '115 W' },
   { id: 'stellarbox-pro', name: 'UVEL Box Pro', tier: 'Pro', imageUrl: '/static/img/products/uvel-pedestal/stellarbox-pro.webp', price: 4999, monthlyEstimateUsdt: 672, dailyEarn: 22.4, dailyEarnNEX: 12, gpu: 'NVIDIA RTX 4080', vram: '16 GB', power: '320 W' },
 ].map(p => ({ ...p, imageUrl: new URL(p.imageUrl, BASE).href, tagline: '', badge: null, productType: 'DEVICE', inventoryMode: 'FINITE', datacenter: '', warranty: null, hashRate: null, sold: 7, stock: 60, features: [], ai: null, status: 'active', available: true, releaseState: null, releasePhaseId: null, unlocksAtPhase: null, purchaseGate: null }));
-const trialProduct = products.find(product => product.id === 'stellarbox-s1');
-const trial = { ...authority, authoritative: true, state: 'ELIGIBLE', canStart: true, serverNowEpochMs: now, version: 1, claimNo: null, startedAt: null, expiresAt: null, graceEndsAt: null, finishedAt: null, cooldownUntil: null, shadowUSD: 0, shadowNEX: 0, source: 'nx_trial_claim', provenance: { ...authority, source: 'nx_trial_claim' }, paymentRail: 'UVEL_USDT_WALLET', config: { trialDays: '3', graceDays: '7', discountRate: '0.15', discountCapUSD: '20', trialOffsetCapUSD: null, trialProductId: trialProduct.id, trialProductName: trialProduct.name, trialPriceUSD: String(trialProduct.price), shadowDailyUSD: String(trialProduct.dailyEarn), shadowDailyNEX: String(trialProduct.dailyEarnNEX), seatsLeftToday: '1', phaseOpen: true, autoPushEnabled: false, autoPushDelayMs: '1500', autoPushCooldownHours: '24', autoPushMaxPerSession: '1' } };
+const trial = { ...authority, authoritative: true, state: 'ELIGIBLE', canStart: true, serverNowEpochMs: now, version: 1, claimNo: null, startedAt: null, expiresAt: null, graceEndsAt: null, finishedAt: null, cooldownUntil: null, shadowUSD: 0, shadowNEX: 0, source: 'nx_trial_claim', provenance: { ...authority, source: 'nx_trial_claim' }, paymentRail: 'UVEL_USDT_WALLET', config: { trialDays: '3', graceDays: '7', discountRate: '0.15', discountCapUSD: '20', trialOffsetCapUSD: null, ...previewTrialProductConfig(products.find(product => product.id === previewDefaultTrialSku)), seatsLeftToday: '1', phaseOpen: true, autoPushEnabled: false, autoPushDelayMs: '1500', autoPushCooldownHours: '24', autoPushMaxPerSession: '1' } };
 const voucher = { voucherId: 'V-DESIGN', voucherName: 'Device voucher', voucherType: 'fixed', amountUsd: 50, percentValue: 0, minPurchaseUsd: 0, maxDiscountUsd: 50, applicableSkus: '[]', audience: 'all', claimSurfaces: '["home","store"]', startAt: 0, endAt: 0, popupEnabled: false, popupDelayMs: 300, popupCooldownHours: 1, popupMaxPerSession: 1, popupCadenceEnabled: false, popupLastSeenAt: 0, popupSessionCount: 0, nextEligibleAt: 0, stackWithTrial: false, stackWithOthers: false, splittable: false, definitionStatus: 'active', definitionDeleted: 0, grantStatus: 'UNCLAIMED', claimable: true, audienceEligible: true, popupEligible: false };
 
 const capacitySchedule = { stageEarlyEnd: '3', stageMidEnd: '8', capacityFloorPct: '22', capacitySubsidyDays: '30', capacityBand1DeltaPct: '-4', capacityBand2DeltaPct: '-6', capacityBand3DeltaPct: '-23.7', capacityApplyToPhone: 'false', capacityApplyToCloudShare: 'false', capacityApplyToPcGpu: 'false', capacityApplyToS1: 'true', capacityApplyToPro: 'true', capacityApplyToProV2: 'true', capacityApplyToRackP1: 'true', capacityApplyToRackP2: 'true' };
+
+const capacityKeys = { 'STELLARBOX-S1': 'capacityApplyToS1', 'STELLARBOX-PRO': 'capacityApplyToPro',
+    'STELLARBOX-PRO-V2': 'capacityApplyToProV2', 'STELLARRACK-P1': 'capacityApplyToRackP1',
+    'STELLARRACK-P2': 'capacityApplyToRackP2', 'CLOUD-SHARE': 'capacityApplyToCloudShare',
+    'MOBILE-CLOUD-SHARE': 'capacityApplyToCloudShare', 'PHONE': 'capacityApplyToPhone', 'MOBILE': 'capacityApplyToPhone',
+    'PHONE-BASIC': 'capacityApplyToPhone', 'IPHONE15': 'capacityApplyToPhone' };
+
+const upgradeLadder = [
+  'phone', 'stellarbox-s1', 'stellarbox-pro', 'stellarbox-pro-v2', 'stellarrack-p1', 'stellarrack-p2',
+];
+const upgradeKinds = {
+  capacityApplyToPhone: 'phone',
+  capacityApplyToS1: 'stellarbox-s1',
+  capacityApplyToPro: 'stellarbox-pro',
+  capacityApplyToProV2: 'stellarbox-pro-v2',
+  capacityApplyToRackP1: 'stellarrack-p1',
+  capacityApplyToRackP2: 'stellarrack-p2',
+};
+
+export function previewDoTheMath(devices, products, canPurchase) {
+  const current = devices
+    .filter(device => device.activatedAt != null && !device.pendingDeactivate && device.dailyUsdt > 0)
+    .sort((a, b) => b.dailyUsdt - a.dailyUsdt || a.id - b.id)[0];
+  if (!current) return null;
+  const baseKind = upgradeKinds[current.capacityConfigKey];
+  const baseRank = upgradeLadder.indexOf(baseKind);
+  if (baseRank < 0 || baseRank === upgradeLadder.length - 1) return null;
+
+  const next = products
+    .map(product => {
+      const kind = upgradeKinds[capacityKeys[product.id.toUpperCase()]];
+      return { product, kind, rank: upgradeLadder.indexOf(kind) };
+    })
+    .filter(({ product, rank }) => rank > baseRank && product.dailyEarn > current.dailyUsdt && product.price > 0)
+    .sort((a, b) => a.rank - b.rank || a.product.dailyEarn - b.product.dailyEarn || a.product.id.localeCompare(b.product.id))
+    .find(({ product }) => canPurchase(product));
+  if (!next) return null;
+
+  const ownedSku = products.find(product => product.id.toUpperCase() === current.productCode)?.id ?? current.productCode;
+  return {
+    basis: 'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',
+    base: { kind: baseKind, productNo: ownedSku, name: current.name, dailyUsdt: current.dailyUsdt },
+    target: { kind: next.kind, productNo: next.product.id, name: next.product.name, dailyUsdt: next.product.dailyEarn, priceUsdt: next.product.price },
+    multiplier: Math.round(next.product.dailyEarn / current.dailyUsdt),
+    paybackDays: Math.round(next.product.price / next.product.dailyEarn),
+  };
+}
 
 export function previewCapacity(device, schedule, at) {
   const anchor = device.purchasedAt ?? device.activatedAt;
@@ -31,11 +90,7 @@ export function previewCapacity(device, schedule, at) {
   anniversary.setUTCDate(Math.min(purchased.getUTCDate(), lastDay));
   if (anniversary > current) months--;
   const capacityAgeMonths = Math.max(0, months);
-  const capacityConfigKey = ({ 'STELLARBOX-S1': 'capacityApplyToS1', 'STELLARBOX-PRO': 'capacityApplyToPro',
-    'STELLARBOX-PRO-V2': 'capacityApplyToProV2', 'STELLARRACK-P1': 'capacityApplyToRackP1',
-    'STELLARRACK-P2': 'capacityApplyToRackP2', 'CLOUD-SHARE': 'capacityApplyToCloudShare',
-    'MOBILE-CLOUD-SHARE': 'capacityApplyToCloudShare', 'PHONE': 'capacityApplyToPhone', 'MOBILE': 'capacityApplyToPhone',
-    'PHONE-BASIC': 'capacityApplyToPhone', 'IPHONE15': 'capacityApplyToPhone' })[device.productCode];
+  const capacityConfigKey = capacityKeys[device.productCode];
   const early = Number(schedule.stageEarlyEnd), mid = Number(schedule.stageMidEnd);
   const capacityPct = schedule[capacityConfigKey] === 'true'
     ? Number(Math.max(Number(schedule.capacityFloorPct), 100
@@ -94,7 +149,7 @@ function fixture(url, locale, state, request) {
   if (url.pathname === '/api/config/referral-rewards') return {enabled:true,welcomeGift:{lockMode:'risk_bucket',usdtAmount:0,nexAmount:0},inviterReward:{nexAmount:10},rhythmMonth:1,newcomerMultiplier:1,inviterMultiplier:1,effectiveAt:iso,sources:['nx_user.sponsor_user_id']};
   if (url.pathname === '/api/config/platform') return platform;
   if (url.pathname === '/api/devices/earnings') {
-    const device = { id: 41, rowVersion: 1, instanceNo: 'REVIEW-S1', name: 'UVEL Box S1', deviceType: 'BOX', productCode: 'STELLARBOX-S1', monthlyTargetActive: true, status: 'ACTIVE', pendingDeactivate: false, activatedAt: now - 86400000 * 40, purchasedAt: now - 86400000 * 40, dailyUsdt: 6.2, dailyNex: 3, todayEarningsUsdt: 2.34, todayEarningsNex: 1, gpuModel: 'GPU', vramTotalGb: 24, basePowerW: 150, location: 'Review', actualPaidUsdt: 1299, cumulativeOutputUsdt: 100 };
+    const device = { id: 41, rowVersion: 1, instanceNo: 'REVIEW-S1', name: products[0].name, deviceType: 'BOX', productCode: 'STELLARBOX-S1', monthlyTargetActive: true, status: 'ACTIVE', pendingDeactivate: false, activatedAt: now - 86400000 * 40, purchasedAt: now - 86400000 * 40, dailyUsdt: 6.2, dailyNex: 3, todayEarningsUsdt: 2.34, todayEarningsNex: 1, gpuModel: 'GPU', vramTotalGb: 24, basePowerW: 150, location: 'Review', actualPaidUsdt: 1299, cumulativeOutputUsdt: 100 };
     Object.assign(device, previewCapacity(device, capacitySchedule, now));
     device.dailyUsdt = Number((products.find(product => product.id === 'stellarbox-s1').dailyEarn * device.capacityPct / 100).toFixed(6));
     return { ...authority, source: 'nx_user_device + nx_compute_receipt + nx_compute_e3_config', dailyUsdt: device.dailyUsdt, dailyNex: device.dailyNex, realizedTodayUsdt: 16.24, realizedTodayNex: 3, walletUsdt: 0, walletNex: 0, userJoinedAt: now, serverNow: now, timezone: 'UTC', slotCap: 6, devices: [device], capacitySchedule };

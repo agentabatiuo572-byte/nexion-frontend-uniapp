@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { computeDemo, demoComputeFacts } from "./prototype-demo-compute.mjs";
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
-import { fixture as reviewFixture, previewCapacity, previewInterfaceLanguages } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
 import { learningDemo } from './prototype-demo-learning.mjs';
@@ -77,7 +77,7 @@ export const demoOptions = {
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
-  catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足']],
+  catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全'],['lite-filtered','冻结组：网页已完成 / 手机未完成'],['web-complete','纯网页冻结组：全部完成']],
   wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
@@ -111,7 +111,7 @@ export const demoOptions = {
 };
 const skuDefinitions = [
   // Per-unit monthly USDT estimates; daily values are projections of these amounts.
-  ['stellarbox-s1','UVELBox S1','Entry',1299,186,3,'4 × RTX 4090','96 GB',1200],
+  [previewDefaultTrialSku,previewDefaultTrialName,'Entry',1299,186,3,'4 × RTX 4090','96 GB',1200],
   ['stellarbox-pro','UVELBox Pro','Pro',4999,672,12,'8 × RTX 4090','192 GB',2400],
   ['stellarbox-pro-v2','UVELBox Pro v2','Pro',5999,858,18,'8 × RTX 5090','256 GB',2200],
   ['stellarrack-p1','UVELRack P1','Flagship',12999,1350,30,'8 × A100','640 GB',3200],
@@ -142,7 +142,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
-    return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
+    return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
       vram:share?'not_applicable':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'not_applicable',hashRate:null,
       tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',badge:index===0?'Recommended':index===1?'Best seller':null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
@@ -295,7 +295,7 @@ function genesisPublic(now) {
 // quote): occupied = activated formal devices + order and promotion reservations + one effective trial
 // (ACTIVE/GRACE) <= cap. demoFleetFacts computes it from the retained state; reads and commands all use it.
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
-  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,state.dataState==='empty'?[]:demoProducts(state,url.origin)).state)?1:0;
+  &&['ACTIVE','GRACE','EXTENDED'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,state.dataState==='empty'?[]:demoProducts(state,url.origin)).state)?1:0;
 // Session orders plus the state-sample rows that belong to the scenario. The paid (002) and provisioning (003)
 // samples hold slots, so they appear only in fleetState=reserved, where they are its reservations. The activated
 // sample (004) is the order of seeded device 41 and is listed only while the seed holds that device, on that device's
@@ -416,7 +416,7 @@ export function demoFleetFacts(url,locale,state) {
     state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
     if(retired.includes(state.deviceIds[instanceNo]))continue;
     // A session device starts its own purchase history at its paid order.
-    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name:product.name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:Number(order.amountUsdt)/order.quantity,
+    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name:order.trialSettlement?line.name:product.name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:Number(order.amountUsdt)/order.quantity,
       activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
       ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
   }
@@ -644,8 +644,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null},
         {rank:3,kind:'phone',name:null,dailyUsdt:.06,bestFor:null},
       ]};
-      const current=demoFleetFacts(url,locale,state).devices.find(device=>device.productCode==='STELLARBOX-S1'&&device.activatedAt!==null),next=products.find(product=>product.id==='stellarbox-pro');
-      overview.doTheMath=current?{basis:'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',base:{kind:'stellarbox-s1',name:current.name,dailyUsdt:current.dailyUsdt},target:{kind:next.id,productNo:next.id,name:next.name,dailyUsdt:next.dailyEarn,priceUsdt:next.price},multiplier:Math.round(next.dailyEarn/current.dailyUsdt),paybackDays:Math.round(next.price/next.dailyEarn)}:null;
+      const devices=demoFleetFacts(url,locale,state).devices;
+      const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+      overview.doTheMath=previewDoTheMath(devices,products,product=>demoSkuPurchaseRules(state,product,points,now).eligible);
       overview.onGrid={clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}],activeDevices:3206,activeJobs:128,perSecUsdt:.028};
     }
     return overview;
