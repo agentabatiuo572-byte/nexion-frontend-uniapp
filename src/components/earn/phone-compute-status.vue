@@ -2,10 +2,10 @@
   <view class="phone-compute-status" role="status" aria-live="polite" data-phone-task-status="true">
     <text class="block phone-compute-status__title">{{ copy.title }}</text>
     <text v-if="!nativePhone" class="block">{{ copy.web }}</text>
-    <text v-if="loading" class="block">{{ copy.loading }}</text>
-    <text v-else-if="failed" class="block">{{ copy.unavailable }}</text>
+    <text v-if="loading && !onlineRefused" class="block">{{ copy.loading }}</text>
+    <text v-else-if="failed && !onlineRefused" class="block">{{ copy.unavailable }}</text>
     <template v-else-if="phone">
-      <text v-if="expired" class="block">{{ copy.expired }}</text>
+      <text v-if="notReady || expired" class="block">{{ notReady ? copy.notReady : copy.expired }}</text>
       <text v-else-if="phone.simulationState === 'CLOSING'" class="block">{{ copy.restoring }}</text>
       <text v-else class="block">{{ phone.currentTask?.status === 'RUNNING' ? copy.running : copy.waiting }}</text>
       <text v-if="!expired && phone.simulationState !== 'CLOSING' && phone.phoneValidUntil != null" class="block">{{ copy.validUntil }} {{ visibility.mask(validUntilText) }}</text>
@@ -31,6 +31,9 @@ const copy = usePhoneComputeCopy();
 const nativePhone = hasNativePhoneRuntime();
 const visibility = useDataVisibility();
 const phone = computed(() => app.devices.find(row => row.id === props.deviceId));
+const onlineRefused = computed(() => app.nativePhoneConfigWait?.refused === true
+  && app.nativePhoneConfigWait.deviceId === props.deviceId);
+const notReady = computed(() => onlineRefused.value || phone.value?.simulationState === 'WAITING_CONFIG');
 const monotonicNow = ref(readMonotonicNowMs());
 useVisibleInterval(() => { monotonicNow.value = readMonotonicNowMs(); }, 1000);
 const expired = computed(() => phone.value?.simulationState === 'EXPIRED' || (phone.value?.phoneValidUntil != null
