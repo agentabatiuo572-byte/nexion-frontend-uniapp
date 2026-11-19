@@ -1,4 +1,4 @@
-// Loopback-only fixtures for reading or retrying a previously issued registration.
+// Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
@@ -48,10 +48,26 @@ export function createAuthDemo(state) {
       return attempt;
     },
     handles(path) {
-      return recoverPath.test(path) || path === '/auth/users/refresh'
+      return recoverPath.test(path) || ['/auth/users/login', '/auth/users/refresh', '/auth/users/logout'].includes(path)
         || (saved && path === '/auth/users/register');
     },
     handle(path, headers, body) {
+      if (path === '/auth/users/login') {
+        if (body.countryCode !== existing.countryCode || body.phone !== existing.phone || body.password !== 'Local404Pass!') {
+          return failure(401, 'USER_CREDENTIAL_INVALID');
+        }
+        return issue({
+          ...session({ ...existing, nickname: 'Formal Probe' }),
+          accessToken: 'formal-probe-access-token',
+        });
+      }
+      if (path === '/auth/users/logout') {
+        state.sessionState = 'signed-out';
+        delete state.authUser;
+        state.savedAttemptState = 'none';
+        saved = null;
+        return success(null);
+      }
       if (path === '/auth/users/refresh') {
         return state.sessionState === 'signed-out'
           ? failure(401, 'AUTH_REQUIRED')

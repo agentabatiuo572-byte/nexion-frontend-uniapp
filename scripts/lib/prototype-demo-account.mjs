@@ -43,13 +43,6 @@ export function accountDemo(url, locale, state, request) {
   const reject = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
   const interval = 7 * 86400000;
   const nextChange = (changedAt) => changedAt && changedAt + interval > Date.now() ? changedAt + interval : null;
-  if (path === '/auth/users/login' && method === 'POST') {
-    const input = body();
-    if (input.countryCode !== '+86' || input.phone !== '13800000000' || input.password !== 'Local404Pass!') reject('USER_CREDENTIAL_INVALID', 401);
-    return { accessToken: 'formal-probe-access-token', refreshToken: null, tokenType: 'Bearer',
-      user: { userId: 900001, countryCode: '+86', phone: '13800000000', nickname: 'Formal Probe', onboardingComplete: true } };
-  }
-  if (path === '/auth/users/logout' && method === 'POST') return null;
   if (path === '/api/app/security/account-deletion' || path === '/api/app/security/account-deletion/cancel') {
     const history = state.accountDeletionDemo ??= { requests: [], commands: {} };
     const blockedReason = { 'blocked-funds': 'UNSETTLED_FUNDS_OR_ORDERS',
