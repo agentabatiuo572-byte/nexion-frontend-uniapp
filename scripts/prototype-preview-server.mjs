@@ -129,8 +129,9 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/state') {
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
-        const accountPayment=value=>['low-balance','urgent','late','remote-in-progress'].includes(value)?value:'';
-        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
+        const accountPayment=value=>['low-balance','urgent','late'].includes(value)?value:'';
+        const paymentMode=()=>state.paymentState==='read-error'?state.paymentBeforeReadError:state.paymentState;
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPaymentMode=paymentMode(),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
         if(update.reset){
           const accountCreatedAt=state.accountCreatedAt;
           for(const key of Object.keys(state))delete state[key];
@@ -138,6 +139,8 @@ const server=http.createServer(async(req,res)=>{
         }
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(key!=='promotionRewardState'&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
+        else delete state.paymentBeforeReadError;
         if(state.dataState==='empty')state.withdrawLimitState='open';
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
@@ -149,7 +152,7 @@ const server=http.createServer(async(req,res)=>{
         // late) is one too. Presentation knobs keep them.
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
-        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
+        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode())!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -158,7 +161,7 @@ const server=http.createServer(async(req,res)=>{
         // Saved payout addresses and their OTP belong to the account scenario too.
         if(scenarioChange&&state.bankDemo){Object.assign(state.bankDemo,{quotes:{},orders:{},commands:{},addresses:{}});delete state.bankDemo.addressOtp;}
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
-        else if(scenarioChange&&state.paymentState==='low-balance')state.walletBalance=820.64;
+        else if(scenarioChange&&paymentMode()==='low-balance')state.walletBalance=820.64;
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
@@ -199,7 +202,7 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         realtime.stateChanged(update);
         if('supportReadbackState' in update)setTransferSampleOutcome(state);
-        if(scenarioChange&&state.paymentState==='remote-in-progress') {
+        if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
         }

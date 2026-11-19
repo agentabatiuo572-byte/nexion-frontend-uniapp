@@ -340,7 +340,7 @@ async function refreshOrder() {
         orderPresentation.value = result ?? null;
         remoteOrderError.value = false;
         if (result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
-            && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo)) {
+            && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
           paymentLookupScope = scope;
           await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, result.productName,
             () => isCurrentDetailScope(scope) && liveOrder.value?.status === 'placed');
