@@ -124,14 +124,14 @@ const metrics = computed<Cell[]>(() => {
   const failed = cfg.syncFailed;
   const pulse = failed ? null : cfg.config.networkPulse;
   // H9 supplies the published counts and the server supplies the device estimate.
-  // Online devices read as the whole number in the compact view (BUG-531); members keep the shared band.
+  // Members and online devices read as the whole number in the compact view (BUG-531).
   const displayCell = (label: string, value: number | null | undefined, color: string, whole = false): Cell => {
     if (value === null || value === undefined || !Number.isSafeInteger(value) || value < 0) return placeholderCell(label);
     if (whole && props.compactView) return { k: label, v: formatGroupedAmount(value, "full"), count: value, tone: "var(--v5-ink)", sub: "", data: null, color };
     return { k: label, v: props.compactView ? networkPopulationBand(value, locale.code) : compact(value), tone: "var(--v5-ink)", sub: "", data: null, color };
   };
   const memberValue = props.compactView && props.estimated ? props.registeredDisplay : pulse?.registeredUsers;
-  const members = displayCell(t.value.home.networkMembers, memberValue, "var(--v5-brand)");
+  const members = displayCell(t.value.home.networkMembers, memberValue, "var(--v5-brand)", true);
   const devices = displayCell(t.value.home.networkDevices, pulse?.onlineDevices, "var(--v5-tech-cyan-ink)", true);
 
   return [members, devices];
