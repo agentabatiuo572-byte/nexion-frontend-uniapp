@@ -468,6 +468,7 @@ const checkoutRouteFence = new CheckoutRouteFence();
 let purchaseEligibilityRequestSequence = 0;
 let activeCheckoutLoad: CheckoutRouteScope | null = null;
 let checkoutRouteInitialized = false;
+let ordinaryCheckoutInitialized = false;
 type PurchaseEligibilityResult = "eligible" | "ineligible" | "stale";
 let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
@@ -494,6 +495,7 @@ function checkoutRouteIdentity() {
 }
 
 function beginCheckoutRoute(): CheckoutRouteScope {
+  ordinaryCheckoutInitialized = false;
   return checkoutRouteFence.begin(checkoutRouteIdentity());
 }
 
@@ -501,9 +503,10 @@ function captureCheckoutRoute(): CheckoutRouteScope {
   return checkoutRouteFence.capture(checkoutRouteIdentity());
 }
 
-function invalidateCheckoutRoute(): void {
+function invalidateCheckoutRoute(keepOrdinaryInitialization = false): void {
   checkoutRouteFence.invalidate();
   activeCheckoutLoad = null;
+  if (!keepOrdinaryInitialization) ordinaryCheckoutInitialized = false;
   remoteTradeinRecoveryBusy.value = false;
 }
 
@@ -608,6 +611,7 @@ onLoad(async (options) => {
 
 async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void> {
   activeCheckoutLoad = routeScope;
+  quantityReady.value = false;
   try {
     // A durable server order is a recovery route, never a fresh purchase. It has
     // priority over catalog/eligibility gates so a newly denied purchase cannot
@@ -690,6 +694,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       return;
     }
     await fireTradeinIntercept();
+    if (isCurrentCheckoutRoute(routeScope)) ordinaryCheckoutInitialized = true;
   } finally {
     if (activeCheckoutLoad?.generation === routeScope.generation
       && activeCheckoutLoad.accountKey === routeScope.accountKey
@@ -2146,8 +2151,13 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
         remoteTradeinRecoveryRequired.value = false;
         remoteTradeinRecoveryError.value = false;
         step.value = 'select-payment';
-        // The cold load can now continue its normal checkout initialization.
-        if (activeCheckoutLoad === scope) return false;
+        if (!ordinaryCheckoutInitialized) {
+          if (activeCheckoutLoad) return false;
+          // A new scope lets initialization run the original-order check without joining this recovery.
+          remoteTradeinRecoveryBusy.value = false;
+          await initializeCheckout(beginCheckoutRoute());
+          return true;
+        }
         await retryCheckoutCapacity();
       } else remoteTradeinRecoveryError.value = true;
     }
@@ -2473,7 +2483,7 @@ onHide(() => {
   tradein.hide();
   if(promotionRoute.value){promotionCheckout.value?.hide();return;}
   pageVisible = false;
-  invalidateCheckoutRoute();
+  invalidateCheckoutRoute(true);
   interceptFired = false;
   remoteCapacityGate.reset();
   checkoutOnboardingRequired.value = false;
