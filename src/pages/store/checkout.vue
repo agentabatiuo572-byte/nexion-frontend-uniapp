@@ -18,7 +18,7 @@
       </view>
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);margin-bottom:var(--v5-space-3)">{{ t.tradein.recoveryPending }}</text>
-        <NxButton :label="t.store.catalogRetry" :busy="remoteTradeinRecoveryBusy" @click="resumePendingRemoteTradein(captureCheckoutRoute(), true, true)" />
+        <NxButton :label="t.store.catalogRetry" :busy="remoteTradeinRecoveryBusy" @click="resumePendingRemoteTradein(captureCheckoutRoute(), true)" />
       </view>
       <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
@@ -1976,7 +1976,7 @@ function retireRemoteOrderKey(): void {
   remoteOrderCommandKey.clear();
 }
 
-async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissionScope: CheckoutRouteScope, newSubmission = false, retainRecovery = false, allowResume = false): Promise<CanonicalTradeinResult | null> {
+async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissionScope: CheckoutRouteScope, newSubmission = false, retainRecovery = false): Promise<CanonicalTradeinResult | null> {
   const scopeIsCurrent = () => isCurrentCheckoutRoute(submissionScope);
   const reviewedQuote = { ...recovery.tradeinQuote };
   const authorizationIsCurrent = () => {
@@ -2005,7 +2005,8 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
     if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
     if (result.status === 'REJECTED') return null;
     if (result.status === 'SUCCEEDED') recoveredResult = parseCanonicalTradeinResult(result.receipt);
-    else if (!(allowResume && result.status === 'NOT_SEEN' && result.canResumeSameKey)) throw new Error('PAYMENT_RESULT_UNRESOLVED');
+    else if (result.status === 'NOT_SEEN' && result.canResumeSameKey) remoteTradeinRecoveryError.value = false;
+    else throw new Error('PAYMENT_RESULT_UNRESOLVED');
   }
   return completeVerifiedMutation({
         submit: async () => {
@@ -2013,7 +2014,8 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
           remoteTradeinRecoveryRequired.value = true;
           if (recoveredResult) return recoveredResult;
           let submitted: CanonicalTradeinResult | null = null;
-          const paid = await executeSelectedPurchase({amount:recovery.tradeinQuote.payableUsdt,currency:'USDT',summary:product.value?.name??t.value.store.coConfirmPurchase},
+          const summary = product.value?.name ?? (reviewedQuote.targetProductName || t.value.store.coConfirmPurchase);
+          const paid = await executeSelectedPurchase({amount:recovery.tradeinQuote.payableUsdt,currency:'USDT',summary},
             async authorization=>{
               if (!authorizationIsCurrent()) return null;
               return deviceE3Api.submit(recovery.tradeinQuote.sourceDeviceId,recovery.productNo,markCommandSubmitted(),recovery.tradeinQuote,authorization);
@@ -2101,7 +2103,7 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
       });
 }
 
-async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = false, allowResume = false): Promise<boolean> {
+async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = false): Promise<boolean> {
   if (!remoteApiEnabled || !isCurrentCheckoutRoute(scope)) return false;
   let recovery: CheckoutTradeinRecovery | null;
   try { recovery = readCheckoutTradein(scope.accountKey, scope.productNo); }
@@ -2115,7 +2117,7 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
   if (remoteTradeinRecoveryBusy.value) return true;
   remoteTradeinRecoveryBusy.value = true;
   try {
-    const result = await completeRemoteTradein(recovery, scope, false, navigate, allowResume);
+    const result = await completeRemoteTradein(recovery, scope, false, navigate);
     if (!result) {
       if (!isCurrentCheckoutRoute(scope)) return true;
       finishCheckoutTradein(scope.accountKey, recovery);
