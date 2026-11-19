@@ -19,6 +19,8 @@ export function createPrototypeMessages({state,fixtureFor}) {
       const receipt=receiptPath.exec(url.pathname);
       if(receipt&&request.method()==='GET') {
         const key=decodeURIComponent(receipt[1]),saved=receipts.get(key);
+        const transfer=state.supportTransferSample;
+        if(transfer?.key===key&&!transfer.committed)return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
         const clearance=state.supportClearCommands?.find(row=>row.accountId===supportAccountId(state)&&row.key===key);
         if(clearance)return ok({resultType:'CONVERSATION_USER_CLEAR',result:structuredClone(clearance.result)});
         if(!saved) {

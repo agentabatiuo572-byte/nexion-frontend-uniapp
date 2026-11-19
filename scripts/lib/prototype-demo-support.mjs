@@ -111,6 +111,47 @@ function prepareMessageIds(state) {
   return nextId;
 }
 
+function addTransferSample(state, nextMessageId, now) {
+  const currentId=++state.supportConversationSequence;
+  const oldId=++state.supportConversationSequence;
+  const currentNo='DEMO-SUPPORT-'+currentId;
+  const conversationNo='DEMO-SUPPORT-'+oldId;
+  const makeDetail=(id, number, agentId, agentName, content, canReply, createdAt)=> {
+    const message={id:nextMessageId(),senderType:'agent',senderName:agentName,content,createdAt,receiptStatus:'sent'};
+    return {conversation:{id,conversationNo:number,conversationType:'advisor',status:'OPEN',version:1,
+      ownerAgentId:agentId,ownerAgentName:agentName,lastMessage:content,lastMessageAt:createdAt,lastPublicMessageId:message.id,unreadCount:0},
+      messages:[message],writeState:{canReply,writableConversationNo:currentNo},historyTruncated:false,nextCursor:null};
+  };
+  const old=makeDetail(oldId,conversationNo,'2','演示旧客服','这是转接前的客服会话。',false,new Date(Date.parse(now)-60000).toISOString());
+  const current=makeDetail(currentId,currentNo,String(state.supportAdvisorId??1),'演示当前客服','你好，我来继续跟进。',true,now);
+  state.supportConversations.push(old,current);
+  const text='请帮我继续核对这笔订单。';
+  const slot='sha256:'+createHash('sha256').update(`conversation-reply:${conversationNo}:text:${text}`).digest('hex');
+  state.supportTransferSample={conversationNo,currentNo,key:'support-reply-preview-transfer-'+oldId,text,slot};
+}
+
+export function setTransferSampleOutcome(state) {
+  const sample=state.supportTransferSample;
+  const outcome=state.supportReadbackState;
+  if(state.messageState!=='transferred'||!sample||sample.committed||!['sent','cleared'].includes(outcome))return;
+  const detail=state.supportConversations.find(row=>row.conversation.conversationNo===sample.conversationNo);
+  if(!detail)return;
+  const nextId=prepareMessageIds(state), createdAt=new Date().toISOString();
+  const message={id:nextId(),senderType:'user',clientMessageId:sample.key,content:sample.text,createdAt,receiptStatus:'sent'};
+  detail.messages.push(message);
+  if(outcome==='cleared') {
+    (state.supportUserClearMarkers??=[]).push({accountId:supportAccountId(state),scope:'USER_VIEW',userScopeCleared:true,
+      peerKey:peerKey(detail),throughMessageId:message.id,conversationNos:[sample.conversationNo]});
+    detail.messages.push({id:nextId(),senderType:'agent',senderName:detail.conversation.ownerAgentName,
+      content:'清空后的新备注。',createdAt,receiptStatus:'sent'});
+  }
+  const last=detail.messages.at(-1);
+  Object.assign(detail.conversation,{version:detail.conversation.version+1,lastMessage:last.content,lastMessageAt:createdAt,lastPublicMessageId:last.id});
+  state.supportMessageCommands.push({key:sample.key,conversationNo:sample.conversationNo,
+    fingerprint:commandFingerprint('reply',sample.conversationNo,{body:sample.text})});
+  sample.committed=true;
+}
+
 export function supportDemo(url,locale,state,request) {
   const root='/api/app/support',p=url.pathname;
   if(!p.startsWith(root))return undefined;
@@ -143,6 +184,13 @@ export function supportDemo(url,locale,state,request) {
   restoreMessageCommands(state);
   // Every receipt here is an explicit server fixture, never inferred by the UI.
   if(state.supportScenario!==scenario&&state.supportConversations.length) {
+    if(scenario!=='transferred'&&state.supportTransferSample) {
+      const {conversationNo,currentNo,key}=state.supportTransferSample;
+      state.supportConversations=state.supportConversations.filter(row=>![conversationNo,currentNo].includes(row.conversation.conversationNo));
+      state.supportMessageCommands=state.supportMessageCommands.filter(command=>command.key!==key);
+      state.supportUserClearMarkers=state.supportUserClearMarkers?.filter(marker=>!marker.conversationNos.includes(conversationNo));
+      delete state.supportTransferSample;
+    }
     const detail=state.supportConversations[0];
     // Leaving the unassigned welcome returns the conversation to the demo advisor.
     if(scenario!=='welcome-unassigned'&&!detail.conversation.ownerAgentId)Object.assign(detail.conversation,{ownerAgentId:'1',ownerAgentName:'Demo support'});
@@ -241,7 +289,8 @@ export function supportDemo(url,locale,state,request) {
       state.supportConversations=[{conversation:{id,conversationNo:'DEMO-SUPPORT-'+id,conversationType:'advisor',status:'OPEN',version:1,
         ownerAgentId:assigned?'1':null,ownerAgentName:assigned?advisor:'待分配',unreadCount:1,lastMessage:welcome,lastMessageAt:now,lastPublicMessageId:message.id},
         messages:[message],historyTruncated:false,nextCursor:null}];
-    } else detail.conversation.unreadCount=scenario==='long-count'?1298:scenario==='read'?0:1;
+    } else if(scenario==='transferred') addTransferSample(state,nextMessageId,now);
+    else detail.conversation.unreadCount=scenario==='long-count'?1298:scenario==='read'?0:1;
     detail.conversation.version++;
     state.supportScenario=scenario;
   }
@@ -312,6 +361,8 @@ export function supportDemo(url,locale,state,request) {
     if(match[2]==='replies') {
       const fingerprint=commandFingerprint('reply',match[1],input);
       if(!replayCommand(state,input.clientMessageId,fingerprint)) {
+        if(detail.writeState?.canReply===false)
+          throw Object.assign(new Error('CONVERSATION_PEER_CHANGED'),{status:409});
         const id=nextMessageId();detail.messages.push({id,clientMessageId:input.clientMessageId,senderType:'user',content:input.body,createdAt:now,receiptStatus:'sent'});
         Object.assign(detail.conversation,{version:detail.conversation.version+1,lastMessage:input.body,lastMessageAt:now,lastPublicMessageId:id});
         state.supportMessageCommands.push({key:input.clientMessageId,fingerprint,conversationNo:match[1]});
