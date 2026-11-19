@@ -3626,6 +3626,7 @@ export const uz: Messages = {
     typeAchievement: "Yutuq",
     typeClawback: "Mukofot qaytarib olindi",
     typeOther: "Boshqa",
+    statusDone: "Bajarildi",
     statusPosted: "Hisobga tushdi",
     statusPending: "Kutilmoqda",
     statusFailed: "Xatolik",

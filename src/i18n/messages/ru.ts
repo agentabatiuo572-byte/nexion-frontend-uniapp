@@ -3626,6 +3626,7 @@ export const ru: Messages = {
     typeAchievement: "Достижение",
     typeClawback: "Списание награды",
     typeOther: "Другое",
+    statusDone: "Выполнено",
     statusPosted: "Зачислено",
     statusPending: "В обработке",
     statusFailed: "Ошибка",

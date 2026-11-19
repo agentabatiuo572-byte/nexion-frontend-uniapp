@@ -119,7 +119,7 @@
           <view class="bills-sheet__fact"><text>{{ t.bills.detailType }}</text><text class="bills-sheet__value">{{ typeLabel(detail.type) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailTime }}</text><text class="bills-sheet__value tabular-nums">{{ fmtTime(detail.ts) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailSource }}</text><text class="bills-sheet__value">{{ billMemo(detail) }}</text></view>
-          <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status)" /></view>
+          <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status, isDebit(detail))" /></view>
           <view v-if="detail.ref" class="bills-sheet__fact"><text>{{ t.bills.detailRef }}</text><view class="bills-sheet__ref"><text class="font-mono-code bills-sheet__value">{{ detail.ref }}</text><CopyCodeButton :value="detail.ref" :label="t.bills.detailRef" /></view></view>
           <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums" :class="{ 'bills-balance--debt': detail.balanceAfter < 0 }">{{ formatWalletBillBalance(detail.balanceAfterExact, detail.balanceAfter, detail.symbol, dateLocale()) }}</text></view>
         </view>
@@ -338,8 +338,9 @@ function typeLabel(type: BillType): string {
   const key = `type${type.charAt(0).toUpperCase()}${type.slice(1)}` as keyof typeof t.value.bills;
   return t.value.bills[key] as string;
 }
-function statusLabel(s: BillStatus): string {
-  if (s === "posted") return t.value.bills.statusPosted;
+// A posted debit (clawback, withdrawal, purchase) reads as done: several languages' "posted" word means money came in.
+function statusLabel(s: BillStatus, debit = false): string {
+  if (s === "posted") return debit ? t.value.bills.statusDone : t.value.bills.statusPosted;
   if (s === "pending") return t.value.bills.statusPending;
   return t.value.bills.statusFailed;
 }

@@ -3626,6 +3626,7 @@ export const fil: Messages = {
     typeAchievement: "Achievement",
     typeClawback: "Binawing reward",
     typeOther: "Iba pa",
+    statusDone: "Tapos na",
     statusPosted: "Naitala",
     statusPending: "Pending",
     statusFailed: "Nabigo",

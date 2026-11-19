@@ -3626,6 +3626,7 @@ export const id: Messages = {
     typeAchievement: "Pencapaian",
     typeClawback: "Hadiah ditarik kembali",
     typeOther: "Lainnya",
+    statusDone: "Selesai",
     statusPosted: "Masuk",
     statusPending: "Diproses",
     statusFailed: "Gagal",

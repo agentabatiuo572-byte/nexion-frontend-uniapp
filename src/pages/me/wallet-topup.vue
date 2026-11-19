@@ -12,10 +12,10 @@
 
       <!-- Topping up for a purchase, with a return action when an existing order is covered. -->
       <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': topupCovered }" role="status">
-        <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ topupCovered ? payCopy.topupDone : payCopy.topupFor }}</text></view>
-        <text v-if="orderTopupLeft !== null && orderTopupLeft > 0" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, shortfallPrecision) }} USDT</text>{{ payCopy.topupNeedTail }}</text>
-        <text v-else-if="topupCovered" class="topup-order__d">{{ fillCopy(payCopy.topupEnough, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
-        <view v-if="!topupCovered && orderCloseLeft !== null" class="topup-order__cd">
+        <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ topupCovered ? payCopy.topupDone : orderTopup.orderNo ? payCopy.topupFor : payCopy.topupForPurchase }}</text></view>
+        <text v-if="orderTopupLeft !== null && orderTopupLeft > 0" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, shortfallPrecision) }} USDT</text>{{ orderTopup.orderNo ? payCopy.topupNeedTail : payCopy.topupNeedTailPurchase }}</text>
+        <text v-else-if="topupCovered" class="topup-order__d">{{ fillCopy(orderTopup.orderNo ? payCopy.topupEnough : payCopy.topupEnoughPurchase, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
+        <view v-if="!topupCovered && orderTopup.orderNo && orderCloseLeft !== null" class="topup-order__cd">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
           <text>{{ fillCopy(payCopy.topupCloses, { t: orderCloseLeft }) }}</text>
         </view>
