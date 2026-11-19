@@ -16,7 +16,7 @@
 <template>
   <AppChassis active="me">
     <view class="trial-page">
-      <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="authorityScreenUnavailable ? undefined : deviceName" />
+      <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="t.trial.pageHeaderSubtitle" />
 
       <view v-if="authorityScreenUnavailable" class="mx-4 trial-read-state" role="status" :aria-busy="freeTrial.authorityStatus === 'loading'">
         <view v-if="freeTrial.authorityStatus === 'loading'" class="trial-read-skeleton" aria-hidden="true"><view/><view/><view/></view>
@@ -136,7 +136,7 @@
           <NxTag class="trial-slot__tag" tone="brand">{{ fmt(detail.freeDays, { n: String(cfg.trialDays) }) }}</NxTag>
         </view>
         <view class="trial-terminal-copy trial-terminal-copy--claim trial-rise trial-rise--2">
-          <text class="trial-terminal-copy__title">{{ fmt(t.trial.idleTitleNew, { device: deviceName }) }}</text>
+          <text class="trial-terminal-copy__title">{{ t.trial.idleTitleNew }}</text>
           <text v-if="idleBody" class="trial-terminal-copy__body">{{ idleBody }}</text>
         </view>
       </view>
@@ -378,7 +378,7 @@ const totalSource = computed(() => (purchaseQuote.value && !authorityScreenUnava
 const totalCount = useViewCountUp(totalSource, "grouped", { follow: true });
 const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalSource.value ?? 0)));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
-const deviceName = computed(() => cfg.value.trialProductName);
+const deviceName = computed(() => trialProduct.value?.name ?? cfg.value.trialProductName);
 const buyTitle = computed(() => {
   if (earlyQuote.value) return fmt(detail.value.earlyTitle, { device: deviceName.value, amount: usdShort(earlyQuote.value.earlyDiscountUSD) });
   return isGrace.value ? detail.value.graceTitle : purchase.value.accruedTitle;

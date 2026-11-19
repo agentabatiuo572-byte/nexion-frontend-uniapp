@@ -37,7 +37,7 @@ export interface AppHomeOnGridClient {
 
 export interface AppHomeDoTheMath {
   basis: "OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT";
-  base: { kind: DeviceKind; productNo?: string; name: string; dailyUsdt: number };
+  base: { kind: DeviceKind; name: string; dailyUsdt: number };
   target: { productNo: string; kind: DeviceKind; name: string; dailyUsdt: number; priceUsdt: number };
   multiplier: number;
   paybackDays: number;
@@ -162,7 +162,7 @@ function doTheMath(v: unknown): AppHomeDoTheMath | null {
       || paybackDays !== Math.round(priceUsdt / targetDaily)) return invalid();
   return {
     basis: v.basis,
-    base: { kind: baseKind, productNo: text(v.base.productNo) || undefined, name: baseName, dailyUsdt: baseDaily },
+    base: { kind: baseKind, name: baseName, dailyUsdt: baseDaily },
     target: { productNo, kind: targetKind, name: targetName, dailyUsdt: targetDaily, priceUsdt },
     multiplier, paybackDays,
   };

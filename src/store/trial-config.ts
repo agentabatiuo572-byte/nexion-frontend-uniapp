@@ -75,9 +75,13 @@ export function resolveTrialCheckoutProductId(productId: unknown): string | null
 export function resolveTrialDeviceName(productId: unknown, serverName?: unknown): string | null {
   const productNo = resolveTrialCheckoutProductId(productId);
   if (!productNo) return null;
-  const normalizedName = typeof serverName === "string" ? serverName.trim() : "";
-  if (normalizedName && normalizedName.length <= 128) return normalizedName;
-  return productNo === "stellarbox-s1" ? TRIAL_PRODUCT_DEVICE_NAMES["stellarbox-s1"] : null;
+  const rawProductId = typeof productId === "string" ? productId.trim() : "";
+  if (Object.prototype.hasOwnProperty.call(TRIAL_PRODUCT_DEVICE_NAMES, rawProductId)) {
+    return TRIAL_PRODUCT_DEVICE_NAMES[rawProductId as keyof typeof TRIAL_PRODUCT_DEVICE_NAMES];
+  }
+  if (typeof serverName !== "string") return null;
+  const normalizedName = serverName.trim();
+  return normalizedName && normalizedName.length <= 128 ? normalizedName : null;
 }
 
 export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
