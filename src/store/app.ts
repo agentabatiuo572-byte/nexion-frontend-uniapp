@@ -466,7 +466,7 @@ export const useApp = defineStore("app", () => {
   const remoteAssignmentStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteAssignmentError = ref("");
   const remotePhoneBindingInvalid = ref(false);
-  const nativePhoneConfigWait = ref<{ deviceId: string; refused: boolean } | null>(null);
+  const nativePhoneConfigWaitDeviceId = ref<string | null>(null);
   // This belongs to the bound account generation only. It lets read-only Earn
   // history remain visible while a subsequent assignment poll is in flight;
   // it is deliberately reset before a different account can render anything.
@@ -479,7 +479,7 @@ export const useApp = defineStore("app", () => {
   let remoteTaskSyncInFlightKey: string | null = null;
   let remoteTaskSyncAfter = 0;
   let visibleTaskReadAfter = 0;
-  const taskReadPages = new Set<"home" | "earn" | "device-detail">();
+  const taskReadPages = new Set<"home" | "earn" | "device-detail" | "device-inventory">();
   let remoteTaskForeground = true;
   let remoteTaskForegroundEpoch = 0;
   // Keep online confirmations ordered across foreground transitions.
@@ -505,7 +505,7 @@ export const useApp = defineStore("app", () => {
     remoteTaskForegroundEpoch += 1;
     remoteTaskSyncAfter = 0;
     remotePhoneBindingInvalid.value = false;
-    nativePhoneConfigWait.value = null;
+    nativePhoneConfigWaitDeviceId.value = null;
     nativePhoneBinding = null;
     invalidateRemoteTaskAssignments();
     void syncRemoteTaskAssignments();
@@ -908,7 +908,7 @@ export const useApp = defineStore("app", () => {
     return pending;
   }
 
-  function setTaskReadPageVisible(page: "home" | "earn" | "device-detail", visible: boolean): void {
+  function setTaskReadPageVisible(page: "home" | "earn" | "device-detail" | "device-inventory", visible: boolean): void {
     if (visible) {
       taskReadPages.add(page);
       void refreshVisibleTaskAssignments();
@@ -1006,8 +1006,8 @@ export const useApp = defineStore("app", () => {
             }
             remotePhoneBindingInvalid.value = false;
             const waitingForConfig = online.simulationState === "WAITING_CONFIG";
-            if (nativePhoneConfigWait.value && !waitingForConfig) invalidateRemoteTaskAssignments();
-            nativePhoneConfigWait.value = waitingForConfig ? { deviceId: String(online.deviceId), refused: false } : null;
+            if (nativePhoneConfigWaitDeviceId.value !== null && !waitingForConfig) invalidateRemoteTaskAssignments();
+            nativePhoneConfigWaitDeviceId.value = waitingForConfig ? String(online.deviceId) : null;
             if (waitingForConfig || online.simulationState === "CLOSING") {
               remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
             }
@@ -1017,7 +1017,7 @@ export const useApp = defineStore("app", () => {
             const binding = nativePhoneBinding;
             nativePhoneBinding = null;
             if (binding && isApiRefusal(cause, 422, "SIMULATED_E3_POLICY_HISTORY_MISSING")) {
-              nativePhoneConfigWait.value = { deviceId: String(binding.deviceId), refused: true };
+              nativePhoneConfigWaitDeviceId.value = String(binding.deviceId);
               remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
             } else if (asApiError(cause).retryable) {
               remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
@@ -1281,7 +1281,7 @@ export const useApp = defineStore("app", () => {
       remoteWalletReceiptHasSnapshot.value = false;
       remoteAssignmentStatus.value = "idle";
       remotePhoneBindingInvalid.value = false;
-      nativePhoneConfigWait.value = null;
+      nativePhoneConfigWaitDeviceId.value = null;
       nativePhoneBinding = null;
       remoteAssignmentError.value = "";
       remoteAssignmentHasSnapshot.value = false;
@@ -2679,7 +2679,7 @@ export const useApp = defineStore("app", () => {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, remoteSlotUsage, remoteSlotsUsed, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError, homeTruthRateLimited, homeTruthTransientFailure,
-    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, activeJobsDisplay, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePendingEarned, remoteComputeProtocolVersion, remotePhoneBindingInvalid, nativePhoneConfigWait,
+    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, activeJobsDisplay, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePendingEarned, remoteComputeProtocolVersion, remotePhoneBindingInvalid, nativePhoneConfigWaitDeviceId,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, ensureRemoteFleet, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, refreshVisibleTaskAssignments, invalidateRemoteTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
     tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining, acceptPhoneActivation,

@@ -191,7 +191,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
-import { onLoad, onShow, onUnload } from '@dcloudio/uni-app';
+import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
 import { computed, ref } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -232,9 +232,11 @@ const nativePhoneAvailable = hasNativePhoneRuntime();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 const trial = useFreeTrial();
 onShow(() => {
+  app.setTaskReadPageVisible("device-inventory", true);
   void trial.refreshVisible();
   if (remoteApiEnabled) void app.refreshRemoteFleet(undefined, { coalesce: true });
 });
+onHide(() => app.setTaskReadPageVisible("device-inventory", false));
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
@@ -335,7 +337,10 @@ function openBay(target: string) {
 // Deactivate sheet (running-task branch) — page-driven (no chassis store).
 const { sheetDevice, handleDeactivate, onSheetWait, onSheetForce, runRemoteDeviceCommand } = useDeviceDeactivation();
 let deactivateRequest = 0;
-onUnload(() => { deactivateRequest += 1; });
+onUnload(() => {
+  app.setTaskReadPageVisible("device-inventory", false);
+  deactivateRequest += 1;
+});
 onLoad(async options => {
   const query = new URLSearchParams(takeNavigationQuery('/pages/me/devices'));
   const id = options?.deactivate || query.get('deactivate') || '';
