@@ -715,17 +715,6 @@ export const useApp = defineStore("app", () => {
       case "capacityApplyToPro": return "stellarbox-pro";
       case "capacityApplyToS1": return "stellarbox-s1";
     }
-    // Keep normalization and precedence identical to the backend classifier.
-    const identity = `${device.productCode} ${device.deviceType}`.toLowerCase().replace(/_/g, "-");
-    if (identity.includes("phone") || identity.includes("mobile")) return "phone";
-    if (identity.includes("cloud")) return "cloud-share";
-    if (identity.includes("pc") || identity.includes("gpu")) return "pc-gpu";
-    if (identity.includes("share")) return "cloud-share";
-    if (identity.includes("rack-p2") || identity.includes("rackp2")) return "stellarrack-p2";
-    if (identity.includes("rack-p1") || identity.includes("rackp1") || identity.includes("rack")) return "stellarrack-p1";
-    if (identity.includes("pro-v2") || identity.includes("prov2")) return "stellarbox-pro-v2";
-    if (identity.includes("pro")) return "stellarbox-pro";
-    if (identity.includes("s1") || identity.includes("box")) return "stellarbox-s1";
     return "unknown";
   }
 

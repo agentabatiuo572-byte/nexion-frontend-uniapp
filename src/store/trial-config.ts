@@ -42,11 +42,7 @@ export interface TrialConfig {
   autoPushMaxPerSession: number;
 }
 
-/**
- * The API owns the selected product; the client only recognizes contractually
- * supported product-to-display-device mappings.  An unrecognized remote id is
- * deliberately rejected instead of being guessed or silently falling back.
- */
+/** Display-name compatibility for older responses with no name. */
 export const TRIAL_PRODUCT_DEVICE_NAMES = {
   "stellarbox-s1": "UVELBox S1",
   "device-trial-standard": "UVELBox S1",
@@ -60,28 +56,20 @@ export type TrialProductId = string;
  * Keep that translation explicit so an alias can never be sent to checkout as
  * a dangling product id.
  */
-const TRIAL_CHECKOUT_PRODUCT_IDS: Record<string, string> = {
-  "stellarbox-s1": "stellarbox-s1",
-  "device-trial-standard": "stellarbox-s1",
-};
-
 export function resolveTrialCheckoutProductId(productId: unknown): string | null {
   if (typeof productId !== "string") return null;
   const normalized = productId.trim();
   if (!/^[A-Za-z0-9._-]{2,64}$/.test(normalized)) return null;
-  return TRIAL_CHECKOUT_PRODUCT_IDS[normalized] ?? normalized;
+  return normalized === "device-trial-standard" ? "stellarbox-s1" : normalized;
 }
 
 export function resolveTrialDeviceName(productId: unknown, serverName?: unknown): string | null {
   const productNo = resolveTrialCheckoutProductId(productId);
   if (!productNo) return null;
-  const rawProductId = typeof productId === "string" ? productId.trim() : "";
-  if (Object.prototype.hasOwnProperty.call(TRIAL_PRODUCT_DEVICE_NAMES, rawProductId)) {
-    return TRIAL_PRODUCT_DEVICE_NAMES[rawProductId as keyof typeof TRIAL_PRODUCT_DEVICE_NAMES];
-  }
-  if (typeof serverName !== "string") return null;
-  const normalizedName = serverName.trim();
-  return normalizedName && normalizedName.length <= 128 ? normalizedName : null;
+  if (serverName != null && typeof serverName !== "string") return null;
+  const normalizedName = serverName?.trim();
+  if (normalizedName) return normalizedName.length <= 128 ? normalizedName : null;
+  return productNo === "stellarbox-s1" ? TRIAL_PRODUCT_DEVICE_NAMES[productNo] : null;
 }
 
 export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
@@ -155,11 +143,9 @@ export const useTrialConfig = defineStore("trialConfig", () => {
     const discountRate = number("discountRate");
     const shadowDailyUSD = raw.shadowDailyUSD === null ? null : number("shadowDailyUSD");
     const shadowDailyNEX = raw.shadowDailyNEX === null ? null : number("shadowDailyNEX");
-    const trialProductId = String(raw.trialProductId ?? "").trim();
-    const trialProductName = String(raw.trialProductName ?? "").trim();
-    if (discountRate > 100 || !resolveTrialCheckoutProductId(trialProductId)
-      || ((trialProductName || (shadowDailyUSD !== null && shadowDailyNEX !== null))
-        && !resolveTrialDeviceName(trialProductId, trialProductName))) {
+    const trialProductId = typeof raw.trialProductId === "string" ? raw.trialProductId.trim() : "";
+    const trialProductName = resolveTrialDeviceName(trialProductId, raw.trialProductName);
+    if (discountRate > 100 || !trialProductName) {
       throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
     }
     config.value = {

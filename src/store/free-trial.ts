@@ -3,7 +3,7 @@ import { invalidateBeforePassiveTabRead, runPassiveTabRead } from "@/lib/passive
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialDeviceName } from "./trial-config";
+import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId, resolveTrialDeviceName } from "./trial-config";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, writeAccountRow } from "./account-scoped-storage";
@@ -206,6 +206,14 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const remoteEligibilityReason = ref<TrialIneligibleReason>("unknown");
   const authorityClaimNo = ref<string | null>(null);
   const authorityServerState = ref<TrialAuthorityState["serverState"] | null>(null);
+  // The server projects the current offer for claimable cycles and the pinned
+  // claim identity for active and redeemed cycles.
+  const authoritativeProductIdentity = computed(() => {
+    if (authorityServerState.value === null) return null;
+    const { trialProductId, trialProductName } = useTrialConfig().config;
+    const productNo = resolveTrialCheckoutProductId(trialProductId);
+    return productNo ? { productNo, name: trialProductName } : null;
+  });
   const authorityVersion = ref(0);
   const serverClockOffsetMs = ref(0);
   let sampledServerTime = 0;
@@ -885,7 +893,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
-    authorityClaimNo, authorityVersion, authorityServerState,
+    authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
     start, convert, cancel, poll, bindAccount, snapshot, getBindingEpoch, takeExpiryNotice,
