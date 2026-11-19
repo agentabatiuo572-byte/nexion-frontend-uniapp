@@ -61,7 +61,7 @@
             </view>
             <view v-if="messageTimes[m.id]?.clock || (m.side === 'right' && receiptState(m))" class="nx-conv-bubble-meta" :class="{ 'nx-conv-bubble-meta--retry': canRetryStatus(m) }">
               <text v-if="messageTimes[m.id]?.clock" class="nx-conv-message-time" :title="messageTimes[m.id]?.full" :aria-label="[m.meta, messageTimes[m.id]?.full].filter(Boolean).join(' · ')">{{ messageTimes[m.id]?.clock }}</text>
-              <view v-if="m.side === 'right' && receiptState(m)" class="nx-conv-receipt" :class="{ 'nx-conv-receipt--action': canRetryStatus(m) }" :data-state="receiptState(m)" :role="canRetryStatus(m) ? 'button' : 'img'" :tabindex="canRetryStatus(m) ? 0 : undefined" :aria-label="receiptLabel(m)" @click="retryStatus(m)" @keydown.enter.prevent="onKeyboardActivate($event, () => retryStatus(m))" @keydown.space.prevent="onKeyboardActivate($event, () => retryStatus(m))">
+              <view v-if="m.side === 'right' && receiptState(m)" class="nx-conv-receipt" :class="{ 'nx-conv-receipt--action': canRetryStatus(m) }" :data-state="receiptState(m)" :role="canRetryStatus(m) || canCheckStatus(m) ? 'button' : 'img'" :tabindex="canRetryStatus(m) || canCheckStatus(m) ? 0 : undefined" :aria-label="receiptLabel(m)" @click="activateStatus(m)" @keydown.enter.prevent="onKeyboardActivate($event, () => activateStatus(m))" @keydown.space.prevent="onKeyboardActivate($event, () => activateStatus(m))">
                 <MessageStatusIcon :state="receiptState(m) || 'sent'" />
               </view>
             </view>
@@ -206,7 +206,7 @@ const props = defineProps<{
       名称不能跟着提示走。 */
   inputLabel: string;
   sendLabel: string;
-  statusLabels?: Record<MessageDeliveryState, string> & { retry: string };
+  statusLabels?: Record<MessageDeliveryState, string> & { retry: string; check?: string };
   /** Authoritative successes across send, retry and quick actions; independent of button motion. */
   sendSuccessRevision?: number;
   sendSuccessOwner?: string;
@@ -234,6 +234,7 @@ const props = defineProps<{
   failedSendLabel?: string;
   canDiscardSend?: boolean;
   canRetrySend?: boolean;
+  canCheckSend?: boolean;
   sendBlocked?: boolean;
 }>();
 
@@ -249,6 +250,7 @@ const emit = defineEmits<{
   (e: "restart"): void;
   (e: "queue-action", turnId: string, action: "edit" | "cancel" | "retry" | "cancel-edit"): void;
   (e: "queue-save", turnId: string, text: string): void;
+  (e: "check-message", message: ThreadMsg): void;
   (e: "attach" | "retry-upload" | "replace-attachment" | "cancel-attachment" | "retry-message" | "edit-message" | "discard-message" | "retry-policy"): void;
 }>();
 
@@ -303,14 +305,20 @@ function canRetryStatus(message: ThreadMsg): boolean {
   if (message.side !== 'right') return false;
   return message.queue?.state === 'failed' || !!(message.localSend && ['failed', 'unknown'].includes(receiptState(message) ?? '') && props.canRetrySend);
 }
+function canCheckStatus(message: ThreadMsg): boolean {
+  return !!(props.canCheckSend && message.side === 'right' && message.localSend && receiptState(message) === 'unknown');
+}
 function receiptLabel(message: ThreadMsg): string {
   const state = receiptState(message);
   const label = state ? props.statusLabels?.[state] ?? receiptText(message) ?? '' : '';
+  if (canCheckStatus(message)) return `${label} · ${props.statusLabels?.check ?? ''}`;
   return canRetryStatus(message) ? `${label} · ${props.statusLabels?.retry ?? props.imageLabels?.retrySend ?? props.queueLabels?.retry ?? ''}` : label;
 }
-function retryStatus(message: ThreadMsg) {
-  if (!canRetryStatus(message)) return;
-  if (message.queue) runQueueAction(message, 'retry'); else emit('retry-message');
+function activateStatus(message: ThreadMsg) {
+  if (canCheckStatus(message)) emit('check-message', message);
+  else if (canRetryStatus(message)) {
+    if (message.queue) runQueueAction(message, 'retry'); else emit('retry-message');
+  }
 }
 
 const draft = ref(props.initialDraft ?? "");

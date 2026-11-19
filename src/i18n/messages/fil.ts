@@ -3329,6 +3329,7 @@ export const fil: Messages = {
       unknown: "Hindi kumpirmado",
       queued: "Nakapila",
       retry: "Ipadala ulit",
+      check: "I-tap para tingnan kung naipadala",
     },
     recommendation: {
       product: "Tingnan ang produkto",
