@@ -18,7 +18,7 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
-import { demoBinaryLegMembers, demoH4Account, demoH4CheckInBonus, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
+import { demoBinaryLegMembers, demoH4Account, demoH4CheckInBonus, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers, wheelVoucherId } from './prototype-demo-events.mjs';
 import { demoCommissionGroups, demoStreakMilestones, demoReferralLedger, demoHasOpeningMilestone, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
@@ -33,7 +33,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
@@ -54,8 +54,10 @@ export const demoOptions = {
   messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['author-photo','客服带本人头像'],['recommendations','商品与链接推荐'],['agent-switch','客服已切换提示（有名字/无名字）'],['welcome-unassigned','刚注册 · 未分配客服 · 欢迎语未读'],['welcome-assigned','刚注册 · 已有专属客服 · 欢迎语未读'],['read','会话全部已读'],['transferred','已转接 · 只读旧会话待核对']],
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
+  quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
   catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全'],['lite-filtered','冻结组：网页已完成 / 手机未完成'],['web-complete','纯网页冻结组：全部完成']],
+  wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
   raffleState:[['normal','正常开奖'],['small-usdt','微额 USDT 奖励'],['upcoming','1 分钟后开始'],['ending','1 分钟后截止'],['ended','已截止待开奖']],
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
@@ -106,7 +108,9 @@ function promotionDeviceReward(giftName) {
         countsForRank:false,transferable:false,exchangeable:false,revocationMode:'MANUAL_IF_USED'}}};
 }
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
-  const products=skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
+  const products=skuDefinitions.map(([id,name,tier,listPrice,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
+    const price=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
+      'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
     const bought=(state.createdOrders??[]).filter(order=>order.quotaUsedAt!=null&&demoPaidPurchase(order))
       .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
@@ -116,11 +120,11 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
     return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
-      vram:share?'不适用（虚拟算力份额）':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'不适用（非独立设备）',hashRate:null,
+      vram:share?'not_applicable':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'not_applicable',hashRate:null,
       tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',badge:index===0?'Recommended':index===1?'Best seller':null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
-      features:[],taskLevels:[],ai:null,datacenter:'Singapore',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
+      features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
       releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,purchaseGate:null,
       purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
       dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
@@ -144,12 +148,14 @@ function demoPaidPurchase(order) {
     &&!['REFUNDED','CHARGEBACK'].includes(order.orderStatus);
 }
 
+const approvedQuotaSku='stellarbox-s1';
+
 function demoHardwareQuota(product,state,points,now){
   const monthlyStock=60,month=demoTeamBusinessDate(now).slice(0,7);
   const sameMonth=at=>at<=now&&demoTeamBusinessDate(at).slice(0,7)===month;
   const sampleAt=state.previewFactsAt??demoStartedAt;
   const soldOut=state.catalogState==='soldout'&&product.id==='stellarbox-s1';
-  const seeded=sameMonth(sampleAt)?(soldOut?monthlyStock:skuDefinitions.findIndex(([sku])=>sku===product.id)*7):0;
+  const seeded=sameMonth(sampleAt)?(soldOut?monthlyStock:7):0;
   const used=(state.createdOrders??[]).filter(order=>demoPaidPurchase(order)
     &&sameMonth(order.quotaUsedAt??order.paidAt??order.placedAt))
     .flatMap(order=>order.lineItems).filter(line=>line.sku===product.id).reduce((sum,line)=>sum+line.quantity,0);
@@ -164,7 +170,7 @@ function demoHardwareQuota(product,state,points,now){
 function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
   const e1={policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
-  if(product.productType==='DEVICE'){
+  if(state.quotaState==='approved'&&product.id===approvedQuotaSku){
     const quota=demoHardwareQuota(product,state,points,now);
     const [condition]=quota.conditions;
     const gap=condition?Math.max(0,condition.required-condition.current):0;
@@ -257,7 +263,7 @@ function genesisPublic(now) {
 // quote): occupied = activated formal devices + order and promotion reservations + one effective trial
 // (ACTIVE/GRACE) <= cap. demoFleetFacts computes it from the retained state; reads and commands all use it.
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
-  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,demoProducts(state,url.origin)).state)?1:0;
+  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,state.dataState==='empty'?[]:demoProducts(state,url.origin)).state)?1:0;
 // Session orders plus the state-sample rows that belong to the scenario. The paid (002) and provisioning (003)
 // samples hold slots, so they appear only in fleetState=reserved, where they are its reservations. The activated
 // sample (004) is the order of seeded device 41 and is listed only while the seed holds that device, on that device's
@@ -508,7 +514,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname.startsWith('/api/growth/day-one/page-observations/'))return {accepted:true,recorded:true};
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
-    return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,products,
+    return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,empty?[]:products,
       productNo=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true));
   }
   if(pathname==='/api/devices/activate'&&request.method()==='POST'){
@@ -694,31 +700,55 @@ export function demoFixture(url,locale,state,request) {
       return {...authority,runId:null,productNo,...demoSkuPurchaseRules(state,product,teamComputePoints,now),
         evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
     }
-    if(empty)throw Object.assign(new Error('TEAM_QUOTA_CATALOG_NOT_READY'),{status:503});
+    if(!['approved','catalog-error'].includes(state.quotaState))
+      throw Object.assign(new Error('TEAM_QUOTA_NOT_READY'),{status:503});
+    const approvedProduct=!empty&&state.quotaState==='approved'&&products.find(product=>product.id===approvedQuotaSku);
+    if(!approvedProduct)throw Object.assign(new Error('TEAM_QUOTA_CATALOG_NOT_READY'),{status:503});
     const direct=demoH4TeamMembers(state,now).filter(member=>member.layer===1);
     return {...authority,source:'server',generatedAt:iso,facts:{rank:demoH4Account(state).rank,
       directRefs:direct.filter(member=>member.lifetimeComputePoints>=demoV1SelfComputePoints).length,
       directInvites:direct.length,activeDirect:members.filter(member=>member.layer===1).length,teamComputePoints},
-      tiers:products.filter(product=>product.productType==='DEVICE').map(product=>demoHardwareQuota(product,state,teamComputePoints,now))};
+      tiers:[demoHardwareQuota(approvedProduct,state,teamComputePoints,now)]};
   }
   const tradeinCuts=[25,50,75,100],tradeinRates=[75,60,45,30,15];
-  if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'OPEN',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:7,source:'server'};
+  if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'L4_PLUS',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:30,source:'server'};
+  const tradeinRankAllowed=()=>demoH4Account(state,now).rank>=4;
+  const tradeinSourceReason=(device,product)=>{
+    if(device.actualPaidUsdt<=0||device.sourceChannel==='PROMOTION_GIFT')return 'SOURCE_PAID_PRICE_UNAVAILABLE';
+    if(device.productCode.toLowerCase()===product.id)return 'TARGET_MUST_DIFFER';
+    return product.price>device.actualPaidUsdt?'OK':'HIGHER_PRICE_REQUIRED';
+  };
+  const tradeinTargetReason=product=>{
+    if(!product||product.productType!=='DEVICE')return 'TARGET_NOT_ACTIVE';
+    if(product.stock<1)return 'TARGET_OUT_OF_STOCK';
+    if(!product.available)return 'TARGET_NOT_RELEASED';
+    return null;
+  };
   if(pathname==='/api/app/trade-in/eligibility'){
-    // Paid devices may trade up to any higher-priced device SKU (PRD §7.5.1).
-    const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo)||products[0];
-    const devices=empty||product.productType!=='DEVICE'?[]:demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices;
-    // The mixed scope also has the server offer the phone as a trade-in source.
-    const sources=devices.filter(d=>d.actualPaidUsdt>0||(state.scopeState==='mixed'&&d.deviceType==='PHONE')).map(d=>{
-      const reasonCode=d.productCode.toLowerCase()===product.id?'TARGET_MUST_DIFFER':product.price>d.actualPaidUsdt?'OK':'HIGHER_PRICE_REQUIRED';
-      return {sourceDeviceId:d.id,sourceProductName:d.name,eligible:reasonCode==='OK',reasonCode};
+    const {targetProductNo}=request.postDataJSON();
+    const refused=empty?'TRADEIN_DISABLED':!tradeinRankAllowed()?'TRADEIN_ELIGIBILITY_NOT_MET':null;
+    const product=refused?null:products.find(p=>p.id===targetProductNo);
+    const targetReason=refused??tradeinTargetReason(product);
+    const sources=targetReason?[]:demoFleetFacts(url,locale,state).devices.filter(device=>device.actualPaidUsdt>0).map(device=>{
+      const reasonCode=tradeinSourceReason(device,product);
+      return {sourceDeviceId:device.id,sourceProductName:device.name,eligible:reasonCode==='OK',reasonCode};
     });
     const eligible=sources.some(source=>source.eligible);
-    return {enabled:!empty,eligible,decisionCode:eligible?'ELIGIBLE':'NO_ELIGIBLE_SOURCE',targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price,requireHigherPrice:true,maxDevicesPerOrder:1,sources,decisionSource:'server'};
+    return {enabled:!empty,eligible,decisionCode:targetReason??(eligible?'ELIGIBLE':'NO_ELIGIBLE_SOURCE'),
+      targetProductId:product?products.indexOf(product)+1:null,targetProductNo,targetProductName:product?.name??null,
+      targetPriceUsdt:product?.price??null,requireHigherPrice:true,maxDevicesPerOrder:1,sources,decisionSource:'server'};
   }
   const tradeinQuote=(sourceDeviceId,targetProductNo)=>{
-    const product=products.find(p=>p.id===targetProductNo)||products[0];
-    const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices.find(d=>d.id===sourceDeviceId&&d.sourceChannel!=='PROMOTION_GIFT');
-    if(!device)throw new Error('Unknown demo trade-in source');
+    if(empty)refuse('TRADEIN_DISABLED');
+    if(!tradeinRankAllowed())refuse('TRADEIN_ELIGIBILITY_NOT_MET');
+    const product=products.find(p=>p.id===targetProductNo);
+    const targetReason=tradeinTargetReason(product);
+    if(targetReason)refuse('TRADEIN_'+targetReason);
+    const device=demoFleetFacts(url,locale,state).devices.find(d=>d.id===sourceDeviceId);
+    if(!device)refuse('TRADEIN_SOURCE_NOT_ACTIVE_OR_NOT_OWNED');
+    const reason=tradeinSourceReason(device,product);
+    if(reason!=='OK')refuse('TRADEIN_'+reason);
+    requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
     return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
@@ -963,7 +993,7 @@ export function demoFixture(url,locale,state,request) {
         assetReceipt:gift?{deviceIds:gift.deviceIds,instanceNos:gift.instances,source:'PROMOTION_GIFT',
           issuedAt:new Date(gift.at).toISOString(),ledgerBizNo:null,earningsEntryNo:null}:null});
       if(state.promoState==='phone-gift'){
-        const referral=demoFixture(new URL('/api/promotions/demo-promo-2',url.origin),locale,{...state,eventState:'mixed',dataState:'normal'},request).rewardRules[0].inviterReward;
+        const referral=demoFixture(new URL('/api/promotions/demo-promo-2',url.origin),locale,{...state,eventState:'mixed',wheelState:'closed',dataState:'normal'},request).rewardRules[0].inviterReward;
         const {disclosure:inviterDisclosure,...inviterReward}=referral;
         items.push({obligationId:'demo-reward-10',activityId:'demo-promo-2',orderNo:'DEMO-ORDER-005',orderLineId:'demo-line-0',updatedAt:new Date(order.activatedAt).toISOString(),
           reward:inviterReward,disclosure:inviterDisclosure,beneficiaryRole:'DIRECT_INVITER',state:'ISSUED',refundHold:false,refundRequestIds:[],assetReceipt:null});
@@ -1190,6 +1220,12 @@ export function demoFixture(url,locale,state,request) {
     const data=structuredClone(reviewFixture(url,locale,{...state,offers:!empty&&!state.voucherUsed&&state.benefitState!=='finished'},request));
     data.vouchers=data.vouchers.map(v=>({...v,voucherName:localized(locale,'设备代金券','Device voucher','Phiếu giảm giá thiết bị')}));
     if(['claimed','grace'].includes(state.benefitState)||state.voucherClaimed) data.vouchers=data.vouchers.map(v=>({...v,grantId:'DEMO-GRANT',grantStatus:'AVAILABLE',claimable:false,claimedAt:now-day}));
+    const wheelWin=state.h4Events?.spins.find(({result})=>result.rewardType==='COUPON');
+    if(!empty&&wheelWin) {
+      const template=reviewFixture(url,locale,{offers:true},request).vouchers[0];
+      data.vouchers.push({...template,voucherId:wheelVoucherId,voucherName:'Lucky Spin $50 Device Coupon',
+        minPurchaseUsd:50,claimSurfaces:'[]',claimable:false,grantId:wheelWin.result.spinId,grantStatus:'AVAILABLE',claimedAt:wheelWin.at});
+    }
     return data;
   }
   if(pathname==='/api/vouchers/V-DESIGN/claim'){state.voucherClaimed=true;return {...authority,voucherId:'V-DESIGN',grantId:'DEMO-GRANT',status:'AVAILABLE',replay:false,source:'nx_growth_voucher_grant'};}

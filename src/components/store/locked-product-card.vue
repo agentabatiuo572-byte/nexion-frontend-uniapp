@@ -71,7 +71,7 @@ const t = useT();
 const locale = useLocaleStore();
 const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
 const gpuText = computed(() => specText(t.value, props.product.gpu, "-"));
-const vramText = computed(() => specText(t.value, props.product.vram, "-"));
+const vramText = computed(() => specText(t.value, props.product.vram, "-", "vram"));
 
 const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: number }> = {
   P3: { current: 1, total: 3, pct: 33 },

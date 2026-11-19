@@ -53,7 +53,7 @@ export function useTrialPresentation(displayActive?: () => boolean) {
     ? trial.authoritativeRemainderUSD : localOffset.value?.remainderUSD ?? null);
   const estimatedUSD = computed(() => {
     const row = retained.value;
-    if (!presentationReady.value || !row || !config.value) return null;
+    if (!presentationReady.value || !row || !config.value || config.value.shadowDailyUSD === null) return null;
     const duration = !remoteApiEnabled && row.startedAt !== null && row.expiresAt !== null
       ? Math.max(0, row.expiresAt - row.startedAt) / 86_400_000 : config.value.trialDays;
     return duration * config.value.shadowDailyUSD;

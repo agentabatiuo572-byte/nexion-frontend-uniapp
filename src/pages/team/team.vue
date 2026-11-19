@@ -95,7 +95,7 @@
         <view>
           <text class="team-section-title">{{ designCopy.moreTools }}</text>
           <view class="team-tools">
-            <view class="team-tool" role="link" tabindex="0" :aria-label="t.teamV3.hardwareQuota" @click="go('/pages/team/quota')" @keydown.enter.prevent="go('/pages/team/quota')"><view class="team-tool__icon team-tool__icon--brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z M3 7l9 5 9-5M12 12v10"/></svg></view><text class="team-tool__label">{{ t.teamV3.hardwareQuota }}</text></view>
+            <view v-if="quotaEntryVisible" class="team-tool" role="link" tabindex="0" :aria-label="t.teamV3.hardwareQuota" @click="go('/pages/team/quota')" @keydown.enter.prevent="go('/pages/team/quota')"><view class="team-tool__icon team-tool__icon--brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7Z M3 7l9 5 9-5M12 12v10"/></svg></view><text class="team-tool__label">{{ t.teamV3.hardwareQuota }}</text></view>
             <view class="team-tool" role="link" tabindex="0" :aria-label="t.teamV3.ambassador" @click="go('/pages/team/agent')" @keydown.enter.prevent="go('/pages/team/agent')"><view class="team-tool__icon team-tool__icon--orange"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></view><text class="team-tool__label">{{ t.teamV3.ambassador }}</text></view>
             <view class="team-tool" role="link" tabindex="0" :aria-label="t.teamV3.visualizations.influenceNetwork" @click="go('/pages/team/network')" @keydown.enter.prevent="go('/pages/team/network')"><view class="team-tool__icon team-tool__icon--cyan"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="4" r="3"/><circle cx="4" cy="19" r="3"/><circle cx="20" cy="19" r="3"/><path d="m10.5 7-5 9m9-9 5 9M7 19h10"/></svg></view><text class="team-tool__label">{{ t.teamV3.visualizations.influenceNetwork }}</text></view>
             <view class="team-tool" role="link" tabindex="0" :aria-label="t.teamV3.visualizations.genealogy" @click="go('/pages/team/tree')" @keydown.enter.prevent="go('/pages/team/tree')"><view class="team-tool__icon team-tool__icon--violet"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg></view><text class="team-tool__label">{{ t.teamV3.visualizations.genealogy }}</text></view>
@@ -135,7 +135,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useNetwork } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
-import { apiRuntimeConfig, remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
+import { apiRuntimeConfig, remoteApiEnabled, teamInsightsApi, teamQuotaApi } from "@/api/runtime";
 import { productCatalogState, productCatalogDisplayProof, productCatalogPresentation, isProductCatalogDisplayCurrent } from "@/store/product-catalog";
 import type { CanonicalBinaryState } from "@/api/commission-config-api";
 import type { TeamCommissionSnapshot, TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
@@ -147,6 +147,7 @@ import { useDataVisibility } from '@/store/data-visibility';
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { uiLocale } from "@/i18n";
+import { isApiRefusal } from "@/api/errors";
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -188,6 +189,8 @@ const remotePoolReadable = computed(() => !remoteApiEnabled || remotePoolState.v
   || (remotePoolState.value === "loading" && remotePool.value !== null));
 let remotePoolRequest = 0;
 let remotePoolMounted = true;
+const quotaEntryVisible = ref(!remoteApiEnabled);
+let quotaRead = 0;
 function clearTeamPresentation() {
   ledgerFailureFeedback.value = false;
   ledgerPresentation.value = null; rankPresentation.value = null; binaryPresentation.value = null;
@@ -412,7 +415,7 @@ async function refreshVisibleTeam() {
     vrank.remoteError ? undefined : vrank.ensureCanonicalVRank(), commission.ensureCanonicalBinary(),
     commission.eventsStatus === "error" ? undefined : commission.ensureCanonicalEvents(),
     network.remoteStatus === "error" ? undefined : network.ensureCanonicalNetwork(),
-    referralRewards.error ? undefined : referralRewards.ensure(), refreshRemotePool(),
+    referralRewards.error ? undefined : referralRewards.ensure(), refreshRemotePool(), refreshQuotaEntry(),
   ]);
 }
 onMounted(() => {
@@ -430,8 +433,27 @@ onShow(() => {
   void commission.ensureCanonicalEvents();
   void network.ensureCanonicalNetwork();
   void refreshRemotePool(true);
+  void refreshQuotaEntry();
 });
 onHide(() => { releaseActiveRefresh(); remotePoolVisible = false; remotePoolRequest += 1; });
+async function refreshQuotaEntry() {
+  if (!remoteApiEnabled || !remotePoolVisible || displayEnvironmentInvalidated.value) return;
+  const request = ++quotaRead;
+  const account = captureAccountScope();
+  const runtime = captureRuntimeRevision();
+  let visible = true;
+  try {
+    await runPassiveTabRead("team-quota-entry", () => teamQuotaApi.snapshot());
+  } catch (error) {
+    visible = !isApiRefusal(error, 503, "TEAM_QUOTA_NOT_READY");
+  }
+  if (remotePoolMounted && remotePoolVisible && request === quotaRead
+    && isCurrentAccountScope(account) && isCurrentRuntimeRevision(runtime)) quotaEntryVisible.value = visible;
+}
+watch(() => [app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
+  quotaEntryVisible.value = !remoteApiEnabled;
+  void refreshQuotaEntry();
+}, { flush: "sync" });
 async function refreshRemotePool(passive = false) {
   if (!remoteApiEnabled || !remotePoolVisible || displayEnvironmentInvalidated.value) return;
   const request = ++remotePoolRequest;
@@ -463,6 +485,7 @@ const unsubscribeRemotePoolRun = subscribeRuntimeRevision(scope => {
   if (!displayCatalogValid.value) remotePool.value = null;
   remotePoolState.value = "loading";
   void refreshRemotePool(true);
+  void refreshQuotaEntry();
 });
 onUnmounted(() => {
   releaseActiveRefresh();
