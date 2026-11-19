@@ -325,7 +325,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { markTradeinPurchaseExpired } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -2014,7 +2014,10 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
       return null;
     }
     if (result.status === 'SUCCEEDED') recoveredResult = parseCanonicalTradeinResult(result.receipt);
-    else if (result.status === 'NOT_SEEN' && result.canResumeSameKey) remoteTradeinRecoveryError.value = false;
+    else if (result.status === 'NOT_SEEN' && result.canResumeSameKey
+        && recovery.tradeinCommandSubmitted !== true && !hasTradeinPurchaseIntent(submissionScope.accountKey, key)) {
+      remoteTradeinRecoveryError.value = false;
+    }
     else throw new Error('PAYMENT_RESULT_UNRESOLVED');
   }
   return completeVerifiedMutation({
@@ -2030,7 +2033,8 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
               return deviceE3Api.submit(recovery.tradeinQuote.sourceDeviceId,recovery.productNo,markCommandSubmitted(),recovery.tradeinQuote,authorization);
             },authorizationIsCurrent,
             {kind:'TRADE_IN',payload:{sourceDeviceId:reviewedQuote.sourceDeviceId,expectedSourceVersion:reviewedQuote.sourceRowVersion,targetProductNo:recovery.productNo,expectedPayableUsdt:reviewedQuote.payableUsdt,expectedDiscountUsdt:reviewedQuote.discountUsdt},
-              commandKey:markCommandSubmitted,parseReceipt:parseCanonicalTradeinResult});
+              commandKey:markCommandSubmitted,tradeinKey:key,parseReceipt:parseCanonicalTradeinResult});
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           if (!paid) {
             // The server no longer holds this payment and its record is released: nothing is left to recover.
             if (!readCheckoutTradein(submissionScope.accountKey, recovery.productNo)) {
@@ -2126,6 +2130,12 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
   if (remoteTradeinRecoveryBusy.value) return true;
   remoteTradeinRecoveryBusy.value = true;
   try {
+    const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
+    const tracking = prepareTradeinPaymentRecovery(scope.accountKey, key, recovery.tradeinCommandSubmitted === false);
+    if (tracking) {
+      await tracking;
+      if (!isCurrentCheckoutRoute(scope)) return true;
+    }
     const result = await completeRemoteTradein(recovery, scope, false, navigate);
     if (!result) {
       if (!isCurrentCheckoutRoute(scope)) return true;
