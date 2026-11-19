@@ -140,7 +140,8 @@ const trialOffer = computed(() => canRestart.value || (!hasLifecycle.value && tr
   && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || capacityFull.value)));
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !canRestart.value));
 const trialOfferEnabled = computed(() => canRestart.value || capacityFull.value || canClaim.value);
-const trialName = computed(() => trialView.deviceName.value ?? t.value.trial.heroDeviceName);
+// B53: only the confirmed trial product is named; until then the card shows the same "-" as its unknown amounts, never a default S1.
+const trialName = computed(() => trialView.deviceName.value ?? '-');
 const trialDays = computed(() => trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
 const trialArt = computed(() => getProductMedia(trialView.productId.value)?.src);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
