@@ -224,7 +224,7 @@ import { navReplace, navTo, takeNavigationQuery } from '@/lib/route';
 import { displayDeadline, localized } from '@/lib/promotion-display';
 import { formatDayMonth, formatDisplayDateTime, formatDisplayTime } from '@/lib/display-date';
 import { createPromotionReadFence, isPromotionActive, promotionDetailHref, promotionDisclosures, promotionStoreHref } from '@/lib/promotion-entry';
-import { landingKind, landingProduct, landingProductImage, landingProductName, promotionLandingHref, promotionRemaining, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
+import { landingKind, landingProduct, landingProductImage, landingProductName, promotionLandingHref, promotionRemaining, promotionRepurchaseInterval, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
 import { productCopy } from '@/lib/product-copy';
 import { getProductMedia } from '@/lib/product-media';
 
@@ -238,6 +238,7 @@ const fence = createPromotionReadFence();
 let activityId = '';
 
 const kind = computed(() => activity.value ? landingKind(activity.value) : null);
+const repurchaseInterval = computed(() => promotionRepurchaseInterval(activity.value));
 const rule = computed(() => activity.value?.rewardRules[0] ?? null);
 const phase = computed(() => activity.value?.state === 'ACTIVE' ? 'active' : activity.value?.state === 'SCHEDULED' ? 'scheduled' : 'ended');
 // A paused offer is closed like an ended one, so it keeps that layout; only its label and note say paused.
