@@ -33,12 +33,13 @@ export interface WithdrawAttempt {
 }
 
 const TABLE_KEY = "nexgrid-withdraw-attempt-accounts-v1"; // { [accountKey]: WithdrawAttempt }
+const CONSUMED_TABLE_KEY = "nexgrid-withdraw-consumed-accounts-v1";
 
 const NETWORKS: ReadonlyArray<CryptoNetwork> = ["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"];
 
 /** 读未收口的尝试。形状不完整一律当没有 —— 宁可多铸一个新键,也不拿半个 body 去重放。 */
-export function readWithdrawAttempt(accountKey: string): WithdrawAttempt | null {
-  const row = readAccountRow<Partial<WithdrawAttempt>>(TABLE_KEY, accountKey);
+export function readWithdrawAttempt(accountKey: string, throwOnReadError = false): WithdrawAttempt | null {
+  const row = readAccountRow<Partial<WithdrawAttempt>>(TABLE_KEY, accountKey, throwOnReadError);
   if (!row) return null;
   const { key, amount, network, address, policyVersion, offset } = row;
   if (typeof key !== "string" || !key) return null;
@@ -63,6 +64,20 @@ export function rememberWithdrawAttempt(accountKey: string, attempt: WithdrawAtt
 export function forgetWithdrawAttempt(accountKey: string, receiptKey: string): void {
   if (readAccountRow<Pick<WithdrawAttempt, "key">>(TABLE_KEY, accountKey)?.key !== receiptKey) return;
   writeAccountRow<Record<string, never>>(TABLE_KEY, accountKey, {});
+}
+
+/** Record the canonical order before publishing a recovered result. */
+export function consumeWithdrawCommit(accountKey: string, withdrawalNo: string): "new" | "seen" | "unavailable" {
+  try {
+    const row = readAccountRow<{ withdrawalNos: string[] }>(CONSUMED_TABLE_KEY, accountKey, true);
+    const withdrawalNos = row?.withdrawalNos ?? [];
+    if (withdrawalNos.includes(withdrawalNo)) return "seen";
+    return writeAccountRow(CONSUMED_TABLE_KEY, accountKey, {
+      withdrawalNos: [...withdrawalNos, withdrawalNo],
+    }) ? "new" : "unavailable";
+  } catch {
+    return "unavailable";
+  }
 }
 
 /** 新键。带随机熵 —— 纯时间戳 + 计数器在两个标签页的首笔上会撞出同一个字符串。 */
