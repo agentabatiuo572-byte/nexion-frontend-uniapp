@@ -399,7 +399,7 @@ const appShow = () => { appHidden = false; if (active.value && s.open) payment.w
 function visibility() { if (typeof document === 'undefined' || !s.open) return; if (document.hidden) payment.pause(); else if (active.value) payment.wake(); }
 watch(() => app.accountKey, () => payment.close());
 // Channel availability is read when the method sheet opens.
-watch(() => active.value && s.open && !s.pending && s.policy === null, load => { if (load) void payment.loadPolicy(); }, { immediate: true });
+watch(() => active.value && s.open && !s.concluded && !s.pending && s.policy === null, load => { if (load) void payment.loadPolicy(); }, { immediate: true });
 onShow(() => { active.value = true; if (s.open) payment.wake(); });
 // Each page mounts its own dialog host. Close synchronously on route leave so
 // the departing host cannot close the next page's automatically resumed intent.
