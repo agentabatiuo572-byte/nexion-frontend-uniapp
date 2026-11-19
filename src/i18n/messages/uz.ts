@@ -2329,7 +2329,7 @@ export const uz: Messages = {
     faq: {
       location: {
         q: "Qurilma qayerda joylashtiriladi?",
-        a: "Joylashuv maʼlumotlar markazidagi boʻsh joy, resurslar va ish ehtiyojlariga qarab belgilanadi, muayyan bir joyga bogʻlanmagan.",
+        a: "Qurilma topshirilganda maʼlumotlar markazlarimizdan biriga biriktiriladi. Maʼlumotlar markazi buyurtmangizda koʻrsatiladi.",
       },
       withdraw: {
         q: "Daromadni qanday yechib olaman?",
@@ -2517,7 +2517,7 @@ export const uz: Messages = {
     cardEstimateNote: "Taxminiy qiymat, haqiqiy toʻlov farq qilishi mumkin.",
     shareReferenceAnnual: "Taxminiy yillik mukofot (%)",
     shareFlexibleDescription: "Hisoblash quvvati ulushini bevosita sotib oling — qulayroq.",
-    shareDailyEstimateNote: "USDT joriy narx, ulushlar soni va yillik mukofot koʻrsatkichi asosida taxminan hisoblanadi. Haqiqiy toʻlov farq qilishi mumkin.",
+    shareDailyEstimateNote: "Taxmin tanlangan ulushlar soniga koʻra. Haqiqiy toʻlov farq qilishi mumkin.",
     shareAnnualUnavailable: "-",
     shareYieldDisclaimer: "Toʻlov farq qilishi mumkin.",
     cloudShareLowBarrierTagline: "Bulutli quvvat ulushi · oson boshlash",

@@ -2329,7 +2329,7 @@ export const ms: Messages = {
     faq: {
       location: {
         q: "Di manakah peranti akan ditempatkan?",
-        a: "Penempatan ditentukan secara dinamik berdasarkan kapasiti pusat data, sumber dan keperluan operasi, bukan di lokasi tetap.",
+        a: "Semasa penghantaran, peranti ditempatkan di salah satu pusat data kami. Pusat data itu dipaparkan pada pesanan anda.",
       },
       withdraw: {
         q: "Bagaimana mengeluarkan pendapatan?",
@@ -2517,7 +2517,7 @@ export const ms: Messages = {
     cardEstimateNote: "Anggaran sahaja; pembayaran sebenar mungkin berbeza.",
     shareReferenceAnnual: "Kadar ganjaran tahunan angg.",
     shareFlexibleDescription: "Beli bahagian pengkomputeran secara terus untuk lebih fleksibel.",
-    shareDailyEstimateNote: "USDT dianggarkan daripada harga semasa, kuantiti dan kadar ganjaran tahunan. Pembayaran sebenar mungkin berbeza.",
+    shareDailyEstimateNote: "Anggaran mengikut kuantiti yang dipilih. Bayaran sebenar mungkin berbeza.",
     shareAnnualUnavailable: "-",
     shareYieldDisclaimer: "Bayaran sebenar mungkin berbeza.",
     cloudShareLowBarrierTagline: "Bahagian pengkomputeran awan · mudah dimulakan",
