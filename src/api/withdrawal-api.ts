@@ -116,6 +116,7 @@ export interface WithdrawalApi {
     policyVersion: string;
   }): Promise<WithdrawalEligibilitySnapshot>;
   get(withdrawalNo: string): Promise<WithdrawalDetailSnapshot>;
+  readAttempt(idempotencyKey: string, signal?: AbortSignal): Promise<WithdrawalAttemptReadResult>;
   abandonAttempt(input: WithdrawalAttemptAbandonInput): Promise<WithdrawalAttemptAbandonResult>;
   submit(
     amount: number,
@@ -140,6 +141,12 @@ export type WithdrawalAttemptAbandonResult =
   | { state: "ABANDONED"; withdrawal: null }
   | { state: "COMMITTED"; withdrawal: WithdrawalSubmission };
 
+export type WithdrawalAttemptReadResult =
+  | { state: "COMMITTED"; withdrawalNo: string }
+  | { state: "REJECTED"; reasonCode: number; reason: string }
+  | { state: "PROCESSING" | "UNKNOWN" }
+  | { state: "NOT_SEEN"; canRetrySameKey: true };
+
 export interface WithdrawalEligibilitySnapshot {
   canSubmit: boolean;
   maxWithdrawableUsdt: number;
@@ -159,6 +166,36 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function parseAttemptRead(value: unknown, status: number): WithdrawalAttemptReadResult {
+  const row = record(value);
+  if (status === 404) {
+    // ApiClient accepts only the exact business envelope for this HTTP status.
+    if (row?.state === "NOT_SEEN" && row.canRetrySameKey === true) {
+      return { state: "NOT_SEEN", canRetrySameKey: true };
+    }
+  } else if (row?.canRetrySameKey === false) {
+    switch (row.state) {
+      case "COMMITTED": {
+        const withdrawalNo = text(row.withdrawalNo);
+        if (withdrawalNo && withdrawalNo === text(record(row.withdrawal)?.withdrawalNo)) {
+          return { state: "COMMITTED", withdrawalNo };
+        }
+        break;
+      }
+      case "REJECTED":
+        if (typeof row.reasonCode === "number" && Number.isInteger(row.reasonCode) && row.reasonCode !== 0
+          && typeof row.reason === "string" && row.reason.trim()) {
+          return { state: "REJECTED", reasonCode: row.reasonCode, reason: row.reason };
+        }
+        break;
+      case "PROCESSING":
+      case "UNKNOWN":
+        return { state: row.state };
+    }
+  }
+  throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_ATTEMPT_RESPONSE_INVALID", status });
 }
 
 function parseAttemptAbandon(value: unknown): WithdrawalAttemptAbandonResult {
@@ -770,6 +807,17 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
       method: "GET",
       path: `/api/withdrawals/${encodeURIComponent(withdrawalNo)}`,
     }), withdrawalNo),
+    readAttempt: async (idempotencyKey, signal) => {
+      if (!idempotencyKey.trim()) throw new Error("WITHDRAWAL_ATTEMPT_KEY_REQUIRED");
+      return client.request<WithdrawalAttemptReadResult>({
+        method: "GET",
+        path: `/api/withdrawals/attempts/${encodeURIComponent(idempotencyKey)}`,
+        signal,
+        retryAfterAuth: false,
+        acceptedResponses: [{ status: 404, code: 404, message: "WITHDRAWAL_ATTEMPT_NOT_FOUND" }],
+        parseResponseData: parseAttemptRead,
+      });
+    },
     abandonAttempt: async (input) => {
       const key = input.idempotencyKey.trim();
       if (!key) throw new Error("WITHDRAWAL_ATTEMPT_KEY_REQUIRED");

@@ -305,7 +305,8 @@ import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
+import { consumeWithdrawCommit, forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
+import { createAbortController } from "@/lib/abort-controller-compat";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { computeWithdrawalMaximum, formatWithdrawalRatioPercent, resolveWithdrawalUseMax } from "@/lib/withdrawal-use-max";
@@ -338,7 +339,7 @@ type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 // Submission failures share the exact refusal and original-attempt policy below.
 import { ApiError } from "@/api/errors";
 import { triageWithdrawFailure } from "@/lib/withdraw-failure-triage";
-import type { WithdrawalPolicy } from "@/api/withdrawal-api";
+import type { WithdrawalAttemptReadResult, WithdrawalPolicy } from "@/api/withdrawal-api";
 
 const ALL_NETWORKS: { id: CryptoNetwork; label: string }[] = [
   { id: "USDT-TRC20", label: "TRC20" },
@@ -368,11 +369,36 @@ const withdrawalPolicyError = ref("");
 let withdrawalPolicyRefreshSequence = 0;
 const pendingAttempt = ref(remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null);
 const abandoningAttempt = ref(false);
+const WITHDRAWAL_RECOVERY_INTERVAL_MS = 5000;
+type RecoveredWithdrawal = { state: "COMMITTED"; withdrawalNo: string; trackingRoute: string; noticePending: boolean };
+type WithdrawalRecovery = Exclude<WithdrawalAttemptReadResult, { state: "COMMITTED" }>
+  | RecoveredWithdrawal | { state: "CHECKING" | "READ_FAILED" };
+const recoveryResult = ref<{ key: string; outcome: WithdrawalRecovery } | null>(null);
+const withdrawalRecoveryRuntimeEpoch = ref(0);
+const withdrawalRecovery = computed<WithdrawalRecovery | null>(() => {
+  const pending = pendingAttempt.value;
+  if (!pending) return recoveryResult.value?.outcome ?? null;
+  return recoveryResult.value?.key === pending.key ? recoveryResult.value.outcome : { state: "CHECKING" };
+});
+const canRetryPendingAttempt = computed(() => withdrawalPageVisible.value && foregroundReadAllowed()
+  && remoteSessionReady.value && pendingAttempt.value !== null && withdrawalRecovery.value?.state === "NOT_SEEN");
+
+function takeRecoveredWithdrawalNotice(): { withdrawalNo: string; trackingRoute: string } | null {
+  const result = recoveryResult.value;
+  const outcome = withdrawalRecovery.value;
+  if (!withdrawalPageVisible.value || !foregroundReadAllowed() || !remoteSessionReady.value
+    || !result || outcome?.state !== "COMMITTED" || !outcome.noticePending) return null;
+  recoveryResult.value = { key: result.key, outcome: { ...outcome, noticePending: false } };
+  return { withdrawalNo: outcome.withdrawalNo, trackingRoute: outcome.trackingRoute };
+}
 
 function refreshPendingAttempt() {
   pendingAttempt.value = remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null;
 }
-watch([() => app.accountKey, remoteSessionReady], refreshPendingAttempt, { flush: "sync" });
+watch([() => app.accountKey, () => app.accountBindingEpoch, remoteSessionReady], () => {
+  recoveryResult.value = null;
+  refreshPendingAttempt();
+}, { flush: "sync" });
 
 function showWithdrawReceipt(kind: "info" | "error", key: string, title: string, body?: string) {
   const otherAttempt = pendingAttempt.value && pendingAttempt.value.key !== key;
@@ -384,8 +410,9 @@ async function abandonPendingAttempt() {
   const accountKey = app.accountKey;
   const bindingEpoch = app.accountBindingEpoch;
   const runtimeScope = captureRuntimeRevision();
-  const scopeIsCurrent = () => app.accountKey === accountKey
+  const scopeIsCurrent = () => remoteSessionReady.value && app.accountKey === accountKey
     && app.accountBindingEpoch === bindingEpoch && isCurrentRuntimeRevision(runtimeScope);
+  if (!scopeIsCurrent()) return;
   const pending = readWithdrawAttempt(accountKey);
   if (!pending || abandoningAttempt.value || submitting.value || confirmingSubmit.value) return;
   abandoningAttempt.value = true;
@@ -397,7 +424,8 @@ async function abandonPendingAttempt() {
       icon: "warn",
       confirmLabel: t.value.walletV3.withdrawAbandonAttemptCta,
     });
-    if (!confirmed || !scopeIsCurrent()) return;
+    if (!confirmed || !scopeIsCurrent() || readWithdrawAttempt(accountKey)?.key !== pending.key) return;
+    recoveryResult.value = null;
     if (remoteApiEnabled) {
       const result = await withdrawalApi.abandonAttempt({
         idempotencyKey: pending.key,
@@ -408,10 +436,12 @@ async function abandonPendingAttempt() {
         useNexFeeOffset: pending.offset,
       });
       if (!scopeIsCurrent()) return;
+      const consumed = result.state === "COMMITTED"
+        ? consumeWithdrawCommit(accountKey, result.withdrawal.withdrawalNo) : null;
       forgetWithdrawAttempt(accountKey, pending.key);
       refreshPendingAttempt();
       if (result.state === "COMMITTED") {
-        showWithdrawReceipt("info", pending.key, t.value.walletV3.withdrawAbandonAlreadyCommitted);
+        if (consumed !== "seen") showWithdrawReceipt("info", pending.key, t.value.walletV3.withdrawAbandonAlreadyCommitted);
         await app.refreshRemoteFleet();
         if (!scopeIsCurrent()) return;
         navTo(`/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(result.withdrawal.withdrawalNo)}`);
@@ -575,7 +605,9 @@ watch([() => app.accountBindingEpoch, remoteSessionReady], ([epoch, ready], [pre
   void retryWithdrawalFacts();
 }, { flush: "post" });
 
-const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision(() => {
+const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision((_scope, reason) => {
+  if (reason === "authority" || withdrawalRecovery.value?.state === "NOT_SEEN") recoveryResult.value = null;
+  withdrawalRecoveryRuntimeEpoch.value += 1;
   invalidateWithdrawalFacts();
   if (foregroundReadAllowed()) void retryWithdrawalFacts();
 });
@@ -1018,6 +1050,74 @@ const submitting = ref(false);
 // FEAT-WD02 ⑥:确认弹窗在途守卫。弹窗打开期间 submitting 尚未置位,不挡的话
 // 连点 CTA 会叠出第二个弹窗,两次确认 = 双重建单(mask 盖住 CTA 是第二道,这是第一道)。
 const confirmingSubmit = ref(false);
+const withdrawalCommandBusy = computed(() => submitting.value || confirmingSubmit.value || abandoningAttempt.value);
+watch([
+  withdrawalPageVisible, foregroundReadAllowed, remoteSessionReady,
+  () => app.accountKey, () => app.accountBindingEpoch, () => pendingAttempt.value?.key,
+  withdrawalCommandBusy, withdrawalRecoveryRuntimeEpoch,
+], ([visible, foreground, ready, accountKey, bindingEpoch, key, busy], _previous, onCleanup) => {
+  if (!visible || !foreground) {
+    if (withdrawalRecovery.value?.state === "NOT_SEEN") recoveryResult.value = null;
+    return;
+  }
+  if (!remoteApiEnabled || !ready || !key || busy) return;
+
+  const attemptKey = key;
+  const scope = captureRuntimeRevision();
+  const controller = createAbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => {
+    controller.abort();
+    clearTimeout(timer);
+  });
+  const isCurrent = () => !controller.signal.aborted && withdrawalPageVisible.value && foregroundReadAllowed()
+    && remoteSessionReady.value && app.accountKey === accountKey && app.accountBindingEpoch === bindingEpoch
+    && pendingAttempt.value?.key === attemptKey && !withdrawalCommandBusy.value && isCurrentRuntimeRevision(scope);
+  const stillStored = () => {
+    if (!isCurrent()) return false;
+    const stored = readWithdrawAttempt(accountKey, true);
+    if (stored?.key === attemptKey) return true;
+    recoveryResult.value = null;
+    pendingAttempt.value = stored;
+    return false;
+  };
+
+  async function poll(): Promise<void> {
+    try {
+      if (!stillStored()) return;
+      const result = await withdrawalApi.readAttempt(attemptKey, controller.signal);
+      if (!stillStored()) return;
+      if (result.state === "COMMITTED") {
+        const { withdrawalNo } = result;
+        const consumed = consumeWithdrawCommit(accountKey, withdrawalNo);
+        if (consumed === "unavailable") {
+          recoveryResult.value = { key: attemptKey, outcome: { state: "READ_FAILED" } };
+        } else {
+          recoveryResult.value = { key: attemptKey, outcome: {
+            state: "COMMITTED", withdrawalNo, noticePending: consumed === "new",
+            trackingRoute: `/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(withdrawalNo)}`,
+          } };
+          forgetWithdrawAttempt(accountKey, attemptKey);
+          refreshPendingAttempt();
+          void app.refreshRemoteFleet();
+          void app.refreshRemoteWithdrawalList(accountKey);
+          return;
+        }
+      } else {
+        recoveryResult.value = { key: attemptKey, outcome: result };
+        if (result.state === "REJECTED") {
+          forgetWithdrawAttempt(accountKey, attemptKey);
+          refreshPendingAttempt();
+          return;
+        }
+      }
+    } catch {
+      if (isCurrent()) recoveryResult.value = { key: attemptKey, outcome: { state: "READ_FAILED" } };
+    }
+    if (isCurrent()) timer = setTimeout(() => void poll(), WITHDRAWAL_RECOVERY_INTERVAL_MS);
+  }
+  void poll();
+}, { flush: "post" });
 /**
  * 🔴 输入面冻结判据 = 账号绑定未就绪 **或** 未收口尝试 **或** 提交中 **或** 确认弹窗打开中。
  * 只看 submitting 的话,弹窗那几秒 submitting 还是 false —— 改金额的入口(输入框、
@@ -1131,7 +1231,8 @@ function fmtNex(n: number): string {
 }
 
 const canSubmit = computed(() => submitDisabledReason.value === "");
-const canSubmitAction = computed(() => remoteSessionReady.value && !submitting.value && !confirmingSubmit.value && (!!pendingAttempt.value || canSubmit.value));
+const canSubmitAction = computed(() => remoteSessionReady.value && !withdrawalCommandBusy.value
+  && (pendingAttempt.value ? canRetryPendingAttempt.value : canSubmit.value));
 
 function networkHint(id: CryptoNetwork): string {
   switch (id) {
@@ -1192,7 +1293,7 @@ async function handleResetAddresses() {
 }
 
 async function handleSubmit() {
-  if (!remoteSessionReady.value || submitting.value || confirmingSubmit.value) return;
+  if (!remoteSessionReady.value || withdrawalCommandBusy.value) return;
   // 🔴 **上一次没确认结果的提交,必须先收口,才允许开始新的一笔**(2026-08-11 独立审计 P0)。
   // 幂等键此前在本函数里每次点击现铸 → 超时重试 = 服务端第二张单,而幂等键存在的唯一场景
   // 正是这个场景。键与它那一次的 body 一起冻在 lib/withdraw-attempt(落盘,理由见该文件),
@@ -1200,6 +1301,7 @@ async function handleSubmit() {
   // 这样用户改金额/换网络/切抵扣开关也无法绕过幂等键去建第二张单。
   const pending = readWithdrawAttempt(app.accountKey);
   pendingAttempt.value = pending;
+  if (pending && !canRetryPendingAttempt.value) return;
   // 重放路径绕开 canSubmit:它判的是「当前输入能不能开新的一笔」(费率拉不到、金额被清空、
   // 今日额度用完都会为 false),而重放要发的是一笔**已经通过过这道门**的旧请求 ——
   // 拿新意图的门去锁旧请求,等于把唯一的收口路径锁死。
@@ -1289,7 +1391,7 @@ async function handleSubmit() {
   } finally {
     confirmingSubmit.value = false;
   }
-  if (!confirmed) {
+  if (!confirmed || (pending && !canRetryPendingAttempt.value)) {
     clearSubmitFreeze();
     return;
   }
@@ -1400,6 +1502,7 @@ async function handleSubmit() {
     toast.error(t.value.walletV3.withdrawNotSentTitle, t.value.walletV3.withdrawNotSentBody);
     return;
   }
+  recoveryResult.value = null;
   try {
     const wd = await app.submitWithdrawal(
       snap.amount,
@@ -1416,6 +1519,7 @@ async function handleSubmit() {
       fresh?.fastLaneApplied ?? false,
       fresh?.waivedGates ?? [],
     );
+    consumeWithdrawCommit(snap.account, wd.id);
     forgetWithdrawAttempt(snap.account, snap.idempotencyKey);
     refreshPendingAttempt();
     clearSubmitFreeze();

@@ -68,6 +68,7 @@ export interface ApiRequest {
     code: number;
     message: string;
   }>;
+  parseResponseData?: (data: unknown, status: number) => unknown;
   /** A rejected secret-bearing command must ask the user again after authentication. */
   retryAfterAuth?: boolean;
 }
@@ -196,7 +197,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
 
   async function execute<T>(
     request: HttpRequest,
-    acceptedResponses: ApiRequest["acceptedResponses"] = [],
+    { acceptedResponses = [], parseResponseData }: Pick<ApiRequest, "acceptedResponses" | "parseResponseData"> = {},
   ): Promise<T> {
     const snapshotWrite = captureTabSnapshotWrite();
     const key = request.method === "GET" ? cooldownKey(request.url) : null;
@@ -271,7 +272,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       });
     }
     if (businessWrite(request)) { invalidatePassiveTabReads(); invalidateTabSnapshots(undefined, snapshotWrite); }
-    return envelope.data as T;
+    return (parseResponseData ? parseResponseData(envelope.data, response.status) : envelope.data) as T;
   }
 
   async function terminateSession(
@@ -458,7 +459,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (apiRequest.body !== undefined) httpRequest.body = apiRequest.body;
 
     try {
-      const result = await execute<T>(httpRequest, apiRequest.acceptedResponses);
+      const result = await execute<T>(httpRequest, apiRequest);
       responseGuard();
       return result;
     } catch (error) {
@@ -491,7 +492,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
               Authorization: `${refreshed.tokenType || "Bearer"} ${refreshed.accessToken}`,
             },
           },
-          apiRequest.acceptedResponses,
+          apiRequest,
         );
         responseGuard();
         return result;
