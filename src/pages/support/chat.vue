@@ -412,6 +412,7 @@ async function checkHumanSend(message: ThreadMsg) {
   const page = humanRealtime.capture(cid.value);
   if (!canCheckHumanSend.value || !page || !failed || checkingHumanSend) return;
   const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
+  const composerKey = humanComposerKey.value, clearThrough = convStore.clearedComposerThrough[composerKey];
   const current = () => humanRealtime.isCurrent(page.epoch, page.id) && supportSessionReady.value
     && binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated;
   checkingHumanSend = true;
@@ -419,7 +420,8 @@ async function checkHumanSend(message: ThreadMsg) {
     const key = await convStore.checkHumanReply(page.id, failed, () => current() && failedHumanSend.value === failed);
     if (!current()) return;
     if (key) {
-      localHumanSend.value = { ...message, clientMessageId: key, deliveryState: 'sent' };
+      if (clearThrough === convStore.clearedComposerThrough[composerKey])
+        localHumanSend.value = { ...message, clientMessageId: key, deliveryState: 'sent' };
       return;
     }
   } catch {

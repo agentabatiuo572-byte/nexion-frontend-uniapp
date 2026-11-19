@@ -69,6 +69,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
     const now = Date.now(), age = now - intent.createdAt, scenario = state.paymentState ?? 'delivered', bank = intent.paymentMethod === 'HDPAY_BANK';
+    if (scenario === 'intent-missing') return intent;
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED' && intent.reason === 'PAYMENT_FAILED' && graceOver) return timeOut(intent);
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;
@@ -143,6 +144,15 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // AppOrderCommandService refuses a wallet pay or a cancel while an order's external payment is open.
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
+  function readIntent(intent) {
+    if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE');
+    if (state.paymentState === 'intent-missing' && intent) {
+      intents.delete(intent.intentNo);
+      if (intent.orderNo && state.intentOrders) delete state.intentOrders[intent.orderNo];
+      intent = undefined;
+    }
+    return intent ? {status: 200, message: 'OK', data: view(intent)} : refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
+  }
   function handle(url, request) {
     sync();
     const path = url.pathname, method = request.method();
@@ -228,12 +238,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (path === `${base}-intents` && method === 'GET') {
       const intent = [...intents.values()].find(row => row.kind === url.searchParams.get('kind') && row.commandKey === url.searchParams.get('commandKey'));
-      return intent ? {status: 200, message: 'OK', data: view(intent)} : {status: 404, message: 'PURCHASE_PAYMENT_INTENT_NOT_FOUND', data: null};
+      return readIntent(intent);
     }
     const one = path.match(/^\/api\/app\/purchase-payment-intents\/([^/]+)$/);
     if (one && method === 'GET') {
-      const intent = intents.get(decodeURIComponent(one[1]));
-      return intent ? {status: 200, message: 'OK', data: view(intent)} : {status: 404, message: 'PURCHASE_PAYMENT_INTENT_NOT_FOUND', data: null};
+      return readIntent(intents.get(decodeURIComponent(one[1])));
     }
     return {status: 404, message: 'PURCHASE_PAYMENT_NOT_MODELED', data: null};
   }

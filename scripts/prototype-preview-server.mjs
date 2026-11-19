@@ -9,6 +9,7 @@ import { initializeDemoWalletHistory, initializeLegacyStreakSavers } from './lib
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
+import { setTransferSampleOutcome } from './lib/prototype-demo-support.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
@@ -75,7 +76,25 @@ function previewScenarioPage(scenario,keys){
     return nativeFetch.call(this,input,{...init,headers}).then(response=>{follow(response.headers.get('X-Preview-Scenario'));return response;});
   };
 }
-const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');</script>';
+function previewTransferOutbox(run,sample) {
+  const marker='uvel-preview-support-transfer', previous=JSON.parse(sessionStorage.getItem(marker)||'null');
+  if(previous?.run===run&&previous?.key===sample?.key||!previous&&!sample)return;
+  const outboxKey='support-human-outbox:user:900001', pendingKey='support-pending-commands:user:900001:canonical-v1:conversations';
+  const outbox=JSON.parse(sessionStorage.getItem(outboxKey)||'{}'), pending=JSON.parse(localStorage.getItem(pendingKey)||'{}');
+  if(previous) {
+    delete outbox['conversation:'+previous.conversationNo];
+    if(pending[previous.slot]===previous.key)delete pending[previous.slot];
+  }
+  if(sample&&!sample.committed) {
+    outbox['conversation:'+sample.conversationNo]={text:'',failedSend:{text:sample.text,kind:'unknown',settled:false,retryable:true,attempts:1}};
+    pending[sample.slot]=sample.key;
+  }
+  sessionStorage.setItem(outboxKey,JSON.stringify(outbox));
+  localStorage.setItem(pendingKey,JSON.stringify(pending));
+  sessionStorage.setItem(marker,JSON.stringify(sample?{run,key:sample.key,conversationNo:sample.conversationNo,slot:sample.slot}:null));
+}
+const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');'
+  +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(state.supportTransferSample??null)+');</script>';
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
 const modeledWrite=/^\/(auth\/users\/(refresh|logout|login)|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|devices\/activate|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/security\/account-deletion(?:\/cancel)?|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
@@ -107,6 +126,7 @@ const server=http.createServer(async(req,res)=>{
           for(const key of Object.keys(state))delete state[key];
           Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
         }
+        if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(key!=='promotionRewardState'&&options.some(([value])=>value===update[key]))state[key]=update[key];
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
@@ -161,6 +181,7 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         realtime.stateChanged(update);
+        if('supportReadbackState' in update)setTransferSampleOutcome(state);
       }
       return sendJson(res,{state,options:demoOptions,simulation:true});
     }
