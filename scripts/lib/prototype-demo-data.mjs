@@ -433,10 +433,10 @@ function demoLiveActivity(product,now) {
 }
 
 /** Mutable state belongs only to the loopback demonstration server. */
-export function demoFixture(url,locale,state,request) {
+export function demoFixture(url,locale,state,request,now=Date.now()) {
   state.previewFactsAt??=demoStartedAt;
   state.walletLegacySeed??=false;
-  const now=Date.now(),iso=new Date(now).toISOString(),pathname=url.pathname;
+  const iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin);
   if (pathname === '/api/config/phone-tiers') return { tiers: [1,2,3,4,5].map(tier => ({
@@ -711,8 +711,26 @@ export function demoFixture(url,locale,state,request) {
       return {...item,lineId:'demo-line-'+index,unitPriceUsdt:product.price.toFixed(2),subtotalUsdt:(product.price*item.quantity).toFixed(2),discountUsdt:'0.00',payableUsdt:(product.price*item.quantity).toFixed(2)};
     });
     const subtotal=items.reduce((sum,item)=>sum+Number(item.subtotalUsdt),0).toFixed(2);
-    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:input.activityId?1:null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
-    if(input.activityId){const activity=demoFixture(new URL('/api/promotions/'+input.activityId,url.origin),locale,state,request);quote.activityVersion=activity.version??quote.activityVersion;for(const line of items){const rule=activity.rewardRules?.find(r=>r.productNo===line.productNo);if(rule){const {disclosure,...reward}=rule.buyerReward;quote.expectedRewards.push({lineId:line.lineId,activityId:activity.activityId,version:activity.version,ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});}}}
+    const activity=input.activityId
+      ? demoFixture(new URL('/api/promotions/'+input.activityId,url.origin),locale,state,request,now)
+      : null;
+    const repurchase=activity?.template==='REPURCHASE';
+    const matches=items.flatMap(line=>{
+      const rule=activity?.rewardRules?.find(candidate=>candidate.productNo===line.productNo
+        &&(!repurchase||line.quantity>=candidate.minBuyQty));
+      return rule?[{line,rule}]:[];
+    });
+    if(input.activityId&&(!activity?.activityId
+        ||(repurchase&&(activity.eligibility!=='ESTIMATE_ELIGIBLE'||!matches.length)))){
+      refuse('PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
+    }
+    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
+    for(const {line,rule} of matches){
+      const {disclosure,...reward}=rule.buyerReward;
+      quote.expectedRewards.push({lineId:line.lineId,activityId:activity.activityId,version:activity.version,
+        ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,
+        groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});
+    }
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
     let remaining=bundleDiscount+voucherDiscount(state,input.voucherId,Number(subtotal)-bundleDiscount);quote.discountUsdt=remaining.toFixed(2);quote.amountUsdt=(Number(subtotal)-remaining).toFixed(2);
     for(const line of items){const discount=Math.min(remaining,Number(line.subtotalUsdt));line.discountUsdt=discount.toFixed(2);line.payableUsdt=(Number(line.subtotalUsdt)-discount).toFixed(2);remaining-=discount;}
