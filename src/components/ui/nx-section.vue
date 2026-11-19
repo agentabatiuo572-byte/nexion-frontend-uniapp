@@ -19,7 +19,7 @@ defineEmits<{ (event: 'action'): void }>();
 .nx-section__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); letter-spacing: -.01em; }
 .nx-section__title:lang(zh) { letter-spacing: 0; }
 .nx-section__meta { font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); }
-.nx-section__heading :deep(.nx-button) {gap:2px;padding:0;min-height:44px;}
+.nx-section__heading :deep(.nx-button) {gap:2px;padding:0;min-height:44px;flex-shrink:0;white-space:nowrap;}
 .nx-section__heading :deep(.nx-section__icon-action) { width:44px;min-width:44px; }
 .nx-section__heading :deep(.nx-section__icon-action .nx-button__surface) { justify-content:flex-end; }
 @media (max-width: 374px) {

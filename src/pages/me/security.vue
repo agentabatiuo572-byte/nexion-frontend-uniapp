@@ -198,6 +198,11 @@
     <NxSheet :open="deletionSheetOpen" :title="t.security.deleteAccount" @close="closeDeletionSheet" class="security-half-sheet"><view class="security-sheet-form"><text class="security-sheet-note">{{ t.security.deleteAccountHint }}</text><template v-if="remoteApiEnabled && !deletionPending">
           <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.deletionPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
         </template></view><template #footer><NxButton variant="primary" :busy="securityBusy" @click="handleDeleteAccount">{{ t.security.deleteAccount }}</NxButton></template></NxSheet>
+    <!-- Wallet debt blocks deletion: top up is the way forward, support stays one tap away, cancel only closes. -->
+    <NxNoticeDialog :open="deletionDebtOpen" :title="t.security.deleteAccount" :body="fmt(t.security.deleteAccountBlockedByDebt, { usdt: formatAmount(-app.user.usdtBalance, 'full') })"
+      :primary="t.security.deleteAccountTopUp" :secondary="t.ui.cancel" @primary="leaveForDebt('/pages/me/wallet-topup')" @secondary="deletionDebtOpen = false">
+      <view class="security-debt-support" role="link" tabindex="0" @click="leaveForDebt('/pages/support/chat?start=support')" @keydown.enter.prevent="leaveForDebt('/pages/support/chat?start=support')"><text>{{ t.help.contactSupport }}</text></view>
+    </NxNoticeDialog>
     <CountryCodeSheet :open="showPhoneCountries" :model-value="'+' + phoneCountry" @select="selectPhoneCountry" @close="showPhoneCountries = false" />
   </AppChassis>
 </template>
@@ -206,6 +211,7 @@
 import { dateLocale } from "@/i18n/format";
 import { displayTimestamp, formatDisplayDate, formatDisplayDateTime } from "@/lib/display-date";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
@@ -327,6 +333,11 @@ const deletionBalanceBlock = computed(() => {
   if (app.user.usdtBalance > 0 || app.user.nexBalance > 0) return "balance";
   return null;
 });
+const deletionDebtOpen = ref(false);
+async function leaveForDebt(url: string) {
+  deletionDebtOpen.value = false;
+  if (!(await navTo(url))) toast.error(t.value.ui.navigationFailed);
+}
 const deletionPassword = ref("");
 const deletionCommandKey = ref("");
 const remoteSecurityLoading = ref(false);
@@ -1002,6 +1013,10 @@ async function handleDeleteAccount() {
         && isCurrentSecurityRequest(pageScope, accountScope, accountKey)) toast.error(t.value.ui.navigationFailed);
       return;
     }
+    if (deletionBalanceBlock.value === "debt") {
+      deletionDebtOpen.value = true;
+      return;
+    }
     if (deletionBalanceBlock.value) {
       const hasNex = app.user.nexBalance > 0;
       const view = await uiConfirm({
@@ -1387,6 +1402,9 @@ const dangerLabelStyle: CSSProperties = {
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
 .security-sheet-note { font-size:13px; line-height:20px; color:var(--v5-ink-3); }
+.security-debt-support { display:flex; align-items:center; justify-content:center; min-height:44px; margin-top:8px; padding:0 12px; border-radius:var(--v5-radius-full); font:400 14px/20px var(--font-v5); color:var(--v5-ink-2); text-decoration:underline; text-underline-offset:3px; }
+.security-debt-support:active { opacity:.7; }
+.security-debt-support:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
 </style>
 
 <style scoped>

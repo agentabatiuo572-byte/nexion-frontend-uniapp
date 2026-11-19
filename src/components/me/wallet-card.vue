@@ -1,6 +1,6 @@
 <!-- Balances retain their existing sources; the summary follows the approved wallet design. -->
 <template>
-  <view class="nx-wallet" :class="{'nx-wallet--compact': compact, 'nx-wallet--glow-paused': !glowLoops.running.value}">
+  <view class="nx-wallet" :class="{'nx-wallet--compact': compact, 'nx-wallet--glow-paused': !glowLoops.running.value, 'nx-wallet--debt': debt}">
     <view ref="glowRef" class="nx-glass-card nx-glass-hero nx-wallet-summary">
       <view class="nx-wallet-arc" aria-hidden="true">
         <template v-if="compact">
@@ -20,9 +20,13 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
         </view>
       </view>
-      <text class="nx-sr-only">{{ t.me.usdtBalance + ': ' + visibility.mask('$' + usdtLabel) }}</text>
+      <text class="nx-sr-only">{{ t.me.usdtBalance + ': ' + visibility.mask((debt ? '−' : '') + '$' + usdtLabel) }}</text>
       <view :id="usdtCount.hostId" class="nx-wallet-total" :style="usdtFitStyle" aria-hidden="true" :count-up="usdtCount.config.value" :change:count-up="countUp.update">
-        <text v-if="!visibility.hidden" class="nx-wallet-currency">$</text><text v-if="visibility.hidden" class="tabular-nums nx-wallet-amount">••••</text><text v-else-if="usdtBalanceReadable" class="tabular-nums nx-wallet-amount"><text class="nx-count--int">{{ intPart }}</text><text class="nx-wallet-fraction nx-count--frac">.{{ fracPart }}</text></text><text v-else class="tabular-nums nx-wallet-amount">—</text>
+        <text v-if="!visibility.hidden" class="nx-wallet-currency">{{ debt ? '−$' : '$' }}</text><text v-if="visibility.hidden" class="tabular-nums nx-wallet-amount">••••</text><text v-else-if="usdtBalanceReadable" class="tabular-nums nx-wallet-amount"><text class="nx-count--int">{{ intPart }}</text><text class="nx-wallet-fraction nx-count--frac">.{{ fracPart }}</text></text><text v-else class="tabular-nums nx-wallet-amount">—</text>
+      </view>
+      <view v-if="debt" class="nx-wallet-debt" role="note">
+        <svg class="nx-wallet-debt__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+        <text>{{ fmt(t.me.walletDebtNote, { amount: visibility.mask(formatGroupedAmount(-usdt, 6)) }) }}</text>
       </view>
       <view class="nx-wallet-nex" role="link" tabindex="0" @click="goNex" @keydown.enter.prevent="goNex" :aria-label="t.uiChrome.nexBalance + ': ' + nexLabel + ' UVT'">
         <view class="nx-wallet-coin" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" /></svg></view>
@@ -41,8 +45,8 @@
         <!-- Quick actions strip -->
         <view :style="compact ? {marginTop:'var(--v5-space-3)'} : actionsBlockStyle">
           <text v-if="!compact" class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px">{{ t.me.quickActions }}</text>
-          <view class="grid grid-cols-3" style="gap: 8px">
-            <WalletActionBtn :compact="compact" href="/pages/me/wallet-topup" :label="t.me.topup" sub="USDT">
+          <view class="grid grid-cols-3" :class="{ 'nx-wallet-action-grid--text': longActionLabels }" style="gap: 8px">
+            <WalletActionBtn :compact="compact" :emphasis="debt" href="/pages/me/wallet-topup" :label="t.me.topup" sub="USDT">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></svg>
             </WalletActionBtn>
             <WalletActionBtn :compact="compact" href="/pages/me/wallet-withdraw-method" :label="t.me.withdraw" sub="USDT / VND">
@@ -80,6 +84,7 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { fmt, fmtMoney, openSlotsTemplate } from "@/i18n/format";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { useApp } from "@/store/app";
 import { earningsReleaseHasSnapshot, earningsReleaseSnapshot, earningsReleaseStatus } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
@@ -123,9 +128,12 @@ const buckets = computed(() => ({
 }));
 // 2026-07-31:与 wallet.vue / wallet-withdraw 同源 —— 可提口径 = 总余额(held 两桶账外)。
 const usdt = computed(() => liveUsdtReadable.value ? app.user.usdtBalance : walletSnapshot.value?.usdt ?? 0);
-const usdtText = computed(() => formatAmount(usdt.value));
+// A negative USDT balance is a wallet debt: the digits show its size and the sign sits with the currency.
+const debt = computed(() => usdtBalanceReadable.value && usdt.value < 0);
+const usdtText = computed(() => formatAmount(Math.abs(usdt.value)));
 // Only the shown digits count up; the label and fit size keep the final balance so the size does not jump.
-const usdtCount = useViewCountUp(() => usdtBalanceReadable.value ? usdt.value : null, "finance");
+const longActionLabels = computed(() => [t.value.me.topup, t.value.me.withdraw, t.value.me.exchange].some((label) => label.length > 9));
+const usdtCount = useViewCountUp(() => usdtBalanceReadable.value ? Math.abs(usdt.value) : null, "finance");
 const intPart = computed(() => usdtText.value.split(".")[0]);
 const fracPart = computed(() => usdtText.value.split(".")[1]);
 const auditCopy = useAuditUiCopy();
@@ -273,7 +281,7 @@ import { useSlotActionSheet } from "@/store/slot-action-sheet";
 const usdtLabel = computed(() => usdtBalanceReadable.value ? usdtText.value : "—");
 // Fit the complete formatted amount and currency; ordinary balances keep their existing size.
 const usdtFitStyle = computed<CSSProperties>(() => ({
-  "--nx-wallet-fit-size": `calc((100vw - 80px) / ${(visibility.mask(usdtLabel.value).length + 1) * 0.6})`,
+  "--nx-wallet-fit-size": `calc((100vw - 80px) / ${(visibility.mask(usdtLabel.value).length + (debt.value ? 2 : 1)) * 0.6})`,
 }));
 </script>
 
@@ -293,6 +301,11 @@ export default countUpView;
 .nx-wallet-currency { font-size: min(clamp(28px, 8vw, 38px), var(--nx-wallet-fit-size)); }
 .nx-wallet-amount { min-width: 0; white-space: nowrap; overflow-wrap: normal; font-size: min(clamp(32px, 10.5vw, 52px), var(--nx-wallet-fit-size)); }
 .nx-wallet-fraction { color: var(--v5-ink-3); }
+/* Wallet debt: amber figure and one note line under it; the top-up action carries the brand glass. */
+.nx-wallet.nx-wallet--debt .nx-wallet-total { color: var(--v5-warning-ink); margin-bottom: 10px; }
+.nx-wallet--debt .nx-wallet-fraction { color: inherit; opacity: .72; }
+.nx-wallet-debt { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 6px; margin-bottom: 18px; font: 400 var(--v5-type-caption)/1.45 var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
+.nx-wallet-debt__icon { flex-shrink: 0; margin-top: 1px; color: var(--v5-warning-ink); }
 .nx-wallet-nex { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; font: 500 20px/1.4 var(--font-amount); color: var(--v5-ink-2); overflow-wrap: anywhere; }
 .nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; color: var(--v5-bg); background: var(--v5-nex); }
 .nx-wallet-arc { position: absolute; width: 360px; height: 300px; border-radius: 50%;  bottom: -220px; right: -190px; transform: rotate(-30deg); background: radial-gradient(ellipse at center, var(--v5-nex-soft), transparent 68%); box-shadow: 0 0 40px var(--v5-nex-soft); pointer-events: none; animation: wallet-arc-breathe 7s ease-in-out infinite alternate; }
@@ -319,6 +332,8 @@ export default countUpView;
 .nx-wallet--compact .nx-wallet-title { font-size: var(--ui-type-card-title); }
 .nx-wallet-heading-bills { font-size: var(--v5-type-caption); color: var(--v5-ink-3); white-space: nowrap; }
 .nx-wallet--compact .nx-wallet-total { margin: 20px 0; }
+/* Labels stay on one line: on a narrow screen, a strip with a long label drops the small icons instead. */
+@media (max-width: 359px) { .nx-wallet--compact .nx-wallet-action-grid--text :deep(.wallet-action__icon) { display: none; } }
 .nx-wallet--compact .nx-wallet-amount { font-size: min(var(--ui-type-wallet-amount), var(--nx-wallet-fit-size)); line-height: var(--ui-type-wallet-amount-lh); }
 .nx-wallet--compact .nx-wallet-nex { min-height: 44px; font-size: var(--v5-type-body-m); padding-bottom: 0; }
 .nx-wallet--compact .nx-wallet-token-amount { font-size: 18px; }

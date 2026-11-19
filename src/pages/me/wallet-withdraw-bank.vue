@@ -121,6 +121,7 @@
               <text v-if="amountError" class="error-text" role="alert">{{ amountError }}</text>
             </view>
           </view>
+          <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
           <view v-if="displayConfig.policy && displayConfig.capacity" class="daily">
             <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity.dailyRemainingCount, total: displayConfig.capacity.dailyLimitCount }) }}</text>
             <view class="refresh-limits" role="button" tabindex="0" data-testid="bank-refresh-limits" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refreshLimits }}</text></view>
@@ -169,6 +170,7 @@
 <script setup lang="ts">
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -588,6 +590,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .bcard__no { display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; text-shadow: 0 1px 0 rgba(0,0,0,.45); }
 .bcard__cur { color: color-mix(in srgb, white 55%, transparent); font: 500 12px/16px var(--font-metric); letter-spacing: .08em; }
 .note { display: flex; align-items: flex-start; gap: 8px; margin: 14px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.note--debt { color: var(--v5-ink-2); }
+.note--debt svg { flex-shrink: 0; margin-top: 2px; color: var(--v5-warning-ink); }
 .note > svg { flex: none; margin-top: 2px; }
 .acct { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-top: 15px; padding: 8px 14px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .acct__ico { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 10px; background: var(--v5-success-soft); color: var(--v5-success-ink); }
@@ -610,7 +614,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .slab .use-max { min-width: 0; min-height: 32px; padding: 0 4px; font: 500 13px/18px var(--font-v5); }
 .slab .limits { margin-top: 4px; font: 400 12px/18px var(--font-v5); }
 .daily { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.daily .refresh-limits { font: 500 12px/18px var(--font-v5); }
+.daily .refresh-limits { flex-shrink: 0; white-space: nowrap; font: 500 12px/18px var(--font-v5); }
 .ticket { position: relative; margin-top: 12px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .ticket__top { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
 .ticket__title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }

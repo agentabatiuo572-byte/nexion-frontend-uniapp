@@ -8,11 +8,11 @@
   fail:()=>{} 兜未接入的目标。
 -->
 <template>
-  <view class="flex flex-col items-center text-center active:opacity-90" :class="{'wallet-action--compact': compact}" style="gap: 6px; padding: 6px 2px; min-height: 44px" :data-me-action="`wallet:${props.href}`" role="button" tabindex="0" :aria-label="props.label" @click="go" @keydown.enter.prevent="go" @keydown.space.prevent="go">
-    <view class="grid place-items-center shrink-0" :style="compact ? {color:'var(--v5-brand)'} : iconStyle">
+  <view class="flex flex-col items-center text-center active:opacity-90" :class="{'wallet-action--compact': compact, 'nx-frosted-button wallet-action--emphasis': compact && emphasis}" style="gap: 6px; padding: 6px 2px; min-height: 44px" :data-me-action="`wallet:${props.href}`" role="button" tabindex="0" :aria-label="props.label" @click="go" @keydown.enter.prevent="go" @keydown.space.prevent="go">
+    <view class="grid place-items-center shrink-0 wallet-action__icon" :style="compact ? {color:'var(--v5-brand)'} : iconStyle">
       <slot />
     </view>
-    <text :style="labelStyle">{{ label }}</text>
+    <text :style="compact && emphasis ? { ...labelStyle, color: 'var(--v5-brand)' } : labelStyle">{{ label }}</text>
     <text v-if="sub && !compact" :style="subStyle">{{ sub }}</text>
   </view>
 </template>
@@ -26,6 +26,8 @@ const props = defineProps<{
   label: string;
   sub?: string;
   compact?: boolean;
+  /** Brand liquid glass for the one action the wallet state points to (top up while the wallet is in debt). */
+  emphasis?: boolean;
 }>();
 
 function go() {
@@ -61,6 +63,7 @@ const subStyle: CSSProperties = {
 };
 </script>
 <style scoped>
-.wallet-action--compact { flex-direction: row; justify-content: center; border-radius: var(--v5-radius-full); background: var(--v5-surface-2); border: 0; box-shadow: none; }
+.wallet-action--compact { padding-left: 8px !important; padding-right: 8px !important; flex-direction: row; justify-content: center; border-radius: var(--v5-radius-full); background: var(--v5-surface-2); border: 0; box-shadow: none; }
+.wallet-action--compact.wallet-action--emphasis { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), var(--ui-button-fill); box-shadow: var(--ui-glass-edge-shadow); }
 .wallet-action--compact:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>

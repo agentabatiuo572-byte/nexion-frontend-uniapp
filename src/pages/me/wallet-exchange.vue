@@ -1003,7 +1003,7 @@ const minLabel = computed(() => exchangeSnapshotReady.value
   ? t.value.exchange.minAmount.replace("{n}", minFrom.value === null ? "—" : formatAmount(minFrom.value)).replace("{sym}", platformDisplayText(fromSym.value))
   : t.value.exchange.remoteNotProvided);
 const fromBalLabel = computed(() => exchangeSnapshotReady.value
-  ? formatAmount(fromBal.value)
+  ? formatAmount(fromBal.value).replace(/^-/, "−")
   : "-");
 const toAmountLabel = computed(() => !exchangeSnapshotReady.value || feeInvalid.value ? "—" : amtLabel(toAmount.value));
 const rateLabel = computed(() => exchangeSnapshotReady.value
@@ -1083,8 +1083,8 @@ const historyEmptyStyle: CSSProperties = {
 .ex-k { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .ex-mono { font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
 .ex-top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: -5px 16px 0; }
-.ex-how { display: inline-flex; align-items: center; min-height: 44px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); cursor: pointer; }
-.ex-fresh { display: flex; align-items: center; gap: 6px; }
+.ex-how { display: inline-flex; flex-shrink: 0; align-items: center; min-height: 44px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); white-space: nowrap; cursor: pointer; }
+.ex-fresh { display: flex; align-items: center; gap: 6px; min-width: 0; text-align: right; }
 .ex-fresh__ring { transform: rotate(-90deg); }
 .ex-fresh__trk { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 12%, transparent); stroke-width: 2.5; }
 .ex-fresh__val { fill: none; stroke: var(--v5-brand); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 44; transition: stroke-dashoffset .5s linear; }

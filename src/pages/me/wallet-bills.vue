@@ -55,6 +55,7 @@
               v-for="b in g.rows"
               :key="b.id"
               class="bills-row"
+              :class="{ 'bills-row--clawback': b.type === 'clawback' }"
               role="button"
               tabindex="0"
               :aria-label="billAria(b)"
@@ -70,7 +71,7 @@
                   <text class="bills-row__title">{{ typeLabel(b.type) }}</text>
                   <NxTag v-if="b.status !== 'posted'" :tone="b.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(b.status)" />
                 </view>
-                <view :class="b.memoKey === 'learningReward' ? '' : 'truncate'" class="bills-row__sub">
+                <view :class="b.memoKey === 'learningReward' || b.type === 'clawback' ? '' : 'truncate'" class="bills-row__sub">
                   <text>{{ billMemo(b) }}</text>
                   <text v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'"> · </text>
                   <text v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'" class="font-mono-tabular">{{ b.ref }}</text>
@@ -88,7 +89,7 @@
                   <text>{{ isDebit(b) ? "−" : "+" }}{{ fmtAmount(b) }}</text>
                   <text class="bills-row__unit">{{ platformDisplayText(b.symbol) }}</text>
                 </view>
-                <text v-if="b.balanceAfter !== undefined && b.symbol === 'USDT'" class="bills-row__balance tabular-nums">{{ runningBalanceLabel(b) }}</text>
+                <text v-if="b.balanceAfter !== undefined && b.symbol === 'USDT'" class="bills-row__balance tabular-nums" :class="{ 'bills-balance--debt': b.balanceAfter < 0 }">{{ runningBalanceLabel(b) }}</text>
               </view>
             </view>
           </view>
@@ -120,7 +121,7 @@
           <view class="bills-sheet__fact"><text>{{ t.bills.detailSource }}</text><text class="bills-sheet__value">{{ billMemo(detail) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status)" /></view>
           <view v-if="detail.ref" class="bills-sheet__fact"><text>{{ t.bills.detailRef }}</text><view class="bills-sheet__ref"><text class="font-mono-code bills-sheet__value">{{ detail.ref }}</text><CopyCodeButton :value="detail.ref" :label="t.bills.detailRef" /></view></view>
-          <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums">{{ formatWalletBillBalance(detail.balanceAfterExact, detail.balanceAfter, detail.symbol, dateLocale()) }}</text></view>
+          <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums" :class="{ 'bills-balance--debt': detail.balanceAfter < 0 }">{{ formatWalletBillBalance(detail.balanceAfterExact, detail.balanceAfter, detail.symbol, dateLocale()) }}</text></view>
         </view>
         <view class="bills-sheet__close" role="button" tabindex="0" @click="detail = null" @keydown.enter.prevent="detail = null" @keydown.space.prevent="detail = null"><LiquidGlass :radius="24" tone="control" /><text>{{ t.bills.detailClose }}</text></view>
       </view>
@@ -513,12 +514,18 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-row__copy { display:flex;flex-direction:column;min-width:0; }
 .bills-row__title-row { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
 .bills-row__title { overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);text-overflow:ellipsis;white-space:nowrap; }
+/* A clawback title is longer than most: it may take two lines, and the figure column gives way before the copy does. */
+.bills-row--clawback { grid-template-columns:32px minmax(0,1fr) fit-content(45%); }
+.bills-row--clawback .bills-row__title { white-space:normal; }
+.bills-row--clawback .bills-row__balance { text-align:right; }
 .bills-row__sub { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-row__figure { display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:var(--v5-space-1); }
 .bills-row__amount { display:flex;align-items:baseline;gap:var(--v5-space-1);font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink); }
 .bills-row__amount--in { color:var(--v5-success-ink); }
 .bills-row__unit { font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
 .bills-row__balance { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
+/* A balance below zero is a wallet debt: same place and alignment, amber ink. */
+.bills-row__balance.bills-balance--debt, .bills-sheet__value.bills-balance--debt { color:var(--v5-warning-ink); }
 .bills-end { display:block;padding:0 0 4px;text-align:center;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-4); }
 .bills-sheet-root { position:fixed;inset:0;z-index:790;display:flex;align-items:flex-end; }
 .bills-sheet-scrim { position:absolute;inset:0;background:var(--v5-bg-color-mask); }

@@ -68,13 +68,13 @@ export const WALLET_BILL_TYPE_COLOR: Record<BillType, string> = {
   stake: "var(--v5-warning)",
   unstake: "var(--v5-ink-3)",
   achievement: "var(--v5-warning)",
-  clawback: "var(--v5-ink-3)",
+  clawback: "var(--v5-aura-sky)",
   other: "var(--v5-ink-3)",
 };
 
 /** Icon tile tint for a bill type: neutral types stay faint, warm accents a little stronger. */
 export function walletBillTypeTint(type: BillType): string {
-  const percent = type === "withdraw" || type === "unstake" || type === "other" || type === "clawback" ? 8
+  const percent = type === "withdraw" || type === "unstake" || type === "other" ? 8
     : type === "bonus" || type === "achievement" || type === "stake" ? 20
       : type === "refer" || type === "purchase" || type === "refund" || type === "verification" ? 18 : 16;
   return `color-mix(in srgb, ${WALLET_BILL_TYPE_COLOR[type]} ${percent}%, transparent)`;
