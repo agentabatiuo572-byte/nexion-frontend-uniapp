@@ -31,7 +31,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
@@ -61,6 +61,7 @@ export const demoOptions = {
   ambassadorState:[['none','尚未申请'],['draft','进行中 · 待提交材料（M0）'],['review','核验中 · 业务通过、费用待核（M3）'],['partial','核验中 · 已交但缺两项（M1）'],['more-finance','需补材料 · 费用退回、可下调（M6）'],['more-business','需补材料 · 业务退回（M5）'],['passed','两项通过 · 待批准（M7）'],['passed-short','两项通过 · 认可金额不足（M8）'],['passed-precise','两项通过 · 认可金额 2999.999999'],['future','两项通过 · 活动未到（M9）'],['bucket','历史待审缺类别（M10）'],['approved','最近一份已通过（M13）'],['rejected','最近一份未通过（M13）']],
   ambassadorIoState:[['normal','材料读写正常'],['upload-slow','上传慢（每次 4 秒）'],['upload-fail-once','下一次上传失败一次'],['save-reject-once','下一次提交被拒绝一次（422）'],['save-unknown-once','下一次提交结果未知一次（503）'],['save-lands-unknown-once','下一次提交已生效但回复丢失（503）'],['close-on-submit-once','下一次提交时申请已终结（409）'],['late-read-once','下一次材料读取迟到 4 秒（返回旧数据）'],['rereview-finance-once','下一次读取：同版本费用重新通过'],['history-fail-once','下一次申请记录读取失败一次']],
   ambassadorRank:[['follow','跟随“最高等级 V8”开关'],['v5','V5（刚满足资格）']],
+  repurchaseState:['follow','inside','boundary','outside'].map(value=>[value,value]),
   promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],
   sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
   promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
@@ -202,6 +203,7 @@ const samplePlacedAgo={urgent:paymentWindow-(4*60000+50000),late:paymentWindow-6
 const deadlineTaskDelay=60000;
 export const demoTimedOutOrder={canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'};
 export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'&&order.expiresAt+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo];
+const repurchaseSampleDays={inside:12,boundary:30,outside:12};
 function demoOrders(products,state,now,device41) {
   if (state.accountDeletionState === 'clear') return [];
   const at=state.sampleOrdersAt??=now;
@@ -218,7 +220,10 @@ function demoOrders(products,state,now,device41) {
       &&(original==='activated'||original==='provisioning_failed'))computePoints=640;
     if(device&&state.highestRank)computePoints=64000;
     else if(device&&state.walletLegacySeed)computePoints=1280;
-    const placedAt=device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
+    const repurchaseDays=repurchaseSampleDays[state.repurchaseState];
+    const placedAt=original==='provisioning_failed'&&repurchaseDays!==undefined
+      ? at-repurchaseDays*day-samplePaidAfter
+      : device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
     return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:unitPrice,lineAmountUsdt:unitPrice}]};
   }).filter(order=>!accountDeletionWallet(state)||(['COMPLETED','CANCELLED','CLOSED','FAILED','REFUNDED'].includes(order.orderStatus)&&['PAID','FAILED','CANCELLED','REFUNDED','EXPIRED'].includes(order.paymentStatus)));
@@ -791,6 +796,17 @@ export function demoFixture(url,locale,state,request) {
     const sample=base('/api/promotions').items[0];
     const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
     const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
+    const authenticated=['Bearer local-demo-token','Bearer formal-probe-access-token'].includes(request?.headers?.().authorization);
+    const exact=state.repurchaseState==='boundary'||state.repurchaseState==='outside';
+    const repurchaseWindow=exact?{minDays:30,maxDays:30}:{minDays:state.repurchaseState==='inside'?7:0,maxDays:90};
+    const readsPurchaseHistory=authenticated&&!empty&&state.eventState!=='empty';
+    // The initial order snapshot cannot be newer than this projection's server time.
+    if(readsPurchaseHistory)state.sampleOrdersAt??=now;
+    const latestPaid=readsPurchaseHistory
+      ? demoAccountOrders(url,locale,state,now).reduce((latest,order)=>
+          order.paymentStatus==='PAID'&&!['REFUNDED','CANCELLED'].includes(order.orderStatus)
+            && typeof order.paidAt==='number'&&(latest===null||order.paidAt>latest)?order.paidAt:latest,null)
+      : null;
     const items=empty||state.eventState==='empty'?[]:configs.map(([template,zh,en,vi,productNo],i)=>{
       const item=structuredClone(sample);item.activityId='demo-promo-'+i;item.template=template;item.title={zh,en,vi};item.productNos=template==='MULTI_PRODUCT'?['stellarbox-pro','stellarrack-p1','stellarbox-s1']:[productNo];item.placement=[0,1,4].includes(i)?'home.purchase-promotion':null;
       item.rewardRules[0].productNo=productNo;item.rewardRules[0].ruleId='demo-rule-'+i;
@@ -814,6 +830,14 @@ export function demoFixture(url,locale,state,request) {
         const edge=(state.promotionTimingAt||now)+60000;
         if(state.promotionTiming==='starting'){item.startsAt=new Date(edge).toISOString();item.state=now<edge?'SCHEDULED':'ACTIVE';}
         else if(state.promotionTiming==='ending'){item.endsAt=new Date(edge).toISOString();item.state=now<edge?'ACTIVE':'ENDED';}
+      }
+      if(template==='REPURCHASE'){
+        item.repurchaseWindow=repurchaseWindow;
+        item.lastValidPurchaseAt=latestPaid===null?null:new Date(latestPaid).toISOString();
+        const days=latestPaid===null?null:Math.floor((now-latestPaid)/day);
+        item.eligibility=!authenticated?'SIGN_IN_REQUIRED'
+          :days!==null&&days>=repurchaseWindow.minDays&&days<=repurchaseWindow.maxDays&&state.promotionEligibility!=='ineligible'
+            ?'ESTIMATE_ELIGIBLE':'INELIGIBLE';
       }
       // Like PromotionPublicService, an offer that is not running is never eligible.
       if(item.state!=='ACTIVE')item.eligibility='INELIGIBLE';
