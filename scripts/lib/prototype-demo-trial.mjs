@@ -113,8 +113,10 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   }
   function conversionOrder(orderNo,at,quote){
     const price=Number(cfg.trialPriceUSD),amount=quote.amountUsdt;
-    return {orderNo,productId:products.findIndex(product=>product.id===cfg.trialProductId)+1,productNo:cfg.trialProductId,productName:cfg.trialProductName,quantity:1,unitPriceUsdt:price,subtotalUsdt:price,discountUsdt:number(units(price)-units(amount)),amountUsdt:amount,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paymentMethod:'WALLET',placedAt:at,paidAt:at,activatedAt:at,orderType:'SINGLE',itemCount:1,dataCenter:'Singapore',
-      lineItems:[{sku:cfg.trialProductId,name:cfg.trialProductName,quantity:1,unitPriceUsdt:price,lineAmountUsdt:price}],
+    const productIndex=products.findIndex(product=>product.id===cfg.trialProductId);
+    const productName=products[productIndex].name;
+    return {orderNo,productId:productIndex+1,productNo:cfg.trialProductId,productName,trialClaimedDeviceName:cfg.trialProductName,quantity:1,unitPriceUsdt:price,subtotalUsdt:price,discountUsdt:number(units(price)-units(amount)),amountUsdt:amount,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paymentMethod:'WALLET',placedAt:at,paidAt:at,activatedAt:at,orderType:'SINGLE',itemCount:1,dataCenter:'Singapore',
+      lineItems:[{sku:cfg.trialProductId,name:productName,quantity:1,unitPriceUsdt:price,lineAmountUsdt:price}],
       trialSettlement:{settlementPolicy:quote.settlementPolicy,promoDiscountUsdt:quote.promoDiscountUsdt,offsetUsdt:quote.offsetUsdt,earlyDiscountUsdt:quote.earlyDiscountUsdt,rewardUsdt:quote.remainderUsdt,rewardNex:quote.rewardNex}};
   }
   const key=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
