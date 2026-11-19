@@ -369,6 +369,7 @@ async function submitOriginal() {
             if (networkPaused) state.pausedPaymentMethod = pending.paymentMethod ?? null;
             conclude(networkPaused ? 'networkPaused' : 'changed');
           }
+          else if (context && !context.current()) finish(null);
           else requote = true;
         }
       }
