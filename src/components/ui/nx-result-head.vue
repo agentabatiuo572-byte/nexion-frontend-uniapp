@@ -5,7 +5,8 @@
   Tone follows the status map (DS 03 §3.8): success = 已到账/已完成, warning = 等待/处理中/核对中,
   neutral = 已退回/已关闭, danger = 失败, brand = 下一步可继续. The icon defaults per tone.
   The title is the live status: it carries role=status and aria-live so a polled change is read out;
-  title-testid puts an e2e hook on it. The icon pops once when it mounts or changes; static under
+  title-testid puts an e2e hook on it. Pass :live="false" for a state the page already announces
+  another way (e.g. a toast with the same words), so one change is read out once. The icon pops once when it mounts or changes; static under
   reduced motion. Extra content (amount, note) goes in the default slot, centred under the line.
 -->
 <template>
@@ -20,20 +21,24 @@
         <template v-else><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></template>
       </svg>
     </view>
-    <text class="nx-result-head__title" role="status" aria-live="polite" aria-atomic="true" :data-testid="titleTestid">{{ title }}</text>
+    <text class="nx-result-head__title" :role="speaks ? 'status' : undefined" :aria-live="speaks ? 'polite' : undefined" :aria-atomic="speaks ? 'true' : undefined" :data-testid="titleTestid">{{ title }}</text>
     <text v-if="description" class="nx-result-head__desc">{{ description }}</text>
     <slot />
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 type Tone = "success" | "warning" | "neutral" | "danger" | "brand";
 type Icon = "check" | "return" | "clock" | "shield" | "failed" | "alert";
-const props = defineProps<{ tone: Tone; title: string; description?: string; icon?: Icon; titleTestid?: string }>();
+const props = withDefaults(defineProps<{ tone: Tone; title: string; description?: string; icon?: Icon; titleTestid?: string; live?: boolean }>(), { live: true });
 const toneIcon: Record<Tone, Icon> = { success: "check", warning: "clock", neutral: "return", danger: "failed", brand: "check" };
 const glyph = computed(() => props.icon ?? toneIcon[props.tone]);
+// The region turns live after it is shown, so appearing (often next to a toast) is not read out; later changes are.
+const armed = ref(false);
+onMounted(() => { armed.value = true; });
+const speaks = computed(() => props.live && armed.value);
 </script>
 
 <style scoped>

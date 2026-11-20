@@ -13,7 +13,7 @@
       </view>
 
       <template v-if="order">
-        <NxResultHead class="result-head" :tone="resultTone" :icon="outcome === 'held' ? 'shield' : undefined" :title="statusLabel" :description="c.resultNotes[outcome]" title-testid="bank-order-status" />
+        <NxResultHead class="result-head" :tone="resultTone" :icon="outcome === 'held' ? 'shield' : undefined" :title="statusLabel" :description="c.resultNotes[outcome]" title-testid="bank-order-status" :live="!terminal" />
         <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">VND</text></text></view>
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
@@ -565,9 +565,9 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .row > text:last-child { flex: none; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .row--code { align-items: center; }
 .money { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: 34px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.money__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
+.money__unit { margin-left: var(--v5-space-2); color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
 /* Result: centred head, then the amount; actions sit in the fixed bar. */
-.result-head { margin: 8px 0 4px; }
+.result-head { margin: var(--v5-space-2) 0 var(--v5-space-1); }
 .intent-code { max-width: 100%; color: inherit; }
 .consent { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 12px; line-height: 1.6; cursor: pointer; margin-bottom: 10px; }
 .checkbox { width: 20px; height: 20px; flex-shrink: 0; border: 1px solid var(--v5-border-strong); border-radius: 4px; display: flex; align-items: center; justify-content: center; }
