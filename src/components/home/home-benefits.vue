@@ -155,9 +155,9 @@ const trialPill = computed<[string, string]>(() => {
   if (canRestart.value) return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
   switch (trial.confirmedOfferState()) {
     case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim];
-    case "error": return [t.value.trial.entryUnavailable, t.value.trial.entryUnavailable];
+    case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable];
     case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut];
-    default: return [t.value.trial.entryChecking, t.value.trial.entryChecking];
+    default: return [copy.value.benefitTrialChecking, copy.value.benefitTrialChecking];
   }
 });
 const trialOfferAria = computed(() => capacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
@@ -246,7 +246,7 @@ function retryEligibility() {
 .hb-tag { display:inline-flex;align-items:center;box-sizing:border-box;height:24px;padding:0 8px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand);font:var(--ui-type-chip-weight) 12px/16px var(--font-v5);white-space:nowrap; }
 /* Brand liquid-glass S button (same fill override as the previous trial CTA); the whole card is the control. */
 .hb-pill { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent);--ui-button-ink:var(--v5-brand);--ui-button-solid:color-mix(in srgb,var(--v5-brand) 12%,var(--v5-surface));position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:32px;max-width:100%;padding:7px 14px;border-radius:var(--v5-radius-full);font:var(--ui-type-compact-button-weight) 13px/18px var(--font-v5);white-space:nowrap; }
-.hb-pill--muted { opacity:.5;white-space:normal;text-align:center;overflow-wrap:anywhere; }
+.hb-pill--muted { opacity:.5; }
 .hb-link { flex:none;display:inline-flex;align-items:center;min-height:44px;font:var(--ui-type-text-link-weight) 13px/18px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 
 /* Half offer card */
@@ -258,7 +258,8 @@ function retryEligibility() {
 .hb-half__main { flex:1;padding:4px 14px 12px; }
 .hb-half__amount { font-size:32px;line-height:38px; }
 .hb-half__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
-.hb-half__foot { display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;min-height:52px;padding:4px 10px 4px 14px; }
+/* Same as the wide trial footer: when the label and the pill do not fit side by side, the label goes above and the pill below, each on one line. */
+.hb-half__foot { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;box-sizing:border-box;min-height:52px;padding:4px 10px 4px 14px; }
 .hb-perf { position:relative;margin:0 14px;border-top:1px dashed var(--v5-border-strong); }
 .hb-perf::before,.hb-perf::after { content:"";position:absolute;top:-9px;box-sizing:content-box;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--hb-rim); }
 .hb-perf::before { left:-23px; }
@@ -318,7 +319,7 @@ function retryEligibility() {
   .hb-half__art { width:72px;height:72px; }
   .hb-half__art--device { width:108px;height:108px;margin:-26px 0 0 -18px; }
   .hb-half__main,.hb-half__foot { padding-left:12px; }
-  .hb-half__foot { gap:4px;padding-right:8px; }
+  .hb-half__foot { gap:6px 4px;padding-right:8px; }
   .hb-half__foot .hb-pill { padding-inline:11px; }
   .hb-half__amount,.hb-wv__amount { font-size:28px;line-height:34px; }
   .hb-wv__art { width:64px;height:64px;margin-left:4px; }
