@@ -72,7 +72,7 @@
                   <text class="bills-row__title">{{ typeLabel(b.type) }}</text>
                   <NxTag v-if="b.status !== 'posted'" :tone="b.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(b.status)" />
                 </view>
-                <!-- Memo and time flow together (two lines at most); a reference gets its own line, ellipsized in the middle. -->
+                <!-- Memo and time flow together and wrap; a reference gets its own line, ellipsized in the middle. -->
                 <view :class="b.memoKey === 'learningReward' || b.type === 'clawback' ? '' : 'bills-row__sub--line'" class="bills-row__sub">
                   <text class="bills-row__memo">{{ billMemo(b) }}</text>
                   <text class="bills-row__dot"> · {{ fmtClock(b.ts) }}</text>
@@ -528,8 +528,8 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-row--clawback .bills-row__balance { text-align:right; }
 .bills-row__sub { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 /* uni-text sets white-space: pre-line on itself, so a nowrap parent alone does not keep the line whole. */
-/* Memo and time flow as one text: up to two lines, then ellipsis (the opened bill shows the rest). */
-.bills-row__sub--line { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:break-word; }
+/* Memo and time flow as one text and wrap by word, so the time is never cut off. */
+.bills-row__sub--line { display:block;overflow-wrap:break-word; }
 .bills-row__sub--line > .bills-row__dot { white-space:pre-wrap; }
 .bills-row__figure { display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:var(--v5-space-1); }
 .bills-row__amount { display:flex;align-items:baseline;gap:var(--v5-space-1);font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink); }
