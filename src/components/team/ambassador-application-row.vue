@@ -5,7 +5,7 @@
     <AmbassadorBucketIcon :bucket="application.bucket" />
     <view class="amb-row__titles">
       <text class="amb-row__title">{{ application.city }}</text>
-      <text class="amb-row__meta">{{ bucketTitle }} · {{ fmt(c.eventOn, { date: application.eventDate ?? '—' }) }}</text>
+      <text class="amb-row__meta">{{ bucketTitle }} · <text class="amb-row__date">{{ fmt(c.eventOn, { date: application.eventDate ?? '—' }) }}</text></text>
     </view>
     <view class="amb-row__side">
       <AmbassadorAmount :value="application.budgetUsdt" />
@@ -43,7 +43,8 @@ function open() { if (props.application.applicationId) void navTo(AMBASSADOR_ROU
 .amb-row__titles { flex: 1; min-width: 0; }
 .amb-row__title, .amb-row__meta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .amb-row__title { font: var(--ui-type-list-title-weight, 500) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
-/* The support type and event date wrap instead of being cut; the row opens the full application. */
+/* The support type and event date wrap instead of being cut (the row opens the full application); the date itself stays on one line. */
+.amb-row__date { white-space: nowrap; }
 .amb-row__meta { white-space: normal; overflow-wrap: break-word; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .amb-row__side { flex: 0 1 auto; min-width: 0; max-width: 60%; display: flex; flex-direction: column; align-items: flex-end; text-align: end; }
 .amb-row__status { margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }

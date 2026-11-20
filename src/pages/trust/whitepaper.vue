@@ -128,7 +128,7 @@ useAutoRecovery({ failed: () => status.value === "error", retry: refresh });
 /* Side by side while the details fit beside the link in two lines; otherwise the details take the full width and the link drops to the bottom-right. */
 .wp-publisher { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--v5-space-3); padding: var(--v5-space-4); border-radius: var(--v5-radius-l); background: var(--v5-surface); }
 .wp-publisher__icon { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; border-radius: var(--v5-radius-s); background: var(--v5-brand-soft); color: var(--v5-brand); }
-.wp-publisher__copy { flex: 1 1 150px; }
+.wp-publisher__copy { flex: 1 1 165px; }
 .wp-publisher__link { display: inline-flex; align-items: center; margin-left: auto; white-space: nowrap; min-height: 44px; font: 600 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
 .wp-publisher__link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .wp-footnote { text-align: center; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
