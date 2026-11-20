@@ -183,12 +183,12 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   const { withdrawals } = facts;
   if(state.accountDeletionState==='withdrawal-error'&&p==='/api/withdrawals')refuse(503,'DEMO_WITHDRAWAL_READ_UNAVAILABLE');
   if(p==='/api/withdrawals')return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawals,page:{pageNum:1,pageSize:50,total:withdrawals.length,hasMore:false}};
-  if (p.startsWith('/api/withdrawals/WD-B34-DEMO-')) {
-    const withdrawal = withdrawals.find(row => row.withdrawalNo === p.split('/').pop());
+  const order = p.match(/^\/api\/withdrawals\/(WD-(?:B34-DEMO-[^/]*|DEMO-?\d+|[A-F0-9]{32}))$/);
+  if (order) {
+    const withdrawal = withdrawals.find(row => row.withdrawalNo === order[1]);
     if (!withdrawal) refuse(404, 'WITHDRAWAL_NOT_FOUND');
     return { source: 'nx_withdrawal_order', sourceEnvironment: 'PRODUCTION', withdrawal };
   }
-  if(/^\/api\/withdrawals\/WD-(?:DEMO-?\d+|[A-F0-9]{32})$/.test(p))return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawal:withdrawals.find(row=>row.withdrawalNo===p.split('/').pop())};
   if (p === "/api/withdrawals/policy") return demoWithdrawalPolicy(state, facts);
   if (p === "/api/withdrawals/eligibility") {
     const input = method === 'GET' ? Object.fromEntries(url.searchParams) : request.postDataJSON();

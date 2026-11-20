@@ -46,17 +46,38 @@ export function demoBatchPage(params, batches) {
   return {...proof,records,nextCursor:rows.length>boundary+1+limit?records.at(-1).batchNo:null};
 }
 
-// The panel's terminal result applies to every withdrawal read, not just the bank detail page.
-export function settleDemoBankWithdrawals(state) {
-  if (!['settled', 'rejected'].includes(state.bankState)) return;
+// Advance the same order facts for the bank detail, quote recovery, config and tracking reads.
+export function updateDemoBankWithdrawals(state, now) {
   for (const row of Object.values(state.bankDemo?.orders ?? {})) {
-    if (row.outcome) continue;
-    row.outcome = state.bankState;
-    // Once ended, keep that outcome and return a rejected withdrawal's reserve exactly once.
-    if (row.outcome === 'rejected') {
-      postDemoWalletEntries(state, { bizNo: row.withdrawalNo + ':PAYOUT:USDT:REFUND',
-        bizType: 'WITHDRAW_PAYOUT_REFUND', asset: 'USDT', direction: 'IN', amount: row.bank.amountUsdt,
-        at: Date.now(), category: 'withdraw' });
+    if (row.settlementEvidence) continue;
+    const ready = row.providerState === 'READY';
+    if (state.bankState === 'review') {
+      if (ready) row.withdrawal.status = 'REVIEW_PENDING';
+      continue;
+    }
+    const paid = state.bankState === 'settled', refunded = state.bankState === 'rejected';
+    if (paid || refunded) {
+      const d2Refund = ready && refunded;
+      const evidenceRef = d2Refund ? 'D2-REFUND-' + row.withdrawalNo : 'DEMO-' + row.withdrawalNo;
+      if (refunded) {
+        postDemoWalletEntries(state, {
+          bizNo: d2Refund ? evidenceRef : row.withdrawalNo + ':PAYOUT:USDT:REFUND',
+          bizType: d2Refund ? 'WITHDRAW_REFUND' : 'WITHDRAW_PAYOUT_REFUND',
+          asset: 'USDT', direction: 'IN', amount: row.bank.amountUsdt, at: now, category: 'withdraw',
+        });
+      }
+      row.providerState = paid ? 'PAID' : d2Refund ? 'READY' : 'FAILED';
+      row.withdrawal.status = paid ? 'CONFIRMED' : d2Refund ? 'REFUNDED' : 'FAILED';
+      row.settlementEvidence = { status: paid ? 'paid' : 'refunded', evidenceRef,
+        providerOrderId: d2Refund ? null : 'DEMO-PROVIDER-' + row.withdrawalNo,
+        providerStatus: paid ? 3 : d2Refund ? null : 5,
+        checkedAt: new Date(now).toISOString(), amountUsdt: row.bank.amountUsdt };
+    } else if (state.bankState === 'held') {
+      row.providerState = 'MANUAL_REVIEW';
+      row.withdrawal.status = 'TX_ORPHANED';
+    } else if (ready) {
+      row.providerState = 'DISPATCHING';
+      row.withdrawal.status = 'PROCESSING';
     }
   }
 }
@@ -65,10 +86,9 @@ export function settleDemoBankWithdrawals(state) {
 export function demoBankWithdrawalIntent(state, now) {
   const demo = state.bankDemo;
   if (!demo) return null;
-  settleDemoBankWithdrawals(state);
   const active = Object.values(demo.quotes).filter(row => !row.abandoned && !row.order && Date.parse(row.quote.expiresAt) > now);
   const intents = active.map(({ quote }) => ({ state: 'NOT_SUBMITTED', quoteNo: quote.quoteNo, withdrawalNo: null, expiresAt: quote.expiresAt, providerState: null }));
-  intents.push(...Object.values(demo.orders).filter(row => !row.outcome).map(row => ({
+  intents.push(...Object.values(demo.orders).filter(row => !row.settlementEvidence).map(row => ({
     state: 'COMMITTED', quoteNo: row.bank.quoteNo, withdrawalNo: row.withdrawalNo,
     expiresAt: row.bank.expiresAt, providerState: row.providerState,
   })));
@@ -78,7 +98,6 @@ export function demoBankWithdrawalIntent(state, now) {
 }
 
 export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUser(state)) {
-  settleDemoBankWithdrawals(state);
   const sampleAt = state.withdrawalSamplesAt ??= now;
   const history = demoDeletionHistory(state);
   // A rejected reserve that was returned is REFUNDED. Keep the original fee and net quote.
@@ -97,7 +116,7 @@ export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUs
   }));
   const bankRows = Object.values(state.bankDemo?.orders ?? {}).map(row => ({
     withdrawalNo: row.withdrawalNo, targetAddress: 'BANK-VND:' + row.beneficiaryNo, amount: row.bank.amountUsdt,
-    chain: 'BANK-VND', status: row.outcome === 'settled' ? 'CONFIRMED' : row.outcome === 'rejected' ? 'REFUNDED' : 'PROCESSING',
+    chain: 'BANK-VND', status: row.withdrawal.status,
     holdUntil: new Date(row.createdAt).toISOString(), createdAt: new Date(row.createdAt).toISOString(),
     networkConfirmUsd: row.bank.feeUsdt, networkFee: row.bank.feeUsdt, penaltyFee: 0, grossFee: row.bank.feeUsdt,
     nexBurned: 0, feeWaived: 0, actualFee: row.bank.feeUsdt, netReceive: row.bank.netUsdt,
@@ -152,7 +171,13 @@ export function secondaryDemo(url,state,request,walletBills){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
-    const items=demoSettledTasks(state,state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['Image generation','Language inference','Video generation'][i],proofHash:String(i+1).repeat(64)}));
+    const items=demoSettledTasks(state,state.previewFactsAt??now).map((task,i)=>({...proof,
+      receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,
+      rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,
+      startedAt:task.completedAt-task.durationSec*1000,durationSec:task.durationSec,deviceId:task.deviceId,
+      deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,
+      taskId:'demo-'+task.taskClass.toLowerCase(),taskName:task.taskName,...task.simulation,
+      proofHash:task.simulation?null:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts')return demoReceiptPage(url.searchParams,items);
     const receipt=items.find(r=>r.receiptNo===p.split('/').pop());
     if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});

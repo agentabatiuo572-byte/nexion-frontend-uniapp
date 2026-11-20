@@ -14,11 +14,32 @@ const reward=row=>row.direction==='IN'&&row.amount>0&&!(row.bizType==='TEAM_COMM
 
 export function demoSettledTasks(state,at) {
   if(!demoHasEarningsHistory(state))return [];
+  if(state.deviceTaskSampleState==='long') {
+    return [
+      ['LL','language inference - structured knowledge extraction','0.029745'],
+      ['IG','image gen - watercolor garden concept','0.029234'],
+      ['EM','embedding - digital passage retrieval','0.018296'],
+      ['VG','video gen - digital weather animation','0.024993'],
+      ['SP','speech processing - cinematic interview notes','0.025376'],
+      ['EM','embedding - digital passage retrieval','0.019308'],
+      ['FT','fine tuning - compact summary adaptation','0.007892'],
+      ['VG','video gen - digital weather animation','0.025009'],
+      ['VG','video gen - digital weather animation','0.024729'],
+      ['SP','speech processing - cinematic interview notes','123.011586'],
+    ].map(([taskClass,taskName,rewardAmount],index)=>{
+      const completedAt=at-(index+1)*420000;
+      return {taskNo:'DEMO-TASK-'+(10+index),receiptNo:'DEMO-RECEIPT-L'+index,batchNo:'DEMO-BATCH-L'+index,
+        deviceId:41,taskClass,taskName,amount:Number(rewardAmount),nex:0,completedAt,postedAt:completedAt+60000,
+        durationSec:300,client:'Demo Studio',model:'SDXL',simulation:{executionMode:'SIMULATED',proofKind:'TASK_RECEIPT',
+          modelExecuted:false,rewardAsset:'USDT',rewardAmount}};
+    });
+  }
   return [['IG',2.34],['LL',8.5],['VG',5.4]].map(([taskClass,amount],index)=>{
     const completedAt=at-(index+1)*3600000;
     return {taskNo:'DEMO-TASK-'+(index+1),receiptNo:'DEMO-RECEIPT-'+(index+1),
       batchNo:index<2?'DEMO-BATCH-'+(index+1):null,deviceId:41,taskClass,amount,
-      nex:0,completedAt,postedAt:completedAt+600000,
+      nex:0,completedAt,postedAt:completedAt+600000,durationSec:600,
+      taskName:['Image generation','Language inference','Video generation'][index],
       client:'Demo Studio',model:['SDXL','Llama 3.1','Video generation'][index]};
   });
 }

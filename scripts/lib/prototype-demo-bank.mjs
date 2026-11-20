@@ -2,7 +2,7 @@ import { postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
-import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, settleDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
+import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, updateDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
 import { demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
 
 const DAY = 86400000;
@@ -40,16 +40,10 @@ export function bankDemo(url, state, request) {
     const base = secondaryDemo(new URL('/api/withdrawals/bank/config', url.origin), state, { method: () => 'GET' });
     return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: demoBankWithdrawalIntent(state, now) };
   };
-  const orderView = row => {
-    settleDemoBankWithdrawals(state);
-    const settled = row.outcome === 'settled', rejected = row.outcome === 'rejected';
-    // Open orders follow the panel live: review = queued before dispatch, held = manual review.
-    const review = !row.outcome && state.bankState === 'review', held = !row.outcome && state.bankState === 'held';
-    // The refund option models a D2 refund before dispatch (READY + REFUNDED + refund proof).
-    return { ...snapshot(row), providerState: settled ? 'PAID' : rejected || review ? 'READY' : held ? 'MANUAL_REVIEW' : 'PENDING',
-      withdrawal: { ...row.withdrawal, status: settled ? 'CONFIRMED' : rejected ? 'REFUNDED' : review ? 'REVIEW_PENDING' : 'PROCESSING' },
-      settlementEvidence: { status: settled ? 'paid' : rejected ? 'refunded' : held ? 'review_required' : 'unconfirmed', evidenceRef: settled || rejected ? 'DEMO-' + row.withdrawalNo : null, providerOrderId: settled ? 'DEMO-PROVIDER-' + row.withdrawalNo : null, providerStatus: settled ? 3 : null, checkedAt: new Date(now).toISOString(), amountUsdt: row.bank.amountUsdt } };
-  };
+  const orderView = row => snapshot({ ...row, settlementEvidence: row.settlementEvidence ?? {
+    status: row.providerState === 'MANUAL_REVIEW' ? 'review_required' : 'unconfirmed',
+    evidenceRef: null, providerOrderId: null, providerStatus: null, checkedAt: null, amountUsdt: null,
+  } });
   if (path === '/api/withdrawals/bank/config' && method === 'GET') return config();
   if (path === '/api/withdrawals/bank/beneficiary/otp' && method === 'POST') return challenge('bank');
   if (path === '/api/withdrawals/bank/beneficiary' && method === 'POST') return command('bind', () => {
@@ -75,7 +69,7 @@ export function bankDemo(url, state, request) {
   if (quoteMatch) {
     const row = demo.quotes[quoteMatch[1]];
     if (!row) fail('BANK_QUOTE_NOT_FOUND', 404);
-    if (row.order) return orderView(row.order);
+    if (row.order) return orderView(demo.orders[row.order.withdrawalNo]);
     if (!row.abandoned && Date.parse(row.quote.expiresAt) <= now) return { state: 'EXPIRED' };
     if (quoteMatch[2] && method === 'POST') row.abandoned = true;
     if (row.abandoned) return { state: 'ABANDONED' };
@@ -87,7 +81,7 @@ export function bankDemo(url, state, request) {
     const receipt = command('withdraw', () => {
       const row = demo.quotes[quoteNo];
       if (!row) fail('BANK_QUOTE_NOT_FOUND', 404);
-      if (row.order) return orderView(row.order);
+      if (row.order) return orderView(demo.orders[row.order.withdrawalNo]);
       if (row.abandoned) fail('BANK_QUOTE_ABANDONED');
       if (Date.parse(row.quote.expiresAt) <= now) fail('BANK_QUOTE_EXPIRED');
       const intent = demoBankWithdrawalIntent(state, now);
@@ -102,8 +96,9 @@ export function bankDemo(url, state, request) {
       postDemoWalletEntries(state,
         { ...reserve, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', amount: row.quote.netUsdt },
         { ...reserve, bizNo: withdrawalNo + ':USDT:BANK_FEE', bizType: 'WITHDRAW_BANK_FEE', amount: row.quote.feeUsdt });
-      row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo: config().beneficiary.beneficiaryNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
+      row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo: config().beneficiary.beneficiaryNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'REVIEW_PASSED' }, providerState: 'READY', bank: snapshot(row.quote) };
       demo.orders[withdrawalNo] = row.order;
+      updateDemoBankWithdrawals(state, now);
       return orderView(row.order);
     });
     return orderView(demo.orders[receipt.withdrawalNo]);
