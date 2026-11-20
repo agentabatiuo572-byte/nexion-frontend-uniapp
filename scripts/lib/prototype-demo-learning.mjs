@@ -1,9 +1,21 @@
 // Loopback simulation only. Question answers and rewards below are illustrative.
 import { createHash } from 'node:crypto';
 import { fixture } from './design-review-fixture.mjs';
+import { demoHasEarningsHistory } from './prototype-demo-wallet.mjs';
 const proof = { serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '' };
+const prefix = '/api/content/learning/courses';
+const longBillCourseId = 'review-course-1';
+const hasLongBillCourse = state => state.billRefsState === 'long-refs' && demoHasEarningsHistory(state);
+
+export function demoLongLearningBill(url, state) {
+  if (!hasLongBillCourse(state)) return null;
+  const course = learningDemo(new URL(prefix + '/' + longBillCourseId, url.origin), state);
+  const userId = state.authUser?.userId ?? 900001;
+  return [`LEARN:${userId}:${course.id}:${course.version}`, 'UVT', 'IN', course.rewardNex,
+    'LEARNING_REWARD', 'bonus', state.previewFactsAt - 3600000];
+}
+
 export function learningDemo(url, state, request) {
-  const prefix = '/api/content/learning/courses';
   if (!url.pathname.startsWith(prefix)) return undefined;
   const locale = (url.searchParams.get('language')?.trim() || 'vi').toLowerCase().split('-')[0];
   const overview = fixture(new URL(prefix, url.origin), locale, state, request);
@@ -14,6 +26,10 @@ export function learningDemo(url, state, request) {
   ];
   const publishedCourses = state.dataState === 'empty' ? [] : overview.courses.map(course => {
     const result = state.learningResults?.[course.id];
+    if (course.id === longBillCourseId && hasLongBillCourse(state)) {
+      return { ...course, attempts: Math.max(1, result?.attempts ?? course.attempts), lastScore: result?.score ?? 100,
+        completed: true, rewardGranted: true, progress: 100 };
+    }
     return { ...course, ...(course.id === 'review-course-3' ? { questions, body: zh ? '登录验证码仅供本人使用，请勿转发。定期检查账户安全中的已登录设备；发现陌生设备时，退出该设备并检查账户信息。' : vi ? 'Mã xác minh chỉ dành cho bạn; không chia sẻ. Thường xuyên kiểm tra thiết bị đã đăng nhập trong phần bảo mật. Nếu thấy thiết bị lạ, hãy đăng xuất thiết bị đó và kiểm tra tài khoản.' : 'Keep verification codes private. Review signed-in devices in account security. If you notice an unfamiliar device, sign it out and check your account information.' } : {}), ...(result ? { attempts: result.attempts, lastScore: result.score, completed: result.completed, rewardGranted: result.rewardGranted, progress: result.completed ? 100 : 25 } : {}) };
   });
   const courses = publishedCourses.filter(course => course.title?.trim() && course.body?.trim()
@@ -21,7 +37,7 @@ export function learningDemo(url, state, request) {
       && item.options.every(option => option.trim())));
   if (url.pathname === prefix) return { ...overview, courses, totalCourses: courses.length,
     completedCourses: courses.filter(course => course.completed).length,
-    earnedNex: state.dataState === 'empty' ? 0 : overview.earnedNex };
+    earnedNex: courses.reduce((total, course) => total + (course.rewardGranted ? course.rewardNex : 0), 0) };
   const match = url.pathname.match(/^\/api\/content\/learning\/courses\/([^/]+)(?:\/(start|complete|quiz)(?:\/receipts\/(.+))?)?$/);
   if (!match) return undefined;
   const [, encodedId, action, receiptKey] = match;

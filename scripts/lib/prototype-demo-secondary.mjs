@@ -70,6 +70,16 @@ export function restoreDemoBankWithdrawals(state, now) {
       recordDemoBankSettlement(row, { paid: false, evidenceRef: refund?.bizNo ?? row.withdrawalNo,
         at: refund?.at ?? now, providerProof: Boolean(refund) });
     } else {
+      // Old orders kept PENDING/PROCESSING in storage and projected the panel's live stage on reads.
+      if (row.providerState === 'PENDING' && row.withdrawal?.status === 'PROCESSING') {
+        if (state.bankState === 'held') {
+          row.providerState = 'MANUAL_REVIEW';
+          row.withdrawal.status = 'TX_ORPHANED';
+        } else if (state.bankState === 'review') {
+          row.providerState = 'READY';
+          row.withdrawal.status = 'REVIEW_PENDING';
+        }
+      }
       continue;
     }
     delete row.outcome;
