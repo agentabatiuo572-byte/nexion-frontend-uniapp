@@ -2,7 +2,7 @@ import { postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
-import { demoWithdrawalFacts, demoWithdrawals, secondaryDemo, settleDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
+import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, settleDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
 import { demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
 
 const DAY = 86400000;
@@ -37,22 +37,9 @@ export function bankDemo(url, state, request) {
     const challenge = demo[type + 'Otp'];
     if (!challenge || challenge.expiresAt <= now || input().challengeNo !== challenge.challengeNo || input().code !== '123456') fail(type === 'address' ? 'PAYOUT_ADDRESS_OTP_INVALID' : 'OTP_INVALID', type === 'address' ? 422 : 400);
   };
-  // BankWithdrawalService.currentIntent: live quotes and orders without settlement proof share one gate.
-  const currentIntent = () => {
-    settleDemoBankWithdrawals(state);
-    const active = Object.values(demo.quotes).filter(row => !row.abandoned && !row.order && Date.parse(row.quote.expiresAt) > now);
-    const intents = active.map(({ quote }) => ({ state: 'NOT_SUBMITTED', quoteNo: quote.quoteNo, withdrawalNo: null, expiresAt: quote.expiresAt, providerState: null }));
-    intents.push(...Object.values(demo.orders).filter(row => !row.outcome).map(row => ({
-      state: 'COMMITTED', quoteNo: row.bank.quoteNo, withdrawalNo: row.withdrawalNo,
-      expiresAt: row.bank.expiresAt, providerState: row.providerState,
-    })));
-    const single = intents.length === 1 ? intents[0] : null;
-    return !intents.length ? null : { state: single?.state ?? 'MULTIPLE', intents,
-      quoteNo: single?.quoteNo ?? null, withdrawalNo: single?.withdrawalNo ?? null };
-  };
   const config = () => {
     const base = secondaryDemo(new URL('/api/withdrawals/bank/config', url.origin), state, { method: () => 'GET' });
-    return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: currentIntent() };
+    return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: demoBankWithdrawalIntent(state, now) };
   };
   const orderView = row => {
     settleDemoBankWithdrawals(state);
@@ -73,7 +60,7 @@ export function bankDemo(url, state, request) {
     return { beneficiary: snapshot(demo.beneficiary) };
   });
   if (path === '/api/withdrawals/bank/quotes' && method === 'POST') {
-    if (currentIntent()) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
+    if (demoBankWithdrawalIntent(state, now)) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
     const bank = config().beneficiary, amountUsdt = Number(input().amountUsdt);
     const { policy, capacity } = config();
     if (!bank?.canWithdraw || !Number.isFinite(amountUsdt) || amountUsdt < policy.minAmountUsd || amountUsdt > policy.maxAmountUsd || amountUsdt > capacity.maxWithdrawableUsdt) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
@@ -102,7 +89,7 @@ export function bankDemo(url, state, request) {
       if (row.order) return orderView(row.order);
       if (row.abandoned) fail('BANK_QUOTE_ABANDONED');
       if (Date.parse(row.quote.expiresAt) <= now) fail('BANK_QUOTE_EXPIRED');
-      const intent = currentIntent();
+      const intent = demoBankWithdrawalIntent(state, now);
       if (intent?.state !== 'NOT_SUBMITTED' || intent.quoteNo !== quoteNo) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
       // AppWithdrawalService.reserveBank: one daily count with USDT withdrawals, and the funds leave the wallet here.
       const facts = demoWithdrawalFacts(state, now);

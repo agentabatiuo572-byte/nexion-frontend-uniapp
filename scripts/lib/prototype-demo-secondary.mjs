@@ -60,7 +60,23 @@ export function settleDemoBankWithdrawals(state) {
     }
   }
 }
-export function demoWithdrawals(state, now = Date.now()) {
+// BankWithdrawalService.currentIntent: live quotes and orders without settlement proof share one gate.
+export function demoBankWithdrawalIntent(state, now) {
+  const demo = state.bankDemo;
+  if (!demo) return null;
+  settleDemoBankWithdrawals(state);
+  const active = Object.values(demo.quotes).filter(row => !row.abandoned && !row.order && Date.parse(row.quote.expiresAt) > now);
+  const intents = active.map(({ quote }) => ({ state: 'NOT_SUBMITTED', quoteNo: quote.quoteNo, withdrawalNo: null, expiresAt: quote.expiresAt, providerState: null }));
+  intents.push(...Object.values(demo.orders).filter(row => !row.outcome).map(row => ({
+    state: 'COMMITTED', quoteNo: row.bank.quoteNo, withdrawalNo: row.withdrawalNo,
+    expiresAt: row.bank.expiresAt, providerState: row.providerState,
+  })));
+  const single = intents.length === 1 ? intents[0] : null;
+  return !intents.length ? null : { state: single?.state ?? 'MULTIPLE', intents,
+    quoteNo: single?.quoteNo ?? null, withdrawalNo: single?.withdrawalNo ?? null };
+}
+
+export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUser(state)) {
   settleDemoBankWithdrawals(state);
   const sampleAt = state.withdrawalSamplesAt ??= now;
   const history = demoDeletionHistory(state);
@@ -87,7 +103,7 @@ export function demoWithdrawals(state, now = Date.now()) {
     nexBurned: 0, feeWaived: 0, actualFee: row.bank.feeUsdt, netReceive: row.bank.netUsdt,
     policyVersion: 'money-policy', useNexFeeOffset: false, riskRoute: 'fast-pass', idSource: 'server',
   }));
-  return [...bankRows, ...chainRows];
+  return [...Object.values(state.withdrawalOrders?.[user] ?? {}), ...bankRows, ...chainRows];
 }
 
 export function demoWithdrawalUser(state, headers) {
@@ -96,24 +112,17 @@ export function demoWithdrawalUser(state, headers) {
   return state.authUser?.userId ?? 900001;
 }
 
-export function demoRecoveryOrders(state, headers) {
-  const user = demoWithdrawalUser(state, headers);
-  return Object.values(state.withdrawRecoveryDemo?.[user] ?? {})
-    .filter(attempt => attempt.order)
-    .map(attempt => attempt.order);
-}
-
 // One rule for every withdrawal read (EarningsReleaseService.withdrawableAmount, AppWithdrawalService.maximumWithdrawable
 // and bankCapacity): every earnings bucket is credited to the wallet, so pending and locked amounts sit inside the balance
 // and come off it before the ratio. USDT and bank withdrawals are rows of one table, so they share one daily count.
-export function demoWithdrawalFacts(state,now=Date.now()){
-  const withdrawals=demoWithdrawals(state,now);
+export function demoWithdrawalFacts(state,now=Date.now(),user=demoWithdrawalUser(state)){
+  const withdrawals=demoWithdrawals(state,now,user);
   const wallet=accountDeletionWallet(state);
   const empty=state.dataState==='empty',walletUsdt=wallet?.usdtAvailable??(empty?0:state.walletBalance??52800.64),pendingReview=wallet||empty?0:12.5,bonusLocked=wallet||empty?0:50,balanceMaxRatio=1,dailyLimitCount=state.withdrawLimitState==='used'?1:2;
   const released=Math.max(0,Math.round((walletUsdt-pendingReview-bonusLocked)*1e6)/1e6);
   // WithdrawalDayWindow: Vietnam UTC+7 midnight, with an inclusive start and exclusive end.
   const start=Math.floor((now+7*3600000)/day)*day-7*3600000,dailyCountResetAt=start+day;
-  const used=[...withdrawals, ...demoRecoveryOrders(state)].filter(row=>{
+  const used=withdrawals.filter(row=>{
     const createdAt=Date.parse(row.createdAt);
     return createdAt>=start&&createdAt<dailyCountResetAt;
   }).length;

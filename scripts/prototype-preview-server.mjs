@@ -2,7 +2,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
-import { handlesWithdrawalRecovery, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
+import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
@@ -26,6 +26,7 @@ if(process.env.DEMO_STATE_FILE){
 const authDemo=createAuthDemo(state);
 const startedAt=Date.now();
 if(process.env.DEMO_STATE_FILE){
+  restoreDemoWithdrawalOrders(state);
   initializeDemoH4State(state,startedAt);
   initializeLegacyStreakSavers(state);
   if(state.computeTaskSnapshots)state.computeResumeAt=startedAt;
@@ -156,7 +157,7 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode())!==accountPayment(wasPaymentMode);
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -268,7 +269,7 @@ const server=http.createServer(async(req,res)=>{
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
       }
       if(url.pathname==='/auth/users/refresh')return sendJson(res,{code:0,message:'OK',data:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:{userId:900001,countryCode:'+86',phone:'13800000000',nickname:'Alex',onboardingComplete:true}}});
-      const recoveryRequest = handlesWithdrawalRecovery(state, url.pathname, req.method, req.headers);
+      const withdrawalRequest = handlesWithdrawalRequest(url.pathname, req.method);
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
       const modeledBankTopup=req.method==='POST'&&/^\/api\/app\/deposits\/vietqr\/intents(?:\/[^/]+\/cancel)?$/.test(url.pathname);
       const bankTopupEndpoint=/^\/api\/app\/(payments\/(config|fx-quote)|deposits\/vietqr\/(receipts|intents(?:\/[^/]+(?:\/cancel)?)?))$/.test(url.pathname);
@@ -277,7 +278,7 @@ const server=http.createServer(async(req,res)=>{
       const computeWrite=req.method==='POST'&&url.pathname==='/api/tasks/simulated/stop';
       const trialWrite=req.method==='POST'&&/^\/api\/trial\/(start|cancel|convert)$/.test(url.pathname);
       const conversationDelete=req.method==='DELETE'&&/^\/api\/app\/support\/conversations\/DEMO-SUPPORT-\d+$/.test(url.pathname);
-      if(req.method!=='GET'&&!realtimeTicket&&!trialWrite&&!computeWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!recoveryRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
+      if(req.method!=='GET'&&!realtimeTicket&&!trialWrite&&!computeWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
       const businessRead=req.method==='GET'&&/^\/api\/(config\/(platform|v-rank|exchange|repurchase|staking|commission)|store\/(catalog|purchase-eligibility)|team\/(rank|binary)|app\/(team|payments|deposits|home\/overview|proof|network|security|support|developer)|content\/(learning|trust|how-it-works|i18n)|quests\/state|events|points\/state|devices\/earnings|exchange|repurchase|withdrawals|payout-addresses|deposits|notifications|goals|promotions|promotion-rewards|tasks|payment-methods|developer|public\/referrals|legal\/(privacy|risk)|staking|stakes)/.test(url.pathname);
       if(bankTopupEndpoint&&state.dataState==='error')return sendJson(res,{code:503,message:url.pathname.endsWith('/config')?'PAYMENT_CONFIG_UNAVAILABLE':url.pathname.endsWith('/fx-quote')?'FX_QUOTE_UNAVAILABLE':'VIETQR_RUNTIME_PROFILE_INVALID',data:null},503);
       if(businessRead&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
@@ -300,7 +301,7 @@ const server=http.createServer(async(req,res)=>{
       }
       let body='';for await(const chunk of req)body+=chunk;
       if(staleWrite())return refuseStale();
-      if (recoveryRequest) {
+      if (withdrawalRequest) {
         const response = withdrawalRecoveryResponse(state, url.pathname, req.method, req.headers, JSON.parse(body || '{}'));
         return sendJson(res, response.body, response.status);
       }

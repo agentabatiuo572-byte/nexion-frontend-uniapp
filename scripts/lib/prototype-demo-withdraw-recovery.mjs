@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { demoWithdrawalEligibility, demoWithdrawalPolicy, demoWithdrawalRisk } from './prototype-demo-finance.mjs';
+import { demoWithdrawalPolicy, seedDemoConfirmedWithdrawal, submitDemoWithdrawal } from './prototype-demo-finance.mjs';
 import { demoWithdrawalFacts, demoWithdrawalUser } from './prototype-demo-secondary.mjs';
-import { demoWalletNex, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 
 export const withdrawRecoveryOptions = [
   ['off', '未载入尝试'],
@@ -16,7 +15,6 @@ const demoAttemptPrefix = 'withdrawal:b34-demo-';
 const attemptRoute = /^\/api\/withdrawals\/attempts\/([^/]+)(\/abandon)?$/;
 const ok = data => ({ status: 200, body: { code: 0, message: 'OK', data } });
 const fail = (status, message, data = null) => ({ status, body: { code: status, message, data } });
-const day = 86400000;
 const money = amount => Number(amount.toFixed(6));
 
 function saveAttempt(state, user, attempt) {
@@ -41,48 +39,16 @@ function readKey(segment) {
   }
 }
 
-function createReceipt(attempt, policy, createdAt, nexAvailable) {
-  const { amount, network: chain, policyVersion, offset: useNexFeeOffset } = attempt.frozen;
-  const feeKey = chain.split('-')[1].toLowerCase();
-  const networkFee = policy.networkConfirmFeeUsd[feeKey];
-  const nexBurned = useNexFeeOffset ? Math.min(nexAvailable, Math.ceil(networkFee / policy.nexFeeOffsetRate)) : 0;
-  const feeWaived = Math.floor(nexBurned * policy.nexFeeOffsetRate * 1e6) / 1e6;
-  const actualFee = money(networkFee - feeWaived);
-  const { fastLaneApplied, strongReview, ...risk } = demoWithdrawalRisk(policy, chain, amount);
-  const holdDays = chain === 'USDT-TRC20' ? policy.cooldownDays : risk.complianceHoldDays;
-  const holdAt = createdAt + holdDays * day;
-  return {
-    withdrawalNo: attempt.withdrawalNo, amount, chain,
-    status: fastLaneApplied || risk.complianceHoldApplies ? 'EXTENDED_HOLD' : 'REVIEW_PENDING',
-    holdUntil: new Date(holdAt).toISOString(),
-    payoutDueAt: new Date(holdAt + policy.payoutSlaHours * 3600000).toISOString(),
-    networkConfirmUsd: networkFee, networkFee, penaltyFeeRate: 0, penaltyFee: 0, grossFee: networkFee,
-    nexBurned, feeWaived, penaltyFeeWaived: 0, networkFeeWaived: feeWaived,
-    actualPenaltyFee: 0, actualNetworkFee: actualFee, actualFee, netReceive: money(amount - actualFee),
-    policyVersion, useNexFeeOffset, ...risk, strongReview, strongReviewRequired: strongReview,
-    riskRoute: fastLaneApplied ? 'fast-pass' : strongReview ? 'strong-review' : 'manual',
-    k3RiskRoute: 'pass', k4Priority: 'low', riskRuleId: null, idSource: 'server',
-  };
-}
-
-function commit(attempt, receipt, createdAt, confirmedAt = null) {
-  attempt.receipt = receipt;
-  attempt.order = {
-    ...receipt, targetAddress: attempt.frozen.address, createdAt: new Date(createdAt).toISOString(), confirmedAt,
-    status: confirmedAt ? 'CONFIRMED' : receipt.status,
-  };
-  attempt.state = 'COMMITTED';
-}
-
-function reserve(state, receipt, at) {
-  const { withdrawalNo, netReceive, actualNetworkFee, nexBurned } = receipt;
-  const debit = { direction: 'OUT', at, category: 'withdraw' };
-  postDemoWalletEntries(state,
-    { ...debit, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', asset: 'USDT', amount: netReceive },
-    ...(actualNetworkFee > 0 ? [{ ...debit, bizNo: withdrawalNo + ':USDT:NETWORK_FEE',
-      bizType: 'WITHDRAW_NETWORK_FEE', asset: 'USDT', amount: actualNetworkFee }] : []),
-    ...(nexBurned > 0 ? [{ ...debit, bizNo: withdrawalNo + ':NEX:OFFSET',
-      bizType: 'WITHDRAW_FEE_OFFSET', asset: 'UVT', amount: nexBurned }] : []));
+// Older preview handoffs embedded the current order in the original-key record.
+export function restoreDemoWithdrawalOrders(state) {
+  for (const [user, attempts] of Object.entries(state.withdrawRecoveryDemo ?? {})) {
+    for (const attempt of Object.values(attempts)) {
+      if (!attempt.order) continue;
+      const accounts = state.withdrawalOrders ??= {};
+      (accounts[user] ??= {})[attempt.withdrawalNo] = attempt.order;
+      delete attempt.order;
+    }
+  }
 }
 
 export function seedWithdrawalRecovery(state, selection) {
@@ -96,21 +62,19 @@ export function seedWithdrawalRecovery(state, selection) {
     key: demoAttemptPrefix + id, amount: 100, network: 'USDT-BEP20',
     address: '0x' + '1'.repeat(40), policyVersion: policy.policyVersion, offset: false,
   };
-  const attempt = { frozen, state: selection, withdrawalNo: 'WD-B34-DEMO-' + id };
+  const attempt = { frozen, state: selection };
   if (selection === 'COMMITTED') {
-    const createdAt = now - 2 * day;
-    const receipt = createReceipt(attempt, policy, createdAt, 0);
-    commit(attempt, receipt, createdAt, new Date(Date.parse(receipt.holdUntil) + 3600000).toISOString());
+    attempt.withdrawalNo = 'WD-B34-DEMO-' + id;
+    attempt.receipt = seedDemoConfirmedWithdrawal(state, user, frozen, policy, now, attempt.withdrawalNo);
   }
   saveAttempt(state, user, attempt);
   return { accountKey: 'user:' + user, attempt: frozen };
 }
 
-export function handlesWithdrawalRecovery(state, path, method, headers) {
+export function handlesWithdrawalRequest(path, method) {
   const route = attemptRoute.exec(path);
   if (route) return method === (route[2] ? 'POST' : 'GET');
-  return method === 'POST' && path === '/api/withdrawals'
-    && Object.hasOwn(state.withdrawRecoveryDemo?.[demoWithdrawalUser(state)] ?? {}, headers['idempotency-key']?.trim());
+  return method === 'POST' && path === '/api/withdrawals';
 }
 
 export function withdrawalRecoveryResponse(state, path, method, headers, body) {
@@ -123,9 +87,10 @@ export function withdrawalRecoveryResponse(state, path, method, headers, body) {
 
   const attempts = state.withdrawRecoveryDemo?.[user] ?? {};
   const attempt = Object.hasOwn(attempts, key) ? attempts[key] : undefined;
+  const order = state.withdrawalOrders?.[user]?.[attempt?.withdrawalNo];
   if (method === 'GET') {
     if (!attempt || attempt.state === 'NOT_SEEN') return unseenWithdrawalAttempt(path, method);
-    if (attempt.order) return ok({ state: 'COMMITTED', withdrawalNo: attempt.withdrawalNo, withdrawal: attempt.order, canRetrySameKey: false });
+    if (order) return ok({ state: 'COMMITTED', withdrawalNo: attempt.withdrawalNo, withdrawal: order, canRetrySameKey: false });
     if (attempt.state === 'ABANDONED' || attempt.state === 'REJECTED') {
       const { code, message } = attempt.rejection?.body ?? {
         code: 409, message: attempt.state === 'ABANDONED' ? 'WITHDRAWAL_ATTEMPT_ABANDONED' : 'WITHDRAWAL_PAYOUT_ADDRESS_MISMATCH',
@@ -151,33 +116,24 @@ export function withdrawalRecoveryResponse(state, path, method, headers, body) {
     return fail(409, 'WITHDRAWAL_ATTEMPT_PAYLOAD_CONFLICT');
   }
   if (route?.[2]) {
-    if (attempt?.order) return ok({ state: 'COMMITTED', withdrawalNo: attempt.withdrawalNo, withdrawal: attempt.order });
+    if (order) return ok({ state: 'COMMITTED', withdrawalNo: attempt.withdrawalNo, withdrawal: order });
     saveAttempt(state, user, { frozen, state: 'ABANDONED' });
     return ok({ state: 'ABANDONED', withdrawal: null });
   }
 
-  if (attempt.receipt) return ok(attempt.receipt);
-  if (attempt.state === 'ABANDONED') return fail(409, 'WITHDRAWAL_ATTEMPT_ABANDONED');
-  if (attempt.state === 'REJECTED') return attempt.rejection ?? fail(409, 'WITHDRAWAL_PAYOUT_ADDRESS_MISMATCH');
-  if (attempt.state !== 'NOT_SEEN') return fail(409, 'WITHDRAWAL_DEMO_ATTEMPT_UNRESOLVED');
+  if (attempt?.receipt) return ok(attempt.receipt);
+  if (attempt?.state === 'ABANDONED') return fail(409, 'WITHDRAWAL_ATTEMPT_ABANDONED');
+  if (attempt?.state === 'REJECTED') return attempt.rejection ?? fail(409, 'WITHDRAWAL_PAYOUT_ADDRESS_MISMATCH');
+  if (attempt && attempt.state !== 'NOT_SEEN') return fail(409, 'WITHDRAWAL_DEMO_ATTEMPT_UNRESOLVED');
 
-  const now = Date.now();
-  const facts = demoWithdrawalFacts(state, now);
-  const policy = demoWithdrawalPolicy(state, facts);
-  const reject = (status, message, data) => {
-    attempt.state = 'REJECTED';
-    return attempt.rejection = fail(status, message, data);
-  };
-  if (!policy.withdrawalEnabled) return reject(409, 'WITHDRAWAL_KILL_SWITCH_DISABLED');
-  if (!policy.enabledNetworks.includes(network)) return fail(409, 'WITHDRAWAL_NETWORK_DISABLED');
-  if (policyVersion !== policy.policyVersion) {
-    return reject(409, 'WITHDRAWAL_POLICY_VERSION_CONFLICT', { policyVersion: policy.policyVersion });
+  const result = submitDemoWithdrawal(state, user, frozen);
+  if (result.receipt) {
+    saveAttempt(state, user, {
+      frozen, state: 'COMMITTED', withdrawalNo: result.receipt.withdrawalNo, receipt: result.receipt,
+    });
+    return ok(result.receipt);
   }
-  const { rejection } = demoWithdrawalEligibility(state, body, now, facts, policy);
-  if (rejection) return reject(rejection === 'WITHDRAWAL_MIN_AMOUNT_NOT_MET' ? 422 : 409, rejection);
-  const receipt = createReceipt(attempt, policy, now, demoWalletNex(state, now));
-  if (receipt.netReceive <= 0) return reject(422, 'WITHDRAWAL_NET_AMOUNT_INVALID');
-  reserve(state, receipt, now);
-  commit(attempt, receipt, now);
-  return ok(receipt);
+  const rejection = fail(result.status, result.message, result.data);
+  saveAttempt(state, user, { frozen, state: 'REJECTED', rejection });
+  return rejection;
 }
