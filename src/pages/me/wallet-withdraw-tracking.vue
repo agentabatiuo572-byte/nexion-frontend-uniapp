@@ -6,8 +6,8 @@
 -->
 <template>
   <AppChassis active="me">
-    <view class="tr-page" :class="{ 'tr-page--id': !!wd }" style="padding-bottom: 16px">
-      <SubPageHeader :back="'/pages/me/me'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
+    <view class="tr-page" style="padding-bottom: 16px">
+      <SubPageHeader :back="'/pages/me/me'" :title="t.wallet.withdrawalStatusSubtitle" />
 
       <!-- Exact deep-link reads wait for the authenticated account before presenting any absence. -->
       <view v-if="trackingReadPending && !wd" class="px-5" style="padding-top: 4px">
@@ -38,7 +38,8 @@
               <view class="tr-row1"><text class="tr-k">{{ t.wallet.trackAmountLabel }}</text><text class="tr-tag" :class="`tr-tag--${statusTone}`">{{ statusTag }}</text></view>
               <text class="tr-amt"><text class="tr-cur">$</text>{{ amountParts[0] }}<text class="tr-dec">{{ amountParts[1] }}</text></text>
               <text class="tr-note">{{ viaLine }}</text>
-              <text class="tr-addr">{{ wd.address }}</text>
+              <NxCodeValue class="tr-addr" :value="wd.address" :label="t.wallet.withdrawAddressLabel" />
+              <view class="tr-id"><text class="tr-k">{{ t.bankWithdrawal.orderNumber }}</text><NxCodeValue class="tr-id__v" :value="wd.id" :label="t.bankWithdrawal.orderNumber" fill /></view>
             </view>
             <!-- 失败终态不渲染步进条:五步全灰、连「已提交」都不打勾,而下方卡片说转账失败(对抗证伪坐实) -->
             <template v-if="!isFailedEnd">
@@ -128,6 +129,7 @@ import { occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
 import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
@@ -604,8 +606,6 @@ const againReasonStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink
 
 <style scoped>
 /* P-45 withdrawal tracking: ticket with amount + status, tear line, timeline; back to wallet in the fixed bar. */
-/* The order number in the header reads as an identifier (mono, as on the board). */
-.tr-page--id :deep(.spv-title) { font-family: var(--font-metric); }
 .tr { display: flex; flex-direction: column; gap: 12px; padding: 0 16px; }
 .tr-ticket { position: relative; margin-top: 3px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .tr-tk { padding: 18px 20px 16px; }
@@ -620,7 +620,11 @@ const againReasonStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink
 .tr-cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
 .tr-dec { color: var(--v5-ink-3); }
 .tr-note { display: block; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.tr-addr { display: block; margin-top: 6px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-metric); word-break: break-all; }
+/* Address and withdrawal number are long codes: one line, middle ellipsis, copy gives the whole code (NxCodeValue). */
+.tr-addr { margin-top: 6px; color: var(--v5-ink-3); font-size: 12px; line-height: 18px; }
+.tr-id { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; }
+.tr-id > .tr-k { flex: 0 1 auto; min-width: 0; }
+.tr-id__v { color: var(--v5-ink-2); font-size: 12px; line-height: 18px; }
 .tr-tear { position: relative; height: 0; margin: 0 18px; border-top: 1.5px dashed var(--v5-border-strong); }
 .tr-tear::before, .tr-tear::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-bg); }
 .tr-tear::before { left: -28px; } .tr-tear::after { right: -28px; }

@@ -101,7 +101,7 @@
           </view>
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="rowLabelStyle">{{ sessionDeviceLabel(s) }}</text>
-            <text class="block truncate security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
+            <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
           <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)">

@@ -1881,7 +1881,7 @@ export const ms: Messages = {
       sell: "Jual",
     },
     breakdown: {
-      label: "PECAHAN PEGANGAN",
+      label: "PECAHAN PEGANGAN (UVT)",
       liquid: "Baki tersedia",
       mining: "Pendapatan UVT hari ini",
       miningHint: "Selepas perbelanjaan, termasuk rekod yang diproses",

@@ -71,9 +71,9 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="breakdownLabelStyle">{{ br.label }}</text>
-                <text v-if="br.hint" class="block truncate" :style="breakdownHintStyle">{{ br.hint }}</text>
+                <text v-if="br.hint" class="block" :style="breakdownHintStyle">{{ br.hint }}</text>
               </view>
-              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}</text>
+              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}<text v-if="br.value !== '—'" class="nx-sr-only"> UVT</text></text>
             </view>
           </view>
         </view>
@@ -111,7 +111,8 @@
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block truncate" :style="activityLabelStyle">{{ a.label }}</text>
+              <!-- Rows open nothing, so the label wraps in full; the part after the last " · " (a code or a kind) never breaks at its hyphens. -->
+              <text class="block" style="overflow-wrap: break-word" :style="activityLabelStyle">{{ labelHead(a.label) }}<text v-if="labelTail(a.label)" style="display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom">{{ labelTail(a.label) }}</text></text>
               <text class="block" :style="activityTimeStyle">{{ fmtActivityTime(a.ts) }}</text>
             </view>
             <view class="text-right">
@@ -251,6 +252,9 @@ function fmtNum(n: number, dp = 2): string {
 function fmtUSD(n: number): string {
   return Number.isFinite(n) ? `$${fmtNum(n)}` : "—";
 }
+// Only a tail without spaces (a code) is kept whole; a phrase tail wraps like the rest of the label.
+const labelTail = (label: string) => { const i = label.lastIndexOf(" · "), tail = i < 0 ? "" : label.slice(i + 3); return /\s/.test(tail) ? "" : tail; };
+const labelHead = (label: string) => { const tail = labelTail(label); return tail ? label.slice(0, label.length - tail.length) : label; };
 function fmtActivityTime(timestamp: number): string {
   return Number.isFinite(new Date(timestamp).getTime()) ? formatTrialDateTime(timestamp, dateLocale()) : "—";
 }
@@ -281,9 +285,9 @@ const quickCells = computed(() => [
 ]);
 
 const breakdownRows = computed(() => [
-  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} UVT` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} UVT`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
-  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} UVT`, hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
+  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? fmtNum(nexBalance.value, 2) : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)}`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
+  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : fmtNum(pendingNex.value, 2), hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
 const useTiles = computed(() => [

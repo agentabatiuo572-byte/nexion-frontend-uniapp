@@ -1881,7 +1881,7 @@ export const id: Messages = {
       sell: "Jual",
     },
     breakdown: {
-      label: "RINCIAN ASET",
+      label: "RINCIAN ASET (UVT)",
       liquid: "Saldo tersedia",
       mining: "Pendapatan UVT hari ini",
       miningHint: "Setelah dipakai, termasuk yang diproses",

@@ -17,6 +17,7 @@ const ICONS = {
   "arrow-up": { d: ["M12 19V5", "m6 11 6-6 6 6"] },
   "arrow-up-right": { d: ["M7 17 17 7", "M8 7h9v9"] },
   plus: { d: ["M12 5v14", "M5 12h14"] },
+  close: { d: ["M6 6l12 12", "M18 6 6 18"] },
   minus: { d: ["M5 12h14"] },
   check: { d: ["m5 12.5 4.5 4.5L19 7"] },
   "caret-up": { d: ["M12 7.5 18.5 16h-13z"], fill: true },
