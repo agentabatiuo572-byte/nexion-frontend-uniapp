@@ -71,6 +71,7 @@ export interface ApiRequest {
   parseResponseData?: (data: unknown, status: number) => unknown;
   /** A rejected secret-bearing command must ask the user again after authentication. */
   retryAfterAuth?: boolean;
+  beforeAuthRetry?: () => void;
 }
 
 export interface ApiClient {
@@ -477,6 +478,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       if (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision)) {
         throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
       }
+      apiRequest.beforeAuthRetry?.();
       const retryRevision = options.vault.revision();
       try {
         const result = await execute<T>(
