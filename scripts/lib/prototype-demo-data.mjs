@@ -2,7 +2,7 @@
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { createHash } from 'node:crypto';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
-import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
 import { learningDemo } from './prototype-demo-learning.mjs';
@@ -491,7 +491,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   if(pathname==='/api/app/network/device-rank' && state.deviceRankState==='configured') {
-    return reviewFixture(url,locale,state,request,previewHomeDisplay(state,now).online[0]);
+    return reviewFixture(url,locale,state,request,previewHomeDisplaySample(state,now).online);
   }
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
@@ -543,14 +543,14 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     config.featureFlags.stakingVisible=false;
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
-    const batch=previewHomeDisplay(state,now);
+    const sample=previewHomeDisplaySample(state,now);
     Object.assign(config.publicStats,{
       registeredUsersBase:2000,registeredUsersAnchorAt:demoStartedAt,
       registeredUsersTickIntervalSec:300,registeredUsersTickStepMin:0,registeredUsersTickStepMax:2,
       virtualUserCount:0,activeJobsBase:previewActiveJobsBase(state),
     });
     config.publicStats.networkPulse={
-      registeredUsers:derivedRegisteredUsers(config.publicStats,now),onlineDevices:batch.online[0],activeJobs:batch.activeJobs[0],
+      registeredUsers:derivedRegisteredUsers(config.publicStats,now),onlineDevices:sample.online,activeJobs:sample.activeJobs,
     };
     // Globe split and drift; the totals come from the shared home-display batch.
     const globeCenters=[['sg',236000,18,12.5],['jp',253000,22,13],['vn',163000,26,8.5],['uk',249000,16,12],['fr',208000,20,10],['de',217000,14,11],['us-ny',316000,24,17],['us-sj',284000,17,16]];
@@ -602,7 +602,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       overview.doTheMath=previewDoTheMath(devices,products,product=>demoSkuPurchaseRules(state,product,points,now).eligible);
       overview.onGrid={clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}],activeDevices:3206,perSecUsdt:.028};
     }
-    overview.onGrid.activeJobs=previewHomeDisplay(state,now).activeJobs[0];
+    overview.onGrid.activeJobs=previewHomeDisplaySample(state,now).activeJobs;
     return overview;
   }
   if(pathname==='/api/store/bundle-discount')return {source:'server',serverCanonical:true,policyVersion:1,tiers:[{minItems:2,rate:.04},{minItems:3,rate:.07},{minItems:4,rate:.11}]};
