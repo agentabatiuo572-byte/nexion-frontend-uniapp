@@ -325,7 +325,7 @@
       <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
       <view v-else-if="deviceTodayCompleted.length">
         <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" time="" />
-        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
+        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
       </view>
     </view>
 
