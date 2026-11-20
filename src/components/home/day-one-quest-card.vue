@@ -546,16 +546,18 @@ const toggleStyle: CSSProperties = {
 .newcomer-task--mission .newcomer-task__progress-copy { margin-top:8px !important; font:400 12px/16px var(--font-v5) !important; gap:4px; align-items:baseline; }
 .newcomer-task--mission .newcomer-task__progress-copy > text { color:var(--v5-ink-3) !important; }
 .newcomer-task--mission .newcomer-task__progress-copy > text:last-child { color:var(--v5-nex-ink) !important; white-space:nowrap; }
+/* Lite: the web-unavailable notice is the row's only text; it wraps instead of running out of the card. */
+.newcomer-task--mission .newcomer-task__progress-copy > text:only-child { white-space:normal; }
 .newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view { box-sizing:border-box; min-height:53px; }
 
 
 .newcomer-task--mission .newcomer-task__count { display:inline-flex; align-items:center; height:24px; min-width:38px; box-sizing:border-box; justify-content:center; padding:0 8px; }
 .newcomer-task--mission .newcomer-task__reward { gap:6px; margin-top:17.5px; }
 .newcomer-task--mission .newcomer-task__unit { margin-left:0!important; }
-.newcomer-task--mission .newcomer-task__top { position:relative; }
-.newcomer-task--mission .newcomer-task__clock { position:absolute; right:0; top:12px; transform:translateY(-50%); }
-/* The countdown is absolutely placed; keep the title and task count clear of it, wrapping the count when a language runs long. */
-.newcomer-task--mission .newcomer-task__top > view:first-child { padding-right:80px; }
+/* The countdown stays in the row, so it keeps its real width (countdown or the expired label) and the title and task count
+   wrap beside it; it is centred on the title's first line, 12px down. */
+.newcomer-task--mission .newcomer-task__top { align-items:flex-start !important; }
+.newcomer-task--mission .newcomer-task__clock { transform:translateY(calc(12px - 50%)); }
 .newcomer-task--mission .newcomer-task__progress-copy { margin-top:9.5px!important; }
 .newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view > view:last-child { display:flex; align-items:center; justify-content:flex-end; }
 

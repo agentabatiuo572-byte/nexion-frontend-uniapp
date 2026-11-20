@@ -409,9 +409,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && status.value === "error", re
 .trust-whitepaper__copy { display: flex; flex-direction: column; gap: 6px; }
 .trust-whitepaper__title { font: 700 20px/28px var(--font-v5); }
 .trust-whitepaper__body { font: 400 13px/18px var(--font-v5); opacity: .92; }
-.trust-whitepaper__bottom { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); }
+/* The button keeps one line; when it does not fit beside the file details it drops to the right on its own line. */
+.trust-whitepaper__bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--v5-space-2) var(--v5-space-3); }
 .trust-whitepaper__meta { font: 400 12px/16px var(--font-v5); opacity: .85; font-variant-numeric: tabular-nums; }
-.trust-whitepaper__cta { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: var(--v5-radius-full); background: var(--v5-on-brand); color: var(--v5-brand); font: 700 13px/18px var(--font-v5); }
+.trust-whitepaper__cta { display: inline-flex; align-items: center; margin-left: auto; white-space: nowrap; min-height: 32px; padding: 0 14px; border-radius: var(--v5-radius-full); background: var(--v5-on-brand); color: var(--v5-brand); font: 700 13px/18px var(--font-v5); }
 /* Two banded counts side by side; the paid-out amount takes a full row so it never breaks mid-number. */
 .trust-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--v5-space-2); }
 .trust-summary__cell:last-child { grid-column: 1 / -1; }

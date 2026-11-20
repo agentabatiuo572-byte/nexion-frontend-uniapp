@@ -452,7 +452,7 @@ let followingTail = true, measuredViewportHeight = 0;
 const HISTORY_MEASURE_MS = 500;
 let positionTimer: ReturnType<typeof setTimeout> | undefined, historyDisposed = false;
 let preparedHistory: { id: string; prefix: number; inset: number; owner: string; host: unknown; root: unknown } | null = null;
-type PositionAdjustment = { owner: string; host: unknown; root: unknown; top: number; inset: number; tail: boolean; id?: string; prefix?: number;
+type PositionAdjustment = { owner: string; host: unknown; root: unknown; top: number; inset: number; tail: boolean; id?: string; prefix?: number; anchor?: { id: string; offset: number };
   expiresAt: number; settled: Promise<boolean>; settle: (applied: boolean) => void };
 let pendingPosition: PositionAdjustment | null = null;
 let historyPreparation = 0;
@@ -622,7 +622,7 @@ function cancelScroll(keepPosition = false) {
   pendingTailGeneration = undefined;
   if (!keepPosition) settlePosition();
 }
-function invalidateHistoryPosition() { cancelScroll(); preparedHistory = null; historyPreparation++; }
+function invalidateHistoryPosition() { cancelScroll(); preparedHistory = null; historyAnchor = null; historyPreparation++; }
 onScopeDispose(() => { historyDisposed = true; invalidateHistoryPosition(); });
 onHide(invalidateHistoryPosition);
 watch(() => [historyOwner(), listHost.value, listRoot()], invalidateHistoryPosition, { flush: 'sync' });
@@ -635,11 +635,17 @@ function scroller(): HTMLElement | undefined {
 function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: number } }) {
   if (stopPreviewPreparation) { nativePreviewReading = null; clearPreviewRowHeights(); }
   pendingTailGeneration = undefined;
+  // The delayed echo of our own pin (same scrollTop) can arrive after late content has grown the list;
+  // measuring it against the new height would wrongly mark the reader as having left the tail.
+  const echo = event.detail.scrollTop === lastScrollTop;
   // Observe gestures without turning delayed App scroll events back into scroll commands.
   if (pendingPosition) pendingPosition.top += event.detail.scrollTop - lastScrollTop;
   lastScrollTop = event.detail.scrollTop;
   const node = scroller();
-  if (node) followingTail = node.scrollHeight - node.clientHeight - node.scrollTop <= 24;
+  // A real gesture ends any pending history restoration anchor.
+  if (!echo) historyAnchor = null;
+  if (echo) { /* keep followingTail */ }
+  else if (node) followingTail = node.scrollHeight - node.clientHeight - node.scrollTop <= 24;
   else if (event.detail.scrollHeight !== undefined && measuredViewportHeight > 0)
     followingTail = event.detail.scrollHeight - measuredViewportHeight - lastScrollTop <= 24;
   if (threadVisible.value && nativePreviewReading?.returning) {
@@ -648,6 +654,25 @@ function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: num
   scheduleBubblePositions();
 }
 function messageRowId(id: string) { return 'nx-conv-message-' + Array.from(id).map(char=>char.charCodeAt(0).toString(16)).join('-'); }
+// The reading anchor of the latest history prepend, kept for the rest of that transaction: the header and date
+// markers settle a frame or two after the rows, and each follow-up correction restores against the same message.
+let historyAnchor: { id: string; offset: number; until: number } | null = null;
+function anchoredDelta(top: number): number | null {
+  const anchor = historyAnchor;
+  if (!anchor || Date.now() > anchor.until) { historyAnchor = null; return null; }
+  const node = scroller(), row = listRoot()?.querySelector?.('#' + anchor.id) as HTMLElement | null | undefined;
+  if (!node || !row) return null;
+  return node.scrollTop - top + row.getBoundingClientRect().top - node.getBoundingClientRect().top - anchor.offset;
+}
+function visibleMessageAnchor(node: HTMLElement): { id: string; offset: number } | null {
+  const top = node.getBoundingClientRect().top;
+  for (const row of Array.from(node.querySelectorAll<HTMLElement>('[id^="nx-conv-message-"]'))) {
+    if (row.id.endsWith('-preview')) continue;
+    const rect = row.getBoundingClientRect();
+    if (rect.bottom > top) return { id: row.id, offset: rect.top - top };
+  }
+  return null;
+}
 function measurePrefix(firstId: string, done: (height: number | null) => void) {
   const root = listRoot(), host = listHost.value, owner = historyOwner();
   const finish = (height: number | null) => done(!historyDisposed && threadVisible.value && host === listHost.value
@@ -744,6 +769,13 @@ function preservePosition(previousInset: number, firstId?: string) {
     // H5 can capture the still-unpatched DOM synchronously. Normalize its
     // header/prefix space to the transaction's original inset.
     if (node) measurePrefix(firstId, value => { prefix = value === null ? null : value + adjustment.inset - previousInset; });
+    // H5: the DOM here is still the pre-prepend layout. The first message visible at the viewport top and its
+    // offset are the reading position itself, so restoring that offset holds even when the history header or a
+    // date marker changes height in the same patch (the last page collapses the "load earlier" header).
+    if (node) {
+      adjustment.anchor = visibleMessageAnchor(node) ?? undefined;
+      historyAnchor = adjustment.anchor ? { ...adjustment.anchor, until: Date.now() + HISTORY_MEASURE_MS } : null;
+    }
     preparedHistory = null;
     if (prefix === null || !Number.isFinite(prefix)) { cancelScroll(); return; }
     adjustment.id = firstId; adjustment.prefix = prefix;
@@ -776,13 +808,15 @@ function preservePosition(previousInset: number, firstId?: string) {
   void nextTick(() => {
     if (!current()) return;
     if (adjustment.id && adjustment.prefix !== undefined) {
+      const anchored = anchoredDelta(adjustment.top);
+      if (anchored !== null) { apply(anchored); return; }
       measurePrefix(adjustment.id, prefix => {
         if (!current()) return;
         if (prefix !== null && Number.isFinite(prefix)) apply(prefix - adjustment.prefix!);
         else settlePosition();
       });
     } else if (adjustment.tail && followingTail) { settlePosition(true); scrollToEnd(); }
-    else apply(inset - adjustment.inset);
+    else apply(anchoredDelta(adjustment.top) ?? inset - adjustment.inset);
   });
 }
 watch(
@@ -993,6 +1027,20 @@ onMounted(() => {
 onShow(() => { void nextTick(scheduleBubblePositions); });
 onHide(cancelBubblePositions);
 onScopeDispose(() => { bubbleMeasurementDisposed = true; cancelBubblePositions(); bubbleResizeObserver?.disconnect(); });
+// The first pin to the newest message runs before late content (images, history rows, fonts) has its
+// final height, which left the last message under the composer. While the reader is at the tail,
+// keep it pinned whenever the content grows; a reader who scrolled up is left where they are.
+let tailResizeObserver: ResizeObserver | undefined;
+onMounted(() => {
+  const content = listRoot()?.querySelector?.('.nx-conv-content');
+  if (typeof ResizeObserver === 'undefined' || !content) return;
+  tailResizeObserver = new ResizeObserver(() => {
+    if (followingTail && threadVisible.value && !pendingPosition && !preparedHistory) scrollToEnd();
+  });
+  // border-box: the top inset and composer space are padding on this element, and they settle late too.
+  tailResizeObserver.observe(content, { box: 'border-box' });
+});
+onScopeDispose(() => tailResizeObserver?.disconnect());
 
 function bubbleStyle(m: ThreadMsg): CSSProperties {
   const position = bubblePositions.value[m.id] ?? 0.5;

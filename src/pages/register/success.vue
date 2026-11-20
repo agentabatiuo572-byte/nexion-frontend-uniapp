@@ -72,7 +72,7 @@
           <view v-for="item in platformDownloads" :key="item.platform" class="rs-platform-download">
             <view v-if="item.url" class="rs-h5-download__action active-press" role="link" tabindex="0"
               @click="openDownload(item.url)">
-              <text class="rs-h5-download__action-text">{{ item.label }} ↗</text>
+              <text class="rs-h5-download__action-text nx-after-external">{{ item.label }}</text>
             </view>
             <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
               <text class="rs-h5-download__pending">{{ item.label }}</text>
@@ -90,7 +90,7 @@
           @keydown.enter.prevent="openOfficialDownload"
         >
           <text class="rs-h5-download__action-text">{{ t.register.doneOfficialDownloadLink }}</text>
-          <text class="rs-h5-download__arrow">↗</text>
+          <view class="rs-h5-download__arrow" aria-hidden="true"><NxIcon name="arrow-up-right" /></view>
         </view>
         <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
           <text class="rs-h5-download__pending">{{ t.register.doneOfficialDownloadPending }}</text>
@@ -123,6 +123,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";

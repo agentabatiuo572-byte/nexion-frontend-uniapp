@@ -30,7 +30,7 @@
       </view>
       <view class="dc-foot">
         <text class="dc-foot__caption">{{ fmt(generalBase ? t.home.doMathVs : t.home.doMathYour, { base: baseShort }) }}</text>
-        <NxButton class="dc-foot__action" variant="brand" size="small" :label="`${t.home.doMathSeeCta} →`" @click="goStore" />
+        <NxButton class="dc-foot__action" variant="brand" size="small" :label="t.home.doMathSeeCta" icon="arrow-right" @click="goStore" />
       </view>
     </view>
   </NxSection>
@@ -112,7 +112,8 @@ function goStore() {
 /* Recessed stage with a faint cyan glow behind the target. */
 .dc-stage { --dc-well:inset 0 2px 10px rgba(0,0,0,.55); position:relative; height:208px; border-radius:16px; overflow:hidden; background:radial-gradient(55% 65% at 75% 92%,color-mix(in srgb,var(--v5-tech-cyan) 18%,transparent),transparent 72%),var(--v5-surface-2); box-shadow:var(--dc-well); }
 :global([data-theme="light"] .dc-stage) { --dc-well:inset 0 1px 4px rgba(20,16,8,.08); }
-.dc-stage__label { position:absolute; left:12px; top:10px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+/* The multiplier sits centred at the top: the label keeps to the space left of it and wraps there in long languages. */
+.dc-stage__label { position:absolute; left:12px; top:10px; max-width:calc(50% - 56px); font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .dc-stage__floor { position:absolute; left:12px; right:12px; bottom:22px; height:1px; background:var(--v5-border-strong); }
 .dc-col { position:absolute; bottom:22px; width:100px; display:flex; flex-direction:column; align-items:center; }
 .dc-col--base { left:calc(25% - 50px); }

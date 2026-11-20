@@ -70,15 +70,15 @@
           <!-- secondary stats -->
           <view class="grid grid-cols-3" style="margin-top: var(--ui-space-inset); gap: 8px">
             <view :style="miniStatStyle">
-              <text class="block truncate" :style="miniLabelStyle">{{ t.proof.activeDays }}</text>
+              <text class="block" :style="miniLabelStyle">{{ t.proof.activeDays }}</text>
               <text class="block font-display tabular-nums" :style="miniValueStyle">{{ activeDays === null ? "—" : activeDays }}</text>
             </view>
             <view :style="miniStatStyle">
-              <text class="block truncate" :style="miniLabelStyle">{{ t.proof.devices }}</text>
+              <text class="block" :style="miniLabelStyle">{{ t.proof.devices }}</text>
               <text class="block font-display tabular-nums" :style="miniValueStyle">{{ onlineDevices === null ? "—" : onlineDevices }}</text>
             </view>
             <view :style="miniStatStyle">
-              <text class="block truncate" :style="miniLabelStyle">{{ topPctLabel }}</text>
+              <text class="block" :style="miniLabelStyle">{{ topPctLabel }}</text>
               <text class="block font-display tabular-nums" :style="miniValueSmallStyle">{{ topPctText }}</text>
             </view>
           </view>
@@ -111,7 +111,7 @@
                 @keydown.enter.stop.prevent="copyLink" @keydown.space.stop.prevent="copyLink"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                <text style="margin-left: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; pointer-events: none">{{ referralLink }}</text>
+                <NxCodeValue :value="referralLink" :label="t.proof.shareDestinations.copy" :copyable="false" style="margin-left: 4px; flex: 1; font-size: 12px; color: var(--v5-ink-3); pointer-events: none" />
               </view>
             </view>
             <view class="grid place-items-center shrink-0" :style="qrBoxStyle">
@@ -193,6 +193,7 @@ import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -704,8 +705,6 @@ const refLinkStyle: CSSProperties = {
   maxWidth: "100%",
   minWidth: "0",
   boxSizing: "border-box",
-  overflowWrap: "anywhere",
-  wordBreak: "break-all",
   marginTop: "4px",
   minHeight: "44px",
   marginLeft: "-4px",

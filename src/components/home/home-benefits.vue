@@ -24,7 +24,7 @@
             <view class="hb-rule" aria-hidden="true" />
             <view class="hb-half__foot">
               <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
-              <text v-if="showCapacityManagement" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
+              <text v-if="showCapacityManagement" class="hb-link nx-after-chevron">{{ lifecycleCopy.cardManage }}</text>
               <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialPillWait }">{{ trialPill[0] }}</text>
             </view>
           </template>
@@ -38,7 +38,7 @@
               <text class="hb-sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text>
               <view class="hb-wt__row">
                 <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : t.trial.homeNoPayment }}</text>
-                <text v-if="showCapacityManagement" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
+                <text v-if="showCapacityManagement" class="hb-link nx-after-chevron">{{ lifecycleCopy.cardManage }}</text>
                 <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialPillWait }">{{ trialPill[1] }}</text>
               </view>
             </view>
@@ -49,7 +49,7 @@
         <view v-if="voucherPending" class="hb-card hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popVoucher }" :style="{ '--hb-i': offerCount }" role="button" tabindex="0" :aria-label="`${pendingName} · ${copy.benefitVoucherReady} · ${copy.benefitVoucherUse}`" @click="useVoucherNow" @keydown.enter.prevent="useVoucherNow" @keydown.space.prevent="useVoucherNow">
           <view class="hb-icon" aria-hidden="true"><image class="hb-icon__img" :src="COUPON_ART" mode="aspectFit" /></view>
           <view class="hb-pend__text"><text class="hb-pend__title">{{ pendingName }}</text><text class="hb-pend__sub"><text class="hb-warn">{{ copy.benefitVoucherReady }}</text><template v-if="pendingCount === 1">{{ copy.benefitVoucherAuto }}</template></text></view>
-          <text v-if="pendingCount === 1" class="hb-act">{{ copy.benefitVoucherUse }} →</text>
+          <text v-if="pendingCount === 1" class="hb-act nx-after-arrow">{{ copy.benefitVoucherUse }}</text>
           <svg v-else class="hb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
         <view v-if="trialPending" class="hb-card hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popTrial }" :style="{ '--hb-i': offerCount + (voucherPending ? 1 : 0) }" :data-trial-state="status" role="button" tabindex="0" :aria-label="trialPendingAria" @click="openTrialDetails" @keydown.enter.prevent="openTrialDetails" @keydown.space.prevent="openTrialDetails">
@@ -62,7 +62,7 @@
             <text class="hb-pend__title">{{ trialName }}</text>
             <text class="hb-pend__sub"><template v-if="status === 'ended'">{{ lifecycleCopy.endedTitle }}</template><template v-else>{{ status === 'active' ? copy.benefitTrialLeft : copy.benefitCreditLeft }}<text class="hb-mono font-mono-tabular">{{ countdownText }}</text></template></text>
           </view>
-          <text v-if="pendingCount === 1 && status === 'ended'" class="hb-act">{{ lifecycleCopy.buyDevice }} →</text>
+          <text v-if="pendingCount === 1 && status === 'ended'" class="hb-act nx-after-arrow">{{ lifecycleCopy.buyDevice }}</text>
           <template v-else>
             <view v-if="pendingCount === 1" class="hb-val"><text>{{ copy.benefitCredit }}</text><text class="hb-val__amount">{{ visibility.mask(creditText) }}</text></view>
             <svg class="hb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
@@ -319,7 +319,7 @@ function retryEligibility() {
 .hb-pend__text { flex:1;min-width:0; }
 .hb-pend__title { display:block;font:500 14px/20px var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }
 .hb-pend--wide .hb-pend__title { font-size:15px; }
-.hb-pend__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.hb-pend__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .hb-pend--wide .hb-pend__sub { font-size:13px;line-height:18px; }
 .hb-warn { color:var(--v5-warning-ink); }
 .hb-mono { font-size:12px;color:var(--v5-ink);white-space:nowrap; }

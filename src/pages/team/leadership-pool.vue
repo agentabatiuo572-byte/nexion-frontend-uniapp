@@ -374,7 +374,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .pool-action { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 44px; color: var(--v5-ink-2); font-size: var(--ui-type-button); line-height: var(--ui-type-button-lh); }
 .pool-action > svg { display: none; }
 .pool-action > text { color: inherit !important; }
-.pool-action::after { content: '→'; flex: none; }
+.pool-action::after { content: ""; flex: none; width: 1em; height: 1em; background: currentColor; -webkit-mask: var(--nx-glyph-arrow-right) center / contain no-repeat; mask: var(--nx-glyph-arrow-right) center / contain no-repeat; }
 .pool-read-state { padding-block: 18px; border-top: 1px solid var(--v5-border); }
 .pool-read-state .pool-action { font: 600 13px/20px var(--font-v5); }
 [role="button"]:focus-visible, [role="link"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }

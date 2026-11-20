@@ -33,7 +33,7 @@
             </view>
           </view>
           <view class="reward-income-lifetime"><text>{{ designCopy.totalEarned }}</text><view class="reward-income-lifetime__amounts"><text>{{ assetTotal(lifetimeTotals.usdt, 'usdt') }}</text><text>{{ assetTotal(lifetimeTotals.nex, 'uvt') }}</text></view></view>
-          <template #footer><view class="commission-overview__rules nx-commissions-focusable" role="link" tabindex="0" :aria-label="t.commissions.howItWorksEntry" @click="go('/pages/team/commissions-how')" @keydown.enter.prevent="go('/pages/team/commissions-how')"><text>{{ t.commissions.howItWorksEntry }}</text><text aria-hidden="true">›</text></view></template>
+          <template #footer><view class="commission-overview__rules nx-commissions-focusable" role="link" tabindex="0" :aria-label="t.commissions.howItWorksEntry" @click="go('/pages/team/commissions-how')" @keydown.enter.prevent="go('/pages/team/commissions-how')"><text>{{ t.commissions.howItWorksEntry }}</text><NxIcon name="chevron-right" /></view></template>
         </RewardHero>
 
 
@@ -66,6 +66,7 @@
                   <text v-if="e.layer" class="font-mono-tabular" :style="e.layer === 1 ? directBadgeStyle : extendedBadgeStyle">{{ e.layer === 1 ? t.commissions.directBadge : t.commissions.extendedBadge }}</text>
                 </view>
                 <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
+                <view v-for="code in eventCodes(e)" :key="code.label" class="commission-code"><text class="commission-code__label">{{ code.label }}</text><NxCodeValue class="commission-code__value" :value="code.value" :label="code.label" /></view>
               </view>
               <view class="text-right" style="max-width: 48%; overflow-wrap: anywhere">
                 <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>
@@ -111,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { teamRedesignCopy } from "@/i18n/team-redesign";
@@ -124,6 +126,7 @@ import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { commissionFilterCopy } from '@/i18n/commission-filter-copy';
 import { useApp } from '@/store/app';
 import { useAuth } from '@/store/auth';
@@ -280,9 +283,15 @@ const noKindText = computed(() =>
 
 function eventMeta(e: CommissionEvent): string {
   const kindLabel = t.value.commissions.kind[e.kind];
-  const order = e.sourceRef ? ` · ${e.kind === "direct_purchase" ? t.value.directReferral.order : t.value.directReferral.receipt} ${e.sourceRef}` : e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${visibility.mask(formatGroupedAmount(e.orderAmountUSD))}` : "";
-  const device = e.sourceDeviceId ? ` · ${t.value.directReferral.device}: ${e.sourceDeviceId}` : "";
-  return `${kindLabel}${order}${device}`;
+  const order = !e.sourceRef && e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${visibility.mask(formatGroupedAmount(e.orderAmountUSD))}` : "";
+  return `${kindLabel}${order}`;
+}
+// Receipt, order and device numbers are long codes: each gets its own label | code line (NxCodeValue) instead of breaking inside the meta sentence.
+function eventCodes(e: CommissionEvent): { label: string; value: string }[] {
+  const codes: { label: string; value: string }[] = [];
+  if (e.sourceRef) codes.push({ label: e.kind === "direct_purchase" ? t.value.directReferral.order : t.value.directReferral.receipt, value: e.sourceRef });
+  if (e.sourceDeviceId) codes.push({ label: `${t.value.directReferral.device}:`, value: e.sourceDeviceId });
+  return codes;
 }
 function coolingTag(e: CommissionEvent): string {
   const days = Math.max(0, Math.ceil((e.unlockAt - Date.now()) / 86400000));
@@ -393,6 +402,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 .reward-income-lifetime { display: flex; justify-content: space-between; gap: var(--ui-space-inline); margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3); }
 .reward-income-lifetime__amounts { display: flex; gap: 6px; text-align: right; font-family: var(--font-metric); color: var(--v5-ink-2); font-variant-numeric: tabular-nums; }
 .commission-days { display: flex; flex-direction: column; gap: var(--v5-space-4); }
+.commission-code { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--v5-ink-3); }
+.commission-code__label { flex: 0 1 auto; min-width: 0; overflow-wrap: break-word; }
+.commission-code__value { min-width: 11ch; font-size: 12px; line-height: 16px; color: var(--v5-ink-3); }
 .commission-day { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .commission-day__label { padding: 0 4px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .commission-day__card { padding: 0 var(--ui-space-inset); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
@@ -403,8 +415,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 .commission-filter-trigger { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; max-width: 70%; padding: 0 14px; color: var(--v5-ink); font: 600 13px/18px var(--font-v5); cursor: pointer; }
 .commission-filter-trigger::before { content: ""; position: absolute; inset: 4px 0; z-index: -1; border-radius: 999px; background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), color-mix(in srgb, var(--v5-ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .commission-filter-trigger svg { flex: none; }
-.commission-filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.commission-filter-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: anywhere; cursor: pointer; }
+/* Two options per row; an option whose label does not fit half the width (ru «Сотрудничество») takes a full row instead of breaking mid-word. */
+.commission-filter-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.commission-filter-option { flex: 0 1 calc(50% - 4px); min-width: min(100%, max-content); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: break-word; cursor: pointer; }
 .commission-filter-option--selected { color: var(--v5-brand); background: var(--v5-brand-soft); }
 .commission-filter-option__count { flex: none; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); font-variant-numeric: tabular-nums; }
 .commission-filter-trigger:focus-visible, .commission-filter-option:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }

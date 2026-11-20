@@ -20,7 +20,7 @@
     <view class="trial-stage__actions">
       <view class="trial-stage__group">
         <view class="trial-stage__pill" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails"><text class="trial-stage__pill-face nx-frosted-button">{{ copy.detailsAction }}</text></view>
-        <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button">{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }} →</text></view>
+        <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button nx-after-arrow">{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }}</text></view>
       </view>
     </view>
   </view>

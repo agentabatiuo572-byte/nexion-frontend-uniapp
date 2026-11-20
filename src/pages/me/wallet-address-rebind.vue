@@ -167,7 +167,7 @@
           <view class="flex-1 min-w-0">
             <text class="block" :style="warnTextStyle">{{ t.addrRebind.inFlightBlocked }}</text>
             <view class="nx-rebind-goto-tracking inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" tabindex="0" @click="goTracking">
-              <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.addrRebind.inFlightGoCta }} →</text>
+              <text class="nx-after-arrow" style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.addrRebind.inFlightGoCta }}</text>
             </view>
           </view>
         </view>

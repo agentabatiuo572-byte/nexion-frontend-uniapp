@@ -75,7 +75,7 @@
         <!-- Trade-in callout (legacy) -->
         <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
           <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success-ink); font-weight: 500">{{ tradeCreditText }}</text></text>
-          <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
+          <text class="whitespace-nowrap active:opacity-70 nx-after-arrow" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
       <text v-if="copy.taskLevels" class="block mt-1.5" style="font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; color: var(--v5-ink-3)">{{ copy.taskLevels }}</text>
@@ -88,7 +88,7 @@
       <text v-if="copy.taskLevels" class="product-compact-levels">{{ copy.taskLevels }}</text>
       <view class="product-compact-bottom">
         <text class="product-compact-price">{{ fmtMoney(product.price).replace(/\.00$/, '') }}</text>
-        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.text }}</text>
+        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.label }} · <text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
     </view>
@@ -310,12 +310,13 @@ const dailyEarnText = computed(() => {
 });
 const compactEstimate = computed(() => {
   if (isShare.value) {
-    const text = `${t.value.bundle.estimatedDaily} · ${dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—"}`;
-    return { text, ariaLabel: text };
+    const value = dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—";
+    return { label: t.value.bundle.estimatedDaily, value, ariaLabel: `${t.value.bundle.estimatedDaily} · ${value}` };
   }
   const daily = fmtMoney(props.product.dailyEarn);
   return {
-    text: `${estimateLabel.value} · ${daily.replace(/\.00$/, "")}${t.value.store.cardPerDaySuffix}`,
+    label: estimateLabel.value,
+    value: `${daily.replace(/\.00$/, "")}${t.value.store.cardPerDaySuffix}`,
     ariaLabel: `${t.value.store.cardYouEarn} · ${daily}${t.value.store.cardPerDaySuffix}`,
   };
 });
@@ -554,6 +555,8 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
 .product-compact-price { color:var(--v5-ink); font:600 16px/21px var(--font-v5); }
 .product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
+/* The rate and its "/day" never split across lines. */
+.product-compact-estimate__value { white-space:nowrap; }
 .product-compact-status { display:block; margin-top:8px; font:400 12px/17px var(--font-v5); color:var(--v5-warning-ink); }
 .product-card--compact:nth-child(2n) .product-art { animation-delay:-1.1s; }
 .product-card--compact:nth-child(3n) .product-art { animation-delay:-2.2s; }

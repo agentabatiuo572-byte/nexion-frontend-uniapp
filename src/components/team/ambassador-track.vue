@@ -38,7 +38,8 @@ const reached = (step: AmbassadorStep) => step.state !== "todo" && step.state !=
 .amb-track--hero .amb-track__dot--todo::after { width: 10px; height: 10px; }
 .amb-track__dot--stop { background: var(--v5-warning-ink); color: var(--v5-on-brand); }
 .amb-track__dot--fail { background: var(--v5-danger); color: var(--v5-on-brand); }
-.amb-track__label { max-width: 100%; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+/* A label may run a few px past its quarter so one long word (kk «Мақұлданды») stays whole. */
+.amb-track__label { max-width: calc(100% + 8px); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .amb-track__label--current { color: var(--amb-current); }
 .amb-track__label--stop { color: var(--v5-warning-ink); }
 .amb-track__label--fail { color: var(--v5-danger); }

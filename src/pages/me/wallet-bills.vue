@@ -72,7 +72,7 @@
                   <text class="bills-row__title">{{ typeLabel(b.type) }}</text>
                   <NxTag v-if="b.status !== 'posted'" :tone="b.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(b.status)" />
                 </view>
-                <!-- Memo and time on one line (the memo ellipsizes); a reference gets its own line, ellipsized in the middle. -->
+                <!-- Memo and time flow together and wrap; a reference gets its own line, ellipsized in the middle. -->
                 <view :class="b.memoKey === 'learningReward' || b.type === 'clawback' ? '' : 'bills-row__sub--line'" class="bills-row__sub">
                   <text class="bills-row__memo">{{ billMemo(b) }}</text>
                   <text class="bills-row__dot"> · {{ fmtClock(b.ts) }}</text>
@@ -508,28 +508,30 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-day__unit { padding:0 4px 8px;font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__label { display:block;padding:0 4px 8px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__group { overflow:hidden;border:1px solid var(--v5-border);border-radius:var(--ui-radius-surface);background:var(--v5-surface); }
-.bills-row { display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);min-height:64px;box-sizing:border-box;padding:var(--ui-space-inline) 16px;cursor:pointer; }
+/* The name column keeps at least 104px (a long one-word type label); the running-balance line wraps instead. */
+.bills-row { display:grid;grid-template-columns:32px minmax(104px,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);min-height:64px;box-sizing:border-box;padding:var(--ui-space-inline) 16px;cursor:pointer; }
 .bills-row + .bills-row { border-top:1px solid var(--v5-border); }
 .bills-row:active { background:var(--v5-surface-2); }
 .bills-row:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
 .bills-row__icon { display:grid;place-items:center;width:32px;height:32px;border-radius:10px; }
 .bills-row__copy { display:flex;flex-direction:column;min-width:0; }
 .bills-row__title-row { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
-.bills-row__title { overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);text-overflow:ellipsis;white-space:nowrap; }
+/* Names take up to two lines, then ellipsis; the bill detail opened from the row shows them in full. */
+.bills-row__title { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);overflow-wrap:break-word; }
 /* A clawback title is longer than most: it may take two lines, and the figure column gives way before the copy does. */
 .bills-row--clawback { grid-template-columns:32px minmax(0,1fr) fit-content(45%); }
 .bills-row--clawback .bills-row__title { white-space:normal; }
 .bills-row--clawback .bills-row__balance { text-align:right; }
 .bills-row__sub { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 /* uni-text sets white-space: pre-line on itself, so a nowrap parent alone does not keep the line whole. */
-.bills-row__sub--line { display:flex;align-items:baseline;min-width:0; }
-.bills-row__sub--line > .bills-row__memo { flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.bills-row__sub--line > .bills-row__dot { flex:none;white-space:pre; }
+/* Memo and time flow as one text and wrap by word, so the time is never cut off. */
+.bills-row__sub--line { display:block;overflow-wrap:break-word; }
+.bills-row__sub--line > .bills-row__dot { white-space:pre-wrap; }
 .bills-row__figure { display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:var(--v5-space-1); }
 .bills-row__amount { display:flex;align-items:baseline;gap:var(--v5-space-1);font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink); }
 .bills-row__amount--in { color:var(--v5-success-ink); }
 .bills-row__unit { font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
-.bills-row__balance { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
+.bills-row__balance { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);text-align:right; }
 /* A balance below zero is a wallet debt: same place and alignment, amber ink. */
 .bills-row__balance.bills-balance--debt, .bills-sheet__value.bills-balance--debt { color:var(--v5-warning-ink); }
 .bills-end { display:block;padding:0 0 4px;text-align:center;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-4); }

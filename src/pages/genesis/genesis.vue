@@ -8,7 +8,7 @@
       <view class="genesis-seat genesis-edge">
         <view class="flex items-center justify-between" style="gap:8px">
           <view class="genesis-crown-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z"/></svg><text>{{ t.genesis.heroCrown }}</text></view>
-          <view class="genesis-how" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesis.howItWorksEntry }} →</view>
+          <view class="genesis-how" role="button" tabindex="0" @click="goHowItWorks"><text class="nx-after-arrow">{{ t.genesis.howItWorksEntry }}</text></view>
         </view>
         <text class="genesis-title">{{ t.genesis.heroTitle }}</text>
         <text v-if="showUrgency && supplyDisplay.known" class="genesis-description">{{ supplyCaption }}</text>
@@ -349,7 +349,11 @@ function goMarketplace() {
 [data-theme="light"] .genesis-main-art { background-image:url("@/static/img/genesis/genesis-card-light.webp"); }
 .genesis-seat { position:relative; margin:-24px 12px 0; padding:18px 18px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
 .genesis-edge::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 160deg,transparent 0 40%,color-mix(in srgb,var(--v5-genesis-gold) 85%,transparent) 66%,transparent 92%); mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); mask-composite:exclude; pointer-events:none; }
-.genesis-crown-chip { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:var(--v5-radius-full); background:var(--genesis-soft); color:var(--v5-genesis-gold); font-size:12px; line-height:16px; font-weight:500; }
+/* Chip and "how it works" link share a row that wraps when both do not fit (vi, ru); the link then sits at the right on its own line. */
+.genesis-seat > view:first-child { flex-wrap:wrap; row-gap:4px; }
+.genesis-crown-chip > text, .genesis-how, .genesis-how > text { white-space:nowrap; }
+.genesis-how { margin-left:auto; }
+.genesis-crown-chip { display:inline-flex; align-items:center; gap:6px; min-height:24px; padding:0 8px; border-radius:var(--v5-radius-full); background:var(--genesis-soft); color:var(--v5-genesis-gold); font-size:12px; line-height:16px; font-weight:500; }
 .genesis-how { display:flex; align-items:center; min-height:44px; margin-block:-10px; font-size:13px; line-height:18px; font-weight:500; color:var(--v5-genesis-gold); }
 .genesis-title { display:block; margin-top:var(--v5-space-3); font-size:24px; line-height:32px; font-weight:600; color:var(--v5-genesis-gold-hi); }
 .genesis-description { display:block; margin-top:var(--v5-space-1); font-size:13px; line-height:20px; color:var(--v5-ink-3); }

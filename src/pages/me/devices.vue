@@ -416,9 +416,10 @@ function goStore() {
 .device-hero__loading { display: inline-flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
 .device-hero__spin { width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); border-top-color: var(--v5-brand); animation: spin 1s linear infinite; }
 .device-hero__spin--lg { width: 22px; height: 22px; }
-.device-bays__cell { min-width: 0; }
+/* Bays and slots in one row share its height when a long device name takes a second line. */
+.device-bays__cell { display: grid; min-width: 0; }
 .device-bays { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
-.device-bay-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 112px; box-sizing: border-box; border-radius: var(--v5-radius-m); }
+.device-bay-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 112px; box-sizing: border-box; border-radius: var(--v5-radius-m); }
 .device-bay-slot--empty { border: 1.5px dashed var(--v5-border-strong); cursor: pointer; }
 /* The dashed slot is the control; its plus carries no glass surface inside the tinted hero (P-67). */
 .device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; color: var(--v5-ink-3); }

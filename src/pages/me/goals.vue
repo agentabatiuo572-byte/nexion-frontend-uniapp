@@ -78,7 +78,7 @@
       <view v-if="recommendationWarmDisplay" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recPathStyle">{{ recommendationWarmDisplay }}</text>
-        <view class="inline-flex items-center" :style="recCtaStyle" aria-hidden="true"><text :style="recCtaLabelStyle">{{ t.goals.shopCta }} →</text></view>
+        <view class="inline-flex items-center" :style="recCtaStyle" aria-hidden="true"><text class="nx-after-arrow" :style="recCtaLabelStyle">{{ t.goals.shopCta }}</text></view>
       </view>
       <view v-else-if="editorHasSnapshot && target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'loading'" class="nx-glass-card mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
@@ -97,7 +97,7 @@
         <text v-else class="block" :style="recPathStyle">{{ recPathLine }}</text>
         <text v-if="recommendation.reason" class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
         <view class="goal-device-well flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.goals.shopCta" @click="goStore">
-          <view class="goal-device-copy"><text class="goal-device-label">{{ t.growthUi.recommendedDevice }}</text><text class="goal-device-name">{{ recommendation.tier }}</text></view><text :style="recCtaLabelStyle">{{ t.goals.shopCta }} →</text>
+          <view class="goal-device-copy"><text class="goal-device-label">{{ t.growthUi.recommendedDevice }}</text><text class="goal-device-name">{{ recommendation.tier }}</text></view><text class="nx-after-arrow" :style="recCtaLabelStyle">{{ t.goals.shopCta }}</text>
         </view>
       </view>
 

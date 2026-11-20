@@ -34,7 +34,7 @@
                 <text class="block tabular-nums" :style="heroUsdStyle">≈ {{ valuationKnown ? fmtUSD(usdValue) : "—" }}</text>
                 <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="heroChangeStyle" role="status" aria-live="polite">{{ t.wallet.loadingTransactions }}</text>
                 <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="heroChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
-                <text v-else class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable && Number.isFinite(change24h) ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
+                <text v-else class="block tabular-nums" :class="market.change24hAvailable && Number.isFinite(change24h) ? (isUp ? 'nx-before-caret-up' : 'nx-before-caret-down') : undefined" :style="heroChangeStyle"><text v-if="market.change24hAvailable && Number.isFinite(change24h)" class="nx-sr-only">{{ isUp ? "+" : "−" }}</text>{{ market.change24hAvailable && Number.isFinite(change24h) ? `${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
               </view>
             </view>
 
@@ -71,9 +71,9 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="breakdownLabelStyle">{{ br.label }}</text>
-                <text v-if="br.hint" class="block truncate" :style="breakdownHintStyle">{{ br.hint }}</text>
+                <text v-if="br.hint" class="block" :style="breakdownHintStyle">{{ br.hint }}</text>
               </view>
-              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}</text>
+              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}<text v-if="br.value !== '—'" class="nx-sr-only"> UVT</text></text>
             </view>
           </view>
         </view>
@@ -111,7 +111,13 @@
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block truncate" :style="activityLabelStyle">{{ a.label }}</text>
+              <!-- Rows open nothing, so the label wraps in full. A code after the last " · " is a long code (decision 6): one line,
+                   middle ellipsis, tail visible, copy and screen readers get it whole; it moves under the label when it does not fit. -->
+              <view v-if="labelTail(a.label)" class="flex flex-wrap items-center" :style="activityLabelStyle">
+                <text style="white-space: pre-wrap; overflow-wrap: break-word">{{ labelHead(a.label) }}</text>
+                <NxCodeValue :value="labelTail(a.label)" :label="labelHead(a.label).replace(/ · $/, '')" style="max-width: 100%" />
+              </view>
+              <text v-else class="block" style="overflow-wrap: break-word" :style="activityLabelStyle">{{ a.label }}</text>
               <text class="block" :style="activityTimeStyle">{{ fmtActivityTime(a.ts) }}</text>
             </view>
             <view class="text-right">
@@ -136,6 +142,7 @@ import { computed, ref, watch, type CSSProperties } from "vue";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexSparkline from "@/components/me/nex-sparkline.vue";
@@ -251,6 +258,9 @@ function fmtNum(n: number, dp = 2): string {
 function fmtUSD(n: number): string {
   return Number.isFinite(n) ? `$${fmtNum(n)}` : "—";
 }
+// Only a tail without spaces (a code) goes to NxCodeValue; a phrase tail wraps like the rest of the label.
+const labelTail = (label: string) => { const i = label.lastIndexOf(" · "), tail = i < 0 ? "" : label.slice(i + 3); return /\s/.test(tail) ? "" : tail; };
+const labelHead = (label: string) => { const tail = labelTail(label); return tail ? label.slice(0, label.length - tail.length) : label; };
 function fmtActivityTime(timestamp: number): string {
   return Number.isFinite(new Date(timestamp).getTime()) ? formatTrialDateTime(timestamp, dateLocale()) : "—";
 }
@@ -281,9 +291,9 @@ const quickCells = computed(() => [
 ]);
 
 const breakdownRows = computed(() => [
-  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} UVT` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} UVT`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
-  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} UVT`, hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
+  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? fmtNum(nexBalance.value, 2) : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)}`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
+  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : fmtNum(pendingNex.value, 2), hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
 const useTiles = computed(() => [

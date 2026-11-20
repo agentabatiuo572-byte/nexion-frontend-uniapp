@@ -2,13 +2,13 @@
   <view v-if="items.length || (!listRead && status !== 'ready') || status === 'error' || mode !== 'home'" ref="loopRef" class="promotion promotion-entry" :class="{'promotion-entry-home':mode==='home','nx-loops-paused':!loops.running.value}" :data-testid="'promotion-entry-'+mode">
     <view v-if="mode==='events'" class="entry-navigation">
       <text class="promotion-title">{{ t.promotion.promotionList }}</text>
-      <view class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.space.prevent="navTo('/pages/me/rewards-list?cat=promotion')"><text>{{ t.promotion.rewards }}</text><text aria-hidden="true">›</text></view>
+      <view class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.space.prevent="navTo('/pages/me/rewards-list?cat=promotion')"><text>{{ t.promotion.rewards }}</text><NxIcon name="chevron-right" /></view>
     </view>
     <view v-if="!items.length&&!listRead" class="entry-placeholder" role="status" :aria-busy="status==='loading'" :aria-label="status==='loading'?t.promotion.loading:undefined"><text v-if="mode==='home'" class="promotion-title">{{ t.promotion.promotionList }}</text><view /><view /></view>
 
     <view v-if="status==='ready'&&!items.length&&mode==='events'" class="entry-status">
       <text class="promotion-title">{{ t.promotion.empty }}</text><text class="promotion-copy">{{ t.promotion.emptyNote }}</text>
-      <NxButton class="entry-cta" size="medium" :label="t.promotion.allProducts" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text><text aria-hidden="true">→</text></NxButton>
+      <NxButton class="entry-cta" size="medium" :label="t.promotion.allProducts" icon="arrow-right" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text></NxButton>
     </view>
     <view class="entry-list" :class="{ 'entry-list--home': mode==='home' }"><view class="entry-track" :style="mode==='home' ? { transform: `translateX(-${activeIndex * 100}%)` } : undefined">
     <view v-for="(activity, index) in items" :key="activity.activityId" :inert="mode==='home' && index!==activeIndex ? true : undefined" :aria-hidden="mode==='home' && index!==activeIndex ? 'true' : undefined" :class="[mode==='home'?'entry-advert':eventLanding(activity)?'entry-landing':'entry-event', 'entry-kind-'+activityKind(activity), { 'entry-advert--banner': mode==='home' && bannerReady(activity), 'nx-tint': tinted }]" :data-color-scheme="theme.resolved" :data-activity-id="activity.activityId" :data-activity-kind="activityKind(activity)">
@@ -23,7 +23,7 @@
         <text class="entry-title">{{ localized(activity.title,locale.code) }}</text>
         <text v-if="homeRewardSummary(activity)" class="entry-benefit">{{ homeRewardSummary(activity) }}</text>
         </template>
-        <text class="entry-home-deadline" role="button" tabindex="0" :aria-label="t.promotion.homeRulesLink" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)">{{ t.promotion.homeRulesLink }} ›</text>
+        <text class="entry-home-deadline nx-after-chevron" role="button" tabindex="0" :aria-label="t.promotion.homeRulesLink" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)">{{ t.promotion.homeRulesLink }}</text>
       </view>
       <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-copy">
         <text class="entry-eyebrow">{{ t.promotion.activityBadge }}</text>
@@ -40,8 +40,8 @@
       <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-footer">
         <text class="entry-deadline">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
         <view class="entry-event-actions">
-          <view class="promotion-link" role="button" tabindex="0" @click="openTerms(activity)" @keydown.enter.prevent="openTerms(activity)" @keydown.space.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
-          <NxButton class="entry-cta" size="medium" :label="t.promotion.browse" @click="navTo(promotionStoreHref(activity.activityId))"><text>{{ t.promotion.browse }}</text><text aria-hidden="true">→</text></NxButton>
+          <view class="promotion-link" role="button" tabindex="0" @click="openTerms(activity)" @keydown.enter.prevent="openTerms(activity)" @keydown.space.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }}</text><NxIcon name="chevron-right" /></view>
+          <NxButton class="entry-cta" size="medium" :label="t.promotion.browse" icon="arrow-right" @click="navTo(promotionStoreHref(activity.activityId))"><text>{{ t.promotion.browse }}</text></NxButton>
         </view>
       </view>
       <!-- Purchase gift, first purchase and repurchase open their own landing page; the
@@ -59,27 +59,28 @@
           <text class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text>
         </view>
         <view v-else class="entry-card__well">
-          <view class="entry-card__slot"><CatalogMachineImage class="entry-card__slot-image" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-slot'" :refresh-key="catalogRefreshKey" /><text class="entry-card__plus entry-pop" aria-hidden="true">+</text></view>
+          <view class="entry-card__slot"><CatalogMachineImage class="entry-card__slot-image" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-slot'" :refresh-key="catalogRefreshKey" /><view class="entry-card__plus entry-pop" aria-hidden="true"><NxIcon name="plus" :size="12" /></view></view>
           <view class="entry-card__bonus"><text class="entry-card__bonus-amount">{{ card.discount ? '−' : '+' }}{{ card.parts.asset==='DEVICE' ? card.rewardText : card.parts.amount }}</text><text v-if="card.parts.asset!=='DEVICE'" class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text></view>
         </view>
         <template v-if="card.kind==='first'"><view class="entry-card__tear" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--top" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--bottom" aria-hidden="true" /></template>
         <view v-if="card.kind!=='gift'" class="entry-card__body">
           <view class="entry-card__head"><text class="entry-card__title">{{ localized(activity.title,locale.code) }}</text><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
           <text class="entry-card__note">{{ card.kind==='first' ? (card.discount ? landing.cardFirstNoteDiscount : landing.cardFirstNote) : fmt(landing.cardRepurchaseNote,{name:card.buyName}) }}</text>
-          <view class="entry-card__link" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }} ›</text></view>
+          <view class="entry-card__link" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text class="nx-after-chevron">{{ t.promotion.rulesLink }}</text></view>
         </view>
-        <view v-else class="entry-card__link entry-card__link--corner" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }} ›</text></view>
+        <view v-else class="entry-card__link entry-card__link--corner" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text class="nx-after-chevron">{{ t.promotion.rulesLink }}</text></view>
       </view>
     </view>
     </view></view>
     <view v-if="mode==='home'&&items.length>1" class="entry-pagination" role="button" tabindex="0" :aria-label="`${t.promotion.nextOffer} · ${activeIndex+1} / ${items.length}`" @click="cycleOffer(1)" @keydown.enter.prevent="cycleOffer(1)" @keydown.space.prevent="cycleOffer(1)" @keydown.right.prevent="cycleOffer(1)" @keydown.left.prevent="cycleOffer(-1)">
       <view v-for="(_,index) in items" :key="index" class="entry-page-dot" :class="{selected:activeIndex===index}" aria-hidden="true" />
     </view>
-    <NxButton v-if="hasMore&&mode==='events'" class="entry-cta" size="medium" :busy="status==='loading'" :label="status==='loading'?t.promotion.loading:t.promotion.more" @click="load(false)"><text>{{ status==='loading'?t.promotion.loading:t.promotion.more }}</text><text aria-hidden="true">→</text></NxButton>
+    <NxButton v-if="hasMore&&mode==='events'" class="entry-cta" size="medium" :busy="status==='loading'" :label="status==='loading'?t.promotion.loading:t.promotion.more" icon="arrow-right" @click="load(false)"><text>{{ status==='loading'?t.promotion.loading:t.promotion.more }}</text></NxButton>
     <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="termsText" :rules="termsRules" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot, invalidateTabSnapshots, type PromotionEntrySnapshot } from "@/lib/tab-first-screen-snapshot";
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -316,6 +317,11 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-deadline { display: block; color: var(--v5-ink-3); font: 400 11px/1.5 var(--font-v5); overflow-wrap: anywhere; }
 .entry-event-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: var(--ui-space-row-y); }
 .promotion-link { gap: 8px; color: var(--v5-ink-2); }
+/* A text link and its chevron stay on one line; when the title row cannot hold both, the link drops to the right on its own line. */
+.promotion-link { flex: none; }
+.entry-navigation .promotion-link, .entry-event-actions > .entry-cta { margin-left: auto; }
+.promotion-link > text { white-space: nowrap; }
+.entry-navigation { flex-wrap: wrap; row-gap: 0; }
 .entry-cta { max-width: 100%; }
 .entry-event.entry-kind-coupon { grid-template-columns: minmax(0,1fr) 94px; border-radius: 16px; }
 .entry-kind-coupon .entry-event-copy { padding-right: 18px; }

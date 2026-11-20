@@ -132,7 +132,7 @@
       <view v-if="!phoneFactsReady" class="mx-5 mb-4 rounded-xl" style="padding: 12px; background: var(--v5-brand-soft)" role="status">
         <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ phoneActivationGuidance.title }}</text>
         <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ phoneActivationGuidance.body }}</text>
-        <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
+        <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text class="nx-after-arrow">{{ t.myDevices.phoneActivationCta }}</text></view>
       </view>
       <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" />
       <template v-if="stage">
@@ -326,7 +326,7 @@
       <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
       <view v-else-if="deviceTodayCompleted.length">
         <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" time="" />
-        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
+        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
       </view>
     </view>
 
@@ -996,7 +996,8 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 [data-theme="light"] .earn-stage__floor { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 20%, transparent), transparent); }
 .earn-stage__job { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 10px 18px 0; text-align: center; }
 .earn-stage__job-name { display: flex; align-items: center; justify-content: center; gap: 6px; max-width: 100%; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
-.earn-stage__job-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The stage opens nothing for the job, so a long task name wraps in full under the gauge. */
+.earn-stage__job-title { min-width: 0; white-space: normal; overflow-wrap: break-word; }
 .earn-stage__eq { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 10px; height: 10px; flex: none; }
 .earn-stage__eq > view { width: 2.2px; height: 10px; border-radius: 1px; background: var(--v5-brand); transform-origin: bottom; transform: scaleY(.55); }
 .earn-stage__eq--running > view { animation: earn-stage-eq .9s ease-in-out infinite; }

@@ -149,7 +149,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .tree-stat--brand { --accent: var(--v5-brand); }
 .tree-stat > text.tree-points { max-width: 100%; overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 .tree-stat--cyan { --accent: var(--ui-device-ink); }
-.tree-stat__label { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.tree-stat__label { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .tree-search { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; padding: 0 var(--ui-space-inset); border-radius: 999px; color: var(--v5-ink-3); background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border), inset 0 3px 6px -2px rgba(255,255,255,.18); }
 .tree-search__input { flex: 1; min-width: 0; font: 400 15px/var(--ui-type-input-lh) var(--font-v5); color: var(--v5-ink); background: transparent; }
 /* Roster cards; direct invites hang from "you" by a connector line to show the one level we know. */
