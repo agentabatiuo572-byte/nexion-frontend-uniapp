@@ -151,7 +151,7 @@ export default viewImplementation;
    brings the selected option into view (Material scrollable tabs). */
 :where(.nx-glass-segments--filter.nx-glass-segments--equal) { overflow-x: auto; scrollbar-width: none; }
 :where(.nx-glass-segments--filter.nx-glass-segments--equal)::-webkit-scrollbar { display: none; }
-:where(.nx-glass-segments--filter.nx-glass-segments--equal) .nx-glass-option { flex: 1 0 0; min-width: auto; padding-inline: 10px; }
+:where(.nx-glass-segments--filter.nx-glass-segments--equal) .nx-glass-option { flex: 1 0 0; min-width: auto; padding-inline: 8px; }
 .nx-glass-segments--equal[data-glass-overflow="true"], .nx-glass-segments--equal[data-glass-overflow="true"] .nx-glass-option { touch-action: pan-x pan-y; }
 .nx-glass-track-viewport { position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none; }
 .nx-glass-segments--scroll { overflow-x: auto; scrollbar-width: none; }
