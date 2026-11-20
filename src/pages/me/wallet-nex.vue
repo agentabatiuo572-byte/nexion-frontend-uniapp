@@ -111,7 +111,8 @@
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block truncate" :style="activityLabelStyle">{{ a.label }}</text>
+              <!-- Rows open nothing, so the label wraps in full; the part after the last " · " (a code or a kind) never breaks at its hyphens. -->
+              <text class="block" :style="activityLabelStyle">{{ labelHead(a.label) }}<text v-if="labelTail(a.label)" style="display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom">{{ labelTail(a.label) }}</text></text>
               <text class="block" :style="activityTimeStyle">{{ fmtActivityTime(a.ts) }}</text>
             </view>
             <view class="text-right">
@@ -251,6 +252,9 @@ function fmtNum(n: number, dp = 2): string {
 function fmtUSD(n: number): string {
   return Number.isFinite(n) ? `$${fmtNum(n)}` : "—";
 }
+// Activity labels read "<what> · <code or kind>"; the tail is kept as one unit when the label wraps.
+const labelHead = (label: string) => { const i = label.lastIndexOf(" · "); return i < 0 ? label : label.slice(0, i + 3); };
+const labelTail = (label: string) => { const i = label.lastIndexOf(" · "); return i < 0 ? "" : label.slice(i + 3); };
 function fmtActivityTime(timestamp: number): string {
   return Number.isFinite(new Date(timestamp).getTime()) ? formatTrialDateTime(timestamp, dateLocale()) : "—";
 }

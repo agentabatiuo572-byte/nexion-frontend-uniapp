@@ -513,7 +513,8 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-day__unit { padding:0 4px 8px;font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__label { display:block;padding:0 4px 8px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__group { overflow:hidden;border:1px solid var(--v5-border);border-radius:var(--ui-radius-surface);background:var(--v5-surface); }
-.bills-row { display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);min-height:64px;box-sizing:border-box;padding:var(--ui-space-inline) 16px;cursor:pointer; }
+/* The name column keeps at least 104px (a long one-word type label); the running-balance line wraps instead. */
+.bills-row { display:grid;grid-template-columns:32px minmax(104px,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);min-height:64px;box-sizing:border-box;padding:var(--ui-space-inline) 16px;cursor:pointer; }
 .bills-row + .bills-row { border-top:1px solid var(--v5-border); }
 .bills-row:active { background:var(--v5-surface-2); }
 .bills-row:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
@@ -535,7 +536,7 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-row__amount { display:flex;align-items:baseline;gap:var(--v5-space-1);font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink); }
 .bills-row__amount--in { color:var(--v5-success-ink); }
 .bills-row__unit { font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
-.bills-row__balance { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
+.bills-row__balance { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);text-align:right; }
 /* A balance below zero is a wallet debt: same place and alignment, amber ink. */
 .bills-row__balance.bills-balance--debt, .bills-sheet__value.bills-balance--debt { color:var(--v5-warning-ink); }
 .bills-end { display:block;padding:0 0 4px;text-align:center;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-4); }
