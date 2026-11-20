@@ -24,12 +24,25 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet-withdraw-network" :title="t.wallet.withdraw" subtitle="USDT" />
-      <view v-if="pendingAttempt" class="mx-4 mb-3 flex items-start" :style="holdBannerStyle">
-        <view class="flex-1 min-w-0">
-          <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 600">{{ t.walletV3.withdrawAmbiguousExitTitle }}</text>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px; line-height: 1.4">{{ t.walletV3.withdrawAmbiguousExitBody }}</text>
-          <view class="inline-flex items-center active:scale-[0.98] transition-transform" style="min-height: 44px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="abandoningAttempt" :aria-label="t.walletV3.withdrawAbandonAttemptCta" @click="abandonPendingAttempt"  @keydown.enter.prevent="abandonPendingAttempt" @keydown.space.prevent="abandonPendingAttempt">
-            <text style="font-size: 12px; color: var(--v5-danger); text-decoration: underline">{{ abandoningAttempt ? `${t.walletV3.withdrawAbandonAttemptCta}…` : t.walletV3.withdrawAbandonAttemptCta }}</text>
+      <!-- B34 提现结果找回:一处横幅,按 withdrawalRecovery.state 只换图标、标题、正文和动作;原样重新提交在底栏(handleSubmit)。 -->
+      <view v-if="recoveryBanner" class="wd-recover mx-4 mb-3" :class="`wd-recover--${recoveryBanner.tone}`" data-testid="withdraw-recovery" role="status" aria-live="polite">
+        <view class="wd-recover__icon" aria-hidden="true">
+          <svg v-if="recoveryBanner.tone === 'pending'" class="wd-recover__spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+          <svg v-else-if="recoveryBanner.tone === 'retry'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
+          <svg v-else-if="recoveryBanner.tone === 'rejected'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+        </view>
+        <view class="wd-recover__main">
+          <text class="wd-recover__title">{{ recoveryBanner.title }}</text>
+          <text v-for="line in recoveryBanner.lines" :key="line" class="wd-recover__body">{{ line }}</text>
+          <view v-if="recoveryBanner.trackingRoute || recoveryBanner.abandon" class="wd-recover__acts">
+            <view v-if="recoveryBanner.trackingRoute" class="wd-recover__act" role="button" tabindex="0" @click="navTo(recoveryBanner.trackingRoute)" @keydown.enter.prevent="navTo(recoveryBanner.trackingRoute)" @keydown.space.prevent="navTo(recoveryBanner.trackingRoute)">
+              <text>{{ t.walletV3.withdrawRecoveryTrackCta }}</text>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+            </view>
+            <view v-if="recoveryBanner.abandon" class="wd-recover__act wd-recover__act--muted" role="button" tabindex="0" :aria-disabled="abandoningAttempt || submitting || confirmingSubmit ? 'true' : 'false'" :aria-busy="abandoningAttempt" @click="abandonPendingAttempt" @keydown.enter.prevent="abandonPendingAttempt" @keydown.space.prevent="abandonPendingAttempt">
+              <text>{{ abandoningAttempt ? `${t.walletV3.withdrawAbandonAttemptCta}…` : t.walletV3.withdrawAbandonAttemptCta }}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -282,7 +295,7 @@
         <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
             <svg v-if="submitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-            <text>{{ submitting ? t.wallet.submitChecking : canSubmitAction ? (pendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.submitCtaPaired) : t.walletV3.submitCtaDisabled }}</text>
+            <text>{{ submitting ? t.wallet.submitChecking : canSubmitAction ? (pendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.submitCtaPaired) : pendingAttempt ? t.walletV3.withdrawRecoveryWaitCta : t.walletV3.submitCtaDisabled }}</text>
           </view>
         </view>
       </view>
@@ -391,6 +404,57 @@ function takeRecoveredWithdrawalNotice(): { withdrawalNo: string; trackingRoute:
   recoveryResult.value = { key: result.key, outcome: { ...outcome, noticePending: false } };
   return { withdrawalNo: outcome.withdrawalNo, trackingRoute: outcome.trackingRoute };
 }
+
+// ── B34 视觉:找回横幅(只做呈现,不改找回逻辑) ──
+// 🟡 PLACEHOLDER(B34 接线,Codex):一次性提示。由接线阶段在 COMMITTED 且 noticePending 时调用
+// takeRecoveredWithdrawalNotice(),把返回值写进这里;非 null 时横幅显示「提现已提交成功」整版,
+// null 时 COMMITTED 只留「上一笔提现已提交 · 查看进度」入口(已按单号消费过的同一单)。
+const recoveredWithdrawalNotice = ref<{ withdrawalNo: string; trackingRoute: string } | null>(null);
+// 服务端拒绝原因 → 九语一句话;风控类与未列出的原因不写原因,只给通用收尾句。
+const RECOVERY_REASON_COPY: Record<string, "withdrawRecoveryReasonAbandoned" | "withdrawRecoveryReasonDailyLimit"
+  | "withdrawRecoveryReasonPaused" | "withdrawRecoveryReasonAddress" | "withdrawRecoveryReasonAmount"
+  | "withdrawRecoveryReasonFee" | "withdrawRecoveryReasonBank"> = {
+  WITHDRAWAL_ATTEMPT_ABANDONED: "withdrawRecoveryReasonAbandoned",
+  WITHDRAWAL_DAILY_LIMIT_EXCEEDED: "withdrawRecoveryReasonDailyLimit",
+  WITHDRAWAL_KILL_SWITCH_DISABLED: "withdrawRecoveryReasonPaused",
+  WITHDRAWAL_NETWORK_DISABLED: "withdrawRecoveryReasonPaused",
+  WITHDRAWAL_PAYOUT_ADDRESS_REQUIRED: "withdrawRecoveryReasonAddress",
+  WITHDRAWAL_PAYOUT_ADDRESS_CHANGE_PENDING: "withdrawRecoveryReasonAddress",
+  WITHDRAWAL_PAYOUT_ADDRESS_MISMATCH: "withdrawRecoveryReasonAddress",
+  WITHDRAWAL_ADDRESS_INVALID: "withdrawRecoveryReasonAddress",
+  WITHDRAWAL_BALANCE_LIMIT_EXCEEDED: "withdrawRecoveryReasonAmount",
+  WITHDRAWAL_RELEASE_BUCKET_INSUFFICIENT: "withdrawRecoveryReasonAmount",
+  WITHDRAWAL_MIN_AMOUNT_NOT_MET: "withdrawRecoveryReasonAmount",
+  WITHDRAWAL_NET_AMOUNT_INVALID: "withdrawRecoveryReasonAmount",
+  WITHDRAWAL_AMOUNT_INVALID: "withdrawRecoveryReasonAmount",
+  WITHDRAWAL_POLICY_VERSION_CONFLICT: "withdrawRecoveryReasonFee",
+  BANK_WITHDRAWAL_UNRESOLVED_INTENT: "withdrawRecoveryReasonBank",
+};
+// 「放弃」只在可能长期停住的状态出现(UNKNOWN / READ_FAILED)和可原样重试时;CHECKING / PROCESSING 只说等待。
+const recoveryBanner = computed<{
+  tone: "pending" | "retry" | "rejected" | "done"; title: string; lines: string[]; abandon: boolean; trackingRoute: string;
+} | null>(() => {
+  const outcome = withdrawalRecovery.value;
+  const c = t.value.walletV3;
+  if (!outcome) return null;
+  switch (outcome.state) {
+    case "COMMITTED":
+      return recoveredWithdrawalNotice.value
+        ? { tone: "done", title: c.withdrawRecoveryCommittedTitle, lines: [c.withdrawRecoveryCommittedBody], abandon: false, trackingRoute: outcome.trackingRoute }
+        : { tone: "done", title: c.withdrawRecoveryCommittedSeenTitle, lines: [], abandon: false, trackingRoute: outcome.trackingRoute };
+    case "REJECTED": {
+      const reasonKey = RECOVERY_REASON_COPY[outcome.reason];
+      return { tone: "rejected", title: c.withdrawRecoveryRejectedTitle,
+        lines: [reasonKey ? c[reasonKey] : "", c.withdrawRecoveryRejectedNext].filter(Boolean), abandon: false, trackingRoute: "" };
+    }
+    case "NOT_SEEN":
+      return { tone: "retry", title: c.withdrawRecoveryNotSeenTitle, lines: [c.withdrawRecoveryNotSeenBody], abandon: !!pendingAttempt.value, trackingRoute: "" };
+    default:
+      return { tone: "pending", title: c.withdrawRecoveryPendingTitle,
+        lines: outcome.state === "READ_FAILED" ? [c.withdrawRecoveryPendingBody, c.withdrawRecoveryReadFailed] : [c.withdrawRecoveryPendingBody],
+        abandon: !!pendingAttempt.value && (outcome.state === "UNKNOWN" || outcome.state === "READ_FAILED"), trackingRoute: "" };
+  }
+});
 
 function refreshPendingAttempt() {
   pendingAttempt.value = remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null;
@@ -1799,4 +1863,20 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-submit--on { cursor: pointer; }
 .wd-submit--on:active { transform: scale(.98); }
 @media (prefers-reduced-motion: reduce) { .wd-submit--on:active { transform: none; } }
+/* B34 找回横幅:与页内合规/冻结横幅同一语汇(8% 色底 + 28px 图标块),色只按状态换。 */
+.wd-recover { --wd-recover-hue: var(--v5-warning); display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px 4px; border-radius: 12px; background: color-mix(in srgb, var(--wd-recover-hue) 8%, transparent); }
+.wd-recover--rejected { --wd-recover-hue: var(--v5-danger); }
+.wd-recover--done { --wd-recover-hue: var(--v5-success); }
+.wd-recover__icon { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--wd-recover-hue) 20%, transparent); color: var(--wd-recover-hue); }
+.wd-recover__spin { animation: spin 1.6s linear infinite; }
+.wd-recover__main { flex: 1; min-width: 0; padding-bottom: 6px; }
+.wd-recover__title { display: block; color: var(--v5-ink); font: 600 13px/18px var(--font-v5); overflow-wrap: anywhere; }
+.wd-recover__body { display: block; margin-top: 3px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); overflow-wrap: anywhere; }
+.wd-recover__acts { display: flex; flex-wrap: wrap; align-items: center; column-gap: 20px; margin: 2px 0 -6px; }
+.wd-recover__act { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.wd-recover__act--muted { color: var(--v5-ink-2); }
+.wd-recover__act:active { opacity: .6; }
+.wd-recover__act[aria-disabled="true"] { opacity: .5; cursor: default; }
+.wd-recover__act:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { .wd-recover__spin { animation: none; } .wd-recover__act:active { opacity: 1; } }
 </style>
