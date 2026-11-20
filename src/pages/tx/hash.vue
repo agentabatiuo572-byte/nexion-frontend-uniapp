@@ -14,7 +14,7 @@
         <text class="block" :style="holdBodyStyle">{{ hash ? w.detailUnavailableBody : hashProvided ? recoveryCopy.txInvalidBody : recoveryCopy.txMissingBody }}</text>
         <view v-if="hash" style="margin-top: 16px">
           <text class="block" :style="holdBodyStyle">{{ recoveryCopy.txHashLabel }}</text>
-          <text class="block tx-retained-hash" selectable :style="hashStyle">{{ hash }}</text>
+          <NxCodeValue class="tx-retained-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
           <view :style="copyBtnStyle" role="button" :tabindex="copyBusy ? -1 : 0" :aria-disabled="copyBusy" :aria-busy="copyBusy" @click="copyHash" @keydown.enter.prevent="copyHash" @keydown.space.prevent="copyHash"><text>{{ copyButtonText }}</text></view>
         </view>
         <view class="tx-bills-link" role="link" tabindex="0" :style="copyBtnStyle" @click="viewBills" @keydown.enter.prevent="viewBills"><text>{{ recoveryCopy.viewBills }}</text></view>
@@ -76,6 +76,7 @@ import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import Stat from "@/components/tx/tx-stat.vue";
 import Row from "@/components/tx/tx-row.vue";
 import { useT } from "@/i18n/use-t";
@@ -298,7 +299,8 @@ const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-typ
 </script>
 
 <style scoped>
-.tx-retained-hash { margin-top: 6px; user-select: text; overflow-wrap: anywhere; }
+/* The retained hash stays fully visible: its own full-width monospace block, wrapping evenly (NxCodeValue full); the copy button below copies it. */
+.tx-retained-hash { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); user-select: text; }
 .tx-bills-link { display: flex !important; justify-content: center; }
 [role="button"][aria-disabled="true"] { opacity: 0.5; }
 [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
