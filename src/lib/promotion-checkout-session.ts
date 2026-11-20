@@ -245,9 +245,18 @@ export class PromotionCheckoutSession {
         }
         const result = await this.ports.api.command(pending.key, pending.operation, pending.targetId);
         if (!this.ports.current()) return;
-        if (result.status === 'SUCCEEDED' && result.order)
-          this.acceptOrder(result.order, false, pending.operation === 'createOrder' || pending.operation === 'createBundle');
-        else if(result.status==='FAILED'&&!result.order){
+        if (result.status === 'SUCCEEDED' && result.order) {
+          const creation = pending.operation === 'createOrder' || pending.operation === 'createBundle';
+          let order = result.order;
+          if (creation && order.paymentStatus === 'PENDING') {
+            // A recovered creation receipt can still carry the status at creation time.
+            const liveOrder = await this.ports.api.findOrder(order.orderNo);
+            if (!this.ports.current()) return;
+            if (!liveOrder) { this.unknown = true; this.confirmed = false; return; }
+            order = { ...liveOrder, ...(order.recoveredQuoteId ? { recoveredQuoteId: order.recoveredQuoteId } : {}) };
+          }
+          this.acceptOrder(order, false, creation);
+        } else if(result.status==='FAILED'&&!result.order){
           if(this.record.order){
             const order=await this.ports.api.findOrder(this.record.order.orderNo);
             if(!this.ports.current())return;
