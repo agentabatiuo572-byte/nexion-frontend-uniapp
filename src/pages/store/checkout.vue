@@ -26,7 +26,7 @@
 
       <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogErrorTitle }}</text>
-        <view class="mb-3"><NxButton :label="t.store.catalogRetry" @click="refreshVisibleCheckout(true)" /></view>
+        <view class="mb-3"><NxButton :label="t.store.catalogRetry" @click="refreshVisibleCheckout()" /></view>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text>{{ t.store.coBackToStore }}</text>
         </view>
@@ -621,11 +621,15 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, catalogRead?: 
     if (remoteApiEnabled && await resumeServerOrder(routeScope)) return;
     if (!isCurrentCheckoutRoute(routeScope)) return;
 
-    [catalogReady] = await Promise.all([
-      catalogRead ?? settleProductCatalogRefresh(refreshProductCatalog(true)),
+    const read = catalogRead ?? refreshProductCatalog(true);
+    await Promise.all([
+      read,
       refreshServerProductPhase(true),
       freeTrial.refreshVisible(),
     ]);
+    if (!isCurrentCheckoutRoute(routeScope)) return;
+    // A retry may have replaced the failed read while phase and trial were still loading.
+    catalogReady = await settleProductCatalogRefresh(read);
     // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
     if (!isCurrentCheckoutRoute(routeScope) || !catalogReady) return;
     // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
@@ -2466,11 +2470,11 @@ async function resumeReadyCheckout(scope: CheckoutRouteScope, catalogRead: Promi
   }
 }
 
-function refreshVisibleCheckout(retryCatalog = false) {
+function refreshVisibleCheckout() {
   const catalogRead = settleProductCatalogRefresh(refreshProductCatalog(true));
   if (!checkoutRouteInitialized || createdCheckoutOrder.value || settledResultReplay.value) return;
-  // An explicit retry supersedes an initialization still unwinding from the failed catalog.
-  if (activeCheckoutLoad && !retryCatalog) return;
+  // The active load owns original-order recovery and follows the latest catalog itself.
+  if (activeCheckoutLoad) return;
   if (!quantityReady.value) void initializeCheckout(beginCheckoutRoute(), catalogRead);
   else void resumeReadyCheckout(captureCheckoutRoute(), catalogRead);
 }
