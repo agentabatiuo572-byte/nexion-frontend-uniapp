@@ -24,8 +24,8 @@
             <text class="earn-market__name">{{ workloadCopy(w).name }}</text>
             <text class="earn-market__unit">{{ workloadCopy(w).unit }}</text>
             <text class="earn-market__price">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
-            <text class="earn-market__delta" :style="{ color: arrowColor(w) }">{{ w.delta === null ? "—" : `${arrow(w)} ${Math.abs(w.delta).toFixed(1)}%` }}</text>
-            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} <text class="earn-market__flagship-delta">{{ signedDelta(w.flagshipDelta) }}</text></text>
+            <text class="earn-market__delta" :class="w.delta === null ? undefined : arrow(w)" :style="{ color: arrowColor(w) }"><text v-if="w.delta !== null && Math.abs(w.delta) > 0.05" class="nx-sr-only">{{ w.delta > 0 ? "+" : "−" }}</text>{{ w.delta === null ? "—" : `${Math.abs(w.delta).toFixed(1)}%` }}</text>
+            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} <text class="earn-market__flagship-delta" :class="trendClass(w.flagshipDelta)"><text v-if="trendClass(w.flagshipDelta)" class="nx-sr-only">{{ w.flagshipDelta > 0 ? "+" : "−" }}</text>{{ Math.abs(w.flagshipDelta).toFixed(1) }}%</text></text>
             <view v-if="w.spark.length > 1" class="earn-market__spark"><svg data-native-svg class="earn-market-spark" width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="sparkPoints(w.spark)" fill="none" :stroke="arrowColor(w)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" /></svg></view>
           </view>
         </view>
@@ -128,15 +128,14 @@ const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
   : DEVICE_RANKINGS);
 
 function arrow(w: WorkloadPrice): string {
-  return w.delta !== null && w.delta > 0.05 ? "↑" : w.delta !== null && w.delta < -0.05 ? "↓" : "→";
+  return w.delta !== null && w.delta > 0.05 ? "nx-before-arrow-up" : w.delta !== null && w.delta < -0.05 ? "nx-before-arrow-down" : "nx-before-arrow-right";
 }
 function arrowColor(w: WorkloadPrice): string {
   return w.delta !== null && w.delta > 0.05 ? "var(--v5-success-ink)" : w.delta !== null && w.delta < -0.05 ? "var(--v5-danger)" : "var(--v5-ink-4)";
 }
-// Same thresholds as the workload delta: ↑ rising, ↓ falling, no arrow when flat.
-function signedDelta(delta: number): string {
-  const sign = delta > 0.05 ? "↑" : delta < -0.05 ? "↓" : "";
-  return `${sign}${Math.abs(delta).toFixed(1)}%`;
+// Same thresholds as the workload delta: up arrow rising, down arrow falling, no arrow when flat.
+function trendClass(delta: number): string | undefined {
+  return delta > 0.05 ? "nx-before-arrow-up" : delta < -0.05 ? "nx-before-arrow-down" : undefined;
 }
 // Bars scale to the best tier; a non-zero tier always keeps a visible sliver.
 const rankMax = computed(() => Math.max(0, ...deviceRankings.value.map((row) => row.dailyEarn ?? 0)));
