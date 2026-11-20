@@ -819,7 +819,7 @@ const trialQuoteIncomplete = computed(() => trialEarlyQuoteLapsed.value
     && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null
       || freeTrial.authoritativePriceUSD === null)));
 const trialQuoteUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
-// The 4s trial poll marks the authority loading while it re-reads. Keep the last confirmed quote on
+// While trial authority is loading, keep the last confirmed quote on
 // screen meanwhile instead of swapping the page out (which also threw the scroll back to the top);
 // every action still waits on trialQuoteUnavailable.
 const trialQuoteScreenUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && ((freeTrial.authorityStatus !== "ready"
@@ -832,7 +832,6 @@ const trialOffsetView = computed(() => trialView.value);
 const promoDiscountText = computed(() => formatAmount(promoDiscount.value));
 const trialOffsetText = computed(() => formatAmount(trialOffsetView.value.offsetUSD));
 const trialEarlyDiscountText = computed(() => formatAmount(trialOffsetView.value.earlyDiscountUSD));
-watch(trialEarlyQuoteLapsed, (lapsed) => { if (lapsed) void freeTrial.refreshRemote(true); });
 // What the trial purchase credits right after payment (server quote convert() settles).
 const trialCreditText = computed(() => {
   const quote = remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote : null;
@@ -1369,7 +1368,7 @@ const stepDisplay = computed(() => ['confirmed','activating','live'].includes(st
 async function submitReview() {
   if (checkoutPurchaseChecking.value) return;
   const scope = captureCheckoutRoute();
-  // A tap during the 4s trial re-read waits for that read, then goes on with the fresh authority.
+  // A tap during a trial read waits for it, then goes on with fresh authority.
   if (trialQuoteUnavailable.value && !trialQuoteScreenUnavailable.value) {
     const ready = await freeTrial.refreshRemote();
     if (!ready || !isCurrentCheckoutRoute(scope)) return;
