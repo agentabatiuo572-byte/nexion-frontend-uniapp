@@ -220,7 +220,9 @@ function goAll() {
 .nx-home-live-feed :deep(.nx-feed-icon--running) { background:color-mix(in srgb,var(--ui-device-ink) 16%,transparent);color:var(--ui-device-ink); }
 .nx-home-live-feed :deep(.nx-feed-copy) { display:flex;flex-direction:column;min-width:0; }
 .nx-home-live-feed :deep(.nx-feed-title-row) { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
-.nx-home-live-feed :deep(.nx-feed-title) { overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);white-space:nowrap;text-overflow:ellipsis; }
+/* Activity and running rows open nothing, so a long task name wraps in full; income rows open the bill, so their title keeps two lines before the ellipsis. Rows grow with the name. */
+.nx-home-live-feed :deep(.nx-feed-title) { min-width:0;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);white-space:normal;overflow-wrap:break-word; }
+.nx-home-live-feed :deep(.nx-feed-list .nx-feed-title) { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden; }
 .nx-home-live-feed :deep(.nx-feed-sub) { overflow:hidden;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);white-space:nowrap;text-overflow:ellipsis; }
 .nx-home-live-feed :deep(.nx-feed-sub--split) { display:flex;gap:var(--v5-space-1); }
 /* Running rows: the estimate drops to its own line rather than cutting the status. */
