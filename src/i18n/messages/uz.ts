@@ -4912,7 +4912,7 @@ export const uz: Messages = {
     condTeamVol: "Jamoa quvvati",
     condRank: "V{v} darajasi",
     buyCta: "{name} olish",
-    inviteFriendsTitle: "Yana doʻst taklif qiling",
+    inviteFriendsTitle: "Doʻst taklif qilish",
     inviteFriendsHint: "Har bir taklif uchun +{inviterNex}\u00A0UVT olasiz; doʻstingiz roʻyxatdan oʻtganda +{nex}\u00A0UVT sovgʻa oladi",
   },
   agent: {

@@ -4912,7 +4912,7 @@ export const fil: Messages = {
     condTeamVol: "Compute ng team",
     condRank: "Umabot sa V{v}",
     buyCta: "Bilhin ang {name}",
-    inviteFriendsTitle: "Mag-imbita pa ng kaibigan",
+    inviteFriendsTitle: "Mag-imbita pa",
     inviteFriendsHint: "Kikita ka ng +{inviterNex}\u00A0UVT bawat imbita; may +{nex}\u00A0UVT na regalo sa pag-sign up ang kaibigan mo",
   },
   agent: {

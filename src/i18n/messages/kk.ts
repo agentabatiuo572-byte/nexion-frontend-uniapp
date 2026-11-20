@@ -4912,7 +4912,7 @@ export const kk: Messages = {
     condTeamVol: "Команда ұпайы",
     condRank: "Дәреже: V{v}",
     buyCta: "Сатып алу: {name}",
-    inviteFriendsTitle: "Көбірек дос шақыру",
+    inviteFriendsTitle: "Дос шақыру",
     inviteFriendsHint: "Әр шақыруға +{inviterNex}\u00A0UVT аласыз; досыңыз тіркелгенде +{nex}\u00A0UVT сыйлық алады",
   },
   agent: {

@@ -4912,7 +4912,7 @@ export const ms: Messages = {
     condTeamVol: "Mata pasukan",
     condRank: "Capai V{v}",
     buyCta: "Beli {name}",
-    inviteFriendsTitle: "Jemput lebih ramai rakan",
+    inviteFriendsTitle: "Jemput rakan",
     inviteFriendsHint: "Anda dapat +{inviterNex}\u00A0UVT bagi setiap jemputan; rakan anda dapat hadiah pendaftaran +{nex}\u00A0UVT",
   },
   agent: {

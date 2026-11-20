@@ -4636,7 +4636,7 @@ timeHoursAgo: "{n}h ago",
     condTeamVol: "Team compute",
     condRank: "Reach V{v}",
     buyCta: "Buy {name}",
-    inviteFriendsTitle: "Invite more friends",
+    inviteFriendsTitle: "Invite friends",
     inviteFriendsHint: "You earn +{inviterNex}\u00A0UVT per invite; your friend gets a +{nex}\u00A0UVT signup gift",
   },
 
