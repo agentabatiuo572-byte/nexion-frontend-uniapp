@@ -1003,7 +1003,8 @@ onMounted(() => {
   tailResizeObserver = new ResizeObserver(() => {
     if (followingTail && threadVisible.value && !pendingPosition && !preparedHistory) scrollToEnd();
   });
-  tailResizeObserver.observe(content);
+  // border-box: the top inset and composer space are padding on this element, and they settle late too.
+  tailResizeObserver.observe(content, { box: 'border-box' });
 });
 onScopeDispose(() => tailResizeObserver?.disconnect());
 
