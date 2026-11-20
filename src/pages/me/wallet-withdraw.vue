@@ -318,7 +318,7 @@ import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { consumeWithdrawCommit, forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
+import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { createAbortController } from "@/lib/abort-controller-compat";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
@@ -396,12 +396,15 @@ const withdrawalRecovery = computed<WithdrawalRecovery | null>(() => {
 const canRetryPendingAttempt = computed(() => withdrawalPageVisible.value && foregroundReadAllowed()
   && remoteSessionReady.value && pendingAttempt.value !== null && withdrawalRecovery.value?.state === "NOT_SEEN");
 
+const announcedWithdrawalNos = new Set<string>();
+
 function takeRecoveredWithdrawalNotice(): { withdrawalNo: string; trackingRoute: string } | null {
   const result = recoveryResult.value;
   const outcome = withdrawalRecovery.value;
   if (!withdrawalPageVisible.value || !foregroundReadAllowed() || !remoteSessionReady.value
     || !result || outcome?.state !== "COMMITTED" || !outcome.noticePending) return null;
   recoveryResult.value = { key: result.key, outcome: { ...outcome, noticePending: false } };
+  announcedWithdrawalNos.add(outcome.withdrawalNo);
   return { withdrawalNo: outcome.withdrawalNo, trackingRoute: outcome.trackingRoute };
 }
 
@@ -506,12 +509,10 @@ async function abandonPendingAttempt() {
         useNexFeeOffset: pending.offset,
       });
       if (!scopeIsCurrent()) return;
-      const consumed = result.state === "COMMITTED"
-        ? consumeWithdrawCommit(accountKey, result.withdrawal.withdrawalNo) : null;
       forgetWithdrawAttempt(accountKey, pending.key);
       refreshPendingAttempt();
       if (result.state === "COMMITTED") {
-        if (consumed !== "seen") showWithdrawReceipt("info", pending.key, t.value.walletV3.withdrawAbandonAlreadyCommitted);
+        showWithdrawReceipt("info", pending.key, t.value.walletV3.withdrawAbandonAlreadyCommitted);
         await app.refreshRemoteFleet();
         if (!scopeIsCurrent()) return;
         navTo(`/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(result.withdrawal.withdrawalNo)}`);
@@ -1160,20 +1161,15 @@ watch([
       if (!stillStored()) return;
       if (result.state === "COMMITTED") {
         const { withdrawalNo } = result;
-        const consumed = consumeWithdrawCommit(accountKey, withdrawalNo);
-        if (consumed === "unavailable") {
-          recoveryResult.value = { key: attemptKey, outcome: { state: "READ_FAILED" } };
-        } else {
-          recoveryResult.value = { key: attemptKey, outcome: {
-            state: "COMMITTED", withdrawalNo, noticePending: consumed === "new",
-            trackingRoute: `/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(withdrawalNo)}`,
-          } };
-          forgetWithdrawAttempt(accountKey, attemptKey);
-          refreshPendingAttempt();
-          void app.refreshRemoteFleet();
-          void app.refreshRemoteWithdrawalList(accountKey);
-          return;
-        }
+        recoveryResult.value = { key: attemptKey, outcome: {
+          state: "COMMITTED", withdrawalNo, noticePending: !announcedWithdrawalNos.has(withdrawalNo),
+          trackingRoute: `/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(withdrawalNo)}`,
+        } };
+        forgetWithdrawAttempt(accountKey, attemptKey);
+        refreshPendingAttempt();
+        void app.refreshRemoteFleet();
+        void app.refreshRemoteWithdrawalList(accountKey);
+        return;
       } else {
         recoveryResult.value = { key: attemptKey, outcome: result };
         if (result.state === "REJECTED") {
@@ -1590,7 +1586,6 @@ async function handleSubmit() {
       fresh?.fastLaneApplied ?? false,
       fresh?.waivedGates ?? [],
     );
-    consumeWithdrawCommit(snap.account, wd.id);
     forgetWithdrawAttempt(snap.account, snap.idempotencyKey);
     refreshPendingAttempt();
     clearSubmitFreeze();

@@ -3,6 +3,7 @@ import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-acc
 import {randomUUID} from 'node:crypto';
 import {demoWithdrawalFacts} from './prototype-demo-secondary.mjs';
 import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
+import { demoRecoveryOrders } from './prototype-demo-withdraw-recovery.mjs';
 import { demoCreditedDeposit } from './prototype-demo-wallet.mjs';
 const day=86400000;
 const exchangeDay = new Intl.DateTimeFormat('en-CA', {
@@ -43,9 +44,17 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   }
   if (p === "/api/config/repurchase") refuse(503, 'REPURCHASE_CONFIG_INVALID');
   if (p === "/api/repurchase/orders") return { ...repurchaseProof, walletBalanceUsdt: walletAmount, serverTime: iso, ordersPage: { total: 0, pageNum: 1, pageSize: 50 }, orders: [] };
-  const {withdrawals}=facts;
+  const isRecoveryDetail = p.startsWith('/api/withdrawals/WD-B34-DEMO-');
+  const withdrawals = p === '/api/withdrawals' || isRecoveryDetail
+    ? [...demoRecoveryOrders(state, request.headers()), ...facts.withdrawals]
+    : facts.withdrawals;
   if(state.accountDeletionState==='withdrawal-error'&&p==='/api/withdrawals')refuse(503,'DEMO_WITHDRAWAL_READ_UNAVAILABLE');
   if(p==='/api/withdrawals')return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawals,page:{pageNum:1,pageSize:50,total:withdrawals.length,hasMore:false}};
+  if (isRecoveryDetail) {
+    const withdrawal = withdrawals.find(row => row.withdrawalNo === p.split('/').pop());
+    if (!withdrawal) refuse(404, 'WITHDRAWAL_NOT_FOUND');
+    return { source: 'nx_withdrawal_order', sourceEnvironment: 'PRODUCTION', withdrawal };
+  }
   if(/^\/api\/withdrawals\/WD-DEMO-?\d+$/.test(p))return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawal:withdrawals.find(row=>row.withdrawalNo===p.split('/').pop())};
   // Open USDT payout networks follow the preview option; eligibility refuses a closed one like the server does.
   const withdrawNetworks = demoWithdrawalNetworks(state);

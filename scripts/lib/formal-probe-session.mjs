@@ -1,3 +1,4 @@
+import { unseenWithdrawalAttempt } from "./prototype-demo-withdraw-recovery.mjs";
 import { installProbeConversationRealtime, probeConversationReadFixture } from "./probe-conversation-realtime.mjs";
 
 export async function installFormalProbeSession(page, { authenticated = true, responseFor } = {}) {
@@ -72,6 +73,14 @@ export async function installFormalProbeSession(page, { authenticated = true, re
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ code: 0, message: "OK", data: fixture }),
+      });
+    }
+    const attempt = authenticated && unseenWithdrawalAttempt(url.pathname, route.request().method());
+    if (attempt) {
+      return route.fulfill({
+        status: attempt.status,
+        contentType: "application/json",
+        body: JSON.stringify(attempt.body),
       });
     }
     // Authenticated restoration waits for the account-owned language before

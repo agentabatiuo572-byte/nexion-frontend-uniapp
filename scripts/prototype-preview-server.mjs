@@ -2,6 +2,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
+import { handlesWithdrawalRecovery, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
@@ -127,6 +128,7 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/auth-requests')return sendJson(res,{simulation:true,requests:authDemo.trace});
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
+      let withdrawalRecoverySeed;
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
@@ -144,6 +146,10 @@ const server=http.createServer(async(req,res)=>{
         else delete state.paymentBeforeReadError;
         if(state.dataState==='empty')state.withdrawLimitState='open';
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
+        const recoverySelection = demoOptions.withdrawRecoveryState.find(([value]) => value === update.withdrawRecoveryState);
+        if (recoverySelection || update.reset) {
+          withdrawalRecoverySeed = seedWithdrawalRecovery(state, recoverySelection?.[0] ?? 'off');
+        }
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.authState)delete state.scopeCalls;
         if(update.stakingOpenState){delete state.stakingAttempts;delete state.stakingStatusReads;}
@@ -212,7 +218,7 @@ const server=http.createServer(async(req,res)=>{
       const options=state.dataState==='empty'
         ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}
         : demoOptions;
-      return sendJson(res,{state,options,simulation:true});
+      return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed});
     }
     if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}
@@ -261,6 +267,7 @@ const server=http.createServer(async(req,res)=>{
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
       }
       if(url.pathname==='/auth/users/refresh')return sendJson(res,{code:0,message:'OK',data:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:{userId:900001,countryCode:'+86',phone:'13800000000',nickname:'Alex',onboardingComplete:true}}});
+      const recoveryRequest = handlesWithdrawalRecovery(state, url.pathname, req.method, req.headers);
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
       const modeledBankTopup=req.method==='POST'&&/^\/api\/app\/deposits\/vietqr\/intents(?:\/[^/]+\/cancel)?$/.test(url.pathname);
       const bankTopupEndpoint=/^\/api\/app\/(payments\/(config|fx-quote)|deposits\/vietqr\/(receipts|intents(?:\/[^/]+(?:\/cancel)?)?))$/.test(url.pathname);
@@ -269,7 +276,7 @@ const server=http.createServer(async(req,res)=>{
       const computeWrite=req.method==='POST'&&url.pathname==='/api/tasks/simulated/stop';
       const trialWrite=req.method==='POST'&&/^\/api\/trial\/(start|cancel|convert)$/.test(url.pathname);
       const conversationDelete=req.method==='DELETE'&&/^\/api\/app\/support\/conversations\/DEMO-SUPPORT-\d+$/.test(url.pathname);
-      if(req.method!=='GET'&&!realtimeTicket&&!trialWrite&&!computeWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
+      if(req.method!=='GET'&&!realtimeTicket&&!trialWrite&&!computeWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!recoveryRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
       const businessRead=req.method==='GET'&&/^\/api\/(config\/(platform|v-rank|exchange|repurchase|staking|commission)|store\/(catalog|purchase-eligibility)|team\/(rank|binary)|app\/(team|payments|deposits|home\/overview|proof|network|security|support|developer)|content\/(learning|trust|how-it-works|i18n)|quests\/state|events|points\/state|devices\/earnings|exchange|repurchase|withdrawals|payout-addresses|deposits|notifications|goals|promotions|promotion-rewards|tasks|payment-methods|developer|public\/referrals|legal\/(privacy|risk)|staking|stakes)/.test(url.pathname);
       if(bankTopupEndpoint&&state.dataState==='error')return sendJson(res,{code:503,message:url.pathname.endsWith('/config')?'PAYMENT_CONFIG_UNAVAILABLE':url.pathname.endsWith('/fx-quote')?'FX_QUOTE_UNAVAILABLE':'VIETQR_RUNTIME_PROFILE_INVALID',data:null},503);
       if(businessRead&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
@@ -292,6 +299,10 @@ const server=http.createServer(async(req,res)=>{
       }
       let body='';for await(const chunk of req)body+=chunk;
       if(staleWrite())return refuseStale();
+      if (recoveryRequest) {
+        const response = withdrawalRecoveryResponse(state, url.pathname, req.method, req.headers, JSON.parse(body || '{}'));
+        return sendJson(res, response.body, response.status);
+      }
       if(conversationDelete) {
         const data=fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers});
         return sendJson(res,{code:0,message:'OK',data});
