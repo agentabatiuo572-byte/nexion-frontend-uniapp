@@ -193,11 +193,17 @@ import { parseServerTimestamp } from "@/api/server-time";
 import { formatBankDateTime } from "@/lib/bank-date";
 import { bankAccountNotice, bankBeneficiaryReady, bankCanQuote, bankOrderOutcome, bankAmountError, bankMaximumAmount } from "@/lib/bank-withdrawal-state";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
+// #ifdef H5
+import { useRouter } from "vue-router";
+// #endif
 
 const c = computed(() => useTranslations.value.bankWithdrawal);
 const useTranslations = useT();
 const app = useApp();
 const auth = useAuth();
+// #ifdef H5
+const routeHistory = useRouter().options.history;
+// #endif
 const remoteSessionReady = computed(() => binarySessionReady({
   remote: remoteApiEnabled,
   authenticated: auth.isAuthenticated,
@@ -499,19 +505,19 @@ async function abandon() {
   });
 }
 function replaceOrderInH5(orderNo: string | null) {
-  if (typeof window === "undefined" || typeof window.history?.replaceState !== "function") return;
-  const hash = window.location.hash;
-  const question = hash.indexOf("?");
-  const path = question < 0 ? hash : hash.slice(0, question);
-  if (path !== "#/pages/me/wallet-withdraw-bank") return;
-  const query = new URLSearchParams(question < 0 ? "" : hash.slice(question + 1));
+  // #ifdef H5
+  const location = routeHistory.location;
+  const question = location.indexOf("?");
+  const path = question < 0 ? location : location.slice(0, question);
+  if (path !== "/pages/me/wallet-withdraw-bank") return;
+  const query = new URLSearchParams(question < 0 ? "" : location.slice(question + 1));
   if (query.get("order") === orderNo) return;
   if (orderNo === null) query.delete("order");
   else query.set("order", orderNo);
   const search = query.toString();
-  try {
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${path}${search ? `?${search}` : ""}`);
-  } catch { /* Unsupported history leaves the existing in-memory selection intact. */ }
+  // Sync the router's history state without navigating or remounting the page.
+  routeHistory.replace(search ? `${path}?${search}` : path);
+  // #endif
 }
 function startNew() {
   refreshPendingAttempt();
