@@ -63,7 +63,7 @@
               <text class="sheet-relation" :style="{ color: selected.layer === 1 ? DIRECT_COLOR : EXTENDED_COLOR }">{{ selected.layer === 1 ? t.network.badgeDirect : t.network.badgeExtended }}<text v-if="selected.city"> · {{ selected.city }}</text></text>
             </view>
             <view class="grid place-items-center active:opacity-60" :style="sheetCloseStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="selected = null" @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
-              <text aria-hidden="true">×</text>
+              <NxIcon name="close" :size="18" />
             </view>
           </view>
           <view class="sheet-metrics">
