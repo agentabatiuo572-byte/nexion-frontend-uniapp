@@ -94,6 +94,13 @@ function previewTransferOutbox(run,sample) {
   const outbox=JSON.parse(sessionStorage.getItem(outboxKey)||'{}'), pending=JSON.parse(localStorage.getItem(pendingKey)||'{}');
   if(previous) {
     delete outbox['conversation:'+previous.conversationNo];
+    localStorage.removeItem('support-human-send:user:900001:'+previous.key);
+    localStorage.removeItem('support-human-send:user:900001:'+previous.slot);
+    const retainedKey='support-human-pending:user:900001';
+    const retained=JSON.parse(localStorage.getItem(retainedKey)||'{}');
+    delete retained['conversation:'+previous.conversationNo];
+    if(Object.keys(retained).length)localStorage.setItem(retainedKey,JSON.stringify(retained));
+    else localStorage.removeItem(retainedKey);
     if(pending[previous.slot]===previous.key)delete pending[previous.slot];
   }
   if(sample&&!sample.committed&&!sample.rejected) {

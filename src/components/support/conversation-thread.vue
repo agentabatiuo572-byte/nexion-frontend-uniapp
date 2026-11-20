@@ -120,7 +120,7 @@
       </view>
     </view>
 
-    <view v-if="!closed && attachmentDraft" class="nx-conv-attachment" role="status" aria-live="polite">
+    <view v-if="!closed && !inputDisabled && attachmentDraft" class="nx-conv-attachment" role="status" aria-live="polite">
       <view v-if="attachmentPreviewSrc" class="nx-conv-image-open" role="button" tabindex="0" :aria-label="imageLabels?.view" @click="openPreview(attachmentPreviewSrc)" @keydown.enter.prevent="openPreview(attachmentPreviewSrc)" @keydown.space.prevent="openPreview(attachmentPreviewSrc)"><image class="nx-conv-image" :src="attachmentPreviewSrc" mode="aspectFill" /></view>
       <text>{{ attachmentDraft.label }}</text>
       <view class="nx-conv-attachment-actions">
@@ -129,14 +129,14 @@
         <view role="button" tabindex="0" class="nx-conv-attachment-action family-control" @click="emit('cancel-attachment')" @keydown.enter.prevent="emit('cancel-attachment')" @keydown.space.prevent="emit('cancel-attachment')"><LiquidGlass rendering="frosted" :radius="22" /><text>{{ imageLabels?.cancel }}</text></view>
       </view>
     </view>
-    <view v-if="!closed && failedSendLabel && canDiscardSend" class="nx-conv-recovery-actions">
+    <view v-if="!closed && !inputDisabled && failedSendLabel && canDiscardSend" class="nx-conv-recovery-actions">
       <view class="nx-conv-attachment-actions">
         <view v-if="canDiscardSend" role="button" tabindex="0" class="nx-conv-attachment-action family-control" @click="emit('edit-message')" @keydown.enter.prevent="emit('edit-message')" @keydown.space.prevent="emit('edit-message')"><LiquidGlass rendering="frosted" :radius="22" /><text>{{ imageLabels?.editSend }}</text></view>
         <view v-if="canDiscardSend" role="button" tabindex="0" class="nx-conv-attachment-action family-control" @click="emit('discard-message')" @keydown.enter.prevent="emit('discard-message')" @keydown.space.prevent="emit('discard-message')"><LiquidGlass rendering="frosted" :radius="22" /><text>{{ imageLabels?.discard }}</text></view>
       </view>
     </view>
     <!-- Input row -->
-    <view v-else-if="!closed" ref="composerHost" class="nx-conv-composer">
+    <view v-else-if="composerVisible" ref="composerHost" class="nx-conv-composer">
     <view class="nx-conv-input-row">
       <view v-if="imageLabels" class="nx-conv-attach-trigger family-control" role="button" :tabindex="attachDisabled ? -1 : 0" :aria-label="attachDisabled && attachUnavailable ? imageLabels.attach + ' · ' + attachUnavailable : imageLabels.attach" :aria-disabled="attachDisabled ? 'true' : 'false'" :style="attachDisabled ? { opacity: 0.45 } : undefined" @click="!attachDisabled && emit('attach')" @keydown.enter.prevent="!attachDisabled && emit('attach')" @keydown.space.prevent="!attachDisabled && emit('attach')"><LiquidGlass rendering="frosted" :radius="22" /><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></view>
       <view class="nx-conv-compose-field" :style="composerLightStyle">
@@ -324,7 +324,7 @@ function activateStatus(message: ThreadMsg) {
 const draft = ref(props.initialDraft ?? "");
 const inputHeight = ref(24);
 const composerHost = ref<unknown>(null), composerSpace = ref(86), composerMeasured = ref(false);
-const composerVisible = computed(() => !props.closed && !(props.failedSendLabel && props.canDiscardSend));
+const composerVisible = computed(() => !props.closed && !props.inputDisabled && !(props.failedSendLabel && props.canDiscardSend));
 const inputLimit = computed(() => props.maxInputLength ?? 2000);
 const inputLength = computed(() => draft.value.trim().length);
 const showInputLength = computed(() => inputLength.value >= inputLimit.value * .9);
