@@ -1619,7 +1619,8 @@ async function handleSubmit() {
     // 在账单页查不到自己的钱去哪了。收口点**有意不弹**通用提示(见它的头注):这里给的是
     // 带下一步的提现专属文案,两条一起弹正是 2026-08-04 修过的同型缺陷。不阻断跳转。
     // (即便这里写失败,App.vue 的对账下一拍也会把它补回来 —— 但用户此刻该知道。)
-    if (!postReceiptForAccount(snap.account, withdrawalBillDrafts(wd))) {
+    // 服务端账本随提现提交入账；只有本地账本需要补写收据。
+    if (!fundsServerEnabled && !postReceiptForAccount(snap.account, withdrawalBillDrafts(wd))) {
       toast.error(t.value.wallet.withdrawBillWriteFailed);
     }
     // Remote wallet balance is server-owned. Re-read the E3 fleet snapshot
