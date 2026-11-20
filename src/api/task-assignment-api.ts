@@ -461,11 +461,11 @@ function receiptPage(value: unknown, mode: ApiEnvironment): CanonicalComputeRece
 export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment): TaskAssignmentApi {
   return {
     async state(preferV2 = false, requireCurrent) {
-      const { assignments: current, hasServerDevices } = state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
+      const { assignments: current, hasServerDevices } = state(await client.request<unknown>({ path: "/api/tasks/assignments", beforeAuthRetry: requireCurrent }), mode);
       if (current.protocolVersion === 3) return current;
       if (preferV2 && hasServerDevices) {
         requireCurrent?.();
-        try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments" }), mode, true).assignments; }
+        try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments", beforeAuthRetry: requireCurrent }), mode, true).assignments; }
         catch (cause) {
           if (!(cause instanceof ApiError) || cause.kind !== "http" || (cause.status !== 404 && cause.status !== 501)) throw cause;
         }

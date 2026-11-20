@@ -512,6 +512,7 @@ export const useApp = defineStore("app", () => {
     request: Promise<CanonicalTaskAssignments>;
   } | null = null;
   let taskAssignmentReadEpoch = 0;
+  let fleetAssignmentReadEpoch = 0;
   const remoteFleetRefreshCoordinator = createRemoteFleetRefreshCoordinator();
   let remoteFleetRefreshSequence = 0;
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
@@ -875,8 +876,14 @@ export const useApp = defineStore("app", () => {
   }
 
   function setDeviceInventoryVisible(visible: boolean): void {
-    if (deviceInventoryVisible && !visible && !taskReadPages.size) stopInventoryTaskRead();
+    if (deviceInventoryVisible === visible) return;
     deviceInventoryVisible = visible;
+    if (!visible && !taskReadPages.size) stopInventoryTaskRead();
+    if (visible && remoteFleetRefreshCoordinator.hasInFlight()
+      && fleetAssignmentReadEpoch !== taskAssignmentReadEpoch) {
+      // The fleet can still be shared, but its task read belongs to the previous display.
+      void refreshVisibleTaskAssignments(true);
+    }
   }
 
   function stopInventoryTaskRead(): void {
@@ -897,8 +904,9 @@ export const useApp = defineStore("app", () => {
   }
 
   // All visible task pages share one account read window and in-flight request.
-  async function refreshVisibleTaskAssignments(): Promise<void> {
-    if (!remoteApiEnabled || !remoteTaskForeground || !taskReadPages.size
+  async function refreshVisibleTaskAssignments(inventoryOnly = false): Promise<void> {
+    const hasVisiblePage = () => inventoryOnly ? deviceInventoryVisible : taskReadPages.size > 0;
+    if (!remoteApiEnabled || !remoteTaskForeground || !hasVisiblePage()
       || miningPaused.value || Date.now() < visibleTaskReadAfter) return;
     const request = remoteAccountEpoch.snapshot();
     const activeSession = sessionVault.read();
@@ -906,7 +914,7 @@ export const useApp = defineStore("app", () => {
     const runScope = captureRuntimeRevision();
     visibleTaskReadAfter = Date.now() + VISIBLE_TASK_READ_MS;
     const foregroundEpoch = remoteTaskForegroundEpoch;
-    if (!remoteTaskForeground || !taskReadPages.size || foregroundEpoch !== remoteTaskForegroundEpoch
+    if (!remoteTaskForeground || !hasVisiblePage() || foregroundEpoch !== remoteTaskForegroundEpoch
       || !remoteAccountEpoch.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return;
     const readEpoch = taskAssignmentReadEpoch;
     try {
@@ -918,6 +926,7 @@ export const useApp = defineStore("app", () => {
       remoteAssignmentHasSnapshot.value = true;
       remoteAssignmentStatus.value = "ready";
       remoteAssignmentError.value = "";
+      if (inventoryOnly) return;
       await Promise.allSettled([
         refreshRemoteFleet(request, { coalesce: true }),
         refreshHomeTruth(request),
@@ -1078,6 +1087,7 @@ export const useApp = defineStore("app", () => {
     return rememberPassiveTabRead("remote-fleet", remoteFleetRefreshCoordinator.refresh(scope, async (lease) => {
       let refreshSequence: number | null = null;
       const assignmentReadEpochAtStart = taskAssignmentReadEpoch;
+      fleetAssignmentReadEpoch = assignmentReadEpochAtStart;
       try {
         const activeSession = sessionVault.read();
         if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
