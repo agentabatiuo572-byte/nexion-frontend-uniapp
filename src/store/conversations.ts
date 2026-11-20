@@ -297,6 +297,7 @@ export const useConversations = defineStore("conversations", () => {
       for (const { composerKey, saved, failed } of retainedHumanSends(account)) {
         if (failed.expiresAt! <= now) continue;
         const draft = drafts[composerKey], previous = draft?.failedSend;
+        if (failed.settled && draft?.text) continue;
         if (previous?.settled || (!failed.settled && (previous?.expiresAt ?? 0) > failed.expiresAt!)) continue;
         drafts[composerKey] = { ...saved, text: draft?.text ?? "" };
       }
@@ -343,20 +344,36 @@ export const useConversations = defineStore("conversations", () => {
     persistHumanDrafts();
   }
 
-  function settleHumanComposer(key: string, value: HumanComposer) {
+  function settleHumanComposer(key: string, value: HumanComposer, failed = humanComposers.value[key]?.failedSend) {
     if (humanWritesBlocked) return;
-    const failed = humanComposers.value[key]?.failedSend;
-    if (failed) retireHumanSend(accountKeyValue, key, failed);
-    if (!value.failedSend && key.startsWith("conversation:")) {
+    if (value.failedSend?.replyRejected && failed?.commandKey && failed.expiresAt !== undefined) {
       try {
-        const retired = failed && humanSendStorageKey(accountKeyValue, key, failed);
-        const rows = retainedHumanSends(accountKeyValue)
-          .filter(row => row.composerKey === key && row.failed.expiresAt! > Date.now() && row.storageKey !== retired);
-        const next = rows.find(row => row.failed.settled) ?? rows[0];
-        if (next) value = { ...value, failedSend: next.failed };
-      } catch { /* Still apply the current send's result. */ }
+        saveReplyRejection(key, value, { ...value.failedSend, commandKey: failed.commandKey, expiresAt: failed.expiresAt }, true);
+        return;
+      } catch { /* The page can still present the confirmed refusal if retention fails. */ }
     }
-    saveComposer(key, value);
+    if (failed) retireHumanSend(accountKeyValue, key, failed);
+    saveComposer(key, withNextRetainedSend(key, value, failed));
+  }
+
+  function withNextRetainedSend(key: string, value: HumanComposer, retired?: FailedHumanSend | null): HumanComposer {
+    if (value.failedSend || !key.startsWith("conversation:")) return value;
+    try {
+      const excluded = retired && humanSendStorageKey(accountKeyValue, key, retired);
+      const rows = retainedHumanSends(accountKeyValue)
+        .filter(row => row.composerKey === key && row.failed.expiresAt! > Date.now() && row.storageKey !== excluded);
+      // An unknown command still locks sending. A confirmed rejection can wait for an empty draft.
+      const next = rows.find(row => !row.failed.settled) ?? (!value.text && !value.imageDraft ? rows[0] : undefined);
+      if (next) return { ...value, failedSend: next.failed };
+    } catch { /* Keep the current composer when storage is unavailable. */ }
+    return value;
+  }
+
+  function resumeRetainedSend(key: string) {
+    const saved = composer(key);
+    if (saved.text || saved.imageDraft || saved.failedSend) return;
+    const next = withNextRetainedSend(key, saved);
+    if (next !== saved) saveComposer(key, next);
   }
   function recordHumanDispatch(composerKey: string, key: string) {
     const saved = humanComposers.value[composerKey], failed = saved?.failedSend;
@@ -381,7 +398,9 @@ export const useConversations = defineStore("conversations", () => {
     persistHumanDrafts();
   }
   function continueRejectedReply(sourceKey: string, targetKey: string) {
-    const source = composer(sourceKey), failed = source.failedSend;
+    const source = composer(sourceKey);
+    // A background rejection may be queued behind another draft in the old thread.
+    const failed = source.failedSend ?? withNextRetainedSend(sourceKey, { text: "", imageDraft: null, failedSend: null }).failedSend;
     if (!failed?.peerChanged && !failed?.replyRejected) return;
     const target = composer(targetKey);
     // Leave the destination's draft and any unresolved command intact.
@@ -390,7 +409,7 @@ export const useConversations = defineStore("conversations", () => {
     const attachment = image?.state === "ready" && image.attachmentId && image.attachmentId === failed.attachmentId ? image : null;
     if (!failed.text && !attachment) return;
     saveComposer(targetKey, { ...target, text: failed.text, imageDraft: attachment, retainDraft: true });
-    settleHumanComposer(sourceKey, { ...source, imageDraft: attachment ? null : image, failedSend: null });
+    settleHumanComposer(sourceKey, { ...source, imageDraft: attachment ? null : image, failedSend: null }, failed);
   }
   function forgetHumanDrafts(account: string, discard = false) {
     try {
@@ -444,13 +463,18 @@ export const useConversations = defineStore("conversations", () => {
     if (!saved || !matches(saved)) return false;
     const failed = saved.failedSend!;
     const rejected: FailedHumanSend = { ...failed, settled: true, retryable: false, kind: 'failed', replyRejected: true };
-    if (failed.expiresAt !== undefined) {
-      rejected.commandKey = key;
-      writeRetainedHumanSend(scope.accountKey, composerKey, saved, rejected);
-    }
-    if (isCurrent || !current?.failedSend) saveComposer(composerKey, { ...saved, ...current, failedSend: rejected });
+    rejected.commandKey = key;
+    saveReplyRejection(composerKey, { ...saved, ...current }, rejected, isCurrent || !current?.failedSend);
     completePending(scope, fingerprint, key);
     return true;
+  }
+  function saveReplyRejection(key: string, composer: HumanComposer, rejected: FailedHumanSend, show: boolean) {
+    if (rejected.expiresAt !== undefined) writeRetainedHumanSend(accountKeyValue, key, composer, rejected);
+    if (!show) return;
+    // Leave a durable refusal queued while the user works on the next draft.
+    if (rejected.expiresAt !== undefined && (composer.text || composer.imageDraft))
+      saveComposer(key, withNextRetainedSend(key, { ...composer, failedSend: null, retainDraft: true }));
+    else saveComposer(key, { ...composer, failedSend: rejected });
   }
   async function checkHumanReply(id: string, failed: NonNullable<HumanComposer["failedSend"]>, active: () => boolean): Promise<{ status: 'sent' | 'rejected'; key: string } | null> {
     const scope = await commandScope(true);
@@ -1138,5 +1162,5 @@ export const useConversations = defineStore("conversations", () => {
     }).catch(() => undefined);
   }
 
-  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,settleHumanComposer,recordHumanDispatch,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,pendingHumanSendKey,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
+  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,settleHumanComposer,resumeRetainedSend,recordHumanDispatch,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,pendingHumanSendKey,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
 });
