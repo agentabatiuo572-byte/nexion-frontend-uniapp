@@ -156,7 +156,7 @@ const trialPill = computed<[string, string]>(() => {
   switch (trial.confirmedOfferState()) {
     case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim];
     case "error": return [t.value.trial.entryUnavailable, t.value.trial.entryUnavailable];
-    case "unavailable": { const text = eligibility.value.reason === "product-unavailable" ? t.value.trial.heroProductUnavailable : t.value.store.temporarilyOutOfStock; return [text, text]; }
+    case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut];
     default: return [t.value.trial.entryChecking, t.value.trial.entryChecking];
   }
 });
