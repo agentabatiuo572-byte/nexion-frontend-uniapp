@@ -642,12 +642,13 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .learning-course { --learning-reward: var(--v5-nex); padding-bottom: var(--v5-space-6); color: var(--v5-ink); font-family: var(--font-v5); }
 .learning-course :deep(.spv--design) { grid-template-columns: 56px minmax(0, 1fr) 56px; margin: 0; }
 .course-state, .course-lesson { padding: var(--v5-space-5) 16px 0; }
-.course-result-header { display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; align-items: center; box-sizing: border-box; height: 56px; padding: 0 6px; }
+.course-result-header { display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; align-items: center; box-sizing: border-box; min-height: 56px; padding: 0 6px; }
 .course-result-header__close { position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-left: 6px; border-radius: 50%; color: var(--v5-ink-2); cursor: pointer; }
 .course-result-header__close > svg { position: relative; z-index: 1; }
 .course-result-header__close:active { opacity: .7; }
 .course-result-header__close:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.course-result-header__title { overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 600; line-height: 24px; }
+/* The page's own title opens nothing else, so a long course name wraps in full; the header grows past 56px only if it needs a third line. */
+.course-result-header__title { text-align: center; white-space: normal; overflow-wrap: break-word; font-size: 18px; font-weight: 600; line-height: 24px; }
 .course-result { display: flex; flex-direction: column; align-items: center; padding: 56px 24px 0; text-align: center; }
 .course-result__badge { display: grid; place-items: center; flex: none; width: 84px; height: 84px; border-radius: 50%; color: var(--v5-on-brand); background: linear-gradient(160deg, var(--ui-lime-pale), var(--v5-brand)); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 10%, transparent), 0 0 0 22px color-mix(in srgb, var(--v5-brand) 5%, transparent), 0 14px 40px color-mix(in srgb, var(--v5-brand) 35%, transparent); }
 .course-result__title { display: block; margin-top: 18px; font-size: var(--v5-type-h2); font-weight: 600; line-height: 38px; overflow-wrap: anywhere; }
