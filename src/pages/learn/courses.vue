@@ -13,7 +13,7 @@
           <GrowthProgress ring :size="64" :stroke="9" :value="overviewProgress" :label="progressLine"><text>{{ overview.completedCourses }}/{{ overview.totalCourses }}</text></GrowthProgress>
           <view class="learning-summary__line">
             <text class="learning-summary__progress">{{ progressLine }}</text>
-            <view class="learning-summary__earned"><text>{{ pageCopy.earned }}</text><text class="learning-reward">{{ formatAmount(overview.earnedNex) }} UVT</text></view>
+            <view class="learning-summary__earned"><text>{{ pageCopy.earned }}</text><text class="learning-reward">{{ `${formatAmount(overview.earnedNex)}\u00A0UVT` }}</text></view>
           </view>
 
         </view>
@@ -23,7 +23,7 @@
           <view class="course-feature">
             <text class="course-feature__label">{{ featuredCourse.progress > 0 ? recommendationCopy.resume : t.learning.featuredLabel }}</text>
             <text class="course-feature__name">{{ featuredCourse.title }}</text>
-            <view class="course-feature__meta"><text>{{ courseMetaLead(featuredCourse) }} · {{ pageCopy.reward }}</text><text class="learning-reward" style="margin-left:3px">{{ formatAmount(featuredCourse.rewardNex) }} UVT</text></view>
+            <view class="course-feature__meta"><text>{{ courseMetaLead(featuredCourse) }} · {{ pageCopy.reward }}</text><text class="learning-reward" style="margin-left:3px">{{ `${formatAmount(featuredCourse.rewardNex)}\u00A0UVT` }}</text></view>
             <view class="course-feature__progress">
               <GrowthProgress class="course-progress" :value="featuredCourse.progress" :label="featuredCourse.title" />
             </view>
@@ -34,12 +34,12 @@
         <view v-else-if="overview.courses.length" class="course-completed"><text>{{ auditCopy.allCoursesDone }}</text><text>{{ fmt(auditCopy.earned, { n: formatAmount(overview.earnedNex) }) }}</text></view>
 
         <view v-if="overview.courses.length" class="learning-section">
-          <view class="course-list__heading"><text class="course-list__title">{{ pageCopy.allCourses }}</text><text class="course-list__count">{{ fmt(pageCopy.courseCount, { n: overview.totalCourses }) }}</text></view>
+          <view class="course-list__heading"><text class="course-list__title">{{ pageCopy.allCoursesUnit }}</text><text class="course-list__count">{{ fmt(pageCopy.courseCount, { n: overview.totalCourses }) }}</text></view>
           <view class="course-list">
             <view v-for="(course, index) in overview.courses" :key="course.id" class="course-row" :class="{ 'course-row--recommended': course.id === featuredCourse?.id }" role="button" tabindex="0" :aria-label="course.title + ' · ' + courseMeta(course) + ' · ' + courseStatus(course)" @click="open(course.id)">
               <view v-if="course.completed" class="course-status course-status--done" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10" /></svg></view>
               <GrowthProgress v-else ring :size="36" :stroke="9" :value="course.progress" :label="courseStatus(course)"><text class="course-number" :class="{'course-number--active': course.progress > 0}">{{ index + 1 }}</text></GrowthProgress>
-              <view class="course-row__body"><text class="course-row__title">{{ course.title }}</text><view class="course-row__meta"><text>{{ courseMetaLead(course) }} · {{ pageCopy.reward }}</text><text class="learning-reward" style="margin-left:3px">{{ formatAmount(course.rewardNex) }} UVT</text><text v-if="!course.completed && course.progress > 0" class="course-row__progress-copy"> · {{ fmt(auditCopy.progress,{n:course.progress}) }}</text></view></view>
+              <view class="course-row__body"><text class="course-row__title">{{ course.title }}</text><view class="course-row__meta"><text>{{ courseMetaLead(course) }} · {{ pageCopy.reward }}</text><text class="learning-reward" style="margin-left:3px">{{ formatAmount(course.rewardNex) }}</text><text v-if="!course.completed && course.progress > 0" class="course-row__progress-copy"> · {{ fmt(auditCopy.progress,{n:course.progress}) }}</text></view></view>
               <text v-if="course.completed" class="course-row__done">{{ auditCopy.completed }}</text>
               <text v-else-if="course.id === featuredCourse?.id" class="course-row__tag">{{ pageCopy.recommended }}</text>
               <svg v-else class="course-row__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
@@ -89,15 +89,15 @@ const errorText = computed(() => error.value ? t.value.learning[error.value] : "
 const featuredCourse = computed(() => selectRecommendedCourse(overview.value?.courses ?? []));
 const language = computed(() => serverLanguage(locale.code));
 const pageCopy = computed(() => ({
-  zh: { progress: "已学完 {done}/{total} 课", earned: "已获", allCourses: "全部课程", courseCount: "{n} 门", recommended: "推荐", questions: "{n} 道小测", reward: "奖励" },
-  en: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
-  vi: { progress: "Đã học {done}/{total} bài", earned: "Đã nhận", allCourses: "Tất cả bài học", courseCount: "{n} bài", recommended: "Đề xuất", questions: "{n} câu hỏi", reward: "Thưởng" },
-  id: { progress: "{done}/{total} kursus selesai", earned: "Diperoleh", allCourses: "Semua kursus", courseCount: "{n} kursus", recommended: "Disarankan", questions: "{n} soal kuis", reward: "Hadiah" },
-  ms: { progress: "{done}/{total} kursus selesai", earned: "Diperoleh", allCourses: "Semua kursus", courseCount: "{n} kursus", recommended: "Disyorkan", questions: "{n} soalan kuiz", reward: "Ganjaran" },
-  fil: { progress: "{done}/{total} kurso ang natapos", earned: "Nakuha", allCourses: "Lahat ng kurso", courseCount: "{n} kurso", recommended: "Mungkahi", questions: "{n} tanong sa quiz", reward: "Reward" },
-  ru: { progress: "Пройдено курсов: {done}/{total}", earned: "Получено", allCourses: "Все курсы", courseCount: "Курсов: {n}", recommended: "Советуем", questions: "Вопросов: {n}", reward: "Награда" },
-  kk: { progress: "Аяқталған курс: {done}/{total}", earned: "Алынды", allCourses: "Барлық курс", courseCount: "{n} курс", recommended: "Ұсынылған", questions: "{n} тест сұрағы", reward: "Сыйақы" },
-  uz: { progress: "{done}/{total} kurs tugatildi", earned: "Olindi", allCourses: "Barcha kurslar", courseCount: "{n} ta kurs", recommended: "Tavsiya", questions: "{n} ta test savoli", reward: "Mukofot" },
+  zh: { progress: "已学完 {done}/{total} 课", earned: "已获", allCourses: "全部课程", allCoursesUnit: "全部课程（UVT）", courseCount: "{n} 门", recommended: "推荐", questions: "{n} 道小测", reward: "奖励" },
+  en: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", allCoursesUnit: "All courses (UVT)", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
+  vi: { progress: "Đã học {done}/{total} bài", earned: "Đã nhận", allCourses: "Tất cả bài học", allCoursesUnit: "Tất cả bài học (UVT)", courseCount: "{n} bài", recommended: "Đề xuất", questions: "{n} câu hỏi", reward: "Thưởng" },
+  id: { progress: "{done}/{total} kursus selesai", earned: "Diperoleh", allCourses: "Semua kursus", allCoursesUnit: "Semua kursus (UVT)", courseCount: "{n} kursus", recommended: "Disarankan", questions: "{n} soal kuis", reward: "Hadiah" },
+  ms: { progress: "{done}/{total} kursus selesai", earned: "Diperoleh", allCourses: "Semua kursus", allCoursesUnit: "Semua kursus (UVT)", courseCount: "{n} kursus", recommended: "Disyorkan", questions: "{n} soalan kuiz", reward: "Ganjaran" },
+  fil: { progress: "{done}/{total} kurso ang natapos", earned: "Nakuha", allCourses: "Lahat ng kurso", allCoursesUnit: "Lahat ng kurso (UVT)", courseCount: "{n} kurso", recommended: "Mungkahi", questions: "{n} tanong sa quiz", reward: "Reward" },
+  ru: { progress: "Пройдено курсов: {done}/{total}", earned: "Получено", allCourses: "Все курсы", allCoursesUnit: "Все курсы (UVT)", courseCount: "Курсов: {n}", recommended: "Советуем", questions: "Вопросов: {n}", reward: "Награда" },
+  kk: { progress: "Аяқталған курс: {done}/{total}", earned: "Алынды", allCourses: "Барлық курс", allCoursesUnit: "Барлық курс (UVT)", courseCount: "{n} курс", recommended: "Ұсынылған", questions: "{n} тест сұрағы", reward: "Сыйақы" },
+  uz: { progress: "{done}/{total} kurs tugatildi", earned: "Olindi", allCourses: "Barcha kurslar", allCoursesUnit: "Barcha kurslar (UVT)", courseCount: "{n} ta kurs", recommended: "Tavsiya", questions: "{n} ta test savoli", reward: "Mukofot" },
 }[uiLocale(locale.code)]));
 const progressLine = computed(() => overview.value ? fmt(pageCopy.value.progress, { done: overview.value.completedCourses, total: overview.value.totalCourses }) : "");
 const overviewProgress = computed(() => overview.value?.totalCourses ? Math.min(100, Math.max(0, overview.value.completedCourses / overview.value.totalCourses * 100)) : 0);
@@ -256,7 +256,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!error.value && !loading.va
 .course-feature { padding-top:22px; display:flex; flex-direction:column; box-sizing:border-box; min-height:197.5px; overflow:visible; box-shadow:var(--v5-glass-shadow); }
 .course-feature::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 120deg,transparent 0 50%,color-mix(in srgb,var(--v5-brand) 80%,transparent) 72%,transparent 94%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
 .course-feature__actions { box-sizing:border-box; padding:0 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:64px; margin-top:auto; }.course-feature__actions .course-progress__label { padding:0; margin:0; }
-.learning-center .course-feature__cta { margin:0; flex:none; width:92px; max-width:none; }
+/* The button keeps its label on one line: at least the approved 92px, wider for long languages; the row wraps it to the bottom-right when the progress label and the button do not fit. */
+.course-feature__actions { flex-wrap:wrap; }
+.learning-center .course-feature__cta { margin:0 0 0 auto; flex:none; width:auto; min-width:92px; max-width:none; }
 .course-feature__cta :deep(.nx-button__surface) { padding-inline:16px; --ui-button-ink:var(--v5-ink) !important; }
 .learning-reward { font-family:var(--font-v5); }.learning-summary__earned .learning-reward { font-family:var(--font-metric); }
 

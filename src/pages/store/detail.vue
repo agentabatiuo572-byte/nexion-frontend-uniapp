@@ -180,7 +180,7 @@
               role="link" tabindex="0" :aria-label="productSpecDocument.title"
               @click="openTrustUrl(productSpecDocument.url)" @keydown.enter.prevent="openTrustUrl(productSpecDocument.url)">
               <text class="block" :style="trustDisclosureTitleStyle">{{ productSpecDocument.title }}</text>
-              <text class="block" :style="trustLinkStyle">{{ t.store.viewRelatedMaterial }} ↗</text>
+              <text class="block nx-after-external" :style="trustLinkStyle">{{ t.store.viewRelatedMaterial }}</text>
             </view>
             <text v-else-if="!hasTrustSnapshot && (trustStatus === 'loading' || trustStatus === 'idle')" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
             <template v-else-if="hasTrustSnapshot && productAuditRows.length">
@@ -189,7 +189,7 @@
                 @click="openTrustUrl(row.Url)" @keydown.enter.prevent="openTrustUrl(row.Url)">
                 <text class="block" :style="trustDisclosureTitleStyle">{{ row.Primary }}</text>
                 <text class="block" :style="trustBodyStyle">{{ row.Secondary }}</text>
-                <text class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
+                <text class="block nx-after-external" :style="trustLinkStyle">{{ t.trust.latest }}</text>
               </view>
             </template>
             <template v-else>

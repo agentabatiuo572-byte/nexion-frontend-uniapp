@@ -37,7 +37,7 @@
       <view v-if="remoteApiEnabled" class="mx-4 security-providers"><ThirdPartyAuth :key="app.accountKey + ':' + app.accountBindingEpoch" intent="LINK" sheet :disabled="securityBusy || !remoteSecurity" @busy="oauthBusy = $event" /></view>
       <view v-if="phoneBound === false" class="mx-4 nx-glass-card" style="padding: var(--v5-space-4); margin-bottom: 16px" role="status">
         <text class="block">{{ t.security.phoneBindingRequired }}</text>
-        <view role="button" tabindex="0" style="min-height: 44px; color: var(--v5-brand); display: flex; align-items: center" @click="navTo('/pages/me/phone-binding')">{{ t.security.phoneBindingTitle }} →</view>
+        <view role="button" tabindex="0" style="min-height: 44px; color: var(--v5-brand); display: flex; align-items: center" @click="navTo('/pages/me/phone-binding')"><text class="nx-after-arrow">{{ t.security.phoneBindingTitle }}</text></view>
       </view>
       <!-- ───── Password + Two-factor (merged, de-carded group) ───── -->
       <view class="nx-glass-card mx-4 security-credentials" :style="cardStyle">
@@ -101,7 +101,7 @@
           </view>
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="rowLabelStyle">{{ sessionDeviceLabel(s) }}</text>
-            <text class="block truncate security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
+            <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
           <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)">
@@ -167,7 +167,7 @@
           <template v-else-if="!phoneChallenge">
             <view class="flex" style="gap: 8px">
               <view :style="pwdInputStyle" role="button" tabindex="0" :aria-label="t.countryCodes.title"
-                :aria-expanded="showPhoneCountries" @click="showPhoneCountries = true">{{ '+' + phoneCountry }} ▾</view>
+                :aria-expanded="showPhoneCountries" @click="showPhoneCountries = true"><text class="nx-after-chevron-down">{{ '+' + phoneCountry }}</text></view>
               <input class="flex-1" :style="pwdInputStyle" type="number" :value="phoneNext" :placeholder="t.security.phoneChangeNew"
                 :aria-label="t.security.phoneChangeNew" maxlength="15" @input="phoneNext = detailVal($event)" />
             </view>

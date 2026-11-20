@@ -33,7 +33,7 @@
           <text class="earn-half__label">{{ t.earn.latestSettlement }}</text>
           <view v-if="latest" class="earn-half__latest"><text class="earn-half__amount">{{ visibility.mask(latest.amt) }}</text><text class="earn-half__who">{{ latest.model }} · {{ latest.who }}</text></view>
           <view v-else-if="!remoteApiEnabled || app.homeTruthStatus === 'idle' || (app.homeTruthStatus === 'loading' && !app.homeTruth)" class="earn-half__placeholder" aria-hidden="true" />
-          <view v-else class="earn-half__latest"><text class="earn-half__amount earn-half__amount--none">—</text><text class="earn-half__who">{{ ledgerStatusText }}</text></view>
+          <view v-else class="earn-half__latest"><text class="earn-half__amount earn-half__amount--none">—</text><text class="earn-half__who earn-half__who--note">{{ ledgerStatusText }}</text></view>
         </view>
       </view>
 
@@ -287,7 +287,9 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 .earn-half__latest { min-width: 0; }
 .earn-half__amount { display: block; font: 500 19px/24px var(--font-metric); color: var(--v5-success-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-half__amount--none { color: var(--v5-ink-3); }
-.earn-half__who { display: block; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The tile opens the ledger, which shows full names: a name takes two lines before the ellipsis; the status note wraps in full. */
+.earn-half__who { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: normal; overflow-wrap: break-word; }
+.earn-half__who--note { display: block; -webkit-line-clamp: none; overflow: visible; }
 .earn-half__placeholder { width: 80%; height: 14px; border-radius: 8px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 
 .earn-fleet-head { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 32px 18px 8px; }

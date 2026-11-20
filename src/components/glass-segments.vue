@@ -4,7 +4,9 @@
     :role="variant === 'navigation' ? 'navigation' : semantics === 'radio' ? 'radiogroup' : 'tablist'" :aria-label="label" :aria-orientation="variant !== 'navigation' ? layout === 'vertical' ? 'vertical' : 'horizontal' : undefined"
     :segments-config="configuration" :change:segments-config="segmentsView.update"
   >
-    <LiquidGlass v-if="variant === 'navigation' || resolvedSurface === 'glass'" :radius="variant === 'navigation' ? 34 : 26" :tone="variant === 'navigation' ? 'navigation' : 'control'" :backdrop="variant === 'navigation' ? '.nx-page-enter' : ''" class="nx-glass-track nx-glass-backdrop" />
+    <LiquidGlass v-if="variant === 'navigation' || (resolvedSurface === 'glass' && layout !== 'equal')" :radius="variant === 'navigation' ? 34 : 26" :tone="variant === 'navigation' ? 'navigation' : 'control'" :backdrop="variant === 'navigation' ? '.nx-page-enter' : ''" class="nx-glass-track nx-glass-backdrop" />
+    <!-- An equal filter track scrolls when its one-line labels cannot fit; the viewport keeps the glass track still. -->
+    <view v-else-if="resolvedSurface === 'glass'" class="nx-glass-track-viewport" aria-hidden="true"><LiquidGlass :radius="26" tone="control" class="nx-glass-track nx-glass-backdrop" /></view>
     <view v-if="resolvedSelection === 'flat'" class="nx-glass-indicator nx-flat-indicator" aria-hidden="true" />
     <LiquidGlass v-else
       class="nx-glass-indicator" :radius="variant === 'navigation' ? 28 : 23"
@@ -134,7 +136,7 @@ export default viewImplementation;
 .nx-glass-option:active { opacity: .78; }
 .nx-glass-option:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -3px; }
 .nx-glass-option--disabled { opacity: .45; cursor: default; }
-.nx-glass-option__label { font-family: var(--font-v5); font-size: 12px; font-weight: 600; line-height: 17px; text-align: center; overflow-wrap: anywhere; }
+.nx-glass-option__label { font-family: var(--font-v5); font-size: 12px; font-weight: 600; line-height: 17px; text-align: center; white-space: nowrap; }
 .nx-glass-option__count { font-size: 12px; font-variant-numeric: tabular-nums; }
 /* Main switch and secondary filters (design system 03 §3.7): 32px visible options inside a
    40px track, 44px hit area, 500 labels, muted until selected. :where() keeps page overrides
@@ -144,6 +146,15 @@ export default viewImplementation;
 :where(.nx-glass-segments--filter) .nx-glass-option--selected { color: var(--v5-brand); }
 :where(.nx-glass-segments--filter) .nx-glass-option__label { font-size: var(--ui-type-segment); font-weight: var(--ui-type-segment-weight); line-height: var(--ui-type-segment-lh); }
 :where(.nx-glass-segments--scroll, .nx-glass-segments--wrap) .nx-glass-option__label { font-size: var(--ui-type-compact-button); line-height: var(--ui-type-compact-button-lh); }
+/* Design system 03 §3.7: labels never wrap. Equal filters stay equal while every label fits its share; a longer
+   label keeps its own width, and when the labels cannot all fit the track scrolls sideways and the view layer
+   brings the selected option into view (Material scrollable tabs). */
+/* Scrollable only while overflowing: a scroll container would otherwise swallow vertical page pans. */
+:where(.nx-glass-segments--filter.nx-glass-segments--equal)[data-glass-overflow="true"] { overflow-x: auto; scrollbar-width: none; }
+:where(.nx-glass-segments--filter.nx-glass-segments--equal)::-webkit-scrollbar { display: none; }
+:where(.nx-glass-segments--filter.nx-glass-segments--equal) .nx-glass-option { flex: 1 0 0; min-width: auto; padding-inline: 8px; }
+.nx-glass-segments--equal[data-glass-overflow="true"], .nx-glass-segments--equal[data-glass-overflow="true"] .nx-glass-option { touch-action: pan-x pan-y; }
+.nx-glass-track-viewport { position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none; }
 .nx-glass-segments--scroll { overflow-x: auto; scrollbar-width: none; }
 .nx-glass-segments--scroll::-webkit-scrollbar { display: none; }
 .nx-glass-segments--scroll .nx-glass-option { flex: 0 0 auto; white-space: nowrap; padding-inline: 16px; }

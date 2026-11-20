@@ -8,7 +8,7 @@
       <view class="genesis-seat genesis-edge">
         <view class="flex items-center justify-between" style="gap:8px">
           <view class="genesis-crown-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z"/></svg><text>{{ t.genesis.heroCrown }}</text></view>
-          <view class="genesis-how" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesis.howItWorksEntry }} →</view>
+          <view class="genesis-how" role="button" tabindex="0" @click="goHowItWorks"><text class="nx-after-arrow">{{ t.genesis.howItWorksEntry }}</text></view>
         </view>
         <text class="genesis-title">{{ t.genesis.heroTitle }}</text>
         <text v-if="showUrgency && supplyDisplay.known" class="genesis-description">{{ supplyCaption }}</text>

@@ -72,7 +72,7 @@
                   <text class="bills-row__title">{{ typeLabel(b.type) }}</text>
                   <NxTag v-if="b.status !== 'posted'" :tone="b.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(b.status)" />
                 </view>
-                <!-- Memo and time on one line (the memo ellipsizes); a reference gets its own line, ellipsized in the middle. -->
+                <!-- Memo and time flow together and wrap; a reference gets its own line, ellipsized in the middle. -->
                 <view :class="b.memoKey === 'learningReward' || b.type === 'clawback' ? '' : 'bills-row__sub--line'" class="bills-row__sub">
                   <text class="bills-row__memo">{{ billMemo(b) }}</text>
                   <text class="bills-row__dot"> · {{ fmtClock(b.ts) }}</text>
@@ -515,16 +515,17 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-row__icon { display:grid;place-items:center;width:32px;height:32px;border-radius:10px; }
 .bills-row__copy { display:flex;flex-direction:column;min-width:0; }
 .bills-row__title-row { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
-.bills-row__title { overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);text-overflow:ellipsis;white-space:nowrap; }
+/* Names take up to two lines, then ellipsis; the bill detail opened from the row shows them in full. */
+.bills-row__title { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);overflow-wrap:break-word; }
 /* A clawback title is longer than most: it may take two lines, and the figure column gives way before the copy does. */
 .bills-row--clawback { grid-template-columns:32px minmax(0,1fr) fit-content(45%); }
 .bills-row--clawback .bills-row__title { white-space:normal; }
 .bills-row--clawback .bills-row__balance { text-align:right; }
 .bills-row__sub { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 /* uni-text sets white-space: pre-line on itself, so a nowrap parent alone does not keep the line whole. */
-.bills-row__sub--line { display:flex;align-items:baseline;min-width:0; }
-.bills-row__sub--line > .bills-row__memo { flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.bills-row__sub--line > .bills-row__dot { flex:none;white-space:pre; }
+/* Memo and time flow as one text and wrap by word, so the time is never cut off. */
+.bills-row__sub--line { display:block;overflow-wrap:break-word; }
+.bills-row__sub--line > .bills-row__dot { white-space:pre-wrap; }
 .bills-row__figure { display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:var(--v5-space-1); }
 .bills-row__amount { display:flex;align-items:baseline;gap:var(--v5-space-1);font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink); }
 .bills-row__amount--in { color:var(--v5-success-ink); }

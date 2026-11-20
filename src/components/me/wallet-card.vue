@@ -37,7 +37,7 @@
       <text v-if="!compact && pendingLine" class="block nx-wallet-pending tabular-nums" :aria-hidden="pendingLine ? undefined : true">{{ pendingLine }}</text>
       <view class="nx-wallet-valuation">
         <text>{{ nexMarketLabel }}</text>
-        <view v-if="!compact" class="nx-wallet-bills" role="link" tabindex="0" @click="goBills"  @keydown.enter.prevent="goBills" ><text>{{ fmt(t.me.billsThisMonth, {n:visibility.mask(billsThisMonth)}) }}</text><text aria-hidden="true"> ›</text></view>
+        <view v-if="!compact" class="nx-wallet-bills" role="link" tabindex="0" @click="goBills"  @keydown.enter.prevent="goBills" ><text>{{ fmt(t.me.billsThisMonth, {n:visibility.mask(billsThisMonth)}) }}</text><NxIcon name="chevron-right" /></view>
       </view>
     </view>
     </view>
@@ -67,7 +67,7 @@
             </view>
           </view>
           <view class="wallet-add-device shrink-0 inline-flex items-center justify-center active:opacity-90" :style="addDeviceBtnStyle" data-me-action="add-device" role="button" tabindex="0" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
-            <text>{{ t.me.addDeviceCta }}</text>
+            <text class="nx-after-arrow">{{ t.me.addDeviceCta }}</text>
           </view>
         </view>
     </view>
@@ -75,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { useDataVisibility } from "@/store/data-visibility";

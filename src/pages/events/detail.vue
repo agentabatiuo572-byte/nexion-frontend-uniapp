@@ -39,7 +39,7 @@
         </view>
       </view>
       <text v-if="commandError" class="event-copy" role="alert">{{ copy.pending }}</text>
-      <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" :busy="busy" :disabled="loading || error" @click="run"><text>{{ copy.open }}</text><text aria-hidden="true">→</text></NxButton>
+      <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" icon="arrow-right" :busy="busy" :disabled="loading || error" @click="run"><text>{{ copy.open }}</text></NxButton>
       <view v-else-if="action" class="event-primary" role="button" :tabindex="busy || loading || error ? -1 : 0" :aria-disabled="busy || loading || error" @click="run" @keydown.enter.prevent="activate($event, run)" @keydown.space.prevent="activate($event, run)"><text>{{ busy ? copy.busy : action === 'remind' ? reminderCopy.remind : copy[action] }}</text></view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>

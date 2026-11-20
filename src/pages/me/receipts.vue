@@ -63,7 +63,7 @@
             >
               <view class="flex-1 min-w-0">
                 <text class="block truncate" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
-                <text class="block truncate" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
+                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
               </view>
               <view class="text-right shrink-0 min-w-0" style="margin-left: 8px; max-width: 42%">
                 <text class="block truncate tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 'full')} UVT` : `+$${formatAmount(r.rewardUsdt, 'full')}` }}</text>
@@ -141,7 +141,7 @@
             </view>
           </view>
           <view class="text-right shrink-0" style="margin-left: 8px">
-            <text class="block tabular-nums" :style="rowAmountStyle(r)">{{ rowAmount(r) }}</text>
+            <text class="block tabular-nums" :class="{ 'nx-before-check': r.category === 'KY' }" :style="rowAmountStyle(r)">{{ rowAmount(r) }}</text>
             <text class="block" :style="rowDateStyle">{{ shortDate(r.settledAt) }}</text>
           </view>
         </view>
@@ -573,7 +573,7 @@ function copySig(r: Receipt) {
 }
 
 function rowAmount(r: Receipt): string {
-  return r.category === "KY" ? `✓ ${formatAmount(r.netPaid)}` : `+${formatAmount(r.netPaid)}`;
+  return r.category === "KY" ? formatAmount(r.netPaid) : `+${formatAmount(r.netPaid)}`;
 }
 function shortDate(ts: number | string): string {
   const timestamp = displayTimestamp(ts);

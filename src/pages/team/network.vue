@@ -42,7 +42,7 @@
                   <view class="network-member-meta"><text>{{ visibility.mask(rankLabel(member.vRank, locale.code, [])) }}</text><view class="network-member-dot" :style="{ background: statusColor(member.status) }" aria-hidden="true" /><text>{{ networkReauditCopy(locale.code)[member.status] }}</text></view>
                 </view>
                 <view class="network-member-compute"><text class="network-member-points nx-num-metric" :aria-label="visibility.mask(formatComputePoints(member.monthComputePoints, locale.code))">{{ visibility.mask(formatComputePoints(member.monthComputePoints, locale.code).split(' ')[0]) }}</text><text class="network-meta">{{ monthPointsLabel }}</text></view>
-                <text class="network-chevron" aria-hidden="true">›</text>
+                <view class="network-chevron" aria-hidden="true"><NxIcon name="chevron-right" /></view>
               </view>
             </view>
           </view>
@@ -86,6 +86,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatDisplayDateTime } from "@/lib/display-date";

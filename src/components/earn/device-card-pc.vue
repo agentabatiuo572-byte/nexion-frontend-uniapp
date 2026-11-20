@@ -132,7 +132,7 @@
       <view v-if="!phoneFactsReady" class="mx-5 mb-4 rounded-xl" style="padding: 12px; background: var(--v5-brand-soft)" role="status">
         <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ phoneActivationGuidance.title }}</text>
         <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ phoneActivationGuidance.body }}</text>
-        <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
+        <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text class="nx-after-arrow">{{ t.myDevices.phoneActivationCta }}</text></view>
       </view>
       <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" />
       <template v-if="stage">
@@ -326,7 +326,7 @@
       <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
       <view v-else-if="deviceTodayCompleted.length">
         <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" time="" />
-        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
+        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
       </view>
     </view>
 

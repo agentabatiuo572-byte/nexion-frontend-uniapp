@@ -23,7 +23,7 @@
 
       <view class="px-4 space-y-3">
         <GlassSegments :label="t.promotion.events" v-model="eventSource" :options="sourceOptions" />
-        <view class="nx-glass-card" style="padding:14px;border-radius:var(--nx-glass-radius)" role="link" tabindex="0" @click="navTo('/pages/events/genesis-raffle')" @keydown.enter.prevent="navTo('/pages/events/genesis-raffle')"><text class="block" style="font-size:14px;font-weight:600;color:var(--v5-brand)">{{ raffleCopy.title }} ›</text><text class="block" style="margin-top:4px;font-size:12px;color:var(--v5-ink-3)">{{ raffleCopy.intro }}</text></view>
+        <view class="nx-glass-card" style="padding:14px;border-radius:var(--nx-glass-radius)" role="link" tabindex="0" @click="navTo('/pages/events/genesis-raffle')" @keydown.enter.prevent="navTo('/pages/events/genesis-raffle')"><text class="block nx-after-chevron" style="font-size:14px;font-weight:600;color:var(--v5-brand)">{{ raffleCopy.title }}</text><text class="block" style="margin-top:4px;font-size:12px;color:var(--v5-ink-3)">{{ raffleCopy.intro }}</text></view>
         <PromotionEntry v-if="eventSource==='promotions'" mode="events" />
         <view v-else-if="!signedIn" class="promotion-flat"><view class="promotion-action" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent('/pages/events/events'))"><text>{{ t.promotion.signIn }}</text></view></view>
         <template v-else>

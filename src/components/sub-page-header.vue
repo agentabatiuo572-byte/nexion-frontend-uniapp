@@ -224,8 +224,12 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   letter-spacing: -0.01em;
   color: var(--v5-ink);
   line-height: var(--ui-type-nav-title-lh);
-  white-space: normal;
-  overflow-wrap: anywhere;
+  /* One line, like iOS/Material navigation bars. Titles are written to fit at 360 in every language; a longer
+     one (e.g. user data) ends in an ellipsis while the DOM keeps the full title for screen readers. */
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .spv-glass svg { width: 20px; height: 20px; }
 .spv-sub {

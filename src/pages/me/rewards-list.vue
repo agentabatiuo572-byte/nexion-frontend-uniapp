@@ -97,10 +97,10 @@
               <svg width="18.5" height="18.5" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block truncate" :style="rowTitleStyle">{{ rewardTypeLabel(b.type) }}</text>
+              <text class="block" :style="rowTitleStyle">{{ rewardTypeLabel(b.type) }}</text>
               <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
-              <text v-else :class="b.memoKey === 'learningReward' ? 'block' : 'block truncate'" :style="rowSubStyle">{{ b.memo }}</text>
-              <text v-if="courseRewardId(b)" class="block active:opacity-70" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }} ›</text>
+              <text v-else class="block" :style="rowSubStyle">{{ b.memo }}</text>
+              <text v-if="courseRewardId(b)" class="block active:opacity-70 nx-after-chevron" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }}</text>
               <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: var(--v5-space-1)" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
               <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
             </view>
