@@ -2,6 +2,7 @@
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoDeletionStake } from './prototype-demo-staking.mjs';
+import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 
 const day=86400000;
 const timeZone='Asia/Shanghai';
@@ -14,7 +15,7 @@ const reward=row=>row.direction==='IN'&&row.amount>0&&!(row.bizType==='TEAM_COMM
 
 export function demoSettledTasks(state,at) {
   if(!demoHasEarningsHistory(state))return [];
-  if(state.deviceTaskSampleState==='long') {
+  if(demoHasLongTasks(state)) {
     return [
       ['LL','language inference - structured knowledge extraction','0.029745'],
       ['IG','image gen - watercolor garden concept','0.029234'],

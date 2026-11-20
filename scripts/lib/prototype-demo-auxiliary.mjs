@@ -3,6 +3,7 @@ import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionGroups, demoCommissionTotals, demoLifetimeEarningsUsdt, demoSettledTasks, demoTeamPeriod } from './prototype-demo-wallet.mjs';
 
 import { demoBatchPage } from './prototype-demo-secondary.mjs';
+import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
@@ -64,7 +65,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   if(p==='/api/tasks/assignments'||p==='/api/tasks/v2/assignments') {
     const v2=p.includes('/v2/'),settledTasks=demoSettledTasks(state,state.previewFactsAt??now),[settlement]=settledTasks;
     const devices=fleetDevices();
-    const v3=state.deviceTaskSampleState==='long';
+    const v3=demoHasLongTasks(state);
     if(v2&&(v3||!devices.some(device=>device.activatedAt!==null)))
       throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
     const task=(sample,status)=>{

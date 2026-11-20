@@ -1,5 +1,6 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
+import { demoHasLongContent, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -137,10 +138,11 @@ export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUs
   const history = demoDeletionHistory(state);
   // A rejected reserve that was returned is REFUNDED. Keep the original fee and net quote.
   const chainOrders = history?.withdrawals ?? (state.dataState === 'empty' ? [] :
-    ['CONFIRMED', 'REFUNDED'].map((status, i) => ({
-      withdrawalNo: 'WD-DEMO-' + (i + 1), amount: 100, netReceive: 99, fee: 1, status,
-      at: sampleAt - (i + 2) * day, holdUntil: sampleAt - day,
-    })));
+    ['CONFIRMED', 'REFUNDED'].map((status, i) => {
+      const sample = 'WD-DEMO-' + (i + 1);
+      return { withdrawalNo: demoHasLongContent(state) ? demoLongWithdrawalNo(sample) : sample,
+        amount: 100, netReceive: 99, fee: 1, status, at: sampleAt - (i + 2) * day, holdUntil: sampleAt - day };
+    }));
   const chainRows = chainOrders.map(({ at, holdUntil = at, ...order }) => ({
     ...order, targetAddress: `0x${'1'.repeat(40)}`, chain: 'USDT-BEP20',
     holdUntil: new Date(holdUntil).toISOString(), createdAt: new Date(at).toISOString(),

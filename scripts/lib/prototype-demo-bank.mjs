@@ -4,11 +4,58 @@ import { postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { randomBytes } from 'node:crypto';
 import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, updateDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
 import { demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
+import { demoHasLongContent, longBankOrderNo } from './prototype-demo-long-content.mjs';
 
 const DAY = 86400000;
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
 const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
 const snapshot = value => structuredClone(value);
+const bankConfigUrl = new URL('http://127.0.0.1/api/withdrawals/bank/config');
+
+function bankConfig(state, now) {
+  const base = secondaryDemo(bankConfigUrl, state);
+  const beneficiary = state.bankDemo?.beneficiary ?? base.beneficiary;
+  return { ...base, beneficiary, unresolvedIntent: demoBankWithdrawalIntent(state, now) };
+}
+
+function canQuote({ beneficiary, policy, capacity }, amountUsdt) {
+  return beneficiary?.canWithdraw && Number.isFinite(amountUsdt)
+    && amountUsdt >= policy.minAmountUsd && amountUsdt <= policy.maxAmountUsd
+    && amountUsdt <= capacity.maxWithdrawableUsdt;
+}
+
+function saveQuote(demo, bank, amountUsdt, now) {
+  const feeUsdt = Math.round(Math.max(1, Math.min(100, amountUsdt * .01)) * 1e6) / 1e6;
+  const netUsdt = Math.round((amountUsdt - feeUsdt) * 1e6) / 1e6;
+  const quote = { quoteNo: 'BQ-' + randomBytes(16).toString('hex'), amountUsdt, feeUsdt, netUsdt,
+    rateVnd: 25000, amountVnd: Math.round(netUsdt * 25000), bankCode: bank.bankCode, bankName: bank.bankName,
+    bankRoutingVerified: true, maskedAccount: bank.maskedAccount, expiresAt: new Date(now + 300000).toISOString() };
+  return demo.quotes[quote.quoteNo] = { quote };
+}
+
+function reserveBankOrder(state, demo, row, beneficiaryNo, withdrawalNo, now) {
+  const reserve = { asset: 'USDT', direction: 'OUT', at: now, category: 'withdraw' };
+  postDemoWalletEntries(state,
+    { ...reserve, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', amount: row.quote.netUsdt },
+    { ...reserve, bizNo: withdrawalNo + ':USDT:BANK_FEE', bizType: 'WITHDRAW_BANK_FEE', amount: row.quote.feeUsdt });
+  row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo,
+    withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'REVIEW_PASSED' },
+    providerState: 'READY', bank: snapshot(row.quote) };
+  demo.orders[withdrawalNo] = row.order;
+  updateDemoBankWithdrawals(state, now);
+  return row.order;
+}
+
+export function seedLongBankOrder(state, now) {
+  if (!demoHasLongContent(state) || state.dataState === 'empty' || state.accountDeletionState === 'clear'
+    || state.bankDemo?.orders?.[longBankOrderNo]) return;
+  const config = bankConfig(state, now), amountUsdt = 5000;
+  if (config.unresolvedIntent || !config.capacity.dailyRemainingCount || !canQuote(config, amountUsdt)) return;
+  const demo = state.bankDemo ??= { quotes: {}, orders: {}, commands: {} };
+  const row = saveQuote(demo, config.beneficiary, amountUsdt, now);
+  reserveBankOrder(state, demo, row, config.beneficiary.beneficiaryNo, longBankOrderNo, now);
+}
+
 export function bankDemo(url, state, request) {
   const path = url.pathname, method = request.method(), now = Date.now();
   if (!path.startsWith('/api/withdrawals/bank/') && !path.startsWith('/api/payout-addresses')) return undefined;
@@ -36,10 +83,7 @@ export function bankDemo(url, state, request) {
     const challenge = demo[type + 'Otp'];
     if (!challenge || challenge.expiresAt <= now || input().challengeNo !== challenge.challengeNo || input().code !== '123456') fail(type === 'address' ? 'PAYOUT_ADDRESS_OTP_INVALID' : 'OTP_INVALID', type === 'address' ? 422 : 400);
   };
-  const config = () => {
-    const base = secondaryDemo(new URL('/api/withdrawals/bank/config', url.origin), state, { method: () => 'GET' });
-    return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: demoBankWithdrawalIntent(state, now) };
-  };
+  const config = () => bankConfig(state, now);
   const orderView = row => snapshot({ ...row, settlementEvidence: row.settlementEvidence ?? {
     status: row.providerState === 'MANUAL_REVIEW' ? 'review_required' : 'unconfirmed',
     evidenceRef: null, providerOrderId: null, providerStatus: null, checkedAt: null, amountUsdt: null,
@@ -56,14 +100,9 @@ export function bankDemo(url, state, request) {
   });
   if (path === '/api/withdrawals/bank/quotes' && method === 'POST') {
     if (demoBankWithdrawalIntent(state, now)) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
-    const bank = config().beneficiary, amountUsdt = Number(input().amountUsdt);
-    const { policy, capacity } = config();
-    if (!bank?.canWithdraw || !Number.isFinite(amountUsdt) || amountUsdt < policy.minAmountUsd || amountUsdt > policy.maxAmountUsd || amountUsdt > capacity.maxWithdrawableUsdt) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
-    const feeUsdt = Math.round(Math.max(1, Math.min(100, amountUsdt * .01)) * 1e6) / 1e6;
-    const netUsdt = Math.round((amountUsdt - feeUsdt) * 1e6) / 1e6;
-    const quote = { quoteNo: 'BQ-' + randomBytes(16).toString('hex'), amountUsdt, feeUsdt, netUsdt, rateVnd: 25000, amountVnd: Math.round(netUsdt * 25000), bankCode: bank.bankCode, bankName: bank.bankName, bankRoutingVerified: true, maskedAccount: bank.maskedAccount, expiresAt: new Date(now + 300000).toISOString() };
-    demo.quotes[quote.quoteNo] = { quote };
-    return snapshot(quote);
+    const current = config(), amountUsdt = Number(input().amountUsdt);
+    if (!canQuote(current, amountUsdt)) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
+    return snapshot(saveQuote(demo, current.beneficiary, amountUsdt, now).quote);
   }
   const quoteMatch = path.match(/^\/api\/withdrawals\/bank\/quotes\/(BQ-[a-f0-9]{32})(\/abandon)?$/);
   if (quoteMatch) {
@@ -92,14 +131,7 @@ export function bankDemo(url, state, request) {
       if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
       // Real form: WD- plus 32 upper-case hex (35 characters), so result layouts see the true length.
       const withdrawalNo = 'WD-' + randomBytes(16).toString('hex').toUpperCase();
-      const reserve = { asset: 'USDT', direction: 'OUT', at: now, category: 'withdraw' };
-      postDemoWalletEntries(state,
-        { ...reserve, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', amount: row.quote.netUsdt },
-        { ...reserve, bizNo: withdrawalNo + ':USDT:BANK_FEE', bizType: 'WITHDRAW_BANK_FEE', amount: row.quote.feeUsdt });
-      row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo: config().beneficiary.beneficiaryNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'REVIEW_PASSED' }, providerState: 'READY', bank: snapshot(row.quote) };
-      demo.orders[withdrawalNo] = row.order;
-      updateDemoBankWithdrawals(state, now);
-      return orderView(row.order);
+      return orderView(reserveBankOrder(state, demo, row, config().beneficiary.beneficiaryNo, withdrawalNo, now));
     });
     return orderView(demo.orders[receipt.withdrawalNo]);
   }

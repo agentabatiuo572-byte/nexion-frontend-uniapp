@@ -1,11 +1,12 @@
 // Loopback simulation only. Question answers and rewards below are illustrative.
 import { createHash } from 'node:crypto';
 import { fixture } from './design-review-fixture.mjs';
+import { demoHasLongBillRefs } from './prototype-demo-long-content.mjs';
 import { demoHasEarningsHistory } from './prototype-demo-wallet.mjs';
 const proof = { serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '' };
 const prefix = '/api/content/learning/courses';
 const longBillCourseId = 'review-course-1';
-const hasLongBillCourse = state => state.billRefsState === 'long-refs' && demoHasEarningsHistory(state);
+const hasLongBillCourse = state => demoHasLongBillRefs(state) && demoHasEarningsHistory(state);
 
 export function demoLongLearningBill(url, state) {
   if (!hasLongBillCourse(state)) return null;
