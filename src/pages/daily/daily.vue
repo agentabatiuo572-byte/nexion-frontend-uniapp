@@ -912,7 +912,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dly-num { margin-top: 2px; font: 500 76px/76px var(--font-metric); letter-spacing: -.05em; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .dly-num--q { color: var(--v5-ink-4); }
-.dly-lbl { margin-top: 6px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+/* The 76px streak number's glyph box reaches below its 76px line; the label sits clear of it. */
+.dly-lbl { margin-top: 10px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .dly-next { position: relative; display: block; margin: 14px 16px 0; font: 500 15px/22px var(--font-v5); color: var(--v5-ink); }
 .dly-next--mut { font-weight: 400; color: var(--v5-ink-3); }
 .dly-next__r { color: var(--v5-warning-ink); white-space: nowrap; }

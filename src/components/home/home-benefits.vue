@@ -319,7 +319,7 @@ function retryEligibility() {
 .hb-pend__text { flex:1;min-width:0; }
 .hb-pend__title { display:block;font:500 14px/20px var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }
 .hb-pend--wide .hb-pend__title { font-size:15px; }
-.hb-pend__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.hb-pend__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .hb-pend--wide .hb-pend__sub { font-size:13px;line-height:18px; }
 .hb-warn { color:var(--v5-warning-ink); }
 .hb-mono { font-size:12px;color:var(--v5-ink);white-space:nowrap; }
