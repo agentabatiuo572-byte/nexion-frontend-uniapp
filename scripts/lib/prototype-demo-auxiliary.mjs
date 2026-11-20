@@ -62,26 +62,35 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   }
   // Like the backend, v2 is the v1 read plus settlement fields and the unposted totals; with no devices it is 404.
   if(p==='/api/tasks/assignments'||p==='/api/tasks/v2/assignments') {
-    const v2=p.includes('/v2/'),[settlement]=demoSettledTasks(state,state.previewFactsAt??now);
+    const v2=p.includes('/v2/'),settledTasks=demoSettledTasks(state,state.previewFactsAt??now),[settlement]=settledTasks;
     const devices=fleetDevices();
     if(v2&&!devices.some(device=>device.activatedAt!==null))
       throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
-    const posted=settlement?new Date(settlement.postedAt).toISOString():null;
-    // Layout sample: simulated jobs carry their full task name and a 6-decimal amount, the longest shapes the App shows.
-    const longSimulatedTasks=base=>[['LL','language inference - structured knowledge extraction','0.029745'],['IG','image gen - watercolor garden concept','0.029234'],
-      ['EM','embedding - digital passage retrieval','0.018296'],['VG','video gen - digital weather animation','0.024993'],['SP','speech processing - cinematic interview notes','0.025376'],
-      ['EM','embedding - digital passage retrieval','0.019308'],['FT','fine tuning - compact summary adaptation','0.007892'],['VG','video gen - digital weather animation','0.025009'],
-      ['VG','video gen - digital weather animation','0.024729'],['SP','speech processing - cinematic interview notes','123.011586']].map(([taskClass,taskName,rewardAmount],index)=>{
-        const completedAt=new Date(now-(index+1)*420000).toISOString();
-        return {...base(10+index,'COMPLETED',taskClass),taskName,executionMode:'SIMULATED',proofKind:'TASK_RECEIPT',modelExecuted:false,
-          rewardAsset:'USDT',rewardAmount,rewardUsdt:Number(rewardAmount),startedAt:new Date(now-(index+1)*420000-300000).toISOString(),completableAt:completedAt,completedAt,receiptNo:'DEMO-RECEIPT-L'+index};
-      });
-    const task=(id,status,taskClass)=>({...proof,serverCanonical:true,...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,settlementStatus:status==='COMPLETED'?'POSTED':'NONE',settlementBatchNo:status==='COMPLETED'?settlement.batchNo:null,settledAt:status==='COMPLETED'?posted:null}),taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:'Image generation',taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:settlement.amount,requiredSeconds:600,startedAt:new Date(status==='RUNNING'?now-300000:settlement.completedAt-600000).toISOString(),completableAt:new Date(status==='RUNNING'?now+300000:settlement.completedAt).toISOString(),completedAt:status==='COMPLETED'?new Date(settlement.completedAt).toISOString():null,receiptNo:status==='COMPLETED'?settlement.receiptNo:null,proofNonce:null,proofExpiresAt:null});
+    const task=(sample,status)=>{
+      const completed=status==='COMPLETED';
+      const completedAt=completed?new Date(sample.completedAt).toISOString():null;
+      return {...proof,serverCanonical:true,
+        ...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,
+          settlementStatus:completed?'POSTED':'NONE',settlementBatchNo:completed?sample.batchNo:null,
+          settledAt:completed?new Date(sample.postedAt).toISOString():null}),
+        taskNo:sample.taskNo,deviceId:sample.deviceId,taskId:'demo-'+sample.taskClass.toLowerCase(),
+        taskName:sample.taskName,taskClass:sample.taskClass,model:sample.model,client:sample.client,
+        status,rewardUsdt:sample.amount,requiredSeconds:sample.durationSec,...sample.simulation,
+        startedAt:new Date(completed?sample.completedAt-sample.durationSec*1000:now-300000).toISOString(),
+        completableAt:completedAt??new Date(now+300000).toISOString(),completedAt,
+        receiptNo:completed?sample.receiptNo:null,proofNonce:null,proofExpiresAt:null};
+    };
     return {...proof,serverCanonical:true,serverNow:iso,devices:devices.map(device=>{
       const hasSample=device.id===settlement?.deviceId;
+      const currentSample=hasSample?{...settlement,taskNo:'DEMO-TASK-4',durationSec:600}:null;
+      if(currentSample?.simulation) {
+        currentSample.amount=0.031874;
+        currentSample.simulation={...currentSample.simulation,rewardAmount:'0.031874'};
+      }
       return {deviceId:device.id,instanceNo:device.instanceNo,deviceType:device.deviceType,lockUntil:null,
-        currentTask:hasSample&&device.activatedAt!==null?(state.deviceTaskSampleState==='long'?{...task(4,'RUNNING','LL'),taskName:'language inference - structured knowledge extraction',executionMode:'SIMULATED',proofKind:'TASK_RECEIPT',modelExecuted:false,rewardAsset:'USDT',rewardAmount:'0.031874',rewardUsdt:0.031874}:task(4,'RUNNING','IG')):null,
-        recentTasks:!hasSample?[]:state.deviceTaskSampleState==='long'?longSimulatedTasks(task):[task(1,'COMPLETED','IG')],...(v2&&{recoveryPending:false,recoveryReason:null})};
+        currentTask:currentSample&&device.activatedAt!==null?task(currentSample,'RUNNING'):null,
+        recentTasks:hasSample?(settlement.simulation?settledTasks:[settlement]).map(sample=>task(sample,'COMPLETED')):[],
+        ...(v2&&{recoveryPending:false,recoveryReason:null})};
     }),...(v2&&{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]})};
   }
   if(p==='/api/tasks/v2/settlements'||p.startsWith('/api/tasks/v2/settlements/')) {
