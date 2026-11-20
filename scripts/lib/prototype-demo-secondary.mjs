@@ -46,6 +46,35 @@ export function demoBatchPage(params, batches) {
   return {...proof,records,nextCursor:rows.length>boundary+1+limit?records.at(-1).batchNo:null};
 }
 
+function recordDemoBankSettlement(row, { paid, d2Refund, evidenceRef, at }) {
+  row.providerState = paid ? 'PAID' : d2Refund ? 'READY' : 'FAILED';
+  row.withdrawal.status = paid ? 'CONFIRMED' : d2Refund ? 'REFUNDED' : 'FAILED';
+  row.settlementEvidence = { status: paid ? 'paid' : 'refunded', evidenceRef,
+    providerOrderId: d2Refund ? null : 'DEMO-PROVIDER-' + row.withdrawalNo,
+    providerStatus: paid ? 3 : d2Refund ? null : 5,
+    checkedAt: new Date(at).toISOString(), amountUsdt: row.bank.amountUsdt };
+}
+
+// Old handoffs saved terminal outcomes separately from the order fields and evidence.
+export function restoreDemoBankWithdrawals(state, now) {
+  for (const row of Object.values(state.bankDemo?.orders ?? {})) {
+    if (row.settlementEvidence) continue;
+    if (row.outcome === 'settled') {
+      recordDemoBankSettlement(row, { paid: true, evidenceRef: 'DEMO-' + row.withdrawalNo, at: now });
+    } else if (row.outcome === 'rejected') {
+      const refund = state.walletMovements?.find(entry =>
+        entry.bizNo === row.withdrawalNo + ':PAYOUT:USDT:REFUND' && entry.bizType === 'WITHDRAW_PAYOUT_REFUND'
+        && entry.asset === 'USDT' && entry.direction === 'IN' && entry.status === 'SUCCESS'
+        && entry.amount === row.bank.amountUsdt && Number.isFinite(entry.at));
+      if (!refund) throw new Error('Missing legacy bank refund ledger entry for ' + row.withdrawalNo);
+      recordDemoBankSettlement(row, { paid: false, evidenceRef: refund.bizNo, at: refund.at });
+    } else {
+      continue;
+    }
+    delete row.outcome;
+  }
+}
+
 // Advance the same order facts for the bank detail, quote recovery, config and tracking reads.
 export function updateDemoBankWithdrawals(state, now) {
   for (const row of Object.values(state.bankDemo?.orders ?? {})) {
@@ -66,12 +95,7 @@ export function updateDemoBankWithdrawals(state, now) {
           asset: 'USDT', direction: 'IN', amount: row.bank.amountUsdt, at: now, category: 'withdraw',
         });
       }
-      row.providerState = paid ? 'PAID' : d2Refund ? 'READY' : 'FAILED';
-      row.withdrawal.status = paid ? 'CONFIRMED' : d2Refund ? 'REFUNDED' : 'FAILED';
-      row.settlementEvidence = { status: paid ? 'paid' : 'refunded', evidenceRef,
-        providerOrderId: d2Refund ? null : 'DEMO-PROVIDER-' + row.withdrawalNo,
-        providerStatus: paid ? 3 : d2Refund ? null : 5,
-        checkedAt: new Date(now).toISOString(), amountUsdt: row.bank.amountUsdt };
+      recordDemoBankSettlement(row, { paid, d2Refund, evidenceRef, at: now });
     } else if (state.bankState === 'held') {
       row.providerState = 'MANUAL_REVIEW';
       row.withdrawal.status = 'TX_ORPHANED';
