@@ -29,8 +29,8 @@
               <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ nexPriceText }}</text>
               <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="nexChangeStyle" role="status" aria-live="polite">{{ t.marketPage.nexHero.loading }}</text>
               <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="nexChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
-              <text v-else class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
-                {{ market.change24hAvailable ? `${nexDirection} ${Math.abs(nex.change24h).toFixed(2)}%` : "—" }} (24h)
+              <text v-else class="block font-mono-tabular tabular-nums" :class="market.change24hAvailable ? nexDirection : undefined" :style="nexChangeStyle">
+                <text v-if="market.change24hAvailable && nexDirection" class="nx-sr-only">{{ nex.change24h > 0 ? "+" : "−" }}</text>{{ market.change24hAvailable ? `${Math.abs(nex.change24h).toFixed(2)}%` : "—" }} (24h)
               </text>
             </view>
           </view>
@@ -152,7 +152,7 @@ const nexChartData = computed(() => {
 });
 const historyUnavailableText = computed(() => fmt(t.value.marketPage.nexHero.historyUnavailable, { range: tf.value }));
 const nexUp = computed(() => nex.value.change24h >= 0);
-const nexDirection = computed(() => nex.value.change24h > 0 ? "▲" : nex.value.change24h < 0 ? "▼" : "•");
+const nexDirection = computed(() => nex.value.change24h > 0 ? "nx-before-caret-up" : nex.value.change24h < 0 ? "nx-before-caret-down" : undefined);
 const athDeltaPct = computed(() => nex.value.ath > 0 ? ((nex.value.priceUSD - nex.value.ath) / nex.value.ath) * 100 : 0);
 
 function fmtPrice(n: number): string {
