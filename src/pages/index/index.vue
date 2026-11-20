@@ -144,7 +144,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch, locale.code], () => { fenc
    bottom right and the copy takes the full width above it. The visible copy adds nothing to the intrinsic width. */
 .phone-policy-copy-box { flex: 1 1 auto; min-width: 0; max-width: calc(100% - 42px); display: grid; }
 .phone-policy-copy-box > .phone-policy-copy, .phone-policy-copy-box > .phone-policy-copy-gauge { grid-area: 1 / 1; }
-.phone-policy-copy { width: 0; min-width: 100%; font: 400 13px/18px var(--font-v5); color: var(--v5-ink); text-wrap: balance; word-break: keep-all; overflow-wrap: break-word; }
+.phone-policy-copy { width: 0; min-width: 100%; font: 400 13px/18px var(--font-v5); color: var(--v5-ink); text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
 .phone-policy-copy-gauge { height: 0; overflow: hidden; visibility: hidden; font: 400 13px/0 var(--font-v5); white-space: nowrap; word-break: keep-all; }
 .phone-policy-action { flex: none; display: flex; margin-left: auto; align-items: center; min-height: 44px; border-radius: var(--v5-radius-full); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .phone-policy-action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
