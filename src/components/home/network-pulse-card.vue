@@ -51,6 +51,8 @@
 </template>
 
 <script setup lang="ts">
+import { homeDisplay } from "@/composables/use-home-display";
+import { remoteApiEnabled } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
@@ -132,7 +134,8 @@ const metrics = computed<Cell[]>(() => {
   };
   const memberValue = props.compactView && props.estimated ? props.registeredDisplay : pulse?.registeredUsers;
   const members = displayCell(t.value.home.networkMembers, memberValue, "var(--v5-brand)", true);
-  const devices = displayCell(t.value.home.networkDevices, pulse?.onlineDevices, "var(--v5-tech-cyan-ink)", true);
+  const online = remoteApiEnabled ? homeDisplay.value?.online : pulse?.onlineDevices;
+  const devices = displayCell(t.value.home.networkDevices, online, "var(--v5-tech-cyan-ink)", true);
 
   return [members, devices];
 });

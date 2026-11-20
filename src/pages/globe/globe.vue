@@ -192,6 +192,7 @@
 </template>
 
 <script setup lang="ts">
+import { useHomeDisplay } from "@/composables/use-home-display";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useConfig } from "@/store/config";
 import { useApp } from "@/store/app";
@@ -232,10 +233,10 @@ const pulseTick = ref(0);
 const simulationNow = ref(Date.now());
 let pulseTimer = 0;
 const globeSettings = computed(() => cfg.config.publicStats.globeDisplay);
-// Totals are the home online-devices figure and the Earn task centre's job count, shown directly; H9 only splits them.
-const onlineTotal = computed(() => cfg.config.networkPulse?.onlineDevices ?? null);
+const display = useHomeDisplay(() => remoteApiEnabled);
+const onlineTotal = computed(() => (remoteApiEnabled ? display.value?.online : cfg.config.networkPulse?.onlineDevices) ?? null);
 const centerStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0,
-  globeSettings.value, onlineTotal.value, app.activeJobsDisplay));
+  globeSettings.value, onlineTotal.value, app.activeJobsDisplay, remoteApiEnabled));
 const topStats = computed<NetworkStatCell[]>(() => [
   { key: "devices", label: t.value.home.networkDevices, count: onlineTotal.value },
   { key: "jobs", label: t.value.globe.activeJobs, count: app.activeJobsDisplay },
@@ -309,11 +310,6 @@ onShow(() => {
   pageActive = true;
   simulationNow.value = Date.now();
   void cfg.revalidate();
-  // Same reads as the Earn page, so the job total matches its task centre.
-  if (remoteApiEnabled) {
-    void app.ensureRemoteFleet().catch(() => undefined);
-    void app.ensureHomeTruth().catch(() => undefined);
-  }
 });
 onHide(() => { pageActive = false; selected.value = null; });
 onUnmounted(() => { if (pulseTimer) clearInterval(pulseTimer); });

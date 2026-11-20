@@ -49,16 +49,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
-import { apiClient } from "@/api/runtime";
+import { computed, getCurrentInstance, onMounted } from "vue";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { trustCenterCopy } from "@/i18n/trust-center";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { useTrustDocuments } from "@/composables/use-trust-documents";
-import { createHomeDisplayPlayer, parseHomeDisplayBatch, type homeDisplayAt } from "@/lib/home-display-player";
-import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
+import { refreshHomeDisplay, useHomeDisplay } from "@/composables/use-home-display";
+import { onShow } from "@/composables/use-tab-page-lifecycle";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import NxSection from "@/components/ui/nx-section.vue";
 
@@ -72,36 +71,17 @@ const goTrust = () => navTo("/pages/trust/trust");
 // Same published feed; run only while this card and its page are visible.
 const instance = getCurrentInstance()!;
 const { elRef, running } = useLoopsInView(".home-trust__card");
-const display = ref<ReturnType<typeof homeDisplayAt>>(null);
-const player = createHomeDisplayPlayer({
-  fetch: async () => parseHomeDisplayBatch(await apiClient.request({ path: "/api/config/home-display", authenticated: false })),
-  now: () => typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now(),
-  render: next => { display.value = next; },
-});
-let pageVisible = false;
-function syncPlayer() {
-  if (pageVisible && running.value && (typeof document === "undefined" || !document.hidden)) player.start();
-  else player.stop();
-}
+const display = useHomeDisplay(() => running.value);
 onShow(() => {
-  pageVisible = true;
-  syncPlayer();
   if (status.value === "idle" || status.value === "error") void refresh();
 });
-onHide(() => { pageVisible = false; syncPlayer(); });
-watch(running, syncPlayer);
-defineExpose({ refresh: () => Promise.allSettled([refresh(), player.refresh()]) });
+defineExpose({ refresh: () => Promise.allSettled([refresh(), refreshHomeDisplay()]) });
 
 onMounted(() => {
   // Resolve the existing card without changing its markup. Native observation uses the instance selector.
   elRef.value = typeof IntersectionObserver === "undefined"
     ? instance.proxy as unknown as HTMLElement
     : instance.proxy!.$el.querySelector(".home-trust__card");
-  if (typeof document !== "undefined") document.addEventListener("visibilitychange", syncPlayer);
-});
-onUnmounted(() => {
-  player.stop();
-  if (typeof document !== "undefined") document.removeEventListener("visibilitychange", syncPlayer);
 });
 </script>
 

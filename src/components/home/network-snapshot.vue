@@ -3,9 +3,15 @@
 import { computed } from 'vue';
 import { useRegisteredUsersEstimate } from '@/composables/use-registered-users-estimate';
 import { useConfig } from '@/store/config';
+import { remoteApiEnabled } from '@/api/runtime';
+import { useHomeDisplay } from '@/composables/use-home-display';
 import NetworkPulseCard from './network-pulse-card.vue';
 const cfg = useConfig(), memberCount = useRegisteredUsersEstimate();
-const available = computed(() => memberCount.value !== null && Number.isSafeInteger(cfg.config.networkPulse?.onlineDevices) && cfg.config.networkPulse!.onlineDevices! >= 0);
+const display = useHomeDisplay(() => remoteApiEnabled && memberCount.value !== null);
+const available = computed(() => {
+  const online = remoteApiEnabled ? display.value?.online : cfg.config.networkPulse?.onlineDevices;
+  return memberCount.value !== null && online != null && Number.isSafeInteger(online) && online >= 0;
+});
 </script>
 <style scoped>
 .network-snapshot__estimate { display: block; font: 400 12px/1.5 var(--font-v5); color: var(--v5-ink-2); margin-top: 4px; }

@@ -137,6 +137,13 @@ const server=http.createServer(async(req,res)=>{
           for(const key of Object.keys(state))delete state[key];
           Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
         }
+        if(update.homeDisplayState==='growth'&&state.homeDisplayState!=='growth'){
+          state.homeDisplayGrowthAt=Date.now();
+          state.homeDisplayState='growth';
+        }else if(update.homeDisplayState==='paused'&&state.homeDisplayState==='growth'){
+          state.homeDisplayElapsed=(state.homeDisplayElapsed??0)+Math.max(0,Math.floor((Date.now()-(state.homeDisplayGrowthAt??startedAt))/1000));
+          state.homeDisplayState='paused';
+        }
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(key!=='promotionRewardState'&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;

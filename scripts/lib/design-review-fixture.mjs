@@ -8,7 +8,7 @@ export function previewInterfaceLanguages(mode = 'all') {
   return mode === 'en-only' ? ['en'] : mode === 'default' ? codes.filter(code => code !== 'zh') : codes;
 }
 
-const platform = { interfaceLanguages: previewInterfaceLanguages(), featureFlags: { computeShareEnabled: true, homeNewcomerTasksEnabled: true, homeWeeklyPromoEnabled: false }, share: { baseUrl: "https://ui-probe.invalid/ref/", channels: [], appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "", version: "", releaseNotes: { zh: "", en: "" }, source: "unavailable" } }, publicStats: { version: 1, ...authority, source: "server:nx_config_item,nx_user", realUserCount: 4, networkPulse: {registeredUsers:12480,onlineDevices:3206} }, onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 }, computerCompute: { domain: "E6", flags: [{ key: "computeShareEnabled", enabled: true }], coefficients: [{ key: "h5BaseFactor", value: 0.6 }, { key: "continuityFullHours", value: 24 }], yieldEstimate: [{ key: "topsBaseline", value: 100 }, { key: "dailyUsdtPerBaseline", value: 0.24 }, { key: "nexPerUsdt", value: 10 }], gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, i) => ({ id, label: `UI ${id}`, tops: (i + 1) * 100, keywords: [{ slot: "keyword1", value: `UI ${id}` }] })), download: { url: "https://ui-probe.invalid/agent-fixture.zip", zhTitle: "测试下载入口", zhGuide: "前端验收数据，不下载或安装", enTitle: "UI fixture download", enGuide: "Frontend fixture; no installer download or native execution" }, sources: ["e6.compute_config"] }, updatedAt: iso };
+const platform = { interfaceLanguages: previewInterfaceLanguages(), featureFlags: { computeShareEnabled: true, homeNewcomerTasksEnabled: true, homeWeeklyPromoEnabled: false }, share: { baseUrl: "https://ui-probe.invalid/ref/", channels: [], appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "", version: "", releaseNotes: { zh: "", en: "" }, source: "unavailable" } }, publicStats: { version: 1, ...authority, source: "server:nx_config_item,nx_user", realUserCount: 4, networkPulse: {registeredUsers:12480} }, onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 }, computerCompute: { domain: "E6", flags: [{ key: "computeShareEnabled", enabled: true }], coefficients: [{ key: "h5BaseFactor", value: 0.6 }, { key: "continuityFullHours", value: 24 }], yieldEstimate: [{ key: "topsBaseline", value: 100 }, { key: "dailyUsdtPerBaseline", value: 0.24 }, { key: "nexPerUsdt", value: 10 }], gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, i) => ({ id, label: `UI ${id}`, tops: (i + 1) * 100, keywords: [{ slot: "keyword1", value: `UI ${id}` }] })), download: { url: "https://ui-probe.invalid/agent-fixture.zip", zhTitle: "测试下载入口", zhGuide: "前端验收数据，不下载或安装", enTitle: "UI fixture download", enGuide: "Frontend fixture; no installer download or native execution" }, sources: ["e6.compute_config"] }, updatedAt: iso };
 export const previewDefaultTrialSku = 'stellarbox-s1';
 export const previewDefaultTrialName = 'UVELBox S1';
 
@@ -105,7 +105,24 @@ export function previewCapacity(device, schedule, at) {
     capacitySubsidyRemainingDays: Math.max(0, Math.ceil((capacitySubsidyEndsAt - at) / 86400000)) };
 }
 
-function fixture(url, locale, state, request, onlineDevices=platform.publicStats.networkPulse.onlineDevices) {
+export function previewActiveJobsBase(state) {
+  return state.jobsBaseState === 'unpublished' ? null : 560;
+}
+
+export function previewHomeDisplay(state, at = Date.now()) {
+  const enabled = state.homeDisplayState === 'growth';
+  const anchor = state.homeDisplayGrowthAt ?? now;
+  const seconds = enabled ? Math.max(0, Math.floor((at - anchor) / 1000)) : 0;
+  const elapsed = (state.homeDisplayElapsed ?? 0) + seconds;
+  const startAt = enabled ? anchor + seconds * 1000 : now;
+  const samples = Array.from({ length: enabled ? 121 : 1 }, (_, offset) => elapsed + offset);
+  const jobsBase = previewActiveJobsBase(state);
+  return { enabled, startAt, serverNow: at, validUntil: enabled ? startAt + 121_000 : at + 60_000,
+    sequence: elapsed + 1, online: samples.map(t => 800 + t * 2), paidCents: samples.map(t => 300000 + t * 25),
+    activeJobs: samples.map(t => jobsBase === null ? null : jobsBase + t * 2) };
+}
+
+function fixture(url, locale, state, request, onlineDevices=3206) {
   if (url.pathname === '/api/quests/state') {
     const mode = state.taskState || 'pending';
     if (mode === 'error') return {};
@@ -151,9 +168,14 @@ function fixture(url, locale, state, request, onlineDevices=platform.publicStats
   if (url.pathname === '/api/config/v-ranks') return { ...authority, source: 'nx_v_rank_config', prizeName: 'Ranks', capabilities: { peer: false, genesis: false }, ranks: Array.from({ length: 9 }, (_, v) => ({ v, title: `Level ${v}`, cnTitle: `等级 ${v}`, directBonus: .1, unilevelDepth: v + 1, peerBonus: 0, leadershipVotes: v, cultivationBonus: 0, selfComputePoints: v * 1000, directRefs: v, teamComputePoints: v * 10000, rewards: [{ type: 'UVT', amount: v * 10 }], visible: true })) };
   if (url.pathname === '/api/team/rank') return { ...authority, source: 'nx_team_member + server VRankPerformanceRepository', rankCode: state.highestRank ? 'V8' : 'V2', progress: { selfComputePoints: 2500, directRefs: 2, teamComputePoints: 23000, vDownlineCounts: {} } };
   if (url.pathname === '/api/app/profile') return { nickname: 'Alex', avatarUrl: '', avatarRevision: '', profileChangeIntervalDays: 7, nicknameChangeAvailableAt: null, avatarChangeAvailableAt: null, language: locale };
-  if (url.pathname === '/api/app/home/overview') return { ...authority, source: 'server:nx_compute_receipt,nx_compute_task,nx_user_device.dc_location,nx_product,nx_growth_promo_banner', generatedAt: iso, accountScope: 'authenticated-account', earnings: { todayVsYesterdayPct: 0, todayVsYesterdayUsdt: 0.812, ...Object.fromEntries(['today', 'week', 'month', 'all'].map(p => [p, { usdt: 16.24, nex: 3, jobCount: 10 }])) }, earningsLedgerMode: 'SETTLED', earningsLedger: [], marketBoard: { workloads: [], deviceRankings: [] }, doTheMath: null, weeklyPromo: null, onboarding: { cumulativePaidUsdt: 0, activeDevices: 0 }, onGrid: { clients: [], activeDevices: 0, activeJobs: 0, perSecUsdt: 0 } };
+  if (url.pathname === '/api/config/home-display') return previewHomeDisplay(state);
+  if (url.pathname === '/api/app/home/overview') return { ...authority, source: 'server:nx_compute_receipt,nx_compute_task,nx_user_device.dc_location,nx_product,nx_growth_promo_banner', generatedAt: iso, accountScope: 'authenticated-account', earnings: { todayVsYesterdayPct: 0, todayVsYesterdayUsdt: 0.812, ...Object.fromEntries(['today', 'week', 'month', 'all'].map(p => [p, { usdt: 16.24, nex: 3, jobCount: 10 }])) }, earningsLedgerMode: 'SETTLED', earningsLedger: [], marketBoard: { workloads: [], deviceRankings: [] }, doTheMath: null, weeklyPromo: null, onboarding: { cumulativePaidUsdt: 0, activeDevices: 0 }, onGrid: { clients: [], activeDevices: 0, activeJobs: previewHomeDisplay(state).activeJobs[0], perSecUsdt: 0 } };
   if (url.pathname === '/api/config/referral-rewards') return {enabled:true,welcomeGift:{lockMode:'risk_bucket',usdtAmount:0,nexAmount:0},inviterReward:{nexAmount:10},rhythmMonth:1,newcomerMultiplier:1,inviterMultiplier:1,effectiveAt:iso,sources:['nx_user.sponsor_user_id']};
-  if (url.pathname === '/api/config/platform') return platform;
+  if (url.pathname === '/api/config/platform') {
+    const batch = previewHomeDisplay(state);
+    return { ...platform, publicStats: { ...platform.publicStats, activeJobsBase: previewActiveJobsBase(state),
+      networkPulse: { ...platform.publicStats.networkPulse, onlineDevices: batch.online[0], activeJobs: batch.activeJobs[0] } } };
+  }
   if (url.pathname === '/api/devices/earnings') {
     const device = { id: 41, rowVersion: 1, instanceNo: 'REVIEW-S1', name: products[0].name, deviceType: 'BOX', productCode: 'STELLARBOX-S1', monthlyTargetActive: true, status: 'ACTIVE', pendingDeactivate: false, activatedAt: now - 86400000 * 40, purchasedAt: now - 86400000 * 40, dailyUsdt: 6.2, dailyNex: 3, todayEarningsUsdt: 2.34, todayEarningsNex: 1, gpuModel: 'GPU', vramTotalGb: 24, basePowerW: 150, location: 'Review', actualPaidUsdt: 1299, cumulativeOutputUsdt: 100 };
     Object.assign(device, previewCapacity(device, capacitySchedule, now));
