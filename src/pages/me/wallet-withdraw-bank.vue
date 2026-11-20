@@ -432,6 +432,7 @@ function applyRecovery(recovered: BankRecovery, quoteNo: string) {
       useTranslations.value.walletV3.withdrawOtherPending);
     return true;
   }
+  if (recovered.state === "COMMITTED") replaceOrderInH5(recovered.withdrawalNo);
   return false;
 }
 async function openIntent(intent: BankIntent) {
@@ -497,9 +498,25 @@ async function abandon() {
     }
   });
 }
+function replaceOrderInH5(orderNo: string | null) {
+  if (typeof window === "undefined" || typeof window.history?.replaceState !== "function") return;
+  const hash = window.location.hash;
+  const question = hash.indexOf("?");
+  const path = question < 0 ? hash : hash.slice(0, question);
+  if (path !== "#/pages/me/wallet-withdraw-bank") return;
+  const query = new URLSearchParams(question < 0 ? "" : hash.slice(question + 1));
+  if (query.get("order") === orderNo) return;
+  if (orderNo === null) query.delete("order");
+  else query.set("order", orderNo);
+  const search = query.toString();
+  try {
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${path}${search ? `?${search}` : ""}`);
+  } catch { /* Unsupported history leaves the existing in-memory selection intact. */ }
+}
 function startNew() {
   refreshPendingAttempt();
   if (!newWithdrawalAllowed.value || !terminal.value || busy.value) return;
+  replaceOrderInH5(null);
   order.value = null; quote.value = null; requestedOrder = null; amount.value = ""; formStep.value = "account"; accepted.value = false; void load();
 }
 function clearScope() {
