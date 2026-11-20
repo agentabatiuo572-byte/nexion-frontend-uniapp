@@ -312,6 +312,11 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-deadline { display: block; color: var(--v5-ink-3); font: 400 11px/1.5 var(--font-v5); overflow-wrap: anywhere; }
 .entry-event-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: var(--ui-space-row-y); }
 .promotion-link { gap: 8px; color: var(--v5-ink-2); }
+/* A text link and its chevron stay on one line; when the title row cannot hold both, the link drops to the right on its own line. */
+.promotion-link { flex: none; }
+.entry-navigation .promotion-link, .entry-event-actions > .entry-cta { margin-left: auto; }
+.promotion-link > text { white-space: nowrap; }
+.entry-navigation { flex-wrap: wrap; row-gap: 0; }
 .entry-cta { max-width: 100%; }
 .entry-event.entry-kind-coupon { grid-template-columns: minmax(0,1fr) 94px; border-radius: 16px; }
 .entry-kind-coupon .entry-event-copy { padding-right: 18px; }

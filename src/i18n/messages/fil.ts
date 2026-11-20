@@ -4880,7 +4880,7 @@ export const fil: Messages = {
   tree: {
     pageTitle: "Listahan ng miyembro",
     totalNetwork: "Laki ng team",
-    monthlyVolume: "Compute/buwan",
+    monthlyVolume: "Compute kada buwan",
     member: "miyembro",
     membersPlural: "miyembro",
     directTitle: "Inimbitahan ko",
