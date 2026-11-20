@@ -283,7 +283,8 @@ function retryEligibility() {
 .hb-wt__tag { position:absolute;top:2px;left:8px; }
 .hb-wt__txt { flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start; }
 .hb-wt__amount { font-size:28px;line-height:34px; }
-.hb-wt__row { display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:6px; }
+/* The footer wraps when the label and the button do not fit side by side (320 width, long languages): label above, button below, button text on one line. */
+.hb-wt__row { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;width:100%;margin-top:6px; }
 
 /* Claimed (pending) cards */
 .hb-pend { display:flex;align-items:center;gap:8px;min-height:64px;padding:10px;border-radius:18px; }
