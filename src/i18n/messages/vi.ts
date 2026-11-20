@@ -3531,7 +3531,7 @@ earningsMilestone: "Mốc thu nhập ${threshold}",
     loading: "Đang tải lịch sử tác vụ…",
     tabHistory: "Lịch sử",
     viewAll: "Xem tất cả",
-    viewAllAccountReceipts: "Xem biên nhận của tài khoản",
+    viewAllAccountReceipts: "Tất cả biên nhận",
     historyHint: "{n} biên nhận tác vụ gần nhất",
 
 timeJustNow: "vừa xong",

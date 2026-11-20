@@ -3606,7 +3606,7 @@ earningsMilestone: "Earnings milestone ${threshold}",
     loading: "Loading job history…",
     tabHistory: "History",
     viewAll: "View all",
-    viewAllAccountReceipts: "View account receipts",
+    viewAllAccountReceipts: "All receipts",
     historyHint: "Latest {n} job receipts",
 
 timeJustNow: "just now",

@@ -3991,7 +3991,7 @@ export const id: Messages = {
     loading: "Memuat riwayat tugas…",
     tabHistory: "Riwayat",
     viewAll: "Lihat semua",
-    viewAllAccountReceipts: "Lihat kuitansi akun",
+    viewAllAccountReceipts: "Semua kuitansi",
     historyHint: "{n} kuitansi tugas terbaru",
     timeJustNow: "baru saja",
     timeMinutesAgo: "{n} mnt lalu",

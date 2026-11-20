@@ -46,6 +46,7 @@
       <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.home.ledgerEmpty }}</text>
     </view>
     <view v-else class="earn-history-list pb-3 space-y-1.5">
+      <view v-if="historyRewardUnit" class="earn-history-row earn-history-head" aria-hidden="true"><text class="earn-history-unit">{{ historyRewardUnit }}</text></view>
       <view
         v-for="task in allRecent"
         :key="task.id"
@@ -59,7 +60,8 @@
       >
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
         <text class="earn-history-description" :title="task.type" style="color: var(--v5-ink-2)">{{ task.type }}</text>
-        <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5)" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatTaskReward(task, true)) }}<text v-if="task.settlementStatus" class="block">{{ computeCopy.statuses[task.settlementStatus] }}</text></text>
+        <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5)" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatTaskReward(task, true, !historyRewardUnit)) }}<text v-if="historyRewardUnit" class="nx-sr-only"> {{ historyRewardUnit }}</text></text>
+        <text v-if="task.settlementStatus" class="earn-history-status" :style="{ color: task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ computeCopy.statuses[task.settlementStatus] }}</text>
         <text class="earn-history-time" style="font-size: 12px; color: var(--v5-ink-3)">{{ completedTime(task.completedAt) }}</text>
         <view v-if="canOpenTaskReceipt(task)" class="earn-history-document shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" :title="task.receiptNo ?? task.id" @click.stop="openTaskReceipt(task)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>
@@ -87,7 +89,7 @@
 <script setup lang="ts">
 import { useHomeDisplay } from "@/composables/use-home-display";
 import { useDataVisibility } from "@/store/data-visibility";
-import { formatTaskReward } from "@/lib/task-reward-display";
+import { formatTaskReward, taskRewardUnit } from "@/lib/task-reward-display";
 import { navTo } from "@/lib/route";
 import { computed, inject, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
@@ -185,6 +187,11 @@ onUnmounted(() => {
 });
 
 // History list: completed tasks across all devices, most-recent first (last 20).
+// One shared unit goes to the header cell above the amounts; mixed units stay on every row.
+const historyRewardUnit = computed(() => {
+  const units = new Set(allRecent.value.map(taskRewardUnit));
+  return units.size === 1 ? [...units][0] : null;
+});
 const allRecent = computed(() =>
   app.visibleDevices
     .filter(device => device.kind !== "phone")
@@ -237,10 +244,14 @@ function completedTime(ts: number): string {
 .earn-tc__arrow--open { transform: rotate(90deg); }
 .earn-tc__panel { padding-bottom: 4px; }
 @media (prefers-reduced-motion: reduce) { .earn-tc__arrow { transition: none; } }
-.earn-history-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 76px 22px; align-items: center; gap: 6px; }
-.earn-history-description { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-history-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 22px; align-items: center; gap: 2px 8px; }
+.earn-history-row > svg { grid-row: 1 / span 2; }
+.earn-history-description { grid-column: 2; grid-row: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-history-description :deep(*) { white-space: nowrap; }
-.earn-history-amount { min-width: 0; max-width: 120px; text-align: right; overflow-wrap: anywhere; }
-.earn-history-time { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 16px; text-align: right; }
-.earn-history-document { grid-column: 5; }
+.earn-history-amount { grid-column: 3; grid-row: 1; text-align: right; white-space: nowrap; }
+.earn-history-status { grid-column: 3; grid-row: 2; font-size: 12px; line-height: 16px; text-align: right; white-space: nowrap; }
+.earn-history-head { min-height: 16px; }
+.earn-history-unit { grid-column: 3; font: 500 11px/16px var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; text-align: right; }
+.earn-history-time { grid-column: 2; grid-row: 2; min-width: 0; white-space: nowrap; line-height: 16px; }
+.earn-history-document { grid-column: 4; grid-row: 1 / span 2; }
 </style>

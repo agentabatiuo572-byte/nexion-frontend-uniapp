@@ -706,6 +706,9 @@ body {
   font-family: var(--font-jet-mono);
   font-variant-numeric: tabular-nums;
 }
+/* uni-app gives every <text> white-space: pre-line, which blocks a parent's nowrap. Let the truncate utility reach
+   the texts inside it so they end in an ellipsis; anything else that sets nowrap on a view must set it on its texts. */
+.truncate uni-text, .truncate text { white-space: inherit; }
 
 /* Slow spin used by the orbital particle ring around the phone hero. */
 @keyframes mc-orbit {

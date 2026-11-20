@@ -3991,7 +3991,7 @@ export const uz: Messages = {
     loading: "Ishlar tarixi yuklanmoqda…",
     tabHistory: "Tarix",
     viewAll: "Barchasi",
-    viewAllAccountReceipts: "Akkaunt cheklarini koʻrish",
+    viewAllAccountReceipts: "Barcha cheklar",
     historyHint: "Soʻnggi {n} ta ish cheki",
     timeJustNow: "hozirgina",
     timeMinutesAgo: "{n} daq. oldin",
