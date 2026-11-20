@@ -112,7 +112,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <!-- Rows open nothing, so the label wraps in full; the part after the last " · " (a code or a kind) never breaks at its hyphens. -->
-              <text class="block" :style="activityLabelStyle">{{ labelHead(a.label) }}<text v-if="labelTail(a.label)" style="display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom">{{ labelTail(a.label) }}</text></text>
+              <text class="block" style="overflow-wrap: break-word" :style="activityLabelStyle">{{ labelHead(a.label) }}<text v-if="labelTail(a.label)" style="display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom">{{ labelTail(a.label) }}</text></text>
               <text class="block" :style="activityTimeStyle">{{ fmtActivityTime(a.ts) }}</text>
             </view>
             <view class="text-right">
@@ -252,9 +252,9 @@ function fmtNum(n: number, dp = 2): string {
 function fmtUSD(n: number): string {
   return Number.isFinite(n) ? `$${fmtNum(n)}` : "—";
 }
-// Activity labels read "<what> · <code or kind>"; the tail is kept as one unit when the label wraps.
-const labelHead = (label: string) => { const i = label.lastIndexOf(" · "); return i < 0 ? label : label.slice(0, i + 3); };
-const labelTail = (label: string) => { const i = label.lastIndexOf(" · "); return i < 0 ? "" : label.slice(i + 3); };
+// Only a tail without spaces (a code) is kept whole; a phrase tail wraps like the rest of the label.
+const labelTail = (label: string) => { const i = label.lastIndexOf(" · "), tail = i < 0 ? "" : label.slice(i + 3); return /\s/.test(tail) ? "" : tail; };
+const labelHead = (label: string) => { const tail = labelTail(label); return tail ? label.slice(0, label.length - tail.length) : label; };
 function fmtActivityTime(timestamp: number): string {
   return Number.isFinite(new Date(timestamp).getTime()) ? formatTrialDateTime(timestamp, dateLocale()) : "—";
 }
