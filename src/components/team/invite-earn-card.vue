@@ -177,9 +177,11 @@ onUnmounted(stopRuntimeRefresh);
 .invite-card__code-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 17px/22px var(--font-metric); letter-spacing: 2px; }
 .invite-card__copy { flex: none; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--v5-brand); font: 600 12px/16px var(--font-v5); cursor: pointer; }
 .invite-card__action { position: relative; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); border-radius: 999px; font: 600 14px/20px var(--font-v5); color: var(--v5-ink); cursor: pointer; }
-.invite-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* Two actions side by side; when their one-line labels do not both fit (uz), the row wraps and each takes the full width. */
+.invite-card__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.invite-card__actions > .invite-card__action { flex: 1 1 0; min-width: max-content; box-sizing: border-box; padding-inline: 16px; }
 .invite-card__actions > .invite-card__action { background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), color-mix(in srgb, var(--v5-ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-ink) 8%, transparent); }
-.invite-card__actions > .invite-card__action > text { min-width: 0; overflow-wrap: anywhere; text-align: center; }
+.invite-card__actions > .invite-card__action > text { white-space: nowrap; text-align: center; }
 .invite-card__action[aria-disabled='true'],.invite-card__copy[aria-disabled='true'] { cursor: default; opacity: .55; }
 .invite-card [tabindex='0']:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .invite-card__action:active,.invite-card__copy:active,.invite-card__rules:active,.invite-card__history:active { opacity: .75; }

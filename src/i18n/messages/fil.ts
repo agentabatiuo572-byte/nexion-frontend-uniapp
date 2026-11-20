@@ -2248,7 +2248,7 @@ export const fil: Messages = {
     expiredBadge: "Expired",
     useCta: "Gamitin",
     typeBonus: "Bonus",
-    courseDetail: "Tingnan ang detalye ng kurso",
+    courseDetail: "Detalye ng kurso",
     showSourceId: "Ipakita ang ID ng source",
     hideSourceId: "Itago ang ID ng source",
     typeRefer: "Reward sa imbita",
@@ -3655,7 +3655,7 @@ export const fil: Messages = {
   },
   orders: {
     resultReadback: "Buksan ang detalye ng order para makita ang pinakabagong status ng bayad at activation.",
-    copyAndSupport: "Kopyahin ang numero ng order at kontakin ang support",
+    copyAndSupport: "Kopyahin at kontakin ang support",
     recoveryNext: "May tanong? Makipag-ugnayan sa support dala ang numero ng order mo. Huwag magbayad ulit.",
     expiredNext: "Nag-expire na ang order na ito at hindi na mababayaran. Puwede kang mamili ulit. Kung nakapagpadala ka na ng pondo, makipag-ugnayan sa support dala ang numero ng order mo.",
     title: "Aking mga order",
