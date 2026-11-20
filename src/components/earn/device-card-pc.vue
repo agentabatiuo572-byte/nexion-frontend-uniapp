@@ -326,7 +326,7 @@
       <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
       <view v-else-if="deviceTodayCompleted.length">
         <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" time="" />
-        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :time="localClockTime(task.completedAt)" />
+        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
       </view>
     </view>
 
@@ -376,7 +376,7 @@
         <text v-else-if="!taskHistoryReady" class="earn-stage__recent-note" role="status" aria-live="polite">{{ t.taskHistory.loading }}</text>
         <view v-else-if="deviceTodayCompleted.length" class="earn-stage__rows">
           <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" />
-          <NxAmountRow v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" compact data-phone-today-task="true" :name="done.type" :amount="visibility.mask(formatTaskReward(done, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" />
+          <NxAmountRow v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" compact data-phone-today-task="true" :name="done.type" :amount="visibility.mask(formatTaskReward(done, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" />
         </view>
         <text v-else class="earn-stage__recent-note">{{ t.home.ledgerEmpty }}</text>
       </view>
