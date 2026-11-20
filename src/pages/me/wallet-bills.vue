@@ -509,7 +509,7 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-filter:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
 .bills-list { margin: 0 16px 12px; }
 .bills-day { margin-bottom: var(--ui-space-inset); }
-.bills-day__head { display:flex;align-items:baseline;justify-content:space-between;gap:12px; }
+.bills-day__head { display:flex;align-items:baseline;justify-content:space-between;gap:var(--v5-space-3); }
 .bills-day__unit { padding:0 4px 8px;font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__label { display:block;padding:0 4px 8px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__group { overflow:hidden;border:1px solid var(--v5-border);border-radius:var(--ui-radius-surface);background:var(--v5-surface); }
