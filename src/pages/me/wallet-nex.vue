@@ -73,7 +73,7 @@
                 <text class="block" :style="breakdownLabelStyle">{{ br.label }}</text>
                 <text v-if="br.hint" class="block" :style="breakdownHintStyle">{{ br.hint }}</text>
               </view>
-              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}</text>
+              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}<text v-if="br.value !== '—'" class="nx-sr-only"> UVT</text></text>
             </view>
           </view>
         </view>
