@@ -993,6 +993,19 @@ onMounted(() => {
 onShow(() => { void nextTick(scheduleBubblePositions); });
 onHide(cancelBubblePositions);
 onScopeDispose(() => { bubbleMeasurementDisposed = true; cancelBubblePositions(); bubbleResizeObserver?.disconnect(); });
+// The first pin to the newest message runs before late content (images, history rows, fonts) has its
+// final height, which left the last message under the composer. While the reader is at the tail,
+// keep it pinned whenever the content grows; a reader who scrolled up is left where they are.
+let tailResizeObserver: ResizeObserver | undefined;
+onMounted(() => {
+  const content = listRoot()?.querySelector?.('.nx-conv-content');
+  if (typeof ResizeObserver === 'undefined' || !content) return;
+  tailResizeObserver = new ResizeObserver(() => {
+    if (followingTail && threadVisible.value && !pendingPosition && !preparedHistory) scrollToEnd();
+  });
+  tailResizeObserver.observe(content);
+});
+onScopeDispose(() => tailResizeObserver?.disconnect());
 
 function bubbleStyle(m: ThreadMsg): CSSProperties {
   const position = bubblePositions.value[m.id] ?? 0.5;

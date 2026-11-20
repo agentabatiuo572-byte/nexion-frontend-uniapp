@@ -415,8 +415,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 .commission-filter-trigger { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; max-width: 70%; padding: 0 14px; color: var(--v5-ink); font: 600 13px/18px var(--font-v5); cursor: pointer; }
 .commission-filter-trigger::before { content: ""; position: absolute; inset: 4px 0; z-index: -1; border-radius: 999px; background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), color-mix(in srgb, var(--v5-ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .commission-filter-trigger svg { flex: none; }
-.commission-filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.commission-filter-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: anywhere; cursor: pointer; }
+/* Two options per row; an option whose label does not fit half the width (ru «Сотрудничество») takes a full row instead of breaking mid-word. */
+.commission-filter-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.commission-filter-option { flex: 1 1 calc(50% - 4px); min-width: min(100%, max-content); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: break-word; cursor: pointer; }
 .commission-filter-option--selected { color: var(--v5-brand); background: var(--v5-brand-soft); }
 .commission-filter-option__count { flex: none; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); font-variant-numeric: tabular-nums; }
 .commission-filter-trigger:focus-visible, .commission-filter-option:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
