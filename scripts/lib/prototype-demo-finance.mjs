@@ -189,7 +189,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     if (!withdrawal) refuse(404, 'WITHDRAWAL_NOT_FOUND');
     return { source: 'nx_withdrawal_order', sourceEnvironment: 'PRODUCTION', withdrawal };
   }
-  if(/^\/api\/withdrawals\/WD-DEMO-?\d+$/.test(p))return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawal:withdrawals.find(row=>row.withdrawalNo===p.split('/').pop())};
+  if(/^\/api\/withdrawals\/WD-(?:DEMO-?\d+|[A-F0-9]{32})$/.test(p))return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawal:withdrawals.find(row=>row.withdrawalNo===p.split('/').pop())};
   if (p === "/api/withdrawals/policy") return demoWithdrawalPolicy(state, facts);
   if (p === "/api/withdrawals/eligibility") {
     const input = method === 'GET' ? Object.fromEntries(url.searchParams) : request.postDataJSON();

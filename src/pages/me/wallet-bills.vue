@@ -48,8 +48,9 @@
 
       <!-- Day-grouped list -->
       <view v-else class="bills-list">
-        <view v-for="g in grouped" :key="g.key" class="bills-day">
-          <text class="bills-day__label">{{ g.label }}</text>
+        <view v-for="(g, gi) in grouped" :key="g.key" class="bills-day">
+          <!-- One unit for the whole list: written once over the amount column, not on every row. -->
+          <view class="bills-day__head"><text class="bills-day__label">{{ g.label }}</text><text v-if="listUnit && gi === 0" class="bills-day__unit">{{ listUnit }}</text></view>
           <view class="bills-day__group">
             <view
               v-for="b in g.rows"
@@ -71,23 +72,22 @@
                   <text class="bills-row__title">{{ typeLabel(b.type) }}</text>
                   <NxTag v-if="b.status !== 'posted'" :tone="b.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(b.status)" />
                 </view>
-                <view :class="b.memoKey === 'learningReward' || b.type === 'clawback' ? '' : 'truncate'" class="bills-row__sub">
-                  <text>{{ billMemo(b) }}</text>
-                  <text v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'"> · </text>
-                  <text v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'" class="font-mono-tabular">{{ b.ref }}</text>
-                  <text> · {{ fmtClock(b.ts) }}</text>
+                <!-- Memo and time on one line (the memo ellipsizes); a reference gets its own line, ellipsized in the middle. -->
+                <view :class="b.memoKey === 'learningReward' || b.type === 'clawback' ? '' : 'bills-row__sub--line'" class="bills-row__sub">
+                  <text class="bills-row__memo">{{ billMemo(b) }}</text>
+                  <text class="bills-row__dot"> · {{ fmtClock(b.ts) }}</text>
                 </view>
-                <view v-if="b.type === 'refund' && b.ref" class="flex items-center" style="gap: var(--v5-space-2)" @click.stop>
-                  <text class="font-mono-tabular min-w-0" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
-                  <CopyCodeButton :value="b.ref" :label="t.orders.refundBillNo" />
+                <NxCodeValue v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'" class="bills-row__code" :value="b.ref" :label="t.bills.detailRef" :copyable="false" />
+                <view v-if="b.type === 'refund' && b.ref" class="flex items-center" @click.stop>
+                  <NxCodeValue class="bills-row__code" :value="b.ref" :label="t.orders.refundBillNo" />
                 </view>
                 <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click.stop="toggleSourceRef(b.id)"  @keydown.enter.stop.prevent="toggleSourceRef(b.id)" @keydown.space.stop.prevent="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
-                <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
+                <NxCodeValue v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward' && b.ref" class="bills-row__code" :value="b.ref" :label="t.rewards.showSourceId" :copyable="false" full />
               </view>
               <view class="bills-row__figure">
                 <view class="bills-row__amount" :class="{ 'bills-row__amount--in': !isDebit(b) }">
                   <text>{{ isDebit(b) ? "−" : "+" }}{{ fmtAmount(b) }}</text>
-                  <text class="bills-row__unit">{{ platformDisplayText(b.symbol) }}</text>
+                  <text v-if="!listUnit" class="bills-row__unit">{{ platformDisplayText(b.symbol) }}</text>
                 </view>
                 <text v-if="b.balanceAfter !== undefined && b.symbol === 'USDT'" class="bills-row__balance tabular-nums" :class="{ 'bills-balance--debt': b.balanceAfter < 0 }">{{ runningBalanceLabel(b) }}</text>
               </view>
@@ -120,7 +120,7 @@
           <view class="bills-sheet__fact"><text>{{ t.bills.detailTime }}</text><text class="bills-sheet__value tabular-nums">{{ fmtTime(detail.ts) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailSource }}</text><text class="bills-sheet__value">{{ billMemo(detail) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status, isDebit(detail))" /></view>
-          <view v-if="detail.ref" class="bills-sheet__fact"><text>{{ t.bills.detailRef }}</text><view class="bills-sheet__ref"><text class="font-mono-code bills-sheet__value">{{ detail.ref }}</text><CopyCodeButton :value="detail.ref" :label="t.bills.detailRef" /></view></view>
+          <view v-if="detail.ref" class="bills-sheet__fact"><text>{{ t.bills.detailRef }}</text><NxCodeValue :value="detail.ref" :label="t.bills.detailRef" /></view>
           <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums" :class="{ 'bills-balance--debt': detail.balanceAfter < 0 }">{{ formatWalletBillBalance(detail.balanceAfterExact, detail.balanceAfter, detail.symbol, dateLocale()) }}</text></view>
         </view>
         <view class="bills-sheet__close" role="button" tabindex="0" @click="detail = null" @keydown.enter.prevent="detail = null" @keydown.space.prevent="detail = null"><LiquidGlass :radius="24" tone="control" /><text>{{ t.bills.detailClose }}</text></view>
@@ -138,7 +138,7 @@ import { platformDisplayText } from "@/lib/brand-copy";
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
-import CopyCodeButton from "@/components/copy-code-button.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
@@ -306,6 +306,8 @@ function typeColor(type: BillType): string {
 // 判据回到本工程自己的规矩:**指不出单源的数字,要么接单源,要么别显示**。
 // mock 期 balanceAfter 恒为 undefined → 这一列不渲染;接上真后端自动出现,零改动。
 const REWARD_TYPES: BillType[] = ["refer", "bonus", "achievement"];
+// Rows repeat their unit only when the list mixes assets (a receipt lookup across the ledger).
+const listUnit = computed(() => { const units = new Set(filtered.value.map((b) => b.symbol)); return units.size === 1 ? platformDisplayText([...units][0]) : ""; });
 const filtered = computed<Bill[]>(() => {
   if (ledgerBizNo.value) return activePager.value.rows.filter(b => b.ledgerBizNo === ledgerBizNo.value);
   if (fundsServerEnabled) return activePager.value.rows;
@@ -502,6 +504,8 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-filter:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
 .bills-list { margin: 0 16px 12px; }
 .bills-day { margin-bottom: var(--ui-space-inset); }
+.bills-day__head { display:flex;align-items:baseline;justify-content:space-between;gap:12px; }
+.bills-day__unit { padding:0 4px 8px;font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__label { display:block;padding:0 4px 8px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__group { overflow:hidden;border:1px solid var(--v5-border);border-radius:var(--ui-radius-surface);background:var(--v5-surface); }
 .bills-row { display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);min-height:64px;box-sizing:border-box;padding:var(--ui-space-inline) 16px;cursor:pointer; }
@@ -517,6 +521,10 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-row--clawback .bills-row__title { white-space:normal; }
 .bills-row--clawback .bills-row__balance { text-align:right; }
 .bills-row__sub { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
+/* uni-text sets white-space: pre-line on itself, so a nowrap parent alone does not keep the line whole. */
+.bills-row__sub--line { display:flex;align-items:baseline;min-width:0; }
+.bills-row__sub--line > .bills-row__memo { flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.bills-row__sub--line > .bills-row__dot { flex:none;white-space:pre; }
 .bills-row__figure { display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:var(--v5-space-1); }
 .bills-row__amount { display:flex;align-items:baseline;gap:var(--v5-space-1);font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink); }
 .bills-row__amount--in { color:var(--v5-success-ink); }
@@ -539,7 +547,8 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-sheet__fact { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inset);min-height:48px;box-sizing:content-box;padding:0 16px;font:400 14px/20px var(--font-v5);color:var(--v5-ink-3); }
 .bills-sheet__fact + .bills-sheet__fact { border-top:1px solid var(--v5-border); }
 .bills-sheet__value { min-width:0;font-weight:400;text-align:right;color:var(--v5-ink);overflow-wrap:anywhere; }
-.bills-sheet__ref { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
+.bills-sheet__fact > text:first-child { flex:none;max-width:45%; }
+.bills-row__code { color:var(--v5-ink-3);font-size:12px;line-height:18px; }
 .bills-sheet__close { position:relative;isolation:isolate;display:grid;place-items:center;min-height:48px;border-radius:24px;color:var(--v5-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);cursor:pointer; }
 .bills-sheet__close > text { position:relative;z-index:1; }
 </style>

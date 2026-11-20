@@ -13,26 +13,23 @@
       </view>
 
       <template v-if="order">
-        <view class="status-mark" aria-hidden="true"><text>{{ outcome === 'paid' ? '✓' : outcome === 'refunded' ? '↶' : '⋯' }}</text></view>
-        <text class="screen-title" data-testid="bank-order-status" role="status" aria-live="polite" aria-atomic="true">{{ statusLabel }}</text>
-        <text class="intro">{{ c.resultNotes[outcome] }}</text>
-        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}</text><text class="currency">VND</text></view>
-        <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ order.bank.maskedAccount }}</text></view>
+        <NxResultHead class="result-head" :tone="resultTone" :icon="outcome === 'held' ? 'shield' : undefined" :title="statusLabel" :description="c.resultNotes[outcome]" title-testid="bank-order-status" />
+        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">VND</text></text></view>
+        <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
-          <view class="row"><text>{{ c.orderNumber }}</text><view class="code-value"><text>{{ order.withdrawalNo }}</text><CopyCodeButton :value="order.withdrawalNo" :label="c.orderNumber" /></view></view>
+          <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" /></view>
           <view class="row"><text>{{ c.totalDebit }}</text><text>{{ money(order.bank.amountUsdt) }} USDT</text></view>
           <view class="row"><text>{{ c.fee }}</text><text>{{ money(order.bank.feeUsdt) }}</text></view>
           <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
           <view v-if="terminal && order.settlementEvidence?.checkedAt" class="row"><text>{{ c.confirmedAt }}</text><text>{{ displayDate(order.settlementEvidence.checkedAt) }}</text></view>
         </view>
-        <view v-if="terminal" class="action secondary" role="button" tabindex="0" data-testid="bank-new" :aria-disabled="busy || !newWithdrawalAllowed" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" @keydown.enter.prevent="startNew" @keydown.space.prevent="startNew"><text>{{ c.newWithdrawal }}</text></view>
-        <view class="action secondary" role="button" tabindex="0" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" @keydown.enter.prevent="backToWallet" @keydown.space.prevent="backToWallet"><text>{{ c.backToWallet }}</text></view>
+        <view class="bar-space bar-space--result" />
       </template>
 
       <template v-else-if="uncertain || displayIntents.length || (displayConfig && displayConfig.unresolvedIntent === undefined)">
         <text class="screen-title">{{ c.title }}</text>
         <view v-if="!busy || !uncertain" class="notice" role="alert"><text>{{ displayIntents.length ? c.multipleIntents : uncertain ? c.unknown : c.recoveryUnavailable }}</text></view>
-        <view v-for="intent in displayIntents" :key="intent.quoteNo" class="action secondary" role="button" tabindex="0" :aria-disabled="busy" @click="openIntent(intent)" @keydown.enter.prevent="openIntent(intent)" @keydown.space.prevent="openIntent(intent)"><text>{{ intent.withdrawalNo || intent.quoteNo }}</text></view>
+        <view v-for="intent in displayIntents" :key="intent.quoteNo" class="action secondary" role="button" tabindex="0" :aria-disabled="busy" @click="openIntent(intent)" @keydown.enter.prevent="openIntent(intent)" @keydown.space.prevent="openIntent(intent)"><NxCodeValue class="intent-code" :value="intent.withdrawalNo || intent.quoteNo" :label="c.orderNumber" :copyable="false" /></view>
         <view v-if="!uncertain" class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
       </template>
 
@@ -151,8 +148,12 @@
       </template>
       <view v-else-if="error" class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
     </view>
-    <!-- Main actions in the fixed bottom bar (DS-30): account → change + continue; amount → quote; quote → confirm. -->
+    <!-- Main actions in the fixed bottom bar (DS-30): account → change + continue; amount → quote; quote → confirm; result → new withdrawal + back to wallet. -->
     <template #pageFixed>
+      <view v-if="remoteSessionReady && order" class="bar bar--result nx-glass-bar">
+        <view v-if="terminal" class="action secondary nx-tray-text" role="button" tabindex="0" data-testid="bank-new" :aria-disabled="busy || !newWithdrawalAllowed" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" @keydown.enter.prevent="startNew" @keydown.space.prevent="startNew"><text>{{ c.newWithdrawal }}</text></view>
+        <view class="action primary" role="button" tabindex="0" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" @keydown.enter.prevent="backToWallet" @keydown.space.prevent="backToWallet"><text>{{ c.backToWallet }}</text></view>
+      </view>
       <view v-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote) && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-glass-bar">
         <template v-if="quote">
           <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit"><text>{{ c.confirm }}</text></view>
@@ -176,7 +177,8 @@ import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
-import CopyCodeButton from "@/components/copy-code-button.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
@@ -251,6 +253,8 @@ const accountStatus = computed(() => displayConfig.value?.beneficiary ? c.value.
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));
 const statusLabel = computed(() => c.value[outcome.value]);
+// Status map (DS 03 §3.8): paid = success, refunded = neutral, waiting / in transfer / under review = warning.
+const resultTone = computed(() => outcome.value === "paid" ? "success" : outcome.value === "refunded" ? "neutral" : "warning");
 const recipient = computed(() => order.value?.bank ?? quote.value ?? displayConfig.value?.beneficiary);
 const canContinue = computed(() => newWithdrawalAllowed.value && bankCanQuote(config.value) && !!config.value?.policy && !!config.value?.capacity && config.value.capacity.withdrawalEnabled);
 const amountProblem = computed(() => bankAmountError(amount.value, config.value));
@@ -535,7 +539,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .muted { display: block; color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .loading { margin-bottom: 12px; }
 .account-card, .amount-card { border-radius: 16px; background: var(--v5-surface-2); padding: 18px; margin: 20px 0; }
-.account-number { display: block; font-size: 20px; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin: 6px 0; overflow-wrap: anywhere; }
+.account-number { display: block; font-family: var(--font-metric); font-size: 20px; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin: 6px 0; overflow-wrap: anywhere; }
 .bank-name { font-size: var(--ui-type-body); }
 .chip { display: inline-block; border-radius: 999px; background: var(--v5-surface-2); color: var(--v5-brand); padding: 4px 10px; font-size: 12px; }
 .notice { border-left: 2px solid var(--v5-warning); padding-left: 12px; color: var(--v5-ink-2); font-size: 12px; line-height: 1.7; margin: 20px 0; }
@@ -556,16 +560,19 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .fee-rule { display: block; margin-top: 6px; }
 .details { margin: 20px 0; }
 .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--v5-border); font-size: var(--ui-type-list-subtitle); }
-.row > text:first-child { color: var(--v5-ink-3); font-size: 12px; }
-.row > text:last-child { max-width: 65%; overflow-wrap: anywhere; text-align: right; font-variant-numeric: tabular-nums; }
-.code-value { display: flex; align-items: center; gap: var(--v5-space-2); max-width: 65%; min-width: 0; }
-.code-value > text { min-width: 0; overflow-wrap: anywhere; text-align: right; font-variant-numeric: tabular-nums; }
-.money { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: 34px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.currency { display: block; margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); }
+/* The label wraps before a value is squeezed: amounts and dates stay on one line, the code ellipsizes in the middle. */
+.row > text:first-child { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font-size: 12px; }
+.row > text:last-child { flex: none; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.row--code { align-items: center; }
+.row--code > text:first-child { flex: none; max-width: 45%; }
+.money { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: 34px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
+/* Result: centred head, then the amount; actions sit in the fixed bar. */
+.result-head { margin: 8px 0 4px; }
+.intent-code { max-width: 100%; color: inherit; }
 .consent { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 12px; line-height: 1.6; cursor: pointer; margin-bottom: 10px; }
 .checkbox { width: 20px; height: 20px; flex-shrink: 0; border: 1px solid var(--v5-border-strong); border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 .checkbox.checked { background: var(--v5-brand); color: var(--v5-on-brand); border-color: var(--v5-brand); }
-.status-mark { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: var(--v5-surface-2); color: var(--v5-brand); border-radius: 50%; font-size: 26px; margin-bottom: 22px; }
 /* P-45 bank withdrawal: physical bank card, compact account row, amount on glass, quote ticket, fixed actions. */
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
@@ -640,7 +647,14 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .consent .checkbox { width: 22px; height: 22px; border-radius: 7px; font-size: 13px; }
 .text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }
+.bar-space--result { height: 168px; }
 .bar { position: absolute; z-index: 36; display: flex; }
 .bar .action { flex: 1 1 0; min-height: 48px; margin: 0; padding: 0 20px; font: 500 15px/20px var(--font-v5); }
+/* Result bar: buttons size to their words so neither label wraps at 320 in long languages. */
+/* When both labels cannot share one row (fil, ms at 320), the bar stacks them instead of wrapping a label. */
+.bar--result { flex-wrap: wrap; }
+.bar--result .action { flex: 1 1 auto; padding: 0 16px; }
+/* uni-text sets white-space: pre-line on itself; nowrap goes on the text. */
+.bar--result .action > text { white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .bcard::after { animation: none; opacity: 0; } .cdw__val { transition: none; } }
 </style>
