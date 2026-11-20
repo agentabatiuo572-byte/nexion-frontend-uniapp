@@ -295,7 +295,7 @@
         <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
             <svg v-if="submitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-            <text>{{ submitting ? t.wallet.submitChecking : canSubmitAction ? (pendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.submitCtaPaired) : pendingAttempt ? t.walletV3.withdrawRecoveryWaitCta : t.walletV3.submitCtaDisabled }}</text>
+            <text>{{ submitting ? t.wallet.submitChecking : pendingAttempt ? (canRetryPendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.withdrawRecoveryWaitCta) : canSubmitAction ? t.walletV3.submitCtaPaired : t.walletV3.submitCtaDisabled }}</text>
           </view>
         </view>
       </view>
