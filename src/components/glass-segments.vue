@@ -149,7 +149,8 @@ export default viewImplementation;
 /* Design system 03 §3.7: labels never wrap. Equal filters stay equal while every label fits its share; a longer
    label keeps its own width, and when the labels cannot all fit the track scrolls sideways and the view layer
    brings the selected option into view (Material scrollable tabs). */
-:where(.nx-glass-segments--filter.nx-glass-segments--equal) { overflow-x: auto; scrollbar-width: none; }
+/* Scrollable only while overflowing: a scroll container would otherwise swallow vertical page pans. */
+:where(.nx-glass-segments--filter.nx-glass-segments--equal)[data-glass-overflow="true"] { overflow-x: auto; scrollbar-width: none; }
 :where(.nx-glass-segments--filter.nx-glass-segments--equal)::-webkit-scrollbar { display: none; }
 :where(.nx-glass-segments--filter.nx-glass-segments--equal) .nx-glass-option { flex: 1 0 0; min-width: auto; padding-inline: 8px; }
 .nx-glass-segments--equal[data-glass-overflow="true"], .nx-glass-segments--equal[data-glass-overflow="true"] .nx-glass-option { touch-action: pan-x pan-y; }
