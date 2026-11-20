@@ -193,7 +193,7 @@
 
 <script setup lang="ts">
 import { useHomeDisplay } from "@/composables/use-home-display";
-import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, onMounted, type CSSProperties } from "vue";
 import { useConfig } from "@/store/config";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -206,6 +206,8 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { usePageVisible } from "@/composables/use-loops-in-view";
+import { appReadForeground, documentReadVisible } from "@/lib/foreground-read";
 // #ifndef APP-PLUS
 import { useIntroMotion } from "@/composables/use-intro-motion";
 // #endif
@@ -228,10 +230,9 @@ const H = 240;
 type GlobeRegion = { id: string; displayName: string; cx: number; cy: number; anchorX: number; anchorY: number; devices: number | null;
   activeJobs: number | null; jobsPerHour: number | null; avgLatencyMs: number | null; isYou: boolean };
 const selectedId = ref<string | null>(null);
-let pageActive = true;
+const pageVisible = usePageVisible();
 const pulseTick = ref(0);
 const simulationNow = ref(Date.now());
-let pulseTimer = 0;
 const globeSettings = computed(() => cfg.config.publicStats.globeDisplay);
 const display = useHomeDisplay(() => remoteApiEnabled);
 const onlineTotal = computed(() => (remoteApiEnabled ? display.value?.online : cfg.config.networkPulse?.onlineDevices) ?? null);
@@ -297,22 +298,24 @@ function nativeNodeStyle(r: GlobeRegion): CSSProperties {
 
 function regionName(r: GlobeRegion): string { return r.displayName; }
 onMounted(() => {
-  watch(() => globeSettings.value?.intervalMs, interval => {
-    if (pulseTimer) clearInterval(pulseTimer);
-    pulseTimer = setInterval(() => {
-      if (!pageActive) return;
-      pulseTick.value += 1;
+  watch([
+    () => pageVisible.value && appReadForeground.value && documentReadVisible.value,
+    () => globeSettings.value?.intervalMs,
+  ],
+    ([visible, interval], _, onCleanup) => {
+      if (!visible) return;
       simulationNow.value = Date.now();
-    }, Math.min(1800, interval ?? 1800)) as unknown as number;
-  }, { immediate: true });
+      const timer = setInterval(() => {
+        pulseTick.value += 1;
+        simulationNow.value = Date.now();
+      }, Math.min(1800, interval ?? 1800));
+      onCleanup(() => clearInterval(timer));
+    }, { immediate: true });
 });
 onShow(() => {
-  pageActive = true;
-  simulationNow.value = Date.now();
   void cfg.revalidate();
 });
-onHide(() => { pageActive = false; selected.value = null; });
-onUnmounted(() => { if (pulseTimer) clearInterval(pulseTimer); });
+onHide(() => { selected.value = null; });
 
 // Procedural dot-map silhouette (loose continent blobs).
 function generateDotMap(w: number, h: number): Array<{ x: number; y: number; r: number; bright: boolean }> {
