@@ -46,12 +46,12 @@ export function demoBatchPage(params, batches) {
   return {...proof,records,nextCursor:rows.length>boundary+1+limit?records.at(-1).batchNo:null};
 }
 
-function recordDemoBankSettlement(row, { paid, d2Refund, evidenceRef, at }) {
+function recordDemoBankSettlement(row, { paid, d2Refund, evidenceRef, at, providerProof = !d2Refund }) {
   row.providerState = paid ? 'PAID' : d2Refund ? 'READY' : 'FAILED';
   row.withdrawal.status = paid ? 'CONFIRMED' : d2Refund ? 'REFUNDED' : 'FAILED';
   row.settlementEvidence = { status: paid ? 'paid' : 'refunded', evidenceRef,
-    providerOrderId: d2Refund ? null : 'DEMO-PROVIDER-' + row.withdrawalNo,
-    providerStatus: paid ? 3 : d2Refund ? null : 5,
+    providerOrderId: providerProof ? 'DEMO-PROVIDER-' + row.withdrawalNo : null,
+    providerStatus: providerProof ? (paid ? 3 : 5) : null,
     checkedAt: new Date(at).toISOString(), amountUsdt: row.bank.amountUsdt };
 }
 
@@ -66,8 +66,9 @@ export function restoreDemoBankWithdrawals(state, now) {
         entry.bizNo === row.withdrawalNo + ':PAYOUT:USDT:REFUND' && entry.bizType === 'WITHDRAW_PAYOUT_REFUND'
         && entry.asset === 'USDT' && entry.direction === 'IN' && entry.status === 'SUCCESS'
         && entry.amount === row.bank.amountUsdt && Number.isFinite(entry.at));
-      if (!refund) throw new Error('Missing legacy bank refund ledger entry for ' + row.withdrawalNo);
-      recordDemoBankSettlement(row, { paid: false, evidenceRef: refund.bizNo, at: refund.at });
+      // Before the wallet ledger, a refund only restored the balance and set the order outcome.
+      recordDemoBankSettlement(row, { paid: false, evidenceRef: refund?.bizNo ?? row.withdrawalNo,
+        at: refund?.at ?? now, providerProof: Boolean(refund) });
     } else {
       continue;
     }
