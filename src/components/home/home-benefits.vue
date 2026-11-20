@@ -69,7 +69,7 @@
           </template>
         </view>
       </view>
-      <view v-if="retryShown" class="hb-retry" :class="{ 'hb-retry--busy': retryBusy }" role="button" :tabindex="retryBusy ? -1 : 0" :aria-disabled="retryBusy ? 'true' : undefined" :aria-label="retryBusy ? t.trial.entryChecking : `${copy.benefitTrialLoadFailed} · ${copy.benefitRetry}`" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility">
+      <view v-if="retryShown" class="hb-retry" :class="{ 'hb-retry--busy': retryBusy }" role="button" :tabindex="retryBusy ? -1 : 0" :aria-disabled="retryBusy ? 'true' : undefined" :aria-label="retryBusy ? t.trial.entryChecking : `${copy.benefitTrialLoadFailedAria} · ${copy.benefitRetry}`" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility">
         <svg class="hb-retry__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5h.01" /></svg>
         <text class="hb-retry__msg">{{ retryBusy ? t.trial.entryChecking : copy.benefitTrialLoadFailed }}</text>
         <text class="hb-retry__act">{{ copy.benefitRetry }}</text>
@@ -153,7 +153,7 @@ const trialPill = computed<[string, string, string]>(() => {
   if (showRestartOffer.value && offerState.value !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
   switch (offerState.value) {
     case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim, copy.value.benefitTrialClaim];
-    case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable, t.value.trial.entryUnavailable];
+    case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailableAria];
     case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut, t.value.trial.heroProductUnavailable];
     default: return [copy.value.benefitTrialChecking, copy.value.benefitTrialChecking, t.value.trial.entryChecking];
   }
@@ -261,6 +261,12 @@ function retryEligibility() {
 .hb-pill--muted { opacity:.5; }
 .hb-pill--muted.hb-pill--wait { animation:hb-pill-wait 180ms ease 400ms backwards; }
 @keyframes hb-pill-wait { from { opacity:1; } }
+/* Reduced motion: keep the 400ms threshold but switch at once, no fade either way (the global rule would drop the delay). */
+@keyframes hb-pill-hold { from, to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) {
+  .hb-pill { transition:none; }
+  .hb-pill--muted.hb-pill--wait { animation:hb-pill-hold 400ms linear 0s 1 !important; }
+}
 .hb-link { flex:none;display:inline-flex;align-items:center;min-height:44px;font:var(--ui-type-text-link-weight) 13px/18px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 
 /* Half offer card */
