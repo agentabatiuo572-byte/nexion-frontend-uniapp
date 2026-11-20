@@ -252,7 +252,7 @@ export const vi: Messages = {
     // Team subtree
     teamRank: "Hạng của tôi",
     teamUnilevel: "Thưởng nhóm",
-    teamBinary: "Thưởng cân bằng nhóm",
+    teamBinary: "Thưởng cân bằng",
     teamNetwork: "Bản đồ nhóm",
     teamTree: "Danh sách thành viên",
     teamLeadershipPool: "Quỹ thưởng nhóm",
@@ -275,7 +275,7 @@ export const vi: Messages = {
     // Tx
     tx: "Giao dịch",
     // How-it-works suffix
-    howItWorksSuffix: " · Cách hoạt động",
+    howItWorksSuffix: " · Quy tắc",
   },
   headerSubtitles: {
     // Tab roots
@@ -4204,7 +4204,7 @@ timeHoursAgo: "{n} giờ",
   },
 
   unilevelHowItWorks: {
-    navTitle: "Cách Thưởng đội nhóm hoạt động",
+    navTitle: "Cách nhận Thưởng nhóm",
     heroLabel: "CHƯƠNG TRÌNH thưởng đội nhóm",
     heroTitle: "Tìm hiểu phần thưởng từ bạn bè bạn mời và nhóm của bạn.",
     heroSub:

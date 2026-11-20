@@ -620,7 +620,7 @@ export const id: Messages = {
     meRiskDisclosure: "Pengungkapan risiko",
     teamRank: "Peringkat saya",
     teamUnilevel: "Hadiah tim",
-    teamBinary: "Hadiah keseimbangan tim",
+    teamBinary: "Hadiah keseimbangan",
     teamNetwork: "Peta tim",
     teamTree: "Daftar anggota",
     teamLeadershipPool: "Pool insentif tim",
@@ -638,7 +638,7 @@ export const id: Messages = {
     genesisHolder: "Pemegang Genesis",
     trustNex: "Kepercayaan UVT",
     tx: "Transaksi",
-    howItWorksSuffix: " · Cara kerja",
+    howItWorksSuffix: " · Aturan",
   },
   headerSubtitles: {
     earn: "Perangkat · pendapatan · tugas — real-time",

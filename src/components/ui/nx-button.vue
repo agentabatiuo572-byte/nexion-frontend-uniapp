@@ -17,7 +17,7 @@ const emit = defineEmits<{ (event: 'click'): void }>();
 function activate(event?: Event) { if (!props.disabled && !props.busy && !(event as KeyboardEvent)?.repeat) emit('click'); }
 </script>
 <style scoped>
-.nx-button { position: relative; isolation: isolate; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 48px; border-radius: 999px; color: var(--v5-ink); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; transition: transform 160ms ease; }
+.nx-button { position: relative; isolation: isolate; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: max-content; min-height: 48px; border-radius: 999px; color: var(--v5-ink); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; transition: transform 160ms ease; }
 /* The hit area participates in layout; its compact surface stays inside it. */
 .nx-button__surface { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: 48px; padding: 10px 20px; border-radius: inherit; }
 .nx-button__content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; text-align: center; white-space: nowrap; }

@@ -274,7 +274,7 @@ export const en = {
     // Tx
     tx: "Transaction",
     // How-it-works suffix
-    howItWorksSuffix: " · How it works",
+    howItWorksSuffix: " · Guide",
   },
   headerSubtitles: {
     // Tab roots
@@ -3662,7 +3662,7 @@ timeHoursAgo: "{n}h ago",
     // BUG 196: the card title is the current rank while this figure is the next rank's bonus.
     sevenLayerNetwork: "Team rewards",
     todayMatch: "Team Balance Reward",
-    weeklyPool: "Team incentive pool this week",
+    weeklyPool: "This week's incentive pool",
     thisMonth: "Team rewards this month",
     votes: "votes",
     viewDetails: "View details",
