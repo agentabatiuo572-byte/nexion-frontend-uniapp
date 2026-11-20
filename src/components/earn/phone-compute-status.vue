@@ -6,7 +6,7 @@
     <text v-else-if="failed && !onlineWaitingForConfig" class="block">{{ copy.unavailable }}</text>
     <template v-else-if="phone">
       <text v-if="notReady || expired" class="block">{{ notReady ? copy.notReady : copy.expired }}</text>
-      <text v-else-if="phone.simulationState === 'CLOSING'" class="block">{{ copy.restoring }}</text>
+      <text v-else-if="restoring" class="block">{{ copy.restoring }}</text>
       <text v-else class="block">{{ phone.currentTask?.status === 'RUNNING' ? copy.running : copy.waiting }}</text>
       <text v-if="!expired && phone.simulationState !== 'CLOSING' && phone.phoneValidUntil != null" class="block">{{ copy.validUntil }} {{ visibility.mask(validUntilText) }}</text>
     </template>
@@ -33,6 +33,7 @@ const visibility = useDataVisibility();
 const phone = computed(() => app.devices.find(row => row.id === props.deviceId));
 const onlineWaitingForConfig = computed(() => app.nativePhoneConfigWaitDeviceId === props.deviceId);
 const notReady = computed(() => onlineWaitingForConfig.value || phone.value?.simulationState === 'WAITING_CONFIG');
+const restoring = computed(() => app.nativePhoneTaskRecoveryDeviceId === props.deviceId || phone.value?.simulationState === 'CLOSING');
 const monotonicNow = ref(readMonotonicNowMs());
 useVisibleInterval(() => { monotonicNow.value = readMonotonicNowMs(); }, 1000);
 const expired = computed(() => phone.value?.simulationState === 'EXPIRED' || (phone.value?.phoneValidUntil != null
