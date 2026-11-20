@@ -1810,6 +1810,7 @@ export const uz: Messages = {
     sheetCta: "Tasdiqlash · ${amount} toʻlash",
     sheetCancel: "Bekor",
     recoveryPending: "Oldingi almashtirish natijasi tasdiqlanmagan. Natijani tekshirish uchun qayta urining.",
+    recoveryChecking: "Oldingi almashtirish natijasi tekshirilmoqda. Qayta toʻlamang.\nSahifa avtomatik yangilanadi.",
     keepRecoveryPending: "Eski qurilmani saqlab xarid qilish natijasi tasdiqlanmagan. Avval asl xaridni tiklang.",
     keepRecoveryAction: "Asl xaridni tekshirish",
     keepRecoveryReadError: "Asl xarid soʻrovini aniqlab boʻlmadi. Qayta toʻlashdan oldin buyurtmalaringizni tekshiring yoki yordam xizmatiga murojaat qiling.",
