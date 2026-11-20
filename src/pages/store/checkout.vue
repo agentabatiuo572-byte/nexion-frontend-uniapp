@@ -2460,7 +2460,11 @@ onShow(() => {
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
   void freeTrial.refreshVisible();
-  if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) void resumeServerOrder();
+  if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) {
+    // A load invalidated by onHide cannot finish and restore quantity readiness.
+    if (!quantityReady.value) void initializeCheckout(beginCheckoutRoute());
+    else void resumeServerOrder();
+  }
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
