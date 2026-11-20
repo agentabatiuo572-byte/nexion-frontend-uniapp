@@ -23,8 +23,8 @@
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
             <view class="hb-rule" aria-hidden="true" />
             <view class="hb-half__foot">
-              <text class="hb-label">{{ capacityFull ? copy.benefitSlotsFull : fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
-              <text v-if="capacityFull" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
+              <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
+              <text v-if="showCapacityManagement" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
               <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialPillWait }">{{ trialPill[0] }}</text>
             </view>
           </template>
@@ -37,8 +37,8 @@
               <text class="hb-amount hb-wt__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text>
               <text class="hb-sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text>
               <view class="hb-wt__row">
-                <text class="hb-label">{{ capacityFull ? copy.benefitSlotsFull : t.trial.homeNoPayment }}</text>
-                <text v-if="capacityFull" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
+                <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : t.trial.homeNoPayment }}</text>
+                <text v-if="showCapacityManagement" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
                 <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialPillWait }">{{ trialPill[1] }}</text>
               </view>
             </view>
@@ -127,9 +127,10 @@ const hasLifecycle = computed(() => status.value !== null && status.value !== 'n
 const eligibility = computed(() => trial.eligibility());
 const capacityFull = computed(() => eligibility.value.reason === 'capacity-full');
 const confirmedOffer = computed(() => trial.confirmedHomeOffer);
+const showCapacityFull = computed(() => confirmedOffer.value?.capacityFull ?? capacityFull.value);
 const showRestartOffer = computed(() => confirmedOffer.value?.status === 'ended');
 const trialOffer = computed(() => showRestartOffer.value || (!hasLifecycle.value && trial.status === "none"
-  && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || capacityFull.value)));
+  && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || showCapacityFull.value)));
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !showRestartOffer.value));
 const trialOfferEnabled = computed(() => trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
 // B53: only the confirmed trial product is named; until then the card shows the same "-" as its unknown amounts, never a default S1.
@@ -147,6 +148,7 @@ const creditText = computed(() => trialView.offsetUSD.value === null ? '-' : `$$
 const countdownText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialCountdown(trialView.remainingMs.value));
 // Keep the last confirmed label during a background read (BUG 14). [half pill, wide pill, screen-reader wording]
 const offerState = computed(() => trial.lastReadFailed ? 'error' : trial.confirmedOfferState());
+const showCapacityManagement = computed(() => showCapacityFull.value && offerState.value !== 'error');
 const trialPill = computed<[string, string, string]>(() => {
   if (showRestartOffer.value && offerState.value !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
   switch (offerState.value) {
@@ -162,7 +164,7 @@ const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !t
 // Only a background re-read from a ready card waits before dimming (CSS delay), so a quick read never flashes.
 // Pills that were already muted (out of stock, unavailable, or a retry after a failed read) stay muted.
 const trialPillWait = computed(() => trialRechecking.value && !retryShown.value);
-const trialOfferLabel = computed(() => capacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
+const trialOfferLabel = computed(() => showCapacityManagement.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
   : trial.status === "none" && (eligibility.value.ok || offerState.value === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
   : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[2]}`);
