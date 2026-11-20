@@ -69,7 +69,7 @@
           </template>
         </view>
       </view>
-      <view v-if="trial.authorityStatus === 'error' && (trialOffer || trialPending)" class="hb-retry" role="button" tabindex="0" :aria-label="t.trial.entryRetry" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility"><text>{{ t.trial.entryRetry }}</text></view>
+      <view v-if="trial.authorityStatus === 'error'" class="hb-retry" role="button" tabindex="0" :aria-label="t.trial.entryRetry" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility"><text>{{ t.trial.entryRetry }}</text></view>
     </view>
   </NxSection>
 </template>
@@ -119,13 +119,12 @@ function faceValue(rows: VoucherDef[]) {
 const offerFace = computed(() => faceValue(voucherClaimable.value));
 const pendingName = computed(() => fmt(copy.value.benefitVoucherName, { v: faceValue(voucherClaimed.value).label }));
 
-// Trial: offer and lifecycle rules unchanged from the previous home trial card.
 const status = computed(() => trialView.status.value);
 const hasLifecycle = computed(() => status.value !== null && status.value !== 'none');
 const eligibility = computed(() => trial.eligibility());
 const capacityFull = computed(() => eligibility.value.reason === 'capacity-full');
 // eligibility() fails closed while a background read is in flight, so keep the last
-// CONFIRMED restart answer (reset on rebind). The claim sheet re-verifies before starting.
+// confirmed restart answer for card presentation (reset on rebind).
 const app = useApp(), confirmedRestart = ref(false);
 let restartBinding = '';
 watchEffect(() => {
@@ -134,12 +133,10 @@ watchEffect(() => {
   if (!remoteApiEnabled || trial.authorityStatus === 'ready') confirmedRestart.value = status.value === 'ended' && eligibility.value.ok;
 });
 const canRestart = computed(() => status.value === 'ended' && confirmedRestart.value);
-const canClaim = computed(() => trial.status === "none" && trial.authorityStatus !== 'error'
-  && (eligibility.value.ok || trial.confirmedOfferState() === "claimable"));
 const trialOffer = computed(() => canRestart.value || (!hasLifecycle.value && trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || capacityFull.value)));
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !canRestart.value));
-const trialOfferEnabled = computed(() => canRestart.value || capacityFull.value || canClaim.value);
+const trialOfferEnabled = computed(() => trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
 // B53: only the confirmed trial product is named; until then the card shows the same "-" as its unknown amounts, never a default S1.
 const trialName = computed(() => trialView.deviceName.value ?? '-');
 const trialDays = computed(() => trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
@@ -150,10 +147,11 @@ const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null 
 const estimateParts = computed(() => { const match = /^(\$?)(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { currency: match[1], whole: match[2], cents: match[3] ?? '' }; });
 const creditText = computed(() => trialView.offsetUSD.value === null ? '-' : `$${formatAmount(trialView.offsetUSD.value)}`);
 const countdownText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialCountdown(trialView.remainingMs.value));
-// Label follows the RETAINED offer state (BUG 14); the click stays gated by canClaim.
+// Keep the last confirmed label during a background read (BUG 14).
 const trialPill = computed<[string, string]>(() => {
-  if (canRestart.value) return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
-  switch (trial.confirmedOfferState()) {
+  const offerState = trial.confirmedOfferState();
+  if (canRestart.value && offerState !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
+  switch (offerState) {
     case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim];
     case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable];
     case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut];
@@ -161,7 +159,8 @@ const trialPill = computed<[string, string]>(() => {
   }
 });
 const trialOfferAria = computed(() => capacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
-  : canClaim.value ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
+  : trial.status === "none" && (eligibility.value.ok || trial.confirmedOfferState() === "claimable")
+    ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
   : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[1]}`);
 const trialPendingAria = computed(() => {
   if (status.value === 'ended') return `${trialName.value} · ${lifecycleCopy.value.endedTitle} · ${lifecycleCopy.value.buyDevice}`;
@@ -197,9 +196,9 @@ function openVoucher() {
 }
 function useVoucherNow() { navTo('/pages/store/store'); }
 function openTrialOffer() {
-  if (canRestart.value) { trialSheet.show(); return; }
+  if (!trialOfferEnabled.value) return;
   if (capacityFull.value) { navTo('/pages/me/devices'); return; }
-  if (canClaim.value) trialSheet.show();
+  trialSheet.show();
 }
 function openTrialDetails() { navTo('/pages/me/trial'); }
 function retryEligibility() {
