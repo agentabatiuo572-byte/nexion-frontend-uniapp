@@ -55,7 +55,7 @@
       :entrance-ready="humanOpenRequest === null && !humanHistoryRetryBusy && !humanEarlierBusy"
 	      :input-placeholder="inputPlaceholder"
 	      :input-label="inputLabel"
-	      :input-disabled="awaitingHumanDetail"
+	      :input-disabled="awaitingHumanDetail || !supportSessionReady || (!cid && !startType)"
 	      :send-label="t.conversations.send"
       :status-labels="t.conversations.delivery"
       :send-success-revision="sendSuccessRevision"
@@ -388,29 +388,32 @@ async function retryHumanSend() {
   const failed = failedHumanSend.value;
   if (!failed?.retryable || humanSendBusy.value) return;
   const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
-  const current = () => isReplyAllowed.value && binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated
+  const current = () => pageVisible && isReplyAllowed.value && binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated
     && key === humanComposerKey.value && failedHumanSend.value === failed;
+  let originalKey: string | undefined;
   if (!failed.settled) {
     try {
-      const pending = await convStore.hasPendingHumanSend(key, failed);
+      originalKey = await convStore.pendingHumanSendKey(key, failed);
       if (!current()) return;
-      if (!pending) {
-        failedHumanSend.value = { ...failed, settled: true, retryable: false, kind: "failed" };
+      if (!originalKey) {
+        if (cid.value) await checkHumanSend(threadMessages.value.find(message => message.localSend));
+        else toast.warn(t.value.conversations.delivery.unknown);
         return;
       }
     } catch { return; }
   }
   if (!current() || !acquireSendSlot()) return;
-  failedHumanSend.value = null;
   humanSendBusy.value = true;
-  try { await sendHumanMessage(failed.text, failed.attachmentId, undefined, failed.attempts + 1); }
+  failedHumanSend.value = null;
+  try { await sendHumanMessage(failed.text, failed.attachmentId, undefined, failed.attempts + 1, originalKey); }
   finally { humanSendBusy.value = false; }
 }
 let checkingHumanSend = false;
-async function checkHumanSend(message: ThreadMsg) {
+async function checkHumanSend(message?: ThreadMsg) {
   const failed = failedHumanSend.value;
   const page = humanRealtime.capture(cid.value);
-  if (!canCheckHumanSend.value || !page || !failed || checkingHumanSend) return;
+  if ((!canCheckHumanSend.value && !isReplyAllowed.value) || !page || !failed || failed.settled
+      || checkingHumanSend || humanSendBusy.value) return;
   const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
   const composerKey = humanComposerKey.value, clearThrough = convStore.clearedComposerThrough[composerKey];
   const current = () => humanRealtime.isCurrent(page.epoch, page.id) && supportSessionReady.value
@@ -420,7 +423,7 @@ async function checkHumanSend(message: ThreadMsg) {
     const result = await convStore.checkHumanReply(page.id, failed, () => current() && failedHumanSend.value === failed);
     if (!current()) return;
     if (result?.status === 'sent') {
-      if (clearThrough === convStore.clearedComposerThrough[composerKey])
+      if (message && clearThrough === convStore.clearedComposerThrough[composerKey])
         localHumanSend.value = { ...message, clientMessageId: result.key, deliveryState: 'sent' };
       return;
     }
@@ -882,7 +885,7 @@ const threadMessages = computed<ThreadMsg[]>(() => {
       id: localHumanSend.value?.id ?? `pending-human:${humanComposerKey.value}`,
       side: 'right', tone: 'user', text: failed.text || t.value.conversations.image.message,
       timestamp: localHumanSend.value?.timestamp, meta: t.value.conversations.image.you,
-      clientMessageId: localHumanSend.value?.clientMessageId,
+      clientMessageId: failed.commandKey ?? localHumanSend.value?.clientMessageId,
       imageSrc: failed.attachmentId ? imageDraft.value?.filePath : undefined,
       deliveryState: failed.settled ? 'failed' : 'unknown', localSend: true,
     } : localHumanSend.value?.deliveryState === 'sent' ? localHumanSend.value : null;
@@ -1023,7 +1026,7 @@ async function onSend(text: string, restore?: () => void, settled?: (accepted?: 
   } finally { settled?.(accepted); }
 }
 
-async function sendHumanMessage(text: string, attachmentId?: string, restore?: () => void, attempts = 1) {
+async function sendHumanMessage(text: string, attachmentId?: string, restore?: () => void, attempts = 1, originalKey?: string) {
   if (!supportSessionReady.value) { restore?.(); return; }
   const supportScope = convStore.scopeInvalidated;
   const id = cid.value;
@@ -1045,6 +1048,12 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
       humanCreateRecovery.finish(); humanSendFailed(text, attachmentId, cause, attempts); restore?.(); return;
     }
     if (!humanCreateRecovery.isCurrent(creation) || supportScope !== convStore.scopeInvalidated) return;
+    if (originalKey && !originalPending) {
+      failedHumanSend.value = convStore.composer(`start:${type}`).failedSend;
+      if (failedHumanSend.value) toast.warn(t.value.conversations.delivery.unknown);
+      humanCreateRecovery.finish();
+      return;
+    }
     if (remoteApiEnabled && !originalPending && !convStore.categoryEnabled(type)) {
       humanCreateRecovery.finish();
       restore?.();
@@ -1053,7 +1062,7 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
     }
     if (!stageHumanSend(text, attachmentId, attempts, restore)) { humanCreateRecovery.finish(); return; }
     try {
-      const createdId = await convStore.startConversation(type, text, attachmentId, bindHumanDispatchKey());
+      const createdId = await convStore.startConversation(type, text, attachmentId, bindHumanDispatchKey(), originalKey);
       if (!humanCreateRecovery.isCurrent(creation) || supportScope !== convStore.scopeInvalidated) return;
       conversationSendLimiter.transfer(app.accountKey, 'start:' + type, createdId);
       humanCreateRecovery.complete(createdId, creation);
@@ -1064,6 +1073,11 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
       return true;
     } catch (cause) {
       if (!humanCreateRecovery.isCurrent(creation) || supportScope !== convStore.scopeInvalidated) return;
+      if (originalKey && cause instanceof Error && cause.message === "SUPPORT_PENDING_RECOVERY_SCOPE_CHANGED") {
+        failedHumanSend.value = convStore.composer(`start:${type}`).failedSend;
+        if (failedHumanSend.value) toast.warn(t.value.conversations.delivery.unknown);
+        return;
+      }
       humanSendFailed(text, attachmentId, cause, attempts);
     } finally {
       humanCreateRecovery.finish();
@@ -1079,7 +1093,7 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
   const composerKey = humanComposerKey.value, clearThrough = convStore.clearedComposerThrough[composerKey];
   if (!stageHumanSend(text, attachmentId, attempts, restore)) return;
   try {
-    await convStore.sendUser(id, text, attachmentId, bindHumanDispatchKey());
+    await convStore.sendUser(id, text, attachmentId, bindHumanDispatchKey(), originalKey);
     if (replyBinding !== app.accountBindingEpoch || cid.value !== id || supportScope !== convStore.scopeInvalidated
         || clearThrough !== convStore.clearedComposerThrough[composerKey]) return;
     if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
@@ -1091,15 +1105,25 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
         || clearThrough !== convStore.clearedComposerThrough[composerKey]) return;
     // A same-account assignment notification does not undo this explicit refusal.
     if (supportScope !== convStore.scopeInvalidated && !isConversationPeerChanged(cause)) return;
+    if (originalKey && cause instanceof Error && cause.message === "SUPPORT_PENDING_RECOVERY_SCOPE_CHANGED") {
+      failedHumanSend.value = convStore.composer(composerKey).failedSend;
+      if (failedHumanSend.value) toast.warn(t.value.conversations.delivery.unknown);
+      return;
+    }
     humanSendFailed(text, attachmentId, cause, attempts);
   }
 }
 
 function bindHumanDispatchKey() {
   const owner = threadComposerKey.value, binding = app.accountBindingEpoch, localId = localHumanSend.value?.id;
+  const composerKey = humanComposerKey.value;
   return (key: string) => {
-    if (owner === threadComposerKey.value && binding === app.accountBindingEpoch && localId && localHumanSend.value?.id === localId)
-      localHumanSend.value = { ...localHumanSend.value, clientMessageId: key };
+    if (owner !== threadComposerKey.value || binding !== app.accountBindingEpoch || !localId || localHumanSend.value?.id !== localId) return;
+    localHumanSend.value = { ...localHumanSend.value, clientMessageId: key };
+    if (!remoteApiEnabled) return;
+    const saved = convStore.composer(composerKey);
+    if (saved.failedSend && !saved.failedSend.settled)
+      convStore.saveComposer(composerKey, { ...saved, failedSend: { ...saved.failedSend, commandKey: key } });
   };
 }
 
@@ -1113,11 +1137,15 @@ function stageHumanSend(text: string, attachmentId: string | undefined, attempts
   };
   if (!remoteApiEnabled || !humanComposerKey.value) return true;
   try {
+    const previous = convStore.composer(humanComposerKey.value).failedSend;
+    const original = previous && !previous.settled && attempts > 1 ? previous : null;
     convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value,
-      failedSend: { text, attachmentId, settled: false, retryable: true, attempts, kind: "unknown" } }, true);
+      failedSend: { ...original, text, attachmentId, settled: false, retryable: true, attempts, kind: "unknown" } }, true);
     return true;
   } catch {
-    convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
+    const previous = convStore.composer(humanComposerKey.value).failedSend;
+    if (attempts > 1 && previous?.commandKey) failedHumanSend.value = previous;
+    else convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
     restore?.();
     toast.error(t.value.conversations.image.sendFailed, "");
     return false;
@@ -1132,6 +1160,7 @@ function humanSendFailed(text: string, attachmentId: string | undefined, cause: 
   const rejectedReply = !!cid.value && peerChanged;
   const replyRejected = cause instanceof SupportReplyRejected;
   const key = humanComposerKey.value;
+  const original = convStore.composer(key).failedSend;
   // Assignment invalidation clears the page preview while the reply is in flight.
   const draft = imageDraft.value ?? (rejectedReply ? convStore.composer(key).imageDraft : null);
   if (expired && draft && draft.attachmentId === attachmentId) {
@@ -1140,6 +1169,7 @@ function humanSendFailed(text: string, attachmentId: string | undefined, cause: 
     draft.replaceOnly = true;
   }
   failedHumanSend.value = { text, attachmentId, settled, retryable: !expired && !peerChanged && !replyRejected, attempts,
+    ...(!settled && original ? { commandKey: original.commandKey, expiresAt: original.expiresAt } : {}),
     kind: expired ? "expired" : settled ? "failed" : "unknown", ...(rejectedReply ? { peerChanged: true } : {}),
     ...(replyRejected ? { replyRejected: true } : {}) };
   if (key) convStore.saveComposer(key, { text: draftText.value, imageDraft: draft, failedSend: failedHumanSend.value });

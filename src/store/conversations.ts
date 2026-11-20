@@ -13,7 +13,7 @@ import { awaitMessageOutcome, isConversationDeliveryAmbiguous, isConversationPee
 import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAdvisor, type SupportCommandResult } from "@/api/support-api";
 import type { Conversation, ConversationCategoryAvailability, ConversationType } from "@/domain/support";
 import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
-import { restoreSupportPending, persistSupportPending, clearSupportPending } from "@/lib/support-pending-storage";
+import { restoreSupportPending, persistSupportPending, clearSupportPending, retireSupportPending } from "@/lib/support-pending-storage";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { useConfig } from "@/store/config";
 import { passiveTabReadScope } from "@/lib/passive-tab-read";
@@ -39,38 +39,35 @@ export type CategoryAvailabilityStatus = "loading" | "ready" | "failed";
 export type HumanComposer = {
   text: string;
   imageDraft: { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean } | null;
-  failedSend: { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number; peerChanged?: true; replyRejected?: true } | null;
+  failedSend: { text: string; attachmentId?: string; commandKey?: string; expiresAt?: number; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number; peerChanged?: true; replyRejected?: true } | null;
   recoveredId?: string;
   retainDraft?: boolean;
   /** Visibility boundary already observed when this draft/unknown was saved. */
   userClearThrough?: number;
 };
 
-const HUMAN_REAUTH_ACCOUNT = "support-human-reauth-account";
+const HUMAN_OUTBOX_PREFIX = "support-human-outbox:";
+const HUMAN_PENDING_PREFIX = "support-human-pending:";
+const HUMAN_PENDING_TTL_MS = 24 * 60 * 60 * 1000;
+const humanOutboxKey = (account: string) => HUMAN_OUTBOX_PREFIX + account;
+const humanPendingKey = (account: string) => HUMAN_PENDING_PREFIX + account;
 
-function humanOutboxStorage() {
+function humanOutboxStorage(durable = false) {
   try {
-    if (typeof plus === "undefined") return sessionStorage;
+    if (typeof plus === "undefined") {
+      const storage = durable ? localStorage : sessionStorage;
+      return { getItem: (key: string) => storage.getItem(key), setItem: (key: string, value: string) => storage.setItem(key, value),
+        removeItem: (key: string) => storage.removeItem(key), keys: () => Object.keys(storage) };
+    }
     return { getItem: (key: string) => uni.getStorageSync(key) as string,
       setItem: (key: string, value: string) => uni.setStorageSync(key, value),
-      removeItem: (key: string) => uni.removeStorageSync(key) };
+      removeItem: (key: string) => uni.removeStorageSync(key), keys: () => uni.getStorageInfoSync().keys };
   } catch { return null; }
 }
-function humanOutboxKey(account: string) { return `support-human-outbox:${account}`; }
-function removeHumanCache(key: string) {
-  try { humanOutboxStorage()?.removeItem(key); }
-  catch { try { humanOutboxStorage()?.setItem(key, "{}"); } catch { /* Denied storage must not keep private UI authenticated. */ } }
-}
-function reauthAccount(): string | null {
-  try {
-    const value = humanOutboxStorage()?.getItem(HUMAN_REAUTH_ACCOUNT);
-    return value?.startsWith("user:") ? value : null;
-  } catch { return null; }
-}
-function restoreHumanOutbox(account: string): Record<string, HumanComposer> {
+function readHumanOutbox(account: string, durable = false): Record<string, HumanComposer> {
   if (!account.startsWith("user:")) return {};
   try {
-    const raw = humanOutboxStorage()?.getItem(humanOutboxKey(account));
+    const raw = humanOutboxStorage(durable)?.getItem(durable ? humanPendingKey(account) : humanOutboxKey(account));
     if (!raw) return {};
     const rows: unknown = JSON.parse(raw);
     if (!rows || typeof rows !== "object" || Array.isArray(rows)) return {};
@@ -95,7 +92,16 @@ function restoreHumanOutbox(account: string): Record<string, HumanComposer> {
         && failed.settled === true && failed.kind === "failed" && failed.retryable === false;
       if (!failed || (failed.settled && !rejectedReply) || typeof failed.text !== "string" || !["unknown", "failed", "expired"].includes(failed.kind) || typeof failed.attempts !== "number"
         || (failed.attachmentId !== undefined && typeof failed.attachmentId !== "string")) continue;
-      restored[key] = { ...clearVersion, text, imageDraft: null, failedSend: failed };
+      const { commandKey, expiresAt, ...rest } = failed;
+      const commandType = key.startsWith("start:") ? "create" : "reply";
+      const validKey = typeof commandKey === "string" && commandKey.length <= 128
+        && /^support-conversation-(create|reply)-[a-z0-9-]+$/.test(commandKey)
+        && commandKey.startsWith(`support-conversation-${commandType}-`);
+      const deadline = typeof expiresAt === "number" && Number.isSafeInteger(expiresAt) && expiresAt > 0 ? expiresAt : undefined;
+      if (durable && (!deadline || failed.settled)) continue;
+      restored[key] = { ...clearVersion, text, imageDraft: null, failedSend: {
+        ...rest, ...(validKey ? { commandKey } : {}), ...(deadline ? { expiresAt: deadline } : {}),
+      } };
     }
     return restored;
   } catch { return {}; }
@@ -225,25 +231,77 @@ export const useConversations = defineStore("conversations", () => {
   const humanComposers = ref<Record<string, HumanComposer>>({});
   const clearedComposerThrough = ref<Record<string, number>>({});
   let humanWritesBlocked = false;
-  let suspendedHumanAccount = reauthAccount();
-  const discardedHumanAccounts = new Set<string>();
+  let humanExpiryTimer: ReturnType<typeof setTimeout> | undefined;
+  let nextHumanExpiry = Infinity;
+
+  function scheduleHumanExpiry(deadline: number) {
+    if (deadline >= nextHumanExpiry) return;
+    clearTimeout(humanExpiryTimer);
+    nextHumanExpiry = deadline;
+    humanExpiryTimer = setTimeout(sweepHumanOutboxes, Math.max(0, deadline - Date.now()));
+  }
+  onScopeDispose(() => clearTimeout(humanExpiryTimer));
+
+  function writeHumanOutbox(account: string, rows: Record<string, HumanComposer>, durable: boolean) {
+    const storage = humanOutboxStorage(durable);
+    const key = durable ? humanPendingKey(account) : humanOutboxKey(account);
+    if (!Object.keys(rows).length) { storage?.removeItem(key); return; }
+    const encoded = JSON.stringify(rows);
+    storage?.setItem(key, encoded);
+    if (storage?.getItem(key) !== encoded) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
+  }
+
+  function sweepHumanOutboxes() {
+    clearTimeout(humanExpiryTimer);
+    nextHumanExpiry = Infinity;
+    const now = Date.now();
+    try {
+      for (const storageKey of humanOutboxStorage(true)?.keys() ?? []) {
+        if (!storageKey.startsWith(HUMAN_PENDING_PREFIX + "user:")) continue;
+        const account = storageKey.slice(HUMAN_PENDING_PREFIX.length);
+        const rows = readHumanOutbox(account, true);
+        const expired = new Map<string, string | undefined>();
+        for (const [key, saved] of Object.entries(rows)) {
+          const failed = saved.failedSend;
+          const deadline = failed?.expiresAt;
+          if (!failed || deadline === undefined) continue;
+          if (deadline > now) { scheduleHumanExpiry(deadline); continue; }
+          const slot = humanSendSlot(key, failed);
+          expired.set(slot, failed.commandKey);
+          delete rows[key];
+        }
+        if (!expired.size && Object.keys(rows).length) continue;
+        retireSupportPending(account, "conversations", expired);
+        writeHumanOutbox(account, rows, true);
+      }
+    } catch { /* Storage can be unavailable; subsequent account binding retries cleanup. */ }
+
+    for (const [key, saved] of Object.entries(humanComposers.value)) {
+      const failed = saved.failedSend;
+      if (!failed || failed.settled || failed.expiresAt === undefined) continue;
+      if (failed.expiresAt > now) { scheduleHumanExpiry(failed.expiresAt); continue; }
+      const slot = humanSendSlot(key, failed), pendingKey = pendingKeys.get(slot);
+      if (!failed.commandKey || pendingKey === failed.commandKey) pendingKeys.delete(slot);
+      saveComposer(key, { ...saved, failedSend: null });
+    }
+  }
   function persistHumanOutbox(required = false) {
     if (!accountKeyValue.startsWith("user:")) return;
-    const rows = Object.fromEntries(Object.entries(humanComposers.value)
-      .filter(([key, composer]) => (composer.failedSend && (!composer.failedSend.settled || composer.failedSend.peerChanged || composer.failedSend.replyRejected)) || (key.startsWith("start:") && composer.recoveredId) || (composer.retainDraft && composer.text))
-      .map(([key, composer]) => [key, { text: composer.text, failedSend: composer.failedSend, recoveredId: composer.recoveredId, retainDraft: composer.retainDraft, userClearThrough: composer.userClearThrough }]));
+    const drafts: Record<string, HumanComposer> = {};
+    const pending: Record<string, HumanComposer> = {};
+    for (const [key, composer] of Object.entries(humanComposers.value)) {
+      const { text, failedSend, recoveredId, retainDraft, userClearThrough } = composer;
+      if (failedSend && !failedSend.settled && failedSend.expiresAt !== undefined) {
+        scheduleHumanExpiry(failedSend.expiresAt);
+        pending[key] = { text: "", imageDraft: null, failedSend, userClearThrough };
+        if (text) drafts[key] = { text, imageDraft: null, failedSend: null, retainDraft: true, userClearThrough };
+      } else if (failedSend?.peerChanged || failedSend?.replyRejected || (key.startsWith("start:") && recoveredId) || (retainDraft && text)) {
+        drafts[key] = { text, imageDraft: null, failedSend, recoveredId, retainDraft, userClearThrough };
+      }
+    }
     try {
-      const storage = humanOutboxStorage();
-      if (Object.keys(rows).length) {
-        const encoded = JSON.stringify(rows);
-        storage?.setItem(humanOutboxKey(accountKeyValue), encoded);
-        if (storage?.getItem(humanOutboxKey(accountKeyValue)) !== encoded) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
-        discardedHumanAccounts.delete(accountKeyValue);
-        // Record the owner before sending; a reload may expire before this store is bound.
-        storage?.setItem(HUMAN_REAUTH_ACCOUNT, accountKeyValue);
-        if (storage?.getItem(HUMAN_REAUTH_ACCOUNT) !== accountKeyValue) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
-        suspendedHumanAccount = accountKeyValue;
-      } else storage?.removeItem(humanOutboxKey(accountKeyValue));
+      writeHumanOutbox(accountKeyValue, pending, true);
+      writeHumanOutbox(accountKeyValue, drafts, false);
     } catch {
       if (required) throw new Error("SUPPORT_HUMAN_OUTBOX_PERSIST_FAILED");
     }
@@ -260,7 +318,10 @@ export const useConversations = defineStore("conversations", () => {
     const row = id ? get(id) : undefined;
     const boundary = Math.max(value.userClearThrough ?? -1, id ? clearedThrough.get(`conversation:${id}`) ?? -1 : -1,
       row ? clearedThrough.get(conversationPeerKey(row)) ?? -1 : -1);
-    const next = { ...value, retainDraft, ...(boundary >= 0 ? { userClearThrough: boundary } : {}) };
+    const failed = value.failedSend;
+    const failedSend = failed && !failed.settled && failed.expiresAt === undefined
+      ? { ...failed, expiresAt: Date.now() + HUMAN_PENDING_TTL_MS } : failed;
+    const next = { ...value, failedSend, retainDraft, ...(boundary >= 0 ? { userClearThrough: boundary } : {}) };
     humanComposers.value[key] = next;
     if (key.startsWith("start:") && value.recoveredId && value.text) {
       humanComposers.value[`conversation:${value.recoveredId}`] = { ...next, recoveredId: undefined, retainDraft: true };
@@ -285,26 +346,21 @@ export const useConversations = defineStore("conversations", () => {
     saveComposer(targetKey, { ...target, text: failed.text, imageDraft: attachment, retainDraft: true });
     saveComposer(sourceKey, { ...source, imageDraft: attachment ? null : image, failedSend: null });
   }
-  function suspendForReauthentication() {
-    if (!remoteApiEnabled || !accountKeyValue.startsWith("user:")) return;
-    // Arm before app's epoch watch clears private UI and tries to save empty refs.
-    humanWritesBlocked = true;
-    suspendedHumanAccount = accountKeyValue;
-    try { humanOutboxStorage()?.setItem(HUMAN_REAUTH_ACCOUNT, accountKeyValue); }
-    catch { /* A denied cache write must never prevent clearing invalid authentication. */ }
+  function forgetHumanDrafts(account: string) {
+    try { writeHumanOutbox(account, {}, false); }
+    catch { /* The account epoch still clears private memory. */ }
   }
-  function discardAccountOutbox(account: string) {
-    discardedHumanAccounts.add(account);
-    removeHumanCache(humanOutboxKey(account));
-    clearSupportPending(account, "conversations");
+  function suspendForReauthentication() {
+    // Stop old page watchers writing while the account is being unbound.
+    humanWritesBlocked = true;
   }
   function discardHumanOutbox() {
-    humanWritesBlocked = true;
-    const suspended = suspendedHumanAccount;
-    if (accountKeyValue.startsWith("user:")) discardAccountOutbox(accountKeyValue);
-    if (suspended && suspended !== accountKeyValue) discardAccountOutbox(suspended);
-    removeHumanCache(HUMAN_REAUTH_ACCOUNT);
-    suspendedHumanAccount = null;
+    suspendForReauthentication();
+    if (accountKeyValue.startsWith("user:")) {
+      forgetHumanDrafts(accountKeyValue);
+      try { writeHumanOutbox(accountKeyValue, {}, true); } catch { /* Authentication must still close. */ }
+      clearSupportPending(accountKeyValue, "conversations");
+    }
     reset();
   }
   function humanSendSlot(key: string, failed: NonNullable<HumanComposer["failedSend"]>): string {
@@ -313,32 +369,35 @@ export const useConversations = defineStore("conversations", () => {
       : `conversation-reply:${key.slice(13)}:${failed.attachmentId ?? "text"}:${failed.text.trim()}`;
     return opaqueSupportIntentSlot(intent);
   }
-  async function hasPendingHumanSend(key: string, failed: NonNullable<HumanComposer["failedSend"]>): Promise<boolean> {
-    await preparePendingRun();
-    return pendingKeys.has(humanSendSlot(key, failed));
+  async function pendingHumanSendKey(key: string, failed: NonNullable<HumanComposer["failedSend"]>): Promise<string | undefined> {
+    const scope = await commandScope();
+    const pendingKey = scope.pending.get(humanSendSlot(key, failed));
+    return !failed.commandKey || failed.commandKey === pendingKey ? pendingKey : undefined;
   }
   function matchesReplyRejection(result: SupportCommandResult | null, id: string, key: string): result is Extract<SupportCommandResult, { kind: 'reply-rejected' }> {
     return result?.kind === 'reply-rejected' && result.conversationNo === id
       && result.idempotencyKey === key && result.clientMessageId === key;
   }
-  function applyPendingReplyRejection(scope: CommandScope, fingerprint: string, id: string): boolean {
+  function applyPendingReplyRejection(scope: CommandScope, fingerprint: string, id: string, key: string): boolean {
     const composerKey = `conversation:${id}`, saved = humanComposers.value[composerKey], failed = saved?.failedSend;
-    if (!saved || !failed || failed.settled || humanSendSlot(composerKey, failed) !== fingerprint) return false;
-    completePending(scope, fingerprint);
+    if (!saved || !failed || failed.settled || humanSendSlot(composerKey, failed) !== fingerprint
+        || (failed.commandKey && failed.commandKey !== key)) return false;
+    if (scope.pending.get(fingerprint) === key) completePending(scope, fingerprint);
     saveComposer(composerKey, { ...saved, failedSend: { ...failed, settled: true, retryable: false, kind: 'failed', replyRejected: true } });
     return true;
   }
   async function checkHumanReply(id: string, failed: NonNullable<HumanComposer["failedSend"]>, active: () => boolean): Promise<{ status: 'sent' | 'rejected'; key: string } | null> {
     const scope = await commandScope();
     const fingerprint = humanSendSlot(`conversation:${id}`, failed);
-    const key = scope.pending.get(fingerprint);
+    const pendingKey = scope.pending.get(fingerprint);
+    const key = failed.commandKey ?? pendingKey;
     if (!active() || !key || scope.inFlight.has(fingerprint)) return null;
     const result = await supportApi.commandResult(key);
-    if (!active() || !scopeIsCurrent(scope) || scope.pending.get(fingerprint) !== key
+    if (!active() || !scopeIsCurrent(scope) || scope.pending.get(fingerprint) !== pendingKey
         || scope.inFlight.has(fingerprint)) return null;
-    if (matchesReplyRejection(result, id, key) && applyPendingReplyRejection(scope, fingerprint, id)) return { status: 'rejected', key };
+    if (matchesReplyRejection(result, id, key) && applyPendingReplyRejection(scope, fingerprint, id, key)) return { status: 'rejected', key };
     if (result?.kind !== "conversation" || result.conversation.id !== id) return null;
-    applyPendingConversation(scope, fingerprint, result.conversation);
+    applyPendingConversation(scope, fingerprint, key, result.conversation);
     return { status: 'sent', key };
   }
   let realtime: ConversationRealtime | null = null;
@@ -425,6 +484,7 @@ export const useConversations = defineStore("conversations", () => {
     const restored = restorePending(accountKey, runId);
     pendingRunId = runId;
     pendingKeys = restored;
+    migrateLegacyHumanSends();
   }
 
   function scopeIsCurrent(scope: CommandScope): boolean {
@@ -452,6 +512,7 @@ export const useConversations = defineStore("conversations", () => {
       const restored = restorePending(accountKey, runId);
       pendingRunId = runId;
       pendingKeys = restored;
+      migrateLegacyHumanSends();
     }
     return { accountKey, epoch, runId, pending: pendingKeys, inFlight };
   }
@@ -460,6 +521,24 @@ export const useConversations = defineStore("conversations", () => {
     return !isSupportAttachmentNotReady(cause)
       && !isSupportReplyRequired(cause)
       && isConversationDeliveryAmbiguous(cause);
+  }
+
+  function migrateLegacyHumanSends() {
+    let migrated = false;
+    for (const [key, saved] of Object.entries(humanComposers.value)) {
+      const failed = saved.failedSend;
+      if (!failed || failed.settled || failed.expiresAt !== undefined) continue;
+      const commandKey = pendingKeys.get(humanSendSlot(key, failed));
+      const timestamp = Number(commandKey?.match(/^support-conversation-(?:create|reply)-(\d{13})-/)?.[1]);
+      const now = Date.now();
+      const expiresAt = (timestamp > 0 && timestamp <= now ? timestamp : now) + HUMAN_PENDING_TTL_MS;
+      humanComposers.value[key] = { ...saved, failedSend: { ...failed, commandKey, expiresAt } };
+      migrated = true;
+    }
+    if (migrated) {
+      persistHumanOutbox();
+      sweepHumanOutboxes();
+    }
   }
 
   function completePending(scope: CommandScope, fingerprint: string): void {
@@ -516,7 +595,7 @@ export const useConversations = defineStore("conversations", () => {
     return supportApi.replyConversation(current, text, key, attachmentId);
   }
 
-  async function command<T>(intent: string, action: (key: string) => Promise<T>, recover?: (key: string) => Promise<T | null>, expectedAccount?: AccountScope, createPolicy?: { gate: () => boolean; recovery?: { scope: CommandScope; key: string } }, onKey?: (key: string) => void): Promise<T> {
+  async function command<T>(intent: string, action: (key: string) => Promise<T>, recover?: (key: string) => Promise<T | null>, expectedAccount?: AccountScope, policy?: { gate?: () => boolean; recovery?: { scope: CommandScope; key: string }; replyKey?: string }, onKey?: (key: string) => void): Promise<T> {
     const scope = await commandScope();
     if (expectedAccount && (expectedAccount.epoch !== scope.epoch || expectedAccount.accountKey !== scope.accountKey)) {
       throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
@@ -525,14 +604,12 @@ export const useConversations = defineStore("conversations", () => {
     if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     // Recovery authorization is tied to the final send scope and original key.
     // A new run, retired slot or changed key must never fall through to minting.
-    if (createPolicy?.recovery) {
-      const original = createPolicy.recovery;
-      if (!scopeIsCurrent(original.scope) || original.scope.runId !== scope.runId
-          || original.scope.pending !== scope.pending || original.scope.inFlight !== scope.inFlight
-          || scope.pending.get(fingerprint) !== original.key) {
-        throw new Error("SUPPORT_PENDING_RECOVERY_SCOPE_CHANGED");
-      }
-    } else if (createPolicy && !createPolicy.gate()) {
+    const recovery = policy?.recovery;
+    const originalKey = recovery?.key ?? policy?.replyKey;
+    if ((recovery && !scopeIsCurrent(recovery.scope)) || (originalKey && scope.pending.get(fingerprint) !== originalKey)) {
+      throw new Error("SUPPORT_PENDING_RECOVERY_SCOPE_CHANGED");
+    }
+    if (!originalKey && policy?.gate && !policy.gate()) {
       throw new Error("SUPPORT_CATEGORY_UNAVAILABLE");
     }
     const running = scope.inFlight.get(fingerprint) as Promise<T> | undefined;
@@ -541,7 +618,7 @@ export const useConversations = defineStore("conversations", () => {
       if (originalKey) onKey?.(originalKey);
       return running;
     }
-    const key = createPolicy?.recovery?.key ?? scope.pending.get(fingerprint) ?? mutationKey(intent);
+    const key = originalKey ?? scope.pending.get(fingerprint) ?? mutationKey(intent);
     const humanSend = intent.startsWith('conversation-create:') || intent.startsWith('conversation-reply:');
     const userClear = intent.startsWith('conversation-user-clear:');
     const echoedOutcome = () => humanSend && scopeIsCurrent(scope)
@@ -556,9 +633,9 @@ export const useConversations = defineStore("conversations", () => {
     const promise = Promise.resolve().then(async () => {
       try {
         if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
-        if (createPolicy?.recovery && scope.pending.get(fingerprint) !== createPolicy.recovery.key)
+        if (originalKey && scope.pending.get(fingerprint) !== originalKey)
           throw new Error("SUPPORT_PENDING_RECOVERY_SCOPE_CHANGED");
-        if (createPolicy && !createPolicy.recovery && !createPolicy.gate())
+        if (!originalKey && policy?.gate && !policy.gate())
           throw new Error("SUPPORT_CATEGORY_UNAVAILABLE");
         const operation = action(key);
         const result = await (humanSend ? awaitMessageOutcome(operation, MESSAGE_ACK_TIMEOUT_MS) : operation);
@@ -631,9 +708,10 @@ export const useConversations = defineStore("conversations", () => {
       const intent = composerKey.startsWith('start:')
         ? `conversation-create:${composerKey.slice(6)}:${failed.attachmentId ?? 'text'}:${failed.text.trim()}`
         : `conversation-reply:${conversation.id}:${failed.attachmentId ?? 'text'}:${failed.text.trim()}`;
-      const fingerprint = opaqueSupportIntentSlot(intent), key = scope.pending.get(fingerprint);
+      const fingerprint = opaqueSupportIntentSlot(intent), pendingKey = scope.pending.get(fingerprint);
+      const key = failed.commandKey ?? pendingKey;
       if (!key || !echoed.has(key)) continue;
-      completePending(scope, fingerprint);
+      if (pendingKey === key) completePending(scope, fingerprint);
       saveComposer(composerKey, { ...saved, failedSend: null, recoveredId: composerKey.startsWith('start:') ? conversation.id : undefined });
     }
   }
@@ -827,12 +905,13 @@ export const useConversations = defineStore("conversations", () => {
     }
   }
 
-  function applyPendingConversation(scope: CommandScope, fingerprint: string, conversation: Conversation): void {
+  function applyPendingConversation(scope: CommandScope, fingerprint: string, key: string, conversation: Conversation): void {
     replace(conversation);
-    if (scope.pending.has(fingerprint)) completePending(scope, fingerprint);
+    if (scope.pending.get(fingerprint) === key) completePending(scope, fingerprint);
     for (const [composerKey, saved] of Object.entries(humanComposers.value)) {
       const failed = saved.failedSend;
-      if (!failed || failed.settled || humanSendSlot(composerKey, failed) !== fingerprint) continue;
+      if (!failed || failed.settled || humanSendSlot(composerKey, failed) !== fingerprint
+          || (failed.commandKey && failed.commandKey !== key)) continue;
       saveComposer(composerKey, { ...saved, failedSend: null, recoveredId: composerKey.startsWith("start:") ? conversation.id : undefined });
     }
   }
@@ -841,19 +920,18 @@ export const useConversations = defineStore("conversations", () => {
     const scope: CommandScope = { accountKey: accountKeyValue, epoch: accountEpoch, runId: pendingRunId, pending: pendingKeys, inFlight };
     for (const [fingerprint, key] of [...scope.pending]) {
       if (!scopeIsCurrent(scope)) return;
-      if (scope.inFlight.has(fingerprint)) continue;
+      if (scope.inFlight.has(fingerprint) || scope.pending.get(fingerprint) !== key) continue;
       try {
         const result = await supportApi.commandResult(key);
         if (!scopeIsCurrent(scope)) return;
-        if (scope.inFlight.has(fingerprint)) continue;
+        if (scope.inFlight.has(fingerprint) || scope.pending.get(fingerprint) !== key) continue;
         if (!result) continue;
         if (result.kind === 'conversation-user-clear') {
           applyUserClear(result.clearance); completePending(scope, fingerprint); continue;
         }
-        if (result.kind === "conversation") applyPendingConversation(scope, fingerprint, result.conversation);
-        if (result.kind === 'reply-rejected' && scope.pending.get(fingerprint) === key
-            && matchesReplyRejection(result, result.conversationNo, key))
-          applyPendingReplyRejection(scope, fingerprint, result.conversationNo);
+        if (result.kind === "conversation") applyPendingConversation(scope, fingerprint, key, result.conversation);
+        if (result.kind === 'reply-rejected' && matchesReplyRejection(result, result.conversationNo, key))
+          applyPendingReplyRejection(scope, fingerprint, result.conversationNo, key);
       } catch (cause) {
         // A recorded refusal is terminal; other read failures still leave the original command unknown.
         if (isConversationUserClearRejected(cause) && scopeIsCurrent(scope)
@@ -868,12 +946,13 @@ export const useConversations = defineStore("conversations", () => {
     if (!accountScopeIsCurrent(account)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     return pendingKeys.has(opaqueSupportIntentSlot(`conversation-create:${type}:${attachmentId ?? "text"}:${openingText.trim()}`));
   }
-  async function startConversation(type: Exclude<ConversationType, "ai">, openingText: string, attachmentId?: string, onDispatch?: (key: string) => void): Promise<string> {
+  async function startConversation(type: Exclude<ConversationType, "ai">, openingText: string, attachmentId?: string, onDispatch?: (key: string) => void, expectedKey?: string): Promise<string> {
     const account = { epoch: accountEpoch, accountKey: accountKeyValue };
     const intent = `conversation-create:${type}:${attachmentId ?? "text"}:${openingText.trim()}`;
     const originalScope = remoteApiEnabled ? await commandScope() : undefined;
     if (!accountScopeIsCurrent(account)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
     const originalKey = originalScope?.pending.get(opaqueSupportIntentSlot(intent));
+    if (expectedKey && expectedKey !== originalKey) throw new Error("SUPPORT_PENDING_RECOVERY_SCOPE_CHANGED");
     const createPolicy = { gate: () => !remoteApiEnabled || categoryEnabled(type),
       recovery: originalScope && originalKey ? { scope: originalScope, key: originalKey } : undefined };
     if (!createPolicy.recovery && !createPolicy.gate()) throw new Error("SUPPORT_CATEGORY_UNAVAILABLE");
@@ -897,7 +976,7 @@ export const useConversations = defineStore("conversations", () => {
     return startConversation("support", openingText);
   }
 
-  async function sendUser(id: string, text: string, attachmentId?: string, onDispatch?: (key: string) => void): Promise<boolean> {
+  async function sendUser(id: string, text: string, attachmentId?: string, onDispatch?: (key: string) => void, originalKey?: string): Promise<boolean> {
     const account = { epoch: accountEpoch, accountKey: accountKeyValue };
     const current = get(id) ?? await open(id);
     if (!accountScopeIsCurrent(account)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
@@ -909,7 +988,7 @@ export const useConversations = defineStore("conversations", () => {
           const result = await supportApi.commandResult(key);
           if (matchesReplyRejection(result, id, key)) throw new SupportReplyRejected(result.businessCode, result.businessReason);
           return result?.kind === "conversation" ? result.conversation : null;
-        }, account, undefined, onDispatch);
+        }, account, { replyKey: originalKey }, onDispatch);
     } catch (cause) {
       if (accountScopeIsCurrent(account) && isConversationPeerChanged(cause)) {
         peerChangedReadbacks.value[id] = reconcile(id, account);
@@ -944,24 +1023,28 @@ export const useConversations = defineStore("conversations", () => {
   }
 
   function bindAccount(accountKey: string) {
-    const suspended = suspendedHumanAccount;
-    if (accountKeyValue !== accountKey && accountKeyValue.startsWith("user:") && suspended !== accountKeyValue)
-      discardAccountOutbox(accountKeyValue);
-    if (accountKey.startsWith("user:") && suspended && suspended !== accountKey) {
-      discardAccountOutbox(suspended);
-      removeHumanCache(HUMAN_REAUTH_ACCOUNT);
-      suspendedHumanAccount = null;
-    }
+    if (accountKeyValue !== accountKey && accountKeyValue.startsWith("user:")) forgetHumanDrafts(accountKeyValue);
     reset();
     accountKeyValue = accountKey;
     humanWritesBlocked = false;
-    humanComposers.value = discardedHumanAccounts.has(accountKey) ? {} : restoreHumanOutbox(accountKey);
+    if (remoteApiEnabled) {
+      sweepHumanOutboxes();
+      const drafts = readHumanOutbox(accountKey);
+      const retained = readHumanOutbox(accountKey, true);
+      for (const [key, saved] of Object.entries(retained)) {
+        retained[key] = { ...saved, text: drafts[key]?.text ?? "" };
+      }
+      humanComposers.value = { ...drafts, ...retained };
+    }
     pendingRunId = remoteApiEnabled ? "unverified" : "mock";
     // 启动预热是 fire-and-forget:权威不可达自吞(resilience 门)。pendingRunId 留
     // "unverified",首次 refresh() 重走 preparePendingRun 并把失败落 error 态;
     // preparePendingRun 本身保持 reject 契约(refresh/reconcile 的 await 消费方靠它报错)。
-    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
+    const account = { accountKey, epoch: accountEpoch };
+    if (remoteApiEnabled) void preparePendingRun().then(() => {
+      if (accountScopeIsCurrent(account)) return reconcilePending();
+    }).catch(() => undefined);
   }
 
-  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,hasPendingHumanSend,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
+  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,pendingHumanSendKey,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
 });
