@@ -6,7 +6,7 @@ import { useScrollGrowProgress } from "./use-scroll-grow-progress";
 // uni-app stores a child component's page hooks on the page instance and never removes them. Outside a tab host,
 // children share one visibility flag per page, so remounting stage components cannot pile up callbacks.
 const pageVisibility = new WeakMap<object, Ref<boolean>>();
-function usePageVisible(): Ref<boolean> {
+export function usePageVisible(): Ref<boolean> {
   if (inject(TAB_LIFECYCLE, null)) {
     // The tab host drops these hooks when the child unmounts.
     const visible = ref(true);

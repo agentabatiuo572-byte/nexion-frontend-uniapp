@@ -35,66 +35,34 @@
 </template>
 
 <script setup lang="ts">
-import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { refreshHomeDisplay, useHomeDisplay } from "@/composables/use-home-display";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
-import { apiClient } from "@/api/runtime";
-import { createHomeDisplayPlayer, parseHomeDisplayBatch, type homeDisplayAt } from "@/lib/home-display-player";
-import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import { remoteApiEnabled } from "@/api/runtime";
+import { computed } from "vue";
 import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 
 const t = useT();
 const app = useApp();
 const cfg = useConfig();
-const displayValue = ref<ReturnType<typeof homeDisplayAt>>(null);
-const batchLoading = ref(false);
-const batchFailed = ref(false);
-const player = createHomeDisplayPlayer({
-  fetch: async () => {
-    try {
-      const batch = parseHomeDisplayBatch(await apiClient.request({ path: "/api/config/home-display", authenticated: false }));
-      batchFailed.value = false;
-      return batch;
-    } catch (cause) { batchFailed.value = true; throw cause; }
-  },
-  now: () => typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now(),
-  render: next => { displayValue.value = next; },
-  onLoading: loading => { batchLoading.value = loading; },
-});
-let visible = false;
-useAutoRecovery({ failed: () => batchFailed.value && !batchLoading.value, retry: () => player.refresh() });
-useAutoRecovery({ failed: () => cfg.configStatus === "failed", retry: () => cfg.load() });
-function syncVisibility() {
-  if (visible && (typeof document === "undefined" || !document.hidden)) player.start();
-  else player.stop();
-}
-onShow(() => { visible = true; syncVisibility(); });
-onHide(() => { visible = false; syncVisibility(); });
-onMounted(() => { if (typeof document !== "undefined") document.addEventListener("visibilitychange", syncVisibility); });
-onUnmounted(() => {
-  player.stop();
-  if (typeof document !== "undefined") document.removeEventListener("visibilitychange", syncVisibility);
-});
-const devicesBad = computed(() => cfg.syncFailed || !Number.isSafeInteger(cfg.config.networkPulse?.onlineDevices) || cfg.config.networkPulse!.onlineDevices! < 0);
-const fleetBad = computed(() => displayValue.value === null);
-const gridStatusText = computed(() => cfg.loading || batchLoading.value
-  ? t.value.home.networkStatUpdating
-  : t.value.uiChrome.unavailable);
+const displayValue = useHomeDisplay();
 const perSecText = computed(() => {
   const value = displayValue.value?.paidPerSec;
   if (value == null) return "—";
   return `+${formatAmount(value)}/sec`;
 });
-defineExpose({ refresh: () => player.refresh() });
+defineExpose({ refresh: refreshHomeDisplay });
 
 const gridClients = computed(() => (app.homeTruth?.onGrid.clients ?? [])
   .map((client) => ({ ...client, color: "var(--v5-brand)" })));
-// Whole number with the digit roll (BUG-531); still the config snapshot, not the per-second batch above.
-const activeDevices = computed(() => devicesBad.value ? null : cfg.config.networkPulse!.onlineDevices!);
+const activeDevices = computed(() => {
+  if (remoteApiEnabled) return displayValue.value?.online ?? null;
+  const online = cfg.config.networkPulse?.onlineDevices;
+  return !cfg.syncFailed && online != null && Number.isSafeInteger(online) && online >= 0 ? online : null;
+});
 
 function companyInitial(value: string | null) {
   return value?.trim().charAt(0).toUpperCase() || "—";

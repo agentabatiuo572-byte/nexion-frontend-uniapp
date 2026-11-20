@@ -1,3 +1,4 @@
+import { homeDisplay } from "@/composables/use-home-display";
 import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
@@ -572,23 +573,9 @@ export const useApp = defineStore("app", () => {
       { immediate: true },
     );
   }
-  /**
-   * 「N 个全球作业进行中」: real active jobs + the H9 published `activeJobsBase` (real only when unpublished).
-   * The Earn task centre and the globe page both show this number; null = unavailable.
-   * The Home overview reports `activeJobs` as `null` when the period has no
-   * settled receipts — "no value" — while the fleet snapshot defines the same
-   * day's realized total as a genuine 0. When that snapshot proves today
-   * realized exactly 0 USDT and 0 NEX, the null job count is the confirmed 0
-   * rather than unknown, so the header agrees with the device cards. #128
-   */
-  const activeJobsDisplay = computed<number | null>(() => {
-    const base = cfg.config.publicStats.activeJobsBase ?? 0;
-    if (!remoteApiEnabled) return global.value.activeJobs + base;
-    const real = homeTruth.value?.onGrid.activeJobs ?? null;
-    if (real !== null) return Number.isSafeInteger(real + base) ? real + base : null;
-    const fleet = remoteRealizedToday.value;
-    return fleet && fleet.usdt === 0 && fleet.nex === 0 ? base : null;
-  });
+  const activeJobsDisplay = computed<number | null>(() => remoteApiEnabled
+    ? homeDisplay.value?.activeJobs ?? null
+    : global.value.activeJobs + (cfg.config.publicStats.activeJobsBase ?? 0));
   /**
    * 🔴 提现单**列表**是源真理(与真后端 GET /api/withdrawals 同构)。
    * 此前只存最新一条,第二笔建单会把第一笔整个顶掉 —— 钱已扣、单据不可达、

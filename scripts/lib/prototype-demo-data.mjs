@@ -2,7 +2,7 @@
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { createHash } from 'node:crypto';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
-import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
 import { learningDemo } from './prototype-demo-learning.mjs';
@@ -55,7 +55,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'published',homeDisplayState:'paused',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   savedAttemptState: savedAttemptOptions,
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -95,7 +95,7 @@ export const demoOptions = {
   promotionRewardType:[['reward','首购 / 复购发 UVT'],['discount','首购 / 复购为订单立减'],['gift-discount','购机赠礼为订单立减']],
   promotionRewardState:[['PENDING','待处理'],['READY','待发放'],['ISSUED','已发放'],
     ['RETRYABLE_FAILED','可重试失败'],['CANCELLED','已取消'],['MANUAL_REVIEW','人工审核中']],
-  jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
+  jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 560']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
   fleetState:[['normal','默认设备'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款读取失败（503，保留原单）'],['intent-missing','确证没有原付款单（404，结束查询）'],['remote-in-progress','别处发起的进行中付款（本机无记录）'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['late','宽限结束后到账·订单已取消（示例 001 剩 1 分钟）'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','后台关闭 ERC20'],['usdt-off','后台关闭 USDT 两个网络'],['low-balance','钱包余额不足（820.64 USDT）'],['reward-clawback-debt','奖励扣回·USDT 欠款（−12.123456）']],
@@ -468,18 +468,6 @@ function demoLiveActivity(product,now) {
   return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:Math.min(sales24h,Math.max(1,sales30m))};
 }
 
-function demoHomeDisplay(state, now) {
-  if (state.homeDisplayState !== 'growth') {
-    return { enabled:false, startAt:demoStartedAt, serverNow:now, validUntil:now+60_000, sequence:1,
-      online:[800], paidCents:[300000] };
-  }
-  // Optional growth preview: one sample per second for two minutes.
-  const startAt=Math.floor(now/1000)*1000, elapsed=Math.max(0,Math.floor((startAt-demoStartedAt)/1000));
-  const seconds=Array.from({length:121},(_,offset)=>elapsed+offset);
-  return { enabled:true, startAt, serverNow:now, validUntil:startAt+120_000, sequence:elapsed,
-    online:seconds.map(t=>2968+Math.floor(t/45)), paidCents:seconds.map(t=>128465050+t*160+Math.floor(t/3)*29) };
-}
-
 /** Mutable state belongs only to the loopback demonstration server. */
 export function demoFixture(url,locale,state,request,now=Date.now()) {
   state.previewFactsAt??=demoStartedAt;
@@ -490,7 +478,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if (pathname === '/api/config/phone-tiers') return { tiers: [1,2,3,4,5].map(tier => ({
     tier, name:`Tier ${tier}`, baseRateUsdt:[.02,.04,.06,.09,.12][tier-1], baseRateNex:tier*.1, effectiveAt:iso,
   })), sources:['Local prototype demo'] };
-  if (pathname === '/api/config/home-display' && !empty) return demoHomeDisplay(state, now);
+  if (pathname === '/api/config/home-display') return previewHomeDisplay(state, now);
   const socialProduct = pathname.match(/^\/api\/storefront\/products\/([^/]+)\/social-proof$/);
   if (socialProduct) {
     const product = products.find(item => item.id === decodeURIComponent(socialProduct[1]));
@@ -502,7 +490,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   if(pathname==='/api/app/network/device-rank' && state.deviceRankState==='configured') {
-    return reviewFixture(url,locale,state,request,demoHomeDisplay(state,now).online[0]);
+    return reviewFixture(url,locale,state,request,previewHomeDisplay(state,now).online[0]);
   }
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
@@ -554,16 +542,16 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     config.featureFlags.stakingVisible=false;
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
-    const growth=state.homeDisplayState==='growth';
+    const batch=previewHomeDisplay(state,now);
     Object.assign(config.publicStats,{
-      registeredUsersBase:growth?12480:2000,registeredUsersAnchorAt:demoStartedAt,
-      registeredUsersTickIntervalSec:growth?60:300,registeredUsersTickStepMin:growth?3:0,registeredUsersTickStepMax:growth?10:2,
-      virtualUserCount:0,activeJobsBase:state.jobsBaseState==='published'?1000:null,
+      registeredUsersBase:2000,registeredUsersAnchorAt:demoStartedAt,
+      registeredUsersTickIntervalSec:300,registeredUsersTickStepMin:0,registeredUsersTickStepMax:2,
+      virtualUserCount:0,activeJobsBase:previewActiveJobsBase(state),
     });
-    if(!empty)config.publicStats.networkPulse={
-      registeredUsers:derivedRegisteredUsers(config.publicStats,now),onlineDevices:demoHomeDisplay(state,now).online[0],
+    config.publicStats.networkPulse={
+      registeredUsers:derivedRegisteredUsers(config.publicStats,now),onlineDevices:batch.online[0],activeJobs:batch.activeJobs[0],
     };
-    // Globe split and drift; totals come from networkPulse.onlineDevices and the task-centre job count.
+    // Globe split and drift; the totals come from the shared home-display batch.
     const globeCenters=[['sg',236000,18,12.5],['jp',253000,22,13],['vn',163000,26,8.5],['uk',249000,16,12],['fr',208000,20,10],['de',217000,14,11],['us-ny',316000,24,17],['us-sj',284000,17,16]];
     // Old shape: nodes as weights plus the retired jitter/ratio fields. B22 shape: sharePct only.
     config.publicStats.globeDisplay=state.globeShareState==='nodes'
@@ -573,7 +561,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     // Verified aggregates feed the trust centre's platform figures; the empty fixture has none.
     const aggregate=(value,kind)=>({value,definition:'Preview figure',kind});
     config.publicStats.verified=empty?null:{activeAccounts:aggregate(8642,'COUNT'),registeredAccounts:aggregate(12480,'COUNT'),installedDevices:aggregate(3315,'COUNT'),onlineDevices:aggregate(2968,'COUNT'),completedPayoutUsdt:aggregate(1284650.5,'SUM'),capturedAt:new Date(demoStartedAt).toISOString()};
-    if(empty){delete config.publicStats.registeredUsersBase;config.publicStats.networkPulse=null;}
     return withDemoShareChannels(config,state);
   }
   // Every new account gets the newcomer gift, so the register subtitle shows it even without a code.
@@ -612,8 +599,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       const devices=demoFleetFacts(url,locale,state).devices;
       const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
       overview.doTheMath=previewDoTheMath(devices,products,product=>demoSkuPurchaseRules(state,product,points,now).eligible);
-      overview.onGrid={clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}],activeDevices:3206,activeJobs:128,perSecUsdt:.028};
+      overview.onGrid={clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}],activeDevices:3206,perSecUsdt:.028};
     }
+    overview.onGrid.activeJobs=previewHomeDisplay(state,now).activeJobs[0];
     return overview;
   }
   if(pathname==='/api/store/bundle-discount')return {source:'server',serverCanonical:true,policyVersion:1,tiers:[{minItems:2,rate:.04},{minItems:3,rate:.07},{minItems:4,rate:.11}]};

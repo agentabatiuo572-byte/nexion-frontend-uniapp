@@ -85,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+import { useHomeDisplay } from "@/composables/use-home-display";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatTaskReward } from "@/lib/task-reward-display";
 import { navTo } from "@/lib/route";
@@ -127,6 +128,7 @@ onHide(() => {
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
 });
+useHomeDisplay(() => remoteApiEnabled);
 const activeJobsText = computed(() => app.activeJobsDisplay?.toLocaleString() ?? "—");
 function receiptFor(id: string): Receipt | undefined {
   return receipts?.byId(id);

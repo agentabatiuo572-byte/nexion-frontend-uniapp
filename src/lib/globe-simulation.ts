@@ -72,25 +72,35 @@ function drift(seed: number, step: number): number {
   return noise(seed, slot) * (1 - weight) + noise(seed, slot + 1) * weight;
 }
 // Largest-remainder rounding: the integer parts always add up exactly to `total`.
-function splitByWeights(total: number, weights: number[]): number[] {
+function splitByWeights(total: number, weights: number[], increasing: boolean): number[] {
   const sum = weights.reduce((acc, weight) => acc + weight, 0);
   const exact = weights.map(weight => total * weight / sum);
   const parts = exact.map(Math.floor);
+  const remaining = total - parts.reduce((acc, part) => acc + part, 0);
+  if (increasing) {
+    // Highest averages assign each additional unit without taking one away from another center.
+    for (let left = remaining; left > 0; left--) {
+      const center = weights.reduce((best, weight, i) =>
+        weight / (parts[i] + 1) > weights[best] / (parts[best] + 1) ? i : best, 0);
+      parts[center] += 1;
+    }
+    return parts;
+  }
   const order = exact.map((_, i) => i).sort((a, b) => (exact[b] - parts[b]) - (exact[a] - parts[a]) || a - b);
-  for (let k = 0, left = total - parts.reduce((acc, part) => acc + part, 0); k < left; k += 1) parts[order[k]] += 1;
+  for (let k = 0; k < remaining; k += 1) parts[order[k]] += 1;
   return parts;
 }
 /**
  * Splits the home online-devices figure and the Earn task centre's job count across the centers.
  * The page shows the totals itself; a null total leaves only that metric's per-center values as placeholders.
  */
-export function globeSimulation(step: number, config: GlobeDisplayConfig | undefined, onlineTotal: number | null, jobsTotal: number | null) {
+export function globeSimulation(step: number, config: GlobeDisplayConfig | undefined, onlineTotal: number | null, jobsTotal: number | null, increasing = false) {
   if (!config) return null;
   const tick = Number.isFinite(step) ? Math.max(0, Math.floor(step)) : 0;
   const configured = GLOBE_CENTERS.map(center => config.centers.find(row => row.id === center.id)!);
   const weights = configured.map(row => row.weight);
-  const online = onlineTotal === null ? null : splitByWeights(onlineTotal, weights);
-  const jobs = jobsTotal === null ? null : splitByWeights(jobsTotal, weights);
+  const online = onlineTotal === null ? null : splitByWeights(onlineTotal, weights, increasing);
+  const jobs = jobsTotal === null ? null : splitByWeights(jobsTotal, weights, increasing);
   return GLOBE_CENTERS.map((center, i) => {
     const seed = (i + 1) * 101;
     const activeJobs = jobs?.[i] ?? null;

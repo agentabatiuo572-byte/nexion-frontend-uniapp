@@ -14,35 +14,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from "vue";
-import { apiClient } from "@/api/runtime";
+import { useHomeDisplay } from "@/composables/use-home-display";
 import { useT } from "@/i18n/use-t";
 import { formatGroupedAmount } from "@/lib/amount-display";
-import { createHomeDisplayPlayer, parseHomeDisplayBatch } from "@/lib/home-display-player";
 
 const props = defineProps<{ active: boolean }>();
 const t = useT();
-const value = ref<{ online: number; paid: number } | null>(null);
-const player = createHomeDisplayPlayer({
-  fetch: async () => parseHomeDisplayBatch(await apiClient.request({ path: "/api/config/home-display", authenticated: false })),
-  now: () => typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now(),
-  render: next => {
-    if (next?.online !== value.value?.online || next?.paid !== value.value?.paid) value.value = next;
-  },
-});
-function syncVisibility() {
-  if (props.active && (typeof document === "undefined" || !document.hidden)) player.start();
-  else player.stop();
-}
-watch(() => props.active, syncVisibility);
-onMounted(() => {
-  syncVisibility();
-  if (typeof document !== "undefined") document.addEventListener("visibilitychange", syncVisibility);
-});
-onUnmounted(() => {
-  player.stop();
-  if (typeof document !== "undefined") document.removeEventListener("visibilitychange", syncVisibility);
-});
+const value = useHomeDisplay(() => props.active);
 </script>
 
 <style scoped>
