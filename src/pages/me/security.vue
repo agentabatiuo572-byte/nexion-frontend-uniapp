@@ -1447,6 +1447,8 @@ const dangerLabelStyle: CSSProperties = {
 .security-reason-input[aria-invalid="true"] { box-shadow:inset 0 0 0 1px var(--v5-danger); }
 .security-reason-input:focus-within { outline:2px solid var(--v5-brand); outline-offset:2px; }
 .security-reason-ph { color:var(--v5-ink-4); }
+/* uni's textarea placeholder breaks anywhere; keep whole words (decision 8). */
+.security-reason-input :deep(.uni-textarea-placeholder) { word-break:normal; overflow-wrap:break-word; }
 .security-reason-sent__text { font:400 14px/20px var(--font-v5); color:var(--v5-ink); white-space:pre-wrap; overflow-wrap:anywhere; }
 .security-reason-sent__text--empty { color:var(--v5-ink-3); }
 .security-reason-hint { font-size:12px; line-height:16px; color:var(--v5-ink-3); }

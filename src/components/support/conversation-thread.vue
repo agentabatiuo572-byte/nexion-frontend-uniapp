@@ -635,11 +635,15 @@ function scroller(): HTMLElement | undefined {
 function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: number } }) {
   if (stopPreviewPreparation) { nativePreviewReading = null; clearPreviewRowHeights(); }
   pendingTailGeneration = undefined;
+  // The delayed echo of our own pin (same scrollTop) can arrive after late content has grown the list;
+  // measuring it against the new height would wrongly mark the reader as having left the tail.
+  const echo = event.detail.scrollTop === lastScrollTop;
   // Observe gestures without turning delayed App scroll events back into scroll commands.
   if (pendingPosition) pendingPosition.top += event.detail.scrollTop - lastScrollTop;
   lastScrollTop = event.detail.scrollTop;
   const node = scroller();
-  if (node) followingTail = node.scrollHeight - node.clientHeight - node.scrollTop <= 24;
+  if (echo) { /* keep followingTail */ }
+  else if (node) followingTail = node.scrollHeight - node.clientHeight - node.scrollTop <= 24;
   else if (event.detail.scrollHeight !== undefined && measuredViewportHeight > 0)
     followingTail = event.detail.scrollHeight - measuredViewportHeight - lastScrollTop <= 24;
   if (threadVisible.value && nativePreviewReading?.returning) {
@@ -993,6 +997,20 @@ onMounted(() => {
 onShow(() => { void nextTick(scheduleBubblePositions); });
 onHide(cancelBubblePositions);
 onScopeDispose(() => { bubbleMeasurementDisposed = true; cancelBubblePositions(); bubbleResizeObserver?.disconnect(); });
+// The first pin to the newest message runs before late content (images, history rows, fonts) has its
+// final height, which left the last message under the composer. While the reader is at the tail,
+// keep it pinned whenever the content grows; a reader who scrolled up is left where they are.
+let tailResizeObserver: ResizeObserver | undefined;
+onMounted(() => {
+  const content = listRoot()?.querySelector?.('.nx-conv-content');
+  if (typeof ResizeObserver === 'undefined' || !content) return;
+  tailResizeObserver = new ResizeObserver(() => {
+    if (followingTail && threadVisible.value && !pendingPosition && !preparedHistory) scrollToEnd();
+  });
+  // border-box: the top inset and composer space are padding on this element, and they settle late too.
+  tailResizeObserver.observe(content, { box: 'border-box' });
+});
+onScopeDispose(() => tailResizeObserver?.disconnect());
 
 function bubbleStyle(m: ThreadMsg): CSSProperties {
   const position = bubblePositions.value[m.id] ?? 0.5;

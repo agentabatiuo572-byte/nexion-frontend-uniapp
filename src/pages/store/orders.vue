@@ -35,12 +35,14 @@
           :key="o.id"
           class="order-card"
           :class="{ 'order-card--pending nx-tint': o.kind === 'commerce' && o.status === 'placed' }"
-          role="button"
-          tabindex="0"
-          :aria-label="`${commerceOrderTitle(o,locale.code)} ${o.id}${pendingCloseMinutes(o) ? ' · ' + fmt(t.orders.pendingCloseIn, { min: pendingCloseMinutes(o)! }) : ''}`"
-          @click="goOrder(o)"
+          :role="o.kind === 'genesis' ? undefined : 'button'"
+          :tabindex="o.kind === 'genesis' ? undefined : 0"
+          :aria-label="o.kind === 'genesis' ? undefined : orderCardLabel(o)"
+          @click="o.kind !== 'genesis' && goOrder(o)"
         >
-          <view class="order-card__row">
+          <!-- A Genesis card opens the holdings overview, where this order number is not shown: only its main row
+               opens it, and the order number with its copy button sits below, outside that tap area. -->
+          <view class="order-card__row" :role="o.kind === 'genesis' ? 'button' : undefined" :tabindex="o.kind === 'genesis' ? 0 : undefined" :aria-label="o.kind === 'genesis' ? orderCardLabel(o) : undefined" @click="o.kind === 'genesis' && goOrder(o)">
             <LoopScope class="order-card__thumb" aria-hidden="true">
               <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="orderImage(o)" :scope-key="o.id" />
               <image v-else class="order-card__image nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
@@ -50,7 +52,7 @@
                 <text class="order-card__title">{{ commerceOrderTitle(o,locale.code) }}</text>
                 <NxTag :tone="badge(o.status).tone" :label="badge(o.status).label" />
               </view>
-              <view class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="o.id" :label="t.orders.orderId" :copyable="false" /></view>
+              <view v-if="o.kind !== 'genesis'" class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="o.id" :label="t.orders.orderId" :copyable="false" /></view>
               <text v-if="o.meta" class="order-card__meta">{{ o.meta }}</text>
               <view class="order-card__bottom">
                 <text class="order-card__date">{{ dateText(o.placedAt) }}</text>
@@ -58,6 +60,7 @@
               </view>
             </view>
           </view>
+          <view v-if="o.kind === 'genesis'" class="order-card__meta order-card__code order-card__code--copy"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="o.id" :label="t.orders.orderId" /></view>
           <view v-if="o.kind === 'commerce' && o.status === 'placed'" class="order-card__pending">
             <view v-if="pendingCloseMinutes(o)" class="order-card__countdown">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
@@ -397,6 +400,9 @@ function dateText(ts: number): string {
 function goStore() {
   navTo("/store");
 }
+function orderCardLabel(o: OrderListItem): string {
+  return `${commerceOrderTitle(o, locale.code)} ${o.id}${pendingCloseMinutes(o) ? " · " + fmt(t.value.orders.pendingCloseIn, { min: pendingCloseMinutes(o)! }) : ""}`;
+}
 // The card always opens the detail; only the pending row's button asks it to open payment.
 function goOrder(order: OrderListItem) {
   navTo(order.kind === "genesis" ? "/pages/genesis/holder" : `/pages/store/order-detail?id=${encodeURIComponent(order.id)}&from=${ordersBackHref.value === "/me" ? "me" : "store"}`);
@@ -470,6 +476,10 @@ const browseBtnStyle: CSSProperties = {
 .order-card__code { display: flex; align-items: baseline; gap: 4px; overflow: visible; }
 .order-card__code-label { flex: none; white-space: nowrap; }
 .order-card__code-value { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
+/* Genesis: the order-number row sits under the tappable row, aligned with the text column; its copy button has a 44px target and does not open the card. */
+.order-card__code--copy { align-items: center; min-height: 44px; margin: 4px 0 -10px; padding-left: 86px; cursor: default; }
+.order-card__code--copy :deep(.copy-code-button) { width: 44px; height: 44px; margin: 0 -10px 0 0; }
+.order-card__row[role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
 /* Narrow screens: the amount drops to its own right-aligned line instead of clipping. */
 .order-card__bottom { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: auto; }
 .order-card__date { color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
