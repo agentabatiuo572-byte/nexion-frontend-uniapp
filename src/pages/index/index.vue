@@ -9,7 +9,7 @@
       <!-- #ifdef H5 -->
       <view v-if="auth.isAuthenticated" class="phone-policy-notice" role="status" data-testid="home-app-download-banner">
         <view class="phone-policy-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="2" width="13" height="20" rx="3" /><path d="M12 7v7m-3-3 3 3 3-3M10.5 18.5h3" /></svg></view>
-        <text class="phone-policy-copy">{{ t.phonePolicy.webNotice }}</text>
+        <view class="phone-policy-copy-box"><text class="phone-policy-copy">{{ t.phonePolicy.webNotice }}</text><text class="phone-policy-copy-gauge" aria-hidden="true">{{ t.phonePolicy.webNotice.slice(0, Math.ceil(t.phonePolicy.webNotice.length * 0.56)) }}</text></view>
         <view class="phone-policy-action" role="button" tabindex="0" @click="goAppDownload" @keydown.enter.prevent="goAppDownload" @keydown.space.prevent="goAppDownload"><text class="phone-policy-pill nx-frosted-button">{{ t.phonePolicy.download }}</text></view>
       </view>
       <!-- #endif -->
@@ -138,7 +138,14 @@ watch(() => [app.accountKey, app.accountBindingEpoch, locale.code], () => { fenc
    Long languages drop the button to its own right-aligned line instead of squeezing the message. */
 .phone-policy-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; box-sizing: border-box; min-height: 56px; padding: 5px 6px 5px 12px; border-radius: 18px; background: var(--v5-surface); border: 1px solid var(--v5-border); box-shadow: var(--v5-glass-shadow); }
 .phone-policy-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: color-mix(in srgb, var(--v5-aura-sky) 14%, transparent); color: var(--v5-aura-sky); }
-.phone-policy-copy { flex: 1 1 10em; min-width: 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink); text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
+/* The copy's flex basis is a hidden one-line copy of the message's first 56% (same font size as the copy, so a browser
+   minimum font size cannot inflate it), about half the message's length. The button stays beside
+   the copy while the message fits in about two lines there; a longer message pushes the button to its own line at the
+   bottom right and the copy takes the full width above it. The visible copy adds nothing to the intrinsic width. */
+.phone-policy-copy-box { flex: 1 1 auto; min-width: 0; max-width: calc(100% - 42px); display: grid; }
+.phone-policy-copy-box > .phone-policy-copy, .phone-policy-copy-box > .phone-policy-copy-gauge { grid-area: 1 / 1; }
+.phone-policy-copy { width: 0; min-width: 100%; font: 400 13px/18px var(--font-v5); color: var(--v5-ink); text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
+.phone-policy-copy-gauge { height: 0; overflow: hidden; visibility: hidden; font: 400 13px/0 var(--font-v5); white-space: nowrap; word-break: keep-all; }
 .phone-policy-action { flex: none; display: flex; margin-left: auto; align-items: center; min-height: 44px; border-radius: var(--v5-radius-full); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .phone-policy-action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .phone-policy-pill { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); display: inline-flex; align-items: center; min-height: 32px; box-sizing: border-box; padding: 7px 12px; border-radius: var(--v5-radius-full); font: 500 13px/18px var(--font-v5); white-space: nowrap; transition: transform 200ms ease; }
