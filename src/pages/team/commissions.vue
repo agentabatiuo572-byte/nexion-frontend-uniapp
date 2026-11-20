@@ -66,7 +66,7 @@
                   <text v-if="e.layer" class="font-mono-tabular" :style="e.layer === 1 ? directBadgeStyle : extendedBadgeStyle">{{ e.layer === 1 ? t.commissions.directBadge : t.commissions.extendedBadge }}</text>
                 </view>
                 <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
-                <view v-for="code in eventCodes(e)" :key="code.label" class="commission-code"><text class="commission-code__label">{{ code.label }}</text><NxCodeValue class="commission-code__value" :value="code.value" :label="code.label" :copyable="false" /></view>
+                <view v-for="code in eventCodes(e)" :key="code.label" class="commission-code"><text class="commission-code__label">{{ code.label }}</text><NxCodeValue class="commission-code__value" :value="code.value" :label="code.label" /></view>
               </view>
               <view class="text-right" style="max-width: 48%; overflow-wrap: anywhere">
                 <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>

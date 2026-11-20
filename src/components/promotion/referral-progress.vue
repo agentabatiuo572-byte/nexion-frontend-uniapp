@@ -14,7 +14,7 @@
         </view>
         <view class="referral-art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /><image class="referral-bow" src="/static/img/team-20261025/gift-bow.png" mode="aspectFit" /></view>
       </view>
-      <view class="nx-card-footer referral-actions"><text class="nx-card-footer__note">{{ copy.giftRule }}</text><view class="nx-card-action referral-progress-link" role="button" :tabindex="progressBusy[activity.activityId] || !auth.isAuthenticated ? -1 : 0" :aria-disabled="progressBusy[activity.activityId] || !auth.isAuthenticated" :aria-expanded="expandedActivity===activity.activityId" @click="showProgress(activity.activityId)" @keydown.enter.prevent="!$event.repeat && showProgress(activity.activityId)" @keydown.space.prevent="!$event.repeat && showProgress(activity.activityId)"><text>{{ copy.viewProgress }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view></view>
+      <view class="nx-card-footer referral-actions"><text class="nx-card-footer__note" :style="{ flexBasis: noteBasis(copy.giftRule) }">{{ copy.giftRule }}</text><view class="nx-card-action referral-progress-link" role="button" :tabindex="progressBusy[activity.activityId] || !auth.isAuthenticated ? -1 : 0" :aria-disabled="progressBusy[activity.activityId] || !auth.isAuthenticated" :aria-expanded="expandedActivity===activity.activityId" @click="showProgress(activity.activityId)" @keydown.enter.prevent="!$event.repeat && showProgress(activity.activityId)" @keydown.space.prevent="!$event.repeat && showProgress(activity.activityId)"><text>{{ copy.viewProgress }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view></view>
       <!-- Progress opens as a sheet; expandedActivity stays the single source of which one is open. -->
       <NxSheet :open="expandedActivity===activity.activityId" :title="localized(activity.title,locale.code) || copy.firstPurchase" @close="expandedActivity=null">
         <view class="referral-details">
@@ -135,6 +135,14 @@ useAutoRecovery({
   failed: () => remoteApiEnabled && auth.isAuthenticated && !loading.value && Object.keys(progressErrors.value).some(id => progressErrors.value[id] && !progressBusy.value[id]),
   retry: () => Promise.all(Object.keys(progressErrors.value).filter(id => progressErrors.value[id] && !progressBusy.value[id]).map(id => loadProgress(id, true))),
 });
+// Footer rule (shared-layout-classes.md): the note stays beside the action while it fits in two lines.
+// Its flex-basis is about half its own one-line width (CJK about 1em, other scripts about 0.55em per character),
+// so the row wraps, putting the action at the bottom-right, only when the note would need a third line.
+function noteBasis(text: string): string {
+  let em = 0;
+  for (const ch of text) em += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 1 : 0.55;
+  return `${(em / 2).toFixed(1)}em`;
+}
 </script>
 <style src="./promotion.css"></style>
 <style scoped>
@@ -161,7 +169,7 @@ useAutoRecovery({
 .referral-bow { position: absolute; left: 56%; top: 36%; width: 40%; height: 34%; pointer-events: none; }
 /* Note and action stay side by side while the note fits in two lines; otherwise the note takes the full width and the action drops to the bottom-right. */
 .referral-actions { position: relative; z-index: 1; flex-wrap: wrap; row-gap: 0; }
-.referral-actions > .nx-card-footer__note { flex: 1 1 172px; overflow-wrap: break-word; }
+.referral-actions > .nx-card-footer__note { flex: 1 1 auto; overflow-wrap: break-word; }
 .referral-actions > .referral-progress-link { margin-left: auto; white-space: nowrap; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; }
