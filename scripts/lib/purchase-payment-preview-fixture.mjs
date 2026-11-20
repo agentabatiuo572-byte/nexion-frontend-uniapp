@@ -138,7 +138,17 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (!intent) return null;
     if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
     advance(intent);
-    return {kind,commandKey:key,status:intent.status==='DELIVERED'?'SUCCEEDED':intent.status==='EXPIRED'?'REJECTED':'PROCESSING',canResumeSameKey:false,...(intent.receipt?{receipt:intent.receipt}:{})};
+    const original = {kind, commandKey: key, canResumeSameKey: false};
+    const receipt = intent.receipt;
+    if (receipt != null) {
+      if (typeof receipt !== 'object' || Array.isArray(receipt) || !Object.keys(receipt).length) {
+        return {...original, status: 'INDETERMINATE', message: 'PURCHASE_PAYMENT_RECEIPT_UNAVAILABLE'};
+      }
+      return {...original, status: 'SUCCEEDED', code: 0, receipt};
+    }
+    if (intent.status === 'EXPIRED') return {...original, status: 'REJECTED', message: 'PURCHASE_PAYMENT_EXPIRED'};
+    return {...original, status: intent.status === 'DELIVERED' ? 'INDETERMINATE' : 'PROCESSING',
+      message: intent.reason || 'PURCHASE_PAYMENT_PROCESSING'};
   }
   // The server's own observation of open order payments, so an order read follows them without the App polling.
   function sweep() {
