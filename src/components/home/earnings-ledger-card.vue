@@ -10,10 +10,7 @@
       <view class="earnings-ledger__all" role="link" tabindex="0" data-home-action="earnings-ledger-all" @click="goAll" @keydown.enter.stop.prevent="goAll"><text>{{ t.home.earningsLedgerViewAll }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
     </view>
     <view class="earnings-ledger__card">
-      <view v-for="r in rows" :key="r.id" data-home-ledger-row="true" class="earnings-ledger__row">
-        <text class="earnings-ledger__identity" :title="`${r.model} · ${r.who}`">{{ r.model }}<text class="earnings-ledger__client"> · {{ r.who }}</text></text>
-        <text class="earnings-ledger__amount" :class="{ 'earnings-ledger__amount--masked': visibility.hidden }">{{ visibility.mask(r.amt) }}</text>
-      </view>
+      <NxAmountRow v-for="r in rows" :key="r.id" data-home-ledger-row="true" :title="`${r.model} · ${r.who}`" :name="r.model" :detail="r.who" :amount="visibility.mask(r.amt)" :tone="visibility.hidden ? 'muted' : 'success'" />
       <view v-if="remoteApiEnabled && rows.length === 0" class="earnings-ledger__row">
         <text class="earnings-ledger__status">{{ statusText }}</text>
 
@@ -23,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import NxAmountRow from "@/components/ui/nx-amount-row.vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
@@ -50,10 +48,5 @@ function goAll() {
 [data-theme="light"] .earnings-ledger__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .earnings-ledger__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; box-sizing: content-box; }
 .earnings-ledger__row + .earnings-ledger__row { border-top: 1px solid var(--v5-border); }
-.earnings-ledger__identity { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px/20px var(--font-v5); color: var(--v5-ink); }
-.earnings-ledger__identity :deep(*) { white-space: nowrap; }
-.earnings-ledger__client { font-weight: 400; color: var(--v5-ink-3); }
-.earnings-ledger__amount { font: 500 14px/20px var(--font-metric); color: var(--v5-success-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.earnings-ledger__amount--masked { color: var(--v5-ink-3); }
 .earnings-ledger__status { min-width: 0; font: 400 14px/20px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
 </style>

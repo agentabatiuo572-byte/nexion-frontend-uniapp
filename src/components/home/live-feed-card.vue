@@ -222,6 +222,8 @@ function goAll() {
 .nx-home-live-feed :deep(.nx-feed-title) { overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);white-space:nowrap;text-overflow:ellipsis; }
 .nx-home-live-feed :deep(.nx-feed-sub) { overflow:hidden;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);white-space:nowrap;text-overflow:ellipsis; }
 .nx-home-live-feed :deep(.nx-feed-sub--split) { display:flex;gap:var(--v5-space-1); }
+/* Running rows: the estimate drops to its own line rather than cutting the status. */
+.nx-home-live-feed :deep(.nx-feed-sub--wrap) { flex-wrap:wrap; }
 .nx-home-live-feed :deep(.nx-feed-sub__lead) { overflow:hidden;min-width:0;text-overflow:ellipsis;white-space:nowrap; }
 .nx-home-live-feed :deep(.nx-feed-sub__time) { flex:none; }
 .nx-home-live-feed :deep(.nx-feed-amount) { display:flex;align-items:baseline;gap:9px;font:500 14px/20px var(--font-metric);white-space:nowrap; }
