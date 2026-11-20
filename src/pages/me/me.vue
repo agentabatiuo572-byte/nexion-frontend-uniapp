@@ -629,7 +629,7 @@ async function handleSignOut() {
   if (ok) {
     const logoutAccount = auth.accountId;
     const logoutRevision = sessionVault.revision();
-    conversations.discardHumanOutbox();
+    conversations.suspendForReauthentication();
     // Self sign-out: void in-flight tasks (rollback) + release the shared
     // session record (other tabs see "logged-out") before clearing auth.
     app.interruptAllTasks("logged-out");

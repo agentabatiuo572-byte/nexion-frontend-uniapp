@@ -378,7 +378,7 @@ function billHash(b: Bill): string {
 }
 function billAria(b: Bill): string {
   // 用 billMemo(渲染时翻译)而不是写入时冻结语言的 raw memo —— 切语言后读屏不再旧语直出
-  return `${typeLabel(b.type)} ${billMemo(b)} ${billHash(b)}`;
+  return [typeLabel(b.type), billMemo(b), b.ref].filter(Boolean).join(" ");
 }
 /**
  * 🔴 账单行按条目性质分流(2026-08-02 走查 P0 + 证伪修订):

@@ -55,7 +55,28 @@ export function persistSupportPending(accountKey: string, runId: string, kind: "
   write(storageKey(accountKey, runId, kind), JSON.stringify(Object.fromEntries(values)));
 }
 
-/** Retire only this account's commands when it voluntarily leaves this carrier. */
+/** Retire expired human sends while leaving other commands for the account alone. */
+export function retireSupportPending(accountKey: string, kind: "conversations", expired: Map<string, string | undefined>): void {
+  if (!expired.size) return;
+  const prefix = `${PREFIX}:${accountKey}:`;
+  const suffix = `:${kind}`;
+  const keys = typeof plus === "undefined" ? Object.keys(localStorage) : uni.getStorageInfoSync().keys;
+  for (const key of keys) {
+    if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue;
+    const runId = key.slice(prefix.length, -suffix.length);
+    const pending = restoreSupportPending(accountKey, runId, kind);
+    let changed = false;
+    for (const [slot, expected] of expired) {
+      if (pending.has(slot) && (!expected || pending.get(slot) === expected)) {
+        pending.delete(slot);
+        changed = true;
+      }
+    }
+    if (changed) persistSupportPending(accountKey, runId, kind, pending);
+  }
+}
+
+/** Retire all commands for this account when account deletion is requested. */
 export function clearSupportPending(accountKey: string, kind: "conversations"): void {
   const matches = (key: string) => key.startsWith(`${PREFIX}:${accountKey}:`) && key.endsWith(`:${kind}`);
   if (typeof plus !== "undefined") {
