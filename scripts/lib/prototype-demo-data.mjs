@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { computeDemo, demoComputeFacts } from "./prototype-demo-compute.mjs";
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
@@ -509,6 +510,18 @@ function demoLiveActivity(product,now) {
   return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:Math.min(sales24h,Math.max(1,sales30m))};
 }
 
+function demoHomeDisplay(state, now) {
+  if (state.homeDisplayState !== 'growth') {
+    return { enabled:false, startAt:demoStartedAt, serverNow:now, validUntil:now+60_000, sequence:1,
+      online:[800], paidCents:[300000] };
+  }
+  // Optional growth preview: one sample per second for two minutes.
+  const startAt=Math.floor(now/1000)*1000, elapsed=Math.max(0,Math.floor((startAt-demoStartedAt)/1000));
+  const seconds=Array.from({length:121},(_,offset)=>elapsed+offset);
+  return { enabled:true, startAt, serverNow:now, validUntil:startAt+120_000, sequence:elapsed,
+    online:seconds.map(t=>2968+Math.floor(t/45)), paidCents:seconds.map(t=>128465050+t*160+Math.floor(t/3)*29) };
+}
+
 /** Mutable state belongs only to the loopback demonstration server. */
 export function demoFixture(url,locale,state,request,now=Date.now()) {
   state.previewFactsAt??=demoStartedAt;
@@ -519,13 +532,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if (pathname === '/api/config/phone-tiers') return { tiers: [1,2,3,4,5].map(tier => ({
     tier, name:`Tier ${tier}`, baseRateUsdt:[.02,.04,.06,.09,.12][tier-1], baseRateNex:tier*.1, effectiveAt:iso,
   })), sources:['Local prototype demo'] };
-  // Published home display feed (intro stats, home on-grid, trust card): one sample per second for two minutes.
-  if (pathname === '/api/config/home-display' && !empty) {
-    const startAt=Math.floor(now/1000)*1000, elapsed=Math.max(0,Math.floor((startAt-demoStartedAt)/1000));
-    const at=offset=>elapsed+offset, seconds=Array.from({length:121},(_,offset)=>at(offset));
-    return { enabled:true, startAt, serverNow:now, validUntil:startAt+120_000, sequence:elapsed,
-      online:seconds.map(t=>2968+Math.floor(t/45)), paidCents:seconds.map(t=>128465050+t*160+Math.floor(t/3)*29) };
-  }
+  if (pathname === '/api/config/home-display' && !empty) return demoHomeDisplay(state, now);
   const socialProduct = pathname.match(/^\/api\/storefront\/products\/([^/]+)\/social-proof$/);
   if (socialProduct) {
     const product = products.find(item => item.id === decodeURIComponent(socialProduct[1]));
@@ -536,6 +543,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       windowSales:Math.floor(sold / 3), liveActivity:demoLiveActivity({id:product.id,sold},now) };
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
+  if(pathname==='/api/app/network/device-rank' && state.deviceRankState==='configured') {
+    return reviewFixture(url,locale,state,request,demoHomeDisplay(state,now).online[0]);
+  }
   const fleetDevices=()=>demoFleetFacts(url,locale,state).devices;
   // Reconcile due cycles before any fixture response can read or change the wallet.
   const computeFacts=(state.computeState??'app')==='app'?null:demoComputeFacts(state,now,fleetDevices);
@@ -599,7 +609,15 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     config.featureFlags.stakingVisible=false;
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
-    Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0,activeJobsBase:state.jobsBaseState==='published'?1000:null});
+    const growth=state.homeDisplayState==='growth';
+    Object.assign(config.publicStats,{
+      registeredUsersBase:growth?12480:2000,registeredUsersAnchorAt:demoStartedAt,
+      registeredUsersTickIntervalSec:growth?60:300,registeredUsersTickStepMin:growth?3:0,registeredUsersTickStepMax:growth?10:2,
+      virtualUserCount:0,activeJobsBase:state.jobsBaseState==='published'?1000:null,
+    });
+    if(!empty)config.publicStats.networkPulse={
+      registeredUsers:derivedRegisteredUsers(config.publicStats,now),onlineDevices:demoHomeDisplay(state,now).online[0],
+    };
     // Globe split and drift; totals come from networkPulse.onlineDevices and the task-centre job count.
     const globeCenters=[['sg',236000,18,12.5],['jp',253000,22,13],['vn',163000,26,8.5],['uk',249000,16,12],['fr',208000,20,10],['de',217000,14,11],['us-ny',316000,24,17],['us-sj',284000,17,16]];
     // Old shape: nodes as weights plus the retired jitter/ratio fields. B22 shape: sharePct only.

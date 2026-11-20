@@ -105,7 +105,7 @@ export function previewCapacity(device, schedule, at) {
     capacitySubsidyRemainingDays: Math.max(0, Math.ceil((capacitySubsidyEndsAt - at) / 86400000)) };
 }
 
-function fixture(url, locale, state, request) {
+function fixture(url, locale, state, request, onlineDevices=platform.publicStats.networkPulse.onlineDevices) {
   if (url.pathname === '/api/quests/state') {
     const mode = state.taskState || 'pending';
     if (mode === 'error') return {};
@@ -133,7 +133,13 @@ function fixture(url, locale, state, request) {
 
   if (url.pathname === '/api/content/trust/sections/current') return { ...authority, source: 'nx_trust_section_version:published', sections: ['financials', 'leadership', 'nexNarrative', 'complianceBadges', 'auditsReserves', 'listings'].map(sectionKey => ({ sectionKey, version: 'v1', description: 'UI review fixture', structure: 'Published resources', fields: [] })) };
   if (/^\/api\/content\/trust\/sections\/[^/]+\/view$/.test(url.pathname)) return null;
-  if (url.pathname === '/api/app/network/device-rank') return {...authority,source:'SIMULATED_DEVICE_DISTRIBUTION',currentRank:184,state:'ranked',population:3206,deviceTops:80,modelVersion:1,generatedAt:iso};
+  if (url.pathname === '/api/app/network/device-rank') {
+    const source = 'SIMULATED_DEVICE_DISTRIBUTION';
+    if (state.deviceRankState === 'configured') {
+      return {...authority,source,currentRank:184,state:'ranked',population:onlineDevices,deviceTops:80,modelVersion:1,generatedAt:iso};
+    }
+    return {...authority,source,currentRank:null,state:'disabled',population:null,deviceTops:null,modelVersion:0,generatedAt:new Date(0).toISOString()};
+  }
   if (url.pathname === '/api/app/support/conversation-categories') return [{type:'advisor',enabled:true},{type:'support',enabled:true},{type:'ai',enabled:false}];
   if (url.pathname === '/api/promotions') {
     const localized=(zh,en,vi)=>({zh,en,vi});
