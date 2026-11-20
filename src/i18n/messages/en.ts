@@ -128,7 +128,7 @@ export const en = {
     backToWallet: "Back to wallet",
     orderNumber: "Withdrawal number",
     amountErrors: {"format": "Enter an amount greater than zero with up to 6 decimal places.", "range": "Enter an amount within the displayed per-transaction limits.", "balance": "The amount exceeds your available withdrawal balance.", "daily": "Daily withdrawal count reached. Please try tomorrow.", "unavailable": "Withdrawal limits are unavailable. Please reload."},
-    resultNotes: {"review": "Your request was submitted and is awaiting processing.", "processing": "Bank transfer in progress.", "held": "The result is being confirmed automatically. Do not submit another withdrawal.", "paid": "Receipt by the bank has been confirmed.", "refunded": "The withdrawal amount has been returned to your wallet."},
+    resultNotes: {"review": "Your request was submitted and is awaiting processing.", "processing": "Waiting for the bank's result. This page updates once the money arrives — no need to withdraw again.", "held": "This page updates once the check is done. Please don't submit another withdrawal.", "paid": "Receipt by the bank has been confirmed.", "refunded": "The withdrawal amount has been returned to your wallet."},
     chooseMethod: "Choose withdrawal method", chooseMethodHint: "Select where to receive your withdrawal.",
     usdtMethodHint: "Send USDT to your wallet address", bankMethod: "Bank account", bankMethodHint: "Receive VND in your Vietnamese bank account",
     routeFrom: "UVEL wallet",
@@ -162,7 +162,7 @@ export const en = {
     intentClosed: "This quote is no longer active.",
     reload: "Reload", unknown: "The submission result is being confirmed automatically. Do not start another withdrawal.",
     review: "Awaiting review", processing: "Bank transfer processing", paid: "Received by bank", failed: "Withdrawal failed",
-    held: "Awaiting manual verification — funds remain on hold", error: "Unable to complete this request. Please retry or contact support.",
+    held: "Confirming the result", error: "Unable to complete this request. Please retry or contact support.",
     otpSent: "Code sent", bound: "Bank account saved", newWithdrawal: "New withdrawal", loading: "Loading…",
   },
   privacy: {
