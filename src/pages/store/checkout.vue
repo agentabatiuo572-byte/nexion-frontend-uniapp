@@ -250,7 +250,7 @@
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
-        <NxButton variant="primary" :disabled="checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
+        <NxButton variant="primary" :disabled="checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
     </template>
     <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.store.catalogRetry" :busy="checkoutLeaving" @click="cancelCheckout" /></view></NxSheet>
@@ -263,7 +263,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
-import { ref, reactive, nextTick, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, reactive, shallowRef, nextTick, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
@@ -469,7 +469,10 @@ const checkoutRouteFence = new CheckoutRouteFence();
 let purchaseEligibilityRequestSequence = 0;
 let activeCheckoutLoad: CheckoutRouteScope | null = null;
 let checkoutRouteInitialized = false;
-let ordinaryCheckoutInitialized = false;
+const ordinaryCheckoutInitialized = ref(false);
+const serverOrderRecovery = shallowRef<{ key: string; promise: Promise<boolean> } | null>(null);
+const checkoutPurchaseChecking = computed(() => remoteApiEnabled && !createdCheckoutOrder.value
+  && (!ordinaryCheckoutInitialized.value || serverOrderRecovery.value !== null));
 type PurchaseEligibilityResult = "eligible" | "ineligible" | "stale";
 let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
@@ -496,7 +499,7 @@ function checkoutRouteIdentity() {
 }
 
 function beginCheckoutRoute(): CheckoutRouteScope {
-  ordinaryCheckoutInitialized = false;
+  ordinaryCheckoutInitialized.value = false;
   return checkoutRouteFence.begin(checkoutRouteIdentity());
 }
 
@@ -507,7 +510,8 @@ function captureCheckoutRoute(): CheckoutRouteScope {
 function invalidateCheckoutRoute(keepOrdinaryInitialization = false): void {
   checkoutRouteFence.invalidate();
   activeCheckoutLoad = null;
-  if (!keepOrdinaryInitialization) ordinaryCheckoutInitialized = false;
+  serverOrderRecovery.value = null;
+  if (!keepOrdinaryInitialization) ordinaryCheckoutInitialized.value = false;
   remoteTradeinRecoveryBusy.value = false;
 }
 
@@ -700,7 +704,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, catalogRead?: 
       return;
     }
     await fireTradeinIntercept();
-    if (isCurrentCheckoutRoute(routeScope)) ordinaryCheckoutInitialized = true;
+    if (isCurrentCheckoutRoute(routeScope)) ordinaryCheckoutInitialized.value = true;
   } finally {
     if (activeCheckoutLoad?.generation === routeScope.generation
       && activeCheckoutLoad.accountKey === routeScope.accountKey
@@ -1374,6 +1378,7 @@ const stepLabels = computed(() => [
 ]);
 const stepDisplay = computed(() => ['confirmed','activating','live'].includes(step.value) ? 2 : ['pay-instructions','awaiting'].includes(step.value) ? 1 : 0);
 async function submitReview() {
+  if (checkoutPurchaseChecking.value) return;
   const scope = captureCheckoutRoute();
   // A tap during a trial read waits for it, then goes on with fresh authority.
   if (trialQuoteUnavailable.value && !trialQuoteScreenUnavailable.value) {
@@ -1393,8 +1398,9 @@ async function submitReview() {
     if (!isCurrentCheckoutRoute(scope)) return;
     if (!remoteCapacityGate.canConfirm(Boolean(appliedTradeinView.value?.canonicalQuote))) return;
   }
+  if (checkoutPurchaseChecking.value) return;
   if (step.value === 'select-payment') { goConfirm(); await nextTick(); if (!isCurrentCheckoutRoute(scope)) return; }
-  if (step.value === 'confirm') await requestConfirmPay();
+  if (step.value === 'confirm' && !checkoutPurchaseChecking.value) await requestConfirmPay();
 }
 
 function selectPayment(id: string) {
@@ -2171,7 +2177,7 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
         remoteTradeinRecoveryRequired.value = false;
         remoteTradeinRecoveryError.value = false;
         step.value = 'select-payment';
-        if (!ordinaryCheckoutInitialized) {
+        if (!ordinaryCheckoutInitialized.value) {
           if (activeCheckoutLoad) return false;
           // A new scope lets initialization run the original-order check without joining this recovery.
           remoteTradeinRecoveryBusy.value = false;
@@ -2187,7 +2193,6 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
   return true;
 }
 
-let serverOrderRecovery: { key: string; promise: Promise<boolean> } | null = null;
 function resumeServerOrder(routeScope = captureCheckoutRoute()): Promise<boolean> {
   if (!remoteApiEnabled || !isCurrentCheckoutRoute(routeScope)) return Promise.resolve(false);
   pendingCheckoutCreate.value = readCheckoutCreate(routeScope.accountKey, routeScope.productNo);
@@ -2195,15 +2200,15 @@ function resumeServerOrder(routeScope = captureCheckoutRoute()): Promise<boolean
   // catalogue/stock/eligibility gate. Recovery requires an explicit user action.
   if (pendingCheckoutCreate.value) return Promise.resolve(true);
   const key = JSON.stringify([routeScope.accountKey, routeScope.accountEpoch, routeScope.productNo, routeScope.generation]);
-  if (serverOrderRecovery?.key === key) return serverOrderRecovery.promise;
+  if (serverOrderRecovery.value?.key === key) return serverOrderRecovery.value.promise;
   const promise = resumePendingRemoteTradein(routeScope, true).then(recovered => recovered ? true : recoverCheckoutOrder(routeScope.accountKey, routeScope.productNo, {
     list: orderApi.list,
     isCurrent: () => isCurrentCheckoutRoute(routeScope),
     isCurrentAccount: () => isCurrentAccountScope({ accountKey: routeScope.accountKey, epoch: routeScope.accountEpoch }),
     navigate: (url) => isCurrentCheckoutRoute(routeScope) ? navReplace(url) : Promise.resolve(false),
   })).then(recovered => recovered || (isCurrentCheckoutRoute(routeScope) && recoverCapacityBeforePurchase([routeScope.productNo])))
-    .finally(() => { if (serverOrderRecovery?.key === key) serverOrderRecovery = null; });
-  serverOrderRecovery = { key, promise };
+    .finally(() => { if (serverOrderRecovery.value?.key === key) serverOrderRecovery.value = null; });
+  serverOrderRecovery.value = { key, promise };
   return promise;
 }
 
@@ -2474,7 +2479,7 @@ function reassertTradeinContext() {
 
 async function resumeReadyCheckout(scope: CheckoutRouteScope, catalogRead: Promise<boolean>) {
   if (await resumeServerOrder(scope)) return;
-  if (await catalogRead && isCurrentCheckoutRoute(scope) && ordinaryCheckoutInitialized
+  if (await catalogRead && isCurrentCheckoutRoute(scope) && ordinaryCheckoutInitialized.value
     && !activeSession.value && checkoutCapacityRequired.value) {
     await fireTradeinIntercept('capacity');
   }

@@ -224,6 +224,8 @@ const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=re
 const paymentSheetOpen=ref(false),paymentConfirming=ref(false),leaving=ref(false);
 const paymentEntryChecking=ref(false);
 const eventVoucherId=props.voucherId?.trim()??'';
+const ordinaryMultiItemEntry = !openedOriginal && !props.orderNo && !props.activityId && !eventVoucherId
+  && props.items.reduce((quantity, item) => quantity + item.quantity, 0) > 1;
 const eventVoucherStatus=ref<'loading'|'claimable'|'available'|'unavailable'>('loading');
 const voucherId=ref(session.record.voucherId??(openedOriginal?null:eventVoucherId||null));const selectedVoucherName=computed(()=>voucher.catalog.find(v=>v.id===voucherId.value)?.name??p.value.noVoucher);
 // The API has no voucher-specific amount. Attribute the total to the selected
@@ -315,7 +317,7 @@ async function loadOrderClock(){
 }
 const catalogReadFailed=computed(()=>freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&productCatalogState.status==='error');
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
-const canPay=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
+const canPay=computed(()=>!busy.value&&!recoveryReading.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
 async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';activityConflict.value=false;try{await action();}catch(cause){if(current()){
@@ -519,6 +521,15 @@ async function recover():Promise<boolean>{
     if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
+    const reopenPurchase = ordinaryMultiItemEntry && canStartNew.value && !session.record.quote?.activityId
+      && !order.value?.rewards?.length
+      && (order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED');
+    if (reopenPurchase) {
+      // The replacement quote has its own read generation.
+      recoveryGeneration=null;
+      await Promise.all([startNewPurchase(),refreshWallet(true)]);
+      return current()&&visible.value&&!unknown.value;
+    }
     await loadOrderClock();
     if(!readCurrent(generation))return false;
     if(order.value?.paymentStatus==='PAID')await readActivation();

@@ -98,7 +98,23 @@ export function createPromotionApi(client:ApiClient){return {
   async pay(orderNo:string,key:string,authorization?:import('./payment-password-api').PaymentPasswordAuthorization):Promise<OrderReceipt>{return parsePromotedOrder(await client.request({method:'POST',path:'/api/orders/'+encodeURIComponent(orderNo)+'/pay',idempotencyKey:key,body:authorization,retryAfterAuth:false}));},
   async paymentCommand(key:string){const result=await readPaymentCommand(client,'order-pay',key);return {...result,...(result.status==='SUCCEEDED'?{order:parsePromotedOrder(result.receipt)}:{})};},
   async cancel(orderNo:string,key:string):Promise<OrderReceipt>{return parsePromotedOrder(await client.request({method:'POST',path:'/api/orders/'+encodeURIComponent(orderNo)+'/cancel',idempotencyKey:key}));},
-  async findOrder(orderNo:string):Promise<OrderReceipt|null>{let cursor:string|null=null;const seen=new Set<string>();do{const p=object(await client.request({path:'/api/orders?'+query({beforeOrderNo:cursor,pageSize:100})}));const found=array(p.orders).find(v=>object(v).orderNo===orderNo);if(found)return parsePromotedOrder(found);cursor=typeof p.nextCursor==='string'?p.nextCursor:null;if(cursor&&seen.has(cursor))return invalid();if(cursor)seen.add(cursor);}while(cursor);return null;},
+  async findOrder(orderNo:string):Promise<OrderReceipt|null>{
+    let cursor:string|null=null;
+    const seen=new Set<string>();
+    do{
+      const p=object(await client.request({path:'/api/orders?'+query({beforeOrderNo:cursor,pageSize:100})}));
+      const found=array(p.orders).find(v=>object(v).orderNo===orderNo);
+      if(found){
+        const order=object(found);
+        // Order history marks the absence of a selected payment method as PENDING.
+        return parsePromotedOrder(order.paymentMethod==='PENDING'?{...order,paymentMethod:null}:order);
+      }
+      cursor=typeof p.nextCursor==='string'?p.nextCursor:null;
+      if(cursor&&seen.has(cursor))return invalid();
+      if(cursor)seen.add(cursor);
+    }while(cursor);
+    return null;
+  },
   async command(key:string,operation:PromotionOperation,targetId:string):Promise<CommandReceipt>{const r=object(await client.request({path:'/api/promotion-commands/'+encodeURIComponent(key)+'?'+query({operation,targetId})}));if(r.operation!==operation||r.targetId!==targetId||r.idempotencyKey!==key||!['PROCESSING','SUCCEEDED','FAILED','OUTCOME_UNKNOWN','NOT_FOUND'].includes(string(r.status)))return invalid();if(r.order!==null)parsePromotedOrder(r.order);return r as CommandReceipt;},
   async rewards(filters:{cursor?:string|null;limit?:number;activityId?:string;state?:string;orderNo?:string}={}):Promise<RewardPage>{return page(await client.request({path:'/api/promotion-rewards?'+query(filters)}),reward);},
   async reward(id:string):Promise<Reward>{return reward(await client.request({path:'/api/promotion-rewards/'+encodeURIComponent(id)}));},
