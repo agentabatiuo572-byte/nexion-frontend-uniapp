@@ -49,11 +49,11 @@
                 <view class="grid place-items-center shrink-0" :style="remoteIconBoxStyle(row.status)">
                   <view v-html="iconSvg(row.iconId, row.status === 'LOCKED' ? 'var(--v5-ink-4)' : 'var(--v5-brand)')" />
                 </view>
-                <view class="min-w-0" style="flex: 1">
+                <view class="min-w-0 achievement-row__text">
                   <text class="block" :style="aLabelStyle(row.status !== 'LOCKED')">{{ row.label }}</text>
                   <text class="block" :style="aDescStyle(row.status !== 'LOCKED')">{{ row.description }}</text>
                 </view>
-                <view class="text-right shrink-0">
+                <view class="text-right shrink-0 achievement-row__end">
                   <text v-if="row.status !== 'CLAIMABLE'" class="block" :style="rewardStyle(row.status !== 'LOCKED')">{{ row.reward }}<text v-if="row.unit" class="nx-sr-only"> {{ row.unit }}</text></text>
                   <NxButton v-if="row.status === 'CLAIMABLE'" variant="brand" size="small" :disabled="!!remoteBusy" :label="remoteBusy === row.key ? w.claiming : `${w.claim} ${row.reward}${row.unit ? `\u00A0${row.unit}` : ''}`" @click="claimRemote(row)" />
                   <text v-else-if="row.status !== 'LOCKED'" class="block" style="margin-top: 2px; font-size: 12px; color: var(--v5-ink-3)">
@@ -597,4 +597,9 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
 .achievement-summary > view:last-child > text:last-child { margin-top:4px; }
 .achievement-row--badge:not(.achievement-row--locked) > view:first-child { background:var(--v5-brand-soft)!important; }
 
+/* Text beside the reward or claim button while it has room; when the button would squeeze it narrower than 105px
+   (long languages), the text takes the row and the button drops to the bottom-right. */
+.achievement-row:not(.achievement-row--badge) { flex-wrap:wrap; row-gap:8px !important; }
+.achievement-row__text { flex:1 1 105px; }
+.achievement-row__end { margin-left:auto; }
 </style>

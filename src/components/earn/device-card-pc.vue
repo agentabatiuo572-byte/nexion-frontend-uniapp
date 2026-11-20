@@ -993,7 +993,8 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 [data-theme="light"] .earn-stage__floor { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 20%, transparent), transparent); }
 .earn-stage__job { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 10px 18px 0; text-align: center; }
 .earn-stage__job-name { display: flex; align-items: center; justify-content: center; gap: 6px; max-width: 100%; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
-.earn-stage__job-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The stage opens nothing for the job, so a long task name wraps in full under the gauge. */
+.earn-stage__job-title { min-width: 0; white-space: normal; overflow-wrap: break-word; }
 .earn-stage__eq { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 10px; height: 10px; flex: none; }
 .earn-stage__eq > view { width: 2.2px; height: 10px; border-radius: 1px; background: var(--v5-brand); transform-origin: bottom; transform: scaleY(.55); }
 .earn-stage__eq--running > view { animation: earn-stage-eq .9s ease-in-out infinite; }
