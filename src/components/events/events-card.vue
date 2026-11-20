@@ -23,7 +23,7 @@
         </view>
         <view class="flex-1 min-w-0">
           <text class="block font-mono-tabular" :style="kindLineStyle">{{ kindLabel }}<text v-if="ev.ribbon" style="color: var(--v5-ink-4)"> · {{ ev.ribbon }}</text></text>
-          <text class="block truncate" :style="titleStyle">{{ ev.title }}</text>
+          <text :style="titleStyle">{{ ev.title }}</text>
           <text class="block" :style="subtitleStyle">{{ ev.subtitle }}</text>
         </view>
         <!-- status chip -->
@@ -196,7 +196,13 @@ const kindLineStyle = computed<CSSProperties>(() => ({
   color: "var(--v5-ink-3)",
   opacity: 0.85,
 }));
+// Up to two lines, then an ellipsis; the card box grows with the title (batch 2 decision 7).
 const titleStyle: CSSProperties = {
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 2,
+  overflow: "hidden",
+  overflowWrap: "break-word",
   marginTop: "2px",
   fontSize: "var(--ui-type-card-title)",
   fontWeight: "var(--ui-type-card-title-weight)",
