@@ -230,8 +230,8 @@ const newcomerSubtitle = computed(() => newcomerSubtitleKind(rewardGateEnabled.v
 const giftUsdt = computed(() => localGift.value.usdtAmount);
 const giftNex = computed(() => localGift.value.nexAmount);
 const giftLabel = computed(() => [
-  giftUsdt.value > 0 ? `${formatAmount(giftUsdt.value)} USDT` : "",
-  giftNex.value > 0 ? `${formatAmount(giftNex.value)} UVT` : "",
+  giftUsdt.value > 0 ? `${formatAmount(giftUsdt.value)}\u00A0USDT` : "",
+  giftNex.value > 0 ? `${formatAmount(giftNex.value)}\u00A0UVT` : "",
 ].filter(Boolean).join(" + "));
 
 type Step = 1 | 2 | 3;
@@ -1136,5 +1136,6 @@ onUnmounted(() => cleanup());
 .rg-footer__link:active { opacity: 0.6; }
 .rg-footer__terms { display: block; margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); }
 /* padding 15 而非 14:这行字比 footer__link 小(11.5px),14 只能撑到 43 —— 差 1px 也是差 */
-.rg-footer__terms-link { color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 2px; padding: 15px 0; }
+/* Each link stays on one line; when it does not fit it moves to the next line whole. */
+.rg-footer__terms-link { color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 2px; padding: 15px 0; white-space: nowrap; }
 </style>

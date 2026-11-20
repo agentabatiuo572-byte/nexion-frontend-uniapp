@@ -86,7 +86,7 @@
                   <text class="team-bento__caption">{{ t.teamV3.weeklyPool }}<template v-if="poolShareReady"> · <text class="team-bento__muted">{{ leadershipPoolLineA }}</text></template></text>
                   <text v-if="!poolShareReady" class="team-bento__meta">{{ remotePoolReadable ? leadershipPoolLineB : leadershipPoolLineA }}</text>
                 </view>
-                <view class="team-bento__ring" :class="{ 'team-bento__ring--capped': poolRingPct > 0 }" aria-hidden="true" :style="{ '--nx-viz-ring': bentoInView === false ? 0 : poolRingPct, transition: bentoInView === false ? 'none' : VIZ_RING_TRANSITION }"><view><text class="team-bento__ring-value nx-num-metric">{{ !remotePoolReadable ? "—" : poolShareReady ? leadershipPoolLineB : fmt(t.home.rankUnlockAt, { n: leadershipUnlockRank }) }}</text><text v-if="poolShareReady" class="team-bento__ring-label">{{ t.pool.myShare }}</text></view></view>
+                <view class="team-bento__ring" :class="{ 'team-bento__ring--capped': poolRingPct > 0 }" aria-hidden="true" :style="{ '--nx-viz-ring': bentoInView === false ? 0 : poolRingPct, transition: bentoInView === false ? 'none' : VIZ_RING_TRANSITION }"><view><text class="team-bento__ring-value nx-num-metric" :class="{ 'team-bento__ring-value--text': remotePoolReadable && !poolShareReady }">{{ !remotePoolReadable ? "—" : poolShareReady ? leadershipPoolLineB : fmt(t.home.rankUnlockAt, { n: leadershipUnlockRank }) }}</text><text v-if="poolShareReady" class="team-bento__ring-label">{{ t.pool.myShare }}</text></view></view>
               </view>
             </view>
           </view>
@@ -696,7 +696,9 @@ useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !rec
   .team-bento__ring--capped { background: radial-gradient(circle at calc(50% + sin(calc(var(--nx-viz-ring) * 3.6deg)) * 42px) calc(50% - cos(calc(var(--nx-viz-ring) * 3.6deg)) * 42px), var(--v5-nex) 3.5px, transparent 4px), radial-gradient(circle at 50% 4px, var(--v5-nex) 3.5px, transparent 4px), conic-gradient(var(--v5-nex) calc(var(--nx-viz-ring) * 1%), var(--v5-surface-3) 0); }
 }
 .team-bento__ring > view { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 76px; height: 76px; padding: 0 var(--v5-space-1); box-sizing: border-box; border-radius: 999px; background: var(--v5-surface); text-align: center; }
-.team-bento__ring-value { font: 600 15px/18px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.team-bento__ring-value { font: 600 15px/18px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+/* "Unlocks at V2" is words, not a figure: text face at 12px so a long word (ru «откроется») fits the 68px hole whole. */
+.team-bento__ring-value--text { font: 600 12px/16px var(--font-v5); }
 .team-bento__ring-label { font: 500 11px/14px var(--font-v5); color: var(--v5-ink-3); }
 .team-bento__pool .team-estimate { align-items: flex-start; gap: 2px; }
 /* More tools: four glass icon buttons in one row. */

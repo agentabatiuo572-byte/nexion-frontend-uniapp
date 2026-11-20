@@ -44,7 +44,7 @@
           <view class="wp-publisher__icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/></svg>
           </view>
-          <view class="min-w-0" style="flex: 1">
+          <view class="min-w-0 wp-publisher__copy">
             <text class="block wp-topic__title">{{ fmt(copy.wpPublisher, { name: profile.legalName }) }}</text>
             <text class="block wp-topic__body">{{ fmt(copy.wpPublisherMeta, { id: profile.nyDosId }) }}</text>
           </view>
@@ -125,9 +125,11 @@ useAutoRecovery({ failed: () => status.value === "error", retry: refresh });
 .wp-topic__index { width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand-deep); font: 700 13px/18px var(--font-v5); font-variant-numeric: tabular-nums; }
 .wp-topic__title { font: 600 15px/20px var(--font-v5); color: var(--v5-ink); }
 .wp-topic__body { margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
-.wp-publisher { display: flex; align-items: center; gap: var(--v5-space-3); padding: var(--v5-space-4); border-radius: var(--v5-radius-l); background: var(--v5-surface); }
+/* Side by side while the details fit beside the link in two lines; otherwise the details take the full width and the link drops to the bottom-right. */
+.wp-publisher { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--v5-space-3); padding: var(--v5-space-4); border-radius: var(--v5-radius-l); background: var(--v5-surface); }
 .wp-publisher__icon { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; border-radius: var(--v5-radius-s); background: var(--v5-brand-soft); color: var(--v5-brand); }
-.wp-publisher__link { display: inline-flex; align-items: center; min-height: 44px; font: 600 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+.wp-publisher__copy { flex: 1 1 150px; }
+.wp-publisher__link { display: inline-flex; align-items: center; margin-left: auto; white-space: nowrap; min-height: 44px; font: 600 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
 .wp-publisher__link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .wp-footnote { text-align: center; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 /* The design sets the header title at 15px on this page. */

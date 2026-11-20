@@ -88,7 +88,7 @@
       <text v-if="copy.taskLevels" class="product-compact-levels">{{ copy.taskLevels }}</text>
       <view class="product-compact-bottom">
         <text class="product-compact-price">{{ fmtMoney(product.price).replace(/\.00$/, '') }}</text>
-        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.text }}</text>
+        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.label }} · <text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
     </view>
@@ -310,12 +310,13 @@ const dailyEarnText = computed(() => {
 });
 const compactEstimate = computed(() => {
   if (isShare.value) {
-    const text = `${t.value.bundle.estimatedDaily} · ${dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—"}`;
-    return { text, ariaLabel: text };
+    const value = dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—";
+    return { label: t.value.bundle.estimatedDaily, value, ariaLabel: `${t.value.bundle.estimatedDaily} · ${value}` };
   }
   const daily = fmtMoney(props.product.dailyEarn);
   return {
-    text: `${estimateLabel.value} · ${daily.replace(/\.00$/, "")}${t.value.store.cardPerDaySuffix}`,
+    label: estimateLabel.value,
+    value: `${daily.replace(/\.00$/, "")}${t.value.store.cardPerDaySuffix}`,
     ariaLabel: `${t.value.store.cardYouEarn} · ${daily}${t.value.store.cardPerDaySuffix}`,
   };
 });
@@ -554,6 +555,8 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
 .product-compact-price { color:var(--v5-ink); font:600 16px/21px var(--font-v5); }
 .product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
+/* The rate and its "/day" never split across lines. */
+.product-compact-estimate__value { white-space:nowrap; }
 .product-compact-status { display:block; margin-top:8px; font:400 12px/17px var(--font-v5); color:var(--v5-warning-ink); }
 .product-card--compact:nth-child(2n) .product-art { animation-delay:-1.1s; }
 .product-card--compact:nth-child(3n) .product-art { animation-delay:-2.2s; }

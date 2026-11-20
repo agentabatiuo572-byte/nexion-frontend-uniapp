@@ -202,7 +202,7 @@ function cultivationReward(reward: VRankReward): boolean {
 }
 function rewardText(reward: VRankReward): string {
   if (isEntitlementVRankReward(reward)) return platformDisplayText(rankEntitlementLabel(reward, t.value.rank.rewardUnavailable));
-  const amount = `${formatAmount(reward.amount)} ${reward.type === "UVT" ? "UVT" : reward.type}`;
+  const amount = `${formatAmount(reward.amount)}\u00A0${reward.type === "UVT" ? "UVT" : reward.type}`;
   return amount;
 }
 
@@ -311,7 +311,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-reward-summary { display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;color:var(--v5-nex); }
 .rank-reward-title { display:block;font:600 var(--ui-type-section)/22px var(--font-v5); }
 .rank-reward-amount { display:block;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
-.rank-reward-description { display:block;margin-top:2px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.rank-reward-description { display:block;margin-top:2px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-reward { display:block;margin-top:2px;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-nex);overflow-wrap:anywhere; }
 .rank-actions { margin-top:18px;border-top:1px solid var(--v5-border); }.rank-actions :deep(.nx-list-row) { padding-inline:0;border-bottom:1px solid var(--v5-border); }
 .rank-action-icon { width:32px;height:32px;display:grid;place-items:center;color:var(--v5-ink-2); }
@@ -335,14 +335,17 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-ladder::-webkit-scrollbar { display:none; }
 .rank-ladder-row { flex:none;background:none !important; }
 .rank-ladder-row::before { display:none; }
-.rank-row-heading { flex-direction:column;align-items:center;gap:4px;width:56px;min-height:88px;padding:6px 0;border-radius:16px; }
+/* A rank can be wider than 56px when its status word is long (fil, id, kk, ms); the track scrolls sideways, so the item grows instead of its label running into the next one. */
+.rank-row-heading { flex-direction:column;align-items:center;gap:4px;min-width:56px;width:auto;min-height:88px;padding:6px 6px;border-radius:16px; }
 .rank-row-heading[aria-expanded="true"] { background:color-mix(in srgb,var(--v5-ink) 6%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-ink) 12%,transparent); }
 .rank-row-title { font:600 12px/16px var(--font-metric);text-align:center; }
 .rank-row-sub { margin-top:0;font:500 10px/12px var(--font-v5);text-align:center;white-space:nowrap; }
 .rank-ladder-row[data-status="locked"] .rank-row-heading :deep(.team-rank-emblem) { opacity:.55; }
 .rank-details { margin-top:12px;padding:20px;border-radius:28px;background:var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
 /* P-42 round 2 */
-.rank-identity { margin-bottom:14px;padding-right:96px; }
+/* The "to next rank" pill sits over the top-right corner; the copy keeps to the emblem's lower edge so a long pill (fil, id) never covers the caption. */
+.rank-identity { margin-bottom:14px; }
+.rank-identity__copy { align-self:flex-end; }
 .rank-current-name { margin-top:0;font:700 36px/40px var(--font-metric);color:var(--v5-brand); }
 .rank-next-heading { position:absolute;top:20px;right:20px;display:flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:999px;background:var(--v5-surface-2); }
 .rank-next-heading .rank-next-title,.rank-next-heading .rank-caption { font:600 12px/16px var(--font-v5);color:var(--v5-ink-2); }
