@@ -57,7 +57,9 @@ export function seedWithdrawalRecovery(state, selection) {
 
   const id = randomUUID();
   const now = Date.now();
-  const policy = demoWithdrawalPolicy(state, demoWithdrawalFacts(state, now));
+  // Historical orders were accepted with BEP20 enabled, independently of today's network settings.
+  const policyState = selection === 'COMMITTED' ? { ...state, withdrawNetworksState: 'bep20-erc20' } : state;
+  const policy = demoWithdrawalPolicy(policyState, demoWithdrawalFacts(state, now));
   const frozen = {
     key: demoAttemptPrefix + id, amount: 100, network: 'USDT-BEP20',
     address: '0x' + '1'.repeat(40), policyVersion: policy.policyVersion, offset: false,
