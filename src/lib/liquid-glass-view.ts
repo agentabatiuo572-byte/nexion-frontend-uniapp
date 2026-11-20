@@ -214,7 +214,9 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     const items = nodes(), item = items[config.values.indexOf(selected)];
     const last = items[items.length - 1];
     // An equal filter whose one-line labels cannot fit scrolls like a scroll rail (glass-segments.vue).
-    const overflow = config.layout === "equal" && config.variant !== "navigation" && root.scrollWidth > root.clientWidth + 1;
+    // Measured from the options, not scrollWidth: the stretched track and lens must not flip it.
+    const overflow = config.layout === "equal" && config.variant !== "navigation" && !!last
+      && last.offsetLeft + last.offsetWidth + parseFloat(getComputedStyle(root).paddingRight || "0") > root.clientWidth + 1;
     if (root.dataset.glassOverflow !== String(overflow)) root.dataset.glassOverflow = String(overflow);
     maxTrackScroll = (config.layout === "scroll" || overflow) && last
       ? Math.max(0, last.offsetLeft + last.offsetWidth + parseFloat(getComputedStyle(root).paddingRight || "0") - root.clientWidth) : 0;
