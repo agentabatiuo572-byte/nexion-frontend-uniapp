@@ -55,7 +55,27 @@ export function persistSupportPending(accountKey: string, runId: string, kind: "
   write(storageKey(accountKey, runId, kind), JSON.stringify(Object.fromEntries(values)));
 }
 
-/** Retire only this account's commands when it voluntarily leaves this carrier. */
+/** Retire expired human sends while leaving other commands for the account alone. */
+export function retireSupportPending(accountKey: string, kind: "conversations", slot: string, expected: string): void {
+  const prefix = `${PREFIX}:${accountKey}:`;
+  const suffix = `:${kind}`;
+  const keys = typeof plus === "undefined" ? Object.keys(localStorage) : uni.getStorageInfoSync().keys;
+  for (const key of keys) {
+    if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue;
+    const runId = key.slice(prefix.length, -suffix.length);
+    try {
+      const pending = restoreSupportPending(accountKey, runId, kind);
+      if (pending.get(slot) !== expected) continue;
+      pending.delete(slot);
+      persistSupportPending(accountKey, runId, kind, pending);
+      const startTarget = `support-start-target:${accountKey}:${runId}:${expected}`;
+      if (typeof plus === "undefined") localStorage.removeItem(startTarget);
+      else uni.removeStorageSync(startTarget);
+    } catch { /* An invalid index cannot authorize deletion of any command. */ }
+  }
+}
+
+/** Retire all commands for this account when account deletion is requested. */
 export function clearSupportPending(accountKey: string, kind: "conversations"): void {
   const matches = (key: string) => key.startsWith(`${PREFIX}:${accountKey}:`) && key.endsWith(`:${kind}`);
   if (typeof plus !== "undefined") {
