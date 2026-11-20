@@ -6,7 +6,7 @@
 <template>
   <AppChassis active="me">
     <view class="message-family" style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/me" />
+      <SubPageHeader back="/pages/me/me" plain />
       <!-- #ifdef APP-PLUS -->
       <view class="mx-4" style="margin-bottom: 20px" data-testid="system-notifications">
         <text class="block" :style="headingStyle">{{ pushCopy.title }}</text>
