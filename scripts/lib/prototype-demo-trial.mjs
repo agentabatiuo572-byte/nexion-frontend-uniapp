@@ -44,8 +44,11 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     // The H2 switch can open on an account that claimed S1 before its catalog rename.
     if(switched&&originalProduct)Object.assign(claimConfig,previewTrialProductConfig({...originalProduct,name:previewDefaultTrialName}));
     const duration=Number(claimConfig.trialDays)*day,grace=Number(claimConfig.graceDays)*day;
-    const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day:scenario==='ended'?duration+grace+day:day);
-    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE':['ended','eligible-again'].includes(scenario)?'FAILED':['converted','refunded'].includes(scenario)?'REDEEMED':'ELIGIBLE',startedAt};
+    const cooldown=scenario==='eligible-again'?30*day:0;
+    const ended=['ended','eligible-again'].includes(scenario);
+    const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day:ended?duration+grace+cooldown+day:day);
+    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE':ended?'FAILED':['converted','refunded'].includes(scenario)?'REDEEMED':'ELIGIBLE',startedAt};
+    if(cooldown)state.trialRow.cooldownUntil=startedAt+duration+grace+cooldown;
     // B13: this preset was claimed under the former 50 USDT cap; new claims use today's null cap.
     if(state.trialRow.state!=='ELIGIBLE'){
       if(pricing==='historical-cap'&&['ACTIVE','GRACE','REDEEMED'].includes(state.trialRow.state))claimConfig.trialOffsetCapUSD='50';
@@ -66,7 +69,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const claimed=row.state!=='ELIGIBLE',live=liveStates.includes(row.state);
     const conversion=row.state==='REDEEMED'?conversionFacts():null;
     const {shadow,nex}=claimed?accruedAt(row.state==='REDEEMED'?row.finishedAt:now):{shadow:0n,nex:0n};
-    const eligible=!claimed||(mode==='eligible-again'&&row.state==='FAILED');
+    const eligible=!claimed||(row.state==='FAILED'&&row.cooldownUntil!=null&&row.cooldownUntil<=now);
     // capacity-full comes from the fleet facts alone; the capacity-full preset seeds a genuinely full fleet.
     const canStart=eligible&&available&&!capacityFull;
     const quote=live?quoteFor(shadow,nex,row.state==='ACTIVE'&&now<row.startedAt+duration):undefined;
@@ -74,6 +77,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       claimNo:claimed?'DEMO-TRIAL':null,version:row.version||1,serverNowEpochMs:now,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,graceEndsAtEpochMs:claimed?row.startedAt+duration+grace:null,
       finishedAtEpochMs:['FAILED','CANCELLED','REDEEMED'].includes(row.state)?row.finishedAt||row.startedAt+duration+grace:null,
+      cooldownUntilEpochMs:row.cooldownUntil??null,
       shadowUsdt:number(shadow),shadowNex:number(nex),
       offsetUsdt:quote?.offsetUsdt??0,remainderUsdt:quote?.remainderUsdt??0,priceUsdt:Number(cfg.trialPriceUSD),...(quote?{quote}:{}),...(conversion||{})};
   };
@@ -138,7 +142,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     }
     cfg={...unclaimedConfig};
     duration=Number(cfg.trialDays)*day;grace=Number(cfg.graceDays)*day;
-    Object.assign(row,{state:'ACTIVE',startedAt:now,claimConfig:structuredClone(cfg),version:(row.version||1)+1});
+    Object.assign(row,{state:'ACTIVE',startedAt:now,cooldownUntil:null,claimConfig:structuredClone(cfg),version:(row.version||1)+1});
     return remember(snapshot());
   }
   if(url.pathname==='/api/trial/cancel'){
