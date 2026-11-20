@@ -110,6 +110,7 @@ export function previewActiveJobsBase(state) {
 }
 
 const homeDisplayCacheMs = 60_000;
+const homeDisplayPlanSeconds = 120;
 
 function homeDisplayElapsed(state, at) {
   const seconds = state.homeDisplayState === 'growth'
@@ -121,16 +122,20 @@ export function updatePreviewHomeDisplay(state, update, at) {
   const { homeDisplayState, jobsBaseState } = update;
   if (homeDisplayState === 'growth' && state.homeDisplayState !== 'growth') {
     state.homeDisplayGrowthAt = at;
+    state.homeDisplayPlanAt = at;
     state.homeDisplayState = homeDisplayState;
     state.homeDisplayChangeAt = at;
   } else if (homeDisplayState === 'paused' && state.homeDisplayState === 'growth') {
-    state.homeDisplayElapsed = homeDisplayElapsed(state, at + homeDisplayCacheMs);
+    const planAt = state.homeDisplayPlanAt ?? state.homeDisplayGrowthAt ?? now;
+    const cutoff = Math.min(at + homeDisplayCacheMs, planAt + homeDisplayPlanSeconds * 1000);
+    state.homeDisplayElapsed = homeDisplayElapsed(state, cutoff);
     state.homeDisplayState = homeDisplayState;
     state.homeDisplayChangeAt = at;
   }
   if ((jobsBaseState === 'published' || jobsBaseState === 'unpublished') && jobsBaseState !== state.jobsBaseState) {
     state.jobsBaseState = jobsBaseState;
     state.homeDisplayJobsAnchor = homeDisplayElapsed(state, at);
+    state.homeDisplayPlanAt = at;
     state.homeDisplayChangeAt = at;
   }
 }
@@ -139,14 +144,28 @@ export function previewHomeDisplay(state, at = Date.now()) {
   const enabled = state.homeDisplayState === 'growth';
   const anchor = state.homeDisplayGrowthAt ?? now;
   const changedAt = state.homeDisplayChangeAt ?? now;
-  const elapsed = homeDisplayElapsed(state, at);
-  const startAt = enabled ? anchor + (elapsed - (state.homeDisplayElapsed ?? 0)) * 1000 : changedAt;
-  const validUntil = changedAt + (Math.max(0, Math.floor((at - changedAt) / homeDisplayCacheMs)) + 1) * homeDisplayCacheMs;
-  const samples = Array.from({ length: enabled ? 121 : 1 }, (_, offset) => elapsed + offset);
+  const cacheAt = Math.max(changedAt, now + Math.floor((at - now) / homeDisplayCacheMs) * homeDisplayCacheMs);
+  const validUntil = cacheAt + homeDisplayCacheMs;
+  let startAt = enabled ? state.homeDisplayPlanAt ?? anchor : changedAt;
+  if (enabled) {
+    const renewal = at >= startAt + homeDisplayPlanSeconds * 1000 ? at : cacheAt;
+    if (renewal >= startAt + homeDisplayCacheMs) {
+      startAt = anchor + Math.floor((renewal - anchor) / 1000) * 1000;
+      state.homeDisplayPlanAt = startAt;
+    }
+  }
+  const elapsed = homeDisplayElapsed(state, startAt);
+  const samples = Array.from({ length: enabled ? homeDisplayPlanSeconds + 1 : 1 }, (_, offset) => elapsed + offset);
   const jobsBase = previewActiveJobsBase(state);
   return { enabled, startAt, serverNow: at, validUntil,
     sequence: elapsed + 1, online: samples.map(t => 800 + t * 2), paidCents: samples.map(t => 300000 + t * 25),
     activeJobs: samples.map(t => jobsBase === null ? null : jobsBase + (t - (state.homeDisplayJobsAnchor ?? 0)) * 2) };
+}
+
+export function previewHomeDisplaySample(state, at = Date.now()) {
+  const batch = previewHomeDisplay(state, at);
+  const i = batch.enabled ? Math.floor(Math.max(0, at - batch.startAt) / 1000) : 0;
+  return { online: batch.online[i], activeJobs: batch.activeJobs[i] };
 }
 
 function fixture(url, locale, state, request, onlineDevices=3206) {
@@ -196,12 +215,12 @@ function fixture(url, locale, state, request, onlineDevices=3206) {
   if (url.pathname === '/api/team/rank') return { ...authority, source: 'nx_team_member + server VRankPerformanceRepository', rankCode: state.highestRank ? 'V8' : 'V2', progress: { selfComputePoints: 2500, directRefs: 2, teamComputePoints: 23000, vDownlineCounts: {} } };
   if (url.pathname === '/api/app/profile') return { nickname: 'Alex', avatarUrl: '', avatarRevision: '', profileChangeIntervalDays: 7, nicknameChangeAvailableAt: null, avatarChangeAvailableAt: null, language: locale };
   if (url.pathname === '/api/config/home-display') return previewHomeDisplay(state);
-  if (url.pathname === '/api/app/home/overview') return { ...authority, source: 'server:nx_compute_receipt,nx_compute_task,nx_user_device.dc_location,nx_product,nx_growth_promo_banner', generatedAt: iso, accountScope: 'authenticated-account', earnings: { todayVsYesterdayPct: 0, todayVsYesterdayUsdt: 0.812, ...Object.fromEntries(['today', 'week', 'month', 'all'].map(p => [p, { usdt: 16.24, nex: 3, jobCount: 10 }])) }, earningsLedgerMode: 'SETTLED', earningsLedger: [], marketBoard: { workloads: [], deviceRankings: [] }, doTheMath: null, weeklyPromo: null, onboarding: { cumulativePaidUsdt: 0, activeDevices: 0 }, onGrid: { clients: [], activeDevices: 0, activeJobs: previewHomeDisplay(state).activeJobs[0], perSecUsdt: 0 } };
+  if (url.pathname === '/api/app/home/overview') return { ...authority, source: 'server:nx_compute_receipt,nx_compute_task,nx_user_device.dc_location,nx_product,nx_growth_promo_banner', generatedAt: iso, accountScope: 'authenticated-account', earnings: { todayVsYesterdayPct: 0, todayVsYesterdayUsdt: 0.812, ...Object.fromEntries(['today', 'week', 'month', 'all'].map(p => [p, { usdt: 16.24, nex: 3, jobCount: 10 }])) }, earningsLedgerMode: 'SETTLED', earningsLedger: [], marketBoard: { workloads: [], deviceRankings: [] }, doTheMath: null, weeklyPromo: null, onboarding: { cumulativePaidUsdt: 0, activeDevices: 0 }, onGrid: { clients: [], activeDevices: 0, activeJobs: previewHomeDisplaySample(state).activeJobs, perSecUsdt: 0 } };
   if (url.pathname === '/api/config/referral-rewards') return {enabled:true,welcomeGift:{lockMode:'risk_bucket',usdtAmount:0,nexAmount:0},inviterReward:{nexAmount:10},rhythmMonth:1,newcomerMultiplier:1,inviterMultiplier:1,effectiveAt:iso,sources:['nx_user.sponsor_user_id']};
   if (url.pathname === '/api/config/platform') {
-    const batch = previewHomeDisplay(state);
+    const sample = previewHomeDisplaySample(state);
     return { ...platform, publicStats: { ...platform.publicStats, activeJobsBase: previewActiveJobsBase(state),
-      networkPulse: { ...platform.publicStats.networkPulse, onlineDevices: batch.online[0], activeJobs: batch.activeJobs[0] } } };
+      networkPulse: { ...platform.publicStats.networkPulse, onlineDevices: sample.online, activeJobs: sample.activeJobs } } };
   }
   if (url.pathname === '/api/devices/earnings') {
     const device = { id: 41, rowVersion: 1, instanceNo: 'REVIEW-S1', name: products[0].name, deviceType: 'BOX', productCode: 'STELLARBOX-S1', monthlyTargetActive: true, status: 'ACTIVE', pendingDeactivate: false, activatedAt: now - 86400000 * 40, purchasedAt: now - 86400000 * 40, dailyUsdt: 6.2, dailyNex: 3, todayEarningsUsdt: 2.34, todayEarningsNex: 1, gpuModel: 'GPU', vramTotalGb: 24, basePowerW: 150, location: 'Review', actualPaidUsdt: 1299, cumulativeOutputUsdt: 100 };

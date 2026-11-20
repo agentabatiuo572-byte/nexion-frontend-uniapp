@@ -44,6 +44,7 @@ export function homeDisplayAt(batch: HomeDisplayBatch, serverNow: number) {
 
 const REFRESH_LEAD_MS = 3_000;
 const MIN_REFRESH_INTERVAL_MS = 1_000;
+const REFRESH_WINDOW_MS = 60_000;
 const RETRY_MS = 5_000;
 const EXPIRY_GRACE_MS = 10_000;
 
@@ -67,8 +68,10 @@ export function createHomeDisplayPlayer(deps: {
   };
   let batch: HomeDisplayBatch | null = null;
   let offset = 0;
+  let lastRenderedAt = -Infinity;
   let active = false;
   let pending: Promise<void> | undefined;
+  let lastFetchStartedAt = -Infinity;
   let nextFetch = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let fetchFailed = false;
@@ -77,6 +80,8 @@ export function createHomeDisplayPlayer(deps: {
     if (pending) return pending;
     const started = now();
     if (!active || started < nextFetch) return Promise.resolve();
+    const previousStartedAt = lastFetchStartedAt;
+    lastFetchStartedAt = started;
     pending = deps.fetch().then(next => {
       const received = now();
       const nextOffset = next.serverNow + Math.min(10_000, received - started) / 2 - received;
@@ -89,9 +94,12 @@ export function createHomeDisplayPlayer(deps: {
       batch = next;
       offset = nextOffset;
       fetchFailed = false;
-      // An early refresh can still see the same shared cache entry. Try again at its boundary.
-      const lead = end === previousEnd ? 0 : REFRESH_LEAD_MS;
-      nextFetch = Math.max(received + MIN_REFRESH_INTERVAL_MS, end - offset - lead);
+      // Base the renewal on the time in the response, allowing it to reach the server after expiry.
+      const boundary = received + end - next.serverNow;
+      // Keep a request available at the boundary if prefetch still sees this lease.
+      const canPrefetch = end !== previousEnd && boundary >= started + REFRESH_WINDOW_MS;
+      const renewAt = canPrefetch ? boundary - REFRESH_LEAD_MS : boundary;
+      nextFetch = Math.max(received + MIN_REFRESH_INTERVAL_MS, previousStartedAt + REFRESH_WINDOW_MS, renewAt);
     }).catch(() => {
       fetchFailed = true;
       nextFetch = now() + RETRY_MS;
@@ -104,10 +112,12 @@ export function createHomeDisplayPlayer(deps: {
   function tick() {
     clearTimeout(timer);
     const clock = now();
-    const serverNow = clock + offset;
+    const estimatedNow = clock + offset;
+    const serverNow = Math.max(estimatedNow, lastRenderedAt);
     const end = batch ? batchEnd(batch) : 0;
     const value = batch && homeDisplayAt(batch, serverNow);
     if (value) {
+      lastRenderedAt = serverNow;
       staleSince = undefined;
       deps.render(value);
     } else {
@@ -117,10 +127,11 @@ export function createHomeDisplayPlayer(deps: {
     if (clock >= nextFetch) void refresh();
     const delays = pending ? [] : [nextFetch - clock];
     if (batch && end > serverNow) {
-      delays.push(end - serverNow);
+      delays.push(end - estimatedNow);
       if (batch.enabled) {
         const elapsed = serverNow - batch.startAt;
-        delays.push(elapsed < 0 ? -elapsed : 1000 - elapsed % 1000);
+        const nextSecond = elapsed < 0 ? batch.startAt : serverNow + 1000 - elapsed % 1000;
+        delays.push(nextSecond - estimatedNow);
       }
     } else if (batch && !fetchFailed && staleSince !== undefined && staleSince + EXPIRY_GRACE_MS > clock) {
       delays.push(staleSince + EXPIRY_GRACE_MS - clock);
