@@ -546,6 +546,8 @@ const toggleStyle: CSSProperties = {
 .newcomer-task--mission .newcomer-task__progress-copy { margin-top:8px !important; font:400 12px/16px var(--font-v5) !important; gap:4px; align-items:baseline; }
 .newcomer-task--mission .newcomer-task__progress-copy > text { color:var(--v5-ink-3) !important; }
 .newcomer-task--mission .newcomer-task__progress-copy > text:last-child { color:var(--v5-nex-ink) !important; white-space:nowrap; }
+/* Lite: the web-unavailable notice is the row's only text; it wraps instead of running out of the card. */
+.newcomer-task--mission .newcomer-task__progress-copy > text:only-child { white-space:normal; }
 .newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view { box-sizing:border-box; min-height:53px; }
 
 
