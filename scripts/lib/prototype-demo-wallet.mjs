@@ -270,6 +270,14 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
   ];
   seeds.push(...deletionEntries.map(([bizNo,asset,direction,amount,bizType,category,at])=>
     ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
+  // Layout check: real-form references (36-char order number, its refund, a learning reward source).
+  if(state.billRefsState==='long-refs'){
+    const orderNo='ORD-7F3A9C2E5B8D41F6A0C3E9B27D5F1A84';
+    seeds.push(...[[orderNo,'USDT','OUT',1299,'ORDER_PURCHASE','purchase',seedAt-3*3600000],
+      ['E4-REFUND-'+orderNo,'USDT','IN',1299,'ORDER_REFUND','refund',seedAt-2*3600000],
+      ['LEARN:1:ai-workload-fundamentals-intermediate:lesson-07','UVT','IN',5,'LEARNING_REWARD','bonus',seedAt-3600000]]
+      .map(([bizNo,asset,direction,amount,bizType,category,at])=>({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
+  }
   const credits=demoH4Credits(state,now).filter(row=>!posted.has(row.id)).map(({id,type,amount,at,includedInBalance,asset='UVT'})=>({
     id,bizNo:id,bizType:type,asset,direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));

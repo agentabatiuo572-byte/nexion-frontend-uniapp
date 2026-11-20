@@ -17,7 +17,7 @@
         <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">VND</text></text></view>
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
-          <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" /></view>
+          <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
           <view class="row"><text>{{ c.totalDebit }}</text><text>{{ money(order.bank.amountUsdt) }} USDT</text></view>
           <view class="row"><text>{{ c.fee }}</text><text>{{ money(order.bank.feeUsdt) }}</text></view>
           <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
@@ -564,7 +564,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .row > text:first-child { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font-size: 12px; }
 .row > text:last-child { flex: none; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .row--code { align-items: center; }
-.row--code > text:first-child { flex: none; max-width: 45%; }
 .money { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: 34px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .money__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
 /* Result: centred head, then the amount; actions sit in the fixed bar. */

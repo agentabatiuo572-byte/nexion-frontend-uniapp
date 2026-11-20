@@ -82,7 +82,7 @@
                   <NxCodeValue class="bills-row__code" :value="b.ref" :label="t.orders.refundBillNo" />
                 </view>
                 <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click.stop="toggleSourceRef(b.id)"  @keydown.enter.stop.prevent="toggleSourceRef(b.id)" @keydown.space.stop.prevent="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
-                <NxCodeValue v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward' && b.ref" class="bills-row__code" :value="b.ref" :label="t.rewards.showSourceId" :copyable="false" full />
+                <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
               </view>
               <view class="bills-row__figure">
                 <view class="bills-row__amount" :class="{ 'bills-row__amount--in': !isDebit(b) }">
@@ -120,7 +120,7 @@
           <view class="bills-sheet__fact"><text>{{ t.bills.detailTime }}</text><text class="bills-sheet__value tabular-nums">{{ fmtTime(detail.ts) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailSource }}</text><text class="bills-sheet__value">{{ billMemo(detail) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status, isDebit(detail))" /></view>
-          <view v-if="detail.ref" class="bills-sheet__fact"><text>{{ t.bills.detailRef }}</text><NxCodeValue :value="detail.ref" :label="t.bills.detailRef" /></view>
+          <view v-if="detail.ref" class="bills-sheet__fact bills-sheet__fact--code"><text>{{ t.bills.detailRef }}</text><NxCodeValue :value="detail.ref" :label="t.bills.detailRef" fill /></view>
           <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums" :class="{ 'bills-balance--debt': detail.balanceAfter < 0 }">{{ formatWalletBillBalance(detail.balanceAfterExact, detail.balanceAfter, detail.symbol, dateLocale()) }}</text></view>
         </view>
         <view class="bills-sheet__close" role="button" tabindex="0" @click="detail = null" @keydown.enter.prevent="detail = null" @keydown.space.prevent="detail = null"><LiquidGlass :radius="24" tone="control" /><text>{{ t.bills.detailClose }}</text></view>
@@ -552,7 +552,7 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-sheet__fact { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inset);min-height:48px;box-sizing:content-box;padding:0 16px;font:400 14px/20px var(--font-v5);color:var(--v5-ink-3); }
 .bills-sheet__fact + .bills-sheet__fact { border-top:1px solid var(--v5-border); }
 .bills-sheet__value { min-width:0;font-weight:400;text-align:right;color:var(--v5-ink);overflow-wrap:anywhere; }
-.bills-sheet__fact > text:first-child { flex:none;max-width:45%; }
+.bills-sheet__fact--code > text:first-child { min-width:0; }
 .bills-row__code { color:var(--v5-ink-3);font-size:12px;line-height:18px; }
 .bills-sheet__close { position:relative;isolation:isolate;display:grid;place-items:center;min-height:48px;border-radius:24px;color:var(--v5-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);cursor:pointer; }
 .bills-sheet__close > text { position:relative;z-index:1; }
