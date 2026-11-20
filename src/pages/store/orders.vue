@@ -50,7 +50,7 @@
                 <text class="order-card__title">{{ commerceOrderTitle(o,locale.code) }}</text>
                 <NxTag :tone="badge(o.status).tone" :label="badge(o.status).label" />
               </view>
-              <text class="order-card__meta">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
+              <view class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="o.id" :label="t.orders.orderId" :copyable="false" /></view>
               <text v-if="o.meta" class="order-card__meta">{{ o.meta }}</text>
               <view class="order-card__bottom">
                 <text class="order-card__date">{{ dateText(o.placedAt) }}</text>
@@ -124,6 +124,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
 import {
   createRemoteOrdersRefresh,
@@ -465,6 +466,10 @@ const browseBtnStyle: CSSProperties = {
 .order-card__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
 .order-card__title { flex: 1 1 96px; min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .order-card__meta { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+/* Order number: one monospace line, shortened in the middle so its end stays visible; the whole row opens the order, so no separate copy button. */
+.order-card__code { display: flex; align-items: baseline; gap: 4px; overflow: visible; }
+.order-card__code-label { flex: none; white-space: nowrap; }
+.order-card__code-value { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 /* Narrow screens: the amount drops to its own right-aligned line instead of clipping. */
 .order-card__bottom { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: auto; }
 .order-card__date { color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
