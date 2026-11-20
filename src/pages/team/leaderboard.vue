@@ -11,7 +11,7 @@
             <text class="leader-state-title">{{ t.leaderboard.pausedTitle }}</text>
             <text>{{ t.leaderboard.pausedBody }}</text>
             <text>{{ snapshotAvailable ? `${t.leaderboard.frozenAt} · ${pauseCapturedAt}` : t.leaderboard.snapshotUnavailable }}</text>
-            <view class="leader-cta" role="button" tabindex="0" @click="loadRemote()" @keydown.enter.prevent="loadRemote()" @keydown.space.prevent="loadRemote()"><text class="leader-retry-label">{{ t.leaderboard.retry }}</text><text aria-hidden="true">→</text></view>
+            <view class="leader-cta" role="button" tabindex="0" @click="loadRemote()" @keydown.enter.prevent="loadRemote()" @keydown.space.prevent="loadRemote()"><text class="leader-retry-label">{{ t.leaderboard.retry }}</text><NxIcon name="arrow-right" /></view>
           </view>
           <template v-else>
             <view v-if="!pointsRankingAvailable" class="leader-state" role="status"><text>{{ pointsCopy.unavailable }}</text></view>
@@ -48,7 +48,7 @@
               </view>
             </view>
             <view v-if="hasMore" class="leader-more" role="button" :tabindex="remoteState !== 'ready' || remoteLoadingMore ? -1 : 0" :aria-disabled="remoteState !== 'ready' || remoteLoadingMore" :aria-busy="remoteLoadingMore" @click="loadMore" @keydown.enter.prevent="loadMore" @keydown.space.prevent="loadMore">
-              <text>{{ t.leaderboard.cta.loadMore }}</text><text aria-hidden="true">↓</text>
+              <text>{{ t.leaderboard.cta.loadMore }}</text><NxIcon name="arrow-down" />
             </view>
             <NxButton class="leader-share" variant="primary" :label="t.leaderboard.cta.share" @click="go('/pages/team/team?intent=share')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 13v7h14v-7" /></svg><text>{{ t.leaderboard.cta.share }}</text>
@@ -62,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatDisplayDateTime } from "@/lib/display-date";

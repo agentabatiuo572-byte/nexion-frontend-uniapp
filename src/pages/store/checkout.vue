@@ -104,7 +104,7 @@
                 <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h13m1 12 4-4-4-4M21 16H8" /></svg></view>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-row-description">{{ tradeinChipText }}</text></view>
                 <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
-                <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" @click="reAddTradein" />
+                <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" icon="chevron-right" @click="reAddTradein" />
               </view>
             </view>
           </view>
@@ -145,7 +145,7 @@
               <view class="checkout-capacity-actions">
                 <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
                 <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
-                <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
+                <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" icon="chevron-right" :busy="reAddingTradein" @click="reAddTradein" />
                 <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
               </view>
             </view>
@@ -168,7 +168,7 @@
           <text class="block" :style="centerTitleStyle">{{ remoteOrderFailure ? t.tradein.errPurchaseFailed : t.store.coAwaiting }}</text>
           <text class="block" style="margin-top: var(--v5-space-1); font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ remoteOrderFailure ? t.store.coRecoverOriginalOrder : remoteApiEnabled ? t.store.coAwaitingServer : isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
           <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
-            <text>{{ t.store.coTrackOrder }}</text>
+            <text class="nx-after-arrow">{{ t.store.coTrackOrder }}</text>
           </view>
         </view>
 
@@ -211,7 +211,7 @@
             <view class="h-full nx-progress-fill" style="background: var(--v5-brand)" />
           </view>
           <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: var(--v5-space-4)" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
-            <text>{{ t.store.coTrackOrder }}</text>
+            <text class="nx-after-arrow">{{ t.store.coTrackOrder }}</text>
           </view>
         </view>
 
@@ -224,7 +224,7 @@
           <text class="block" style="margin-top: var(--v5-space-1); font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; padding: 0 4px">{{ orderPlacedBody }}</text>
           <view class="flex" style="margin-top: var(--v5-space-5); gap: var(--v5-space-2)">
             <view class="flex-1 grid place-items-center active:opacity-90" :style="trackBtnStyle" role="button" tabindex="0" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
-              <text @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
+              <text class="nx-after-arrow" @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
             </view>
             <view class="grid place-items-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" :aria-label="t.store.coDone" @click.stop="goStore">
               <text @click.stop="goStore">{{ t.store.coDone }}</text>

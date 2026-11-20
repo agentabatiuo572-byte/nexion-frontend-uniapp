@@ -23,7 +23,7 @@
               <view class="flex-1 min-w-0">
                 <text class="block" :style="ctaTitleStyle">{{ remoteApiEnabled && genesis.remoteAccountReadState !== "ready" ? t.holderFacts.unconfirmed : t.genesisHolder.notHolderTitle }}</text>
                 <text class="block" :style="ctaBodyStyle">{{ notHolderBodyText }}</text>
-                <text class="gh-empty-link">{{ consumerCopy.learn }} →</text>
+                <text class="gh-empty-link nx-after-arrow">{{ consumerCopy.learn }}</text>
               </view>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
@@ -44,7 +44,7 @@
             </view>
           </view>
           <view class="gh-empty-disclosure"><text>{{ t.genesisHolder.disclosureNote }}</text><view class="gh-empty-trust" role="button" tabindex="0" @click="goTrust">
-            <text>{{ consumerCopy.trust }} ›</text>
+            <text class="nx-after-chevron">{{ consumerCopy.trust }}</text>
           </view></view>
         </template>
 
@@ -227,7 +227,7 @@
         </template>
 
         <text v-if="hasNodes" class="block text-center" :style="noteStyle">{{ t.genesisHolder.disclosureNote }}</text>
-        <text v-if="hasNodes && !dividendsOpen" class="block text-center active:opacity-70" :style="howLinkStyle" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
+        <text v-if="hasNodes && !dividendsOpen" class="block text-center active:opacity-70 nx-after-arrow" :style="howLinkStyle" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
       </view>
     </view>
   </AppChassis>

@@ -16,7 +16,7 @@
   text-align: center; cursor: pointer;
 }
 .reward-page :deep(.reward-cta:not(.reward-cta--wide)::before) { content: ''; position: absolute; inset: -2px 0; }
-.reward-page :deep(.reward-cta:not(.reward-cta--wide)::after) { content: '→'; flex-shrink: 0; }
+.reward-page :deep(.reward-cta:not(.reward-cta--wide)::after) { content: ""; flex-shrink: 0; width: 1em; height: 1em; background: currentColor; -webkit-mask: var(--nx-glyph-arrow-right) center / contain no-repeat; mask: var(--nx-glyph-arrow-right) center / contain no-repeat; }
 .reward-page :deep(.reward-cta:focus-visible) { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .reward-page :deep(.reward-cta[aria-disabled="true"]) { opacity: .5; cursor: default; }
 .reward-page :deep(.reward-cta > svg) { display: none; }

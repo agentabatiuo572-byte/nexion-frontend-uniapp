@@ -19,7 +19,7 @@
       <view v-else class="flex items-center justify-between" style="gap: 12px">
         <text class="flex-1 min-w-0" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.orders.empty }}</text>
         <view class="shrink-0 inline-flex items-center justify-center active:opacity-90" :style="browseBtnStyle" data-me-action="browse-orders" role="button" tabindex="0" :aria-label="t.orders.browseStore" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
-          <text>{{ t.orders.browseStore }}</text>
+          <text class="nx-after-arrow">{{ t.orders.browseStore }}</text>
         </view>
       </view>
 

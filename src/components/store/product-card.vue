@@ -75,7 +75,7 @@
         <!-- Trade-in callout (legacy) -->
         <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
           <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success-ink); font-weight: 500">{{ tradeCreditText }}</text></text>
-          <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
+          <text class="whitespace-nowrap active:opacity-70 nx-after-arrow" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
       <text v-if="copy.taskLevels" class="block mt-1.5" style="font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; color: var(--v5-ink-3)">{{ copy.taskLevels }}</text>

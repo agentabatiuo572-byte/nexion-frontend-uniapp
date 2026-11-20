@@ -8,7 +8,7 @@
           <view class="phone-binding-number">
             <view class="phone-binding-code" role="button" tabindex="0" :aria-label="t.countryCodes.title"
               :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true"
-              @keydown.space.prevent="showCountries = true">{{ countryCode }} ▾</view>
+              @keydown.space.prevent="showCountries = true"><text class="nx-after-chevron-down">{{ countryCode }}</text></view>
             <input v-model="phone" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :aria-label="t.register.phonePlaceholder" />
           </view>
           <view class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validPhone || resendLeft > 0" @click="sendCode()" @keydown.enter.prevent="sendCode()" @keydown.space.prevent="sendCode()">

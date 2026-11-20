@@ -213,12 +213,15 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     const selected = pendingNavigation[pendingNavigation.length - 1] ?? config.value;
     const items = nodes(), item = items[config.values.indexOf(selected)];
     const last = items[items.length - 1];
-    maxTrackScroll = config.layout === "scroll" && last
+    // An equal filter whose one-line labels cannot fit scrolls like a scroll rail (glass-segments.vue).
+    const overflow = config.layout === "equal" && config.variant !== "navigation" && root.scrollWidth > root.clientWidth + 1;
+    if (root.dataset.glassOverflow !== String(overflow)) root.dataset.glassOverflow = String(overflow);
+    maxTrackScroll = (config.layout === "scroll" || overflow) && last
       ? Math.max(0, last.offsetLeft + last.offsetWidth + parseFloat(getComputedStyle(root).paddingRight || "0") - root.clientWidth) : 0;
     if (!lens) return;
     if (!item) { ground(); lens.style.visibility = "hidden"; current = target = undefined; return; }
     if (!drag?.engaged) moveTo(item, selected);
-    if (config.layout === "scroll" && (item.offsetLeft < root.scrollLeft || item.offsetLeft + item.offsetWidth > root.scrollLeft + root.clientWidth)) {
+    if ((config.layout === "scroll" || overflow) && (item.offsetLeft < root.scrollLeft || item.offsetLeft + item.offsetWidth > root.scrollLeft + root.clientWidth)) {
       root.scrollLeft = Math.max(0, item.offsetLeft - (root.clientWidth - item.offsetWidth) / 2);
     }
   }
@@ -240,7 +243,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   }
   function onDown(event: PointerEvent) {
     suppressClick = false;
-    if (!event.isPrimary || event.button !== 0 || config.layout !== "equal") return;
+    if (!event.isPrimary || event.button !== 0 || config.layout !== "equal" || root.dataset.glassOverflow === "true") return;
     const item = (event.target as Element).closest<HTMLElement>(".nx-glass-option");
     if (item?.parentElement !== root || !enabled(item)) return;
     drag = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, at: event.timeStamp, engaged: false };
