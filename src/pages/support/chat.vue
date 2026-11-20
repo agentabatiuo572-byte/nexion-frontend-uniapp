@@ -447,8 +447,13 @@ function editHumanSend() {
   if (!failedHumanSend.value?.settled) return;
   const key = humanComposerKey.value;
   convStore.settleHumanComposer(key, { ...convStore.composer(key), text: failedHumanSend.value.text, failedSend: null });
-  draftText.value = convStore.composer(key).text;
-  failedHumanSend.value = convStore.composer(key).failedSend;
+  // Apply both fields together so the draft watcher cannot put the retired refusal back.
+  humanComposerResetting = true;
+  try {
+    const saved = convStore.composer(key);
+    draftText.value = saved.text;
+    failedHumanSend.value = saved.failedSend;
+  } finally { humanComposerResetting = false; }
 }
 
 const cid = ref("");
@@ -513,6 +518,10 @@ watch([() => convStore.humanComposers[humanComposerKey.value], humanSendBusy], (
     if (!humanSendBusy.value) failedHumanSend.value = saved.failedSend;
   } finally { humanComposerResetting = false; }
   restoreRecoveredComposer(saved, humanComposerKey.value);
+});
+// After the user clears a draft, the next retained rejection can be edited.
+watch([draftText, imageDraft, humanSendBusy], ([text, image, busy], [oldText, oldImage]) => {
+  if (!text && !image && !busy && (oldText || oldImage)) convStore.resumeRetainedSend(humanComposerKey.value);
 });
 const humanRealtime = createHumanThreadRealtimeLifecycle({
   currentId: () => cid.value,
@@ -1099,13 +1108,18 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
   const replyBinding = app.accountBindingEpoch;
   const composerKey = humanComposerKey.value, clearThrough = convStore.clearedComposerThrough[composerKey];
   stageHumanSend(text, attachmentId, attempts);
+  const bindKey = bindHumanDispatchKey();
+  let dispatchedKey: string | undefined;
   try {
-    await convStore.sendUser(id, text, attachmentId, bindHumanDispatchKey(), originalKey);
+    await convStore.sendUser(id, text, attachmentId, key => {
+      bindKey(key);
+      dispatchedKey = key;
+    }, originalKey);
     if (replyBinding !== app.accountBindingEpoch || cid.value !== id || supportScope !== convStore.scopeInvalidated
         || clearThrough !== convStore.clearedComposerThrough[composerKey]) return;
     if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
     const remaining = convStore.composer(composerKey).failedSend;
-    if (remaining && remaining.commandKey === localHumanSend.value?.clientMessageId)
+    if (remaining && remaining.commandKey === dispatchedKey)
       convStore.settleHumanComposer(composerKey, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
     noteSendSuccess();
     return true;
@@ -1119,7 +1133,7 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
       if (failedHumanSend.value) toast.warn(t.value.conversations.delivery.unknown);
       return;
     }
-    if (!originalKey && !localHumanSend.value?.clientMessageId) {
+    if (!originalKey && !dispatchedKey) {
       localHumanSend.value = null;
       convStore.saveComposer(composerKey, { text, imageDraft: imageDraft.value, failedSend: null });
       draftText.value = text;
@@ -1182,7 +1196,7 @@ function humanSendFailed(text: string, attachmentId: string | undefined, cause: 
     if (settled) convStore.settleHumanComposer(key, composer);
     else convStore.saveComposer(key, composer);
   }
-  failedHumanSend.value = failed;
+  failedHumanSend.value = key ? convStore.composer(key).failedSend : failed;
 }
 
 let humanConvertRequest: { binding: number; id: string } | null = null;
