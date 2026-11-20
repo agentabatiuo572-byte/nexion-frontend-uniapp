@@ -533,7 +533,7 @@ const uz: LandingCopy = {
   stepsTitle: 'Mukofotgacha uch qadam',
   step1: 'Qurilma tanlang', step1Note: 'Quyidagi istalgani',
   step2: 'Birinchi xaridni toʻlang', step2Note: 'Toʻlovda hisoblanadi',
-  step3: 'Mukofot tushadi', step3Note: '«Mukofotlarim»da koʻring',
+  step3: 'Mukofot tushadi', step3Note: 'Mukofotlarda koʻring',
   devicesTitle: 'Mos qurilmalar', firstTag: 'Birinchi buyurtmaga {reward}',
   keyRules: 'Asosiy qoidalar',
   personLimited: 'Bir akkauntga {n} martagacha', personUnlimited: 'Akkauntga cheklov yoʻq',

@@ -1485,7 +1485,7 @@ export const uz: Messages = {
   },
   search: {
     navTitle: "Qidiruv",
-    placeholder: "Qurilmalar, aʼzolar, savollar, sahifalar…",
+    placeholder: "Qurilmalar, aʼzolar, savollar…",
     inputLabel: "Qurilma, aʼzo, savol yoki sahifani qidirish",
     emptyTitle: "UVELda qidirish",
     emptyBody: "Sahifalar, qurilmalar, mahsulotlar, tarmoq aʼzolari yoki koʻp beriladigan savollarni topish uchun yozing.",
