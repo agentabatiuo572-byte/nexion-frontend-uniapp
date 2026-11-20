@@ -34,7 +34,7 @@
                 <text class="block tabular-nums" :style="heroUsdStyle">≈ {{ valuationKnown ? fmtUSD(usdValue) : "—" }}</text>
                 <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="heroChangeStyle" role="status" aria-live="polite">{{ t.wallet.loadingTransactions }}</text>
                 <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="heroChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
-                <text v-else class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable && Number.isFinite(change24h) ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
+                <text v-else class="block tabular-nums" :class="market.change24hAvailable && Number.isFinite(change24h) ? (isUp ? 'nx-before-caret-up' : 'nx-before-caret-down') : undefined" :style="heroChangeStyle"><text v-if="market.change24hAvailable && Number.isFinite(change24h)" class="nx-sr-only">{{ isUp ? "+" : "−" }}</text>{{ market.change24hAvailable && Number.isFinite(change24h) ? `${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
               </view>
             </view>
 
@@ -71,9 +71,9 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="breakdownLabelStyle">{{ br.label }}</text>
-                <text v-if="br.hint" class="block truncate" :style="breakdownHintStyle">{{ br.hint }}</text>
+                <text v-if="br.hint" class="block" :style="breakdownHintStyle">{{ br.hint }}</text>
               </view>
-              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}</text>
+              <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}<text v-if="br.value !== '—'" class="nx-sr-only"> UVT</text></text>
             </view>
           </view>
         </view>
@@ -281,9 +281,9 @@ const quickCells = computed(() => [
 ]);
 
 const breakdownRows = computed(() => [
-  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} UVT` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} UVT`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
-  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} UVT`, hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
+  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? fmtNum(nexBalance.value, 2) : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)}`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
+  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : fmtNum(pendingNex.value, 2), hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
 const useTiles = computed(() => [

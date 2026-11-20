@@ -13,7 +13,7 @@
     <!-- Max-rank end state -->
     <view v-if="vrank.remoteReady && !gap.next" class="nx-glass-card block active:opacity-90" :style="maxCardStyle" @click="goTeam">
       <view :style="maxIconStyle" :aria-label="maxRankLine">
-        <text style="font-size: 20px">{{ maxPrizeIcon }}</text>
+        <NxIcon name="check" :size="20" />
       </view>
       <view style="flex: 1; min-width: 0">
         <text class="block" style="font-family: var(--font-v5); font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight); color: var(--v5-ink)">{{ maxRankLine }}</text>
@@ -58,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
@@ -83,7 +84,6 @@ const gap = computed(() => nextRankGap(vrank, vrank.ladder));
 const titleOf = (v: number): string => vrank.remoteReady ? rankTitle(v, locale.code, vrank.ladder) : "—";
 
 // ── Max-rank end state ──(实物奖已删 → 用通用「已达成」图标作 dignity 锚点)
-const maxPrizeIcon = "✓";
 const maxRankLine = computed(() => fmt(t.value.me.networkCardMaxRank, { title: titleOf(myRank.value) }));
 
 // ── In-progress derived values ──

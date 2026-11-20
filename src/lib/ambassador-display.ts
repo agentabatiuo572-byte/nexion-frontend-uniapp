@@ -75,7 +75,7 @@ export function ambassadorAmountParts(value: number | null | undefined): { integ
 
 export function ambassadorAmountText(value: number | null | undefined): string {
   const parts = ambassadorAmountParts(value);
-  return parts ? `${parts.integer}${parts.fraction} USDT` : "— USDT";
+  return parts ? `${parts.integer}${parts.fraction}\u00A0USDT` : "— USDT";
 }
 
 export const AMBASSADOR_ROUTES = {

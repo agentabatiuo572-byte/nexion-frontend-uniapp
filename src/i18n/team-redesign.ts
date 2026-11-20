@@ -187,7 +187,7 @@ const COPY = {
     monthRewards: 'Thưởng tháng này',
     earliestCredit: 'Sớm nhất sau {n} ngày',
     rankUpNew: 'Mới khi lên {rank}',
-    rankUpInvite: 'Mời bạn bè để lên hạng nhanh hơn',
+    rankUpInvite: 'Mời bạn, lên hạng nhanh hơn',
   },
   id: {
     estimated: 'Perkiraan',
@@ -250,7 +250,7 @@ const COPY = {
     monthRewards: 'Hadiah bulan ini',
     earliestCredit: 'Paling cepat dalam {n} hari',
     rankUpNew: 'Baru di {rank}',
-    rankUpInvite: 'Undang teman untuk naik peringkat lebih cepat',
+    rankUpInvite: 'Undang teman, naik lebih cepat',
   },
   ms: {
     estimated: 'Anggaran',
@@ -313,7 +313,7 @@ const COPY = {
     monthRewards: 'Ganjaran bulan ini',
     earliestCredit: 'Paling awal dalam {n} hari',
     rankUpNew: 'Baharu di {rank}',
-    rankUpInvite: 'Jemput rakan untuk naik pangkat lebih cepat',
+    rankUpInvite: 'Jemput rakan, naik lebih cepat',
   },
   fil: {
     estimated: 'Tantiya',
@@ -376,7 +376,7 @@ const COPY = {
     monthRewards: 'Reward ngayong buwan',
     earliestCredit: 'Pinakamaaga sa {n} araw',
     rankUpNew: 'Bago sa {rank}',
-    rankUpInvite: 'Mag-imbita para mas mabilis umakyat',
+    rankUpInvite: 'Mag-imbita at umakyat agad',
   },
   ru: {
     estimated: 'Оценка',
@@ -439,7 +439,7 @@ const COPY = {
     monthRewards: 'Награды за месяц',
     earliestCredit: 'От {n} дн.',
     rankUpNew: 'Новое на {rank}',
-    rankUpInvite: 'Приглашайте друзей и повышайте ранг быстрее',
+    rankUpInvite: 'Повышайте ранг с друзьями',
   },
   kk: {
     estimated: 'Болжамды',
@@ -494,7 +494,7 @@ const COPY = {
     friendRewards: 'Достар сыйақысы',
     peopleUnit: 'мүше',
     directInvited: 'Сіз шақырған',
-    giftRule: 'Досыңыз алғаш құрылғы сатып алғаннан кейін сыйлық беріледі',
+    giftRule: 'Досыңыз алғаш құрылғы сатып алған соң сыйлық беріледі',
     myGifts: 'Сатып алу сыйлықтарым',
     myInviteCode: 'Менің шақыру кодым',
     inviteRecords: 'Шақыру сыйақысы жазбалары',
@@ -502,7 +502,7 @@ const COPY = {
     monthRewards: 'Осы айдағы сыйақылар',
     earliestCredit: 'Ең ерте: {n} күннен кейін',
     rankUpNew: '{rank} дәрежесінде жаңа',
-    rankUpInvite: 'Тезірек көтерілу үшін достарды шақырыңыз',
+    rankUpInvite: 'Дос шақырып, тез өсіңіз',
   },
   uz: {
     estimated: 'Taxminiy',
@@ -565,7 +565,7 @@ const COPY = {
     monthRewards: 'Shu oydagi mukofotlar',
     earliestCredit: 'Eng erta {n} kundan keyin',
     rankUpNew: 'Yangi imtiyoz: {rank}',
-    rankUpInvite: 'Tezroq oʻsish uchun doʻst taklif qiling',
+    rankUpInvite: 'Doʻst taklif qiling, tez oʻsing',
   },
 } as const;
 

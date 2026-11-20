@@ -90,7 +90,7 @@
           @keydown.enter.prevent="openOfficialDownload"
         >
           <text class="rs-h5-download__action-text">{{ t.register.doneOfficialDownloadLink }}</text>
-          <text class="rs-h5-download__arrow">↗</text>
+          <view class="rs-h5-download__arrow" aria-hidden="true"><NxIcon name="arrow-up-right" /></view>
         </view>
         <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
           <text class="rs-h5-download__pending">{{ t.register.doneOfficialDownloadPending }}</text>
@@ -123,6 +123,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navBack, navReset } from "@/lib/route";

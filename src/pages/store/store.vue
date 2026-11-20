@@ -79,7 +79,7 @@
 
       <view v-if="!publicOnly && !activityId && !voucherContext.voucherId" class="store-bundle-entry" data-testid="store-bundle-entry" role="button" tabindex="0" :aria-label="t.promotion.bundle"
         @click="navTo('/pages/store/bundle')" @keydown.enter.prevent="navTo('/pages/store/bundle')" @keydown.space.prevent="navTo('/pages/store/bundle')">
-        <text>{{ t.promotion.bundle }}</text><text aria-hidden="true">›</text>
+        <text>{{ t.promotion.bundle }}</text><NxIcon name="chevron-right" />
       </view>
 
       <!-- 《02》§7:Mono 仅限 <5 词短标签/数字;这是 8 词促销 callout 整句,改正文字体 -->
@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";

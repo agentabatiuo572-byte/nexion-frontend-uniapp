@@ -894,8 +894,8 @@ if grep -rqE 'WELCOME_GIFT_USDT|WELCOME_GIFT_NEX' src/ 2>/dev/null; then
 else
   ok "SPEC-7 no local gift amount constants (config-derived)"
 fi
-sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '\{usd\} USDT \+ \{nex\} UVT'
-sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '\{usd\} USDT \+ \{nex\} UVT'
+sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '\{usd\}( |\\u00A0)USDT \+ \{nex\}( |\\u00A0)UVT'
+sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '\{usd\}( |\\u00A0)USDT \+ \{nex\}( |\\u00A0)UVT'
 sentinel_present "SPEC-7 settle reads live cluster (R5)" src/store/app.ts 'evaluateAccountCluster\(accountKey\.value\)'
 sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEarnings'
 # 【z1 判决 C · 假绿清理】原「settle journals ×2」「settle applies release engine」三门

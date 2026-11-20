@@ -13,7 +13,7 @@
     <NxSheet :open="stateSheetOpen" :title="t.promotion.allStates" @close="closeStateSheet">
       <view class="reward-state-options" role="group" :aria-label="t.promotion.allStates">
         <view v-for="option in stateOptions" :key="option.value??'all'" class="reward-state-option" role="button" tabindex="0" :aria-pressed="state===option.value" @click="selectState(option.value)" @keydown.enter.prevent="selectState(option.value)" @keydown.space.prevent="selectState(option.value)">
-          <text>{{ option.label }}</text><text v-if="state===option.value" aria-hidden="true">✓</text>
+          <text>{{ option.label }}</text><NxIcon v-if="state===option.value" name="check" />
         </view>
       </view>
     </NxSheet>
@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { toast } from "@/store/ui";
 import EmptyState from "@/components/empty-state.vue";
