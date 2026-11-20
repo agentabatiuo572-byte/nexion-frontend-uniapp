@@ -7,7 +7,7 @@ import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
-import { updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
+import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
@@ -28,6 +28,7 @@ const authDemo=createAuthDemo(state);
 const startedAt=Date.now();
 if(process.env.DEMO_STATE_FILE){
   restoreDemoWithdrawalOrders(state);
+  restoreDemoBankWithdrawals(state,startedAt);
   initializeDemoH4State(state,startedAt);
   initializeLegacyStreakSavers(state);
   if(state.computeTaskSnapshots)state.computeResumeAt=startedAt;
