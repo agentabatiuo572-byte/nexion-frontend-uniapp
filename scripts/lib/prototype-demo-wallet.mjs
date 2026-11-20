@@ -14,7 +14,7 @@ const settledBill=row=>row.status==='SUCCESS';
 const reward=row=>row.direction==='IN'&&row.amount>0&&!(row.bizType==='TEAM_COMMISSION'&&row.status==='CANCELLED')&&['bonus','refer','achievement'].includes(row.category);
 
 export function demoSettledTasks(state,at) {
-  if(!demoHasEarningsHistory(state)||state.fleetState==='none')return [];
+  if(!demoHasEarningsHistory(state))return [];
   if(demoHasLongTasks(state)) {
     return [
       ['LL','language inference - structured knowledge extraction','0.029745'],
