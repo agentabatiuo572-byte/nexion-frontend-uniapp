@@ -25,7 +25,7 @@
             <view class="hb-half__foot">
               <text class="hb-label">{{ capacityFull ? copy.benefitSlotsFull : fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
               <text v-if="capacityFull" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
-              <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialRechecking }">{{ trialPill[0] }}</text>
+              <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialPillWait }">{{ trialPill[0] }}</text>
             </view>
           </template>
           <template v-else>
@@ -39,7 +39,7 @@
               <view class="hb-wt__row">
                 <text class="hb-label">{{ capacityFull ? copy.benefitSlotsFull : t.trial.homeNoPayment }}</text>
                 <text v-if="capacityFull" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
-                <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialRechecking }">{{ trialPill[1] }}</text>
+                <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialPillWait }">{{ trialPill[1] }}</text>
               </view>
             </view>
           </template>
@@ -162,14 +162,17 @@ const trialPill = computed<[string, string, string]>(() => {
     default: return [copy.value.benefitTrialChecking, copy.value.benefitTrialChecking, t.value.trial.entryChecking];
   }
 });
-// Background re-read with the confirmed label kept: the pill dims only if the read is slow (CSS delay), so a quick read never flashes.
-const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !trialOfferEnabled.value);
+// A re-read that keeps the confirmed claim label: the card says it is checking.
+const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !trialOfferEnabled.value
+  && (trialPill.value[2] === copy.value.benefitTrialClaim || trialPill.value[2] === copy.value.benefitTrialAgain));
+// Only a background re-read from a ready card waits before dimming (CSS delay), so a quick read never flashes.
+// Pills that were already muted (out of stock, unavailable, or a retry after a failed read) stay muted.
+const trialPillWait = computed(() => trialRechecking.value && !retryShown.value);
 const trialOfferLabel = computed(() => capacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
   : trial.status === "none" && (eligibility.value.ok || trial.confirmedOfferState() === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
   : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[2]}`);
-const trialOfferAria = computed(() => trialRechecking.value && trialPill.value[2] !== t.value.trial.entryChecking
-  ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
+const trialOfferAria = computed(() => trialRechecking.value ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
 const trialPendingAria = computed(() => {
   if (status.value === 'ended') return `${trialName.value} · ${lifecycleCopy.value.endedTitle} · ${lifecycleCopy.value.buyDevice}`;
   const remaining = trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.value.longRemaining);
