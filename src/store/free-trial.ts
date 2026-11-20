@@ -206,6 +206,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const confirmedHeroVisible = ref(false);
   const confirmedHomeOffer = shallowRef<{
     status: "none" | "ended";
+    capacityFull: boolean;
     deviceName: string;
     productId: string | null;
     trialDays: number;
@@ -385,9 +386,11 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       && (next.canStart || next.eligibilityReason === "product-unavailable");
     // Keep the confirmed home offer through failed reads and tab remounts.
     const config = trialConfig.config;
-    confirmedHomeOffer.value = (next.status === "none" && confirmedHeroVisible.value)
+    const capacityFull = next.eligibilityReason === "capacity-full";
+    confirmedHomeOffer.value = (next.status === "none" && (confirmedHeroVisible.value || capacityFull))
       || (next.status === "ended" && next.canStart) ? {
         status: next.status,
+        capacityFull,
         deviceName: config.trialProductName,
         productId: resolveTrialCheckoutProductId(config.trialProductId),
         trialDays: config.trialDays,
