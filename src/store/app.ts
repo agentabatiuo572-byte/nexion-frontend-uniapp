@@ -477,6 +477,7 @@ export const useApp = defineStore("app", () => {
   let remoteTaskSyncAfter = 0;
   let visibleTaskReadAfter = 0;
   const taskReadPages = new Set<"home" | "earn" | "device-detail">();
+  let deviceInventoryVisible = false;
   let remoteTaskForeground = true;
   let remoteTaskForegroundEpoch = 0;
   function setRemoteTaskForeground(foreground: boolean): void {
@@ -846,10 +847,13 @@ export const useApp = defineStore("app", () => {
     }
     if (taskAssignmentSnapshotInFlight?.key === key && now < taskAssignmentSnapshotInFlight.startedAt + TASK_ASSIGNMENT_CACHE_MS)
       return taskAssignmentSnapshotInFlight.request;
-    const pending = taskAssignmentApi.state(true).then((state) => {
+    const requireCurrent = () => {
       if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
       if (foregroundEpoch !== remoteTaskForegroundEpoch) throw new Error("REMOTE_FOREGROUND_CHANGED");
       if (readEpoch !== taskAssignmentReadEpoch) throw new Error("REMOTE_ASSIGNMENT_READ_SUPERSEDED");
+    };
+    const pending = taskAssignmentApi.state(true, requireCurrent).then((state) => {
+      requireCurrent();
       taskAssignmentSnapshot = { key, receivedAt: Date.now(), receivedMonotonicAt: readMonotonicNowMs(), state };
       return state;
     }, (cause: unknown) => {
@@ -868,6 +872,18 @@ export const useApp = defineStore("app", () => {
       taskReadPages.add(page);
       void refreshVisibleTaskAssignments();
     } else taskReadPages.delete(page);
+  }
+
+  function setDeviceInventoryVisible(visible: boolean): void {
+    if (deviceInventoryVisible && !visible && !taskReadPages.size) stopInventoryTaskRead();
+    deviceInventoryVisible = visible;
+  }
+
+  function stopInventoryTaskRead(): void {
+    invalidateRemoteTaskAssignments();
+    if (remoteAssignmentStatus.value === "loading") {
+      remoteAssignmentStatus.value = remoteAssignmentHasSnapshot.value ? "ready" : "idle";
+    }
   }
 
   function rememberTaskAssignments(request: RemoteAccountRequest, state: CanonicalTaskAssignments): CanonicalTaskAssignments {
@@ -2582,7 +2598,7 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError, homeTruthRateLimited, homeTruthTransientFailure,
     remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, activeJobsDisplay, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePendingEarned, remoteComputeProtocolVersion, remotePhoneBindingInvalid,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, ensureRemoteFleet, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, refreshVisibleTaskAssignments, invalidateRemoteTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, ensureRemoteFleet, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, setDeviceInventoryVisible, refreshVisibleTaskAssignments, invalidateRemoteTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
     tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,
