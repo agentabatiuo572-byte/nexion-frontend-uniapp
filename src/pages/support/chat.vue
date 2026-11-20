@@ -438,11 +438,17 @@ async function checkHumanSend(message?: ThreadMsg) {
   }
   if (current() && failedHumanSend.value === failed) toast.warn(t.value.conversations.delivery.unknown);
 }
-function discardHumanSend() { if (failedHumanSend.value?.settled) failedHumanSend.value = null; }
+function discardHumanSend() {
+  if (!failedHumanSend.value?.settled) return;
+  const key = humanComposerKey.value;
+  convStore.settleHumanComposer(key, { ...convStore.composer(key), failedSend: null });
+}
 function editHumanSend() {
   if (!failedHumanSend.value?.settled) return;
-  draftText.value = failedHumanSend.value.text;
-  failedHumanSend.value = null;
+  const key = humanComposerKey.value;
+  convStore.settleHumanComposer(key, { ...convStore.composer(key), text: failedHumanSend.value.text, failedSend: null });
+  draftText.value = convStore.composer(key).text;
+  failedHumanSend.value = convStore.composer(key).failedSend;
 }
 
 const cid = ref("");
@@ -504,9 +510,7 @@ watch([() => convStore.humanComposers[humanComposerKey.value], humanSendBusy], (
   humanComposerResetting = true;
   try {
     if (!draftText.value && saved.text && (saved.retainDraft || saved.failedSend)) draftText.value = saved.text;
-    if (!humanSendBusy.value && saved.failedSend && (!failedHumanSend.value
-        || saved.failedSend.replyRejected && !failedHumanSend.value.settled)) failedHumanSend.value = saved.failedSend;
-    if (failedHumanSend.value && !saved.failedSend) failedHumanSend.value = null;
+    if (!humanSendBusy.value) failedHumanSend.value = saved.failedSend;
   } finally { humanComposerResetting = false; }
   restoreRecoveredComposer(saved, humanComposerKey.value);
 });
@@ -1100,7 +1104,9 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
     if (replyBinding !== app.accountBindingEpoch || cid.value !== id || supportScope !== convStore.scopeInvalidated
         || clearThrough !== convStore.clearedComposerThrough[composerKey]) return;
     if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
-    if (humanComposerKey.value) convStore.settleHumanComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
+    const remaining = convStore.composer(composerKey).failedSend;
+    if (remaining && remaining.commandKey === localHumanSend.value?.clientMessageId)
+      convStore.settleHumanComposer(composerKey, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
     noteSendSuccess();
     return true;
   } catch (cause) {
@@ -1113,6 +1119,14 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
       if (failedHumanSend.value) toast.warn(t.value.conversations.delivery.unknown);
       return;
     }
+    if (!originalKey && !localHumanSend.value?.clientMessageId) {
+      localHumanSend.value = null;
+      convStore.saveComposer(composerKey, { text, imageDraft: imageDraft.value, failedSend: null });
+      draftText.value = text;
+      restore?.();
+      toast.error(t.value.conversations.image.sendBlocked, "");
+      return;
+    }
     humanSendFailed(text, attachmentId, cause, attempts);
   }
 }
@@ -1123,8 +1137,8 @@ function bindHumanDispatchKey() {
   return (key: string) => {
     if (owner !== threadComposerKey.value || binding !== app.accountBindingEpoch || !localId || localHumanSend.value?.id !== localId)
       throw new Error("SUPPORT_PENDING_RECOVERY_SCOPE_CHANGED");
-    localHumanSend.value = { ...localHumanSend.value, clientMessageId: key };
     if (remoteApiEnabled) convStore.recordHumanDispatch(composerKey, key);
+    localHumanSend.value = { ...localHumanSend.value, clientMessageId: key };
   };
 }
 

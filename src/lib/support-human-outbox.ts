@@ -6,6 +6,7 @@ export type FailedHumanSend = NonNullable<HumanComposer["failedSend"]>;
 export const HUMAN_OUTBOX_PREFIX = "support-human-outbox:";
 export const LEGACY_PENDING_PREFIX = "support-human-pending:";
 export const HUMAN_SEND_PREFIX = "support-human-send:";
+export const HUMAN_MIGRATION_PREFIX = "support-human-migration:";
 export const HUMAN_PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 export const humanOutboxKey = (account: string) => HUMAN_OUTBOX_PREFIX + account;
 
@@ -103,7 +104,7 @@ export function readRetainedHumanSend(storageKey: string) {
   if (typeof row?.composerKey !== "string") return;
   const { composerKey } = row;
   const saved = parseComposer(composerKey, row.saved), failed = saved?.failedSend;
-  if (!saved || !failed || failed.settled || failed.expiresAt === undefined) return;
+  if (!saved || !failed || failed.expiresAt === undefined) return;
   return { composerKey, saved, failed };
 }
 
@@ -113,6 +114,17 @@ export function writeRetainedHumanSend(account: string, composerKey: string, sav
     composerKey,
     saved: { text: "", imageDraft: null, failedSend: failed, userClearThrough: saved.userClearThrough },
   }, true);
+}
+
+export function humanMigrationKey(account: string, source: string, composerKey: string, failed: FailedHumanSend) {
+  const identity = opaqueSupportIntentSlot(JSON.stringify([source, humanSendSlot(composerKey, failed), failed.commandKey, failed.expiresAt]));
+  return `${HUMAN_MIGRATION_PREFIX}${account}:${identity}`;
+}
+
+export function readHumanMigration(key: string, composerKey: string) {
+  const marker = readJson(key, true) as { expiresAt?: unknown; commandKey?: unknown } | null;
+  if (typeof marker?.expiresAt !== "number" || !Number.isSafeInteger(marker.expiresAt) || marker.expiresAt <= 0) return;
+  return { expiresAt: marker.expiresAt, commandKey: validHumanCommandKey(composerKey, marker.commandKey) ? marker.commandKey : undefined };
 }
 
 export function retainedHumanSends(account: string) {
