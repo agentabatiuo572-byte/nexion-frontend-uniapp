@@ -1803,7 +1803,7 @@ export const fil: Messages = {
     sheetNetCostLabel: "Tantiyang babayaran",
     sheetCta: "Kumpirmahin · checkout ${amount}",
     sheetCancel: "I-cancel",
-    recoveryPending: "Hindi pa kumpirmado ang resulta ng naunang trade-in. Subukan ulit para masuri.",
+    recoveryPending: "Hindi pa kumpirmado ang resulta ng naunang trade-in.",
     recoveryChecking: "Sinusuri ang resulta ng naunang trade-in. Huwag magbayad ulit.\nKusang mag-a-update ang page na ito.",
     keepRecoveryPending: "Hindi pa kumpirmado ang pagbili mo habang pinananatili ang lumang device. I-recover muna ang naunang transaksyon.",
     keepRecoveryAction: "Suriin ang orihinal na pagbili",

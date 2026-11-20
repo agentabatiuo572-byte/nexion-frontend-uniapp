@@ -1803,7 +1803,7 @@ export const id: Messages = {
     sheetNetCostLabel: "Est. dibayar",
     sheetCta: "Konfirmasi · checkout ${amount}",
     sheetCancel: "Batal",
-    recoveryPending: "Hasil tukar tambah sebelumnya belum terkonfirmasi. Coba lagi untuk mengecek hasilnya.",
+    recoveryPending: "Hasil tukar tambah sebelumnya belum terkonfirmasi.",
     recoveryChecking: "Sedang mengecek hasil tukar tambah sebelumnya. Jangan membayar lagi.\nHalaman ini akan diperbarui otomatis.",
     keepRecoveryPending: "Hasil pembelian dengan tetap menyimpan perangkat lama belum terkonfirmasi. Pulihkan transaksi pembelian awal terlebih dahulu.",
     keepRecoveryAction: "Cek pembelian awal",

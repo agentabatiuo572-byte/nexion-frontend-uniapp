@@ -1773,6 +1773,8 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-cta {
   width: 100%;
   min-height: 48px;
+  box-sizing: border-box;
+  padding: 8px 20px;
   border-radius: 999px;
   background: var(--v5-brand);
   display: flex;
@@ -1787,6 +1789,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   opacity: 0.5;
 }
 .tis-cta-text {
+  text-align: center;
   font-family: var(--font-v5);
   font-size: var(--ui-type-button);
   font-weight: 600;
