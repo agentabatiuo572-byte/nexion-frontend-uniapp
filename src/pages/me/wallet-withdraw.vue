@@ -1839,7 +1839,8 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-route { margin-top: 12px; padding: 4px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .wd-route__r { display: flex; align-items: center; gap: 12px; min-height: 52px; }
 .wd-route__r + .wd-route__r { border-top: 1px solid var(--v5-border); }
-.wd-route__k { flex: none; width: 52px; }
+/* Labels keep at least the zh width; long-language labels grow and wrap by word instead of running under the value. */
+.wd-route__k { flex: none; width: min-content; min-width: 52px; max-width: 72px; overflow-wrap: break-word; }
 .wd-net { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-v5); }
 .wd-manage:focus-visible, .wd-add:focus-visible, .wd-submit:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .wd-route__note { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }

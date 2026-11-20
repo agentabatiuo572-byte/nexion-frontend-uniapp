@@ -71,7 +71,7 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="breakdownLabelStyle">{{ br.label }}</text>
-                <text v-if="br.hint" class="block truncate" :style="breakdownHintStyle">{{ br.hint }}</text>
+                <text v-if="br.hint" class="block" :style="breakdownHintStyle">{{ br.hint }}</text>
               </view>
               <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}</text>
             </view>
@@ -281,9 +281,9 @@ const quickCells = computed(() => [
 ]);
 
 const breakdownRows = computed(() => [
-  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} UVT` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} UVT`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
-  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} UVT`, hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
+  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? fmtNum(nexBalance.value, 2) : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)}`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
+  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : fmtNum(pendingNex.value, 2), hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
 const useTiles = computed(() => [

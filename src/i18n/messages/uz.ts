@@ -1881,7 +1881,7 @@ export const uz: Messages = {
       sell: "Sotish",
     },
     breakdown: {
-      label: "TARKIBI",
+      label: "TARKIBI (UVT)",
       liquid: "Mavjud balans",
       mining: "Bugungi UVT daromadi",
       miningHint: "Xarajatlar ayirilgan; jarayondagi yozuvlar ham kiritilgan",
