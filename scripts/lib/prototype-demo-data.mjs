@@ -84,7 +84,7 @@ export const demoOptions = {
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
   withdrawRecoveryState:withdrawRecoveryOptions,
   withdrawNetworksState:[['bep20-erc20','提现网络 · BEP20 和 ERC20'],['bep20','提现网络 · 仅 BEP20'],['erc20','提现网络 · 仅 ERC20'],['closed','提现网络 · 全部关闭']],
-  bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
+  bankState:[['pending','银行提现 · 处理中'],['review','银行提现 · 等待处理'],['held','银行提现 · 核对中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
   streakState:[['normal','连续签到'],['first','首次签到·连续 0 天'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['draft','进行中 · 待提交材料（M0）'],['review','核验中 · 业务通过、费用待核（M3）'],['partial','核验中 · 已交但缺两项（M1）'],['more-finance','需补材料 · 费用退回、可下调（M6）'],['more-business','需补材料 · 业务退回（M5）'],['passed','两项通过 · 待批准（M7）'],['passed-short','两项通过 · 认可金额不足（M8）'],['passed-precise','两项通过 · 认可金额 2999.999999'],['future','两项通过 · 活动未到（M9）'],['bucket','历史待审缺类别（M10）'],['approved','最近一份已通过（M13）'],['rejected','最近一份未通过（M13）']],

@@ -115,7 +115,7 @@
               <text class="block" :style="activityTimeStyle">{{ fmtActivityTime(a.ts) }}</text>
             </view>
             <view class="text-right">
-              <text class="block tabular-nums" :style="activityNexStyle">{{ Number.isFinite(a.nex) && a.nex >= 0 ? "+" : "" }}{{ fmtNum(a.nex, 2) }} UVT</text>
+              <text class="block tabular-nums" :style="activityNexStyle">{{ Number.isFinite(a.nex) && a.nex >= 0 ? "+" : "" }}{{ fmtNum(a.nex, 2) }}</text>
               <text class="block" :style="activityUsdStyle">≈ {{ marketValueKnown ? fmtUSD(a.nex * nexPrice) : "—" }}</text>
             </view>
           </view>

@@ -43,10 +43,12 @@ export function bankDemo(url, state, request) {
   const orderView = row => {
     settleDemoBankWithdrawals(state);
     const settled = row.outcome === 'settled', rejected = row.outcome === 'rejected';
+    // Open orders follow the panel live: review = queued before dispatch, held = manual review.
+    const review = !row.outcome && state.bankState === 'review', held = !row.outcome && state.bankState === 'held';
     // The refund option models a D2 refund before dispatch (READY + REFUNDED + refund proof).
-    return { ...snapshot(row), providerState: settled ? 'PAID' : rejected ? 'READY' : 'PENDING',
-      withdrawal: { ...row.withdrawal, status: settled ? 'CONFIRMED' : rejected ? 'REFUNDED' : 'PROCESSING' },
-      settlementEvidence: { status: settled ? 'paid' : rejected ? 'refunded' : 'unconfirmed', evidenceRef: settled || rejected ? 'DEMO-' + row.withdrawalNo : null, providerOrderId: settled ? 'DEMO-PROVIDER-' + row.withdrawalNo : null, providerStatus: settled ? 3 : null, checkedAt: new Date(now).toISOString(), amountUsdt: row.bank.amountUsdt } };
+    return { ...snapshot(row), providerState: settled ? 'PAID' : rejected || review ? 'READY' : held ? 'MANUAL_REVIEW' : 'PENDING',
+      withdrawal: { ...row.withdrawal, status: settled ? 'CONFIRMED' : rejected ? 'REFUNDED' : review ? 'REVIEW_PENDING' : 'PROCESSING' },
+      settlementEvidence: { status: settled ? 'paid' : rejected ? 'refunded' : held ? 'review_required' : 'unconfirmed', evidenceRef: settled || rejected ? 'DEMO-' + row.withdrawalNo : null, providerOrderId: settled ? 'DEMO-PROVIDER-' + row.withdrawalNo : null, providerStatus: settled ? 3 : null, checkedAt: new Date(now).toISOString(), amountUsdt: row.bank.amountUsdt } };
   };
   if (path === '/api/withdrawals/bank/config' && method === 'GET') return config();
   if (path === '/api/withdrawals/bank/beneficiary/otp' && method === 'POST') return challenge('bank');
@@ -94,7 +96,8 @@ export function bankDemo(url, state, request) {
       const facts = demoWithdrawalFacts(state, now);
       if (facts.dailyRemainingCount === 0) fail('WITHDRAWAL_DAILY_LIMIT_EXCEEDED');
       if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
-      const withdrawalNo = 'WD-DEMO' + (Object.keys(demo.orders).length + 1);
+      // Real form: WD- plus 32 upper-case hex (35 characters), so result layouts see the true length.
+      const withdrawalNo = 'WD-' + randomBytes(16).toString('hex').toUpperCase();
       const reserve = { asset: 'USDT', direction: 'OUT', at: now, category: 'withdraw' };
       postDemoWalletEntries(state,
         { ...reserve, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', amount: row.quote.netUsdt },
