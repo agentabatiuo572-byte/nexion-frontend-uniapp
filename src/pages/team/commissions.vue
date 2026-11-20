@@ -33,7 +33,7 @@
             </view>
           </view>
           <view class="reward-income-lifetime"><text>{{ designCopy.totalEarned }}</text><view class="reward-income-lifetime__amounts"><text>{{ assetTotal(lifetimeTotals.usdt, 'usdt') }}</text><text>{{ assetTotal(lifetimeTotals.nex, 'uvt') }}</text></view></view>
-          <template #footer><view class="commission-overview__rules nx-commissions-focusable" role="link" tabindex="0" :aria-label="t.commissions.howItWorksEntry" @click="go('/pages/team/commissions-how')" @keydown.enter.prevent="go('/pages/team/commissions-how')"><text>{{ t.commissions.howItWorksEntry }}</text><text aria-hidden="true">›</text></view></template>
+          <template #footer><view class="commission-overview__rules nx-commissions-focusable" role="link" tabindex="0" :aria-label="t.commissions.howItWorksEntry" @click="go('/pages/team/commissions-how')" @keydown.enter.prevent="go('/pages/team/commissions-how')"><text>{{ t.commissions.howItWorksEntry }}</text><NxIcon name="chevron-right" /></view></template>
         </RewardHero>
 
 
@@ -112,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { teamRedesignCopy } from "@/i18n/team-redesign";

@@ -34,7 +34,7 @@
                 <text class="block tabular-nums" :style="heroUsdStyle">≈ {{ valuationKnown ? fmtUSD(usdValue) : "—" }}</text>
                 <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="heroChangeStyle" role="status" aria-live="polite">{{ t.wallet.loadingTransactions }}</text>
                 <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="heroChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
-                <text v-else class="block tabular-nums" :style="heroChangeStyle">{{ market.change24hAvailable && Number.isFinite(change24h) ? `${isUp ? "▲" : "▼"} ${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
+                <text v-else class="block tabular-nums" :class="market.change24hAvailable && Number.isFinite(change24h) ? (isUp ? 'nx-before-caret-up' : 'nx-before-caret-down') : undefined" :style="heroChangeStyle"><text v-if="market.change24hAvailable && Number.isFinite(change24h)" class="nx-sr-only">{{ isUp ? "+" : "−" }}</text>{{ market.change24hAvailable && Number.isFinite(change24h) ? `${Math.abs(change24h).toFixed(2)}%` : "—" }} (24h)</text>
               </view>
             </view>
 

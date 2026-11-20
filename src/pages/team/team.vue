@@ -34,7 +34,7 @@
         <!-- My V-rank summary -->
         <!-- Badge, the gap to the next rank and one bar per next-rank condition. -->
         <view class="nx-team-rank-link team-rank" role="link" tabindex="0" :aria-label="t.team.rankBenefits" @click="go('/pages/team/rank')" @keydown.enter.prevent="go('/pages/team/rank')">
-          <view class="team-rank__header"><text class="team-rank__title">{{ designCopy.myRank }}</text><text class="team-rank__chev" aria-hidden="true">›</text></view>
+          <view class="team-rank__header"><text class="team-rank__title">{{ designCopy.myRank }}</text><view class="team-rank__chev" aria-hidden="true"><NxIcon name="chevron-right" /></view></view>
           <view class="team-rank__identity">
             <TeamRankEmblem v-if="!visibility.hidden && rankReadable" :rank="remoteApiEnabled ? selectedRank : myRank" :size="52" />
             <view class="team-rank__copy"><text class="team-rank__level">{{ visibility.mask(myRankDisplay) }}</text><text class="team-rank__hint">{{ visibility.mask(rankGapText) }}</text></view>
@@ -107,6 +107,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";

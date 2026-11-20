@@ -15,7 +15,7 @@
               <view class="binary-hero-heading">
                 <text class="binary-label">{{ binaryCopy.contributions }}</text>
                 <view class="binary-rule-link" role="button" tabindex="0" :aria-label="t.binary.howItWorksEntry"
-                  @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')"><text class="binary-rule-pill">{{ binaryCopy.rules }} ›</text></view>
+                  @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')"><text class="binary-rule-pill nx-after-chevron">{{ binaryCopy.rules }}</text></view>
               </view>
               <view class="binary-comparison">
                 <view v-for="(wing, index) in wings" :key="wing.key" class="binary-contribution">
@@ -43,7 +43,7 @@
                 <text class="binary-notice-title">{{ blockedTitleText }}</text>
                 <text class="binary-note">{{ blockedRecoveryText }}</text>
                 <view v-if="showGrowthRecoveryCta" class="binary-text-action" role="button" tabindex="0"
-                  @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')"><text>{{ t.binary.inviteCta }}</text><text aria-hidden="true">→</text></view>
+                  @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')"><text>{{ t.binary.inviteCta }}</text><NxIcon name="arrow-right" /></view>
               </view>
             </view>
 
@@ -84,6 +84,7 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, VIZ_GROW_HEIGHT_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { useDataVisibility } from "@/store/data-visibility";

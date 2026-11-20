@@ -3,23 +3,27 @@
     role="button" :tabindex="disabled || busy ? -1 : 0" :aria-disabled="disabled || busy" :aria-busy="busy" :aria-label="label"
     @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
     <view class="nx-button__surface" :class="{ 'nx-frosted-button': variant === 'secondary' || variant === 'brand' }">
-      <view class="nx-button__content"><slot><text>{{ label }}</text></slot></view>
+      <view class="nx-button__content"><slot><text>{{ label }}</text></slot><NxIcon v-if="icon" :name="icon" /></view>
     </view>
   </view>
 </template>
 <script setup lang="ts">
 // Design system 03 §3.1: primary = solid brand, brand = brand glass, secondary = neutral glass,
 // text = in-place action in brand color, link = next-level navigation in muted color.
-const props = withDefaults(defineProps<{ label?: string; variant?: 'primary' | 'brand' | 'secondary' | 'text' | 'link'; size?: 'large' | 'medium' | 'small'; disabled?: boolean; busy?: boolean }>(), { variant: 'secondary', size: 'large' });
+// icon = trailing glyph after the label (forward arrow, chevron); never a text character in the copy.
+import NxIcon, { type NxIconName } from './nx-icon.vue';
+const props = withDefaults(defineProps<{ label?: string; variant?: 'primary' | 'brand' | 'secondary' | 'text' | 'link'; size?: 'large' | 'medium' | 'small'; disabled?: boolean; busy?: boolean; icon?: NxIconName }>(), { variant: 'secondary', size: 'large' });
 const emit = defineEmits<{ (event: 'click'): void }>();
 function activate(event?: Event) { if (!props.disabled && !props.busy && !(event as KeyboardEvent)?.repeat) emit('click'); }
 </script>
 <style scoped>
-.nx-button { position: relative; isolation: isolate; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 48px; border-radius: 999px; color: var(--v5-ink); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; transition: transform 160ms ease; }
+.nx-button { position: relative; isolation: isolate; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: max-content; min-height: 48px; border-radius: 999px; color: var(--v5-ink); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; transition: transform 160ms ease; }
 /* The hit area participates in layout; its compact surface stays inside it. */
 .nx-button__surface { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: 48px; padding: 10px 20px; border-radius: inherit; }
-.nx-button__content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; text-align: center; overflow-wrap: anywhere; }
-.nx-button--primary > .nx-button__surface { background: var(--v5-brand); color: var(--v5-on-brand); }
+.nx-button__content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; text-align: center; white-space: nowrap; }
+/* Labels stay on one line (design-rules Controls): uni-text sets its own white-space, so the rule reaches it directly.
+   A row that cannot fit the button wraps the button to the next line instead of squeezing it. */
+.nx-button__content :deep(uni-text), .nx-button__content :deep(text) { white-space: nowrap; }.nx-button--primary > .nx-button__surface { background: var(--v5-brand); color: var(--v5-on-brand); }
 /* Brand glass keeps the shared frosted material and only swaps fill, ink and the solid fallback. */
 .nx-button--brand > .nx-button__surface { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); }
 .nx-button--text { color: var(--v5-brand); }

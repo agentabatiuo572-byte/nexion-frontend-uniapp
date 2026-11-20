@@ -61,7 +61,7 @@
           @keydown="onHandleKeydown"
         >
           <view v-if="busy" class="cs-spin" />
-          <text v-else class="cs-handle__t">{{ verified ? "✓" : "→" }}</text>
+          <view v-else class="cs-handle__t" aria-hidden="true"><NxIcon :name="verified ? 'check' : 'arrow-right'" /></view>
         </view>
       </view>
 
@@ -74,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { ref, computed, onMounted, onUnmounted, getCurrentInstance } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";

@@ -20,7 +20,7 @@
       <text class="pcb-sep" aria-hidden="true">·</text>
       <text class="pcb-countdown font-mono-tabular">{{ countdown }}</text>
       <view class="pcb-cta">
-        <text class="pcb-cta-t">{{ t.store.pendingBarResume }}</text>
+        <text class="pcb-cta-t nx-after-arrow">{{ t.store.pendingBarResume }}</text>
       </view>
     </view>
   </view>

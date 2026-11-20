@@ -31,7 +31,7 @@
       <!-- How-it-works entry + rate freshness ring + refresh (P-46). -->
       <view class="ex-top">
         <view class="ex-how" role="button" tabindex="0" :aria-label="t.exchange.howItWorksEntry" @click="goHowItWorks"  @keydown.enter.prevent="goHowItWorks" @keydown.space.prevent="goHowItWorks">
-          <text>{{ t.exchange.howItWorksEntry }} ›</text>
+          <text class="nx-after-chevron">{{ t.exchange.howItWorksEntry }}</text>
         </view>
         <view class="ex-fresh">
           <svg class="ex-fresh__ring" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle class="ex-fresh__trk" cx="9" cy="9" r="7" /><circle class="ex-fresh__val" cx="9" cy="9" r="7" :style="{ strokeDashoffset: `${(44 * (1 - rateFreshness)).toFixed(1)}` }" /></svg>

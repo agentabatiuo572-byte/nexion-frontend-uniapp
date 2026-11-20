@@ -30,7 +30,7 @@
       </view>
       <view class="dc-foot">
         <text class="dc-foot__caption">{{ fmt(generalBase ? t.home.doMathVs : t.home.doMathYour, { base: baseShort }) }}</text>
-        <NxButton class="dc-foot__action" variant="brand" size="small" :label="`${t.home.doMathSeeCta} →`" @click="goStore" />
+        <NxButton class="dc-foot__action" variant="brand" size="small" :label="t.home.doMathSeeCta" icon="arrow-right" @click="goStore" />
       </view>
     </view>
   </NxSection>

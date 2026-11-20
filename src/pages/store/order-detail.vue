@@ -29,7 +29,7 @@
       <view v-else-if="showOrderNotFound" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" :aria-label="t.orders.title" @click.stop="goOrders">
-          <text>{{ t.orders.title }} →</text>
+          <text class="nx-after-arrow">{{ t.orders.title }}</text>
         </view>
       </view>
 

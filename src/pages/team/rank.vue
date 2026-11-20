@@ -18,7 +18,7 @@
             </view>
             </view>
             <view v-if="inheritedConditions.length" class="rank-inherited">
-              <view class="rank-inherited__toggle" role="button" tabindex="0" :aria-expanded="inheritedExpanded" aria-controls="inherited-conditions" @click="inheritedExpanded=!inheritedExpanded" @keydown.enter.prevent="inheritedExpanded=!inheritedExpanded" @keydown.space.prevent="inheritedExpanded=!inheritedExpanded"><text>{{ rankReviewCopy.previous }} · {{ visibility.mask(inheritedConditions.length) }}</text><text aria-hidden="true">{{ inheritedExpanded ? '−' : '+' }}</text></view>
+              <view class="rank-inherited__toggle" role="button" tabindex="0" :aria-expanded="inheritedExpanded" aria-controls="inherited-conditions" @click="inheritedExpanded=!inheritedExpanded" @keydown.enter.prevent="inheritedExpanded=!inheritedExpanded" @keydown.space.prevent="inheritedExpanded=!inheritedExpanded"><text>{{ rankReviewCopy.previous }} · {{ visibility.mask(inheritedConditions.length) }}</text><NxIcon :name="inheritedExpanded ? 'minus' : 'plus'" /></view>
               <view v-if="inheritedExpanded" id="inherited-conditions">
             <view v-for="condition in inheritedConditions" :key="condition.key" class="rank-condition">
               <view class="rank-condition__heading"><text class="rank-condition__name">{{ condition.displayLabel }}</text><view class="rank-condition__value"><text class="rank-condition__current">{{ visibility.mask(condition.values.split(' / ')[0]) }}</text><text class="rank-condition__target"> / {{ condition.values.split(' / ')[1] }}</text></view></view>
@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { increasedRankBenefitKeys, type RankBenefitKey } from '@/lib/team-rank-benefits';
 import { teamRedesignCopy } from '@/i18n/team-redesign';

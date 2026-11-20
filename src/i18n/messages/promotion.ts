@@ -222,8 +222,8 @@ export const promotionZH = {
   "rulePer": "购买数量",
   "scopeClear": "清除活动范围",
   "failed": "查询原结果后重试",
-  "voucherSaving": "预计减免 {amount} USDT",
-  "voucherMinimum": "满 {amount} USDT 可用",
+  "voucherSaving": "预计减免 {amount}\u00A0USDT",
+  "voucherMinimum": "满 {amount}\u00A0USDT 可用",
   "voucherAllProducts": "适用于所有商品",
 };
 export const promotionEN = {
@@ -449,8 +449,8 @@ export const promotionEN = {
   "rulePer": "Purchase quantity",
   "scopeClear": "Clear promotion",
   "failed": "Try again after checking the original result",
-  "voucherSaving": "Estimated saving: {amount} USDT",
-  "voucherMinimum": "Minimum purchase: {amount} USDT",
+  "voucherSaving": "Estimated saving: {amount}\u00A0USDT",
+  "voucherMinimum": "Minimum purchase: {amount}\u00A0USDT",
   "voucherAllProducts": "All products",
 };
 export const promotionVI = {
@@ -676,7 +676,7 @@ export const promotionVI = {
   "rulePer": "Số lượng mua",
   "scopeClear": "Bỏ phạm vi ưu đãi",
   "failed": "Kiểm tra kết quả ban đầu rồi thử lại",
-  "voucherSaving": "Ước tính giảm {amount} USDT",
-  "voucherMinimum": "Đơn từ {amount} USDT",
+  "voucherSaving": "Ước tính giảm {amount}\u00A0USDT",
+  "voucherMinimum": "Đơn từ {amount}\u00A0USDT",
   "voucherAllProducts": "Áp dụng cho mọi sản phẩm",
 };

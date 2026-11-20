@@ -11,7 +11,7 @@ const copy = {
     backCommissions: '返回奖励明细', poolRecords: '查看本期票数、占比与分配记录',
     poolFactsTitle: '本期参与情况', poolFactsHint: '实际发放金额以发放记录为准。',
     netSummary: '已扣除撤销和未发放的奖励。', settlementDetails: '奖励规则',
-    recordDetails: '查看记录编号', hideDetails: '收起详情', pendingRecovery: '待扣回：{usdt} + {uvt} UVT',
+    recordDetails: '查看记录编号', hideDetails: '收起详情', pendingRecovery: '待扣回：{usdt} + {uvt}\u00A0UVT',
     budgetLabel: '申请预算（USDT）',
   },
   en: {
@@ -25,7 +25,7 @@ const copy = {
     backCommissions: 'Back to reward history', poolRecords: 'View current votes, share and payout records',
     poolFactsTitle: 'Participation this period', poolFactsHint: 'Actual payouts follow the payout records.',
     netSummary: 'Reversed and unpaid rewards are excluded.', settlementDetails: 'Reward rules',
-    recordDetails: 'View record references', hideDetails: 'Hide details', pendingRecovery: 'To be reversed: {usdt} + {uvt} UVT',
+    recordDetails: 'View record references', hideDetails: 'Hide details', pendingRecovery: 'To be reversed: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Requested budget (USDT)',
   },
   vi: {
@@ -39,7 +39,7 @@ const copy = {
     backCommissions: 'Về lịch sử thưởng', poolRecords: 'Xem phiếu, tỷ lệ và lịch sử phân bổ kỳ này',
     poolFactsTitle: 'Tham gia kỳ này', poolFactsHint: 'Số tiền chi trả thực tế theo lịch sử chi trả.',
     netSummary: 'Đã loại trừ các khoản thưởng bị hủy hoặc không được chi trả.', settlementDetails: 'Quy tắc thưởng',
-    recordDetails: 'Xem mã bản ghi', hideDetails: 'Thu gọn chi tiết', pendingRecovery: 'Chờ thu hồi: {usdt} + {uvt} UVT',
+    recordDetails: 'Xem mã bản ghi', hideDetails: 'Thu gọn chi tiết', pendingRecovery: 'Chờ thu hồi: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Ngân sách đề nghị (USDT)',
   },
   id: {
@@ -53,7 +53,7 @@ const copy = {
     backCommissions: 'Kembali ke riwayat hadiah', poolRecords: 'Lihat suara, porsi, dan riwayat pembayaran periode ini',
     poolFactsTitle: 'Partisipasi periode ini', poolFactsHint: 'Pembayaran aktual mengikuti catatan pembayaran.',
     netSummary: 'Hadiah yang dibatalkan dan tidak dibayarkan tidak dihitung.', settlementDetails: 'Aturan hadiah',
-    recordDetails: 'Lihat nomor catatan', hideDetails: 'Sembunyikan detail', pendingRecovery: 'Akan ditarik kembali: {usdt} + {uvt} UVT',
+    recordDetails: 'Lihat nomor catatan', hideDetails: 'Sembunyikan detail', pendingRecovery: 'Akan ditarik kembali: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Anggaran diajukan (USDT)',
   },
   ms: {
@@ -67,7 +67,7 @@ const copy = {
     backCommissions: 'Kembali ke sejarah ganjaran', poolRecords: 'Lihat undi, bahagian dan rekod bayaran semasa',
     poolFactsTitle: 'Penyertaan tempoh ini', poolFactsHint: 'Bayaran sebenar mengikut rekod bayaran.',
     netSummary: 'Ganjaran yang ditarik balik dan tidak dibayar dikecualikan.', settlementDetails: 'Peraturan ganjaran',
-    recordDetails: 'Lihat rujukan rekod', hideDetails: 'Sorok butiran', pendingRecovery: 'Akan ditarik balik: {usdt} + {uvt} UVT',
+    recordDetails: 'Lihat rujukan rekod', hideDetails: 'Sorok butiran', pendingRecovery: 'Akan ditarik balik: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Bajet dipohon (USDT)',
   },
   fil: {
@@ -81,7 +81,7 @@ const copy = {
     backCommissions: 'Bumalik sa history ng reward', poolRecords: 'Tingnan ang boto, share at payout record ngayong period',
     poolFactsTitle: 'Pagsali ngayong period', poolFactsHint: 'Ang aktuwal na payout ay ayon sa payout record.',
     netSummary: 'Hindi kasama ang binawi at hindi naibigay na reward.', settlementDetails: 'Patakaran sa reward',
-    recordDetails: 'Tingnan ang record reference', hideDetails: 'Itago ang detalye', pendingRecovery: 'Babawiin: {usdt} + {uvt} UVT',
+    recordDetails: 'Tingnan ang record reference', hideDetails: 'Itago ang detalye', pendingRecovery: 'Babawiin: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Hininging budget (USDT)',
   },
   ru: {
@@ -95,7 +95,7 @@ const copy = {
     backCommissions: 'К истории наград', poolRecords: 'Голоса, доля и выплаты за период',
     poolFactsTitle: 'Участие в этом периоде', poolFactsHint: 'Фактические выплаты — по записям о выплатах.',
     netSummary: 'Без отменённых и невыплаченных наград.', settlementDetails: 'Правила наград',
-    recordDetails: 'Номера записей', hideDetails: 'Скрыть детали', pendingRecovery: 'Подлежит отзыву: {usdt} + {uvt} UVT',
+    recordDetails: 'Номера записей', hideDetails: 'Скрыть детали', pendingRecovery: 'Подлежит отзыву: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Запрошенный бюджет (USDT)',
   },
   kk: {
@@ -109,7 +109,7 @@ const copy = {
     backCommissions: 'Сыйақы тарихына оралу', poolRecords: 'Ағымдағы дауыстарды, үлесті және төлем жазбаларын қарау',
     poolFactsTitle: 'Осы кезеңдегі қатысу', poolFactsHint: 'Нақты төлемдер төлем жазбаларына сай.',
     netSummary: 'Кері алынған және төленбеген сыйақылар есептелмейді.', settlementDetails: 'Сыйақы ережелері',
-    recordDetails: 'Жазба нөмірлерін қарау', hideDetails: 'Мәліметті жасыру', pendingRecovery: 'Кері алынады: {usdt} + {uvt} UVT',
+    recordDetails: 'Жазба нөмірлерін қарау', hideDetails: 'Мәліметті жасыру', pendingRecovery: 'Кері алынады: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Сұралған бюджет (USDT)',
   },
   uz: {
@@ -123,7 +123,7 @@ const copy = {
     backCommissions: 'Mukofotlar tarixiga qaytish', poolRecords: 'Joriy ovozlar, ulush va toʻlovlar tarixini koʻring',
     poolFactsTitle: 'Shu davrdagi qatnashuv', poolFactsHint: 'Haqiqiy toʻlovlar toʻlovlar tarixiga koʻra.',
     netSummary: 'Bekor qilingan va toʻlanmagan mukofotlar kirmaydi.', settlementDetails: 'Mukofot qoidalari',
-    recordDetails: 'Yozuv raqamlari', hideDetails: 'Yashirish', pendingRecovery: 'Qaytarib olinadi: {usdt} + {uvt} UVT',
+    recordDetails: 'Yozuv raqamlari', hideDetails: 'Yashirish', pendingRecovery: 'Qaytarib olinadi: {usdt} + {uvt}\u00A0UVT',
     budgetLabel: 'Soʻralgan byudjet (USDT)',
   },
 };

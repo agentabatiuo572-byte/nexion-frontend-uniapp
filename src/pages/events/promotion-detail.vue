@@ -47,7 +47,7 @@
 
           <view class="lp-section lp-section-head lp-rise lp-d2">
             <text class="lp-section-title">{{ activity.rewardRules.some(rule => rule.buyerReward.type === 'DISCOUNT_USDT') ? c.offerRules : c.giftRules }}</text>
-            <view class="lp-link" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text>{{ c.fullRules }} ›</text></view>
+            <view class="lp-link" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text class="nx-after-chevron">{{ c.fullRules }}</text></view>
           </view>
           <view v-for="ticket in giftTickets" :key="ticket.id" class="lp-rule lp-card lp-rise lp-d2">
             <view class="lp-rule__row">
@@ -179,7 +179,7 @@
             <view v-if="kind === 'first' && rewardTerms" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4.5h4.5" /></svg><text>{{ rewardTerms }}</text></view>
             <view class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></svg><text>{{ activityTime }}</text></view>
           </view>
-          <view class="lp-link lp-link--block lp-rise lp-d5" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text>{{ c.fullRules }} ›</text></view>
+          <view class="lp-link lp-link--block lp-rise lp-d5" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text class="nx-after-chevron">{{ c.fullRules }}</text></view>
         </template>
       </view>
       <view class="lp-bar-space" aria-hidden="true" />

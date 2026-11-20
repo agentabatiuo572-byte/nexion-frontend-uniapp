@@ -8,7 +8,7 @@
       <SubPageHeader back="/pages/me/me" />
       <view class="px-4 flex justify-end" style="padding-bottom: 8px">
         <view class="flex items-center active:opacity-70" :style="contactLinkStyle" role="button" tabindex="0" :aria-label="w.contactSupport" @click="goSupport"  @keydown.enter.prevent="goSupport" @keydown.space.prevent="goSupport">
-          <text>{{ w.contactSupport }} →</text>
+          <text class="nx-after-arrow">{{ w.contactSupport }}</text>
         </view>
       </view>
 
