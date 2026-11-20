@@ -1809,7 +1809,7 @@ export const ms: Messages = {
     sheetNetCostLabel: "Angg. perlu dibayar",
     sheetCta: "Sahkan · bayar ${amount}",
     sheetCancel: "Batal",
-    recoveryPending: "Keputusan tukar beli sebelumnya belum disahkan. Cuba lagi untuk menyemak keputusannya.",
+    recoveryPending: "Keputusan tukar beli sebelumnya belum disahkan.",
     recoveryChecking: "Sedang menyemak keputusan tukar beli sebelumnya. Jangan bayar lagi.\nHalaman ini akan dikemas kini secara automatik.",
     keepRecoveryPending: "Keputusan simpan-dan-beli sebelumnya belum disahkan. Pulihkan pembelian asal dahulu.",
     keepRecoveryAction: "Semak pembelian asal",

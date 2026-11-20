@@ -1809,7 +1809,7 @@ export const uz: Messages = {
     sheetNetCostLabel: "Taxminiy toʻlov",
     sheetCta: "Tasdiqlash · ${amount} toʻlash",
     sheetCancel: "Bekor",
-    recoveryPending: "Oldingi almashtirish natijasi tasdiqlanmagan. Natijani tekshirish uchun qayta urining.",
+    recoveryPending: "Oldingi almashtirish natijasi hali tasdiqlanmagan.",
     recoveryChecking: "Oldingi almashtirish natijasi tekshirilmoqda. Qayta toʻlamang.\nSahifa avtomatik yangilanadi.",
     keepRecoveryPending: "Eski qurilmani saqlab xarid qilish natijasi tasdiqlanmagan. Avval asl xaridni tiklang.",
     keepRecoveryAction: "Asl xaridni tekshirish",
