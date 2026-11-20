@@ -204,7 +204,7 @@
           </view>
           <EmptyState v-else-if="historyRows.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-for="(h, i) in historyRows" v-else :key="`${h.ts}-${i}`" class="dly-hr">
-            <view class="dly-hr__w"><text class="dly-hr__t"><template v-for="(part, pi) in h.reason.split(' · ')" :key="pi">{{ pi ? ' · ' : '' }}<text :class="{ 'dly-hr__code': !/\s/.test(part) }">{{ part }}</text></template></text><text class="dly-hr__ts">{{ formatTs(h.ts) }}</text></view>
+            <view class="dly-hr__w"><text class="dly-hr__t"><template v-for="(part, pi) in h.reason.split(' · ')" :key="pi">{{ pi ? ' · ' : '' }}<text :class="{ 'dly-hr__code': /^[\x21-\x7E]+$/.test(part) && /[@\d-]/.test(part) }">{{ part }}</text></template></text><text class="dly-hr__ts">{{ formatTs(h.ts) }}</text></view>
             <text class="dly-hr__dl" :class="{ 'dly-hr__dl--p': h.delta > 0 }">{{ h.delta > 0 ? "+" : "" }}{{ formatAmount(h.delta) }}</text>
           </view>
         </view>
@@ -1050,7 +1050,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-hr + .dly-hr { border-top: 1px solid var(--v5-border); }
 .dly-hr__w { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dly-hr__t { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
-/* A memo's reference code (review-course-1@v1) never breaks at its hyphens; the description beside it wraps. */
+/* A memo's reference code (bill ref such as review-course-1@v1: printable ASCII, no spaces, with @, a digit or a hyphen) never breaks at its hyphens; the description, Chinese included, wraps. */
 .dly-hr__code { white-space: nowrap; }
 .dly-hr__ts { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .dly-hr__dl { flex: none; font: 500 14px/20px var(--font-metric); color: var(--v5-ink); white-space: nowrap; }
