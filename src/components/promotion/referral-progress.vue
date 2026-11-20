@@ -14,7 +14,7 @@
         </view>
         <view class="referral-art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /><image class="referral-bow" src="/static/img/team-20261025/gift-bow.png" mode="aspectFit" /></view>
       </view>
-      <view class="nx-card-footer referral-actions"><text class="nx-card-footer__note">{{ copy.giftRule }}</text><view class="nx-card-action referral-progress-link" role="button" :tabindex="progressBusy[activity.activityId] || !auth.isAuthenticated ? -1 : 0" :aria-disabled="progressBusy[activity.activityId] || !auth.isAuthenticated" :aria-expanded="expandedActivity===activity.activityId" @click="showProgress(activity.activityId)" @keydown.enter.prevent="!$event.repeat && showProgress(activity.activityId)" @keydown.space.prevent="!$event.repeat && showProgress(activity.activityId)"><text>{{ copy.viewProgress }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view></view>
+      <view class="nx-card-footer referral-actions"><text class="nx-card-footer__note" :style="{ flexBasis: noteBasis(copy.giftRule) }">{{ copy.giftRule }}</text><view class="nx-card-action referral-progress-link" role="button" :tabindex="progressBusy[activity.activityId] || !auth.isAuthenticated ? -1 : 0" :aria-disabled="progressBusy[activity.activityId] || !auth.isAuthenticated" :aria-expanded="expandedActivity===activity.activityId" @click="showProgress(activity.activityId)" @keydown.enter.prevent="!$event.repeat && showProgress(activity.activityId)" @keydown.space.prevent="!$event.repeat && showProgress(activity.activityId)"><text>{{ copy.viewProgress }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view></view>
       <!-- Progress opens as a sheet; expandedActivity stays the single source of which one is open. -->
       <NxSheet :open="expandedActivity===activity.activityId" :title="localized(activity.title,locale.code) || copy.firstPurchase" @close="expandedActivity=null">
         <view class="referral-details">
@@ -30,17 +30,18 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18v4H3zM5 12v9h14v-9M12 8v13M12 8C6 8 5 5 7 3c2-2 5 2 5 5M12 8c6 0 7-3 5-5-2-2-5 2-5 5" /></svg>
             <text>{{ !progress[activity.activityId] ? progressBusy[activity.activityId] ? t.promotion.loading : '—' : copy.noRewardRecords }}</text>
           </view>
-          <view class="referral-rule-link" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
+          <view class="referral-rule-link" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><NxIcon name="chevron-right" /></view>
           <NxButton class="referral-share" variant="primary" :label="copy.inviteFriends" @click="emit('share')" />
         </view>
       </NxSheet>
     </view>
     <view v-if="error && !activities.length" class="referral-activity nx-tint"><text class="referral-title">{{ copy.firstPurchase }}</text><text class="referral-number">—</text></view>
-    <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text><text aria-hidden="true">→</text></NxButton>
+    <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" icon="arrow-right" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text></NxButton>
     <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="localized(termsActivity?.terms,locale.code)" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import{computed,ref,watch,onBeforeUnmount}from'vue';import{promotionApi,remoteApiEnabled,sessionVault}from'@/api/runtime';import type{PublicPromotion,ReferralProgress}from'@/api/promotion-contracts';import{useApp}from'@/store/app';import{useAuth}from'@/store/auth';import{useT}from'@/i18n/use-t';import{useLocaleStore}from'@/store/locale';import{localized}from'@/lib/promotion-display';import RewardRows from'./reward-rows.vue';
@@ -134,6 +135,14 @@ useAutoRecovery({
   failed: () => remoteApiEnabled && auth.isAuthenticated && !loading.value && Object.keys(progressErrors.value).some(id => progressErrors.value[id] && !progressBusy.value[id]),
   retry: () => Promise.all(Object.keys(progressErrors.value).filter(id => progressErrors.value[id] && !progressBusy.value[id]).map(id => loadProgress(id, true))),
 });
+// Footer rule (shared-layout-classes.md): the note stays beside the action while it fits in two lines.
+// Its flex-basis is about half its own one-line width (CJK about 1em, other scripts about 0.55em per character),
+// so the row wraps, putting the action at the bottom-right, only when the note would need a third line.
+function noteBasis(text: string): string {
+  let em = 0;
+  for (const ch of text) em += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 1 : 0.55;
+  return `${(em / 2).toFixed(1)}em`;
+}
 </script>
 <style src="./promotion.css"></style>
 <style scoped>
@@ -158,7 +167,10 @@ useAutoRecovery({
 .referral-gift { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* A fixed bow over the configured machine (P-67): the machine follows the activity, the bow marks it as a gift. */
 .referral-bow { position: absolute; left: 56%; top: 36%; width: 40%; height: 34%; pointer-events: none; }
-.referral-actions { position: relative; z-index: 1; }
+/* Note and action stay side by side while the note fits in two lines; otherwise the note takes the full width and the action drops to the bottom-right. */
+.referral-actions { position: relative; z-index: 1; flex-wrap: wrap; row-gap: 0; }
+.referral-actions > .nx-card-footer__note { flex: 1 1 auto; overflow-wrap: break-word; }
+.referral-actions > .referral-progress-link { margin-left: auto; white-space: nowrap; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; }
 .referral-share { margin-top: var(--v5-space-2); box-shadow: 0 8px 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }

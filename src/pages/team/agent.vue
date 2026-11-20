@@ -104,7 +104,7 @@
     </view>
     <template #pageFixed>
       <AmbassadorActionBar v-if="policy && pendingApplication">
-        <NxButton variant="primary" @click="go(AMBASSADOR_ROUTES.detail(pendingApplication.applicationId ?? 0))"><text>{{ pendingAction }}</text><text aria-hidden="true">→</text></NxButton>
+        <NxButton variant="primary" icon="arrow-right" @click="go(AMBASSADOR_ROUTES.detail(pendingApplication.applicationId ?? 0))"><text>{{ pendingAction }}</text></NxButton>
       </AmbassadorActionBar>
       <AmbassadorActionBar v-else-if="policy && formOffered && (unlocked || previewForm)">
         <text v-if="!unlocked" class="amb-bar__why nx-tray-note">{{ rankReady ? fmt(t.agent.previewOnly, { rank: requiredRankLabel }) : t.profile.rankUnavailable }}</text>

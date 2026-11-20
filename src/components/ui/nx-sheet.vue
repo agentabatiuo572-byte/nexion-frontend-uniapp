@@ -1,7 +1,7 @@
 <template>
   <view v-if="open" class="nx-sheet-mask nx-sheet-fade-in" @click.self="$emit('close')">
     <view :id="id" class="nx-glass-sheet nx-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="title">
-      <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" @click="$emit('close')"><text aria-hidden="true">×</text></NxButton></view>
+      <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" @click="$emit('close')"><NxIcon name="close" :size="18" /></NxButton></view>
       <view class="nx-sheet__body"><slot /></view>
       <view v-if="$slots.footer" class="nx-sheet__footer"><slot name="footer" /></view>
     </view>
@@ -10,6 +10,7 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance } from 'vue';
 import NxButton from './nx-button.vue';
+import NxIcon from './nx-icon.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 const props = withDefaults(defineProps<{ open: boolean; title: string; nativeBack?: boolean }>(), { nativeBack: true });

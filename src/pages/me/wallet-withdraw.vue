@@ -237,7 +237,7 @@
         <text class="wd-fee__hint">{{ offsetHintText }}</text>
         <!-- NEX=0:开关置灰 + 去赚 NEX 入口(复用 earn 路由;去了再回来,页面实例保留,开关状态不丢) -->
         <view v-if="offsetToggleDisabled" class="wd-link" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex"  @keydown.enter.prevent="goEarnNex" @keydown.space.prevent="goEarnNex">
-          <text>{{ t.walletV3.earnNexCta }} →</text>
+          <text class="nx-after-arrow">{{ t.walletV3.earnNexCta }}</text>
         </view>
       </view>
       <template v-if="withdrawalPolicyCurrent && feeDetailReady">

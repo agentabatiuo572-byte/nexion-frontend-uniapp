@@ -1,7 +1,7 @@
 <template>
   <view class="reward-rule" :class="{ 'reward-rule--section': !!$slots.default, 'reward-rule--step': n !== undefined }">
     <view v-if="q" class="reward-rule__question" role="button" tabindex="0" :aria-expanded="open" @click="open = !open" @keydown.enter.prevent="open = !open" @keydown.space.prevent="open = !open">
-      <text>{{ q }}</text><text aria-hidden="true">{{ open ? '−' : '+' }}</text>
+      <text>{{ q }}</text><NxIcon :name="open ? 'minus' : 'plus'" />
     </view>
     <view v-else-if="title || label" class="reward-rule__heading">
       <text v-if="n !== undefined" class="reward-rule__number">{{ n }}</text>
@@ -15,6 +15,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { ref } from 'vue';
 defineProps<{ title?: string; label?: string; body?: string; q?: string; a?: string; n?: number; accent?: string; tone?: string }>();
 const open = ref(false);

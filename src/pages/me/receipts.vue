@@ -141,7 +141,7 @@
             </view>
           </view>
           <view class="text-right shrink-0" style="margin-left: 8px">
-            <text class="block tabular-nums" :style="rowAmountStyle(r)">{{ rowAmount(r) }}</text>
+            <text class="block tabular-nums" :class="{ 'nx-before-check': r.category === 'KY' }" :style="rowAmountStyle(r)">{{ rowAmount(r) }}</text>
             <text class="block" :style="rowDateStyle">{{ shortDate(r.settledAt) }}</text>
           </view>
         </view>
@@ -573,7 +573,7 @@ function copySig(r: Receipt) {
 }
 
 function rowAmount(r: Receipt): string {
-  return r.category === "KY" ? `✓ ${formatAmount(r.netPaid)}` : `+${formatAmount(r.netPaid)}`;
+  return r.category === "KY" ? formatAmount(r.netPaid) : `+${formatAmount(r.netPaid)}`;
 }
 function shortDate(ts: number | string): string {
   const timestamp = displayTimestamp(ts);

@@ -39,7 +39,7 @@
         <text v-if="accountNotice !== 'ready'" class="hint warn-text" data-testid="bank-binding-status">{{ accountStatus }}</text>
         <template v-if="changeLocked">
           <text class="hint">{{ c.lockedReason }}</text>
-          <view class="link-row" role="link" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw"><text>{{ c.viewWithdrawal }}</text><text aria-hidden="true">›</text></view>
+          <view class="link-row" role="link" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw"><text>{{ c.viewWithdrawal }}</text><NxIcon name="chevron-right" /></view>
         </template>
         <text class="sec-title">{{ copy.bankRules }}</text>
         <view class="rules-card" role="group" :aria-label="copy.bankRules">
@@ -127,6 +127,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { dateLocale } from "@/i18n/format";
 import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";

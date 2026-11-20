@@ -23,7 +23,7 @@
         <!-- 日限用尽时置灰 + 给原因(与「再提一笔」同判据同文案)。深链 miss 让本空态在
              「有单据+额度已满」时也可达,不加这道就是外观可点、点了没反应的死链接(审计双镜头 P1)。 -->
         <view :class="againDisabled ? '' : 'active:opacity-70'" :style="againDisabled ? 'opacity:0.4' : ''" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="againDisabled ? 'true' : 'false'" :aria-describedby="againDisabled ? 'wd-again-reason-empty' : undefined" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
-          <text :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
+          <text class="nx-after-arrow" :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
         </view>
         <text v-if="againDisabled" id="wd-again-reason-empty" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
       </view>
@@ -77,7 +77,7 @@
               <!-- 人工审核 / 冻结态给客服出口:告诉用户「不会自动放款」却不给人问,
                    等于把人钉在原地(业务链必须有下一步)。 -->
               <view v-if="needsSupport" class="active:opacity-70" :style="supportLinkStyle" role="button" tabindex="0" :aria-label="t.wallet.trackContactSupport" @click.stop="goSupport">
-                <text :style="supportLinkTextStyle">{{ t.wallet.trackContactSupport }} →</text>
+                <text class="nx-after-arrow" :style="supportLinkTextStyle">{{ t.wallet.trackContactSupport }}</text>
               </view>
             </view>
           </view>

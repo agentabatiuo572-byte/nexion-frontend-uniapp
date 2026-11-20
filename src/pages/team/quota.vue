@@ -381,7 +381,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-invite-count__step { display:block; margin:2px 0; font:600 16px/22px var(--font-v5); color:var(--v5-ink); }
 .quota-hero > .quota-invite-count:last-child { margin-bottom:0; }
 .quota-hero > .quota-invite-count:first-child { margin-top:0; }
-.quota-footer { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--v5-space-3); margin-top:var(--v5-space-4); }
+/* Two equal buttons side by side; when their one-line labels do not both fit (vi), the row wraps and each takes the full width. */
+.quota-footer { display:flex; flex-wrap:wrap; gap:var(--v5-space-3); margin-top:var(--v5-space-4); }
+.quota-footer > :deep(.nx-button) { flex:1 1 0; min-width:max-content; box-sizing:border-box; }
 .quota-invite-hint { margin-top:var(--v5-space-3); }
 .quota-hero__price { display:flex; align-items:baseline; font:550 24px/32px var(--font-amount); letter-spacing:-.03em; }
 .quota-price-symbol { margin-right:2px; font-size:12px; color:var(--v5-ink-3); }

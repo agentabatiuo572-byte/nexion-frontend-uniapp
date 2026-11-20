@@ -711,7 +711,8 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-file__icon--warn { color: var(--v5-warning-ink); }
 .detail-file__spin { color: var(--v5-brand); animation: spin 900ms linear infinite; }
 .detail-file__text { flex: 1; min-width: 0; padding: var(--v5-space-1) 0; }
-.detail-file__name { display: block; font: var(--ui-type-description-weight, 400) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The file name is shown in full on this detail page: it wraps at word or hyphen breaks. */
+.detail-file__name { display: block; font: var(--ui-type-description-weight, 400) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .detail-file__size { display: block; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-file__size--warn { color: var(--v5-warning-ink); }
 .detail-file__action { display: grid; place-items: center; flex: none; min-width: 44px; height: 44px; box-sizing: border-box; padding: 0 var(--v5-space-2); font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-brand); cursor: pointer; }

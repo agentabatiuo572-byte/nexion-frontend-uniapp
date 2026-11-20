@@ -1376,3 +1376,41 @@ uni-input .uni-input-placeholder {
 
 /* Keep authored image colors when Android WebView automatically darkens small images. */
 uni-image { color-scheme: only light; }
+
+/* Shared UI glyphs as masks (same shapes as components/ui/nx-icon.vue). Text characters (› → ↗ ▾) change
+   shape with the font and are never icons. A trailing glyph on a text link: add .nx-after-<name> to the
+   text element; the glyph takes the text's size and colour and stays hidden from screen readers. */
+:root {
+  --nx-glyph-chevron-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  --nx-glyph-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --nx-glyph-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m13 6 6 6-6 6'/%3E%3C/svg%3E");
+  --nx-glyph-arrow-up-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 17 17 7'/%3E%3Cpath d='M8 7h9v9'/%3E%3C/svg%3E");
+  --nx-glyph-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5'/%3E%3Cpath d='m6 11 6-6 6 6'/%3E%3C/svg%3E");
+  --nx-glyph-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14'/%3E%3Cpath d='m6 13 6 6 6-6'/%3E%3C/svg%3E");
+  --nx-glyph-caret-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7.5 18.5 16h-13z'/%3E%3C/svg%3E");
+  --nx-glyph-caret-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16.5 5.5 8h13z'/%3E%3C/svg%3E");
+  --nx-glyph-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7'/%3E%3C/svg%3E");
+}
+.nx-after-chevron { --nx-glyph: var(--nx-glyph-chevron-right); }
+.nx-after-chevron-down { --nx-glyph: var(--nx-glyph-chevron-down); }
+.nx-after-arrow { --nx-glyph: var(--nx-glyph-arrow-right); }
+.nx-after-external { --nx-glyph: var(--nx-glyph-arrow-up-right); }
+.nx-after-chevron::after, .nx-after-chevron-down::after, .nx-after-arrow::after, .nx-after-external::after {
+  content: ""; display: inline-block; width: 1em; height: 1em; margin-left: .2em; vertical-align: -.15em;
+  background: currentColor; -webkit-mask: var(--nx-glyph) center / contain no-repeat; mask: var(--nx-glyph) center / contain no-repeat;
+}
+/* A leading status glyph inside a number (trend, settled): .nx-before-<name> on the text element. */
+.nx-before-arrow-up { --nx-glyph: var(--nx-glyph-arrow-up); }
+.nx-before-arrow-down { --nx-glyph: var(--nx-glyph-arrow-down); }
+.nx-before-arrow-right { --nx-glyph: var(--nx-glyph-arrow-right); }
+.nx-before-caret-up { --nx-glyph: var(--nx-glyph-caret-up); }
+.nx-before-caret-down { --nx-glyph: var(--nx-glyph-caret-down); }
+.nx-before-check { --nx-glyph: var(--nx-glyph-check); }
+.nx-before-arrow-up::before, .nx-before-arrow-down::before, .nx-before-arrow-right::before, .nx-before-caret-up::before, .nx-before-caret-down::before, .nx-before-check::before {
+  content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .2em; vertical-align: -.15em;
+  background: currentColor; -webkit-mask: var(--nx-glyph) center / contain no-repeat; mask: var(--nx-glyph) center / contain no-repeat;
+}
+@media (forced-colors: active) {
+  .nx-after-chevron::after, .nx-after-chevron-down::after, .nx-after-arrow::after, .nx-after-external::after,
+  [class*="nx-before-"]::before { forced-color-adjust: none; background: CanvasText; }
+}

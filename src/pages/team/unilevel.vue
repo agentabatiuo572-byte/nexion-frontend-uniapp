@@ -52,7 +52,7 @@
           <text v-if="!policy.configured" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.directReferral.unconfigured }}</text>
           <text v-else-if="policy.nexUsdtPrice === null" style="font-size: 12px; color: var(--v5-warning)">{{ t.directReferral.priceUnavailable }}</text>
         </view>
-        <view role="button" tabindex="0" class="nx-unilevel-focus nx-unilevel-details-toggle" :aria-expanded="showSettlementDetails" @click="showSettlementDetails = !showSettlementDetails" @keydown.enter.prevent="showSettlementDetails = !showSettlementDetails" @keydown.space.prevent="showSettlementDetails = !showSettlementDetails"><text>{{ auditCopy.settlementDetails }}</text><text aria-hidden="true">{{ showSettlementDetails ? '−' : '+' }}</text></view>
+        <view role="button" tabindex="0" class="nx-unilevel-focus nx-unilevel-details-toggle" :aria-expanded="showSettlementDetails" @click="showSettlementDetails = !showSettlementDetails" @keydown.enter.prevent="showSettlementDetails = !showSettlementDetails" @keydown.space.prevent="showSettlementDetails = !showSettlementDetails"><text>{{ auditCopy.settlementDetails }}</text><NxIcon :name="showSettlementDetails ? 'minus' : 'plus'" /></view>
         <view v-if="showSettlementDetails" class="nx-unilevel-details">
           <text class="block">{{ t.directReferral.netHint }}</text>
           <text v-if="filter === 'device_earning'" class="block">{{ t.directReferral.platformPays }}</text>
@@ -68,6 +68,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { formatAmount } from "@/lib/amount-display";
