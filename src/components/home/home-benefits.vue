@@ -25,7 +25,7 @@
             <view class="hb-half__foot">
               <text class="hb-label">{{ capacityFull ? copy.benefitSlotsFull : fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
               <text v-if="capacityFull" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
-              <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled }">{{ trialPill[0] }}</text>
+              <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialRechecking }">{{ trialPill[0] }}</text>
             </view>
           </template>
           <template v-else>
@@ -39,7 +39,7 @@
               <view class="hb-wt__row">
                 <text class="hb-label">{{ capacityFull ? copy.benefitSlotsFull : t.trial.homeNoPayment }}</text>
                 <text v-if="capacityFull" class="hb-link">{{ lifecycleCopy.cardManage }} ›</text>
-                <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled }">{{ trialPill[1] }}</text>
+                <text v-else class="hb-pill nx-frosted-button" :class="{ 'hb-pill--muted': !trialOfferEnabled, 'hb-pill--wait': trialRechecking }">{{ trialPill[1] }}</text>
               </view>
             </view>
           </template>
@@ -69,7 +69,11 @@
           </template>
         </view>
       </view>
-      <view v-if="trial.authorityStatus === 'error'" class="hb-retry" role="button" tabindex="0" :aria-label="t.trial.entryRetry" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility"><text>{{ t.trial.entryRetry }}</text></view>
+      <view v-if="retryShown" class="hb-retry" :class="{ 'hb-retry--busy': retryBusy }" role="button" :tabindex="retryBusy ? -1 : 0" :aria-disabled="retryBusy ? 'true' : undefined" :aria-label="retryBusy ? t.trial.entryChecking : `${copy.benefitTrialLoadFailed} · ${copy.benefitRetry}`" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility">
+        <svg class="hb-retry__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5h.01" /></svg>
+        <text class="hb-retry__msg">{{ retryBusy ? t.trial.entryChecking : copy.benefitTrialLoadFailed }}</text>
+        <text class="hb-retry__act">{{ copy.benefitRetry }}</text>
+      </view>
     </view>
   </NxSection>
 </template>
@@ -147,21 +151,25 @@ const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null 
 const estimateParts = computed(() => { const match = /^(\$?)(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { currency: match[1], whole: match[2], cents: match[3] ?? '' }; });
 const creditText = computed(() => trialView.offsetUSD.value === null ? '-' : `$${formatAmount(trialView.offsetUSD.value)}`);
 const countdownText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialCountdown(trialView.remainingMs.value));
-// Keep the last confirmed label during a background read (BUG 14).
-const trialPill = computed<[string, string]>(() => {
+// Keep the last confirmed label during a background read (BUG 14). [half pill, wide pill, screen-reader wording]
+const trialPill = computed<[string, string, string]>(() => {
   const offerState = trial.confirmedOfferState();
-  if (canRestart.value && offerState !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
+  if (canRestart.value && offerState !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
   switch (offerState) {
-    case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim];
-    case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable];
-    case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut];
-    default: return [copy.value.benefitTrialChecking, copy.value.benefitTrialChecking];
+    case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim, copy.value.benefitTrialClaim];
+    case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable, t.value.trial.entryUnavailable];
+    case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut, t.value.trial.heroProductUnavailable];
+    default: return [copy.value.benefitTrialChecking, copy.value.benefitTrialChecking, t.value.trial.entryChecking];
   }
 });
-const trialOfferAria = computed(() => capacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
+// Background re-read with the confirmed label kept: the pill dims only if the read is slow (CSS delay), so a quick read never flashes.
+const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !trialOfferEnabled.value);
+const trialOfferLabel = computed(() => capacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
   : trial.status === "none" && (eligibility.value.ok || trial.confirmedOfferState() === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
-  : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[1]}`);
+  : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[2]}`);
+const trialOfferAria = computed(() => trialRechecking.value && trialPill.value[2] !== t.value.trial.entryChecking
+  ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
 const trialPendingAria = computed(() => {
   if (status.value === 'ended') return `${trialName.value} · ${lifecycleCopy.value.endedTitle} · ${lifecycleCopy.value.buyDevice}`;
   const remaining = trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.value.longRemaining);
@@ -201,6 +209,10 @@ function openTrialOffer() {
   trialSheet.show();
 }
 function openTrialDetails() { navTo('/pages/me/trial'); }
+// The retry row stays through its own re-read (busy), so tapping it does not collapse the section.
+const retryShown = ref(false);
+watch(() => trial.authorityStatus, value => { retryShown.value = value === 'error' || (value === 'loading' && retryShown.value); }, { immediate: true });
+const retryBusy = computed(() => retryShown.value && trial.authorityStatus === 'loading');
 function retryEligibility() {
   if (trial.authorityStatus === "error") void trialView.refresh();
 }
@@ -245,7 +257,12 @@ function retryEligibility() {
 .hb-tag { display:inline-flex;align-items:center;box-sizing:border-box;height:24px;padding:0 8px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand);font:var(--ui-type-chip-weight) 12px/16px var(--font-v5);white-space:nowrap; }
 /* Brand liquid-glass S button (same fill override as the previous trial CTA); the whole card is the control. */
 .hb-pill { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent);--ui-button-ink:var(--v5-brand);--ui-button-solid:color-mix(in srgb,var(--v5-brand) 12%,var(--v5-surface));position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:32px;max-width:100%;padding:7px 14px;border-radius:var(--v5-radius-full);font:var(--ui-type-compact-button-weight) 13px/18px var(--font-v5);white-space:nowrap; }
+/* A background re-read (--wait) keeps the pill at full strength for 400ms before it dims, also when the card mounts mid-read,
+   so a quick read never flashes; the restore fades. Reduced motion: the global rule makes both instant. */
+.hb-pill { transition:opacity 180ms ease; }
 .hb-pill--muted { opacity:.5; }
+.hb-pill--muted.hb-pill--wait { animation:hb-pill-wait 180ms ease 400ms backwards; }
+@keyframes hb-pill-wait { from { opacity:1; } }
 .hb-link { flex:none;display:inline-flex;align-items:center;min-height:44px;font:var(--ui-type-text-link-weight) 13px/18px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 
 /* Half offer card */
@@ -304,7 +321,13 @@ function retryEligibility() {
 .hb-val { flex:none;text-align:right;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 .hb-val__amount { display:block;margin-top:2px;font:500 15px/20px var(--font-v5);color:var(--v5-ink); }
 .hb-chev { flex:none;width:16px;height:16px;color:var(--v5-ink-4); }
-.hb-retry { display:inline-flex;align-items:center;align-self:flex-start;min-height:44px;padding:0 2px;font:600 13px/20px var(--font-v5);color:var(--v5-warning); }
+/* Retry sits on the page floor: icon + state in ink-3, short action on the right that never wraps. */
+.hb-retry { display:flex;align-items:center;gap:6px;min-height:44px;padding:0 2px;font:400 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer;-webkit-tap-highlight-color:transparent; }
+.hb-retry__icon { flex:none;width:16px;height:16px;color:var(--v5-warning-ink); }
+.hb-retry__msg { flex:1;min-width:0;overflow-wrap:anywhere; }
+.hb-retry__act { flex:none;padding-left:8px;font-weight:500;color:var(--v5-brand);white-space:nowrap; }
+.hb-retry--busy { cursor:default; }
+.hb-retry--busy .hb-retry__act { opacity:.5; }
 .hb-retry:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px;border-radius:4px; }
 
 /* Motion: one entrance with a short stagger, one pop when an offer becomes a pending card. */
