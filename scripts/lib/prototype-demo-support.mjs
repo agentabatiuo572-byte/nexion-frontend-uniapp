@@ -127,7 +127,7 @@ function addTransferSample(state, nextMessageId, now) {
   state.supportConversations.push(old,current);
   const text='请帮我继续核对这笔订单。';
   const slot='sha256:'+createHash('sha256').update(`conversation-reply:${conversationNo}:text:${text}`).digest('hex');
-  state.supportTransferSample={conversationNo,currentNo,key:'support-reply-preview-transfer-'+oldId,text,slot,accountId:supportAccountId(state)};
+  state.supportTransferSample={conversationNo,currentNo,key:'support-conversation-reply-preview-transfer-'+oldId,text,slot,accountId:supportAccountId(state)};
 }
 
 export function setTransferSampleOutcome(state) {

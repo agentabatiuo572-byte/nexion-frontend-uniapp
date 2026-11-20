@@ -56,23 +56,22 @@ export function persistSupportPending(accountKey: string, runId: string, kind: "
 }
 
 /** Retire expired human sends while leaving other commands for the account alone. */
-export function retireSupportPending(accountKey: string, kind: "conversations", expired: Map<string, string | undefined>): void {
-  if (!expired.size) return;
+export function retireSupportPending(accountKey: string, kind: "conversations", slot: string, expected: string): void {
   const prefix = `${PREFIX}:${accountKey}:`;
   const suffix = `:${kind}`;
   const keys = typeof plus === "undefined" ? Object.keys(localStorage) : uni.getStorageInfoSync().keys;
   for (const key of keys) {
     if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue;
     const runId = key.slice(prefix.length, -suffix.length);
-    const pending = restoreSupportPending(accountKey, runId, kind);
-    let changed = false;
-    for (const [slot, expected] of expired) {
-      if (pending.has(slot) && (!expected || pending.get(slot) === expected)) {
-        pending.delete(slot);
-        changed = true;
-      }
-    }
-    if (changed) persistSupportPending(accountKey, runId, kind, pending);
+    try {
+      const pending = restoreSupportPending(accountKey, runId, kind);
+      if (pending.get(slot) !== expected) continue;
+      pending.delete(slot);
+      persistSupportPending(accountKey, runId, kind, pending);
+      const startTarget = `support-start-target:${accountKey}:${runId}:${expected}`;
+      if (typeof plus === "undefined") localStorage.removeItem(startTarget);
+      else uni.removeStorageSync(startTarget);
+    } catch { /* An invalid index cannot authorize deletion of any command. */ }
   }
 }
 
