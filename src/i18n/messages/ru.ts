@@ -3985,7 +3985,7 @@ export const ru: Messages = {
     loading: "Загружаем историю задач…",
     tabHistory: "История",
     viewAll: "Смотреть все",
-    viewAllAccountReceipts: "Все квитанции аккаунта",
+    viewAllAccountReceipts: "Все квитанции",
     historyHint: "Последние квитанции о задачах: {n}",
     timeJustNow: "только что",
     timeMinutesAgo: "{n} мин назад",

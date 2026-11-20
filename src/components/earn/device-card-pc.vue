@@ -307,34 +307,25 @@
     <!-- Every device has its own canonical task stream. Keep the active task above;
          this list only mirrors settled task previews returned for this device. -->
     <view v-if="!stage && phoneFactsReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
-      <view class="flex items-center justify-between" :style="{ marginBottom: taskHistoryReady && !deviceTodayCompleted.length ? '0' : '8px' }">
+      <view class="flex flex-wrap items-center justify-between" :style="{ marginBottom: taskHistoryReady && !deviceTodayCompleted.length ? '0' : '8px' }">
         <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ visibility.mask(deviceTodayCompleted.length) }})</template></text>
         <view
           class="active:opacity-60"
-          style="min-height: 44px; padding-left: 16px; display: flex; align-items: center"
+          style="min-height: 44px; margin-left: auto; padding-left: 16px; display: flex; align-items: center"
           role="button"
           tabindex="0"
           @click.stop="goTaskHistory"
 
           @keydown.enter.stop.prevent="goTaskHistory" @keydown.space.stop.prevent="goTaskHistory"
         >
-          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAllAccountReceipts }}</text>
+          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand); white-space: nowrap">{{ t.taskHistory.viewAllAccountReceipts }}</text>
         </view>
       </view>
       <text v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" class="block" style="min-height:44px;color:var(--v5-ink-3)">—</text>
       <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
-      <view v-else-if="deviceTodayCompleted.length" class="space-y-1.5">
-        <view
-          v-for="task in deviceTodayCompleted"
-          :key="task.receiptNo ?? task.id"
-          class="flex items-center justify-between gap-2"
-          data-phone-today-task="true"
-          style="min-height: 28px; font-size: 12px"
-        >
-          <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.type }}</text>
-          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">{{ visibility.mask(formatTaskReward(task, true)) }}</text>
-          <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ localClockTime(task.completedAt) }}</text>
-        </view>
+      <view v-else-if="deviceTodayCompleted.length">
+        <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" time="" />
+        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :time="localClockTime(task.completedAt)" />
       </view>
     </view>
 
@@ -379,11 +370,12 @@
         <view class="earn-stage__stat" :role="capacityTappable ? 'button' : undefined" :tabindex="capacityTappable ? 0 : undefined" :aria-label="capacityTappable ? `${t.earn.jobCapacity} ${visibility.mask(stageCapacityText)} · ${t.earn.capExplainS1Title}` : undefined" @click.stop="capacityTappable && openExplainer()" @keydown.enter.stop.prevent="capacityTappable && openExplainer()" @keydown.space.stop.prevent="capacityTappable && openExplainer()"><text class="earn-stage__label">{{ t.earn.jobCapacity }}</text><text class="earn-stage__value" :class="{ 'earn-stage__value--text': inSubsidy && phoneFactsReady }">{{ visibility.mask(stageCapacityText) }}</text></view>
       </view>
       <view v-if="phoneFactsReady" class="earn-stage__recent" data-device-today-completed="true">
-        <view class="earn-stage__recent-head"><text>{{ t.earn.todayRecentCompleted }}</text><view class="earn-stage__link" role="link" tabindex="0" @click.stop="goTaskHistory" @keydown.enter.stop.prevent="goTaskHistory"><text>{{ t.taskHistory.viewAllAccountReceipts }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view></view>
+        <view class="earn-stage__recent-head"><text class="earn-stage__recent-title">{{ t.earn.todayRecentCompleted }}</text><view class="earn-stage__link earn-stage__link--fixed" role="link" tabindex="0" @click.stop="goTaskHistory" @keydown.enter.stop.prevent="goTaskHistory"><text>{{ t.taskHistory.viewAllAccountReceipts }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view></view>
         <text v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" class="block" style="min-height:44px;color:var(--v5-ink-3)">—</text>
         <text v-else-if="!taskHistoryReady" class="earn-stage__recent-note" role="status" aria-live="polite">{{ t.taskHistory.loading }}</text>
-        <view v-else-if="deviceTodayCompleted.length" class="earn-stage__chips">
-          <view v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" class="earn-stage__chip" data-phone-today-task="true"><text>{{ done.type }}</text><text class="earn-stage__chip-amount">{{ visibility.mask(formatTaskReward(done, true)) }}</text></view>
+        <view v-else-if="deviceTodayCompleted.length" class="earn-stage__rows">
+          <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" />
+          <NxAmountRow v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" compact data-phone-today-task="true" :name="done.type" :amount="visibility.mask(formatTaskReward(done, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" />
         </view>
         <text v-else class="earn-stage__recent-note">{{ t.home.ledgerEmpty }}</text>
       </view>
@@ -395,9 +387,10 @@
 
 <script setup lang="ts">
 import DeviceUnclassifiedCard from "@/components/device-unclassified-card.vue";
+import NxAmountRow from "@/components/ui/nx-amount-row.vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
-import { formatTaskReward } from "@/lib/task-reward-display";
+import { formatTaskReward, taskRewardUnit } from "@/lib/task-reward-display";
 import { formatUsd } from "@/lib/usd-display";
 import { useDeviceStatisticsCapabilityCopy } from "@/i18n/device-statistics-capability";
 import { canControlDevice } from "@/lib/device-control-platform";
@@ -498,6 +491,11 @@ const deviceTodayCompleted = computed(() => todayCompletedTasks(
   props.device.recentTasks,
   liveTaskNow.value,
 ));
+// One shared unit goes to the list's header row once; a list that mixes units keeps it on every row.
+const todayRewardUnit = computed(() => {
+  const units = new Set(deviceTodayCompleted.value.map(taskRewardUnit));
+  return units.size === 1 ? [...units][0] : null;
+});
 const taskHistoryReady = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
   || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
 const taskLockRemainingMinutes = computed(() => {
@@ -1020,13 +1018,13 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__value--nex { color: var(--v5-nex-ink); }
 .earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: anywhere; }
 .earn-stage__recent { position: relative; margin: 6px 18px 0; }
-.earn-stage__recent-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__recent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: 8px; min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); cursor: pointer; text-align: right; }
+.earn-stage__recent-title { min-width: 0; }
+.earn-stage__link--fixed { flex: none; margin-left: auto; white-space: nowrap; }
+.earn-stage__link--fixed uni-text, .earn-stage__link--fixed text { white-space: nowrap; }
 .earn-stage__recent-note { display: block; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
-.earn-stage__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.earn-stage__chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; max-width: 100%; box-sizing: border-box; padding: 0 10px; border-radius: 999px; background: var(--v5-surface-2); font: 400 12px/16px var(--font-v5); color: var(--v5-ink-2); white-space: nowrap; }
-[data-theme="light"] .earn-stage__chip { background: var(--v5-bg); }
-.earn-stage__chip-amount { font: 500 12px/16px var(--font-metric); color: var(--v5-success-ink); font-variant-numeric: tabular-nums; }
+.earn-stage__rows { position: relative; }
 .earn-stage__foot { position: relative; display: flex; justify-content: flex-end; margin: 4px 18px 0; }
 @keyframes earn-stage-in { from { opacity: 0; transform: translateY(6px); } }
 @keyframes earn-stage-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }

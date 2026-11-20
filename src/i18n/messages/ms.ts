@@ -3985,7 +3985,7 @@ export const ms: Messages = {
     loading: "Memuatkan sejarah kerja…",
     tabHistory: "Sejarah",
     viewAll: "Lihat semua",
-    viewAllAccountReceipts: "Lihat resit akaun",
+    viewAllAccountReceipts: "Semua resit",
     historyHint: "{n} resit kerja terkini",
     timeJustNow: "baru sahaja",
     timeMinutesAgo: "{n} min lalu",

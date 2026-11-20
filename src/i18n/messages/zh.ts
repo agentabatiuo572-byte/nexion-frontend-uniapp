@@ -3547,7 +3547,7 @@ earningsMilestone: "收益里程碑 ${threshold}",
     loading: "正在读取作业历史…",
     tabHistory: "历史",
     viewAll: "查看全部",
-    viewAllAccountReceipts: "查看全账户收据",
+    viewAllAccountReceipts: "全部收据",
     historyHint: "最近 {n} 笔作业凭证",
 
 timeJustNow: "刚刚",

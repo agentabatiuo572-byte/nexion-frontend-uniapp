@@ -3985,7 +3985,7 @@ export const kk: Messages = {
     loading: "Жұмыс тарихы жүктелуде…",
     tabHistory: "Тарих",
     viewAll: "Барлығын қарау",
-    viewAllAccountReceipts: "Аккаунт түбіртектерін қарау",
+    viewAllAccountReceipts: "Барлық түбіртектер",
     historyHint: "Соңғы {n} жұмыс түбіртегі",
     timeJustNow: "жаңа ғана",
     timeMinutesAgo: "{n} мин бұрын",

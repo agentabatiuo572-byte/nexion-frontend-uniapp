@@ -3985,7 +3985,7 @@ export const fil: Messages = {
     loading: "Nilo-load ang history ng job…",
     tabHistory: "History",
     viewAll: "Tingnan lahat",
-    viewAllAccountReceipts: "Tingnan ang resibo ng account",
+    viewAllAccountReceipts: "Lahat ng resibo",
     historyHint: "Pinakabagong {n} job receipt",
     timeJustNow: "ngayon lang",
     timeMinutesAgo: "{n}m nakaraan",
