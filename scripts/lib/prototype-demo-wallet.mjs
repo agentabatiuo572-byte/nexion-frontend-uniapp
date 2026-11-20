@@ -14,7 +14,7 @@ const settledBill=row=>row.status==='SUCCESS';
 const reward=row=>row.direction==='IN'&&row.amount>0&&!(row.bizType==='TEAM_COMMISSION'&&row.status==='CANCELLED')&&['bonus','refer','achievement'].includes(row.category);
 
 export function demoSettledTasks(state,at) {
-  if(!demoHasEarningsHistory(state))return [];
+  if(!demoHasEarningsHistory(state)||state.fleetState==='none')return [];
   if(demoHasLongTasks(state)) {
     return [
       ['LL','language inference - structured knowledge extraction','0.029745'],
@@ -29,7 +29,7 @@ export function demoSettledTasks(state,at) {
       ['SP','speech processing - cinematic interview notes','123.011586'],
     ].map(([taskClass,taskName,rewardAmount],index)=>{
       const completedAt=at-(index+1)*420000;
-      return {taskNo:'DEMO-TASK-'+(10+index),receiptNo:'DEMO-RECEIPT-L'+index,batchNo:null,
+      return {taskNo:'DEMO-TASK-'+(10+index),receiptNo:'DEMO-RECEIPT-L'+index,receiptId:index+1,configVersion:'1',batchNo:null,
         deviceId:41,taskClass,taskName,amount:Number(rewardAmount),nex:0,completedAt,postedAt:completedAt+60000,
         durationSec:300,client:'UVEL',model:'',simulation:{executionMode:'SIMULATED',proofKind:'TASK_RECEIPT',
           modelExecuted:false,rewardAsset:'USDT',rewardAmount}};

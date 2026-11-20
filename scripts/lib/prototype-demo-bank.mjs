@@ -1,10 +1,10 @@
-import { postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoWalletUsdt, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
 import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, updateDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
 import { demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
-import { demoHasLongContent, longBankOrderNo } from './prototype-demo-long-content.mjs';
+import { demoHasLongContent, demoLongBankStrongReview, longBankOrderNo } from './prototype-demo-long-content.mjs';
 
 const DAY = 86400000;
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
@@ -24,10 +24,10 @@ function canQuote({ beneficiary, policy, capacity }, amountUsdt) {
     && amountUsdt <= capacity.maxWithdrawableUsdt;
 }
 
-function saveQuote(demo, bank, amountUsdt, now) {
+function saveQuote(demo, bank, amountUsdt, now, quoteNo = 'BQ-' + randomBytes(16).toString('hex')) {
   const feeUsdt = Math.round(Math.max(1, Math.min(100, amountUsdt * .01)) * 1e6) / 1e6;
   const netUsdt = Math.round((amountUsdt - feeUsdt) * 1e6) / 1e6;
-  const quote = { quoteNo: 'BQ-' + randomBytes(16).toString('hex'), amountUsdt, feeUsdt, netUsdt,
+  const quote = { quoteNo, amountUsdt, feeUsdt, netUsdt,
     rateVnd: 25000, amountVnd: Math.round(netUsdt * 25000), bankCode: bank.bankCode, bankName: bank.bankName,
     bankRoutingVerified: true, maskedAccount: bank.maskedAccount, expiresAt: new Date(now + 300000).toISOString() };
   return demo.quotes[quote.quoteNo] = { quote };
@@ -41,19 +41,57 @@ function reserveBankOrder(state, demo, row, beneficiaryNo, withdrawalNo, now) {
   row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo,
     withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'REVIEW_PASSED' },
     providerState: 'READY', bank: snapshot(row.quote) };
+  if (demoLongBankStrongReview(row.order)) {
+    row.order.withdrawal.status = 'REVIEW_PENDING';
+    row.order.withdrawal.reviewStatus = 'REVIEW_PENDING';
+  }
   demo.orders[withdrawalNo] = row.order;
   updateDemoBankWithdrawals(state, now);
   return row.order;
 }
 
-export function seedLongBankOrder(state, now) {
-  if (!demoHasLongContent(state) || state.dataState === 'empty' || state.accountDeletionState === 'clear'
-    || state.bankDemo?.orders?.[longBankOrderNo]) return;
+export function seedLongBankOrder(state, now, quoteNo) {
+  if (!demoHasLongContent(state) || state.bankDemo?.orders?.[longBankOrderNo]) return;
   const config = bankConfig(state, now), amountUsdt = 5000;
   if (config.unresolvedIntent || !config.capacity.dailyRemainingCount || !canQuote(config, amountUsdt)) return;
   const demo = state.bankDemo ??= { quotes: {}, orders: {}, commands: {} };
-  const row = saveQuote(demo, config.beneficiary, amountUsdt, now);
+  const row = saveQuote(demo, config.beneficiary, amountUsdt, now, quoteNo);
   reserveBankOrder(state, demo, row, config.beneficiary.beneficiaryNo, longBankOrderNo, now);
+}
+
+// The local layout-audit snapshot could post a refund without ever reserving the funds.
+// Remove only this sample's old postings and let the current scenario reserve it again.
+export function removeUnreservedLongBankOrder(state) {
+  const demo = state.bankDemo, order = demo?.orders?.[longBankOrderNo];
+  if (!order) return;
+  const principal = longBankOrderNo + ':USDT:PRINCIPAL', fee = longBankOrderNo + ':USDT:BANK_FEE';
+  const movements = state.walletMovements ?? [];
+  const reserved = (bizNo, bizType, amount) => movements.some(row => row.bizNo === bizNo && row.bizType === bizType
+    && row.asset === 'USDT' && row.direction === 'OUT' && row.status === 'SUCCESS' && row.amount === amount);
+  if (reserved(principal, 'WITHDRAW_NET_PRINCIPAL', order.bank?.netUsdt)
+    && reserved(fee, 'WITHDRAW_BANK_FEE', order.bank?.feeUsdt)) return;
+  const refs = new Set([principal, fee, longBankOrderNo + ':PAYOUT:USDT:REFUND', 'D2-REFUND-' + longBankOrderNo]);
+  const money = value => Number(value.toFixed(6));
+  let removed = 0;
+  if (state.walletMovements) {
+    state.walletMovements = movements.filter(row => {
+      if (row.asset !== 'USDT') return true;
+      if (refs.has(row.bizNo)) {
+        removed += row.direction === 'IN' ? row.amount : -row.amount;
+        return false;
+      }
+      if (removed && Number.isFinite(row.balanceAfter)) {
+        row.balanceAfter = money(row.balanceAfter - removed);
+        if (row.balanceAfterExact != null) row.balanceAfterExact = row.balanceAfter.toFixed(6);
+      }
+      return true;
+    });
+  }
+  if (removed) state.walletBalance = money(demoWalletUsdt(state) - removed);
+  const quoteNo = order.bank?.quoteNo;
+  delete demo.orders[longBankOrderNo];
+  if (quoteNo) delete demo.quotes?.[quoteNo];
+  return quoteNo;
 }
 
 export function bankDemo(url, state, request) {

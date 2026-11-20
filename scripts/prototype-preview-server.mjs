@@ -7,7 +7,8 @@ import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
-import { seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
+import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
+import { demoLongContentAvailable, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
@@ -26,6 +27,8 @@ if(process.env.DEMO_STATE_FILE){
   Object.assign(state,saved,{walletLegacySeed:saved.walletLegacySeed??!saved.walletMovements});
 }
 const startedAt=Date.now();
+normalizeDemoLongContent(state);
+const unreservedBankQuote=removeUnreservedLongBankOrder(state);
 if(process.env.DEMO_STATE_FILE){
   restoreDemoWithdrawalOrders(state);
   restoreDemoBankWithdrawals(state,startedAt);
@@ -34,7 +37,7 @@ if(process.env.DEMO_STATE_FILE){
 }else state.catalogAvailableAt=startedAt;
 initializeDemoPreviewAccount(state,startedAt);
 initializeDemoWalletHistory(state,state.previewFactsAt);
-seedLongBankOrder(state,startedAt);
+seedLongBankOrder(state,startedAt,unreservedBankQuote);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
@@ -132,7 +135,7 @@ const server=http.createServer(async(req,res)=>{
     }
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
-      let withdrawalRecoverySeed;
+      let withdrawalRecoverySeed, longContentUnavailable;
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
@@ -143,6 +146,7 @@ const server=http.createServer(async(req,res)=>{
           for(const key of Object.keys(state))delete state[key];
           Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
         }
+        state.previewFactsAt??=startedAt;
         updatePreviewHomeDisplay(state,update,Date.now());
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
@@ -150,6 +154,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.savedAttemptState&&state.savedAttemptState!=='none')state.sessionState='signed-out';
         if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
         else delete state.paymentBeforeReadError;
+        longContentUnavailable=normalizeDemoLongContent(state);
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
         // account (dataState=empty), the low-balance account or a near-deadline sample (paymentState=low-balance, urgent,
@@ -217,7 +222,9 @@ const server=http.createServer(async(req,res)=>{
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
         }
       }
-      return sendJson(res,{state,options:demoOptions,simulation:true,withdrawalRecoverySeed});
+      return sendJson(res,{state,options:demoOptions,simulation:true,withdrawalRecoverySeed,
+        ...(demoLongContentAvailable(state)?{}:{longContentAvailable:false}),
+        ...(longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})});
     }
     if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}

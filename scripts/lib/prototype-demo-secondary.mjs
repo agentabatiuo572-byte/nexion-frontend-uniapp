@@ -1,6 +1,7 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
-import { demoHasLongContent, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
+import { createHash } from 'node:crypto';
+import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -59,6 +60,10 @@ function recordDemoBankSettlement(row, { paid, d2Refund, evidenceRef, at, provid
 // Old handoffs saved terminal outcomes separately from the order fields and evidence.
 export function restoreDemoBankWithdrawals(state, now) {
   for (const row of Object.values(state.bankDemo?.orders ?? {})) {
+    if (demoLongBankStrongReview(row) && row.withdrawal) {
+      row.withdrawal.reviewStatus ??= ['REVIEW_PENDING', 'REFUNDED'].includes(row.withdrawal.status)
+        ? 'REVIEW_PENDING' : 'REVIEW_PASSED';
+    }
     if (row.settlementEvidence) continue;
     if (row.outcome === 'settled') {
       recordDemoBankSettlement(row, { paid: true, evidenceRef: 'DEMO-' + row.withdrawalNo, at: now });
@@ -97,6 +102,10 @@ export function updateDemoBankWithdrawals(state, now) {
       continue;
     }
     const paid = state.bankState === 'settled', refunded = state.bankState === 'rejected';
+    if (ready && !refunded && row.withdrawal.reviewStatus === 'REVIEW_PENDING') {
+      row.withdrawal.reviewStatus = 'REVIEW_PASSED';
+      row.withdrawal.status = 'REVIEW_PASSED';
+    }
     if (paid || refunded) {
       const d2Refund = ready && refunded;
       const evidenceRef = d2Refund ? 'D2-REFUND-' + row.withdrawalNo : 'DEMO-' + row.withdrawalNo;
@@ -157,7 +166,8 @@ export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUs
     holdUntil: new Date(row.createdAt).toISOString(), createdAt: new Date(row.createdAt).toISOString(),
     networkConfirmUsd: row.bank.feeUsdt, networkFee: row.bank.feeUsdt, penaltyFee: 0, grossFee: row.bank.feeUsdt,
     nexBurned: 0, feeWaived: 0, actualFee: row.bank.feeUsdt, netReceive: row.bank.netUsdt,
-    policyVersion: 'money-policy', useNexFeeOffset: false, riskRoute: 'fast-pass', idSource: 'server',
+    policyVersion: 'money-policy', useNexFeeOffset: false,
+    riskRoute: demoLongBankStrongReview(row) ? 'strong-review' : 'fast-pass', idSource: 'server',
   }));
   return [...Object.values(state.withdrawalOrders?.[user] ?? {}), ...bankRows, ...chainRows];
 }
@@ -208,17 +218,26 @@ export function secondaryDemo(url,state,request,walletBills){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
-    const items=demoSettledTasks(state,state.previewFactsAt??now).map((task,i)=>({...proof,
+    const tasks=demoSettledTasks(state,state.previewFactsAt??now);
+    const items=tasks.map((task,i)=>({...proof,
       receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,
       rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,
       startedAt:task.completedAt-task.durationSec*1000,durationSec:task.durationSec,deviceId:task.deviceId,
       deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,
       taskId:'demo-'+task.taskClass.toLowerCase(),taskName:task.taskName,...task.simulation,
+      ...(task.simulation&&{displayReceiptNo:'UVEL-RC-'+task.receiptId.toString(36).toUpperCase().padStart(6,'0'),
+        postingTimeVerified:task.postedAt!=null}),
       proofHash:task.simulation?null:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts')return demoReceiptPage(url.searchParams,items);
-    const receipt=items.find(r=>r.receiptNo===p.split('/').pop());
-    if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
-    return receipt;
+    const index=items.findIndex(r=>r.receiptNo===p.split('/').pop());
+    if(index<0)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
+    const receipt=items[index],task=tasks[index];
+    if(!task.simulation)return receipt;
+    const receiptHash=createHash('sha256').update(['UVEL:TASK_RECEIPT:1',receipt.receiptNo,receipt.taskNo,
+      state.authUser?.userId??900001,receipt.deviceId,receipt.taskId,task.configVersion,
+      new Date(receipt.startedAt).toISOString(),new Date(receipt.completedAt).toISOString(),
+      receipt.rewardUsdt,receipt.rewardNex].join('|')).digest('hex');
+    return {...receipt,receiptHash};
   }
   if(p==='/api/earnings/release-status'){
     const entries=walletBills().filter(row=>row.status==='SUCCESS'&&row.direction==='IN'

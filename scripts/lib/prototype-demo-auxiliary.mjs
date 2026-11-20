@@ -74,7 +74,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       const startedAt=new Date(completed?sample.completedAt-sample.durationSec*1000:now-300000).toISOString();
       return {...proof,serverCanonical:true,
         ...((v2||v3)&&{protocolVersion:v3?3:2,queuedAt:v3?startedAt:null,
-          actualDurationSec:v3?(completed?sample.durationSec:300):null,pausedAt:null,pausedSeconds:0,configVersion:v3?'1':null,
+          actualDurationSec:v3?(completed?sample.durationSec:300):null,pausedAt:null,pausedSeconds:0,configVersion:v3?sample.configVersion:null,
           settlementStatus:completed?'POSTED':'NONE',settlementBatchNo:completed?sample.batchNo:null,
           settledAt:completed?new Date(sample.postedAt).toISOString():null}),
         taskNo:sample.taskNo,deviceId:sample.deviceId,taskId:'demo-'+sample.taskClass.toLowerCase(),
@@ -94,6 +94,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       return {deviceId:device.id,instanceNo:device.instanceNo,deviceType:device.deviceType,lockUntil:null,
         currentTask:currentSample&&device.activatedAt!==null?task(currentSample,'RUNNING'):null,
         recentTasks:hasSample?(settlement.simulation?settledTasks:[settlement]).map(sample=>task(sample,'COMPLETED')):[],
+        ...(v3&&{phoneValidUntil:null,simulationState:currentSample&&device.activatedAt!==null?'CLOSING':'WAITING_CONFIG'}),
         ...(v2&&{recoveryPending:false,recoveryReason:null})};
     }),...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})};
   }
