@@ -102,7 +102,7 @@ export const kk: Messages = {
     signInTitle: "Басқа әдіспен кіру",
     linkTitle: "Байланыстырылған аккаунттар",
     unavailable: "Басқа сервис арқылы кіру қазір қолжетімсіз.",
-    linked: "Байланыстырылды",
+    linked: "Байланған",
     browserPrompt: "Браузерде рұқсат беруді аяқтап, осында оралыңыз.",
     confirmIdentity: "Осы аккаунтты қолданғыңыз келетінін растаңыз.",
     confirmLink: "Аккаунтты байланыстыру",
@@ -1881,7 +1881,7 @@ export const kk: Messages = {
       sell: "Сату",
     },
     breakdown: {
-      label: "АКТИВ ҚҰРЫЛЫМЫ",
+      label: "АКТИВ ҚҰРЫЛЫМЫ (UVT)",
       liquid: "Қолжетімді баланс",
       mining: "Бүгінгі UVT табысы",
       miningHint: "Шығыннан кейін, өңделудегіні қоса",

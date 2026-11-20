@@ -1412,7 +1412,7 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
       sell: "Bán",
     },
     breakdown: {
-      label: "CƠ CẤU NẮM GIỮ",
+      label: "CƠ CẤU NẮM GIỮ (UVT)",
       liquid: "Số dư khả dụng",
       mining: "Thu nhập UVT hôm nay",
       miningHint: "Đã trừ chi tiêu, gồm cả giao dịch đang xử lý",

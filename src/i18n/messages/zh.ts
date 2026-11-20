@@ -1397,7 +1397,7 @@ trustReserve: "暂无可核验的储备资料。",
       sell: "卖出",
     },
     breakdown: {
-      label: "持仓结构",
+      label: "持仓结构（UVT）",
       liquid: "可用余额",
       mining: "今日 UVT 收益",
       miningHint: "已扣除支出，含处理中的记录",

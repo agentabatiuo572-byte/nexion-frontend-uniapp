@@ -1881,7 +1881,7 @@ export const ru: Messages = {
       sell: "Продать",
     },
     breakdown: {
-      label: "СОСТАВ АКТИВОВ",
+      label: "СОСТАВ АКТИВОВ (UVT)",
       liquid: "Доступно",
       mining: "Доход UVT за сегодня",
       miningHint: "Учтены траты и суммы в обработке",

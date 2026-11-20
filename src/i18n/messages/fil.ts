@@ -1881,7 +1881,7 @@ export const fil: Messages = {
       sell: "Ibenta",
     },
     breakdown: {
-      label: "BREAKDOWN NG HAWAK",
+      label: "BREAKDOWN NG HAWAK (UVT)",
       liquid: "Magagamit na balanse",
       mining: "Kita sa UVT ngayon",
       miningHint: "Net ng gastos, kasama ang pending",
@@ -2615,7 +2615,7 @@ export const fil: Messages = {
     withdrawTitle: "Withdraw",
     amountLabel: "Halaga",
     networkLabel: "Network",
-    withdrawAddressLabel: "Address ng withdrawal",
+    withdrawAddressLabel: "Address",
     minAmount: "Min: $20.00",
     minAmountDynamic: "Min: ${n}",
     withdrawableAvailable: "Mawi-withdraw:",
