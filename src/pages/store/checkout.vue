@@ -338,7 +338,7 @@ import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-co
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -621,7 +621,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     if (!isCurrentCheckoutRoute(routeScope)) return;
 
     const [catalogReady] = await Promise.all([
-      refreshProductCatalog(true),
+      settleProductCatalogRefresh(refreshProductCatalog(true)),
       refreshServerProductPhase(true),
       freeTrial.refreshVisible(),
     ]);
@@ -2474,7 +2474,7 @@ onShow(() => {
     }
   }
   void refreshServerProductPhase(true);
-  void refreshProductCatalog(true);
+  void settleProductCatalogRefresh(refreshProductCatalog(true));
   void refreshCheckoutWallet();
   restoreReceiptRecovery();
 });
