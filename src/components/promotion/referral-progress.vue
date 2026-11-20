@@ -160,7 +160,7 @@ useAutoRecovery({
 .referral-bow { position: absolute; left: 56%; top: 36%; width: 40%; height: 34%; pointer-events: none; }
 /* Note and action stay side by side while the note fits in two lines; otherwise the note takes the full width and the action drops to the bottom-right. */
 .referral-actions { position: relative; z-index: 1; flex-wrap: wrap; row-gap: 0; }
-.referral-actions > .nx-card-footer__note { flex: 1 1 162px; overflow-wrap: break-word; }
+.referral-actions > .nx-card-footer__note { flex: 1 1 172px; overflow-wrap: break-word; }
 .referral-actions > .referral-progress-link { margin-left: auto; white-space: nowrap; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; }
