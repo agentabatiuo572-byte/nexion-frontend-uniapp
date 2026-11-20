@@ -42,7 +42,16 @@ export function homeDisplayAt(batch: HomeDisplayBatch, serverNow: number) {
   return { online: batch.online[i], paid: batch.paidCents[i] / 100, paidPerSec, activeJobs: batch.activeJobs[i] };
 }
 
-/** One small visible-page clock; the only network operation is the minute refresh. */
+const REFRESH_LEAD_MS = 3_000;
+const MIN_REFRESH_INTERVAL_MS = 1_000;
+const RETRY_MS = 5_000;
+const EXPIRY_GRACE_MS = 10_000;
+
+function batchEnd(batch: HomeDisplayBatch) {
+  return batch.enabled ? Math.min(batch.validUntil, batch.startAt + batch.online.length * 1000) : batch.validUntil;
+}
+
+/** One visible-page clock refreshes before the current batch expires. */
 export function createHomeDisplayPlayer(deps: {
   fetch(): Promise<HomeDisplayBatch>;
   now(): number;
@@ -62,39 +71,30 @@ export function createHomeDisplayPlayer(deps: {
   let pending: Promise<void> | undefined;
   let nextFetch = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let last: ReturnType<typeof homeDisplayAt> = null;
-  let lastJobs = 0;
-  function paint(serverNow: number) {
-    const value = batch && homeDisplayAt(batch, serverNow);
-    if (!value) {
-      deps.render(null);
-      return;
-    }
-    // A new batch can land behind an already displayed sample, including when growth pauses.
-    if (last && (value.online < last.online || value.paid < last.paid
-      || value.activeJobs !== null && value.activeJobs < lastJobs)) {
-      deps.render({
-        ...last,
-        paidPerSec: batch?.enabled ? last.paidPerSec : 0,
-        activeJobs: value.activeJobs === null ? null : last.activeJobs,
-      });
-      return;
-    }
-    last = value;
-    if (value.activeJobs !== null) lastJobs = value.activeJobs;
-    deps.render(value);
-  }
+  let fetchFailed = false;
+  let staleSince: number | undefined;
   function refresh(): Promise<void> {
     if (pending) return pending;
     const started = now();
     if (!active || started < nextFetch) return Promise.resolve();
-    nextFetch = started + 60_000;
     pending = deps.fetch().then(next => {
-      batch = next;
       const received = now();
-      offset = next.serverNow + Math.min(10_000, received - started) / 2 - received;
+      const nextOffset = next.serverNow + Math.min(10_000, received - started) / 2 - received;
+      const end = batchEnd(next);
+      const previousEnd = batch ? batchEnd(batch) : 0;
+      if (end <= received + nextOffset) {
+        nextFetch = received + MIN_REFRESH_INTERVAL_MS;
+        return;
+      }
+      batch = next;
+      offset = nextOffset;
+      fetchFailed = false;
+      // An early refresh can still see the same shared cache entry. Try again at its boundary.
+      const lead = end === previousEnd ? 0 : REFRESH_LEAD_MS;
+      nextFetch = Math.max(received + MIN_REFRESH_INTERVAL_MS, end - offset - lead);
     }).catch(() => {
-      // The last published batch remains usable through its own validity window.
+      fetchFailed = true;
+      nextFetch = now() + RETRY_MS;
     }).finally(() => {
       pending = undefined;
       if (active) tick();
@@ -105,15 +105,25 @@ export function createHomeDisplayPlayer(deps: {
     clearTimeout(timer);
     const clock = now();
     const serverNow = clock + offset;
-    paint(serverNow);
+    const end = batch ? batchEnd(batch) : 0;
+    const value = batch && homeDisplayAt(batch, serverNow);
+    if (value) {
+      staleSince = undefined;
+      deps.render(value);
+    } else {
+      staleSince ??= clock;
+      if (!batch || fetchFailed || clock >= staleSince + EXPIRY_GRACE_MS) deps.render(null);
+    }
     if (clock >= nextFetch) void refresh();
     const delays = pending ? [] : [nextFetch - clock];
-    if (batch && batch.validUntil > serverNow) {
-      delays.push(batch.validUntil - serverNow);
+    if (batch && end > serverNow) {
+      delays.push(end - serverNow);
       if (batch.enabled) {
         const elapsed = serverNow - batch.startAt;
         delays.push(elapsed < 0 ? -elapsed : 1000 - elapsed % 1000);
       }
+    } else if (batch && !fetchFailed && staleSince !== undefined && staleSince + EXPIRY_GRACE_MS > clock) {
+      delays.push(staleSince + EXPIRY_GRACE_MS - clock);
     }
     if (delays.length) timer = setTimeout(tick, Math.max(1, Math.ceil(Math.min(...delays))));
   }
@@ -128,6 +138,7 @@ export function createHomeDisplayPlayer(deps: {
       active = false;
       clearTimeout(timer);
       timer = undefined;
+      staleSince = undefined;
     },
   };
 }

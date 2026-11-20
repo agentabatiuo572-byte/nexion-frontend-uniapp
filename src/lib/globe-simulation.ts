@@ -71,7 +71,7 @@ function drift(seed: number, step: number): number {
   const weight = fraction * fraction * (3 - 2 * fraction);
   return noise(seed, slot) * (1 - weight) + noise(seed, slot + 1) * weight;
 }
-// Largest-remainder rounding: the integer parts always add up exactly to `total`.
+// Highest averages for live totals and largest remainder for the mock. Both methods allocate the full total.
 function splitByWeights(total: number, weights: number[], increasing: boolean): number[] {
   const sum = weights.reduce((acc, weight) => acc + weight, 0);
   const exact = weights.map(weight => total * weight / sum);

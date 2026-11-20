@@ -4,7 +4,7 @@ import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
-import { previewInterfaceLanguages } from './lib/design-review-fixture.mjs';
+import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
@@ -129,15 +129,9 @@ const server=http.createServer(async(req,res)=>{
           for(const key of Object.keys(state))delete state[key];
           Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
         }
-        if(update.homeDisplayState==='growth'&&state.homeDisplayState!=='growth'){
-          state.homeDisplayGrowthAt=Date.now();
-          state.homeDisplayState='growth';
-        }else if(update.homeDisplayState==='paused'&&state.homeDisplayState==='growth'){
-          state.homeDisplayElapsed=(state.homeDisplayElapsed??0)+Math.max(0,Math.floor((Date.now()-(state.homeDisplayGrowthAt??startedAt))/1000));
-          state.homeDisplayState='paused';
-        }
+        updatePreviewHomeDisplay(state,update,Date.now());
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
-        for(const [key,options] of Object.entries(demoOptions)) if(key!=='promotionRewardState'&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(update.reset||update.savedAttemptState)authDemo.reset();
         if(update.savedAttemptState&&state.savedAttemptState!=='none')state.sessionState='signed-out';
         if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;

@@ -109,17 +109,44 @@ export function previewActiveJobsBase(state) {
   return state.jobsBaseState === 'unpublished' ? null : 560;
 }
 
+const homeDisplayCacheMs = 60_000;
+
+function homeDisplayElapsed(state, at) {
+  const seconds = state.homeDisplayState === 'growth'
+    ? Math.max(0, Math.floor((at - (state.homeDisplayGrowthAt ?? now)) / 1000)) : 0;
+  return (state.homeDisplayElapsed ?? 0) + seconds;
+}
+
+export function updatePreviewHomeDisplay(state, update, at) {
+  const { homeDisplayState, jobsBaseState } = update;
+  if (homeDisplayState === 'growth' && state.homeDisplayState !== 'growth') {
+    state.homeDisplayGrowthAt = at;
+    state.homeDisplayState = homeDisplayState;
+    state.homeDisplayChangeAt = at;
+  } else if (homeDisplayState === 'paused' && state.homeDisplayState === 'growth') {
+    state.homeDisplayElapsed = homeDisplayElapsed(state, at + homeDisplayCacheMs);
+    state.homeDisplayState = homeDisplayState;
+    state.homeDisplayChangeAt = at;
+  }
+  if ((jobsBaseState === 'published' || jobsBaseState === 'unpublished') && jobsBaseState !== state.jobsBaseState) {
+    state.jobsBaseState = jobsBaseState;
+    state.homeDisplayJobsAnchor = homeDisplayElapsed(state, at);
+    state.homeDisplayChangeAt = at;
+  }
+}
+
 export function previewHomeDisplay(state, at = Date.now()) {
   const enabled = state.homeDisplayState === 'growth';
   const anchor = state.homeDisplayGrowthAt ?? now;
-  const seconds = enabled ? Math.max(0, Math.floor((at - anchor) / 1000)) : 0;
-  const elapsed = (state.homeDisplayElapsed ?? 0) + seconds;
-  const startAt = enabled ? anchor + seconds * 1000 : now;
+  const changedAt = state.homeDisplayChangeAt ?? now;
+  const elapsed = homeDisplayElapsed(state, at);
+  const startAt = enabled ? anchor + (elapsed - (state.homeDisplayElapsed ?? 0)) * 1000 : changedAt;
+  const validUntil = changedAt + (Math.max(0, Math.floor((at - changedAt) / homeDisplayCacheMs)) + 1) * homeDisplayCacheMs;
   const samples = Array.from({ length: enabled ? 121 : 1 }, (_, offset) => elapsed + offset);
   const jobsBase = previewActiveJobsBase(state);
-  return { enabled, startAt, serverNow: at, validUntil: enabled ? startAt + 121_000 : at + 60_000,
+  return { enabled, startAt, serverNow: at, validUntil,
     sequence: elapsed + 1, online: samples.map(t => 800 + t * 2), paidCents: samples.map(t => 300000 + t * 25),
-    activeJobs: samples.map(t => jobsBase === null ? null : jobsBase + t * 2) };
+    activeJobs: samples.map(t => jobsBase === null ? null : jobsBase + (t - (state.homeDisplayJobsAnchor ?? 0)) * 2) };
 }
 
 function fixture(url, locale, state, request, onlineDevices=3206) {
