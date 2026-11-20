@@ -72,7 +72,7 @@
           <view v-for="item in platformDownloads" :key="item.platform" class="rs-platform-download">
             <view v-if="item.url" class="rs-h5-download__action active-press" role="link" tabindex="0"
               @click="openDownload(item.url)">
-              <text class="rs-h5-download__action-text">{{ item.label }} ↗</text>
+              <text class="rs-h5-download__action-text nx-after-external">{{ item.label }}</text>
             </view>
             <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
               <text class="rs-h5-download__pending">{{ item.label }}</text>
