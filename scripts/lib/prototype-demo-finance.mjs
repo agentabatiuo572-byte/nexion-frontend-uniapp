@@ -1,9 +1,10 @@
 // Isolated loopback financial models. No real network or financial submissions.
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
-import {randomUUID} from 'node:crypto';
-import {demoRecoveryOrders, demoWithdrawalFacts} from './prototype-demo-secondary.mjs';
-import { demoCreditedDeposit } from './prototype-demo-wallet.mjs';
+import { createHash, randomUUID } from 'node:crypto';
+import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawalUser } from './prototype-demo-secondary.mjs';
+import { demoCreditedDeposit, demoWalletNex, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const day=86400000;
+const money = amount => Number(amount.toFixed(6));
 const exchangeDay = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
 });
@@ -19,18 +20,20 @@ export function demoPayoutAddresses(state, now = Date.now()) {
   return Object.values({ ...defaults, ...state.bankDemo?.addresses }).map(row => ({ ...row, changePending: Date.parse(row.effectiveAt) > now }));
 }
 export function demoWithdrawalPolicy(state, facts) {
-  return {
+  const policy = {
     minAmount: minWithdrawal, dailyLimitCount: facts.dailyLimitCount, balanceMaxRatio: facts.balanceMaxRatio,
     smallAmountThresholdUsd: 100, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
     networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1,
-    policyVersion: 'money-policy', cooldownDays: 7, complianceHoldEnabled: false,
+    cooldownDays: 7, complianceHoldEnabled: false,
     complianceReviewThresholdUsdt: 1000, withdrawalEnabled: true, enabledNetworks: demoWithdrawalNetworks(state),
     currentPhase: 'P1', currentMonth: 1, gateSource: 'J1', source: 'D5+H1',
   };
+  const policyVersion = createHash('sha256').update(JSON.stringify(policy)).digest('hex');
+  return { ...policy, policyVersion };
 }
 
 // The fixture models passing K3 and low K4. Non-fast orders go to manual review.
-export function demoWithdrawalRisk(policy, chain, amount) {
+function demoWithdrawalRisk(policy, chain, amount) {
   const complianceReviewRequired = policy.complianceHoldEnabled && ['USDT-BEP20', 'USDT-ERC20'].includes(chain);
   const complianceHoldApplies = complianceReviewRequired && amount > policy.complianceReviewThresholdUsdt;
   const complianceHoldDays = complianceHoldApplies ? policy.cooldownDays : 0;
@@ -40,7 +43,7 @@ export function demoWithdrawalRisk(policy, chain, amount) {
   return { complianceReviewRequired, complianceHoldApplies, complianceHoldDays, strongReview, smallAmountEligible, fastLaneApplied };
 }
 
-export function demoWithdrawalEligibility(state, input, now, facts, policy) {
+function demoWithdrawalEligibility(state, input, now, facts, policy) {
   const chain = String(input?.chain ?? '').trim().toUpperCase();
   const address = String(input?.address ?? '').trim();
   const amount = Number(input?.amount);
@@ -77,7 +80,83 @@ export function demoWithdrawalEligibility(state, input, now, facts, policy) {
   } };
 }
 
-export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now),walletAmount=facts.walletUsdt; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
+function createWithdrawalReceipt(frozen, policy, createdAt, nexAvailable, withdrawalNo) {
+  const { amount, network: chain, policyVersion, offset: useNexFeeOffset } = frozen;
+  const feeKey = chain.split('-')[1].toLowerCase();
+  const networkFee = policy.networkConfirmFeeUsd[feeKey];
+  const nexBurned = useNexFeeOffset ? Math.min(nexAvailable, Math.ceil(networkFee / policy.nexFeeOffsetRate)) : 0;
+  const feeWaived = Math.floor(nexBurned * policy.nexFeeOffsetRate * 1e6) / 1e6;
+  const actualFee = money(networkFee - feeWaived);
+  const { fastLaneApplied, strongReview, ...risk } = demoWithdrawalRisk(policy, chain, amount);
+  const holdDays = chain === 'USDT-TRC20' ? policy.cooldownDays : risk.complianceHoldDays;
+  const holdAt = createdAt + holdDays * day;
+  return {
+    withdrawalNo, amount, chain,
+    status: fastLaneApplied || risk.complianceHoldApplies ? 'EXTENDED_HOLD' : 'REVIEW_PENDING',
+    holdUntil: new Date(holdAt).toISOString(),
+    payoutDueAt: new Date(holdAt + policy.payoutSlaHours * 3600000).toISOString(),
+    networkConfirmUsd: networkFee, networkFee, penaltyFeeRate: 0, penaltyFee: 0, grossFee: networkFee,
+    nexBurned, feeWaived, penaltyFeeWaived: 0, networkFeeWaived: feeWaived,
+    actualPenaltyFee: 0, actualNetworkFee: actualFee, actualFee, netReceive: money(amount - actualFee),
+    policyVersion, useNexFeeOffset, ...risk, strongReview, strongReviewRequired: strongReview,
+    riskRoute: fastLaneApplied ? 'fast-pass' : strongReview ? 'strong-review' : 'manual',
+    k3RiskRoute: 'pass', k4Priority: 'low', riskRuleId: null, idSource: 'server',
+  };
+}
+
+function recordWithdrawal(state, user, receipt, address, createdAt, confirmedAt = null) {
+  const accounts = state.withdrawalOrders ??= {};
+  (accounts[user] ??= {})[receipt.withdrawalNo] = {
+    ...receipt, targetAddress: address, createdAt: new Date(createdAt).toISOString(), confirmedAt,
+    status: confirmedAt ? 'CONFIRMED' : receipt.status,
+  };
+}
+
+function reserve(state, receipt, at) {
+  const { withdrawalNo, netReceive, actualNetworkFee, nexBurned } = receipt;
+  const debit = { direction: 'OUT', at, category: 'withdraw' };
+  postDemoWalletEntries(state,
+    { ...debit, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', asset: 'USDT', amount: netReceive },
+    ...(actualNetworkFee > 0 ? [{ ...debit, bizNo: withdrawalNo + ':USDT:NETWORK_FEE',
+      bizType: 'WITHDRAW_NETWORK_FEE', asset: 'USDT', amount: actualNetworkFee }] : []),
+    ...(nexBurned > 0 ? [{ ...debit, bizNo: withdrawalNo + ':NEX:OFFSET',
+      bizType: 'WITHDRAW_FEE_OFFSET', asset: 'UVT', amount: nexBurned }] : []));
+}
+
+export function seedDemoConfirmedWithdrawal(state, user, frozen, policy, now, withdrawalNo) {
+  const createdAt = now - 2 * day;
+  const receipt = createWithdrawalReceipt(frozen, policy, createdAt, 0, withdrawalNo);
+  recordWithdrawal(state, user, receipt, frozen.address, createdAt,
+    new Date(Date.parse(receipt.holdUntil) + 3600000).toISOString());
+  return receipt;
+}
+
+export function submitDemoWithdrawal(state, user, frozen) {
+  const now = Date.now();
+  const facts = demoWithdrawalFacts(state, now, user);
+  const policy = demoWithdrawalPolicy(state, facts);
+  const reject = (status, message, data) => ({ status, message, data });
+  if (!policy.withdrawalEnabled) return reject(409, 'WITHDRAWAL_KILL_SWITCH_DISABLED');
+  // WithdrawalNetworkPolicy throws before submitOnce returns an idempotent business result.
+  if (!policy.enabledNetworks.includes(frozen.network)) refuse(409, 'WITHDRAWAL_NETWORK_DISABLED');
+  if (frozen.policyVersion !== policy.policyVersion) {
+    return reject(409, 'WITHDRAWAL_POLICY_VERSION_CONFLICT', { policyVersion: policy.policyVersion });
+  }
+  if (demoBankWithdrawalIntent(state, now)) return reject(409, 'BANK_WITHDRAWAL_UNRESOLVED_INTENT');
+
+  const { rejection } = demoWithdrawalEligibility(state, {
+    amount: frozen.amount, chain: frozen.network, address: frozen.address,
+  }, now, facts, policy);
+  if (rejection) return reject(rejection === 'WITHDRAWAL_MIN_AMOUNT_NOT_MET' ? 422 : 409, rejection);
+
+  const receipt = createWithdrawalReceipt(frozen, policy, now, demoWalletNex(state, now), 'WD-B34-DEMO-' + randomUUID());
+  if (receipt.netReceive <= 0) return reject(422, 'WITHDRAWAL_NET_AMOUNT_INVALID');
+  reserve(state, receipt, now);
+  recordWithdrawal(state, user, receipt, frozen.address, now);
+  return { status: 200, receipt };
+}
+
+export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now,demoWithdrawalUser(state,request.headers?.())),walletAmount=facts.walletUsdt; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
 const caps = { ...proof, source: "G2/G3 server configuration", asset: "UVT", currency: "USDT", currentPrice: .125, userDailyCapUsdt: 5000, platformDailyCapUsdt: 100000, feePct: .1, feeMinUsdt: .1, minUsdt: .1, minNex: 1, queueMode: "QUEUE", swapEnabled: true };
 const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_item + nx_emergency_control_setting" };
   if (p === "/api/config/exchange/caps") return caps;
@@ -101,13 +180,10 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   }
   if (p === "/api/config/repurchase") refuse(503, 'REPURCHASE_CONFIG_INVALID');
   if (p === "/api/repurchase/orders") return { ...repurchaseProof, walletBalanceUsdt: walletAmount, serverTime: iso, ordersPage: { total: 0, pageNum: 1, pageSize: 50 }, orders: [] };
-  const isRecoveryDetail = p.startsWith('/api/withdrawals/WD-B34-DEMO-');
-  const withdrawals = p === '/api/withdrawals' || isRecoveryDetail
-    ? [...demoRecoveryOrders(state, request.headers()), ...facts.withdrawals]
-    : facts.withdrawals;
+  const { withdrawals } = facts;
   if(state.accountDeletionState==='withdrawal-error'&&p==='/api/withdrawals')refuse(503,'DEMO_WITHDRAWAL_READ_UNAVAILABLE');
   if(p==='/api/withdrawals')return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawals,page:{pageNum:1,pageSize:50,total:withdrawals.length,hasMore:false}};
-  if (isRecoveryDetail) {
+  if (p.startsWith('/api/withdrawals/WD-B34-DEMO-')) {
     const withdrawal = withdrawals.find(row => row.withdrawalNo === p.split('/').pop());
     if (!withdrawal) refuse(404, 'WITHDRAWAL_NOT_FOUND');
     return { source: 'nx_withdrawal_order', sourceEnvironment: 'PRODUCTION', withdrawal };
