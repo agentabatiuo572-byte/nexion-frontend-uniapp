@@ -3,6 +3,7 @@ import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionGroups, demoCommissionTotals, demoLifetimeEarningsUsdt, demoSettledTasks, demoTeamPeriod } from './prototype-demo-wallet.mjs';
 
 import { demoBatchPage } from './prototype-demo-secondary.mjs';
+import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
@@ -60,23 +61,26 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       ...(version===2&&{schemaVersion:2,kind:filter,summary:demoCommissionTotals(selected)}),
       generatedAt:iso,snapshotAt:window.snapshotAt};
   }
-  // Like the backend, v2 is the v1 read plus settlement fields and the unposted totals; with no devices it is 404.
+  // The simulated sample uses the v3 projection on the canonical assignment route.
   if(p==='/api/tasks/assignments'||p==='/api/tasks/v2/assignments') {
     const v2=p.includes('/v2/'),settledTasks=demoSettledTasks(state,state.previewFactsAt??now),[settlement]=settledTasks;
     const devices=fleetDevices();
-    if(v2&&!devices.some(device=>device.activatedAt!==null))
+    const v3=demoHasLongTasks(state);
+    if(v2&&(v3||!devices.some(device=>device.activatedAt!==null)))
       throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
     const task=(sample,status)=>{
       const completed=status==='COMPLETED';
       const completedAt=completed?new Date(sample.completedAt).toISOString():null;
+      const startedAt=new Date(completed?sample.completedAt-sample.durationSec*1000:now-300000).toISOString();
       return {...proof,serverCanonical:true,
-        ...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,
+        ...((v2||v3)&&{protocolVersion:v3?3:2,queuedAt:v3?startedAt:null,
+          actualDurationSec:v3?(completed?sample.durationSec:300):null,pausedAt:null,pausedSeconds:0,configVersion:v3?sample.configVersion:null,
           settlementStatus:completed?'POSTED':'NONE',settlementBatchNo:completed?sample.batchNo:null,
           settledAt:completed?new Date(sample.postedAt).toISOString():null}),
         taskNo:sample.taskNo,deviceId:sample.deviceId,taskId:'demo-'+sample.taskClass.toLowerCase(),
         taskName:sample.taskName,taskClass:sample.taskClass,model:sample.model,client:sample.client,
         status,rewardUsdt:sample.amount,requiredSeconds:sample.durationSec,...sample.simulation,
-        startedAt:new Date(completed?sample.completedAt-sample.durationSec*1000:now-300000).toISOString(),
+        startedAt,
         completableAt:completedAt??new Date(now+300000).toISOString(),completedAt,
         receiptNo:completed?sample.receiptNo:null,proofNonce:null,proofExpiresAt:null};
     };
@@ -90,8 +94,9 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       return {deviceId:device.id,instanceNo:device.instanceNo,deviceType:device.deviceType,lockUntil:null,
         currentTask:currentSample&&device.activatedAt!==null?task(currentSample,'RUNNING'):null,
         recentTasks:hasSample?(settlement.simulation?settledTasks:[settlement]).map(sample=>task(sample,'COMPLETED')):[],
+        ...(v3&&{phoneValidUntil:null,simulationState:currentSample&&device.activatedAt!==null?'CLOSING':'WAITING_CONFIG'}),
         ...(v2&&{recoveryPending:false,recoveryReason:null})};
-    }),...(v2&&{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]})};
+    }),...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})};
   }
   if(p==='/api/tasks/v2/settlements'||p.startsWith('/api/tasks/v2/settlements/')) {
     const tasks=demoSettledTasks(state,state.previewFactsAt??now).filter(task=>task.batchNo);
