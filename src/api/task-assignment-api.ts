@@ -134,7 +134,7 @@ export interface CanonicalComputeReceiptPage {
 }
 
 export interface TaskAssignmentApi {
-  state(preferV2?: boolean): Promise<CanonicalTaskAssignments>;
+  state(preferV2?: boolean, requireCurrent?: () => void): Promise<CanonicalTaskAssignments>;
   confirmPhoneOnline(deviceId: number, installationId: string): Promise<CanonicalPhoneOnline>;
   stopSimulatedTask(deviceId: number, afterCurrent: boolean, installationId?: string): Promise<Omit<CanonicalPhoneOnline, "serverNow">>;
   receipt(receiptNo: string): Promise<CanonicalComputeReceipt>;
@@ -460,11 +460,12 @@ function receiptPage(value: unknown, mode: ApiEnvironment): CanonicalComputeRece
 
 export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment): TaskAssignmentApi {
   return {
-    async state(preferV2 = false) {
-      const { assignments: current, hasServerDevices } = state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
+    async state(preferV2 = false, requireCurrent) {
+      const { assignments: current, hasServerDevices } = state(await client.request<unknown>({ path: "/api/tasks/assignments", beforeAuthRetry: requireCurrent }), mode);
       if (current.protocolVersion === 3) return current;
       if (preferV2 && hasServerDevices) {
-        try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments" }), mode, true).assignments; }
+        requireCurrent?.();
+        try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments", beforeAuthRetry: requireCurrent }), mode, true).assignments; }
         catch (cause) {
           if (!(cause instanceof ApiError) || cause.kind !== "http" || (cause.status !== 404 && cause.status !== 501)) throw cause;
         }
