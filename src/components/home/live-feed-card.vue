@@ -58,13 +58,14 @@
     <view class="nx-home-feed-footer">
       <view class="nx-home-feed-more" role="link" tabindex="0" @click.stop="goAll" @keydown.enter.stop.prevent="goAll">
         <text>{{ t.home.liveFeedSeeAll }}</text>
-        <text aria-hidden="true">›</text>
+        <NxIcon name="chevron-right" />
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
 import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";

@@ -100,7 +100,7 @@
               <text class="block" :style="rowTitleStyle">{{ rewardTypeLabel(b.type) }}</text>
               <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
               <text v-else class="block" :style="rowSubStyle">{{ b.memo }}</text>
-              <text v-if="courseRewardId(b)" class="block active:opacity-70" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }} ›</text>
+              <text v-if="courseRewardId(b)" class="block active:opacity-70 nx-after-chevron" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }}</text>
               <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: var(--v5-space-1)" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
               <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
             </view>

@@ -19,11 +19,11 @@
     <template v-if="featuredCourse">
       <view class="learning-footer">
         <text v-if="featuredCourse.progress > 0" class="learning-progress-label">{{ copy.progress.replace('{progress}', String(featuredCourse.progress)) }}</text>
-        <text class="learning-action">{{ featuredCourse.progress > 0 ? copy.resume : copy.start }} <text aria-hidden="true">›</text></text>
+        <text class="learning-action nx-after-chevron">{{ featuredCourse.progress > 0 ? copy.resume : copy.start }}</text>
       </view>
     </template>
     <template v-else>
-      <view class="learning-footer"><text class="learning-action">{{ copy.review }} <text aria-hidden="true">›</text></text></view>
+      <view class="learning-footer"><text class="learning-action nx-after-chevron">{{ copy.review }}</text></view>
     </template>
     </view>
   </view>

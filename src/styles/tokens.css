@@ -1376,3 +1376,24 @@ uni-input .uni-input-placeholder {
 
 /* Keep authored image colors when Android WebView automatically darkens small images. */
 uni-image { color-scheme: only light; }
+
+/* Shared UI glyphs as masks (same shapes as components/ui/nx-icon.vue). Text characters (› → ↗ ▾) change
+   shape with the font and are never icons. A trailing glyph on a text link: add .nx-after-<name> to the
+   text element; the glyph takes the text's size and colour and stays hidden from screen readers. */
+:root {
+  --nx-glyph-chevron-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  --nx-glyph-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --nx-glyph-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m13 6 6 6-6 6'/%3E%3C/svg%3E");
+  --nx-glyph-arrow-up-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 17 17 7'/%3E%3Cpath d='M8 7h9v9'/%3E%3C/svg%3E");
+}
+.nx-after-chevron { --nx-glyph: var(--nx-glyph-chevron-right); }
+.nx-after-chevron-down { --nx-glyph: var(--nx-glyph-chevron-down); }
+.nx-after-arrow { --nx-glyph: var(--nx-glyph-arrow-right); }
+.nx-after-external { --nx-glyph: var(--nx-glyph-arrow-up-right); }
+.nx-after-chevron::after, .nx-after-chevron-down::after, .nx-after-arrow::after, .nx-after-external::after {
+  content: ""; display: inline-block; width: 1em; height: 1em; margin-left: .2em; vertical-align: -.15em;
+  background: currentColor; -webkit-mask: var(--nx-glyph) center / contain no-repeat; mask: var(--nx-glyph) center / contain no-repeat;
+}
+@media (forced-colors: active) {
+  .nx-after-chevron::after, .nx-after-chevron-down::after, .nx-after-arrow::after, .nx-after-external::after { forced-color-adjust: none; background: CanvasText; }
+}

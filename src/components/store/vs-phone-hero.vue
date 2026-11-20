@@ -22,7 +22,7 @@
       </view>
       <!-- Arrow + 117× chip -->
       <view class="flex flex-col items-center px-1" style="gap: 6px">
-        <text style="font-size: 15px; color: var(--v5-ink-4); line-height: 1" aria-hidden="true">→</text>
+        <view style="font-size: 15px; color: var(--v5-ink-4); line-height: 0" aria-hidden="true"><NxIcon name="arrow-right" /></view>
         <text class="whitespace-nowrap nx-num-metric" :style="chipStyle">{{ multiplierText }}</text>
       </view>
       <!-- S1 -->
@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { storefrontNex, storefrontNexFull, storefrontUsd, storefrontUsdFull, type StoreYieldAuthority } from "@/lib/store-yield-authority";
