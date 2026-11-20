@@ -313,7 +313,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .promotion-link { gap: 8px; color: var(--v5-ink-2); }
 /* A text link and its chevron stay on one line; when the title row cannot hold both, the link drops to the right on its own line. */
 .promotion-link { flex: none; }
-.entry-navigation .promotion-link { margin-left: auto; }
+.entry-navigation .promotion-link, .entry-event-actions > .entry-cta { margin-left: auto; }
 .promotion-link > text { white-space: nowrap; }
 .entry-navigation { flex-wrap: wrap; row-gap: 0; }
 .entry-cta { max-width: 100%; }
