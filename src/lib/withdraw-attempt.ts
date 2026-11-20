@@ -60,9 +60,9 @@ export function rememberWithdrawAttempt(accountKey: string, attempt: WithdrawAtt
 }
 
 /** 只退役本回执所属的尝试;另一标签页留下的新键必须保留。仅在结果定局时调用。 */
-export function forgetWithdrawAttempt(accountKey: string, receiptKey: string): void {
-  if (readAccountRow<Pick<WithdrawAttempt, "key">>(TABLE_KEY, accountKey)?.key !== receiptKey) return;
-  writeAccountRow<Record<string, never>>(TABLE_KEY, accountKey, {});
+export function forgetWithdrawAttempt(accountKey: string, receiptKey: string): boolean {
+  return readAccountRow<Pick<WithdrawAttempt, "key">>(TABLE_KEY, accountKey)?.key === receiptKey
+    && writeAccountRow<Record<string, never>>(TABLE_KEY, accountKey, {});
 }
 
 /** 新键。带随机熵 —— 纯时间戳 + 计数器在两个标签页的首笔上会撞出同一个字符串。 */
