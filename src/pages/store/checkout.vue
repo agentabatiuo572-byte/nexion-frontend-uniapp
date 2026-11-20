@@ -26,7 +26,7 @@
 
       <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogErrorTitle }}</text>
-        <view class="mb-3"><NxButton :label="t.store.catalogRetry" @click="refreshProductCatalog(true)" /></view>
+        <view class="mb-3"><NxButton :label="t.store.catalogRetry" @click="refreshVisibleCheckout(true)" /></view>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text>{{ t.store.coBackToStore }}</text>
         </view>
@@ -610,7 +610,8 @@ onLoad(async (options) => {
   await initializeCheckout(routeScope);
 });
 
-async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void> {
+async function initializeCheckout(routeScope: CheckoutRouteScope, catalogRead?: Promise<boolean>): Promise<void> {
+  let catalogReady = true;
   activeCheckoutLoad = routeScope;
   quantityReady.value = false;
   try {
@@ -620,8 +621,8 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     if (remoteApiEnabled && await resumeServerOrder(routeScope)) return;
     if (!isCurrentCheckoutRoute(routeScope)) return;
 
-    const [catalogReady] = await Promise.all([
-      settleProductCatalogRefresh(refreshProductCatalog(true)),
+    [catalogReady] = await Promise.all([
+      catalogRead ?? settleProductCatalogRefresh(refreshProductCatalog(true)),
       refreshServerProductPhase(true),
       freeTrial.refreshVisible(),
     ]);
@@ -701,7 +702,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       && activeCheckoutLoad.accountKey === routeScope.accountKey
       && activeCheckoutLoad.productNo === routeScope.productNo) {
       activeCheckoutLoad = null;
-      quantityReady.value = true;
+      quantityReady.value = catalogReady;
     }
   }
 }
@@ -972,7 +973,7 @@ async function reAddTradein() {
   reAddingTradein.value = true;
   interceptFired = false;
   try {
-    const opened = await fireTradeinIntercept(true);
+    const opened = await fireTradeinIntercept('interactive');
     if (!isCurrentCheckoutRoute(scope)) return;
     if (opened) removedTradein.value = false;
     else if (opened === false) toast.warn(t.value.tradein.errPleaseRetry);
@@ -1073,7 +1074,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   // initializeCheckout still recovers an original command before new quotes.
   if (remoteApiEnabled && checkoutRouteInitialized && pageAlive && pageVisible) void initializeCheckout(beginCheckoutRoute());
 });
-async function fireTradeinIntercept(interactive = false): Promise<boolean | undefined> {
+async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'capacity' = 'review'): Promise<boolean | undefined> {
   if (interceptFired) return;
   interceptFired = true;
   // FEAT-TRIAL02: the trial conversion checkout doesn't intercept with trade-in —
@@ -1097,6 +1098,7 @@ async function fireTradeinIntercept(interactive = false): Promise<boolean | unde
     let eligibility: CanonicalTradeinEligibility | null = null;
     checkoutCapacityRead = remoteCapacityGate.resolve(
       async () => {
+        if (mode === 'capacity') return deviceE3Api.capacityQuote(kind);
         const result = await resolveTradeinCheckoutPreflight(
           deviceE3Api.eligibility(kind), deviceE3Api.capacityQuote(kind),
         );
@@ -1111,7 +1113,7 @@ async function fireTradeinIntercept(interactive = false): Promise<boolean | unde
         .map((source) => String(source.sourceDeviceId)) ?? [];
       if (quote.decision === "REPLACE_REQUIRED") {
         tradeinAvailable.value = true;
-        if (!interactive) return true;
+        if (mode !== 'interactive') return true;
         if (eligibility?.eligible && sourceIds.length > 0) {
           tradein.showChoice(kind, p.price, sourceIds);
         } else {
@@ -1135,7 +1137,7 @@ async function fireTradeinIntercept(interactive = false): Promise<boolean | unde
       // through the ordinary server order path without opening a local sheet.
       if (eligibility?.eligible && sourceIds.length > 0) {
         tradeinAvailable.value = true;
-        if (!interactive) return true;
+        if (mode !== 'interactive') return true;
         if (!isCurrentCheckoutRoute(requestScope)) return;
         tradein.showChoice(kind, p.price, sourceIds);
         return true;
@@ -1156,13 +1158,13 @@ async function fireTradeinIntercept(interactive = false): Promise<boolean | unde
   // reaches browser-owned replacement or order/device writes.
   if (canTradeIn.value && tradeInSources.value.length > 0) {
     tradeinAvailable.value = true;
-    if (!interactive) return true;
+    if (mode !== 'interactive') return true;
     tradein.showChoice(kind, p.price, tradeInSources.value.map((d) => d.id));
     return true;
   }
   if (capped.value) {
     tradeinAvailable.value = true;
-    if (!interactive) return true;
+    if (mode !== 'interactive') return true;
     tradein.showReplace(kind, p.price);
     return true;
   }
@@ -2456,15 +2458,28 @@ function reassertTradeinContext() {
   else tradein.clearApplied(tradeinOwner);
 }
 
+async function resumeReadyCheckout(scope: CheckoutRouteScope, catalogRead: Promise<boolean>) {
+  if (await resumeServerOrder(scope)) return;
+  if (await catalogRead && isCurrentCheckoutRoute(scope) && ordinaryCheckoutInitialized
+    && !activeSession.value && checkoutCapacityRequired.value) {
+    await fireTradeinIntercept('capacity');
+  }
+}
+
+function refreshVisibleCheckout(retryCatalog = false) {
+  const catalogRead = settleProductCatalogRefresh(refreshProductCatalog(true));
+  if (!checkoutRouteInitialized || createdCheckoutOrder.value || settledResultReplay.value) return;
+  // An explicit retry supersedes an initialization still unwinding from the failed catalog.
+  if (activeCheckoutLoad && !retryCatalog) return;
+  if (!quantityReady.value) void initializeCheckout(beginCheckoutRoute(), catalogRead);
+  else void resumeReadyCheckout(captureCheckoutRoute(), catalogRead);
+}
+
 onShow(() => {
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
   void freeTrial.refreshVisible();
-  if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) {
-    // A load invalidated by onHide cannot finish and restore quantity readiness.
-    if (!quantityReady.value) void initializeCheckout(beginCheckoutRoute());
-    else void resumeServerOrder();
-  }
+  refreshVisibleCheckout();
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
@@ -2478,7 +2493,6 @@ onShow(() => {
     }
   }
   void refreshServerProductPhase(true);
-  void settleProductCatalogRefresh(refreshProductCatalog(true));
   void refreshCheckoutWallet();
   restoreReceiptRecovery();
 });
