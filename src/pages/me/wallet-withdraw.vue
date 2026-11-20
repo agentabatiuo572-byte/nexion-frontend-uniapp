@@ -1161,16 +1161,20 @@ watch([
       if (!stillStored()) return;
       if (result.state === "COMMITTED") {
         const { withdrawalNo } = result;
-        recoveryResult.value = { key: attemptKey, outcome: {
-          state: "COMMITTED", withdrawalNo, noticePending: !announcedWithdrawalNos.has(withdrawalNo),
-          trackingRoute: `/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(withdrawalNo)}`,
-        } };
-        forgetWithdrawAttempt(accountKey, attemptKey);
-        refreshPendingAttempt();
-        void app.refreshRemoteFleet();
-        void app.refreshRemoteWithdrawalList(accountKey);
-        return;
-      } else {
+        const retired = forgetWithdrawAttempt(accountKey, attemptKey);
+        if (withdrawalRecovery.value?.state !== "COMMITTED") {
+          recoveryResult.value = { key: attemptKey, outcome: {
+            state: "COMMITTED", withdrawalNo, noticePending: retired && !announcedWithdrawalNos.has(withdrawalNo),
+            trackingRoute: `/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(withdrawalNo)}`,
+          } };
+          void app.refreshRemoteFleet();
+          void app.refreshRemoteWithdrawalList(accountKey);
+        }
+        if (retired) {
+          refreshPendingAttempt();
+          return;
+        }
+      } else if (withdrawalRecovery.value?.state !== "COMMITTED") {
         recoveryResult.value = { key: attemptKey, outcome: result };
         if (result.state === "REJECTED") {
           forgetWithdrawAttempt(accountKey, attemptKey);
@@ -1179,7 +1183,9 @@ watch([
         }
       }
     } catch {
-      if (isCurrent()) recoveryResult.value = { key: attemptKey, outcome: { state: "READ_FAILED" } };
+      if (isCurrent() && withdrawalRecovery.value?.state !== "COMMITTED") {
+        recoveryResult.value = { key: attemptKey, outcome: { state: "READ_FAILED" } };
+      }
     }
     if (isCurrent()) timer = setTimeout(() => void poll(), WITHDRAWAL_RECOVERY_INTERVAL_MS);
   }

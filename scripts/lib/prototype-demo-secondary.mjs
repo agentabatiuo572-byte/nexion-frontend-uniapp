@@ -90,6 +90,19 @@ export function demoWithdrawals(state, now = Date.now()) {
   return [...bankRows, ...chainRows];
 }
 
+export function demoWithdrawalUser(state, headers) {
+  if (headers && (state.sessionState === 'signed-out' || state.authState === 'signed-out'
+    || !['Bearer local-demo-token', 'Bearer formal-probe-access-token'].includes(headers.authorization))) return null;
+  return state.authUser?.userId ?? 900001;
+}
+
+export function demoRecoveryOrders(state, headers) {
+  const user = demoWithdrawalUser(state, headers);
+  return Object.values(state.withdrawRecoveryDemo?.[user] ?? {})
+    .filter(attempt => attempt.order)
+    .map(attempt => attempt.order);
+}
+
 // One rule for every withdrawal read (EarningsReleaseService.withdrawableAmount, AppWithdrawalService.maximumWithdrawable
 // and bankCapacity): every earnings bucket is credited to the wallet, so pending and locked amounts sit inside the balance
 // and come off it before the ratio. USDT and bank withdrawals are rows of one table, so they share one daily count.
@@ -100,7 +113,7 @@ export function demoWithdrawalFacts(state,now=Date.now()){
   const released=Math.max(0,Math.round((walletUsdt-pendingReview-bonusLocked)*1e6)/1e6);
   // WithdrawalDayWindow: Vietnam UTC+7 midnight, with an inclusive start and exclusive end.
   const start=Math.floor((now+7*3600000)/day)*day-7*3600000,dailyCountResetAt=start+day;
-  const used=withdrawals.filter(row=>{
+  const used=[...withdrawals, ...demoRecoveryOrders(state)].filter(row=>{
     const createdAt=Date.parse(row.createdAt);
     return createdAt>=start&&createdAt<dailyCountResetAt;
   }).length;
