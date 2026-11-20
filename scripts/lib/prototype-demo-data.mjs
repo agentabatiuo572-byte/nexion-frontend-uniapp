@@ -826,7 +826,18 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return remember('tradeinSubmit',orderNo,{tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance},order);
   }
   if(pathname==='/api/app/trade-in/capacity-quote'){
-    const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo)||products[0],data=structuredClone(base());
+    const {targetProductNo}=request.postDataJSON();
+    const product=products.find(item=>item.id===targetProductNo);
+    if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
+    const reason=tradeinTargetReason(product);
+    if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
+    const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+    const purchase=demoSkuPurchaseRules(state,product,points,now);
+    if(!purchase.eligible){
+      const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
+      throw Object.assign(new Error(code),{status:403});
+    }
+    const data=structuredClone(base());
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
     if(state.checkoutState==='capacity-error')throw Object.assign(new Error('CAPACITY_UNAVAILABLE'),{status:503});
     if(state.checkoutState==='setup-required')throw Object.assign(new Error('USER_ONBOARDING_REQUIRED'),{status:428});
