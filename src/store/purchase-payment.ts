@@ -11,6 +11,8 @@ import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { getT } from '@/i18n/use-t';
+import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
@@ -42,6 +44,7 @@ let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: P
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
 let quoteTimer: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<typeof setTimeout> | undefined;
 const releaseListeners = new Set<(accountKey: string, commandKey: string) => void>();
+const unsavedExpiries = new Map<string, Map<string, PurchaseKind>>();
 /** A page holding its own copy of a payment's record hears when the server no longer holds that payment. */
 export function onPurchaseRecordReleased(listener: (accountKey: string, commandKey: string) => void) {
   releaseListeners.add(listener);
@@ -54,12 +57,32 @@ function save(pending: PendingExternal, accountKey = state.accountKey) {
   if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: pending } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
   state.revision++;
 }
+function saveExpiry(accountKey: string, commandKey: string, kind: PurchaseKind, observed?: PendingExternal) {
+  // uni storage can return an empty table on read failure. Publish the server's
+  // result for this row before trying to update its durable projection.
+  const expired = unsavedExpiries.get(accountKey) ?? new Map<string, PurchaseKind>();
+  const newlyObserved = expired.get(commandKey) !== kind;
+  if (newlyObserved) {
+    expired.set(commandKey, kind);
+    unsavedExpiries.set(accountKey, expired);
+    state.revision++;
+  }
+  try {
+    const record = rows(accountKey).records[commandKey];
+    if (record?.kind !== kind) return;
+    if (observed || record.lastStatus !== 'EXPIRED') {
+      save({ ...(observed ?? record), lastStatus: 'EXPIRED' }, accountKey);
+    }
+    expired.delete(commandKey);
+    if (!expired.size) unsavedExpiries.delete(accountKey);
+  } catch {
+    if (newlyObserved) toast.error(getT().errors.txNotSavedTitle);
+  }
+}
+
 /** Records the server's expiry of the original trade-in payment without reopening it. */
 export function markTradeinPurchaseExpired(accountKey: string, commandKey: string) {
-  const pending = rows(accountKey).records[commandKey];
-  if (pending?.kind === 'TRADE_IN' && pending.lastStatus !== 'EXPIRED') {
-    save({ ...pending, lastStatus: 'EXPIRED' }, accountKey);
-  }
+  saveExpiry(accountKey, commandKey, 'TRADE_IN');
 }
 function retire(pending: PendingExternal, accountKey: string) {
   const records = { ...rows(accountKey).records }; delete records[pending.commandKey];
@@ -88,6 +111,41 @@ function matches(intent: PurchasePaymentIntent, pending: PendingExternal) {
     || pending.network !== undefined && intent.network !== pending.network
     || pending.intentNo && intent.intentNo !== pending.intentNo) throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
 }
+function readIntent(pending: PendingExternal) {
+  return pending.intentNo ? api.get(pending.intentNo) : api.find(pending.kind, pending.commandKey);
+}
+function displayRecords() {
+  state.revision;
+  const accountKey = account();
+  const expired = unsavedExpiries.get(accountKey);
+  return Object.values(rows(accountKey).records).map(row => expired?.get(row.commandKey) === row.kind
+    ? { ...row, lastStatus: 'EXPIRED' } : row);
+}
+function pendingPayments() {
+  try {
+    const records = displayRecords();
+    state.pendingReadError = false;
+    return records.filter(row => row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+  } catch {
+    state.pendingReadError = true;
+    return [];
+  }
+}
+function unsettledCheckoutPayments(includeTradein: boolean) {
+  return pendingPayments().filter(row => (row.kind === 'ORDER_PAY' || (includeTradein && row.kind === 'TRADE_IN'))
+    && row.lastStatus !== 'MANUAL_REVIEW' && row.lastStatus !== 'DELIVERED' && !row.businessDelivered);
+}
+
+/** The progress bar can outlive both a closed payment layer and a released checkout pointer. */
+export async function refreshExpiredCheckoutPayments(accountKey: string, current: () => boolean, includeTradein: boolean) {
+  if (!current() || account() !== accountKey || state.open) return;
+  await Promise.allSettled(unsettledCheckoutPayments(includeTradein).map(async pending => {
+    const result = await readIntent(pending);
+    if (!current() || account() !== accountKey || state.open || result?.status !== 'EXPIRED') return;
+    matches(result, pending);
+    saveExpiry(accountKey, pending.commandKey, pending.kind);
+  }));
+}
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
 }
@@ -102,15 +160,23 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   // Legacy recovery rows have only the quote identity; bind their first validated original intent for subsequent reads.
   const known = { ...pending, paymentMethod: intent.paymentMethod, network: intent.network,
     intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
-  save(known); state.pending = known; state.intent = intent; state.method = intent.paymentMethod;
-  if (intent.deadlineAt) state.deadlineAt = Date.parse(intent.deadlineAt);
-  if (intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED') {
+  if (known.businessDelivered) {
     const payload = JSON.parse(known.fingerprint)[1] as Record<string, unknown>;
     validatePurchasePaymentReceipt(known.kind, payload, intent.receipt, intent);
-    if (intent.status === 'DELIVERED') {
-      finish({ method: 'EXTERNAL', receipt: intent.receipt, commandKey: known.commandKey, accountKey: state.accountKey });
-      return;
+  }
+  if (intent.status === 'EXPIRED') saveExpiry(state.accountKey, known.commandKey, known.kind, known);
+  else {
+    try { save(known); }
+    catch (error) {
+      if (!settled(intent)) throw error;
+      toast.error(known.businessDelivered ? getT().errors.billMissingTitle : getT().errors.txNotSavedTitle);
     }
+  }
+  state.pending = known; state.intent = intent; state.method = intent.paymentMethod;
+  if (intent.deadlineAt) state.deadlineAt = Date.parse(intent.deadlineAt);
+  if (intent.status === 'DELIVERED') {
+    finish({ method: 'EXTERNAL', receipt: intent.receipt, commandKey: known.commandKey, accountKey: state.accountKey });
+    return;
   }
   if (!purchasePaymentTiming(intent, Date.now(), state.deadlineAt).canPay) state.cashier = false;
   else if (openCashierOnReady && intent.paymentUrl) { openCashierOnReady = false; state.cashier = true; }
@@ -288,12 +354,12 @@ function proceed() {
 }
 async function query() {
   const pending = state.pending;
-  if (!pending || state.busy || state.concluded) return;
+  if (!pending || state.busy || state.concluded || settled(state.intent)) return;
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false;
   state.busy = true; state.unavailable = false;
   try {
-    const result = pending.intentNo ? await api.get(pending.intentNo) : await api.find(pending.kind, pending.commandKey);
+    const result = await readIntent(pending);
     if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
     if (result) accept(result, pending);
@@ -480,14 +546,18 @@ export function usePurchasePayment() {
     openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); else finish(null); },
     support: () => closeAndNavigate('/pages/me/support'),
     reorder: () => { const again = context?.reorder, orderNo = state.orderNo; finish(null); if (again) again(); else if (orderNo && !onOrderPage(orderNo)) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
-    pending: () => { state.revision; try { const records = Object.values(rows().records); state.pendingReadError = false; return records.filter(row => row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated)); } catch { state.pendingReadError = true; return []; } }, resume,
-    records: () => { state.revision; try { return Object.values(rows().records); } catch { return []; } },
+    pending: pendingPayments, unsettledCheckoutPayments, resume,
+    records: () => { try { return displayRecords(); } catch { return []; } },
     viewOrder: () => { const intent = state.intent, pending = state.pending; if (!intent?.receipt || !pending) return; const orderNo = validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt); finish(null); void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
   };
 }
 export function acknowledgePurchasePayment(result: Extract<PurchaseChoice, { method: 'EXTERNAL' }>) {
-  const pending = rows(result.accountKey).records[result.commandKey];
-  if (pending) save({ ...pending, validated: true, businessDelivered: true }, result.accountKey);
+  try {
+    const pending = rows(result.accountKey).records[result.commandKey];
+    if (pending) save({ ...pending, validated: true, businessDelivered: true }, result.accountKey);
+  } catch {
+    toast.error(getT().errors.billMissingTitle);
+  }
 }
 /** The order detail asks whether this order already has an external payment underway. */
 export function pendingOrderPayment(accountKey: string, orderNo: string, knownOnly = false): PendingExternal | null {

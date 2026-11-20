@@ -17,8 +17,7 @@
         <NxButton :label="t.tradein.keepRecoveryAction" @click="recoverCapacityBeforePurchase([keepCheckoutTarget])" />
       </view>
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
-        <text class="block" style="font-size:13px;color:var(--v5-ink-2);margin-bottom:var(--v5-space-3)">{{ t.tradein.recoveryPending }}</text>
-        <NxButton :label="t.store.catalogRetry" :busy="remoteTradeinRecoveryBusy" @click="resumePendingRemoteTradein(captureCheckoutRoute(), true)" />
+        <text class="block" style="font-size:13px;color:var(--v5-ink-2);white-space:pre-line;text-wrap:pretty">{{ t.tradein.recoveryChecking }}</text>
       </view>
       <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
@@ -325,7 +324,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -615,7 +614,7 @@ onLoad(async (options) => {
 });
 
 async function initializeCheckout(routeScope: CheckoutRouteScope, catalogRead?: Promise<boolean>): Promise<void> {
-  let catalogReady = true;
+  let catalogReady = false;
   activeCheckoutLoad = routeScope;
   quantityReady.value = false;
   try {
@@ -813,14 +812,14 @@ const trialView = computed(() => hasOriginalCheckout.value ? NO_TRIAL : trialQuo
 // An early quote past its original-term end is stale too: never show or pay a lapsed offer.
 const trialEarlyQuoteLapsed = computed(() => {
   const quote = freeTrial.authoritativeQuote;
-  return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && nowTick.value >= quote.earlyEndsAt;
+  return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && freeTrial.serverTimeAt(nowTick.value) >= quote.earlyEndsAt;
 });
 const trialQuoteIncomplete = computed(() => trialEarlyQuoteLapsed.value
   || ((freeTrial.status === "active" || freeTrial.status === "grace")
     && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null
       || freeTrial.authoritativePriceUSD === null)));
 const trialQuoteUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
-// The 4s trial poll marks the authority loading while it re-reads. Keep the last confirmed quote on
+// While trial authority is loading, keep the last confirmed quote on
 // screen meanwhile instead of swapping the page out (which also threw the scroll back to the top);
 // every action still waits on trialQuoteUnavailable.
 const trialQuoteScreenUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && ((freeTrial.authorityStatus !== "ready"
@@ -833,7 +832,6 @@ const trialOffsetView = computed(() => trialView.value);
 const promoDiscountText = computed(() => formatAmount(promoDiscount.value));
 const trialOffsetText = computed(() => formatAmount(trialOffsetView.value.offsetUSD));
 const trialEarlyDiscountText = computed(() => formatAmount(trialOffsetView.value.earlyDiscountUSD));
-watch(trialEarlyQuoteLapsed, (lapsed) => { if (lapsed) void freeTrial.refreshRemote(true); });
 // What the trial purchase credits right after payment (server quote convert() settles).
 const trialCreditText = computed(() => {
   const quote = remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote : null;
@@ -1370,7 +1368,7 @@ const stepDisplay = computed(() => ['confirmed','activating','live'].includes(st
 async function submitReview() {
   if (checkoutPurchaseChecking.value) return;
   const scope = captureCheckoutRoute();
-  // A tap during the 4s trial re-read waits for that read, then goes on with the fresh authority.
+  // A tap during a trial read waits for it, then goes on with fresh authority.
   if (trialQuoteUnavailable.value && !trialQuoteScreenUnavailable.value) {
     const ready = await freeTrial.refreshRemote();
     if (!ready || !isCurrentCheckoutRoute(scope)) return;
@@ -1984,8 +1982,22 @@ function retireRemoteOrderKey(): void {
   remoteOrderCommandKey.clear();
 }
 
-async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissionScope: CheckoutRouteScope, newSubmission = false, retainRecovery = false): Promise<CanonicalTradeinResult | null> {
-  const scopeIsCurrent = () => isCurrentCheckoutRoute(submissionScope);
+function rejectRemoteTradein(accountKey: string, recovery: CheckoutTradeinRecovery, key: string, message?: string): never {
+  if (message === 'PURCHASE_PAYMENT_EXPIRED') markTradeinPurchaseExpired(accountKey, key);
+  finishCheckoutTradein(accountKey, recovery);
+  remoteTradeinRecoveryRequired.value = false;
+  remoteTradeinRecoveryError.value = false;
+  if (tradein.appliedTradein?.canonicalQuote?.sourceDeviceId === recovery.tradeinQuote.sourceDeviceId
+      && tradein.appliedTradein.canonicalQuote.sourceRowVersion === recovery.tradeinQuote.sourceRowVersion) tradein.clearApplied();
+  toast.warn(purchaseRecoveryCopy(locale.code).rejected);
+  throw new Error('PAYMENT_CANCELLED');
+}
+
+async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissionScope: CheckoutRouteScope, options: {
+  newSubmission?: boolean; retainRecovery?: boolean; current?: () => boolean;
+} = {}): Promise<CanonicalTradeinResult> {
+  const { newSubmission = false, retainRecovery = false } = options;
+  const scopeIsCurrent = options.current ?? (() => isCurrentCheckoutRoute(submissionScope));
   const reviewedQuote = { ...recovery.tradeinQuote };
   const authorizationIsCurrent = () => {
     if (!scopeIsCurrent()) return false;
@@ -2012,12 +2024,11 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
     const result = await readPaymentCommand(apiClient, 'trade-in', key);
     if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
     if (result.status === 'REJECTED') {
-      if (result.message === 'PURCHASE_PAYMENT_EXPIRED') markTradeinPurchaseExpired(submissionScope.accountKey, key);
-      return null;
+      rejectRemoteTradein(submissionScope.accountKey, recovery, key, result.message);
     }
     if (result.status === 'SUCCEEDED') recoveredResult = parseCanonicalTradeinResult(result.receipt);
     else if (result.status === 'NOT_SEEN' && result.canResumeSameKey
-        && recovery.tradeinCommandSubmitted !== true && !hasTradeinPurchaseIntent(submissionScope.accountKey, key)) {
+        && recovery.tradeinCommandSubmitted === false && !hasTradeinPurchaseIntent(submissionScope.accountKey, key)) {
       remoteTradeinRecoveryError.value = false;
     }
     else throw new Error('PAYMENT_RESULT_UNRESOLVED');
@@ -2028,7 +2039,7 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
           remoteTradeinRecoveryRequired.value = true;
           if (recoveredResult) return recoveredResult;
           let submitted: CanonicalTradeinResult | null = null;
-          const summary = product.value?.name ?? (reviewedQuote.targetProductName || t.value.store.coConfirmPurchase);
+          const summary = reviewedQuote.targetProductName || t.value.store.coConfirmPurchase;
           const paid = await executeSelectedPurchase({amount:recovery.tradeinQuote.payableUsdt,currency:'USDT',summary},
             async authorization=>{
               if (!authorizationIsCurrent()) return null;
@@ -2047,10 +2058,12 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
             // Missing submission history remains unknown, even when the key is unseen.
             const original = await readPaymentCommand(apiClient, 'trade-in', key);
             if (!scopeIsCurrent()) throw new Error('CHECKOUT_ACCOUNT_CHANGED');
+            if (original.status === 'REJECTED') {
+              rejectRemoteTradein(submissionScope.accountKey, recovery, key, original.message);
+            }
             if (original.status === 'SUCCEEDED') submitted = parseCanonicalTradeinResult(original.receipt);
             else {
-              if (original.status === 'REJECTED' || (recovery.tradeinCommandSubmitted === false
-                  && original.status === 'NOT_SEEN' && original.canResumeSameKey)) {
+              if (recovery.tradeinCommandSubmitted === false && original.status === 'NOT_SEEN' && original.canResumeSameKey) {
                 finishCheckoutTradein(submissionScope.accountKey, recovery);
                 remoteTradeinRecoveryRequired.value = false;
                 throw new Error('PAYMENT_CANCELLED');
@@ -2118,8 +2131,9 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
       });
 }
 
-async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = false): Promise<boolean> {
-  if (!remoteApiEnabled || !isCurrentCheckoutRoute(scope)) return false;
+async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = false, foregroundOnly = false): Promise<boolean> {
+  const current = () => isCurrentCheckoutRoute(scope) && (!foregroundOnly || foregroundReadAllowed());
+  if (!remoteApiEnabled || !current()) return false;
   let recovery: CheckoutTradeinRecovery | null;
   try { recovery = readCheckoutTradein(scope.accountKey, scope.productNo); }
   catch {
@@ -2136,33 +2150,25 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
     const tracking = prepareTradeinPaymentRecovery(scope.accountKey, key, recovery.tradeinCommandSubmitted === false);
     if (tracking) {
       await tracking;
-      if (!isCurrentCheckoutRoute(scope)) return true;
-      const current = readCheckoutTradein(scope.accountKey, scope.productNo);
-      if (!current) throw new Error('PAYMENT_CANCELLED');
-      if (current.commandKey !== recovery.commandKey) return true;
-      recovery = current;
+      if (!current()) return true;
+      const stored = readCheckoutTradein(scope.accountKey, scope.productNo);
+      if (!stored) throw new Error('PAYMENT_CANCELLED');
+      if (stored.commandKey !== recovery.commandKey) return true;
+      recovery = stored;
     }
-    const result = await completeRemoteTradein(recovery, scope, false, navigate);
-    if (!result) {
-      if (!isCurrentCheckoutRoute(scope)) return true;
-      finishCheckoutTradein(scope.accountKey, recovery);
-      if (tradein.appliedTradein?.canonicalQuote?.sourceDeviceId === recovery.tradeinQuote.sourceDeviceId
-          && tradein.appliedTradein.canonicalQuote.sourceRowVersion === recovery.tradeinQuote.sourceRowVersion) tradein.clearApplied();
-      toast.warn(purchaseRecoveryCopy(locale.code).rejected);
-      throw new Error('PAYMENT_CANCELLED');
-    }
-    if (navigate && isCurrentCheckoutRoute(scope)) {
+    const result = await completeRemoteTradein(recovery, scope, { retainRecovery: navigate, current });
+    if (navigate && current()) {
       const navigated = await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(result.orderNo)}`);
       if (navigated && isCurrentAccountScope({ accountKey: scope.accountKey, epoch: scope.accountEpoch })) {
-        const current = readCheckoutTradein(scope.accountKey, scope.productNo);
-        if (current?.commandKey === recovery.commandKey) finishCheckoutTradein(scope.accountKey, current);
-      } else if (isCurrentCheckoutRoute(scope)) {
+        const stored = readCheckoutTradein(scope.accountKey, scope.productNo);
+        if (stored?.commandKey === recovery.commandKey) finishCheckoutTradein(scope.accountKey, stored);
+      } else if (current()) {
         remoteTradeinRecoveryRequired.value = true;
         remoteTradeinRecoveryError.value = true;
       }
     }
   } catch (error) {
-    if (isCurrentCheckoutRoute(scope)) {
+    if (current()) {
       if (error instanceof Error && error.message === 'PAYMENT_CANCELLED') {
         remoteTradeinRecoveryRequired.value = false;
         remoteTradeinRecoveryError.value = false;
@@ -2276,7 +2282,7 @@ async function submitRemoteOrder(): Promise<void> {
         commandKey: remoteOrderKey(), tradeinQuote: { ...tradeinContext.canonicalQuote! }, tradeinCommandSubmitted: false };
       rememberCheckoutOrder(submissionScope.accountKey, recovery);
       remoteTradeinRecoveryRequired.value = true;
-      await completeRemoteTradein(recovery, submissionScope, true);
+      await completeRemoteTradein(recovery, submissionScope, { newSubmission: true });
       return;
     }
     const existingOrder = createdCheckoutOrder.value;
@@ -2445,6 +2451,25 @@ async function submitRemoteOrder(): Promise<void> {
 // 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-116 同款)。
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
+const purchasePayment = usePurchasePayment();
+useAutoRecovery({
+  failed: () => remoteApiEnabled && pageAlive && pageVisible && auth.isAuthenticated
+    && !promotionRoute.value && remoteTradeinRecoveryError.value && !remoteTradeinRecoveryBusy.value
+    && !serverOrderRecovery.value && !purchasePayment.state.open && !checkoutLeaving.value,
+  retry: () => resumePendingRemoteTradein(captureCheckoutRoute(), true, true),
+  repeatMs: 15_000,
+});
+useAutoRecovery({
+  failed: () => remoteApiEnabled && pageAlive && pageVisible && auth.isAuthenticated
+    && !purchasePayment.state.open && purchasePayment.unsettledCheckoutPayments(!remoteTradeinRecoveryRequired.value).length > 0,
+  retry: () => {
+    const scope = captureCheckoutRoute();
+    return refreshExpiredCheckoutPayments(scope.accountKey,
+      () => isCurrentCheckoutRoute(scope) && foregroundReadAllowed(),
+      !remoteTradeinRecoveryRequired.value);
+  },
+  repeatMs: 15_000,
+});
 watch([foregroundReadAllowed, () => app.accountBindingEpoch], ([allowed]) => {
   if (allowed && pageVisible && checkoutRouteInitialized && !promotionRoute.value) void freeTrial.refreshVisible();
 });
@@ -2480,8 +2505,10 @@ function refreshVisibleCheckout() {
   if (!checkoutRouteInitialized || createdCheckoutOrder.value || settledResultReplay.value) return;
   // The active load owns original-order recovery and follows the latest catalog itself.
   if (activeCheckoutLoad) return;
-  if (!quantityReady.value) void initializeCheckout(beginCheckoutRoute(), catalogRead);
-  else void resumeReadyCheckout(captureCheckoutRoute(), catalogRead);
+  // An original payment can finish before the ordinary checkout reaches eligibility.
+  if (!quantityReady.value || (!ordinaryCheckoutInitialized.value && !activeSession.value)) {
+    void initializeCheckout(beginCheckoutRoute(), catalogRead);
+  } else void resumeReadyCheckout(captureCheckoutRoute(), catalogRead);
 }
 
 onShow(() => {
