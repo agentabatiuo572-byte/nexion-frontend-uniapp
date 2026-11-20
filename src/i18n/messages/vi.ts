@@ -4178,7 +4178,7 @@ timeHoursAgo: "{n} giờ",
   },
 
   unilevel: {
-    periods: { today: "Hôm nay", week: "Tuần này", month: "Tháng này", all: "Toàn bộ thời gian" },
+    periods: { today: "Hôm nay", week: "Tuần này", month: "Tháng này", all: "Tất cả" },
     pausedLayersTitle: "Một số phần thưởng mạng lưới đang tạm dừng",
     pausedLayersDesc: "Một số phần thưởng nhóm đang tạm dừng chi trả. Các khoản đã ghi nhận không bị ảnh hưởng.",
     pageTitle: "Thưởng nhóm",
