@@ -145,7 +145,7 @@
             </view>
             <view class="nx-dep-record-row__main">
               <text class="nx-dep-record-row__title">{{ rowTitle(r) }}</text>
-              <view class="nx-dep-record-row__sub"><text class="nx-dep-record-row__net">{{ netShort(r.channel) }} · </text><NxCodeValue class="nx-dep-record-row__id" :value="r.depositId" :label="t.bills.detailRef" :copyable="false" /></view>
+              <view class="nx-dep-record-row__sub"><text class="nx-dep-record-row__net">{{ netShort(r.channel) }} · </text><NxCodeValue class="nx-dep-record-row__id" :value="r.depositId" :label="t.bills.detailRef" :copyable="!recordClickable(r)" /></view>
               <view v-if="isInFlight(r) && r.requiredConfirmations != null" class="nx-dep-progress" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
               <view v-if="noteText(r)"><text class="block" :style="noteStyle">{{ noteText(r) }}</text></view>
             </view>
@@ -687,9 +687,14 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-record-row__main { flex: 1; min-width: 0; }
 .nx-dep-record-row__title { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
 /* Network, then the deposit id as a long code (one line, middle ellipsis, read in full by screen readers). */
-.nx-dep-record-row__sub { display: flex; align-items: baseline; min-width: 0; padding-top: 3px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-metric); }
+.nx-dep-record-row__sub { display: flex; flex-wrap: wrap; align-items: baseline; min-width: 0; padding-top: 3px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-metric); }
 .nx-dep-record-row__net { flex: none; white-space: pre; }
 .nx-dep-record-row__id { color: var(--v5-ink-3); font-size: 12px; line-height: 16px; }
+/* The id stays whole and moves under the network when the column is narrow; only an id wider than the column ellipsizes. */
+.nx-dep-record-row__sub > .nx-dep-record-row__id { flex: 0 0 auto; max-width: 100%; }
+/* Copy shows only on rows that open nothing (in-flight on-chain deposits), so it never sits inside a tappable row; 44px touch target. */
+.nx-dep-record-row__id :deep(.copy-code-button) { position: relative; }
+.nx-dep-record-row__id :deep(.copy-code-button)::after { content: ""; position: absolute; inset: -8px; }
 .nx-dep-record-row__side { flex: none; max-width: 50%; text-align: right; }
 .nx-dep-record-row__amt { display: block; font: 500 16px/20px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-dep-record-row__state { display: block; margin-top: 2px; font: 400 12px/16px var(--font-v5); }
