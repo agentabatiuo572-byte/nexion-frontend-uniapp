@@ -2,6 +2,7 @@
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoDeletionStake } from './prototype-demo-staking.mjs';
+import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 
 const day=86400000;
 const timeZone='Asia/Shanghai';
@@ -14,7 +15,7 @@ const reward=row=>row.direction==='IN'&&row.amount>0&&!(row.bizType==='TEAM_COMM
 
 export function demoSettledTasks(state,at) {
   if(!demoHasEarningsHistory(state))return [];
-  if(state.deviceTaskSampleState==='long') {
+  if(demoHasLongTasks(state)) {
     return [
       ['LL','language inference - structured knowledge extraction','0.029745'],
       ['IG','image gen - watercolor garden concept','0.029234'],
@@ -28,9 +29,9 @@ export function demoSettledTasks(state,at) {
       ['SP','speech processing - cinematic interview notes','123.011586'],
     ].map(([taskClass,taskName,rewardAmount],index)=>{
       const completedAt=at-(index+1)*420000;
-      return {taskNo:'DEMO-TASK-'+(10+index),receiptNo:'DEMO-RECEIPT-L'+index,batchNo:'DEMO-BATCH-L'+index,
+      return {taskNo:'DEMO-TASK-'+(10+index),receiptNo:'DEMO-RECEIPT-L'+index,receiptId:index+1,configVersion:'1',batchNo:null,
         deviceId:41,taskClass,taskName,amount:Number(rewardAmount),nex:0,completedAt,postedAt:completedAt+60000,
-        durationSec:300,client:'Demo Studio',model:'SDXL',simulation:{executionMode:'SIMULATED',proofKind:'TASK_RECEIPT',
+        durationSec:300,client:'UVEL',model:'',simulation:{executionMode:'SIMULATED',proofKind:'TASK_RECEIPT',
           modelExecuted:false,rewardAsset:'USDT',rewardAmount}};
     });
   }
@@ -235,7 +236,7 @@ export function demoStreakFacts(state,now) {
     lastCheckInDate,checkedInToday:lastCheckInDate===today};
 }
 
-export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,seedAt)) {
+export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
   initializeDemoWalletCheckpoint(state);
   const events=demoCommissionGroups(state,seedAt);
   const commissions=events.filter(event=>['unlocked','withdrawn'].includes(event.status));
@@ -291,14 +292,8 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
   ];
   seeds.push(...deletionEntries.map(([bizNo,asset,direction,amount,bizType,category,at])=>
     ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
-  // Layout check: real-form references (36-char order number, its refund, a learning reward source).
-  if(state.billRefsState==='long-refs'){
-    const orderNo='ORD-7F3A9C2E5B8D41F6A0C3E9B27D5F1A84';
-    seeds.push(...[[orderNo,'USDT','OUT',1299,'ORDER_PURCHASE','purchase',seedAt-3*3600000],
-      ['E4-REFUND-'+orderNo,'USDT','IN',1299,'ORDER_REFUND','refund',seedAt-2*3600000],
-      ['LEARN:1:ai-workload-fundamentals-intermediate:lesson-07','UVT','IN',5,'LEARNING_REWARD','bonus',seedAt-3600000]]
-      .map(([bizNo,asset,direction,amount,bizType,category,at])=>({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
-  }
+  seeds.push(...longRefs.map(([bizNo,asset,direction,amount,bizType,category,at])=>
+    ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
   const credits=demoH4Credits(state,now).filter(row=>!posted.has(row.id)).map(({id,type,amount,at,includedInBalance,asset='UVT'})=>({
     id,bizNo:id,bizType:type,asset,direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
