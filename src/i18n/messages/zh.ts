@@ -129,7 +129,7 @@ export const zh: Messages = {
     backToWallet: "返回钱包",
     orderNumber: "提现单号",
     amountErrors: {"format": "请输入大于 0 的金额，最多 6 位小数。", "range": "金额超出当前单笔限额，请按显示范围填写。", "balance": "金额超过当前可提现余额。", "daily": "今日提现次数已用完，请在次日再试。", "unavailable": "提现额度暂不可用，请重新加载。"},
-    resultNotes: {"review": "提现申请已提交，正在等待处理。", "processing": "银行转账处理中。", "held": "正在自动核对处理结果，请勿重复提现。", "paid": "银行到账结果已确认。", "refunded": "本次提现金额已退回钱包。"},
+    resultNotes: {"review": "提现申请已提交，正在等待处理。", "processing": "等待银行处理结果，到账后这里会更新，无需重复提现。", "held": "核对完成后这里会更新，请勿重复提现。", "paid": "银行到账结果已确认。", "refunded": "本次提现金额已退回钱包。"},
     chooseMethod: "选择提现方式", chooseMethodHint: "请选择收款方式。",
     usdtMethodHint: "USDT 转入钱包地址", bankMethod: "银行卡", bankMethodHint: "VND 转入越南银行账户",
     routeFrom: "UVEL 钱包",
@@ -163,7 +163,7 @@ export const zh: Messages = {
     intentClosed: "原报价已结束。",
     reload: "重新加载", unknown: "正在自动确认原提交结果，请勿重复发起提现。",
     review: "等待处理", processing: "银行转账处理中", paid: "已到账", failed: "提现失败",
-    held: "客服正在核对，所示金额暂时不可用", error: "操作暂未完成，请重试或联系客服。",
+    held: "正在核对结果", error: "操作暂未完成，请重试或联系客服。",
     otpSent: "验证码已发送", bound: "银行账户已保存", newWithdrawal: "发起新提现", loading: "加载中…",
   },
   privacy: {
