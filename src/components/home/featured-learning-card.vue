@@ -2,6 +2,7 @@
   <view v-if="courses.length" class="learning-card active:opacity-70" :class="{'learning-card--mission': missionLayout}" role="link" tabindex="0" @click="open">
     <GrowthProgress v-if="missionLayout" ring :size="48" :radius="41.6667" :stroke="8.3333" :value="featuredCourse?.progress ?? 100" :label="featuredCourse?.title ?? copy.completed"><text>{{ featuredCourse?.progress ?? 100 }}%</text></GrowthProgress>
     <view class="learning-card__body">
+    <view class="learning-card__text">
     <text class="block" style="font-size:12px;color:var(--v5-brand)">{{ t.learning.featuredLabel }}</text>
     <template v-if="featuredCourse">
       <text class="block learning-title" style="margin-top:var(--v5-space-2);font-size:15px;font-weight:600">{{ featuredCourse.title }}</text>
@@ -9,15 +10,20 @@
       <view v-if="featuredCourse.progress > 0" class="learning-progress" role="progressbar" :aria-label="copy.progress.replace('{progress}', String(featuredCourse.progress))" :aria-valuenow="featuredCourse.progress" :aria-valuemin="0" :aria-valuemax="100">
         <view v-viz-inview class="learning-progress-fill nx-viz-grow" :style="{ width: `${featuredCourse.progress}%` }" />
       </view>
-      <view class="learning-footer">
-        <text v-if="featuredCourse.progress > 0" class="learning-progress-label">{{ copy.progress.replace('{progress}', String(featuredCourse.progress)) }}</text>
-        <text class="learning-action">{{ featuredCourse.progress > 0 ? copy.resume : copy.start }} <text aria-hidden="true">›</text></text>
-      </view>
     </template>
     <template v-else>
       <text class="block learning-title" style="margin-top:var(--v5-space-2);font-size:15px;font-weight:600">{{ copy.completed }}</text>
       <text class="block learning-meta">{{ copy.completedHint }}</text>
-      <view class="learning-footer"><text class="learning-action">{{ copy.review }} <text aria-hidden="true">›</text></text></view>
+    </template>
+    </view>
+    <template v-if="featuredCourse">
+      <view class="learning-footer">
+        <text v-if="featuredCourse.progress > 0" class="learning-progress-label">{{ copy.progress.replace('{progress}', String(featuredCourse.progress)) }}</text>
+        <text class="learning-action nx-after-chevron">{{ featuredCourse.progress > 0 ? copy.resume : copy.start }}</text>
+      </view>
+    </template>
+    <template v-else>
+      <view class="learning-footer"><text class="learning-action nx-after-chevron">{{ copy.review }}</text></view>
     </template>
     </view>
   </view>
@@ -81,7 +87,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { v
 
 <style scoped>
 .learning-card { padding: var(--v5-space-5); border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); }
-.learning-title, .learning-meta { overflow-wrap:anywhere; }
+.learning-title, .learning-meta { overflow-wrap:break-word; }
 .learning-meta { margin-top:6px; font-size:12px; line-height:1.5; color:var(--v5-ink-3); }
 .learning-progress { margin-top:14px; height:4px; border-radius:4px; overflow:hidden; background:var(--v5-brand-soft); }
 .learning-progress-fill { height:100%; border-radius:4px; background:var(--v5-brand); }
@@ -92,9 +98,11 @@ watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { v
 .learning-card__body { min-width: 0; flex: 1; }.learning-card--mission :deep(.growth-progress__center) { font: 500 11px/14px var(--font-metric); }
 .learning-card--mission .learning-title { margin-top: var(--v5-space-1) !important; font: 600 16px/22px var(--font-v5); }.learning-card--mission .learning-meta { margin-top: 2px; line-height:16.5px; }
 .learning-card--mission .learning-progress, .learning-card--mission .learning-progress-label { display: none; }.learning-card--mission .learning-footer { margin-top: var(--v5-space-2); }
-.learning-card--mission .learning-card__body {display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;}.learning-card--mission .learning-card__body > text {grid-column:1;}.learning-card--mission .learning-footer {grid-column:2;grid-row:1 / span 4;align-self:center;margin-top:0;}
+/* Text beside the action while it fits in about two lines; when the action would squeeze it narrower than 128px (long
+   languages), the text takes the full width and the action drops to the bottom-right corner. */
+.learning-card--mission .learning-card__body {display:flex;flex-wrap:wrap;align-items:center;gap:var(--v5-space-2) 12px;}.learning-card--mission .learning-card__text {flex:1 1 128px;min-width:0;}.learning-card--mission .learning-footer {flex:none;margin:0 0 0 auto;}
 
-.learning-card--mission .learning-card__body > text:first-child { transform:translateY(4px); }
+.learning-card--mission .learning-card__text > text:first-child { transform:translateY(4px); }
 .learning-card--mission .learning-action { font-size:13px; }
 
 </style>

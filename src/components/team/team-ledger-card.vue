@@ -4,7 +4,7 @@
       <text class="team-ledger__title">{{ copy.monthIncome }}</text>
       <DataVisibilityToggle />
       <view class="nx-team-commissions-link team-ledger__details" role="link" tabindex="0" @click="goCommissions" @keydown.enter.prevent="goCommissions">
-        <text>{{ copy.details }}</text><text aria-hidden="true">›</text>
+        <text>{{ copy.details }}</text><NxIcon name="chevron-right" />
       </view>
     </view>
     <text class="nx-sr-only">{{ visibility.hidden || !monthUSDTParts ? visibility.mask(intPart) : `${monthUSDTParts.prefix}${intPart}.${fracPart}` }}</text>
@@ -34,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd, formatUsdOverviewParts } from '@/lib/usd-display';
 import { navTo } from "@/lib/route";

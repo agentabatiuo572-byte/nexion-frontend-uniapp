@@ -12,7 +12,7 @@
   asked to reveal; put it under its label, never beside it.
 -->
 <template>
-  <view class="nx-code font-mono-code" :class="{ 'nx-code--full': full, 'nx-code--fill': fill, 'nx-code--copy': copyable }">
+  <view class="nx-code font-mono-code" :class="{ 'nx-code--full': full, 'nx-code--fill': fill, 'nx-code--copy': copyable }" :style="{ '--nx-code-floor': `${4 + end.length}ch` }">
     <text v-if="full" class="nx-code__full">{{ value }}</text>
     <template v-else>
       <text class="nx-code__sr">{{ value }}</text>
@@ -34,8 +34,13 @@ const end = computed(() => props.value.slice(cut.value));
 
 <style scoped>
 :where(.nx-code) { color: var(--v5-ink); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); font-weight: 400; }
-.nx-code { position: relative; display: flex; flex: 0 1 auto; min-width: 0; align-items: center; gap: var(--v5-space-1); }
-.nx-code__line { display: flex; min-width: 0; overflow: hidden; }
+/* Floor = 4ch prefix (with its ellipsis) + the tail, so the tail is never cut. The line wraps on its floor, not its full
+   width: the copy button stays beside the code (head ellipsized) and drops under it only when floor + button do not fit. */
+.nx-code { position: relative; display: flex; flex: 0 1 auto; flex-wrap: wrap; min-width: var(--nx-code-floor); align-items: center; gap: var(--v5-space-1); }
+.nx-code__line { display: flex; flex: 1 1 var(--nx-code-floor); min-width: var(--nx-code-floor); overflow: hidden; }
+.nx-code--fill .nx-code__line { justify-content: flex-end; }
+/* When the button does wrap, it sits at the right end of its own line, never bottom-left. */
+.nx-code :deep(.copy-code-button) { margin-left: auto; }
 /* Row mode: grow into the free space from a zero basis, floor = 4ch head + ellipsis + 6ch tail (+ copy button). */
 .nx-code--fill { flex: 1 1 0; justify-content: flex-end; min-width: 11ch; }
 .nx-code--fill.nx-code--copy { min-width: calc(11ch + 26px); }

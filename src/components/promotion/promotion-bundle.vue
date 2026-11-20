@@ -20,9 +20,9 @@
             <text v-if="levelsFor(item.productNo)" class="promotion-copy">{{ levelsFor(item.productNo) }}</text>
             <text v-if="!productFor(item.productNo)" class="promotion-copy">{{ t.promotion.noMatchingProducts }}</text>
             <view class="bundle-stepper" :aria-label="nameFor(item.productNo)+' · '+t.promotion.quantity">
-              <view role="button" :tabindex="item.quantity<=1?-1:0" :aria-disabled="item.quantity<=1" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.productNo,-1)">−</view>
+              <view role="button" :tabindex="item.quantity<=1?-1:0" :aria-disabled="item.quantity<=1" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.productNo,-1)"><NxIcon name="minus" /></view>
               <text aria-live="polite">{{ item.quantity }}</text>
-              <view role="button" :aria-label="t.uiChrome.increaseQty" :tabindex="totalUnits>=100?-1:0" :aria-disabled="totalUnits>=100" @click="changeQuantity(item.productNo,1)">+</view>
+              <view role="button" :aria-label="t.uiChrome.increaseQty" :tabindex="totalUnits>=100?-1:0" :aria-disabled="totalUnits>=100" @click="changeQuantity(item.productNo,1)"><NxIcon name="plus" /></view>
             </view>
           </view>
           <view class="bundle-remove" role="button" tabindex="0" :aria-label="t.promotion.removeSelection+' · '+nameFor(item.productNo)" @click="remove(item.productNo)">×</view>
@@ -35,7 +35,7 @@
       <view v-for="product in suggestions" :key="product.id" class="promotion-row">
         <image v-if="imageFor(product.id)" class="promotion-image" :src="imageFor(product.id)" mode="aspectFill" :alt="product.name" />
         <view class="promotion-grow"><text class="bundle-name">{{ product.name }}</text><text v-if="product.taskLevels.length" class="promotion-copy">{{ productTaskLevelsText(t,product.taskLevels) }}</text><view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionDetailHref(product.id,scopeId))"><text>{{ t.promotion.detail }}</text></view></view>
-        <view class="bundle-add" role="button" :aria-label="fmt(t.uiChrome.addItem,{name:product.name})" :tabindex="selection.length>=8||totalUnits>=100?-1:0" :aria-disabled="selection.length>=8||totalUnits>=100" @click="add(product.id)">+</view>
+        <view class="bundle-add" role="button" :aria-label="fmt(t.uiChrome.addItem,{name:product.name})" :tabindex="selection.length>=8||totalUnits>=100?-1:0" :aria-disabled="selection.length>=8||totalUnits>=100" @click="add(product.id)"><NxIcon name="plus" /></view>
       </view>
     </view>
     <view class="promotion-flat">
@@ -65,6 +65,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';

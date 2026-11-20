@@ -5,7 +5,7 @@
       <text class="invite-card__title">{{ copy.inviteHeadline }}</text>
       <view class="invite-card__header-actions">
       <view class="invite-card__history" role="button" tabindex="0" :aria-label="copy.rewardRecords" @click="detailMode='records'; detailOpen=true" @keydown.enter.prevent="detailMode='records'; detailOpen=true" @keydown.space.prevent="detailMode='records'; detailOpen=true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg><text>{{ copy.rewardRecords }}</text></view>
-      <view class="invite-card__rules" role="button" tabindex="0" @click="detailMode='rules'; detailOpen=true" @keydown.enter.prevent="detailMode='rules'; detailOpen=true" @keydown.space.prevent="detailMode='rules'; detailOpen=true"><text>{{ copy.rules }}</text><text aria-hidden="true">›</text></view>
+      <view class="invite-card__rules" role="button" tabindex="0" @click="detailMode='rules'; detailOpen=true" @keydown.enter.prevent="detailMode='rules'; detailOpen=true" @keydown.space.prevent="detailMode='rules'; detailOpen=true"><text>{{ copy.rules }}</text><NxIcon name="chevron-right" /></view>
       </view>
     </view>
     <view class="nx-invite-body">
@@ -32,6 +32,7 @@
   <InviteDetailSheet :open="detailOpen" :mode="detailMode" @close="detailOpen=false" />
 </template>
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatAmount } from '@/lib/amount-display';
 import { ref, computed, onUnmounted, watch } from 'vue';

@@ -7,9 +7,9 @@
           <view class="rank-identity">
             <view class="rank-identity__emblem"><TeamRankEmblem v-if="!visibility.hidden" :rank="myRank" :size="96" /><view v-else class="rank-private-emblem" aria-hidden="true">••••</view></view>
             <view class="rank-identity__copy"><text class="rank-caption">{{ t.rank.currentRank }}</text><text class="rank-current-name">{{ visibility.mask(rankLabel(myRank,locale.code,rankDefs)) }}</text></view>
+            <view v-if="prog.next" class="rank-next-heading"><text class="rank-next-title">{{ fmt(copy.toRank,{rank:visibility.mask(rankLabel(prog.next.v,locale.code,rankDefs))}) }}</text><text class="rank-caption">{{ visibility.mask(rankGapSummary) }}</text></view>
           </view>
           <view v-if="prog.next" class="rank-next-progress rank-next-progress--summary">
-            <view class="rank-next-heading"><text class="rank-next-title">{{ fmt(copy.toRank,{rank:visibility.mask(rankLabel(prog.next.v,locale.code,rankDefs))}) }}</text><text class="rank-caption">{{ visibility.mask(rankGapSummary) }}</text></view>
             <view class="rank-rings">
             <view v-for="condition in nextConditions" :key="condition.key" class="rank-condition rank-condition--ring">
               <view class="rank-progress-track rank-ring nx-viz-sweep" role="progressbar" :aria-label="condition.label" :aria-valuenow="visibility.hidden ? undefined : condition.percent" :aria-valuemin="0" :aria-valuemax="100" :aria-valuetext="`${visibility.mask(condition.values.split(' / ')[0])} / ${condition.values.split(' / ')[1]}`" :style="{ '--nx-viz-ring': visibility.hidden ? 0 : (condition.percent ?? 0) }"><view class="rank-ring__hole"><text class="rank-ring__value">{{ visibility.hidden || condition.percent === undefined ? '—' : condition.key.includes('directRefs') ? condition.values.replace(' / ', '/') : `${condition.percent}%` }}</text></view></view>
@@ -18,7 +18,7 @@
             </view>
             </view>
             <view v-if="inheritedConditions.length" class="rank-inherited">
-              <view class="rank-inherited__toggle" role="button" tabindex="0" :aria-expanded="inheritedExpanded" aria-controls="inherited-conditions" @click="inheritedExpanded=!inheritedExpanded" @keydown.enter.prevent="inheritedExpanded=!inheritedExpanded" @keydown.space.prevent="inheritedExpanded=!inheritedExpanded"><text>{{ rankReviewCopy.previous }} · {{ visibility.mask(inheritedConditions.length) }}</text><text aria-hidden="true">{{ inheritedExpanded ? '−' : '+' }}</text></view>
+              <view class="rank-inherited__toggle" role="button" tabindex="0" :aria-expanded="inheritedExpanded" aria-controls="inherited-conditions" @click="inheritedExpanded=!inheritedExpanded" @keydown.enter.prevent="inheritedExpanded=!inheritedExpanded" @keydown.space.prevent="inheritedExpanded=!inheritedExpanded"><text>{{ rankReviewCopy.previous }} · {{ visibility.mask(inheritedConditions.length) }}</text><NxIcon :name="inheritedExpanded ? 'minus' : 'plus'" /></view>
               <view v-if="inheritedExpanded" id="inherited-conditions">
             <view v-for="condition in inheritedConditions" :key="condition.key" class="rank-condition">
               <view class="rank-condition__heading"><text class="rank-condition__name">{{ condition.displayLabel }}</text><view class="rank-condition__value"><text class="rank-condition__current">{{ visibility.mask(condition.values.split(' / ')[0]) }}</text><text class="rank-condition__target"> / {{ condition.values.split(' / ')[1] }}</text></view></view>
@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { increasedRankBenefitKeys, type RankBenefitKey } from '@/lib/team-rank-benefits';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
@@ -202,7 +203,7 @@ function cultivationReward(reward: VRankReward): boolean {
 }
 function rewardText(reward: VRankReward): string {
   if (isEntitlementVRankReward(reward)) return platformDisplayText(rankEntitlementLabel(reward, t.value.rank.rewardUnavailable));
-  const amount = `${formatAmount(reward.amount)} ${reward.type === "UVT" ? "UVT" : reward.type}`;
+  const amount = `${formatAmount(reward.amount)}\u00A0${reward.type === "UVT" ? "UVT" : reward.type}`;
   return amount;
 }
 
@@ -311,7 +312,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-reward-summary { display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;color:var(--v5-nex); }
 .rank-reward-title { display:block;font:600 var(--ui-type-section)/22px var(--font-v5); }
 .rank-reward-amount { display:block;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
-.rank-reward-description { display:block;margin-top:2px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.rank-reward-description { display:block;margin-top:2px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-reward { display:block;margin-top:2px;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-nex);overflow-wrap:anywhere; }
 .rank-actions { margin-top:18px;border-top:1px solid var(--v5-border); }.rank-actions :deep(.nx-list-row) { padding-inline:0;border-bottom:1px solid var(--v5-border); }
 .rank-action-icon { width:32px;height:32px;display:grid;place-items:center;color:var(--v5-ink-2); }
@@ -335,16 +336,20 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-ladder::-webkit-scrollbar { display:none; }
 .rank-ladder-row { flex:none;background:none !important; }
 .rank-ladder-row::before { display:none; }
-.rank-row-heading { flex-direction:column;align-items:center;gap:4px;width:56px;min-height:88px;padding:6px 0;border-radius:16px; }
+/* A rank can be wider than 56px when its status word is long (fil, id, kk, ms); the track scrolls sideways, so the item grows instead of its label running into the next one. */
+.rank-row-heading { flex-direction:column;align-items:center;gap:4px;min-width:56px;width:auto;min-height:88px;padding:6px 6px;border-radius:16px; }
 .rank-row-heading[aria-expanded="true"] { background:color-mix(in srgb,var(--v5-ink) 6%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-ink) 12%,transparent); }
 .rank-row-title { font:600 12px/16px var(--font-metric);text-align:center; }
 .rank-row-sub { margin-top:0;font:500 10px/12px var(--font-v5);text-align:center;white-space:nowrap; }
 .rank-ladder-row[data-status="locked"] .rank-row-heading :deep(.team-rank-emblem) { opacity:.55; }
 .rank-details { margin-top:12px;padding:20px;border-radius:28px;background:var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
 /* P-42 round 2 */
-.rank-identity { margin-bottom:14px;padding-right:96px; }
+/* The "to next rank" pill sits in the top-right corner of the identity row. When the caption and the pill do not fit side by side (fil, id) the row wraps and the pill moves to its own line on the right instead of covering the caption. */
+.rank-identity { flex-wrap:wrap;column-gap:8px;row-gap:10px;margin-bottom:14px; }
+.rank-identity__emblem { margin-right:8px; }
+.rank-identity__copy { flex:1 1 auto; }
 .rank-current-name { margin-top:0;font:700 36px/40px var(--font-metric);color:var(--v5-brand); }
-.rank-next-heading { position:absolute;top:20px;right:20px;display:flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:999px;background:var(--v5-surface-2); }
+.rank-next-heading { flex:none;align-self:flex-start;margin-left:auto;display:flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:999px;background:var(--v5-surface-2); }
 .rank-next-heading .rank-next-title,.rank-next-heading .rank-caption { font:600 12px/16px var(--font-v5);color:var(--v5-ink-2); }
 .rank-condition--ring .rank-condition__gap { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
 .rank-condition--ring { position:relative; }

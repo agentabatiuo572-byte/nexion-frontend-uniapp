@@ -145,7 +145,7 @@ export function buildRankHowContent(policy: RankHowPolicy | null, ranks: Canonic
         ? labels.vDownlines.replace("{n}", number(target.requiredDownlineCount!)).replace("{v}", String(target.requiredDownlineRank)) : copy.noThreshold,
       directRate: `${number(target.directBonus * 100)}%`,
       peerRate: capabilities.peer ? `${number(target.peerBonus * 100)}%` : copy.peerUnavailable,
-      votes: number(target.leadershipVotes), cultivation: `${formatAmount(target.cultivationBonus)} UVT`,
+      votes: number(target.leadershipVotes), cultivation: `${formatAmount(target.cultivationBonus)}\u00A0UVT`,
     });
   }
   if (policy?.rules) {

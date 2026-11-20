@@ -204,7 +204,7 @@
           </view>
           <EmptyState v-else-if="historyRows.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-for="(h, i) in historyRows" v-else :key="`${h.ts}-${i}`" class="dly-hr">
-            <view class="dly-hr__w"><text class="dly-hr__t">{{ h.reason }}</text><text class="dly-hr__ts">{{ formatTs(h.ts) }}</text></view>
+            <view class="dly-hr__w"><text class="dly-hr__t">{{ memoParts(h.reason).text }}</text><NxCodeValue v-if="memoParts(h.reason).code" class="dly-hr__code" :value="memoParts(h.reason).code" :label="t.bills.detailRef" /><text class="dly-hr__ts">{{ formatTs(h.ts) }}</text></view>
             <text class="dly-hr__dl" :class="{ 'dly-hr__dl--p': h.delta > 0 }">{{ h.delta > 0 ? "+" : "" }}{{ formatAmount(h.delta) }}</text>
           </view>
         </view>
@@ -250,6 +250,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StreakPowerUps from "@/components/daily/streak-power-ups.vue";
@@ -559,6 +560,15 @@ const lifetimeSpent = computed(() =>
     ? formatAmount(summaryForDisplay.value.withdrawalOffsetNexSpent) : '—'
     : formatAmount(-faucet.history.reduce((s, h) => s + (h.delta < 0 ? h.delta : 0), 0)),
 );
+// A memo may end in the bill ref (" · review-course-1@v1": printable ASCII with @, a digit or a hyphen). The description
+// wraps; the ref goes to NxCodeValue (one line, middle ellipsis, copy and screen readers get it whole).
+function memoParts(reason: string): { text: string; code: string } {
+  const parts = reason.split(" · ");
+  const last = parts[parts.length - 1];
+  return parts.length > 1 && /^[\x21-\x7E]+$/.test(last) && /[@\d-]/.test(last)
+    ? { text: parts.slice(0, -1).join(" · "), code: last }
+    : { text: reason, code: "" };
+}
 const historyRows = computed(() => remoteApiEnabled
   ? (summaryForDisplay.value != null ? summaryForDisplay.value?.recentNexBills ?? [] : []).map(b => ({
       ts: b.ts, delta: b.amount,
@@ -912,7 +922,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dly-num { margin-top: 2px; font: 500 76px/76px var(--font-metric); letter-spacing: -.05em; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .dly-num--q { color: var(--v5-ink-4); }
-.dly-lbl { margin-top: 6px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+/* The 76px streak number's glyph box reaches below its 76px line; the label sits clear of it. */
+.dly-lbl { margin-top: 10px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .dly-next { position: relative; display: block; margin: 14px 16px 0; font: 500 15px/22px var(--font-v5); color: var(--v5-ink); }
 .dly-next--mut { font-weight: 400; color: var(--v5-ink-3); }
 .dly-next__r { color: var(--v5-warning-ink); white-space: nowrap; }
@@ -1047,8 +1058,10 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-hs__msg { display: block; padding: 12px 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .dly-hr { display: flex; align-items: center; justify-content: space-between; gap: 12px; box-sizing: content-box; min-height: 60px; }
 .dly-hr + .dly-hr { border-top: 1px solid var(--v5-border); }
-.dly-hr__w { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.dly-hr__t { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); }
+.dly-hr__w { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.dly-hr__t { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+/* The text column takes the free space, so a long ref shrinks to its middle ellipsis instead of pushing the amount. */
+.dly-hr__code { align-self: flex-start; max-width: 100%; color: var(--v5-ink-3); }
 .dly-hr__ts { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .dly-hr__dl { flex: none; font: 500 14px/20px var(--font-metric); color: var(--v5-ink); white-space: nowrap; }
 .dly-hr__dl--p { color: var(--v5-success-ink); }

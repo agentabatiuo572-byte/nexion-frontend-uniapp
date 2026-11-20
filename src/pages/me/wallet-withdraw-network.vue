@@ -102,11 +102,12 @@ function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/page
 .method-chev { flex: none; color: var(--v5-ink-4); }
 .route { display: flex; align-items: center; gap: var(--v5-space-2); margin-top: 14px; padding: var(--v5-space-3) 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .route { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
-.route-from { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); white-space: nowrap; }
-.route-arrow { flex: 1; min-width: 18px; height: 1px; background: repeating-linear-gradient(90deg, var(--v5-ink-4) 0 4px, transparent 4px 8px); }
+/* Long-language labels wrap inside the route instead of pushing the destination off the card. */
+.route-from { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); overflow-wrap: break-word; }
+.route-arrow { flex: 1; min-width: 12px; height: 1px; background: repeating-linear-gradient(90deg, var(--v5-ink-4) 0 4px, transparent 4px 8px); }
 .route-tag { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-v5); white-space: nowrap; }
 .route-to { color: var(--v5-ink); font: 500 13px/18px var(--font-metric); white-space: nowrap; }
-.route-to--empty { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.route-to--empty { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); text-align: right; white-space: normal; overflow-wrap: break-word; }
 .status { display: block; margin: var(--v5-space-1) var(--v5-space-1) 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .reload { display: inline-flex; align-items: center; min-height: 44px; margin-left: var(--v5-space-1); color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .method[aria-disabled="true"] { opacity: .5; cursor: default; }

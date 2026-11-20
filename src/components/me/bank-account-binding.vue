@@ -39,7 +39,7 @@
         <text v-if="accountNotice !== 'ready'" class="hint warn-text" data-testid="bank-binding-status">{{ accountStatus }}</text>
         <template v-if="changeLocked">
           <text class="hint">{{ c.lockedReason }}</text>
-          <view class="link-row" role="link" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw"><text>{{ c.viewWithdrawal }}</text><text aria-hidden="true">›</text></view>
+          <view class="link-row" role="link" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw"><text>{{ c.viewWithdrawal }}</text><NxIcon name="chevron-right" /></view>
         </template>
         <text class="sec-title">{{ copy.bankRules }}</text>
         <view class="rules-card" role="group" :aria-label="copy.bankRules">
@@ -127,6 +127,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { dateLocale } from "@/i18n/format";
 import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -376,7 +377,7 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
 .bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
-.bcard__nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
+.bcard__nm { flex: 1; min-width: 0; overflow-wrap: break-word; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
 .bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--bcard-ok) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcard-ok) 24%, transparent); color: var(--bcard-ok); font: 500 12px/16px var(--font-v5); }
 .bcard__tag.warn { background: color-mix(in srgb, var(--bcard-warn) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcard-warn) 24%, transparent); color: var(--bcard-warn); }
 .bcard__bot { position: relative; display: flex; flex-direction: column; margin-top: auto; }

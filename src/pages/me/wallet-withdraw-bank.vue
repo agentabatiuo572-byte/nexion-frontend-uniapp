@@ -128,7 +128,8 @@
           <view class="action text-link" role="button" tabindex="0" :aria-disabled="busy" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
         </template>
         <view v-if="error || (!quote && displayConfig.enabled && (!displayConfig.policy || !displayConfig.capacity))" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
-        <view class="bar-space" />
+        <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
+        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary }" />
       </template>
       <template v-else-if="requestedOrder === null && !pendingAttempt">
         <text class="screen-title" role="heading" aria-level="1">{{ title }}</text>
@@ -193,11 +194,17 @@ import { parseServerTimestamp } from "@/api/server-time";
 import { formatBankDateTime } from "@/lib/bank-date";
 import { bankAccountNotice, bankBeneficiaryReady, bankCanQuote, bankOrderOutcome, bankAmountError, bankMaximumAmount } from "@/lib/bank-withdrawal-state";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
+// #ifdef H5
+import { useRouter } from "vue-router";
+// #endif
 
 const c = computed(() => useTranslations.value.bankWithdrawal);
 const useTranslations = useT();
 const app = useApp();
 const auth = useAuth();
+// #ifdef H5
+const routeHistory = useRouter().options.history;
+// #endif
 const remoteSessionReady = computed(() => binarySessionReady({
   remote: remoteApiEnabled,
   authenticated: auth.isAuthenticated,
@@ -432,6 +439,7 @@ function applyRecovery(recovered: BankRecovery, quoteNo: string) {
       useTranslations.value.walletV3.withdrawOtherPending);
     return true;
   }
+  if (recovered.state === "COMMITTED") replaceOrderInH5(recovered.withdrawalNo);
   return false;
 }
 async function openIntent(intent: BankIntent) {
@@ -497,9 +505,25 @@ async function abandon() {
     }
   });
 }
+function replaceOrderInH5(orderNo: string | null) {
+  // #ifdef H5
+  const location = routeHistory.location;
+  const question = location.indexOf("?");
+  const path = question < 0 ? location : location.slice(0, question);
+  if (path !== "/pages/me/wallet-withdraw-bank") return;
+  const query = new URLSearchParams(question < 0 ? "" : location.slice(question + 1));
+  if (query.get("order") === orderNo) return;
+  if (orderNo === null) query.delete("order");
+  else query.set("order", orderNo);
+  const search = query.toString();
+  // Sync the router's history state without navigating or remounting the page.
+  routeHistory.replace(search ? `${path}?${search}` : path);
+  // #endif
+}
 function startNew() {
   refreshPendingAttempt();
   if (!newWithdrawalAllowed.value || !terminal.value || busy.value) return;
+  replaceOrderInH5(null);
   order.value = null; quote.value = null; requestedOrder = null; amount.value = ""; formStep.value = "account"; accepted.value = false; void load();
 }
 function clearScope() {
@@ -647,13 +671,10 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }
 .bar-space--result { height: 168px; }
-.bar { position: absolute; z-index: 36; display: flex; }
-.bar .action { flex: 1 1 0; min-height: 48px; margin: 0; padding: 0 20px; font: 500 15px/20px var(--font-v5); }
-/* Result bar: buttons size to their words so neither label wraps at 320 in long languages. */
-/* When both labels cannot share one row (fil, ms at 320), the bar stacks them instead of wrapping a label. */
-.bar--result { flex-wrap: wrap; }
-.bar--result .action { flex: 1 1 auto; padding: 0 16px; }
+/* Buttons size to their words so no label wraps; when two labels cannot share one row (long languages at 360), the bar stacks them. */
+.bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
+.bar .action { flex: 1 1 0; min-width: max-content; min-height: 48px; margin: 0; padding: 0 16px; font: 500 15px/20px var(--font-v5); }
 /* uni-text sets white-space: pre-line on itself; nowrap goes on the text. */
-.bar--result .action > text { white-space: nowrap; }
+.bar .action > text { white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .bcard::after { animation: none; opacity: 0; } .cdw__val { transition: none; } }
 </style>

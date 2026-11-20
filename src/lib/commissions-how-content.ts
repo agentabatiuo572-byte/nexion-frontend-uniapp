@@ -117,7 +117,7 @@ export const COMMISSIONS_HOW_SLOTS = ["hero", "overview", "channels", "network",
 export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | null, locale: string) {
   const copy = COPY[uiLocale(locale.split("-")[0])];
   const number = (value: number) => formatHowNumber(value, locale);
-  const money = (value: number, currency = "USDT") => `${formatAmount(value)} ${currency}`;
+  const money = (value: number, currency = "USDT") => `${formatAmount(value)}\u00A0${currency}`;
   const tokens: Record<string, string> = {};
   const publicBodies: Record<string, string> = {};
   const amounts = { network: copy.unknownAmount, cultivation: copy.unknownAmount, peer: copy.unknownAmount, leadership: copy.unknownAmount };
@@ -138,7 +138,7 @@ export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | nu
     tokens.networkPurchaseRules = copy.networkPurchase;
     tokens.directDeviceRules = describe(directPolicy.deviceEarning);
     tokens.directScope = directPolicy.settlementMode === "SEVEN_V2" ? copy.deviceScope : copy.directOnly;
-    tokens.directPrice = directPolicy.nexUsdtPrice === null ? copy.priceUnavailable : `${number(directPolicy.nexUsdtPrice)} USDT / UVT`;
+    tokens.directPrice = directPolicy.nexUsdtPrice === null ? copy.priceUnavailable : `${number(directPolicy.nexUsdtPrice)}\u00A0USDT / UVT`;
     tokens.coolingDays = guide.coolingDays === null ? copy.missing : `${number(guide.coolingDays)} ${copy.days}`;
     // Caps and unmatched-volume handling are payout mechanics, not user guidance (APP-COPY-AUDIT rule 6).
     tokens.binaryRules = b ? `${copy.settlementPeriod}: ${copy[b.settlePeriod]} · ${b.paused ? copy.paused : copy.unpaused}` : copy.missing;

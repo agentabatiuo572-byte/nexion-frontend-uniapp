@@ -7,6 +7,8 @@ import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
+import { demoLongContentAvailable, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
@@ -25,6 +27,8 @@ if(process.env.DEMO_STATE_FILE){
   Object.assign(state,saved,{walletLegacySeed:saved.walletLegacySeed??!saved.walletMovements});
 }
 const startedAt=Date.now();
+normalizeDemoLongContent(state);
+const unreservedBankQuote=removeUnreservedLongBankOrder(state);
 if(process.env.DEMO_STATE_FILE){
   restoreDemoWithdrawalOrders(state);
   restoreDemoBankWithdrawals(state,startedAt);
@@ -33,6 +37,7 @@ if(process.env.DEMO_STATE_FILE){
 }else state.catalogAvailableAt=startedAt;
 initializeDemoPreviewAccount(state,startedAt);
 initializeDemoWalletHistory(state,state.previewFactsAt);
+seedLongBankOrder(state,startedAt,unreservedBankQuote);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
@@ -130,17 +135,18 @@ const server=http.createServer(async(req,res)=>{
     }
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
-      let withdrawalRecoverySeed;
+      let withdrawalRecoverySeed, longContentUnavailable;
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
         const paymentMode=()=>state.paymentState==='read-error'?state.paymentBeforeReadError:state.paymentState;
-        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPaymentMode=paymentMode(),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,wasPaymentMode=paymentMode(),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
         if(update.reset){
           const accountCreatedAt=state.accountCreatedAt;
           for(const key of Object.keys(state))delete state[key];
           Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
         }
+        state.previewFactsAt??=startedAt;
         updatePreviewHomeDisplay(state,update,Date.now());
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
@@ -148,13 +154,14 @@ const server=http.createServer(async(req,res)=>{
         if(update.savedAttemptState&&state.savedAttemptState!=='none')state.sessionState='signed-out';
         if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
         else delete state.paymentBeforeReadError;
+        longContentUnavailable=normalizeDemoLongContent(state);
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
         // account (dataState=empty), the low-balance account or a near-deadline sample (paymentState=low-balance, urgent,
         // late) is one too. Presentation knobs keep them.
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
-        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode())!==accountPayment(wasPaymentMode);
+        const scenarioChange=state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode())!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -207,6 +214,7 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         if ('bankState' in update) updateDemoBankWithdrawals(state, Date.now());
+        if (update.reset || scenarioChange) seedLongBankOrder(state, now);
         realtime.stateChanged(update);
         if('supportReadbackState' in update)setTransferSampleOutcome(state);
         if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
@@ -214,7 +222,9 @@ const server=http.createServer(async(req,res)=>{
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
         }
       }
-      return sendJson(res,{state,options:demoOptions,simulation:true,withdrawalRecoverySeed});
+      return sendJson(res,{state,options:demoOptions,simulation:true,withdrawalRecoverySeed,
+        ...(demoLongContentAvailable(state)?{}:{longContentAvailable:false}),
+        ...(longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})});
     }
     if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}

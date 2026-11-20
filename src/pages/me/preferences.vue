@@ -17,7 +17,7 @@
             </view>
             <text class="push-settings-status">{{ pushCopy[nativePushPermission] }}</text>
             <text class="push-settings-action">{{ nativePushPermission === 'unknown' ? pushCopy.enable : pushCopy.settings }}</text>
-            <text class="push-settings-chevron" aria-hidden="true">›</text>
+            <view class="push-settings-chevron" aria-hidden="true"><NxIcon name="chevron-right" /></view>
           </view>
         </view>
         <text v-if="pushSettingsFailed" class="block mx-1" :style="footerStyle" role="alert">{{ pushCopy.settingsFailed }}</text>
@@ -72,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";

@@ -29,7 +29,7 @@
       <view v-else-if="showOrderNotFound" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" :aria-label="t.orders.title" @click.stop="goOrders">
-          <text>{{ t.orders.title }} →</text>
+          <text class="nx-after-arrow">{{ t.orders.title }}</text>
         </view>
       </view>
 
@@ -1162,7 +1162,7 @@ const sectionLabelStyle: CSSProperties = {
 .order-track__dot--failed { background: var(--v5-danger); color: var(--v5-on-brand); }
 [data-theme="light"] .order-track__dot--failed { color: #fff; }
 /* Break between words; a single word wider than its column is hyphenated (the page sets <html lang>). */
-.order-track__label { max-width: 100%; padding: 0 2px; color: var(--v5-ink); overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.order-track__label { max-width: calc(100% + 8px); padding: 0 2px; color: var(--v5-ink); overflow-wrap: break-word; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 /* A step that waits on the user (unpaid) reads as not done yet; server-side progress stays in primary ink. */
 .order-track__label--stopped, .order-track__label--waiting { color: var(--v5-ink-3); font-weight: 400; }
 .order-track__label--failed { color: var(--v5-danger); }

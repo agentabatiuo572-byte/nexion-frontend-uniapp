@@ -5,7 +5,7 @@
       <AmbassadorBucketIcon :bucket="application.bucket" />
       <view class="amb-card__titles">
         <text class="amb-card__title">{{ application.city }}</text>
-        <text class="amb-card__meta">{{ bucketTitle }} · {{ fmt(c.eventOn, { date: application.eventDate ?? '—' }) }}</text>
+        <text class="amb-card__meta">{{ bucketTitle }} · <text class="amb-card__date">{{ fmt(c.eventOn, { date: application.eventDate ?? '—' }) }}</text></text>
       </view>
       <NxTag :tone="presentation.tone" :label="statusText" />
     </view>
@@ -48,7 +48,9 @@ function open() { if (props.application.applicationId) void navTo(AMBASSADOR_ROU
 .amb-card__head { display: flex; align-items: flex-start; gap: var(--ui-space-inline); }
 .amb-card__titles { flex: 1; min-width: 0; }
 .amb-card__title { display: block; font: var(--ui-type-card-title-weight, 600) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.amb-card__meta { display: block; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.amb-card__meta { display: block; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+/* The event date never splits at its hyphens. */
+.amb-card__date { white-space: nowrap; }
 .amb-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); margin-top: var(--v5-space-4); padding-top: var(--ui-space-inline); border-top: 1px solid var(--v5-border); }
 .amb-card__key { font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .amb-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }

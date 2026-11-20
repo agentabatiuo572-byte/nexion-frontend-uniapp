@@ -15,7 +15,7 @@
         data-home-action="compute-market-open"
         @click="marketNavigation.openMarket"
         @keydown.enter.stop.prevent="marketNavigation.openMarketFromKeyboard"
-      >{{ t.home.marketBoardOpen }} →</view>
+      ><text class="nx-after-arrow">{{ t.home.marketBoardOpen }}</text></view>
     </view>
 
     <view v-if="homeMarketRows.length" class="home-market-table" lang="en" style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
