@@ -2,7 +2,7 @@ import { TRIAL_CONVERT_COMMANDS_TABLE } from '@/lib/purchase-caller-record';
 import { invalidateBeforePassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId, resolveTrialDeviceName } from "./trial-config";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
@@ -189,6 +189,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     remoteApiEnabled ? "unknown" : "mock",
   );
   const authorityError = ref<string | null>(null);
+  const lastReadFailed = ref(false);
   const authoritativeShadowUSD = ref(0);
   const authoritativeShadowNEX = ref(0);
   const authoritativeOffsetUSD = ref<number | null>(null);
@@ -203,6 +204,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const confirmedPromoVisible = ref(false);
   const confirmedPromoKnown = ref(false);
   const confirmedHeroVisible = ref(false);
+  const confirmedHomeOffer = shallowRef<{
+    status: "none" | "ended";
+    deviceName: string;
+    productId: string | null;
+    trialDays: number;
+    estimatedOffsetUSD: number | null;
+  } | null>(null);
   const remoteEligibilityReason = ref<TrialIneligibleReason>("unknown");
   const authorityClaimNo = ref<string | null>(null);
   const authorityServerState = ref<TrialAuthorityState["serverState"] | null>(null);
@@ -302,6 +310,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   function markAuthorityReadFailure(error: string) {
+    lastReadFailed.value = true;
     const boundary = status.value === "active" ? expiresAt.value : status.value === "grace" ? graceEndsAt.value : null;
     if (boundary !== null && serverTimeAt(Date.now()) >= boundary) {
       // Keep the elapsed countdown visible while the authority is unavailable.
@@ -334,10 +343,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       }
       authorityStatus.value = "ready";
       authorityError.value = null;
+      lastReadFailed.value = false;
       return true;
     }
     // Validate the whole policy before committing snapshot or promotion presentation.
-    useTrialConfig().applyAuthoritative(next.config);
+    const trialConfig = useTrialConfig();
+    trialConfig.applyAuthoritative(next.config);
     const confirmedExpiry = next.status === "ended" && next.endReason === "expired";
     if (pendingExpiryClaim !== next.claimNo || !confirmedExpiry) pendingExpiryClaim = null;
     if (confirmedExpiry && next.claimNo && confirmedLifecycle?.claimNo === next.claimNo
@@ -372,12 +383,24 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     confirmedPromoKnown.value = true;
     confirmedHeroVisible.value = next.status === "none"
       && (next.canStart || next.eligibilityReason === "product-unavailable");
+    // Keep the confirmed home offer through failed reads and tab remounts.
+    const config = trialConfig.config;
+    confirmedHomeOffer.value = (next.status === "none" && confirmedHeroVisible.value)
+      || (next.status === "ended" && next.canStart) ? {
+        status: next.status,
+        deviceName: config.trialProductName,
+        productId: resolveTrialCheckoutProductId(config.trialProductId),
+        trialDays: config.trialDays,
+        estimatedOffsetUSD: config.shadowDailyUSD === null ? null
+          : computeTrialOffset(config, config.shadowDailyUSD * config.trialDays).offsetUSD,
+      } : null;
     remoteEligibilityReason.value = next.eligibilityReason ?? "unknown";
     authorityClaimNo.value = next.claimNo;
     authorityServerState.value = next.serverState;
     authorityVersion.value = next.version;
     authorityStatus.value = "ready";
     authorityError.value = null;
+    lastReadFailed.value = false;
     return true;
   }
 
@@ -467,6 +490,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       confirmedPromoVisible.value = false;
       confirmedPromoKnown.value = false;
       confirmedHeroVisible.value = false;
+      confirmedHomeOffer.value = null;
+      lastReadFailed.value = false;
       confirmedLifecycle = null;
       pendingExpiryClaim = null;
       announcedExpiryClaims.clear();
@@ -893,7 +918,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   return {
     status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
-    authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
+    authorityStatus, authorityError, lastReadFailed, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,

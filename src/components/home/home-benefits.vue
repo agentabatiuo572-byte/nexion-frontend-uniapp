@@ -17,7 +17,7 @@
             <view class="hb-wv__stub"><text class="hb-pill nx-frosted-button">{{ t.trial.homeClaimShort }}</text></view>
           </template>
         </view>
-        <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="status" role="button" :tabindex="trialOfferEnabled ? 0 : -1" :aria-disabled="trialOfferEnabled ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
+        <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="confirmedOffer?.status ?? status" role="button" :tabindex="trialOfferEnabled ? 0 : -1" :aria-disabled="trialOfferEnabled ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art hb-half__art--device" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
@@ -79,11 +79,10 @@
 </template>
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { computed, onUnmounted, ref, watch, watchEffect, type Ref } from "vue";
+import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
-import { useApp } from "@/store/app";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -127,35 +126,30 @@ const status = computed(() => trialView.status.value);
 const hasLifecycle = computed(() => status.value !== null && status.value !== 'none');
 const eligibility = computed(() => trial.eligibility());
 const capacityFull = computed(() => eligibility.value.reason === 'capacity-full');
-// eligibility() fails closed while a background read is in flight, so keep the last
-// confirmed restart answer for card presentation (reset on rebind).
-const app = useApp(), confirmedRestart = ref(false);
-let restartBinding = '';
-watchEffect(() => {
-  const binding = `${app.accountKey}:${app.accountBindingEpoch}`;
-  if (binding !== restartBinding) { restartBinding = binding; confirmedRestart.value = false; }
-  if (!remoteApiEnabled || trial.authorityStatus === 'ready') confirmedRestart.value = status.value === 'ended' && eligibility.value.ok;
-});
-const canRestart = computed(() => status.value === 'ended' && confirmedRestart.value);
-const trialOffer = computed(() => canRestart.value || (!hasLifecycle.value && trial.status === "none"
+const confirmedOffer = computed(() => trial.confirmedHomeOffer);
+const showRestartOffer = computed(() => confirmedOffer.value?.status === 'ended');
+const trialOffer = computed(() => showRestartOffer.value || (!hasLifecycle.value && trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || capacityFull.value)));
-const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !canRestart.value));
+const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !showRestartOffer.value));
 const trialOfferEnabled = computed(() => trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
 // B53: only the confirmed trial product is named; until then the card shows the same "-" as its unknown amounts, never a default S1.
-const trialName = computed(() => trialView.deviceName.value ?? '-');
-const trialDays = computed(() => trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
-const trialArt = computed(() => getProductMedia(trialView.productId.value)?.src);
+const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '-');
+const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
+const trialArt = computed(() => getProductMedia(confirmedOffer.value ? confirmedOffer.value.productId : trialView.productId.value)?.src);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
 // Same capped estimate the trial page and checkout quote (BUG 78).
-const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
+const estimateText = computed(() => {
+  const estimate = confirmedOffer.value ? confirmedOffer.value.estimatedOffsetUSD : trialView.estimatedOffsetUSD.value;
+  return estimate === null ? '-' : `$${formatAmount(estimate)}`;
+});
 const estimateParts = computed(() => { const match = /^(\$?)(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { currency: match[1], whole: match[2], cents: match[3] ?? '' }; });
 const creditText = computed(() => trialView.offsetUSD.value === null ? '-' : `$${formatAmount(trialView.offsetUSD.value)}`);
 const countdownText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialCountdown(trialView.remainingMs.value));
 // Keep the last confirmed label during a background read (BUG 14). [half pill, wide pill, screen-reader wording]
+const offerState = computed(() => trial.lastReadFailed ? 'error' : trial.confirmedOfferState());
 const trialPill = computed<[string, string, string]>(() => {
-  const offerState = trial.confirmedOfferState();
-  if (canRestart.value && offerState !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
-  switch (offerState) {
+  if (showRestartOffer.value && offerState.value !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
+  switch (offerState.value) {
     case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim, copy.value.benefitTrialClaim];
     case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable, t.value.trial.entryUnavailable];
     case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut, t.value.trial.heroProductUnavailable];
@@ -169,7 +163,7 @@ const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !t
 // Pills that were already muted (out of stock, unavailable, or a retry after a failed read) stay muted.
 const trialPillWait = computed(() => trialRechecking.value && !retryShown.value);
 const trialOfferLabel = computed(() => capacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
-  : trial.status === "none" && (eligibility.value.ok || trial.confirmedOfferState() === "claimable")
+  : trial.status === "none" && (eligibility.value.ok || offerState.value === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
   : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[2]}`);
 const trialOfferAria = computed(() => trialRechecking.value ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
@@ -212,12 +206,11 @@ function openTrialOffer() {
   trialSheet.show();
 }
 function openTrialDetails() { navTo('/pages/me/trial'); }
-// The retry row stays through its own re-read (busy), so tapping it does not collapse the section.
-const retryShown = ref(false);
-watch(() => trial.authorityStatus, value => { retryShown.value = value === 'error' || (value === 'loading' && retryShown.value); }, { immediate: true });
+// Preserve the retry row while the next read runs, including after a tab remount.
+const retryShown = computed(() => trial.lastReadFailed || trial.authorityStatus === 'error');
 const retryBusy = computed(() => retryShown.value && trial.authorityStatus === 'loading');
 function retryEligibility() {
-  if (trial.authorityStatus === "error") void trialView.refresh();
+  if (retryShown.value && !retryBusy.value) void trialView.refresh();
 }
 </script>
 <style scoped>
