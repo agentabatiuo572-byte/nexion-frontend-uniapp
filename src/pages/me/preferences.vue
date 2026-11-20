@@ -6,7 +6,7 @@
 <template>
   <AppChassis active="me">
     <view class="message-family" style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/me" />
+      <SubPageHeader back="/pages/me/me" plain />
       <view v-if="prefs.error" class="mx-4 nx-inline-recovery" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
         <text class="nx-inline-recovery__copy">{{ preferenceError }}</text>
         <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">

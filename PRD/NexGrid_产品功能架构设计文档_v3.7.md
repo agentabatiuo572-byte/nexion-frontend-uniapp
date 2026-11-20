@@ -4216,6 +4216,7 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 - **目的**:音效 / 触感 / 通知 6 类偏好的统一切换中心
 - **H5 Lite**:不显示 App 的系统通知区(系统通知权限、前往系统设置、推送注册重试);只提供站内通知分类偏好与音效设置。
+- **页头**:只有返回和标题，不放右上角消息铃铛（本页即通知设置，避免重复入口）
 - **2 组设置**:Feedback(sound + haptics)保存在本机；Notifications 保留 commission/team/staking/market/genesis/system 六键。系统必收不可关闭，资金/安全关键消息由后端强制送达。
 - **Store**:`usePreferences` 通过 `GET/PATCH /api/me/notification-preferences` 读取、保存通知偏好；服务器未成功返回前不显示假状态，失败保留错误与重试。五个通知展示分组不等于偏好协议键。
 - **i18n**:`preferences.*` namespace ~14 keys
