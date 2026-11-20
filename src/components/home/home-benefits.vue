@@ -306,6 +306,8 @@ function retryEligibility() {
 .hb-wt__amount { font-size:28px;line-height:34px; }
 /* The footer wraps when the label and the button do not fit side by side (320 width, long languages): label above, button below, button text on one line. */
 .hb-wt__row { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;width:100%;margin-top:6px; }
+/* When the label and the action do not fit on one line, the action wraps to the card's bottom-right corner, not under the label. */
+.hb-wt__row > .hb-pill,.hb-wt__row > .hb-link,.hb-half__foot > .hb-pill,.hb-half__foot > .hb-link { margin-left:auto; }
 
 /* Claimed (pending) cards */
 .hb-pend { display:flex;align-items:center;gap:8px;min-height:64px;padding:10px;border-radius:18px; }
