@@ -174,10 +174,10 @@ function onAction() {
 .device-inventory-row__eq > view:nth-child(2) { animation-delay: -.3s; }
 .device-inventory-row__eq > view:nth-child(3) { animation-delay: -.6s; }
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .device-inventory-row__eq > view { animation-play-state: paused; }
-/* Long task names take two lines, then ellipsis; the device detail opened from the card shows the full name. */
 .device-inventory-row__task-name { flex: 1; min-width: 0; font: 500 13px/18px var(--font-v5); }
-.device-inventory-row__task-value { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
-.device-inventory-row__task-name .device-inventory-row__label { display: block; }
+/* The card opens no device detail, so the task name wraps in full; the label stays on the first line beside it. */
+.device-inventory-row__task-value { overflow-wrap: break-word; }
+.device-inventory-row__task-name .device-inventory-row__label { margin-right: 6px; }
 .device-inventory-row__pct { font: 500 12px/16px var(--font-metric, var(--font-jet-mono)); }
 .device-inventory-row__bar { position: relative; height: 4px; margin-top: 10px; overflow: hidden; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); }
 .device-inventory-row__fill { height: 100%; border-radius: inherit; background: var(--v5-brand); transition: width .6s linear; }
