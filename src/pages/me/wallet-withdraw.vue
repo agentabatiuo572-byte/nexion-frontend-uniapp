@@ -409,6 +409,7 @@ function takeRecoveredWithdrawalNotice(): { withdrawalNo: string; trackingRoute:
 // 🟡 PLACEHOLDER(B34 接线,Codex):一次性提示。由接线阶段在 COMMITTED 且 noticePending 时调用
 // takeRecoveredWithdrawalNotice(),把返回值写进这里;非 null 时横幅显示「提现已提交成功」整版,
 // null 时 COMMITTED 只留「上一笔提现已提交 · 查看进度」入口(已按单号消费过的同一单)。
+// 页面隐藏(onHide,含点「查看进度」进入追踪页)时置回 null:navTo 保留本页实例,返回后只显示安静入口,不再显示成功提示。
 const recoveredWithdrawalNotice = ref<{ withdrawalNo: string; trackingRoute: string } | null>(null);
 // 服务端拒绝原因 → 九语一句话;风控类与未列出的原因不写原因,只给通用收尾句。
 const RECOVERY_REASON_COPY: Record<string, "withdrawRecoveryReasonAbandoned" | "withdrawRecoveryReasonDailyLimit"
