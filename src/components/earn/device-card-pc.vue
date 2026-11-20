@@ -1021,7 +1021,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__value--nex { color: var(--v5-nex-ink); }
 .earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: anywhere; }
 .earn-stage__recent { position: relative; margin: 6px 18px 0; }
-.earn-stage__recent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: 8px; min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__recent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: var(--v5-space-2); min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); cursor: pointer; text-align: right; }
 .earn-stage__recent-title { min-width: 0; }
 .earn-stage__link--fixed { flex: none; margin-left: auto; white-space: nowrap; }
