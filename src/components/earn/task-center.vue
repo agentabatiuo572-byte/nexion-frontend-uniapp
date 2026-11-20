@@ -243,7 +243,7 @@ function completedTime(ts: number): string {
 .earn-tc__arrow--open { transform: rotate(90deg); }
 .earn-tc__panel { padding-bottom: 4px; }
 @media (prefers-reduced-motion: reduce) { .earn-tc__arrow { transition: none; } }
-.earn-history-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 22px; align-items: center; gap: 2px 8px; }
+.earn-history-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 22px; align-items: center; gap: calc(var(--v5-space-1) / 2) var(--v5-space-2); }
 .earn-history-row > svg { grid-row: 1 / span 2; }
 .earn-history-description { grid-column: 2; grid-row: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-history-description :deep(*) { white-space: nowrap; }

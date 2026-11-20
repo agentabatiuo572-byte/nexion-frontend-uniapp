@@ -325,7 +325,7 @@
       <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
       <view v-else-if="deviceTodayCompleted.length">
         <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" time="" />
-        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :time="localClockTime(task.completedAt)" />
+        <NxAmountRow v-for="task in deviceTodayCompleted" :key="task.receiptNo ?? task.id" compact :lines="2" data-phone-today-task="true" :name="task.type" :amount="visibility.mask(formatTaskReward(task, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" :time="localClockTime(task.completedAt)" />
       </view>
     </view>
 
@@ -375,7 +375,7 @@
         <text v-else-if="!taskHistoryReady" class="earn-stage__recent-note" role="status" aria-live="polite">{{ t.taskHistory.loading }}</text>
         <view v-else-if="deviceTodayCompleted.length" class="earn-stage__rows">
           <NxAmountRow v-if="todayRewardUnit" header compact :amount="todayRewardUnit" />
-          <NxAmountRow v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" compact data-phone-today-task="true" :name="done.type" :amount="visibility.mask(formatTaskReward(done, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" />
+          <NxAmountRow v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" compact data-phone-today-task="true" :name="done.type" :amount="visibility.mask(formatTaskReward(done, true, !todayRewardUnit))" :unit="todayRewardUnit ?? undefined" :tone="visibility.hidden ? 'muted' : 'success'" />
         </view>
         <text v-else class="earn-stage__recent-note">{{ t.home.ledgerEmpty }}</text>
       </view>
@@ -1018,7 +1018,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__value--nex { color: var(--v5-nex-ink); }
 .earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: anywhere; }
 .earn-stage__recent { position: relative; margin: 6px 18px 0; }
-.earn-stage__recent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: 8px; min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__recent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: var(--v5-space-2); min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); cursor: pointer; text-align: right; }
 .earn-stage__recent-title { min-width: 0; }
 .earn-stage__link--fixed { flex: none; margin-left: auto; white-space: nowrap; }
