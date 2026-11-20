@@ -175,7 +175,10 @@ useAutoRecovery({
 .referral-gift { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* A fixed bow over the configured machine (P-67): the machine follows the activity, the bow marks it as a gift. */
 .referral-bow { position: absolute; left: 56%; top: 36%; width: 40%; height: 34%; pointer-events: none; }
-.referral-actions { position: relative; z-index: 1; }
+/* Note and action stay side by side while the note fits in two lines; otherwise the note takes the full width and the action drops to the bottom-right. */
+.referral-actions { position: relative; z-index: 1; flex-wrap: wrap; row-gap: 0; }
+.referral-actions > .nx-card-footer__note { flex: 1 1 172px; overflow-wrap: break-word; }
+.referral-actions > .referral-progress-link { margin-left: auto; white-space: nowrap; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; }
 .referral-share { margin-top: var(--v5-space-2); box-shadow: 0 8px 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }

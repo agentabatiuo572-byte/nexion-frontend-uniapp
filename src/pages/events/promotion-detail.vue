@@ -682,7 +682,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-step { min-width: 0; padding: 14px 12px; border-radius: 18px; }
 .lp-step__number { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-jet-mono); }
 .lp-step__title { display: block; margin-top: 12px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.lp-step__note { display: block; margin-top: 4px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.lp-step__note { display: block; margin-top: 4px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 
 /* Product cards: 104px art on first purchase, 100px on repurchase. */
 .lp-product { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 12px 14px 12px 12px; cursor: pointer; }
