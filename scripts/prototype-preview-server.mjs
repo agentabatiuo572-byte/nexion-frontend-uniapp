@@ -217,7 +217,7 @@ const server=http.createServer(async(req,res)=>{
           state.scenarioEpoch=++scenarioEpoch;
           checkoutFlow?.syncScenario();
         }
-        if(update.paymentState==='intent-missing')checkoutFlow?.markUnpaidIntentsMissing();
+        if(update.paymentState==='intent-missing')checkoutFlow?.removeUnpaidIntents();
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.

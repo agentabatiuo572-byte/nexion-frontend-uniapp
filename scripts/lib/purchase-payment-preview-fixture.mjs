@@ -90,12 +90,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     quotes.clear();
     intents.clear();
   }
-  // Remove unpaid attempts from reads and active locks, but remember their consumed quotes.
-  function markUnpaidIntentsMissing() {
+  // Simulate environment cleanup of unpaid intent rows and their reservations.
+  function removeUnpaidIntents() {
     sync();
-    for (const intent of intents.values()) {
-      if (intent.missing || intent.status !== 'AWAITING_PAYMENT') continue;
-      intent.missing = true;
+    for (const [intentNo, intent] of intents) {
+      if (intent.status !== 'AWAITING_PAYMENT') continue;
+      intents.delete(intentNo);
       removeDemoPaymentQuotaHold(state, intent.quotaHold);
       if (intent.orderNo && state.intentOrders) delete state.intentOrders[intent.orderNo];
     }
@@ -116,7 +116,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // An open payment belongs to the same business even when a new request changes the reviewed price.
   const openIntent = (subject, excluding) => [...intents.values()].findLast(row => row !== excluding && row.kind === subject.kind
-    && !row.missing && !row.receipt && !['DELIVERED', 'EXPIRED'].includes(row.status)
+    && !row.receipt && !['DELIVERED', 'EXPIRED'].includes(row.status)
     && (row.kind === 'ORDER_PAY' ? !!subject.orderNo && row.orderNo === subject.orderNo
       : subject.identity != null && row.identity === subject.identity));
   // An old failed attempt cannot cancel a successor or change an already settled order.
@@ -159,11 +159,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       paymentRail: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
     }});
   }
-  const noProviderSuccess = ['waiting', 'urgent', 'late', 'remote-in-progress', 'expired', 'mismatch'];
+  const waitingModes = ['waiting', 'urgent', 'late', 'remote-in-progress', 'intent-missing'];
+  const noProviderSuccess = [...waitingModes, 'expired', 'mismatch'];
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
     const now = Date.now(), age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
-    if (intent.missing || scenario === 'intent-missing') return intent;
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED') {
       if (intent.reason === 'PAYMENT_FAILED' && graceOver) closeUnpaidOrder(intent);
@@ -174,7 +174,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;
     if (intent.status === 'AWAITING_PAYMENT') {
-      if (['waiting', 'urgent', 'late', 'remote-in-progress'].includes(scenario)) {
+      if (waitingModes.includes(scenario)) {
         if (!graceOver) return intent;
         closeUnpaidOrder(intent);
         expire(intent, 'PAYMENT_TIMEOUT');
@@ -236,7 +236,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   function paymentCommand(kind, key) {
     sync();
     const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
-    if (!intent || intent.missing) return null;
+    if (!intent) return null;
     if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
     advance(intent);
     const original = {kind, commandKey: key, canResumeSameKey: false};
@@ -260,7 +260,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
   function readIntent(intent) {
     if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE');
-    return intent && !intent.missing ? {status: 200, message: 'OK', data: view(intent)} : refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
+    return intent ? {status: 200, message: 'OK', data: view(intent)} : refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
   }
   function handle(url, request) {
     sync();
@@ -319,11 +319,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!key) return refused(422, 'IDEMPOTENCY_KEY_REQUIRED');
       if (!source) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const {subject, deadline} = source, known = [...intents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
-      if (known) {
-        if (known.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
-        if (known.missing) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
-        return {status: 200, message: 'OK', data: view(known)};
-      }
+      if (known) return known.paymentQuoteId === quoteId ? {status: 200, message: 'OK', data: view(known)} : refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
       if (!networkOpen(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
@@ -372,5 +368,5 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return handle(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}));
   }
-  return {handles, handle, paymentCommand, sweep, sync, openOrderPayment, seedRemoteOrderPayment, markUnpaidIntentsMissing};
+  return {handles, handle, paymentCommand, sweep, sync, openOrderPayment, seedRemoteOrderPayment, removeUnpaidIntents};
 }

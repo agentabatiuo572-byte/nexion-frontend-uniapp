@@ -109,5 +109,5 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     return ok(demoFixture(url,locale(),state,request));
   }
-  return {handles,handle,pin,syncScenario,observePayments:external.sweep,seedRemoteOrderPayment:external.seedRemoteOrderPayment,markUnpaidIntentsMissing:external.markUnpaidIntentsMissing};
+  return {handles,handle,pin,syncScenario,observePayments:external.sweep,seedRemoteOrderPayment:external.seedRemoteOrderPayment,removeUnpaidIntents:external.removeUnpaidIntents};
 }
