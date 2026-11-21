@@ -189,6 +189,8 @@ const server=http.createServer(async(req,res)=>{
         }
         state.previewFactsAt??=startedAt;
         updatePreviewHomeDisplay(state,update,Date.now());
+        // A live trial conversion policy change keeps existing quotes and payment intents.
+        if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
         const paymentMode=demoPaymentScenario(state);

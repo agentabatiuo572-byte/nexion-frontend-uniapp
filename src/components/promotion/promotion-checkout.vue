@@ -150,7 +150,7 @@ import { useOrders } from '@/store/orders';
 import { computeVoucherDiscount,isVoucherValid,voucherAppliesToSku,type VoucherDef } from '@/mock/vouchers';
 import { ApiError,asApiError,isApiRefusal } from '@/api/errors';
 import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,settleProductCatalogRefresh,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
-import { navTo,navBack,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
+import { navTo,navBack,navReplace,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
 import { fmt } from '@/i18n/format';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord,PROMOTION_CHECKOUT_TABLE } from '@/lib/promotion-checkout-session';
 import { acquireAccountCommandKey,readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
@@ -160,7 +160,7 @@ import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display
 import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
 import { litePromotion } from '@/lib/promotion-landing';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { onPurchaseRecordReleased } from '@/store/purchase-payment';
+import { onPurchaseRecordReleased, refusedPurchasePayment } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
@@ -193,7 +193,7 @@ async function refreshWallet(coalesce=false,background=false){
 const visible=ref(true);
 const account=app.accountKey,epoch=app.accountBindingEpoch;let alive=true,readGeneration=0,refreshOnIdle=false;const current=()=>alive&&app.accountKey===account&&app.accountBindingEpoch===epoch;
 const readCurrent=(generation:number)=>current()&&visible.value&&generation===readGeneration;
-const recoveryReading=ref(false);
+const recoveryRead=shallowRef<Promise<boolean>|null>(null);
 const recoveryReadFailed=ref(false);
 let recoveryGeneration:number|null=null;
 const TABLE=PROMOTION_CHECKOUT_TABLE;
@@ -201,7 +201,7 @@ let storageReadable=true;let records:Record<string,PromotionCheckoutRecord>={};
 try{records=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};}catch{storageReadable=false;}
 // A changed route cannot bypass an unresolved command from this same account.
 const {intent,record:stored,openedOriginal}=selectPromotionCheckoutRecord(records,props);
-const session=new PromotionCheckoutSession({api:promotionApi,current:()=>current()&&(recoveryGeneration===null||readCurrent(recoveryGeneration)),key:key=>acquireAccountCommandKey('nexgrid-promotion-commands-v1',account,key,'promotion'),read:()=>readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)?.[intent]??null,save:record=>{if(!storageReadable)throw new Error('STORAGE_UNAVAILABLE');const rows=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};if(!writeAccountRow(TABLE,account,{...rows,[intent]:record}))throw new Error('STORAGE_UNAVAILABLE');}},stored);
+const session=new PromotionCheckoutSession({api:promotionApi,isExternalPaymentRefused:key=>!!refusedPurchasePayment(account,key),current:()=>current()&&(recoveryGeneration===null||readCurrent(recoveryGeneration)),key:key=>acquireAccountCommandKey('nexgrid-promotion-commands-v1',account,key,'promotion'),read:()=>readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)?.[intent]??null,save:record=>{if(!storageReadable)throw new Error('STORAGE_UNAVAILABLE');const rows=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};if(!writeAccountRow(TABLE,account,{...rows,[intent]:record}))throw new Error('STORAGE_UNAVAILABLE');}},stored);
 const stopReleaseWatch=onPurchaseRecordReleased((accountKey,key)=>{if(accountKey===account&&current()&&session.releaseExternalPayment(key))revision.value++;});
 const quotePresentation=shallowRef<{key:string;quote:Quote}|null>(null);
 const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.value;return session.record.pending||session.record.order||(freshQuoteReady.value&&quotePresentation.value?.key===quotePresentationKey())?session.record.quote:null;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
@@ -259,7 +259,15 @@ function recoverKeepBeforeNewPurchase(reopen=false):boolean {
   const previous=keepRecoveryTarget.value;
   keepRecoveryTarget.value=null;keepRecoveryReadError.value=false;
   for(const {productNo} of selection.value){
-    try{if(!readCapacityPending(account,productNo))continue;}
+    try{
+      const pending=readCapacityPending(account,productNo);
+      if(!pending)continue;
+      if(refusedPurchasePayment(account,pending.key)){
+        if(!reopen||!pending.quote)continue;
+        tradein.showCanonicalReplace(productNo as DeviceKind,pending.quote.payableUsdt,pending.quote);
+        return true;
+      }
+    }
     catch{keepRecoveryReadError.value=true;}
     keepRecoveryTarget.value=productNo;
     freshQuoteReady.value=false;quoteFresh.value=false;quotePresentation.value=null;
@@ -322,7 +330,7 @@ async function loadOrderClock(){
 }
 const catalogReadFailed=computed(()=>freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&productCatalogState.status==='error');
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&(liteSelectionAllowed.value||session.retryOriginal)&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
-const canPay=computed(()=>!busy.value&&!recoveryReading.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
+const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
 async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';activityConflict.value=false;try{await action();}catch(cause){if(current()){
@@ -452,10 +460,15 @@ async function selectVoucher(id:string|null){
   try{session.selectVoucher(id);}catch{error.value=p.value.errorNote;return;}
   voucherId.value=id;voucherOpen.value=false;await loadQuote();
 }
-async function createOrder(){if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase()||!canCreate.value)return;await run(()=>session.create());if(canPay.value&&current()&&visible.value){paymentSheetOpen.value=true;void confirmPayment();}}
+async function createOrder(){if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;await run(()=>session.create());if(canPay.value&&current()&&visible.value){paymentSheetOpen.value=true;void confirmPayment();}}
 const paymentDialogOwner=`promotion-payment:${Date.now()}:${Math.random()}`;
 async function pay(){
   updateClock();if(paymentEntryChecking.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
+  if(session.externalPaymentRefused){
+    paymentSheetOpen.value=true;
+    void confirmPayment();
+    return;
+  }
   paymentEntryChecking.value=true;
   try{
     // Keep the original order amount. A current quote is not current purchase
@@ -517,15 +530,16 @@ async function confirmPayment(){
             throw cause;
           }
         },
-        paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
+        paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
           navigate:href=>{paymentDestination=href;},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);},
           commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}});
     });
     if(!readCurrent(generation)||paymentDestination)return;
     if(order.value?.paymentStatus==='PAID')await readActivation();
     else{
-      await refreshWallet();
+      const walletRefresh=refreshWallet();
       if(!rejection)return;
+      await walletRefresh;
       const reason=error.value;
       const recovered=await recover();
       if(!recovered||!readCurrent(generation)||unknown.value||!canCancel.value)return;
@@ -537,10 +551,23 @@ async function confirmPayment(){
     if(paymentDestination&&readCurrent(generation))await navTo(paymentDestination);
   }
 }
-async function recover():Promise<boolean>{
-  if(!current()||!visible.value||busy.value||session.busy||recoveryReading.value)return false;
+let recoveryReadGeneration=-1;
+function recover():Promise<boolean>{
+  if(!current()||!visible.value||busy.value)return Promise.resolve(false);
+  if(recoveryRead.value){
+    // Back can arrive while the foreground read is checking this same order.
+    if(recoveryReadGeneration===readGeneration)return recoveryRead.value;
+    // A read from before the page was hidden cannot answer for this visit: read again once it ends.
+    return recoveryRead.value.then(()=>recover());
+  }
+  if(session.busy)return Promise.resolve(false);
+  recoveryReadGeneration=readGeneration;
+  recoveryRead.value=readCheckout().finally(()=>{recoveryRead.value=null;});
+  return recoveryRead.value;
+}
+async function readCheckout():Promise<boolean>{
   const generation=readGeneration;
-  recoveryGeneration=generation;recoveryReading.value=true;
+  recoveryGeneration=generation;
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
     &&!session.record.pending&&!unknown.value&&!recoveryReadFailed.value;
   try{
@@ -549,9 +576,17 @@ async function recover():Promise<boolean>{
     if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
+    const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
+    // If recovery was part of Back, let that navigation finish.
+    if (openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
+      && (!props.orderNo || props.orderNo !== order.value?.orderNo)) {
+      const requestedHref = props.orderNo
+        ? '/pages/store/checkout?orderNo=' + encodeURIComponent(props.orderNo)
+        : promotionCheckoutHref(props.items, props.activityId, props);
+      return await navReplace(requestedHref);
+    }
     const reopenPurchase = ordinaryMultiItemEntry && canStartNew.value && !session.record.quote?.activityId
-      && !order.value?.rewards?.length
-      && (order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED');
+      && !order.value?.rewards?.length && unpaidOrderEnded;
     if (reopenPurchase) {
       // The replacement quote has its own read generation.
       recoveryGeneration=null;
@@ -564,7 +599,7 @@ async function recover():Promise<boolean>{
     else if(!clockOnly)await refreshWallet(true,true);
     return readCurrent(generation)&&!unknown.value;
   }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
-  finally{recoveryGeneration=null;recoveryReading.value=false;}
+  finally{recoveryGeneration=null;}
 }
 async function readActivation(){
   if(!current()||!visible.value||resultReading.value||order.value?.paymentStatus!=='PAID')return;
@@ -585,7 +620,7 @@ async function readActivation(){
   }catch{if(valid()){resultState.value='error';resultError.value=t.value.orders.walletPaymentConfirmedRefreshPending;if(walletState.value==='loading')walletState.value='error';}}
   finally{if(generation===resultGeneration)resultReading.value=false;}
 }
-const purchaseReadBusy=()=>loading.value||busy.value||session.busy||recoveryReading.value||resultReading.value
+const purchaseReadBusy=()=>loading.value||busy.value||session.busy||!!recoveryRead.value||resultReading.value
   ||walletState.value==='loading'||paymentConfirming.value||paymentEntryChecking.value||paymentSheetOpen.value||leaving.value||voucherLoading.value;
 useAutoRecovery({
   failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!session.retryOriginal
@@ -632,7 +667,7 @@ async function requestLeave():Promise<boolean>{
   leaving.value=true;paymentSheetOpen.value=false;
   try{
     const recovered=await recover();
-    if(!recovered||!current()||unknown.value||session.record.pending&&!session.retryOriginal){if(current()&&visible.value)error.value=t.value.orders.resultReadback;return false;}
+    if(!recovered||!current()||unknown.value||session.record.pending&&!session.retryOriginal&&!session.externalPaymentRefused){if(current()&&visible.value)error.value=t.value.orders.resultReadback;return false;}
     if(!order.value)return !session.record.pending;
     if(order.value.paymentStatus!=='PENDING')return true;
     // Missing trusted time cannot turn an unresolved original order into a

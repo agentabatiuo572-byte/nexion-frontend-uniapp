@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase} from './prototype-demo-data.mjs';
 import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
@@ -32,10 +32,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return reason === 'NETWORK_SWITCH_OFF' ? refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED') : null;
   };
   const handles = path => path.startsWith(base);
-  function replacementRefusal(url, request, kind, payload) {
+  function replacementRefusal(url, request, kind, sourceId) {
     if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
-    const fleet = demoFleetFacts(url, locale(), state), id = payload.sourceDeviceId;
-    const sourceId = typeof id === 'string' && /^\+?\d+$/.test(id.trim()) ? Number(id) : id;
+    const fleet = demoFleetFacts(url, locale(), state);
     if (kind === 'CAPACITY_REPLACE' && (!Number.isSafeInteger(sourceId)
       || demoCapacityReplacementSource(fleet, demoProducts(state, url.origin))?.id !== sourceId))
       return refused(409, 'CAPACITY_REPLACEMENT_SOURCE_CHANGED');
@@ -45,33 +44,62 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return refusal ? refused(409, refusal) : null;
   }
   const replacementPaths = {TRADE_IN:'submit', CAPACITY_REPLACE:'capacity-replace', CAPACITY_KEEP:'capacity-keep'};
-  function replacementPricing(url, request, kind, payload) {
-    const refusal = replacementRefusal(url, request, kind, payload);
+  function replacementPricing(url, request, subject, payload) {
+    const {kind} = subject;
+    if (!subject.targetProductNo) reject('TRADEIN_TARGET_NOT_ACTIVE');
+    const refusal = replacementRefusal(url, request, kind, subject.sourceDeviceId);
     if (refusal) throw Object.assign(new Error(refusal.message), {status:refusal.status});
     const tradein = kind === 'TRADE_IN';
     const quoted = demoFixture(new URL('/api/app/trade-in/' + (tradein ? 'quote' : 'capacity-quote'), url.origin),
-      locale(), state, {...request, method: () => 'POST', postDataJSON: () => payload});
+      locale(), state, {...request, externalPurchasePricing: true, method: () => 'POST',
+        postDataJSON: () => ({sourceDeviceId: subject.sourceDeviceId, targetProductNo: subject.targetProductNo})});
     const {sourceDeviceId, targetProductId, targetProductNo, targetPriceUsdt, payableUsdt} = quoted;
     const discountUsdt = tradein ? quoted.discountUsdt : 0;
     const targetDeviceStatus = tradein ? quoted.targetDeviceStatus : 'ACTIVE';
     const sourceRowVersion = tradein ? quoted.sourceRowVersion : sourceDeviceId == null ? null
       : demoFleetFacts(url, locale(), state).devices.find(device => device.id === sourceDeviceId)?.rowVersion;
-    if (tradein && payload.expectedSourceVersion !== sourceRowVersion)
-      throw Object.assign(new Error('TRADEIN_SOURCE_VERSION_CONFLICT'), {status:409});
+    if (tradein && (payload.expectedSourceVersion == null || Number(payload.expectedSourceVersion) !== sourceRowVersion))
+      reject('TRADEIN_SOURCE_VERSION_CONFLICT');
     if (!tradein && quoted.decision !== (kind === 'CAPACITY_REPLACE' ? 'REPLACE_REQUIRED' : 'CAPACITY_AVAILABLE'))
-      throw Object.assign(new Error('CAPACITY_REPLACEMENT_SOURCE_CHANGED'), {status:409});
+      reject('CAPACITY_REPLACEMENT_SOURCE_CHANGED');
     if (!Number.isFinite(payload.expectedPayableUsdt) || Math.abs(payload.expectedPayableUsdt - payableUsdt) > 0.000001
       || tradein && (!Number.isFinite(payload.expectedDiscountUsdt) || Math.abs(payload.expectedDiscountUsdt - discountUsdt) > 0.000001))
-      throw Object.assign(new Error('PURCHASE_PAYMENT_PRICING_CHANGED'), {status:409});
+      reject('PURCHASE_PAYMENT_PRICING_CHANGED');
     return {sourceDeviceId, sourceRowVersion, targetProductId, targetProductNo, targetPriceUsdt, payableUsdt, discountUsdt, targetDeviceStatus};
   }
-  function checkedReplacementPricing(url, request, kind, payload, original) {
-    const pricing = replacementPricing(url, request, kind, payload);
+  function checkedReplacementPricing(url, request, subject, payload, original) {
+    const pricing = replacementPricing(url, request, subject, payload);
     if (original && JSON.stringify(pricing) !== JSON.stringify(original))
-      throw Object.assign(new Error('PURCHASE_PAYMENT_PRICING_CHANGED'), {status:409});
+      reject('PURCHASE_PAYMENT_PRICING_CHANGED');
     return pricing;
   }
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
+  const positiveId = value => /^\+?\d+$/.test(String(value).trim()) && Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;
+  const reject = message => { throw Object.assign(new Error(message), {status: 409}); };
+  function purchaseSubject(kind, payload, products) {
+    if (kind === 'ORDER_PAY') return {kind, orderNo: String(payload.orderNo ?? '').trim().toUpperCase()};
+    // Preview claims reuse a sample number. The persisted start distinguishes each claim from its predecessors.
+    if (kind === 'TRIAL_CONVERT') return {kind, identity: state.trialRow?.state === 'ELIGIBLE' ? null : state.trialRow?.startedAt};
+    const requested = String(payload.targetProductNo ?? '').trim().toLowerCase();
+    const targetId = kind === 'TRADE_IN' ? positiveId(payload.targetProductId) : null;
+    const target = targetId ? products[targetId - 1]?.id : products.find(product => product.id === requested)?.id;
+    const targetProductNo = target && (!requested || requested === target) ? target : null;
+    const sourceDeviceId = positiveId(payload.sourceDeviceId);
+    const identity = targetProductNo && (kind === 'CAPACITY_KEEP' || sourceDeviceId)
+      ? JSON.stringify([targetProductNo, kind === 'CAPACITY_KEEP' ? null : sourceDeviceId]) : null;
+    return {kind, identity, targetProductNo, sourceDeviceId};
+  }
+  function trialPricing(url, request, payload, pricingAt) {
+    if (state.trialConversionEnabled === false) reject('TRIAL_KILL_SWITCH_DISABLED');
+    const trial = demoFixture(new URL('/api/trial/state', url.origin), locale(), state, {...request, method: () => 'GET', pricingAt});
+    if (!['ACTIVE', 'GRACE', 'EXTENDED'].includes(trial.state) || !trial.quote) reject('TRIAL_NOT_CONVERTIBLE');
+    if (payload.productNo !== trial.config.trialProductId) reject('TRIAL_PRODUCT_NOT_ELIGIBLE');
+    if (payload.quoteVersion !== trial.quote.quoteVersion) reject('TRIAL_QUOTE_CHANGED');
+    return trial;
+  }
+  const quotaItems = (subject, payload, order) => subject.kind === 'ORDER_PAY'
+    ? order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity}))
+    : [{productNo: subject.kind === 'TRIAL_CONVERT' ? payload.productNo : subject.targetProductNo, quantity: 1}];
   // The account's one order list.
   const ordersOf = origin => demoAccountOrders(new URL(origin), locale(), state);
   // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
@@ -84,7 +112,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     suspendedIntents.clear();
   };
   const sameSubject = (row, subject) => row.kind === subject.kind
-    && (row.kind === 'ORDER_PAY' ? row.orderNo === subject.orderNo : row.payloadKey === subject.payloadKey);
+    && (row.kind === 'ORDER_PAY' ? !!subject.orderNo && row.orderNo === subject.orderNo
+      : subject.identity != null && row.identity === subject.identity);
   function selectPaymentMode(wasMissing) {
     sync();
     const missing = demoPaymentIntentMissing(state);
@@ -125,9 +154,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     else Object.assign(order, demoTimedOutOrder);
     return order;
   }
-  // Another open intent for the same order or the same non-order payload (PurchasePaymentService.activeIntents).
+  // An open payment belongs to the same purchase even when a new request changes the reviewed price.
   const openIntent = (subject, excluding) => [...intents.values()].find(row => row !== excluding && sameSubject(row, subject)
-    && !['DELIVERED', 'EXPIRED'].includes(row.status));
+    && !row.receipt && !['DELIVERED', 'EXPIRED'].includes(row.status));
   // Like PurchasePaymentService.expire: no funds by the deadline plus grace ends the intent and its order together,
   // unless a successor to a failed attempt now owns the order, or the order has already ended another way.
   function timeOut(intent) {
@@ -152,7 +181,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const request = {method: () => 'POST', postDataJSON: () => intent.payload};
     let receipt;
     try {
-      const replacementQuote = checkedReplacementPricing(url, request, intent.kind, intent.payload, intent.replacementQuote);
+      const replacementQuote = checkedReplacementPricing(url, request, intent, intent.payload, intent.replacementQuote);
       receipt = demoFixture(url, locale(), state, {...request, verifiedPayment: intent, replacementQuote});
     } catch (error) {
       return Object.assign(intent, {status: 'MANUAL_REVIEW', reconciliationStatus: 'REVIEW',
@@ -221,7 +250,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, payloadKey, pricingAt, paidAt, replacementQuote, ...row} = intent, open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, replacementQuote, ...row} = intent, open = Date.now() < deadline;
     const networkEnabled = networkGate(row.paymentMethod) === null;
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
@@ -267,41 +296,36 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
     if (path === `${base}-quotes` && method === 'POST') {
-      const body = request.postDataJSON(), order = ordersOf(url.origin).find(row => row.orderNo === body.payload?.orderNo);
+      const body = request.postDataJSON(), {kind, payload} = body;
+      if (!Object.hasOwn(commandKinds, kind) || !payload) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
+      const products = demoProducts(state, url.origin), subject = purchaseSubject(kind, payload, products);
+      if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
       const gate = networkGate(body.paymentMethod);
       if (gate) return gate;
-      // Like PurchasePaymentService.quote: an order payment is quoted only for an existing unpaid order; an expired
-      // one has already been closed by the deadline task, so it is not payable either.
-      if (body.kind === 'ORDER_PAY' && !order) return {status: 404, message: 'ORDER_NOT_FOUND', data: null};
-      if (body.kind === 'ORDER_PAY' && (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT')) return {status: 409, message: 'ORDER_NOT_PAYABLE', data: null};
-      if(body.kind==='ORDER_PAY'){
-        requireDemoPurchase(state,demoProducts(state,url.origin),
-          order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),Date.now());
-      }
-      if (!Object.hasOwn(commandKinds, body.kind) || (body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : body.kind !== 'ORDER_PAY' && !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
+      const order = kind === 'ORDER_PAY' ? ordersOf(url.origin).find(row => row.orderNo === subject.orderNo) : null;
+      if (kind === 'ORDER_PAY' && !order) return refused(404, 'ORDER_NOT_FOUND');
+      if (order && (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT')) return refused(409, 'ORDER_NOT_PAYABLE');
       const bank = body.paymentMethod === 'HDPAY_BANK', erc20 = body.paymentMethod === 'CREGIS_USDT_ERC20';
-      const trial = body.kind === 'TRIAL_CONVERT'
-        ? demoFixture(new URL('/api/trial/state',url.origin),locale(),state,{...request,method:()=> 'GET'}) : null;
+      const trial = kind === 'TRIAL_CONVERT' ? trialPricing(url, request, payload) : null;
       if (trial) {
-        const expected = body.payload.expectedAmountUsdt;
+        subject.identity = trial.claimedAtEpochMs;
+        const expected = payload.expectedAmountUsdt;
         if (typeof expected !== 'number' || !Number.isFinite(expected) || expected < 0 || expected > 1000000
-          || !/^\d+(?:\.\d{1,2})?$/.test(String(expected))) return {status:409,message:'TRIAL_AMOUNT_INVALID',data:null};
-        if (!['ACTIVE','GRACE'].includes(trial.state) || !trial.quote || body.payload.productNo !== trial.config.trialProductId)
-          return {status:409,message:'TRIAL_NOT_CONVERTIBLE',data:null};
-        if (body.payload.quoteVersion !== trial.quote.quoteVersion) return {status:409,message:'TRIAL_QUOTE_CHANGED',data:null};
+          || !/^\d+(?:\.\d{1,2})?$/.test(String(expected))) return refused(409, 'TRIAL_AMOUNT_INVALID');
       }
-      const replacementQuote = Object.hasOwn(replacementPaths, body.kind)
-        ? replacementPricing(url, request, body.kind, body.payload) : undefined;
+      const replacementQuote = Object.hasOwn(replacementPaths, kind)
+        ? replacementPricing(url, request, subject, payload) : undefined;
       const amount = trial ? trial.quote.amountUsdt : order?.amountUsdt ?? replacementQuote.payableUsdt;
       // Trial business amounts retain six decimals; the external principal confirms HALF_UP cents.
       const micros = BigInt(Number(amount).toFixed(6).replace('.', ''));
       const subtotal = trial ? Number((micros + 5000n) / 10000n) : cents(amount);
-      if (trial && subtotal > cents(body.payload.expectedAmountUsdt)) return {status:409,message:'TRIAL_AMOUNT_MISMATCH',data:null};
-      const subject = {kind: body.kind, orderNo: order?.orderNo, payloadKey: JSON.stringify(body.payload)};
-      if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
+      if (trial && subtotal > cents(payload.expectedAmountUsdt)) return refused(409, 'TRIAL_AMOUNT_MISMATCH');
       if (!configured(body.paymentMethod)) return refused(503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
       const now = Date.now(), deadline = order ? Number(order.expiresAt) : now + paymentWindow;
       if (deadline <= now) return refused(409, 'ORDER_PAYMENT_EXPIRED');
+      const items = quotaItems(subject, payload, order);
+      if (order) requireDemoPurchase(state, products, items, now, true);
+      else requireDemoExternalPaymentQuota(state, products, items, now);
       const adjustment = Number(BigInt(subtotal) * 10000n - micros) / 1000000;
       const channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
       if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};
@@ -310,7 +334,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion: 3, pricingAsOf: new Date(now).toISOString(), expiresAt: new Date(Math.min(now + QUOTE_TTL, deadline)).toISOString(),
         deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(body.paymentMethod, deadline)).toISOString(),
         fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null};
-      quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload: body.payload, replacementQuote});
+      quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote});
       return {status: 200, message: 'OK', data: quote};
     }
     if (path === `${base}-intents` && method === 'POST') {
@@ -321,33 +345,34 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (known) return known.paymentQuoteId === quoteId ? {status: 200, message: 'OK', data: view(known)} : refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       const suspended = [...suspendedIntents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (suspended && suspended.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
+      if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
+      if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
       const gate = networkGate(source.quote.paymentMethod);
       if (gate) return gate;
-      // Like PurchasePaymentService.create: the quote is checked again before an intent exists.
-      if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
       if (Date.parse(source.quote.expiresAt) <= Date.now()) return refused(409, 'PURCHASE_PAYMENT_QUOTE_EXPIRED');
-      if (subject.orderNo) {
-        const order = ordersOf(url.origin).find(row => row.orderNo === subject.orderNo);
+      const order = subject.kind === 'ORDER_PAY' ? ordersOf(url.origin).find(row => row.orderNo === subject.orderNo) : null;
+      if (subject.kind === 'ORDER_PAY') {
         if (!order) return refused(404, 'ORDER_NOT_FOUND');
         if (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT') return refused(409, 'ORDER_NOT_PAYABLE');
       }
-      if (subject.kind === 'TRIAL_CONVERT') {
-        // Priced again as of the quote's own time: accrual since then changes nothing, a changed policy refuses before money moves.
-        const trial = demoFixture(new URL('/api/trial/state', url.origin), locale(), state, {...request, method: () => 'GET', pricingAt: source.pricingAt});
-        if (!['ACTIVE', 'GRACE'].includes(trial.state) || !trial.quote) return refused(409, 'TRIAL_NOT_CONVERTIBLE');
-        if (source.payload.quoteVersion !== trial.quote.quoteVersion) return refused(409, 'TRIAL_QUOTE_CHANGED');
-        if (Number(trial.quote.amountUsdt).toFixed(6) !== source.quote.businessAmountUsdt) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
-      }
+      // Reprice the trial at the original quote time while applying the current policy.
+      const trial = subject.kind === 'TRIAL_CONVERT' ? trialPricing(url, request, source.payload, source.pricingAt) : null;
+      if (trial && trial.claimedAtEpochMs !== subject.identity) return refused(409, 'TRIAL_NOT_CONVERTIBLE');
       if (source.replacementQuote)
-        checkedReplacementPricing(url, request, subject.kind, source.payload, source.replacementQuote);
-      if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
+        checkedReplacementPricing(url, request, subject, source.payload, source.replacementQuote);
+      const amount = trial?.quote.amountUsdt ?? order?.amountUsdt;
+      if (amount != null && Number(amount).toFixed(6) !== source.quote.businessAmountUsdt)
+        return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
+      const products = demoProducts(state, url.origin), items = quotaItems(subject, source.payload, order);
+      requireDemoExternalPaymentQuota(state, products, items, Date.now());
+      if (order) requireDemoExternalOrderGate(products, items);
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intentNo = suspended?.intentNo ?? `PPI-PREVIEW-${++sequence}`;
       const intent = suspended ?? {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
         paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
-        createdAt: Date.now(), orderNo: subject.orderNo, payloadKey: subject.payloadKey, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin};
+        createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin};
       if (suspended) suspendedIntents.delete(intentNo);
       intents.set(intentNo, intent);
       // The deadline task leaves an order with a payment intent to the payment's own outcome.
