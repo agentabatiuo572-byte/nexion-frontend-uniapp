@@ -88,17 +88,17 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__image { display:block; width:52px; height:52px; }
 .trial-device-row__image-badge { position:absolute; right:2px; top:2px; padding:1px 2px; border-radius:4px; background:var(--v5-brand); color:var(--v5-on-brand); font:500 9px/11px var(--font-v5); white-space:nowrap; }
 .trial-device-row__identity { min-width:0; flex:1; }
-.trial-device-row__name { display:block; font:600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); overflow-wrap:anywhere; }
+.trial-device-row__name { display:block; font:600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); overflow-wrap:break-word; }
 .trial-device-row__status { display:block; margin-top:4px; color:var(--v5-ink-3); font:400 clamp(11px,3.08vw,12px)/18px var(--font-v5); }
 .trial-device-row__status--online::before { content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:var(--v5-success); vertical-align:1px; }
 .trial-device-row__summary { display:flex; align-items:center; gap:8px; min-width:0; max-width:152px; }
 .trial-device-row__time { min-width:0; text-align:right; color:var(--v5-ink-3); font:400 clamp(11px,3.08vw,12px)/1.4 var(--font-v5); }
-.trial-device-row__time > text { display:block; overflow-wrap:anywhere; }
+.trial-device-row__time > text { display:block; overflow-wrap:break-word; }
 .trial-device-row__remaining { margin-top:4px; color:var(--v5-ink); font:600 clamp(12px,3.6vw,14px)/1.35 var(--font-v5); font-variant-numeric:tabular-nums; }
 .trial-device-row__chevron { display:grid; place-items:center; flex:none; width:28px; height:28px; border-radius:var(--v5-radius-full); background:var(--v5-surface-2); color:var(--v5-ink-3); }
 .trial-device-row__chevron svg { transition:transform .25s ease; }
 .trial-device-row__body { padding:0 20px 16px; }
-.trial-device-row__state { display:block; margin-top:3px; color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); overflow-wrap:anywhere; }
+.trial-device-row__state { display:block; margin-top:3px; color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); overflow-wrap:break-word; }
 .trial-device-row__credit,.trial-device-row__estimate { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:5px 12px; margin-top:12px; font:400 12px/18px var(--font-v5); color:var(--v5-ink-3); }
 .trial-device-row__amount { color:var(--v5-brand); font-size:20px; line-height:26px; font-weight:600; }
 .trial-device-row__progress { height:5px; margin-top:8px; overflow:hidden; border-radius:var(--v5-radius-full); background:var(--v5-surface-3); }
