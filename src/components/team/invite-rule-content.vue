@@ -58,17 +58,29 @@ const liveState = computed(() => {
 const app = useApp();
 const rulePresentation = ref<{ amount: number; effectiveAt: string; state: 'ready' | 'disabled' } | null>(null);
 let environmentInvalidated = false;
-watch(() => apiRuntimeConfig?.environment, () => { environmentInvalidated = true; rulePresentation.value = null; }, { flush: 'sync' });
+watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => { environmentInvalidated = true; rulePresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, locale.code], () => { rulePresentation.value = null; }, { flush: 'sync' });
-watch([liveState, () => rewards.snapshot, () => cfg.config.rewards.effectiveAt, () => cfg.config.rewards.inviterReward.nexAmount], ([value]) => {
+const canRetainRule = computed(() => {
+  const saved = rulePresentation.value;
+  if (!saved || (rewards.error && !rewards.transientFailure) || (cfg.configStatus === 'failed' && !cfg.transientFailure)) return false;
+  const enabled = saved.state === 'ready';
+  const policy = cfg.config.rewards;
+  const snapshot = rewards.snapshot;
+  if (cfg.configStatus === 'ready' && (policy.enabled !== enabled
+      || (enabled && (policy.inviterReward.nexAmount !== saved.amount || policy.effectiveAt !== saved.effectiveAt)))) return false;
+  return !snapshot || (snapshot.rewardEnabled === enabled && (!enabled || snapshot.inviterRewardNex === saved.amount));
+});
+watch([liveState, canRetainRule, () => rewards.snapshot, () => cfg.config.rewards.effectiveAt, () => cfg.config.rewards.inviterReward.nexAmount], ([value]) => {
   if (environmentInvalidated) return;
   if (value === 'ready' || value === 'disabled') rulePresentation.value = {
     amount: rewards.snapshot!.inviterRewardNex, effectiveAt: cfg.config.rewards.effectiveAt ?? '', state: value,
   };
-  else if (value !== 'loading') rulePresentation.value = null;
+  else if (!canRetainRule.value) rulePresentation.value = null;
 }, { immediate: true });
+const readFailedWithoutData = computed(() => (environmentInvalidated || liveState.value === 'unavailable') && !canRetainRule.value);
 const state = computed(() => environmentInvalidated ? 'unavailable'
-  : rulePresentation.value && (loading.value || liveState.value === 'ready' || liveState.value === 'disabled') ? rulePresentation.value.state : liveState.value === 'ready' ? 'unavailable' : liveState.value);
+  : canRetainRule.value ? rulePresentation.value!.state : liveState.value === 'ready' ? 'unavailable' : liveState.value);
+defineExpose({ readFailedWithoutData });
 async function retry() {
   if (loading.value) return;
   await Promise.all([cfg.load(), rewards.refresh()]);

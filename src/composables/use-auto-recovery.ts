@@ -39,7 +39,7 @@ export function useAutoRecovery(options: {
         || epoch !== app.accountBindingEpoch || account !== app.accountKey) return;
       attempts += 1;
       void attempt();
-    }, Math.max(delay === options.repeatMs ? delay : delay * (0.85 + Math.random() * 0.3), retryAt - Date.now()));
+    }, Math.max(delay === repeatDelay() ? delay : delay * (0.85 + Math.random() * 0.3), retryAt - Date.now()));
   }
 
   function attempt(): Promise<boolean> {
