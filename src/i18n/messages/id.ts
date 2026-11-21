@@ -2387,6 +2387,8 @@ export const id: Messages = {
     coOpenOriginalOrder: "Lihat pesanan awal",
     coPendingCreateTitle: "Hasil pesanan sebelumnya belum dikonfirmasi",
     coPendingCreateHint: "Ketuk Sinkronkan lagi untuk memastikan hasilnya. Jangan buat pesanan lain sebelum hasilnya dikonfirmasi.",
+    coResubmitOrder: "Resubmit order",
+    coResubmitOrderHint: "We couldn't confirm your last order. Resubmitting uses the original request and won't create a duplicate.",
     coPendingCreateChecking: "Sedang memastikan hasil pesanan sebelumnya. Jangan buat pesanan lain sebelum hasilnya dikonfirmasi.",
     coPendingCreateFound: "Pesanan sebelumnya sudah dibuat. Buka pesanan itu untuk melanjutkan, tidak perlu memesan lagi.",
     coPendingCreateNotFound: "Pesanan sebelumnya tidak ditemukan. Anda dapat memesan lagi.",

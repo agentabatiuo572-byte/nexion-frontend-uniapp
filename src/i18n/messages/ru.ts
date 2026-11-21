@@ -2387,6 +2387,8 @@ export const ru: Messages = {
     coOpenOriginalOrder: "Открыть исходный заказ",
     coPendingCreateTitle: "Результат прошлого заказа ещё не подтверждён",
     coPendingCreateHint: "Нажмите «Обновить», чтобы подтвердить результат. Не оформляйте новый заказ, пока он не подтверждён.",
+    coResubmitOrder: "Resubmit order",
+    coResubmitOrderHint: "We couldn't confirm your last order. Resubmitting uses the original request and won't create a duplicate.",
     coPendingCreateChecking: "Подтверждаем результат прошлого заказа. Не оформляйте новый заказ, пока он не подтверждён.",
     coPendingCreateFound: "Прошлый заказ создан. Откройте его, чтобы продолжить, — оформлять заново не нужно.",
     coPendingCreateNotFound: "Прошлый заказ не найден. Можно оформить заказ снова.",

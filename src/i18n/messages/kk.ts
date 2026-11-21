@@ -2387,6 +2387,8 @@ export const kk: Messages = {
     coOpenOriginalOrder: "Бастапқы тапсырысты көру",
     coPendingCreateTitle: "Алдыңғы тапсырыс нәтижесі әлі расталмаған",
     coPendingCreateHint: "Нәтижені растау үшін «Қайта жаңарту» түймесін басыңыз. Нәтиже расталғанша басқа тапсырыс бермеңіз.",
+    coResubmitOrder: "Resubmit order",
+    coResubmitOrderHint: "We couldn't confirm your last order. Resubmitting uses the original request and won't create a duplicate.",
     coPendingCreateChecking: "Алдыңғы тапсырыс нәтижесі расталуда. Нәтиже расталғанша басқа тапсырыс бермеңіз.",
     coPendingCreateFound: "Алдыңғы тапсырыс жасалған. Жалғастыру үшін соны ашыңыз, қайта тапсырыс берудің қажеті жоқ.",
     coPendingCreateNotFound: "Алдыңғы тапсырыс табылмады. Тапсырысты қайта беруге болады.",

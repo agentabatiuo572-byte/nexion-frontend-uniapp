@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { accountDemo } from './prototype-demo-account.mjs';
+import { issuePreviewAccessToken } from './prototype-demo-identity.mjs';
 
 export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',registrationState:'normal',phoneBindingState:'normal',savedAttemptState:'none'};
 export const authDemoOptions = {
@@ -35,9 +36,12 @@ export function createAuthDemo(state) {
   const ok=data=>({status:200,body:{code:0,message:'OK',data}});
   const fail=(status,message)=>({status,body:{code:status,message,data:null}});
   const receipt=code=>({sponsorCode:code?.startsWith('NX')?code:null,sponsorDisplayName:code?.startsWith('NX')?'M•••':null,sourceEnvironment:'PRODUCTION',giftStatus:'PENDING_REVIEW',giftUsdt:5,giftNex:20});
+  const registeredUserId=900002;
+  const sessionData=(user,registrationReceipt)=>({accessToken:issuePreviewAccessToken(state,user.userId),
+    refreshToken:null,tokenType:'Bearer',user,...(registrationReceipt?{registrationReceipt}:{})});
   function session(user,registrationReceipt) {
     state.authState='signed-in';state.authUser=user;
-    return ok({accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user,...(registrationReceipt?{registrationReceipt}:{})});
+    return ok(sessionData(user,registrationReceipt));
   }
   return {
     trace,
@@ -48,11 +52,10 @@ export function createAuthDemo(state) {
         installationId:state.savedAttemptState==='legacy-empty'?'':'preview-previous-browser-id',executionSupported:false,
         authMethod:'OTP',authReference:'LOGIN-'+randomBytes(16).toString('hex'),pending:true,context:{countryCode:'+86',phone:'13800000000'}};
       const registration=state.savedAttemptState==='registration';
-      const user=registration?{...existing,userId:900002,phone:'13800000001',onboardingComplete:false}:existing;
+      const user=registration?{...existing,userId:registeredUserId,phone:'13800000001',onboardingComplete:false}:existing;
       if(registration)Object.assign(attempt,{authMethod:'REGISTRATION',authReference:user.countryCode+':'+user.phone,
         context:{countryCode:user.countryCode,phone:user.phone,language:'en',sponsorCode:null,challengeNo:'REG-'+randomBytes(16).toString('hex')}});
-      attempts.set(attempt.loginAttemptId,{...attempt,response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',
-        user,...(registration?{registrationReceipt:receipt(null)}:{})}});
+      attempts.set(attempt.loginAttemptId,{...attempt,response:sessionData(user,registration?receipt(null):null)});
       return attempt;
     },
     reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();delete state.authUser;delete state.captchaInvalidReturned;},
@@ -143,7 +146,7 @@ export function createAuthDemo(state) {
           if(state.oauthState==='lost-issued')attempts.set(headers['x-nexgrid-login-attempt-id'],{
             recoveryProof:headers['x-nexgrid-login-recovery-key'],installationId:headers['x-nexgrid-installation-id'],
             executionSupported:false,authMethod:'OAUTH',authReference:flow.provider+':'+flow.flowId,waitForReplay:true,
-            response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:existing}});
+            response:sessionData(existing)});
           // A gateway failure is deterministic here; a destroyed socket may be
           // transparently retried by Chromium before the UI observes the loss.
           return fail(504,'PREVIEW_COMPLETE_RESPONSE_LOST');
@@ -200,7 +203,7 @@ export function createAuthDemo(state) {
         if(path==='/auth/users/register') {
           if(state.registrationState==='device-limit')return fail(409,'USER_REGISTRATION_DEVICE_LIMIT');
           if(state.registrationState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
-          return session({...existing,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode));
+          return session({...existing,userId:registeredUserId,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode));
         }
         if(path==='/auth/users/login/otp/verify')return session(existing);
         if(path.endsWith('/complete'))return ok({status:'PASSWORD_RESET',revokedSessionCount:0});

@@ -2387,6 +2387,8 @@ export const ms: Messages = {
     coOpenOriginalOrder: "Lihat pesanan asal",
     coPendingCreateTitle: "Keputusan pesanan sebelumnya belum disahkan",
     coPendingCreateHint: "Ketik Segerak semula untuk mengesahkan keputusan. Jangan buat pesanan lain sebelum keputusan disahkan.",
+    coResubmitOrder: "Resubmit order",
+    coResubmitOrderHint: "We couldn't confirm your last order. Resubmitting uses the original request and won't create a duplicate.",
     coPendingCreateChecking: "Sedang mengesahkan keputusan pesanan sebelumnya. Jangan buat pesanan lain sebelum keputusan disahkan.",
     coPendingCreateFound: "Pesanan sebelumnya telah dibuat. Buka pesanan itu untuk meneruskan, tidak perlu memesan semula.",
     coPendingCreateNotFound: "Pesanan sebelumnya tidak ditemui. Anda boleh membuat pesanan semula.",

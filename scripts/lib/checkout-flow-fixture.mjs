@@ -29,9 +29,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     if (path === '/api/orders/create-command' || (path === '/api/orders' && method === 'POST')) {
-      const headers = request.headers();
-      const identity = headers.authorization === 'Bearer formal-probe-access-token' ? {authorization:'Bearer local-demo-token'} : headers;
-      const owner = previewAccountId(state, identity);
+      const owner = previewAccountId(state, request.headers());
       if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
       // Java String.trim() removes characters no greater than U+0020.
       const trimmed = typeof key === 'string' ? key.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g,'') : '';
@@ -60,7 +58,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
           delayCreate = undefined;
           await new Promise(resolve=>setTimeout(resolve, 6000));
         }
-        if (state.scenarioEpoch !== originalEpoch || owner !== previewAccountId(state, identity)) {
+        if (state.scenarioEpoch !== originalEpoch || owner !== previewAccountId(state, request.headers())) {
           return {status:409,message:'PREVIEW_CREATE_SCOPE_CHANGED',data:null};
         }
         creating.receipt = demoFixture(url,locale(),state,request);
