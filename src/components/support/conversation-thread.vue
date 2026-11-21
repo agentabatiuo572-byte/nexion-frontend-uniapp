@@ -451,8 +451,8 @@ let lastScrollTop = 0;
 let followingTail = true, measuredViewportHeight = 0;
 const HISTORY_MEASURE_MS = 500;
 let positionTimer: ReturnType<typeof setTimeout> | undefined, historyDisposed = false;
-let preparedHistory: { id: string; prefix: number; inset: number; owner: string; host: unknown; root: unknown } | null = null;
-type PositionAdjustment = { owner: string; host: unknown; root: unknown; top: number; inset: number; tail: boolean; id?: string; prefix?: number; anchor?: { id: string; offset: number };
+let preparedHistory: { id: string; prefix: number; inset: number; owner: string; host: unknown; root: unknown; atEnd: boolean } | null = null;
+type PositionAdjustment = { owner: string; host: unknown; root: unknown; top: number; inset: number; tail: boolean; id?: string; prefix?: number; resumeTail?: boolean; anchor?: { id: string; offset: number };
   expiresAt: number; settled: Promise<boolean>; settle: (applied: boolean) => void };
 let pendingPosition: PositionAdjustment | null = null;
 let historyPreparation = 0;
@@ -629,9 +629,13 @@ watch(() => [historyOwner(), listHost.value, listRoot()], invalidateHistoryPosit
 function scroller(): HTMLElement | undefined {
   const host = listRoot();
   if (!host?.querySelectorAll) return;
+  const scrollView = host.querySelector('.uni-scroll-view-content')?.parentElement;
+  if (scrollView) return scrollView;
   return [host, ...Array.from(host.querySelectorAll('*'))].find(node =>
     (node as HTMLElement).scrollHeight - (node as HTMLElement).clientHeight > 4) as HTMLElement | undefined;
 }
+function scrollEnd(node: HTMLElement): number { return Math.max(0, node.scrollHeight - node.clientHeight); }
+function atScrollEnd(top: number, end: number): boolean { return end - top < 1; }
 function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: number } }) {
   if (stopPreviewPreparation) { nativePreviewReading = null; clearPreviewRowHeights(); }
   pendingTailGeneration = undefined;
@@ -673,19 +677,24 @@ function visibleMessageAnchor(node: HTMLElement): { id: string; offset: number }
   }
   return null;
 }
-function measurePrefix(firstId: string, done: (height: number | null) => void) {
+function measurePrefix(firstId: string, done: (height: number | null, scroll?: { top: number; end: number }) => void) {
   const root = listRoot(), host = listHost.value, owner = historyOwner();
-  const finish = (height: number | null) => done(!historyDisposed && threadVisible.value && host === listHost.value
-    && root === listRoot() && owner === historyOwner() && height !== null && Number.isFinite(height) ? height : null);
+  const finish = (height: number | null, scroll?: { top: number; end: number }) => done(
+    !historyDisposed && threadVisible.value && host === listHost.value && root === listRoot()
+      && owner === historyOwner() && height !== null && Number.isFinite(height) ? height : null, scroll);
   try {
     const content = root?.querySelector?.('.nx-conv-content'), first = root?.querySelector?.('#' + messageRowId(firstId));
     if (content && first) { finish(first.getBoundingClientRect().top - content.getBoundingClientRect().top); return; }
     if (typeof uni === 'undefined' || !uni.createSelectorQuery) { finish(null); return; }
     const query = uni.createSelectorQuery().in(threadInstance);
     query.select('.nx-conv-content').boundingClientRect(); query.select('#' + messageRowId(firstId)).boundingClientRect();
+    query.select('.nx-conv-list').fields({ size: true, scrollOffset: true }, () => {});
     query.exec(rows => {
-      const [body, anchor] = (Array.isArray(rows) ? rows : []) as UniApp.NodeInfo[];
-      finish(typeof body?.top === 'number' && typeof anchor?.top === 'number' ? anchor.top - body.top : null);
+      const [body, anchor, viewport] = (Array.isArray(rows) ? rows : []) as UniApp.NodeInfo[];
+      const { height, scrollTop, scrollHeight } = viewport ?? {};
+      const scroll = typeof height === 'number' && height > 0 && typeof scrollTop === 'number' && typeof scrollHeight === 'number'
+        ? { top: scrollTop, end: Math.max(0, scrollHeight - height) } : undefined;
+      finish(typeof body?.top === 'number' && typeof anchor?.top === 'number' ? anchor.top - body.top : null, scroll);
     });
   } catch { finish(null); }
 }
@@ -696,6 +705,8 @@ async function prepareHistoryPrepend(): Promise<boolean> {
   const current = () => !historyDisposed && threadVisible.value && preparation === historyPreparation
     && owner === historyOwner() && host === listHost.value && root === listRoot();
   if (!current()) return false;
+  const node = scroller();
+  const wasAtEnd = node ? atScrollEnd(node.scrollTop, scrollEnd(node)) : undefined;
   // This reader asked for history. Cancel a queued pin before waiting for an in-progress layout adjustment.
   followingTail = false;
   clearTimeout(scrollTimer);
@@ -709,13 +720,14 @@ async function prepareHistoryPrepend(): Promise<boolean> {
   return new Promise<boolean>(resolve => {
     let finished = false;
     const timeout = setTimeout(() => { finished = true; resolve(false); }, HISTORY_MEASURE_MS);
-    measurePrefix(id, prefix => {
+    measurePrefix(id, (prefix, scroll) => {
       if (finished) return;
       finished = true;
       clearTimeout(timeout);
       const valid = typeof prefix === 'number' && Number.isFinite(prefix) && current()
         && props.messages[0]?.id === id && inset === positionInset.value;
-      if (valid) preparedHistory = { id, prefix: prefix as number, inset, owner, host, root };
+      if (valid) preparedHistory = { id, prefix: prefix as number, inset, owner, host, root,
+        atEnd: wasAtEnd ?? (!!scroll && atScrollEnd(scroll.top, scroll.end)) };
       resolve(valid);
     });
   });
@@ -767,8 +779,10 @@ function preservePosition(previousInset: number, firstId?: string) {
   const adjustment = pendingPosition ?? beginPosition(previousInset, node);
   if (firstId && !adjustment.id) {
     let prefix: number | null = null;
-    if (preparedHistory?.id === firstId && preparedHistory.owner === owner && preparedHistory.host === host && preparedHistory.root === root)
+    if (preparedHistory?.id === firstId && preparedHistory.owner === owner && preparedHistory.host === host && preparedHistory.root === root) {
       prefix = preparedHistory.prefix + adjustment.inset - preparedHistory.inset;
+      adjustment.resumeTail = preparedHistory.atEnd;
+    }
     // H5 can capture the still-unpatched DOM synchronously. Normalize its
     // header/prefix space to the transaction's original inset.
     if (node) measurePrefix(firstId, value => { prefix = value === null ? null : value + adjustment.inset - previousInset; });
@@ -795,20 +809,24 @@ function preservePosition(previousInset: number, firstId?: string) {
   // releases the transaction without guessing a delta or moving a history reader.
   positionTimer = setTimeout(() => { if (pendingPosition === adjustment && ticket === scrollGeneration) settlePosition(); },
     Math.max(0, adjustment.expiresAt - Date.now()));
-  const apply = (delta: number) => {
+  const apply = (delta: number, nativeEnd?: number) => {
     if (!current() || !Number.isFinite(delta)) return;
     const nextTop = preservedConversationTop(adjustment.top, delta), target = scroller();
     // Native props only react to a changed value. Rearm a repeated restoration
     // at the observed position only when issuing that command, never on gestures.
     if (!target && scrollTop.value === nextTop && lastScrollTop !== nextTop) {
       scrollTop.value = lastScrollTop;
-      void nextTick(() => apply(delta));
+      void nextTick(() => apply(delta, nativeEnd));
       return;
     }
     settlePosition(true);
     if (target) target.scrollTop = nextTop;
     lastScrollTop = target?.scrollTop ?? nextTop;
     scrollTop.value = lastScrollTop;
+    if (adjustment.id) {
+      const end = target ? scrollEnd(target) : nativeEnd;
+      followingTail = adjustment.resumeTail === true && end !== undefined && atScrollEnd(lastScrollTop, end);
+    }
     scheduleBubblePositions();
   };
   void nextTick(() => {
@@ -816,9 +834,9 @@ function preservePosition(previousInset: number, firstId?: string) {
     if (adjustment.id && adjustment.prefix !== undefined) {
       const anchored = anchoredDelta(adjustment.top);
       if (anchored !== null) { apply(anchored); return; }
-      measurePrefix(adjustment.id, prefix => {
+      measurePrefix(adjustment.id, (prefix, scroll) => {
         if (!current()) return;
-        if (prefix !== null && Number.isFinite(prefix)) apply(prefix - adjustment.prefix!);
+        if (prefix !== null && Number.isFinite(prefix)) apply(prefix - adjustment.prefix!, scroll?.end);
         else settlePosition();
       });
     } else if (adjustment.tail && followingTail) { settlePosition(true); scrollToEnd(); }
