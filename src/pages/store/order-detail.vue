@@ -257,13 +257,16 @@ function captureDetailScope(): DetailRequestScope {
   return { pageEpoch: detailEpoch, orderNo: id.value, accountScope: captureAccountScope(), runtimeScope: captureRuntimeRevision() };
 }
 
-function isCurrentDetailScope(scope: DetailRequestScope): boolean {
+function isCurrentDetailVisit(scope: DetailRequestScope): boolean {
   return detailMounted
     && detailVisible
     && detailEpoch === scope.pageEpoch
     && id.value === scope.orderNo
-    && isCurrentAccountScope(scope.accountScope)
-    && isCurrentRuntimeRevision(scope.runtimeScope);
+    && isCurrentAccountScope(scope.accountScope);
+}
+
+function isCurrentDetailScope(scope: DetailRequestScope): boolean {
+  return isCurrentDetailVisit(scope) && isCurrentRuntimeRevision(scope.runtimeScope);
 }
 
 onLoad((options) => {
@@ -782,21 +785,31 @@ async function handleCancel() {
   if (externalPayment.value) { cancelBlocked.value = true; return; }
   if (!cancellable.value) return;
   const scope = captureDetailScope();
+  const baseUrl = apiRuntimeConfig?.baseUrl;
+  const sameOrder = () => isCurrentDetailVisit(scope)
+    && !orderEnvironmentInvalidated.value && apiRuntimeConfig?.baseUrl === baseUrl;
   const cancelAttempt = ++cancelAttemptSequence;
   cancellingOrder.value = true;
   try {
     const ok = await uiConfirm({
       title: t.value.orders.cancelOrder,
       message: t.value.orders.cancelConfirm,
+      confirmLabel: t.value.orders.cancelOrder,
       danger: true,
       icon: "warn",
     });
-    if (!ok || !canCancelCurrentOrder() || !isCurrentDetailScope(scope) || !liveOrder.value) return;
-    const orderNo = liveOrder.value.id;
+    if (!ok || !sameOrder()) return;
+    // A catalogue refresh invalidates the order projection, but the user still confirmed this order.
+    if (remoteApiEnabled && (!isCurrentRuntimeRevision(scope.runtimeScope) || remoteOrderRefreshing.value)) {
+      await refreshOrder();
+    }
+    if (!sameOrder()) return;
+    if (externalPayment.value) { cancelBlocked.value = true; return; }
+    if (!canCancelCurrentOrder()) return;
     const cancelled = remoteApiEnabled
-      ? await orders.cancelOrderRemote(orderNo)
-      : orders.cancelOrder(orderNo);
-    if (!isCurrentDetailScope(scope)) return;
+      ? await orders.cancelOrderRemote(scope.orderNo)
+      : orders.cancelOrder(scope.orderNo);
+    if (!sameOrder()) return;
     restoreOrderAction();
     if (cancelled) {
       toast.warn(t.value.orders.cancelDoneToast);
@@ -804,7 +817,7 @@ async function handleCancel() {
       toast.warn(t.value.orders.cancelPendingServer);
     }
   } catch {
-    restoreOrderAction();toast.warn(recoveryCopy.value.cancelPending);
+    if (sameOrder()) { restoreOrderAction(); toast.warn(recoveryCopy.value.cancelPending); }
   } finally {
     if (cancelAttempt === cancelAttemptSequence) cancellingOrder.value = false;
   }

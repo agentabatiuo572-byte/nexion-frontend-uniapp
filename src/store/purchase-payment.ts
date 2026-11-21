@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
-import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
+import { ApiError, asApiError, isApiRefusal } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
 import { useApp } from './app';
@@ -12,6 +12,7 @@ import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { appReadOnline } from '@/lib/foreground-read';
 import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { getT } from '@/i18n/use-t';
 import { toast } from './ui';
@@ -324,7 +325,8 @@ async function openConditions() {
 function schedule(version: number, accountKey: string, failed: boolean) {
   pollFailures = failed ? pollFailures + 1 : 0;
   clearTimeout(pollTimer); pollTimer = undefined;
-  if (paused || !owns(version, accountKey) || !(state.pending || state.originalRecovery) || settled(state.intent) || state.concluded) return;
+  if (paused || !appReadOnline.value || !owns(version, accountKey)
+      || !(state.pending || state.originalRecovery) || settled(state.intent) || state.concluded) return;
   pollTimer = setTimeout(() => { if (owns(version, accountKey)) void query(); },
     failed ? POLL_BACKOFF[Math.min(pollFailures - 1, POLL_BACKOFF.length - 1)]! : POLL_MS);
 }
@@ -458,7 +460,8 @@ function proceed() {
 async function query() {
   const pending = state.pending;
   const recovery = state.originalRecovery;
-  if (!(pending || recovery) || state.busy || state.reading || state.concluded || settled(state.intent)) return;
+  if (!appReadOnline.value || !(pending || recovery)
+      || state.busy || state.reading || state.concluded || settled(state.intent)) return;
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false;
   state.reading = true;
@@ -511,9 +514,12 @@ async function query() {
     }
     else if (pending.intentNo || pending.lookupOnly) gone(pending, accountKey);
     else state.canResubmit = true;
-  } catch {
+  } catch (error) {
     failed = true;
-    if (owns(version, accountKey) && !state.concluded && pending?.quotaRefusal) conclude(pending.quotaRefusal);
+    if (owns(version, accountKey) && !state.concluded) {
+      if (pending?.quotaRefusal) conclude(pending.quotaRefusal);
+      else if (error instanceof ApiError && error.kind === 'network') state.error = true;
+    }
   }
   finally { if (owns(version, accountKey)) { state.reading = false; schedule(version, accountKey, failed); } }
 }
