@@ -41,14 +41,14 @@
 
     <view class="device-inventory-row__foot">
       <view class="device-inventory-row__money">
-        <text class="device-inventory-row__total">{{ t.myDevices.inventoryEarnedLabel }}<text class="device-inventory-row__earned font-mono-tabular">{{ earnedText }}</text></text>
+        <text class="device-inventory-row__total">{{ t.myDevices.inventoryEarnedLabel }}<text class="device-inventory-row__earned">{{ earnedText }}</text></text>
         <view v-if="tradeinCreditText || tradeinDisabledText" :id="`${quoteInfoId}-trigger`" class="device-inventory-row__quote device-inventory-row__info"
           :class="{ 'device-inventory-row__info--open': quoteInfoOpen }" role="button" tabindex="0"
           :aria-label="`${t.tradein.quoteInfoLabel} · ${tradeinQuoteAmount !== undefined ? t.tradein.inventoryCreditLabel + ' ' + visibility.mask(fmtMoney(tradeinQuoteAmount)) : tradeinDisabledText || t.tradein.quoteUnavailable}`"
-          :aria-expanded="quoteInfoOpen" :aria-controls="quoteInfoId"
+          aria-haspopup="dialog" :aria-expanded="quoteInfoOpen"
           @click.stop="emit('quote-info', !quoteInfoOpen)" @keydown.enter.stop.prevent="emit('quote-info', !quoteInfoOpen)" @keydown.space.stop.prevent="emit('quote-info', !quoteInfoOpen)" @keydown.tab="emit('quote-info', false)" @keydown.esc.stop="emit('quote-info', false)">
           <text v-if="tradeinQuoteAmount !== undefined">{{ t.tradein.inventoryCreditLabel }}</text>
-          <text v-if="tradeinQuoteAmount !== undefined" class="device-inventory-row__credit font-mono-tabular">{{ visibility.mask(fmtMoney(tradeinQuoteAmount)) }}</text>
+          <text v-if="tradeinQuoteAmount !== undefined" class="device-inventory-row__credit">{{ visibility.mask(fmtMoney(tradeinQuoteAmount)) }}</text>
           <text v-else class="device-inventory-row__tradein-disabled">{{ tradeinDisabledText || t.tradein.quoteUnavailable }}</text>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9h.01" /></svg>
         </view>
@@ -59,9 +59,12 @@
         <NxButton v-if="!active" class="device-inventory-row__action device-inventory-row__action--activate" size="small" variant="brand" :label="actionLabel" :disabled="actionDisabled" @click="onAction" />
       </view>
     </view>
-    <view v-if="quoteInfoOpen && (tradeinCreditText || tradeinDisabledText)" :id="quoteInfoId" class="device-inventory-row__popover" role="note" @click.stop>
-      <text class="device-inventory-row__popover-copy">{{ t.tradein.ladderIntro }}</text>
-      <text class="device-inventory-row__popover-footnote">{{ t.tradein.ladderFootnote }}</text>
+    <!-- An explanation the user opens is a bottom sheet (03 §3.5.1); taps inside it stay off the page's close-on-tap. -->
+    <view v-if="tradeinCreditText || tradeinDisabledText" @click.stop>
+      <NxSheet :open="quoteInfoOpen" :title="t.tradein.quoteInfoLabel" @close="emit('quote-info', false)">
+        <text class="device-inventory-row__sheet-copy">{{ t.tradein.ladderIntro }}</text>
+        <text class="device-inventory-row__sheet-footnote">{{ t.tradein.ladderFootnote }}</text>
+      </NxSheet>
     </view>
   </view>
 </template>
@@ -71,6 +74,7 @@ import DeviceUnclassifiedCard from "@/components/device-unclassified-card.vue";
 import { computed, ref } from "vue";
 import type { Device } from "@/store/types";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmtMoney } from "@/i18n/format";
 import { deviceName } from "@/lib/device-copy";
@@ -188,18 +192,19 @@ function onAction() {
 /* The buttons never shrink (03 §3.6.1): when amounts and buttons do not fit on one line, the buttons wrap to the next line, right-aligned. */
 .device-inventory-row__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 12px; min-height: 44px; }
 .device-inventory-row__money { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.device-inventory-row__total { color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); white-space: nowrap; }
-.device-inventory-row__earned { margin-left: 4px; color: var(--v5-ink); font: 500 13px/18px var(--font-metric, var(--font-jet-mono)); }
-.device-inventory-row__quote { position: relative; display: flex; align-items: center; gap: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); white-space: nowrap; }
-.device-inventory-row__credit { color: var(--v5-ink); font: 500 13px/18px var(--font-metric, var(--font-jet-mono)); }
+/* Field names and amounts share the list-subtitle role (10 §10.1); amounts are General Sans figures in the main ink (01 §1.1.1, §1.2). */
+.device-inventory-row__total { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); white-space: nowrap; }
+.device-inventory-row__earned { margin-left: 4px; color: var(--v5-ink); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); font-variant-numeric: tabular-nums; }
+.device-inventory-row__quote { position: relative; align-self: flex-start; display: flex; align-items: center; gap: 4px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); white-space: nowrap; }
+.device-inventory-row__credit { color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .device-inventory-row__info--open { color: var(--v5-brand); }
-/* Keeps a comfortable tap target without spacing the two money lines apart. */
-.device-inventory-row__quote::after { content: ""; position: absolute; inset: -2px -4px -12px; }
+/* A 44px tap target without spacing the two money lines apart (01 §1.3). It grows over the plain 收益 line above and
+   only 6px down: wrapped buttons start 8px below, and their own hit boxes stay theirs. */
+.device-inventory-row__quote::after { content: ""; position: absolute; inset: calc(var(--ui-type-list-subtitle-lh) + 6px - 44px) -4px -6px; }
 .device-inventory-row__actions { display: flex; gap: 8px; flex: none; margin-left: auto; }
-.device-inventory-row__popover { position: relative; margin-top: var(--v5-space-2); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-s); background: var(--v5-surface-2); color: var(--v5-ink-2); font: 400 12px/18px var(--font-v5); }
-.device-inventory-row__popover::before { content: ""; position: absolute; top: -6px; left: 24px; width: 12px; height: 12px; background: inherit; transform: rotate(45deg); }
-.device-inventory-row__popover-copy, .device-inventory-row__popover-footnote { display: block; }
-.device-inventory-row__popover-footnote { margin-top: var(--v5-space-2); color: var(--v5-ink-3); }
+.device-inventory-row__sheet-copy, .device-inventory-row__sheet-footnote { display: block; }
+.device-inventory-row__sheet-copy { color: var(--v5-ink-2); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
+.device-inventory-row__sheet-footnote { margin-top: var(--v5-space-2); color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 [role="button"] { cursor: pointer; }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @keyframes device-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
