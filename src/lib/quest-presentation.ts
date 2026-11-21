@@ -47,6 +47,7 @@ const DAY_ONE_TITLE_KEYS = new Map<string, keyof Messages["home"]>([
 const LEGACY_DEFAULT_NAMES: Readonly<Record<string, string>> = {
   "home.dayOneTaskSeeRoi": "查看 UVELBox S1 ROI",
   "weeklyQuest.tier1_subscribe_premium_title": "复投加速 · 把余额再锁一轮",
+  "weeklyQuest.tier1_tradein_upgrade_title": "下架旧设备 · 抵扣升级高算力",
   "weeklyQuest.tier2_reinvest_title": "复投 $100.00 到网络",
   "weeklyQuest.tier2_genesis_browse_title": "看 Genesis 二级市场",
 };
