@@ -672,6 +672,11 @@ function restart(step: 'bank' | 'methods') {
   Object.assign(state, { pending: null, intent: null, quote: null, notice: '', cashier: false });
   if (step === 'bank') void select('HDPAY_BANK', 'bank'); else choose('WALLET');
 }
+function choosePaymentMethodAgain() {
+  if (state.notice !== 'originalUnavailable' || !context || state.accountKey !== account()) return;
+  Object.assign(state, { notice: '', concluded: false, quote: null, deadlineAt: context.deadlineAt ?? null });
+  choose('WALLET');
+}
 function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload' | 'orderNo' | 'image' | 'deadlineAt'> & { amount?: number | string }, pending: PendingExternal | null) {
   const accountKey = account();
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
@@ -718,7 +723,7 @@ function onOrderPage(orderNo: string) {
   return top?.route === 'pages/store/order-detail' && top.options?.id === orderNo;
 }
 export function usePurchasePayment() {
-  return { state, select, choose, proceed, confirm, query, retryOriginal, restart, loadPolicy, close: () => finish(null),
+  return { state, select, choose, proceed, confirm, query, retryOriginal, restart, choosePaymentMethodAgain, loadPolicy, close: () => finish(null),
     back: () => choose('WALLET'), available,
     notify: (notice: PurchaseNotice) => { state.notice = notice; },
     openCashier: () => { if (state.intent?.paymentUrl && purchasePaymentTiming(state.intent, Date.now(), state.deadlineAt).canPay) state.cashier = true; },

@@ -5,14 +5,16 @@ const originalPaymentEn = {
   checkingOriginalPayment: 'Checking the original payment…',
   originalPaymentNotFoundRetry: 'No payment was found for this request. Select Pay again to resend it.',
   originalPaymentUnavailableTitle: 'Original payment unavailable',
-  originalPaymentUnavailableBody: 'Close this message to return and request a new quote. If you already paid, contact support.',
+  originalPaymentUnavailableBody: 'Choose a payment method to get a new quote. If you already paid, contact support.',
+  choosePaymentMethodAgain: 'Choose a payment method again',
 };
 
 const zh = {
   checkingOriginalPayment: '正在核对原付款单…',
   originalPaymentNotFoundRetry: '未查到这笔付款单。可点击「重新付款」重发原请求。',
   originalPaymentUnavailableTitle: '原付款记录不可用',
-  originalPaymentUnavailableBody: '关闭后可返回并重新报价。如果已经付款，请联系客服。',
+  originalPaymentUnavailableBody: '重新选择付款方式后会获取新报价。如果已经付款，请联系客服。',
+  choosePaymentMethodAgain: '重新选择付款方式',
   trc20: "USDT（TRC20）",
   trc20Chain: "TRON 链",
   gasTrc20: "TRC20 网络确认费已计入总额，外部钱包可能另收 TRX／能量费。",
