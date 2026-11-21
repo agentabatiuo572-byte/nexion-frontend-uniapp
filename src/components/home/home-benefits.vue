@@ -17,7 +17,7 @@
             <view class="hb-wv__stub"><text class="hb-pill nx-frosted-button">{{ t.trial.homeClaimShort }}</text></view>
           </template>
         </view>
-        <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="confirmedOffer?.status ?? status" role="button" :tabindex="trialOfferEnabled ? 0 : -1" :aria-disabled="trialOfferEnabled ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
+        <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="confirmedOffer?.status ?? status" role="button" :tabindex="trialOfferEnabled || showCapacityManagement ? 0 : -1" :aria-disabled="trialOfferEnabled || showCapacityManagement ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art hb-half__art--device" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
@@ -31,7 +31,7 @@
           <template v-else>
             <view class="hb-wt__media">
               <image class="hb-wt__art" :src="trialArt" mode="aspectFit" aria-hidden="true" />
-              <text class="hb-tag hb-wt__tag">{{ fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
+              <NxTag class="hb-wt__tag" tone="brand" :label="fmt(copy.benefitTrialFree, { n: trialDays })" />
             </view>
             <view class="hb-wt__txt">
               <text class="hb-amount hb-wt__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text>
@@ -69,11 +69,6 @@
           </template>
         </view>
       </view>
-      <view v-if="retryShown" class="hb-retry" :class="{ 'hb-retry--busy': retryBusy }" role="button" :tabindex="retryBusy ? -1 : 0" :aria-disabled="retryBusy ? 'true' : undefined" :aria-label="retryBusy ? t.trial.entryChecking : `${copy.benefitTrialLoadFailedAria} · ${copy.benefitRetry}`" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility">
-        <svg class="hb-retry__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5h.01" /></svg>
-        <text class="hb-retry__msg">{{ retryBusy ? t.trial.entryChecking : copy.benefitTrialLoadFailed }}</text>
-        <text class="hb-retry__act">{{ copy.benefitRetry }}</text>
-      </view>
     </view>
   </NxSection>
 </template>
@@ -81,6 +76,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
+import NxTag from '@/components/ui/nx-tag.vue';
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { useFreeTrial } from "@/store/free-trial";
@@ -116,7 +112,7 @@ const voucherOffer = computed(() => voucherClaimable.value.length > 0);
 const voucherPending = computed(() => voucherClaimed.value.length > 0);
 function faceValue(rows: VoucherDef[]) {
   const summary = voucherBenefitSummary(rows);
-  const text = summary.amount != null ? fmtMoney(summary.amount).replace(/^\$/, '').replace(/\.00$/, '') : summary.percent != null ? summary.percent + '%' : '–';
+  const text = summary.amount != null ? fmtMoney(summary.amount).replace(/^\$/, '').replace(/\.00$/, '') : summary.percent != null ? summary.percent + '%' : '—';
   return { money: summary.amount != null, text, label: (summary.amount != null ? '$' : '') + text };
 }
 const offerFace = computed(() => faceValue(voucherClaimable.value));
@@ -133,22 +129,23 @@ const trialOffer = computed(() => showRestartOffer.value || (!hasLifecycle.value
   && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || showCapacityFull.value)));
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !showRestartOffer.value));
 const trialOfferEnabled = computed(() => trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
-// B53: only the confirmed trial product is named; until then the card shows the same "-" as its unknown amounts, never a default S1.
-const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '-');
+// B53: only the confirmed trial product is named; until then the card shows the same "—" as its unknown amounts, never a default S1.
+const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '—');
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
 const trialArt = computed(() => getProductMedia(confirmedOffer.value ? confirmedOffer.value.productId : trialView.productId.value)?.src);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
 // Same capped estimate the trial page and checkout quote (BUG 78).
 const estimateText = computed(() => {
   const estimate = confirmedOffer.value ? confirmedOffer.value.estimatedOffsetUSD : trialView.estimatedOffsetUSD.value;
-  return estimate === null ? '-' : `$${formatAmount(estimate)}`;
+  return estimate === null ? '—' : `$${formatAmount(estimate)}`;
 });
 const estimateParts = computed(() => { const match = /^(\$?)(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { currency: match[1], whole: match[2], cents: match[3] ?? '' }; });
-const creditText = computed(() => trialView.offsetUSD.value === null ? '-' : `$${formatAmount(trialView.offsetUSD.value)}`);
-const countdownText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialCountdown(trialView.remainingMs.value));
+const creditText = computed(() => trialView.offsetUSD.value === null ? '—' : `$${formatAmount(trialView.offsetUSD.value)}`);
+const countdownText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialCountdown(trialView.remainingMs.value));
 // Keep the last confirmed label during a background read (BUG 14). [half pill, wide pill, screen-reader wording]
 const offerState = computed(() => trial.lastReadFailed ? 'error' : trial.confirmedOfferState());
-const showCapacityManagement = computed(() => showCapacityFull.value && offerState.value !== 'error');
+// A failed background re-read keeps the confirmed slots-full snapshot and its 「管理 ›」 entry (03 §3.4); the read recovers on its own.
+const showCapacityManagement = computed(() => showCapacityFull.value);
 const trialPill = computed<[string, string, string]>(() => {
   if (showRestartOffer.value && offerState.value !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
   switch (offerState.value) {
@@ -175,7 +172,7 @@ const trialOfferAria = computed(() => trialRechecking.value || (showCapacityFull
   ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
 const trialPendingAria = computed(() => {
   if (status.value === 'ended') return `${trialName.value} · ${lifecycleCopy.value.endedTitle} · ${lifecycleCopy.value.buyDevice}`;
-  const remaining = trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.value.longRemaining);
+  const remaining = trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.value.longRemaining);
   return `${trialName.value} · ${status.value === 'active' ? lifecycleCopy.value.activeTitle : lifecycleCopy.value.graceTitle} · ${status.value === 'active' ? lifecycleCopy.value.remainingLabel : lifecycleCopy.value.creditUntilLabel} ${remaining} · ${copy.value.benefitCredit} ${visibility.mask(creditText.value)} · ${lifecycleCopy.value.viewTrial}`;
 });
 
@@ -207,17 +204,14 @@ function openVoucher() {
 }
 function useVoucherNow() { navTo('/pages/store/store'); }
 function openTrialOffer() {
+  if (showCapacityManagement.value) { navTo('/pages/me/devices'); return; }
   if (!trialOfferEnabled.value) return;
   if (capacityFull.value) { navTo('/pages/me/devices'); return; }
   trialSheet.show();
 }
 function openTrialDetails() { navTo('/pages/me/trial'); }
-// Preserve the retry row while the next read runs, including after a tab remount.
+// A failed read keeps the pill muted until the automatic recovery above succeeds.
 const retryShown = computed(() => trial.lastReadFailed || trial.authorityStatus === 'error');
-const retryBusy = computed(() => retryShown.value && trial.authorityStatus === 'loading');
-function retryEligibility() {
-  if (retryShown.value && !retryBusy.value) void trialView.refresh();
-}
 </script>
 <style scoped>
 .hb-stack { display:flex;flex-direction:column;gap:12px; }
@@ -226,8 +220,9 @@ function retryEligibility() {
 .hb-card { position:relative;isolation:isolate;box-sizing:border-box;min-width:0;overflow:hidden;border-radius:var(--ui-radius-surface);background:var(--v5-surface);border:1px solid var(--v5-border);box-shadow:var(--v5-glass-shadow);color:var(--v5-ink);cursor:pointer;-webkit-tap-highlight-color:transparent; }
 .hb-card[aria-disabled="true"] { cursor:default; }
 .hb-card:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
-.hb-glow-warn { --hb-glow:color-mix(in srgb,var(--v5-warning) 17%,transparent); }
-.hb-glow-cyan { --hb-glow:color-mix(in srgb,var(--v5-tech-cyan) 17%,transparent); }
+/* One corner glow per offer card at about 9% (04 §4.1). */
+.hb-glow-warn { --hb-glow:color-mix(in srgb,var(--v5-warning) 9%,transparent); }
+.hb-glow-cyan { --hb-glow:color-mix(in srgb,var(--v5-tech-cyan) 9%,transparent); }
 /* Offer cards: liquid-glass soft-edge card, the check-in card's material (04.1 签到); pending cards stay solid.
    The corner glow is a background layer under the sheen, so the sheen, inner rim and highlight paint over it.
    The transparent border keeps the layout and the forced-colors outline; the fill stops inside it so the rim is the outer edge. */
@@ -254,11 +249,10 @@ function retryEligibility() {
 .hb-amount { display:block;font-weight:500;letter-spacing:-.02em;color:var(--v5-brand);white-space:nowrap; }
 .hb-amount__minor { font-size:max(12px,.55em);color:var(--v5-ink-3); }
 .hb-amount__dec { color:var(--v5-ink-3); }
-.hb-label { min-width:0;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
-.hb-sub { font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
-.hb-tag { display:inline-flex;align-items:center;box-sizing:border-box;height:24px;padding:0 8px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand);font:var(--ui-type-chip-weight) 12px/16px var(--font-v5);white-space:nowrap; }
+.hb-label { min-width:0;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.hb-sub { font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 /* Brand liquid-glass S button (same fill override as the previous trial CTA); the whole card is the control. */
-.hb-pill { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent);--ui-button-ink:var(--v5-brand);--ui-button-solid:color-mix(in srgb,var(--v5-brand) 12%,var(--v5-surface));position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:32px;max-width:100%;padding:7px 14px;border-radius:var(--v5-radius-full);font:var(--ui-type-compact-button-weight) 13px/18px var(--font-v5);white-space:nowrap; }
+.hb-pill { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent);--ui-button-ink:var(--v5-brand);--ui-button-solid:color-mix(in srgb,var(--v5-brand) 12%,var(--v5-surface));position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:32px;max-width:100%;padding:7px 12px;border-radius:var(--v5-radius-full);font:var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5);white-space:nowrap; }
 /* A background re-read (--wait) keeps the pill at full strength for 400ms before it dims, also when the card mounts mid-read,
    so a quick read never flashes; the restore fades. Reduced motion: the global rule makes both instant. */
 .hb-pill { transition:opacity 180ms ease; }
@@ -281,7 +275,7 @@ function retryEligibility() {
 .hb-half__art--device { width:126px;height:126px;margin:-30px 0 0 -21px; }
 .hb-half__main { flex:1;padding:4px 14px 12px; }
 .hb-half__amount { font-size:32px;line-height:38px; }
-.hb-half__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.hb-half__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 /* Same as the wide trial footer: when the label and the pill do not fit side by side, the label goes above and the pill below, each on one line. */
 .hb-half__foot { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;box-sizing:border-box;min-height:52px;padding:4px 10px 4px 14px; }
 .hb-perf { position:relative;margin:0 14px;border-top:1px dashed var(--v5-border-strong); }
@@ -321,7 +315,7 @@ function retryEligibility() {
 .hb-icon--dim .hb-icon__img { opacity:.5;filter:grayscale(1); }
 .hb-online { position:absolute;right:1px;bottom:3px;width:8px;height:8px;border-radius:50%;background:var(--v5-success);box-shadow:0 0 0 2px var(--v5-surface-2); }
 .hb-pend__text { flex:1;min-width:0; }
-.hb-pend__title { display:block;font:500 14px/20px var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }
+.hb-pend__title { display:block;font:500 14px/20px var(--font-v5);color:var(--v5-ink);overflow-wrap:break-word; }
 .hb-pend--wide .hb-pend__title { font-size:15px; }
 .hb-pend__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .hb-pend--wide .hb-pend__sub { font-size:13px;line-height:18px; }
@@ -331,14 +325,6 @@ function retryEligibility() {
 .hb-val { flex:none;text-align:right;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 .hb-val__amount { display:block;margin-top:2px;font:500 15px/20px var(--font-v5);color:var(--v5-ink); }
 .hb-chev { flex:none;width:16px;height:16px;color:var(--v5-ink-4); }
-/* Retry sits on the page floor: icon + state in ink-3, short action on the right that never wraps. */
-.hb-retry { display:flex;align-items:center;gap:6px;min-height:44px;padding:0 2px;font:400 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer;-webkit-tap-highlight-color:transparent; }
-.hb-retry__icon { flex:none;width:16px;height:16px;color:var(--v5-warning-ink); }
-.hb-retry__msg { flex:1;min-width:0;overflow-wrap:anywhere; }
-.hb-retry__act { flex:none;padding-left:8px;font-weight:500;color:var(--v5-brand);white-space:nowrap; }
-.hb-retry--busy { cursor:default; }
-.hb-retry--busy .hb-retry__act { opacity:.5; }
-.hb-retry:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px;border-radius:4px; }
 
 /* Motion: one entrance with a short stagger, one pop when an offer becomes a pending card. */
 .hb-stack--enter .hb-card { animation:hb-rise 420ms cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--hb-i, 0) * 70ms); }

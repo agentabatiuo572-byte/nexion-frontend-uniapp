@@ -34,7 +34,7 @@
           v-for="o in filteredOrders"
           :key="o.id"
           class="order-card"
-          :class="{ 'order-card--pending nx-tint': o.kind === 'commerce' && o.status === 'placed' }"
+          :class="{ 'order-card--pending': o.kind === 'commerce' && o.status === 'placed', 'nx-tint': o.id === tintedPendingId }"
           :role="o.kind === 'genesis' ? undefined : 'button'"
           :tabindex="o.kind === 'genesis' ? undefined : 0"
           :aria-label="o.kind === 'genesis' ? undefined : orderCardLabel(o)"
@@ -174,6 +174,8 @@ function orderCategory(order: OrderListItem): Exclude<OrderFilter, "all"> {
 }
 const filteredOrders = computed(() => statusFilter.value === "all" ? orderList.value : orderList.value.filter(order => orderCategory(order) === statusFilter.value));
 const pendingCount = computed(() => orderList.value.filter(order => orderCategory(order) === "pending").length);
+// One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
+const tintedPendingId = computed(() => filteredOrders.value.find(order => order.kind === "commerce" && order.status === "placed")?.id);
 // Minutes left on an unpaid order's server deadline; null once it lapses or when unknown.
 const nowSeconds = useNow();
 function pendingCloseMinutes(order: OrderListItem): number | null {
@@ -461,9 +463,8 @@ const browseBtnStyle: CSSProperties = {
 .order-card[role="button"], .order-card__row[role="button"] { cursor: pointer; }
 .order-card:not(.nx-tint) { background: var(--v5-content-surface); }
 [data-theme="light"] .order-card:not(.nx-tint) { box-shadow: var(--v5-glass-shadow); }
-/* Awaiting payment: tinted warning (it used to be a corner glow). */
-.order-card--pending { --nx-tint: var(--v5-warning); }
-.order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+/* Awaiting payment: tinted warning on the first such card only (it used to be a corner glow). */
+.order-card--pending { --nx-tint: var(--v5-warning); }.order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .order-card__row { display: flex; gap: 14px; }
 .order-card__thumb { position: relative; flex: none; width: 72px; height: 72px; border-radius: 16px; background: var(--v5-surface-2); display: grid; place-items: center; overflow: hidden; }
 .order-card__thumb::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 7px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, #000 55%, transparent), transparent); }

@@ -475,10 +475,10 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
   // A Cloud Share is a share of pooled compute, so it shows no video memory or power (user 2026-11-21).
   const share = p.productType === "SHARE";
   return [
-    { k: s.specGpu, v: specText(t.value, p.gpu, "-") },
-    share ? null : { k: s.specVram, v: specText(t.value, p.vram, "-", "vram") },
-    share ? null : { k: s.specPower, v: specText(t.value, p.power, "-", "power") },
-    { k: s.specOnlineRate, v: specText(t.value, p.uptime, "-") },
+    { k: s.specGpu, v: specText(t.value, p.gpu, "—") },
+    share ? null : { k: s.specVram, v: specText(t.value, p.vram, "—", "vram") },
+    share ? null : { k: s.specPower, v: specText(t.value, p.power, "—", "power") },
+    { k: s.specOnlineRate, v: specText(t.value, p.uptime, "—") },
     specRow(s.specWarranty, p.warranty),
   ].filter((r): r is SpecRow => r !== null);
 });

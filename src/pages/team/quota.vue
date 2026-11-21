@@ -251,7 +251,7 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
     perks: [
       fmt(auditCopy.value.estimatedDaily, { n: formatAmount(p.dailyEarnNEX) }),
       // A Cloud Share shows no video memory.
-      p.productType === "SHARE" ? specText(t.value, p.gpu, "-") : `${specText(t.value, p.gpu, "-")} · ${specText(t.value, p.vram, "-", "vram")}`,
+      p.productType === "SHARE" ? specText(t.value, p.gpu, "—") : `${specText(t.value, p.gpu, "—")} · ${specText(t.value, p.vram, "—", "vram")}`,
     ],
     roiBasis: p.productType === "SHARE" ? undefined : { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p) },
     tint,
@@ -278,7 +278,7 @@ function catalogProductPerks(productId: string, fallback: readonly string[]): st
   // Annualized output is rendered only with its complete calculation basis.
   return [
     fmt(auditCopy.value.estimatedDaily, { n: formatAmount(p.dailyEarnNEX) }),
-    p.productType === "SHARE" ? specText(t.value, p.gpu, "-") : `${specText(t.value, p.gpu, "-")} · ${specText(t.value, p.vram, "-", "vram")}`,
+    p.productType === "SHARE" ? specText(t.value, p.gpu, "—") : `${specText(t.value, p.gpu, "—")} · ${specText(t.value, p.vram, "—", "vram")}`,
   ];
 }
 /**

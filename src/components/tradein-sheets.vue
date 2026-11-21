@@ -51,6 +51,7 @@
 
     <view class="nx-glass-sheet tis-panel" @click.stop>
       <view class="tis-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="hide"  @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
+        <LiquidGlass :radius="22" tone="control" />
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
@@ -59,7 +60,7 @@
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
         <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
-        <view v-if="capacityResumeAllowed" class="tis-secondary" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-secondary-text">{{ recoveryCopy.resume }}</text></view>
+        <view v-if="capacityResumeAllowed" class="tis-secondary nx-frosted-button" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-secondary-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'choice'">
@@ -103,7 +104,7 @@
           </view>
         </view>
         <text v-if="retireView.statusText" class="tis-disclaimer" role="status" :aria-busy="retireView.loading">{{ retireView.statusText }}</text>
-        <view v-if="retireView.retry" class="tis-secondary" role="button" tabindex="0" @click="retryRemoteRetireTargets" @keydown.enter.prevent="retryRemoteRetireTargets" @keydown.space.prevent="retryRemoteRetireTargets"><text class="tis-secondary-text">{{ t.store.purchaseEligibilityRetry }}</text></view>
+        <view v-if="retireView.retry" class="nx-card-recovery-action" role="button" tabindex="0" @click="retryRemoteRetireTargets" @keydown.enter.prevent="retryRemoteRetireTargets" @keydown.space.prevent="retryRemoteRetireTargets"><text>{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
@@ -113,14 +114,14 @@
       <template v-else-if="state.kind === 'tradein' && purchaseRecovery !== 'none'">
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ t.tradein.recoveryPending }}</text></view>
         <text v-if="purchaseRecovery === 'error'" class="tis-disclaimer" role="alert">{{ t.tradein.errPleaseRetry }}</text>
-        <view class="tis-cta" :style="ctaHalo" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
+        <view class="tis-cta" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && remoteApiEnabled && purchaseMessage === 'error'">
         <view class="tis-head" role="status" :aria-busy="purchaseStatus === 'loading' || purchaseStatus === 'idle'">
           <text :id="titleId" class="tis-title">{{ purchaseStatus === 'loading' || purchaseStatus === 'idle' ? t.store.purchaseEligibilityLoading : t.store.purchaseEligibilityError }}</text>
         </view>
-        <view v-if="purchaseStatus === 'error' || purchaseStatus === 'ready'" class="tis-cta" :style="ctaHalo" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ t.store.purchaseEligibilityRetry }}</text></view>
+        <view v-if="purchaseStatus === 'error' || purchaseStatus === 'ready'" class="nx-card-recovery-action" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text>{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && tradeinView">
@@ -159,10 +160,9 @@
         <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ tradeinView.placementHint }}</text>
         <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ t.tradein.sheetDisclaimer }}</text>
 
-        <view class="tis-cta" :class="{ 'tis-cta-disabled': purchaseActionDisabled }" :style="ctaHalo" role="button" :tabindex="purchaseActionDisabled ? -1 : 0" :aria-disabled="purchaseActionDisabled" :aria-busy="purchaseActionBusy" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
+        <view class="tis-cta" :class="{ 'tis-cta-disabled': purchaseActionDisabled }" role="button" :tabindex="purchaseActionDisabled ? -1 : 0" :aria-disabled="purchaseActionDisabled" :aria-busy="purchaseActionBusy" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
           <text class="tis-cta-text">{{ purchaseActionText }}</text>
         </view>
-        <view v-if="remoteApiEnabled && purchaseMessage === 'quotaDepleted'" class="tis-ghost" role="button" tabindex="0" @click="refreshTradeinPurchaseEligibility" @keydown.enter.prevent="onKeyboardActivate($event, refreshTradeinPurchaseEligibility)" @keydown.space.prevent="onKeyboardActivate($event, refreshTradeinPurchaseEligibility)"><text class="tis-ghost-text">{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
@@ -197,7 +197,7 @@
         </view>
         <view
           v-if="!remoteApiEnabled || (state.kind === 'replace' && state.canonicalCapacityQuote?.decision === 'CAPACITY_AVAILABLE')"
-          class="tis-secondary"
+          class="tis-secondary nx-frosted-button"
           :class="{ 'tis-cta-disabled': replaceView.insufficient || confirming }"
           role="button"
           :tabindex="replaceView.insufficient || confirming ? -1 : 0"
@@ -219,7 +219,6 @@
       <template v-else-if="state.kind === 'retire' || state.kind === 'tradein' || state.kind === 'replace'">
         <view class="tis-head">
           <text :id="titleId" class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
-          <text class="tis-subtitle">{{ t.tradein.errPleaseRetry }}</text>
         </view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
@@ -242,7 +241,7 @@
             <text class="tis-cta-text">{{ t.tradein.retireBlockViewTask }}</text>
           </view>
           <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-            <text class="tis-ghost-text">{{ t.tradein.retireBlockOk }}</text>
+            <text class="tis-ghost-text">{{ t.ui.close }}</text>
           </view>
         </template>
         <template v-else>
@@ -290,6 +289,7 @@ import { apiClient, apiRuntimeConfig, deviceE3Api, orderApi, purchaseEligibility
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import PurchaseEligibilityPanel from "@/components/store/purchase-eligibility-panel.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import type { CanonicalCapacityReplaceQuote, CanonicalTradeinConfig, CanonicalTradeinQuote } from "@/api/device-e3-api";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { isProductAvailable } from "@/store/product-availability";
@@ -631,10 +631,6 @@ function previewCredit(oldDevice: Device, targetPriceUsdt: number): number {
     targetPriceUsdt,
   );
 }
-
-const ctaHalo = computed(() => ({
-  boxShadow: "0 0 24px color-mix(in oklab, var(--v5-brand) 35%, transparent)",
-}));
 
 function hide() {
   purchaseReturn = null;
@@ -1728,11 +1724,15 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   width: 44px; /* 44×44 点按区(移动端最小触控标准;PR-D 债 #4) */
   height: 44px;
   border-radius: 999px;
-  background: var(--v5-surface-2);
+  isolation: isolate;
   display: grid;
   place-items: center;
   z-index: 2;
   transition: opacity 0.15s;
+}
+/* The close control is the shared neutral glass circle (03 §3.1 关闭); the glyph sits above the glass layer. */
+.tis-close svg {
+  position: relative;
 }
 /* 《08》§2:尺寸早就补到 44 了,但按下反馈一直缺 */
 .tis-close:active {
@@ -1747,11 +1747,8 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-title {
   display: block;
-  font-family: var(--font-v5);
-  font-size: var(--ui-type-hero-title);
-  font-weight: 600;
+  font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);
   color: var(--v5-ink);
-  line-height: 1.3;
 }
 .tis-subtitle {
   display: block;
@@ -1782,12 +1779,13 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-opt-ico {
   flex-shrink: 0;
 }
+/* Option rows carry a name and price: list title role, content-row weight (10 §10.1). */
 .tis-opt-text {
   flex: 1;
   min-width: 0;
-  font-size: var(--ui-type-list-subtitle);
+  font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);
   color: var(--v5-ink);
-  line-height: 1.4;
+  overflow-wrap: break-word;
 }
 /* detail card (tradein / replace sheets) */
 .tis-card {
@@ -1827,10 +1825,11 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
 }
+/* Field name muted, value in the main ink (01 §1.1.1 pairing 1). */
 .tis-row-value {
   font-size: 13px;
   font-weight: 500;
-  color: var(--v5-ink-2);
+  color: var(--v5-ink);
 }
 .tis-num {
   font-variant-numeric: tabular-nums;
@@ -1840,7 +1839,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-row-emph {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--v5-ink);
 }
 .tis-hr {
@@ -1875,28 +1874,30 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-cta-text {
   text-align: center;
-  font-family: var(--font-v5);
-  font-size: var(--ui-type-button);
-  font-weight: 600;
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
   color: var(--v5-on-brand);
 }
+/* Secondary actions are the shared neutral glass L (03 §3.1); the material comes from .nx-frosted-button. */
 .tis-secondary {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 8px 20px;
   margin-top: 8px;
   border-radius: 999px;
-  background: var(--v5-surface-2);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .tis-secondary:active {
-  opacity: 0.7;
+  transform: scale(0.98);
 }
 .tis-secondary-text {
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink-2);
+  text-align: center;
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-ink);
 }
+/* Cancel and close are text buttons: brand text at the button role (03 §3.1). */
 .tis-ghost {
   width: 100%;
   min-height: 44px;
@@ -1909,9 +1910,8 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   opacity: 0.7;
 }
 .tis-ghost-text {
-  font-size: var(--ui-type-list-subtitle);
-  font-weight: 400;
-  color: var(--v5-ink-3);
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-brand);
 }
 .tis-warn-ghost {
   width: 100%;
@@ -1925,10 +1925,10 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-warn-ghost:active {
   opacity: 0.7;
 }
+/* A destructive choice only swaps the text to the error colour (03 §3.1). */
 .tis-warn-ghost-text {
-  font-size: var(--ui-type-list-subtitle);
-  font-weight: 400;
-  color: var(--v5-warning-ink);
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-danger);
 }
 /* block sheet header */
 .tis-block-head {

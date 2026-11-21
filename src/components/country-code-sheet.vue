@@ -6,6 +6,7 @@
       <view class="cc-head">
         <text class="cc-head__title">{{ t.countryCodes.title }}</text>
         <view ref="closeRef" class="cc-head__close active:opacity-70" role="button" tabindex="0" :aria-label="t.countryCodes.close" @click="emit('close')" @keydown="onCloseKeydown">
+          <LiquidGlass :radius="22" tone="control" />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -42,6 +43,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import { useT } from "@/i18n/use-t";
 import { useDialogScrollLock } from "@/composables/use-dialog-a11y";
 // #ifdef APP-PLUS
@@ -153,7 +155,9 @@ function select(item: CountryRow) {
 .cc-grab { flex: 0 0 auto; width: 40px; height: 4px; margin: 10px auto 0; border-radius: 9999px; background: var(--v5-surface-3); }
 .cc-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 6px 20px; }
 .cc-head__title { font-family: var(--font-v5); font-size: var(--ui-type-hero-title); font-weight: var(--ui-type-hero-title-weight); color: var(--v5-ink); }
-.cc-head__close { width: 44px; height: 44px; border-radius: 9999px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; }
+/* Close is the shared neutral glass circle (03 §3.1 关闭／取消), as on the other sheets. */
+.cc-head__close { position: relative; isolation: isolate; flex: none; width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
+.cc-head__close svg { position: relative; }
 .cc-list { flex: none; min-height: 0; height: calc(min(74vh, 620px, 100vh - var(--nx-overlay-top)) - 72px); padding: 0 16px; box-sizing: border-box; scrollbar-width: none; }
 .cc-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
 /* The bottom inset scrolls with the list, so rows run to the screen edge instead of stopping above an opaque band. */
