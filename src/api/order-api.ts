@@ -155,9 +155,14 @@ export interface CreateOrderRequest {
   idempotencyKey: string;
 }
 
+export type OrderCreateCommand =
+  | { status: "PROCESSING" | "NOT_FOUND" | "UNAVAILABLE" }
+  | { status: "SUCCEEDED"; orderNo: string };
+
 export interface OrderApi {
   list(beforeOrderNo?: string | null, pageSize?: number): Promise<CanonicalOrderList>;
   create(request: CreateOrderRequest): Promise<CreatedOrder>;
+  createCommand(idempotencyKey: string): Promise<OrderCreateCommand>;
   cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
   pay(orderNo: string, idempotencyKey: string, authorization?: import('./payment-password-api').PaymentPasswordAuthorization): Promise<PaidOrderReceipt>;
 }
@@ -528,6 +533,34 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
           voucherId: request.voucherId ?? null,
         },
       }));
+    },
+
+    async createCommand(idempotencyKey): Promise<OrderCreateCommand> {
+      const key = idempotencyKey.trim();
+      if (!key || key.length > 128) return invalid();
+      const notFound = { status: 404, code: 404, message: "ORDER_CREATE_COMMAND_NOT_FOUND" };
+      try {
+        return await client.request<OrderCreateCommand>({
+          path: "/api/orders/create-command",
+          idempotencyKey: key,
+          acceptedResponses: [notFound],
+          parseResponseData(value, status): OrderCreateCommand {
+            const payload = record(value);
+            if (status === 404 && payload.status === "NOT_FOUND") return { status: "NOT_FOUND" };
+            if (status === 200 && payload.status === "PROCESSING") return { status: "PROCESSING" };
+            if (status === 200 && payload.status === "SUCCEEDED") {
+              nonEmptyString(payload.orderStatus);
+              return { status: "SUCCEEDED", orderNo: nonEmptyString(payload.orderNo) };
+            }
+            return invalid();
+          },
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.kind === "http" && error.status === 404 && error.message !== notFound.message) {
+          return { status: "UNAVAILABLE" };
+        }
+        throw error;
+      }
     },
 
     async cancel(orderNo, idempotencyKey): Promise<CancelledOrder> {
