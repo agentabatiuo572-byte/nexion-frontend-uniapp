@@ -87,11 +87,12 @@
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="itemNameStyle">{{ (p.name) }}</text>
             <text class="block" :style="itemMetaStyle">
-              <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
+              {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
             </text>
             <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
             <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
-            <text v-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.purchaseEligibilityIneligible) }}</text>
+            <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
+            <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.purchaseEligibilityIneligible) }}</text>
           </view>
           <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: (p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-surface-2)">
@@ -102,17 +103,20 @@
       </view>
 
       <!-- Suggestions -->
-      <view v-if="suggestions.length > 0" class="mx-4 mt-3">
+      <view v-if="suggestions.length > 0" class="mx-4" style="margin-top: var(--ui-space-section-gap)">
         <text class="block" :style="suggestionsHeadingStyle">{{ t.bundle.suggestionsHeading }}</text>
         <view class="nx-glass-card overflow-hidden" :style="cardStyle">
           <view
             v-for="(p, i) in suggestions"
             :key="p.id"
-            class="w-full flex items-center gap-3 active:opacity-80"
+            class="w-full flex items-center gap-3"
+            :class="{ 'active:opacity-80': !eligibilityUnavailable(p.id) }"
             :style="suggestionRowStyle(i === suggestions.length - 1)"
             role="button"
-            tabindex="0"
-            :aria-label="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
+            :tabindex="eligibilityUnavailable(p.id) ? undefined : 0"
+            :aria-disabled="eligibilityUnavailable(p.id) ? 'true' : undefined"
+            :aria-label="eligibilityUnavailable(p.id) ? `${(p.name)} · ${t.store.temporarilyOutOfStock}`
+              : remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
               ? `${(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: (p.name) })"
             @click.stop="onAddSuggestion(p)"
             @keydown="activate($event, () => onAddSuggestion(p))"
@@ -120,12 +124,13 @@
             <view class="flex-1 min-w-0 text-left">
               <text class="block truncate" :style="suggestionNameStyle">{{ (p.name) }}</text>
               <text class="block" :style="itemMetaStyle">
-                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
+                {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
               </text>
-              <text v-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.gateBlockedToast) }}</text>
+              <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
+              <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.gateBlockedToast) }}</text>
               <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             </view>
-            <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
+            <view v-if="!eligibilityUnavailable(p.id)" class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
               <svg v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
               <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
             </view>
@@ -134,7 +139,7 @@
       </view>
 
       <!-- Total summary -->
-      <view v-if="products.length > 0" class="nx-glass-card nx-tint mx-4 mt-3 relative overflow-hidden" :style="heroStyle">
+      <view v-if="products.length > 0" class="nx-glass-card nx-tint mx-4 relative overflow-hidden" style="margin-top: var(--ui-space-section-gap)" :style="heroStyle">
         <view class="relative">
           <!-- Subtotal -->
           <view class="flex items-center justify-between" style="min-height: 24px">
@@ -201,6 +206,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import PromotionBundle from '@/components/promotion/promotion-bundle.vue';
 import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
@@ -967,41 +973,37 @@ const emptyTitleStyle: CSSProperties = {
 };
 const itemNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13px",
+  fontWeight: "var(--ui-type-list-title-weight)",
+  fontSize: "var(--ui-type-list-title)",
+  lineHeight: "var(--ui-type-list-title-lh)",
   color: "var(--v5-ink)",
-  letterSpacing: "-0.008em",
 };
 const itemMetaStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
+  fontFamily: "var(--font-v5)",
+  fontWeight: "var(--ui-type-list-subtitle-weight)",
+  fontSize: "var(--ui-type-list-subtitle)",
+  lineHeight: "var(--ui-type-list-subtitle-lh)",
+  fontVariantNumeric: "tabular-nums",
   color: "var(--v5-ink-3)",
 };
 
 const suggestionsHeadingStyle: CSSProperties = {
-  marginBottom: "10px",
-  padding: "0 4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
+  marginBottom: "12px",
+  fontFamily: "var(--font-v5)",
+  fontWeight: "var(--ui-type-section-weight)",
+  fontSize: "var(--ui-type-section)",
+  lineHeight: "var(--ui-type-section-lh)",
+  color: "var(--v5-ink)",
 };
 // Suggestion rows now live in one form-b container → hairline-separated rows.
 function suggestionRowStyle(isLast: boolean): CSSProperties {
   return {
-    padding: "12px 14px",
+    padding: "12px 16px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }
-const suggestionNameStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13px",
-  color: "var(--v5-ink)",
-  letterSpacing: "-0.008em",
-};
+const suggestionNameStyle = itemNameStyle;
 
 function rowLabelStyle(big: boolean): CSSProperties {
   return {
