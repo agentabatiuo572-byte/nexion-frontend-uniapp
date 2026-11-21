@@ -211,7 +211,9 @@ function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota
     policies:[e1,f4b]};
 }
 
-function requireDemoMonthlyQuota(policy) {
+function requireDemoMonthlyQuota(state,policy) {
+  if(policy.decisionCode==='F4B_NOT_CONFIGURED')return;
+  if(state.quotaPaused)refuse('ORDER_MONTHLY_QUOTA_PAUSED');
   if(policy.conditions.some(row=>row.kind==='teamComputePoints'&&!row.met))refuse('ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET');
   if(policy.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED')refuse('ORDER_MONTHLY_QUOTA_EXHAUSTED');
 }
@@ -221,9 +223,8 @@ export function requireDemoExternalPaymentQuota(state,products,items,now) {
   const quantity=state.quotaState==='approved'&&product
     ? items.filter(item=>item.productNo===product.id).reduce((sum,item)=>sum+item.quantity,0) : 0;
   if(quantity>0){
-    if(state.quotaPaused)refuse('ORDER_MONTHLY_QUOTA_PAUSED');
     const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
-    requireDemoMonthlyQuota(demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
+    requireDemoMonthlyQuota(state,demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
   }
   return quantity;
 }
@@ -255,12 +256,9 @@ export function requireDemoPurchase(state,products,items,now,settlement=false,qu
     const product=products.find(item=>item.id===sku);
     if(!product||state.dataState==='empty')throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
     const {eligible,decisionCode,policies}=demoSkuPurchaseRules(state,product,points,now,quantity,!quotaHold);
-    if(eligible){
-      if(settlement&&policies[1].decisionCode==='ELIGIBLE')hardwareQuotaUsedAt=now;
-      continue;
-    }
-    if(settlement&&policies[0].eligible)requireDemoMonthlyQuota(policies[1]);
-    refuse(decisionCode);
+    if(settlement&&policies[0].eligible)requireDemoMonthlyQuota(state,policies[1]);
+    if(!eligible)refuse(decisionCode);
+    if(settlement&&policies[1].decisionCode==='ELIGIBLE')hardwareQuotaUsedAt=now;
   }
   return hardwareQuotaUsedAt;
 }
