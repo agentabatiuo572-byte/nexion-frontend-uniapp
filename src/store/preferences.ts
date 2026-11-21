@@ -128,13 +128,13 @@ export const usePreferences = defineStore("preferences", () => {
     persist();
   }
 
-  async function toggleNotifKind(k: NotifKind) {
+  async function toggleNotifKind(k: NotifKind): Promise<"saved" | "failed" | "superseded"> {
     // 简报 #214:强制类只能保持开启 —— 页脚声明「关键合规通知不可禁用」,这里让它成为事实。
-    if (isMandatoryNotifKind(k) && notifPrefs.value[k]) return;
+    if (isMandatoryNotifKind(k) && notifPrefs.value[k]) return "superseded";
     if (!remoteApiEnabled) {
       notifPrefs.value = { ...notifPrefs.value, [k]: !notifPrefs.value[k] };
       persist();
-      return;
+      return "saved";
     }
 
     const request = remoteAccountEpoch.snapshot();
@@ -150,11 +150,11 @@ export const usePreferences = defineStore("preferences", () => {
     // response is intentionally discarded by the generation guard.
     loading.value = false;
 
-    const run = async () => {
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+    const run = async (): Promise<"saved" | "failed" | "superseded"> => {
+      if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
       try {
         const canonical = await notificationPreferencesApi.patch({ [k]: value });
-        if (!remoteAccountEpoch.isCurrent(request)) return;
+        if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
         generation += 1;
         canonicalNotifPrefs = canonical;
         remoteReady.value = true;
@@ -162,18 +162,21 @@ export const usePreferences = defineStore("preferences", () => {
         failedNotifMutations.delete(k);
         applyVisibleNotifPrefs();
         syncMutationError();
+        return "saved";
       } catch (cause) {
-        if (!remoteAccountEpoch.isCurrent(request)) return;
+        if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
         generation += 1;
-        if (pendingNotifMutations.get(k)?.id === mutationId) pendingNotifMutations.delete(k);
+        if (pendingNotifMutations.get(k)?.id !== mutationId) return "superseded";
+        pendingNotifMutations.delete(k);
         failedNotifMutations.set(k, accountErrorMessageKey(cause instanceof Error ? cause : "NOTIFICATION_PREFERENCES_UPDATE_FAILED"));
         applyVisibleNotifPrefs();
         syncMutationError();
+        return "failed";
       }
     };
     const operation = mutationTail.then(run, run);
-    mutationTail = operation.catch(() => undefined);
-    await operation;
+    mutationTail = operation.then(() => undefined, () => undefined);
+    return operation;
   }
 
   async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {

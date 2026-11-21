@@ -51,7 +51,7 @@
             :value="prefs.remoteReady ? prefs.notifPrefs[k] : null"
             :unknown-label="t.uiChrome.unavailable"
             :last="i === notifKinds.length - 1"
-            @toggle="prefs.toggleNotifKind(k)"
+            @toggle="saveNotificationPreference(k)"
           >
             <template #icon>
               <view :style="dotStyle(k)" />
@@ -77,7 +77,7 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
@@ -86,6 +86,7 @@ import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/pr
 import { onHide, onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { toast } from "@/store/ui";
 // #ifdef APP-PLUS
@@ -116,20 +117,34 @@ useAutoRecovery({
 function refreshHealthyPreferences() {
   if (remoteApiEnabled && !prefs.readError && !prefs.loading) return prefs.refreshRemote();
 }
+let pageVisit = 0;
+let pageVisible = false;
 let releaseActiveRefresh = () => {};
 onShow(() => {
+  pageVisible = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshHealthyPreferences, "pages/me/preferences");
   void refreshHealthyPreferences();
 });
-onHide(() => releaseActiveRefresh());
-onUnmounted(() => releaseActiveRefresh());
+function leavePreferences() {
+  pageVisible = false;
+  pageVisit++;
+  releaseActiveRefresh();
+}
+onHide(leavePreferences);
+onUnmounted(leavePreferences);
 // #ifdef APP-PLUS
 onShow(() => refreshNativePush());
 // #endif
-// Reads recover on their own and show "—" (03 §3.4). A switch the server did not save is the
-// user's own action: one toast, and the switch is back at its confirmed value (03 §3.5.1).
-watch(() => prefs.mutationError, error => { if (error) toast.error(t.value.preferences.updateFailed); }, { flush: "sync" });
+async function saveNotificationPreference(kind: NotifKind) {
+  if (!pageVisible || !prefs.remoteReady) return;
+  const visit = pageVisit;
+  const account = remoteAccountScope.snapshot();
+  const result = await prefs.toggleNotifKind(kind);
+  if (result === "failed" && pageVisible && visit === pageVisit && remoteAccountScope.isCurrent(account)) {
+    toast.error(t.value.preferences.updateFailed);
+  }
+}
 
 // Mandatory kinds cannot be switched off, so they are not listed.
 const notifKinds = (["commission", "team", "market", "genesis", "system"] as NotifKind[]).filter(k => !isMandatoryNotifKind(k));
