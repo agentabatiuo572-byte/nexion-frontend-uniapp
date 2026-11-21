@@ -1804,7 +1804,7 @@ export const ms: Messages = {
     sheetCta: "Sahkan · bayar ${amount}",
     sheetCancel: "Batal",
     recoveryPending: "Keputusan tukar beli sebelumnya belum disahkan.",
-    recoveryReading: "Sedang menyemak tukar beli sebelumnya. Paparan ini dikemas kini sendiri, tiada tindakan diperlukan.",
+    recoveryReading: "Sedang menyemak tukar beli sebelumnya secara automatik. Tiada tindakan diperlukan.",
     recoveryChecking: "Sedang menyemak keputusan tukar beli sebelumnya. Jangan bayar lagi.\nHalaman ini akan dikemas kini secara automatik.",
     keepRecoveryPending: "Keputusan simpan-dan-beli sebelumnya belum disahkan. Pulihkan pembelian asal dahulu.",
     keepRecoveryAction: "Semak pembelian asal",
