@@ -524,11 +524,17 @@ async function confirmPayment(){
     if(paymentDestination&&readCurrent(generation))await navTo(paymentDestination);
   }
 }
+let recoveryReadGeneration=-1;
 function recover():Promise<boolean>{
   if(!current()||!visible.value||busy.value)return Promise.resolve(false);
-  // Back can arrive while the foreground read is checking this same order.
-  if(recoveryRead.value)return recoveryRead.value;
+  if(recoveryRead.value){
+    // Back can arrive while the foreground read is checking this same order.
+    if(recoveryReadGeneration===readGeneration)return recoveryRead.value;
+    // A read from before the page was hidden cannot answer for this visit: read again once it ends.
+    return recoveryRead.value.then(()=>recover());
+  }
   if(session.busy)return Promise.resolve(false);
+  recoveryReadGeneration=readGeneration;
   recoveryRead.value=readCheckout().finally(()=>{recoveryRead.value=null;});
   return recoveryRead.value;
 }
