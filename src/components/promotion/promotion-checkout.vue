@@ -640,7 +640,7 @@ async function requestLeave():Promise<boolean>{
   leaving.value=true;paymentSheetOpen.value=false;
   try{
     const recovered=await recover();
-    if(!recovered||!current()||unknown.value||session.record.pending&&!session.retryOriginal){if(current()&&visible.value)error.value=t.value.orders.resultReadback;return false;}
+    if(!recovered||!current()||unknown.value||session.record.pending&&!session.retryOriginal&&!session.externalPaymentRefused){if(current()&&visible.value)error.value=t.value.orders.resultReadback;return false;}
     if(!order.value)return !session.record.pending;
     if(order.value.paymentStatus!=='PENDING')return true;
     // Missing trusted time cannot turn an unresolved original order into a

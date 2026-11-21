@@ -100,7 +100,7 @@ export class PromotionCheckoutSession {
   }
   canExecute(operation:PromotionOperation):boolean {
     const pending=this.record.pending;
-    return !this.busy&&!this.unknown&&(!pending||operation==='payOrder'&&this.externalPaymentRefused||(this.retryOriginal&&(pending.operation===operation
+    return !this.busy&&!this.unknown&&(!pending||(operation==='payOrder'||operation==='cancelOrder')&&this.externalPaymentRefused||(this.retryOriginal&&(pending.operation===operation
       ||operation==='cancelOrder'&&pending.operation==='payOrder'&&pending.key===this.unseenPaymentKey)));
   }
   async create(): Promise<void> {
@@ -136,10 +136,12 @@ export class PromotionCheckoutSession {
     await this.mutate('cancelOrder', order.orderNo, key => this.ports.api.cancel(order.orderNo, key));
   }
   private async mutate(operation: PromotionOperation, targetId: string, command: (key: string) => Promise<OrderReceipt>): Promise<void> {
-    if (this.busy || (this.record.pending && !this.retryOriginal)) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
     const previous = this.record.pending;
+    // A refused external payment created nothing, so the order can still be cancelled; its key stays on record.
+    const cancelRefused=operation==='cancelOrder'&&previous?.targetId===targetId&&this.externalPaymentRefused;
+    if (this.busy || (previous && !this.retryOriginal && !cancelRefused)) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
     if(operation==='payOrder'&&previous?.paymentMethod==='EXTERNAL')throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
-    const cancelUnseen=operation==='cancelOrder'&&previous?.operation==='payOrder'&&previous.key===this.unseenPaymentKey&&previous.targetId===targetId;
+    const cancelUnseen=cancelRefused||operation==='cancelOrder'&&previous?.operation==='payOrder'&&previous.key===this.unseenPaymentKey&&previous.targetId===targetId;
     if (previous && !cancelUnseen && (previous.operation !== operation || previous.targetId !== targetId)) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
     const revision=operation==='payOrder'?(this.record.paymentIntentRevision??0):0;
     const identity = (cancelUnseen?null:previous) ?? { operation, targetId, key: this.ports.key(`${operation}:${targetId}${revision?`:payment-intent:${revision}`:''}`) };
