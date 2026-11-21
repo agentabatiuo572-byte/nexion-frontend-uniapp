@@ -2371,6 +2371,7 @@ export const uz: Messages = {
     coHintErc20: "~15 daq.",
     coCardHint: "Darhol · +{rate} komissiya",
     coSlotsFull: "Barcha {max} ta faollashtirish oʻrni band. Yana qurilma sotib olish uchun Qurilmalar omboridan birini oʻchiring yoki mavjud qurilmani almashtirish imkoniyatidan foydalaning.",
+    coVoucherBlocksReplace: "Vaucherni mavjud qurilmani almashtirish bilan birga qoʻllab boʻlmaydi.",
     coCapacityChecking: "Faollashtirish oʻrinlari tekshirilmoqda. Kuting.",
     coCapacityUnavailable: "Faollashtirish oʻrinlarini tekshirib boʻlmadi. Qayta urining.",
     coCapacityProductUnavailable: "Bu qurilmani hozircha sotib olib boʻlmaydi. Keyinroq qayta urining.",

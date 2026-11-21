@@ -2371,6 +2371,7 @@ export const ms: Messages = {
     coHintErc20: "~15 min",
     coCardHint: "Segera · caj +{rate}",
     coSlotsFull: "Kesemua {max} slot pengaktifan sedang digunakan. Untuk membeli peranti lain, nyahaktifkan satu di Inventori peranti atau gunakan pilihan ganti peranti sedia ada.",
+    coVoucherBlocksReplace: "Baucar tidak boleh digunakan bersama pilihan ganti peranti sedia ada.",
     coCapacityChecking: "Menyemak slot pengaktifan. Sila tunggu.",
     coCapacityUnavailable: "Tidak dapat menyemak slot pengaktifan. Sila cuba lagi.",
     coCapacityProductUnavailable: "Peranti ini belum boleh dibeli buat masa ini. Cuba lagi nanti.",
