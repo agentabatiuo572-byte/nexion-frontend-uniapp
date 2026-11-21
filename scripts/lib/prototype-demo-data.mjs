@@ -200,7 +200,7 @@ function demoHardwareQuota(product,state,points,now){
     // The legacy open preset keeps its original orders and uses a quota without a points requirement.
     conditions:state.walletLegacySeed&&state.catalogState==='available'?[]:
       [{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:points}],
-    perks:[],available:product.available&&product.stock!==0&&remaining>0};
+    perks:[],available:product.available&&remaining>0};
 }
 
 function demoE1PurchaseRule(product) {
@@ -895,7 +895,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const {assignment,refusal}=demoReplacementSourceCheck(source,state,external,
       path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>({})},now));
     if(refusal)refuse(refusal);
-    return assignment;
+    return {source,assignment};
   };
   if(pathname==='/api/app/trade-in/quote'){
     const input=request.postDataJSON();
@@ -921,14 +921,16 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       if(!Number.isFinite(input.expectedPayableUsdt)||!Number.isFinite(input.expectedDiscountUsdt)
         ||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)refuse('TRADEIN_QUOTE_CHANGED');
     }
-    const sourceAssignment=keepingCapacity?null:checkReplacementSource(quote.sourceDeviceId,Boolean(paid));
-    const currentTask=sourceAssignment?.currentTask;
+    const replacement=keepingCapacity?null:checkReplacementSource(quote.sourceDeviceId,Boolean(paid));
+    const currentTask=replacement?.assignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
+    const sourceSku=products.find(p=>p.id===replacement?.source?.productCode.toLowerCase());
+    const computePoints=Math.max(0,product.computePoints-(sourceSku?.computePoints??0));
     if(paid&&Number(quote.payableUsdt).toFixed(6)!==paid.businessAmountUsdt)refuse('PURCHASE_PAYMENT_PRICING_CHANGED');
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true,paid?.quotaHold);
     if(!paid&&!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
     if(replacingCapacity){
-      const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===quote.sourceDeviceId);
+      const {source}=replacement;
       (state.deviceActivations??={})[source.id]={status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',rowVersion:source.rowVersion+1};
     }else if(!keepingCapacity) (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
@@ -938,14 +940,14 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;
     (state.deviceIds??={})[targetDeviceInstanceNo]=targetDeviceId;
     const canonicalStatus=active?'activated':'inventory';
-    const order={...demoOrders(products,state,now)[0],orderNo,productId:quote.targetProductId,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:paid?.paymentMethod??'WALLET',orderType:keepingCapacity?'CAPACITY_KEEP':'TRADE_IN',itemCount:1,
+    const order={...demoOrders(products,state,now)[0],orderNo,productId:quote.targetProductId,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:paid?.paymentMethod??'WALLET',orderType:keepingCapacity?'CAPACITY_KEEP':'TRADE_IN',itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:keepingCapacity?null:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
-      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:paid?.paidAt??now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null,
+      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null,
       ...(paid&&{paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt})};
     (state.createdOrders||=[]).unshift(order);
     if(currentTask?.status==='RUNNING'){
       if(state.computeCycleStarts)delete state.computeCycleStarts[quote.sourceDeviceId];
-      recordDemoTaskCancellation(state,sourceAssignment,currentTask);
+      recordDemoTaskCancellation(state,replacement.assignment,currentTask);
     }
     const paymentReceipt={orderNo,targetDeviceId,orderStatus:'COMPLETED',walletDebitUsdt:paid?0:quote.payableUsdt,walletBalanceAfterUsdt:demoWalletUsdt(state)};
     if(keepingCapacity)return {...paymentReceipt,operationNo:'DEMO-CPK-'+sequence,deviceStatus:'ACTIVE'};
