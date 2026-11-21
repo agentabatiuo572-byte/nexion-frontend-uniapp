@@ -441,18 +441,6 @@ const fullyVoucherSettled = computed(() => order.value != null
   && order.value.paymentMethod?.toUpperCase() === "VOUCHER"
   && order.value.status !== "placed");
 
-// Sticky chassis nav header — back + "Order details" title. The order number
-// stays in the summary card; a long id is not a page title. Getter form: falls
-// back to "not found" before the order loads / for a bad id.
-useSetPageHeader(() => ({
-  title: showTrialResult.value || paymentResultVisible.value ? checkoutFlowCopy(locale.code).resultTitle : order.value
-    ? t.value.orders.detailTitle
-    : (showRemoteOrderLoading.value || remoteOrderError.value ? t.value.orders.title : t.value.orders.notFound),
-  backHref: ordersBackHref.value,
-  // Only while the result is really on screen; a failed first read keeps the order page's back.
-  noBack: !!resultOrder.value && (showTrialResult.value || paymentResultVisible.value),
-}));
-
 // While on this page, tick orders every 3s so the provisioning bar moves
 // visibly. The global ORDER_TICK loop (App.vue, 6s) also advances orders; this
 // faster local tick just gives the detail view a tighter feel.
@@ -490,6 +478,21 @@ const paymentNoticeReason = ref('');
 const noticeCancelFailed = ref(false);
 const paymentResultOrder = ref<Order|null>(null);
 const resultOrder = computed(() => order.value ?? paymentResultOrder.value);
+// Same branch as the template's result view: the header drops back and retitles only while that view is on screen.
+const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value && (showTrialResult.value || paymentResultVisible.value));
+
+// Sticky chassis nav header — back + "Order details" title. The order number
+// stays in the summary card; a long id is not a page title. Getter form: falls
+// back to "not found" before the order loads / for a bad id.
+useSetPageHeader(() => ({
+  title: resultShown.value ? checkoutFlowCopy(locale.code).resultTitle : order.value
+    ? t.value.orders.detailTitle
+    : (showRemoteOrderLoading.value || remoteOrderError.value ? t.value.orders.title : t.value.orders.notFound),
+  backHref: ordersBackHref.value,
+  // A failed first read keeps the order page's title and back.
+  noBack: resultShown.value,
+}));
+
 const pendingCopy = computed(() => checkoutFlowCopy(locale.code));
 const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'>(() => remoteOrderError.value ? 'error' : resultOrder.value?.status === 'activated'
   ? 'activated' : resultOrder.value?.status === 'inventory' ? 'inventory' : walletPaymentConfirmed.value || resultOrder.value?.status === 'paid' || resultOrder.value?.status === 'provisioning' ? 'processing' : 'error');

@@ -443,7 +443,8 @@ function openPaidOrder() { if (s.kind === 'ORDER_PAY' && s.orderNo) payment.open
 // Continuing a bank payment means its bank page; other payments stay on their payment page.
 function continuePaying() { dismiss(); if (isBank.value && ready.value) payment.openCashier(); }
 
-useDialogA11y(sheetOpen, '#pp-sheet', payment.close, true, 3);
+// A notice over the sheet owns Escape, Tab and back until it is answered.
+useDialogA11y(computed(() => sheetOpen.value && !s.notice), '#pp-sheet', payment.close, true, 3);
 useDialogA11y(computed(() => pageOpen.value && !s.cashier && !s.notice), '#pp-page', leavePage, true, 3);
 useDialogA11y(computed(() => active.value && s.open && s.cashier), '.pp-cashier', payment.closeCashier, true, 4);
 
