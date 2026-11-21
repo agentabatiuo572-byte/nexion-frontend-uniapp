@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
-import { ApiError, asApiError, isApiRefusal } from '@/api/errors';
+import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
 import { useApp } from './app';
@@ -67,18 +67,13 @@ function paymentRefusalNotice(cause: ApiError, kind: PurchaseKind): DefinitePaym
 }
 const api = createPurchasePaymentApi(apiClient);
 const deposits = createCregisDepositApi(apiClient);
-type PaymentFailure = 'offline' | 'unknown';
-function paymentFailure(error: unknown): PaymentFailure {
-  return error instanceof ApiError && error.kind === 'network' && error.message === 'NETWORK_UNAVAILABLE'
-    ? 'offline' : 'unknown';
-}
 const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', productNo: '', image: '', deadlineAt: null as number | null,
   policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, notice: '' as PurchaseNotice, cashier: false,
   retryNotice: '' as '' | EligibilityRetry,
   pausedPaymentMethod: null as ExternalPaymentMethod | null,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
-  loading: false, retrying: false, busy: false, failure: null as PaymentFailure | null, unavailable: false, pendingReadError: false, concluded: false, revision: 0 });
+  loading: false, retrying: false, busy: false, error: false, unavailable: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
 let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void } | null = null;
@@ -259,7 +254,7 @@ function gone(pending: PendingExternal, accountKey: string) {
   } catch {
     // Local cleanup can fail after the server has already answered definitively.
   }
-  Object.assign(state, { pending: null, intent: null, quote: null, failure: null });
+  Object.assign(state, { pending: null, intent: null, quote: null, error: false });
   conclude('gone');
 }
 function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
@@ -422,7 +417,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
   if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; state.retryNotice = ''; }
-  state.method = method; state.quote = null; state.failure = null; state.retrying = false; state.unavailable = false;
+  state.method = method; state.quote = null; state.error = false; state.retrying = false; state.unavailable = false;
   clearTimeout(quoteTimer);
   const version = ++requestVersion, accountKey = state.accountKey, expected = context;
   if (method === 'WALLET' || !available(method)) { state.loading = false; return; }
@@ -509,7 +504,7 @@ async function query() {
   try {
     const result = await readIntent(pending);
     if (!owns(version, accountKey) || state.concluded) return;
-    state.failure = null;
+    state.error = false;
     if (result) accept(result, pending);
     else if (pending.quotaRefusal) {
       releaseUncreatedPayment(pending, accountKey);
@@ -517,10 +512,10 @@ async function query() {
     }
     else if (pending.intentNo || pending.lookupOnly) gone(pending, accountKey);
     else state.unavailable = true;
-  } catch (error) {
+  } catch {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
-      state.failure = paymentFailure(error);
+      state.error = true;
       if (pending.quotaRefusal) conclude(pending.quotaRefusal);
     }
   }
@@ -536,7 +531,7 @@ async function submitOriginal() {
   state.busy = true; state.unavailable = false;
   try {
     const intent = await api.create(pending.paymentQuoteId, pending.commandKey);
-    if (owns(version, accountKey) && !state.concluded) { state.failure = null; state.retryNotice = ''; accept(intent, pending); }
+    if (owns(version, accountKey) && !state.concluded) { state.error = false; state.retryNotice = ''; accept(intent, pending); }
   } catch (error) {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
@@ -549,7 +544,7 @@ async function submitOriginal() {
         // Retry the stored quote under the same command key.
         state.retryNotice = paymentRefusal;
         state.unavailable = true;
-        state.failure = 'unknown';
+        state.error = true;
         return;
       }
       const replacement = pending.kind === 'TRADE_IN' || pending.kind === 'CAPACITY_REPLACE';
@@ -559,7 +554,7 @@ async function submitOriginal() {
         releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
         release(pending, accountKey, state.orderNo);
         releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
-        Object.assign(state, { pending: null, quote: null, intent: null, failure: null });
+        Object.assign(state, { pending: null, quote: null, intent: null, error: false });
         context?.onReplacementRefused?.(replacementRefusal);
         conclude(replacementRefusal);
         return;
@@ -567,7 +562,7 @@ async function submitOriginal() {
       if (replacement && isApiRefusal(cause, 503, TRADEIN_RUNTIME_RECOVERING)) {
         // The precheck is temporarily unavailable. Retry the same create through the existing backoff.
         state.unavailable = true;
-        state.failure = 'unknown';
+        state.error = true;
         return;
       }
       if (isApiRefusal(cause, 409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED')) {
@@ -582,7 +577,7 @@ async function submitOriginal() {
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
           || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND');
       const definiteRefusal = !pending.intentNo && (paymentRefusal || rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
-      state.failure = definiteRefusal ? null : paymentFailure(error);
+      state.error = !definiteRefusal;
       if (definiteRefusal) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
         // Another open payment ends every kind of purchase here; it must not fall back to quoting again.
@@ -596,16 +591,16 @@ async function submitOriginal() {
         }
         let existing: PurchasePaymentIntent | null;
         try { existing = await api.find(pending.kind, pending.commandKey); }
-        catch (readError) {
+        catch {
           // Only a read can prove no intent exists: the record stays, and the refusal still stands for the user.
           if (owns(version, accountKey)) {
-            state.failure = paymentFailure(readError);
+            state.error = true;
             if (refusal) conclude(refusal);
           }
           return;
         }
         if (!owns(version, accountKey)) return;
-        state.failure = null;
+        state.error = false;
         if (existing) accept(existing, pending);
         else {
           // A definite refusal plus a successful empty lookup releases the caller's matching unknown command too.
@@ -696,7 +691,7 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload'
   Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', productNo: typeof productNo === 'string' ? productNo.trim() : '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null,
     policy: null, notice: '', retryNotice: '', cashier: false,
-    pausedPaymentMethod: null, quote: null, intent: null, pending, loading: false, retrying: false, busy: false, failure: null, unavailable: false, concluded: false });
+    pausedPaymentMethod: null, quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });
 }
 export function requestPurchasePayment(value: PurchasePaymentContext): Promise<PurchaseChoice | null> {
   if (state.open) throw new Error('PURCHASE_PAYMENT_ALREADY_OPEN');

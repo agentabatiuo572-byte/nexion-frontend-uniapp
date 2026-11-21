@@ -157,7 +157,7 @@
           <view v-if="!conclusion" class="pp-wait__spin" aria-hidden="true" />
           <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
           <text v-if="conclusion" class="pp-wait__s">{{ conclusion.body }}</text>
-          <text v-else-if="ready && !offline" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
+          <text v-else-if="ready && !appDeviceOffline" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
         </view>
         <template v-if="!isBank && ready">
           <view class="pp-card__top"><text class="pp-card__t">{{ copy.address }}</text><text class="pp-tag">{{ networkName }}</text></view>
@@ -236,7 +236,7 @@ import NxNoticeDialog from '@/components/ui/nx-notice-dialog.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
 import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, type PurchaseNotice } from '@/store/purchase-payment';
-import { appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
+import { appDeviceOffline, appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
@@ -321,12 +321,11 @@ const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
-const offline = computed(() => !appReadOnline.value || s.failure === 'offline');
-const waitTone = computed(() => offline.value || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
+const waitTone = computed(() => appDeviceOffline.value || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
 const waitTitle = computed(() => {
   if (retryMessage.value) return retryMessage.value;
-  if (offline.value) return copy.value.offline;
-  if (confirming.value || (!s.intent && s.failure === 'unknown')) return copy.value.confirming;
+  if (appDeviceOffline.value) return copy.value.offline;
+  if (confirming.value || (!s.intent && s.error)) return copy.value.confirming;
   return ready.value ? copy.value.waiting : copy.value.creating;
 });
 watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment.closeCashier(); });

@@ -2,7 +2,7 @@
 import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { refreshActivePage } from "@/lib/active-page-refresh";
-import { appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
+import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
 import { installNativePush, refreshNativePush, flushNativePushClick } from "@/services/native-push";
@@ -426,11 +426,11 @@ function runScheduledReads(route: string, reconnected = false) {
 }
 
 function installForegroundReadSignals() {
-  let outage = false;
   const syncOnline = (online: boolean) => {
+    const disconnected = !online && !appDeviceOffline.value;
+    appDeviceOffline.value = !online;
     appReadOnline.value = online;
-    if (!online && !outage) toast.warn(useT().value.ui.networkDisconnected);
-    outage = !online;
+    if (disconnected) toast.warn(useT().value.ui.networkDisconnected);
   };
   // #ifdef H5
   const syncDocument = () => { documentReadVisible.value = !document.hidden; };
