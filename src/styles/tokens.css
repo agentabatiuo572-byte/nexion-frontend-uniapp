@@ -1201,8 +1201,8 @@ uni-input .uni-input-placeholder {
 }
 
 /* Card read recovery is a text button (design system 03 §3.1, 10 §10.2): brand text 13/18
-   at 500, no fill, inside an unchanged 44px hit target. The combined selector also wins over
-   the later inline-recovery stylesheet. */
+   at 500, no fill. Its box is the label line; the 44px target is a layer that takes no layout.
+   The combined selector also wins over the later inline-recovery stylesheet. */
 .nx-card-recovery-action,
 .nx-inline-recovery__action.nx-card-recovery-action {
   display: flex;
@@ -1210,16 +1210,13 @@ uni-input .uni-input-placeholder {
   justify-content: center;
   gap: 8px;
   width: fit-content;
-  min-width: 44px;
-  min-height: 44px;
-  height: 44px;
   box-sizing: border-box;
   position: relative;
   isolation: isolate;
   flex-shrink: 0;
   margin: 8px 0 0 auto;
   align-self: flex-end;
-  padding: 0 12px;
+  padding: 0;
   border: 0;
   border-radius: 9999px;
   background: none;
@@ -1232,12 +1229,20 @@ uni-input .uni-input-placeholder {
 .nx-card-recovery-action::before {
   content: "";
   position: absolute;
-  inset: 6px 0;
+  inset: -7px -12px;
   z-index: -1;
   box-sizing: border-box;
   border-radius: inherit;
   background: transparent;
   pointer-events: none;
+}
+.nx-card-recovery-action::after {
+  content: "";
+  position: absolute;
+  top: calc(50% - 22px);
+  bottom: calc(50% - 22px);
+  left: min(-8px, calc(50% - 22px));
+  right: min(-8px, calc(50% - 22px));
 }
 .nx-card-recovery-action:active::before {
   background: var(--v5-brand-soft);

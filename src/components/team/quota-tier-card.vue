@@ -107,7 +107,7 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 </script>
 <style scoped>
 /* The conditions block below already draws the divider; the text action row adds none (P-67). */
-.quota-text-action { min-height: 44px; border-top: 0; }
+.quota-text-action { padding-top: 0; border-top: 0; }
 /* P-41 tinted tier card: the shared tinted solid in brand (it used to be a top glow). */
 .quota-tier { --nx-tint:var(--v5-brand);padding:var(--ui-space-section) 18px 22px;margin-bottom:18px;border:1px solid var(--v5-border);border-radius:24px;color:var(--v5-ink); }
 .quota-product { display:flex;align-items:center;gap:14px;min-height:80px;cursor:pointer; }

@@ -43,9 +43,9 @@
           <!-- A Genesis card opens the holdings overview, where this order number is not shown: only its main row
                opens it, and the order number with its copy button sits below, outside that tap area. -->
           <view class="order-card__row" :role="o.kind === 'genesis' ? 'button' : undefined" :tabindex="o.kind === 'genesis' ? 0 : undefined" :aria-label="o.kind === 'genesis' ? orderCardLabel(o) : undefined" @click="o.kind === 'genesis' && goOrder(o)">
-            <LoopScope class="order-card__thumb" aria-hidden="true">
+            <LoopScope class="order-card__thumb" :class="{ 'order-card__thumb--genesis': o.kind === 'genesis' }" aria-hidden="true">
               <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="o.imageUrl" :scope-key="o.id" />
-              <image v-else class="order-card__image nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
+              <image v-else class="order-card__image order-card__image--genesis nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
             </LoopScope>
             <view class="order-card__info">
               <view class="order-card__top">
@@ -61,7 +61,7 @@
             </view>
           </view>
           <view v-if="o.kind === 'genesis'" class="order-card__meta order-card__code order-card__code--copy"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="o.id" :label="t.orders.orderId" /></view>
-          <view v-if="o.kind === 'commerce' && o.status === 'placed'" class="order-card__pending">
+          <view v-if="o.kind === 'commerce' && o.status === 'placed'" class="nx-card-footer order-card__pending">
             <view v-if="pendingCloseMinutes(o)" class="order-card__countdown">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
               <text>{{ fmt(t.orders.pendingCloseIn, { min: pendingCloseMinutes(o)! }) }}</text>
@@ -455,10 +455,16 @@ const browseBtnStyle: CSSProperties = {
 .order-card--pending { --nx-tint: var(--v5-warning); }
 .order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .order-card__row { display: flex; gap: 14px; }
-.order-card__thumb { position: relative; flex: none; width: 72px; height: 72px; border-radius: 16px; background: var(--v5-surface-2); display: grid; place-items: center; overflow: hidden; }
-.order-card__thumb::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 7px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, #000 55%, transparent), transparent); }
+/* The machine is the card's main visual, with no box around it. The art keeps clear margin around the machine and its disc
+   (machines span 31–83% of the art's height, racks up to 91% of its width), so a 104px art fills the 96px slot and sits 7px
+   up to centre the machine; the floor shadow stays under the disc. */
+.order-card__thumb { position: relative; flex: none; width: 96px; height: 80px; display: grid; place-items: center; }
+.order-card__thumb::after { content: ""; position: absolute; left: 18px; right: 18px; bottom: 7px; height: 10px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, #000 55%, transparent), transparent); }
 [data-theme="light"] .order-card__thumb::after { background: radial-gradient(closest-side, rgba(20,16,8,.16), transparent); }
-.order-card__image { position: relative; z-index: 1; width: 62px; height: 62px; }
+.order-card__image { position: relative; z-index: 1; flex: none; width: 104px; height: 104px; margin-top: -14px; }
+/* Genesis art is a full-bleed photo with its own floor, so it sits as an 80px rounded tile (01 §1.3 inner block radius 12). */
+.order-card__image--genesis { width: 80px; height: 80px; margin-top: 0; border-radius: 12px; overflow: hidden; }
+.order-card__thumb--genesis::after { content: none; }
 .order-card__info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* A long status tag moves under the title instead of squeezing it. */
 .order-card__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
@@ -469,7 +475,7 @@ const browseBtnStyle: CSSProperties = {
 .order-card__code-label { flex: none; white-space: nowrap; }
 .order-card__code-value { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 /* Genesis: the order-number row sits under the tappable row, aligned with the text column; its copy button has a 44px target and does not open the card. */
-.order-card__code--copy { align-items: center; min-height: 44px; margin: 4px 0 -10px; padding-left: 86px; cursor: default; }
+.order-card__code--copy { align-items: center; min-height: 44px; margin: 4px 0 -10px; padding-left: 110px; cursor: default; }
 .order-card__code--copy :deep(.copy-code-button) { width: 44px; height: 44px; margin: 0 -10px 0 0; }
 .order-card__row[role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
 /* Narrow screens: the amount drops to its own right-aligned line instead of clipping. */
@@ -479,7 +485,8 @@ const browseBtnStyle: CSSProperties = {
 .order-card__amount :deep(.checkout-amount__symbol) { font-size: 12px; }
 /* Unit per 01 §1.2: 12/16, 500, muted. */
 .order-card__amount :deep(.checkout-amount__unit) { font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
-.order-card__pending { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-top: 14px; padding-top: 2px; border-top: 1px solid var(--v5-border); }
+/* Shared card footer (03 §3.1 P-67): the same 16px above and below the divider and under the action. */
+.order-card__pending { margin-top: var(--ui-space-inset); }
 .order-card__countdown { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--v5-warning-ink); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .order-card__pay { flex: none; margin-left: auto; }
 .orders-filter-empty { display: block; padding: 32px 16px; text-align: center; color: var(--v5-ink-3); font: 400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
