@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 const base = '/api/app/purchase-payment';
@@ -33,11 +33,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       || demoCapacityReplacementSource(fleet, demoProducts(state, url.origin))?.id !== sourceId))
       return refused(409, 'CAPACITY_REPLACEMENT_SOURCE_CHANGED');
     const source = fleet.devices.find(device => device.id === sourceId);
-    if (!source) return null;
-    const busy = status => ['RUNNING', 'BUSY'].includes(status);
-    const assignments = demoFixture(new URL('/api/tasks/assignments', url.origin), locale(), state, {...request, method: () => 'GET'});
-    const task = assignments.devices.find(device => device.deviceId === sourceId)?.currentTask;
-    return [source.status, source.runtimeStatus, task?.status].some(busy) ? refused(409, 'SIMULATED_DEVICE_BUSY') : null;
+    const { refusal } = demoReplacementSourceCheck(source, state, true,
+      path => demoFixture(new URL(path, url.origin), locale(), state, {...request, method: () => 'GET'}));
+    return refusal ? refused(409, refusal) : null;
   }
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   // The account's one order list.

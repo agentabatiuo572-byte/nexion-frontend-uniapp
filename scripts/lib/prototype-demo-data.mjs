@@ -488,6 +488,26 @@ function demoLiveActivity(product,now) {
   return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:Math.min(sales24h,Math.max(1,sales30m))};
 }
 
+// Read the effective task projection used by the preview before changing the source or payment.
+export function demoReplacementSourceCheck(source, state, external, read) {
+  if(source?.activatedAt==null)return {assignment:null,refusal:null};
+  const explicitV2=state.computeState!=null&&!['app','cycles'].includes(state.computeState);
+  let projection=read('/api/tasks/assignments');
+  if(explicitV2||(projection.protocolVersion!==3&&projection.devices.length)){
+    try { projection=read('/api/tasks/v2/assignments'); }
+    catch(error) { if(error.status!==404&&error.status!==501)throw error; }
+  }
+  const assignment=projection.devices.find(row=>row.deviceId===source.id);
+  const task=assignment?.currentTask;
+  if(projection.protocolVersion===2){
+    if(assignment?.recoveryPending)return {assignment,refusal:'COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED'};
+    const drained=!task||(task.startedAt==null?task.status==='FAILED':['COMPLETED','FAILED','CANCELLED'].includes(task.status));
+    return {assignment,refusal:drained?null:'COMPUTE_V2_DEVICE_BUSY'};
+  }
+  const busy=external&&[source.status,source.runtimeStatus,task?.status].some(status=>['RUNNING','BUSY'].includes(status));
+  return {assignment,refusal:busy?'SIMULATED_DEVICE_BUSY':null};
+}
+
 /** Mutable state belongs only to the loopback demonstration server. */
 export function demoFixture(url,locale,state,request,now=Date.now()) {
   state.previewFactsAt??=demoStartedAt;
@@ -778,13 +798,25 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
     return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
   };
-  if(pathname==='/api/app/trade-in/quote'){const input=request.postDataJSON();return tradeinQuote(input.sourceDeviceId,input.targetProductNo);}
+  const checkWalletSource=sourceDeviceId=>{
+    const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===sourceDeviceId);
+    const {assignment,refusal}=demoReplacementSourceCheck(source,state,false,
+      path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>({})},now));
+    if(refusal)refuse(refusal);
+    return assignment;
+  };
+  if(pathname==='/api/app/trade-in/quote'){
+    const input=request.postDataJSON();
+    const quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo);
+    checkWalletSource(quote.sourceDeviceId);
+    return quote;
+  }
   if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'){
     const replacingCapacity=pathname.endsWith('/capacity-replace');
     const input=request.postDataJSON();
     let quote;
     if(replacingCapacity){
-      const capacity=demoFixture(new URL('/api/app/trade-in/capacity-quote',url.origin),locale,state,request,now);
+      const capacity=capacityQuote();
       if(capacity.sourceDeviceId===null||input.sourceDeviceId!==capacity.sourceDeviceId)refuse('CAPACITY_REPLACEMENT_SOURCE_CHANGED');
       if(typeof input.expectedPayableUsdt!=='number'||Math.abs(input.expectedPayableUsdt-capacity.payableUsdt)>0.000001)refuse('CAPACITY_REPLACEMENT_QUOTE_CHANGED');
       quote={...capacity,discountUsdt:0,targetDeviceStatus:'ACTIVE'};
@@ -792,7 +824,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo);
       if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
     }
-    const sourceAssignment=read('/api/tasks/assignments').devices.find(device=>device.deviceId===quote.sourceDeviceId);
+    const sourceAssignment=checkWalletSource(quote.sourceDeviceId);
     const currentTask=sourceAssignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true);
@@ -821,7 +853,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const receipt={tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance};
     return replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);
   }
-  if(pathname==='/api/app/trade-in/capacity-quote'){
+  function capacityQuote(){
     const {targetProductNo}=request.postDataJSON();
     const product=products.find(item=>item.id===targetProductNo);
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
@@ -833,7 +865,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
       throw Object.assign(new Error(code),{status:403});
     }
-    const data=structuredClone(base());
+    const data=structuredClone(base('/api/app/trade-in/capacity-quote'));
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
     const fleet=demoFleetFacts(url,locale,state),active=fleet.devices.filter(device=>device.activatedAt!==null),full=fleet.slotsUsed>=fleet.slotCap;
     const source=demoCapacityReplacementSource(fleet,products);
@@ -841,6 +873,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       sourceDeviceId:source?.id??null,sourceDeviceName:source?.name??null,
       payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
     return data;
+  }
+  if(pathname==='/api/app/trade-in/capacity-quote'){
+    const quote=capacityQuote();
+    if(quote.decision==='REPLACE_REQUIRED')checkWalletSource(quote.sourceDeviceId);
+    return quote;
   }
   if(pathname==='/api/orders/quote') {
     const input=request.postDataJSON();

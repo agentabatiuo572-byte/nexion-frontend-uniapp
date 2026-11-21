@@ -692,10 +692,10 @@ async function openTradeinQuote(oldDevice: Device, targetKind: DeviceKind, newPr
     canonicalQuoteOrigin.value = requestOrigin;
     canonicalQuote.value = quote;
     sheet.showTradein(oldDevice.id, targetKind, newPrice);
-  } catch {
+  } catch (error) {
     if (!requestIsCurrent()) return;
     canonicalQuote.value = null;
-    toast.warn(t.value.tradein.errPleaseRetry);
+    warnTradeinQuoteRefusal(error);
   } finally {
     if (purchaseMounted && requestGeneration === quoteRequestGeneration.value) quoteLoading.value = false;
   }
@@ -734,6 +734,13 @@ async function onChooseFullPrice() {
   }
 }
 
+function warnTradeinQuoteRefusal(error: unknown) {
+  const reason = tradeinPaymentRejection(error);
+  const flow = checkoutFlowCopy(locale.code);
+  if (reason) toast.warn(flow.cannotPay, flow[reason]);
+  else toast.warn(t.value.tradein.errPleaseRetry);
+}
+
 async function refreshCapacityReplacement(targetKind: DeviceKind) {
   const requestGeneration = ++quoteRequestGeneration.value;
   const requestScope = captureAccountScope();
@@ -759,8 +766,8 @@ async function refreshCapacityReplacement(targetKind: DeviceKind) {
       });
     }
     if (requestIsCurrent()) hide();
-  } catch {
-    if (requestIsCurrent()) toast.warn(t.value.tradein.errPleaseRetry);
+  } catch (error) {
+    if (requestIsCurrent()) warnTradeinQuoteRefusal(error);
   } finally {
     if (requestIsCurrent()) quoteLoading.value = false;
   }

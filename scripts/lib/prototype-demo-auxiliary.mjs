@@ -7,6 +7,19 @@ import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
+export function demoReplacementAssignmentHistory(state, projection) {
+  if(projection.protocolVersion!==3||!state.cancelledReplacementAssignments)return projection;
+  const assignments=new Map(projection.devices.map(row=>[row.deviceId,row]));
+  for(const saved of Object.values(state.cancelledReplacementAssignments)){
+    const live=assignments.get(saved.deviceId);
+    const cancelled=saved.recentTasks.filter(task=>task.status==='CANCELLED');
+    const restarted=live?.currentTask&&!cancelled.some(task=>task.taskNo===live.currentTask.taskNo);
+    // Recycled devices leave the fleet, but their terminal task remains readable.
+    assignments.set(saved.deviceId,restarted?{...live,recentTasks:[...cancelled,...live.recentTasks]}:saved);
+  }
+  return {...projection,devices:[...assignments.values()]};
+}
+
 export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts) {
   if(request.method()!=='GET')return undefined;
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty';
@@ -84,9 +97,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
         completableAt:completedAt??new Date(now+300000).toISOString(),completedAt,
         receiptNo:completed?sample.receiptNo:null,proofNonce:null,proofExpiresAt:null};
     };
-    const cancelledAssignments=v3?state.cancelledReplacementAssignments??{}:{};
     const assignments=devices.map(device=>{
-      if(cancelledAssignments[device.id])return cancelledAssignments[device.id];
       const hasSample=device.id===settlement?.deviceId;
       const currentSample=hasSample?{...settlement,taskNo:'DEMO-TASK-4',durationSec:600}:null;
       if(currentSample?.simulation) {
@@ -99,10 +110,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
         ...(v3&&{phoneValidUntil:null,simulationState:currentSample&&device.activatedAt!==null?'CLOSING':'WAITING_CONFIG'}),
         ...(v2&&{recoveryPending:false,recoveryReason:null})};
     });
-    // Recycled devices leave the fleet, but their terminal task remains readable.
-    assignments.push(...Object.values(cancelledAssignments).filter(assignment=>
-      !devices.some(device=>device.id===assignment.deviceId)));
-    return {...proof,serverCanonical:true,serverNow:iso,devices:assignments,...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})};
+    return demoReplacementAssignmentHistory(state,{...proof,serverCanonical:true,serverNow:iso,devices:assignments,...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})});
   }
   if(p==='/api/tasks/v2/settlements'||p.startsWith('/api/tasks/v2/settlements/')) {
     const tasks=demoSettledTasks(state,state.previewFactsAt??now).filter(task=>task.batchNo);
