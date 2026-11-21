@@ -101,7 +101,7 @@
           <text class="order-summary__title">{{ t.orders.orderSummary }}</text>
           <view class="order-summary__total">
             <text class="order-summary__total-label">{{ order.trialReward ? purchaseCopy.orderPaid : t.orders.total }}</text>
-            <CheckoutAmount class="order-summary__amount" :value="order.total" :currency="order.paidAt == null ? 'USD' : 'USDT'" />
+            <CheckoutAmount class="order-summary__amount" v-bind="commerceOrderAmount(order)" />
           </view>
           <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
           <view v-if="order.lineItems?.length" class="order-summary__lines">
@@ -179,7 +179,7 @@
 <script setup lang="ts">
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { dateLocale } from "@/i18n/format";
-import { commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
+import { commerceOrderAmount, commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
@@ -1069,11 +1069,10 @@ function goDevices() {
   void navReset("/pages/me/devices");
 }
 const usdt = (value: number | string) => `${formatAmount(value)} USDT`;
-// Unpaid orders read in dollars (1 USD = 1 USDT); a settled wallet payment reads in USDT.
 // Only subtotal and total rows carry the unit.
 function summaryMoney(value: number | string, unit = false): string {
   if (!unit) return formatAmount(value);
-  return order.value?.paidAt == null ? `$${formatAmount(value)}` : usdt(value);
+  return order.value && commerceOrderAmount(order.value).currency === 'USDT' ? usdt(value) : `$${formatAmount(value)}`;
 }
 const trialRewardText = computed(() => {
   const reward = order.value?.trialReward;
