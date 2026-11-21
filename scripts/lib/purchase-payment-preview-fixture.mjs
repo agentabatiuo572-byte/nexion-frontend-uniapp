@@ -32,6 +32,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return reason === 'NETWORK_SWITCH_OFF' ? refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED') : null;
   };
   const handles = path => path.startsWith(base);
+  // The preview models one purchasing account, including its seeded payments.
+  const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoAccountId;
+  const existingIntent = intent => ({
+    ...refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'),
+    data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo, commandKey: intent.commandKey},
+  });
   function replacementRefusal(url, request, kind, sourceId) {
     if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
     const fleet = demoFleetFacts(url, locale(), state);
@@ -283,23 +289,37 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return intent ? {status: 200, message: 'OK', data: view(intent)} : refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
   }
   function handle(url, request) {
+    return handlePayment(url, request, ownsPreviewPayments(request));
+  }
+  function handlePayment(url, request, ownsPayments) {
     sync();
     const path = url.pathname, method = request.method();
     const byOrder = path.match(/^\/api\/app\/purchase-payment-intents\/by-order\/([^/]+)$/);
     if (byOrder && method === 'GET') {
       const orderNo = decodeURIComponent(byOrder[1]);
-      if (previewAccountId(state, request.headers?.() ?? {}) !== demoAccountId
-          || !demoHasAccountOrder(url,state,orderNo)) return refused(404, 'ORDER_NOT_FOUND');
+      if (!ownsPayments || !demoHasAccountOrder(url,state,orderNo)) return refused(404, 'ORDER_NOT_FOUND');
       if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_LOOKUP_UNAVAILABLE');
       const intent = openIntent({kind: 'ORDER_PAY', orderNo});
       return {status: 200, message: 'OK', data: {orderNo, state: intent ? 'IN_PROGRESS' : 'NONE', intentNo: intent?.intentNo ?? null}};
     }
     if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
     if (path === `${base}-quotes` && method === 'POST') {
+      if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const body = request.postDataJSON(), {kind, payload} = body;
       if (!Object.hasOwn(commandKinds, kind) || !payload) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       const products = demoProducts(state, url.origin), subject = purchaseSubject(kind, payload, products);
-      if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
+      const existing = openIntent(subject);
+      if (existing) {
+        if (kind === 'TRIAL_CONVERT') {
+          const productNo = String(payload.productNo ?? '');
+          if (!/^[A-Za-z0-9._-]{2,64}$/.test(productNo)) return refused(422, 'TRIAL_PRODUCT_REQUIRED');
+          const canonicalProductNo = value => value === 'device-trial-standard' ? 'stellarbox-s1' : value;
+          if (canonicalProductNo(productNo) !== canonicalProductNo(existing.payload.productNo)) {
+            return refused(409, 'TRIAL_PRODUCT_NOT_ELIGIBLE');
+          }
+        }
+        return existingIntent(existing);
+      }
       const gate = networkGate(body.paymentMethod);
       if (gate) return gate;
       const order = kind === 'ORDER_PAY' ? ordersOf(url.origin).find(row => row.orderNo === subject.orderNo) : null;
@@ -338,6 +358,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       return {status: 200, message: 'OK', data: quote};
     }
     if (path === `${base}-intents` && method === 'POST') {
+      if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const key = request.headers()['idempotency-key'], quoteId = request.postDataJSON().paymentQuoteId, source = quotes.get(quoteId);
       if (!key) return refused(422, 'IDEMPOTENCY_KEY_REQUIRED');
       if (!source) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
@@ -346,7 +367,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const suspended = [...suspendedIntents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (suspended && suspended.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
-      if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
+      const existing = openIntent(subject);
+      if (existing) return existingIntent(existing);
       const gate = networkGate(source.quote.paymentMethod);
       if (gate) return gate;
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
@@ -380,11 +402,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       return {status: 200, message: 'OK', data: view(intent)};
     }
     if (path === `${base}-intents` && method === 'GET') {
+      if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
       const intent = [...intents.values()].find(row => row.kind === url.searchParams.get('kind') && row.commandKey === url.searchParams.get('commandKey'));
       return readIntent(intent);
     }
     const one = path.match(/^\/api\/app\/purchase-payment-intents\/([^/]+)$/);
     if (one && method === 'GET') {
+      if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
       return readIntent(intents.get(decodeURIComponent(one[1])));
     }
     return {status: 404, message: 'PURCHASE_PAYMENT_NOT_MODELED', data: null};
@@ -393,10 +417,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const orderNo = 'DEMO-ORDER-001';
     if (openOrderPayment(orderNo)) return {status: 200};
     const request = (body, headers = {}) => ({method: () => 'POST', postDataJSON: () => body, headers: () => headers});
-    const quote = handle(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_BSC', payload: {orderNo}}));
+    const quote = handlePayment(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_BSC', payload: {orderNo}}), true);
     if (quote.status !== 200) return quote;
-    return handle(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
-      {'idempotency-key': `wallet-pay:${orderNo}:other-device`}));
+    return handlePayment(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
+      {'idempotency-key': `wallet-pay:${orderNo}:other-device`}), true);
   }
-  return {handles, handle, paymentCommand, observePayments, openOrderPayment, seedRemoteOrderPayment, selectPaymentMode};
+  return {handles, handle, paymentCommand, observePayments, openOrderPayment, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments};
 }
