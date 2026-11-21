@@ -1,6 +1,6 @@
 <template>
-  <view class="service-messages" :aria-busy="loading">
-    <view v-if="loading && !rows.length" class="service-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
+  <view class="service-messages" :class="{ 'notification-feed--failed': failureShown && !rows.length }" :aria-busy="loading">
+    <view v-if="loading && !rows.length && !failureShown" class="service-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
     <view v-if="!loading && !failed && !rows.length" class="service-state service-empty">
       <text class="service-empty-title">{{ t.notifs.serviceEmpty }}</text>
       <text>{{ t.notifs.serviceEmptyHint }}</text>
@@ -25,19 +25,19 @@
         <view class="service-meta"><view v-if="unreadUnavailable(row) || row.unread > 0" class="service-unread"><text>{{ unreadUnavailable(row) ? '-' : formatUnreadBadge(row.unread) }}</text></view></view>
       </view>
     </ConversationSwipeRow>
-    <view v-if="failed && !rows.length" class="service-state"><text>{{ t.conversations.title }}</text><text>—</text></view>
+    <!-- Nothing to show after a failed first read: one result and the one 重新加载, placed and styled like the
+         notifications tab's cold failure (03 §3.4, §3.5.2). A failed refresh with rows stays quiet. -->
+    <view v-if="failureShown && !rows.length" class="message-state" role="alert"><text>{{ t.conversations.loadError }}</text><view class="nx-card-recovery-action nx-card-recovery-action--quiet" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" :aria-label="t.ui.reload" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"><text>{{ t.ui.reload }}</text></view></view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ConversationSwipeRow from './conversation-swipe-row.vue';
 import { useConversationDelete } from '@/composables/use-conversation-delete';
 import { useConversations } from "@/store/conversations";
 
-import { useMessageDrawer } from "@/store/message-drawer";
 import { useT } from "@/i18n/use-t";
 import { fmt, dateLocale } from "@/i18n/format";
 import { formatDisplayDateTime } from "@/lib/display-date";
@@ -45,8 +45,9 @@ import { navTo } from "@/lib/route";
 import { localizedIdleClose } from "@/lib/support-idle-message";
 import { formatUnreadBadge } from "@/lib/unread-badge";
 
+const props = defineProps<{ retry: () => Promise<unknown> }>();
 const emit = defineEmits<{ (event: "navigate"): void }>();
-const conversations = useConversations(), center = useMessageDrawer();
+const conversations = useConversations();
 const t = useT();
 const actions = useConversationDelete();
 type ServiceKind = "advisor" | "support";
@@ -54,6 +55,10 @@ type Row = { key: string; id: string; kind: ServiceKind; title: string; preview:
 function unreadUnavailable(row: Row) { return !Number.isSafeInteger(row.unread) || row.unread < 0 || !!(conversations.error || conversations.categoryAvailabilityStatus === "failed"); }
 const loading = computed(() => conversations.loading || conversations.categoryLoading);
 const failed = computed(() => !!(conversations.error || conversations.categoryAvailabilityStatus === "failed"));
+// View only: the store clears its error when a re-read starts, so the shown failure is held until a read
+// succeeds or rows arrive; while that re-read runs the button is disabled instead of the state flashing away.
+const failureShown = ref(false);
+function reload() { if (!loading.value) void props.retry(); }
 const clean = (text: string) => text.replace(/\*\*/g, "").replace(/\s*\n+\s*/g, " ").trim();
 const rows = computed<Row[]>(() => {
   return conversations.humanThreads.map<Row>(c => {
@@ -68,6 +73,11 @@ const rows = computed<Row[]>(() => {
       ts: Math.max(c.lastTs, last?.ts ?? 0), unread: c.unread };
   }).sort((a, b) => b.ts - a.ts || a.key.localeCompare(b.key));
 });
+watch([failed, loading, () => rows.value.length], ([isFailed, isLoading, count]) => {
+  if (count) failureShown.value = false;
+  else if (isFailed) failureShown.value = true;
+  else if (!isLoading) failureShown.value = false;
+}, { immediate: true });
 function activityTime(ts: number) {
   return formatDisplayDateTime(ts, dateLocale());
 }
@@ -75,14 +85,6 @@ function go(route: string) { emit("navigate"); navTo(route); }
 function openRow(row: Row) {
   go(`/pages/support/chat?cid=${encodeURIComponent(row.id)}`);
 }
-async function retry() {
-  if (loading.value) return;
-  await center.refresh();
-}
-useAutoRecovery({
-  failed: () => !loading.value && failed.value,
-  retry,
-});
 </script>
 
 <style scoped>

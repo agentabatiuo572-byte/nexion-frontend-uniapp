@@ -111,20 +111,11 @@
         <text class="nx-dep-sec">{{ t.topupChrome.recentDeposits }}</text>
 
         <view v-if="bankHistoryStatus === 'idle' || bankHistoryStatus === 'loading'" class="nx-dep-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
-        <view v-else-if="bankHistoryStatus === 'error'" style="margin-top: 8px">
-          <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
-          <view class="nx-dep-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refreshBankHistory">
-            <text>{{ t.ui.retry }}</text>
-          </view>
-        </view>
+        <view v-if="fundsServerEnabled && !chainHistoryLoaded && !chainHistoryFailed" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
+        <!-- A failed history read is unknown, not empty: a still placeholder that recovers on its own (03 §3.5.2). -->
+        <text v-if="historyUnknown" class="block" :style="historyUnknownStyle">—</text>
 
-        <view v-if="fundsServerEnabled && chainHistoryFailed" style="margin-top: 8px">
-          <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
-          <view class="nx-dep-chain-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refresh()"><text>{{ t.ui.retry }}</text></view>
-        </view>
-        <view v-else-if="fundsServerEnabled && !chainHistoryLoaded" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
-
-        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || (chainHistoryLoaded && !chainHistoryFailed && !addressRefreshFailed))" class="flex flex-col items-center" style="padding: 26px 0 18px">
+        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || (chainHistoryLoaded && !addressRefreshFailed))" class="flex flex-col items-center" style="padding: 26px 0 18px">
           <view class="grid place-items-center" :style="stateIconBoxStyle">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
           </view>
@@ -170,6 +161,7 @@ import { onShow, onHide } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import { cregisDepositApi, fundsServerEnabled, sessionVault } from "@/api/runtime";
 import { binarySessionReady } from "@/lib/binary-session-ready";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useT } from "@/i18n/use-t";
@@ -237,11 +229,9 @@ let loadGeneration = 0;
 let pageVisible = true;
 const requestRunning = ref(false);
 let nextPollAt = 0;
-let pollFailures = 0;
-function pollDelay(state: "preparing" | "ready" | "error", failures = 0): number {
+function pollDelay(state: "preparing" | "ready"): number {
   if (state === "preparing") return 5_000 + Math.floor(Math.random() * 5_001);
-  if (state === "ready") return 30_000 + Math.floor(Math.random() * 15_001);
-  return Math.min(60_000, 10_000 * 2 ** Math.min(failures, 2)) + Math.floor(Math.random() * 5_001);
+  return 30_000 + Math.floor(Math.random() * 15_001);
 }
 const serverAddress = ref("");
 const serverEnabled = ref(false);
@@ -315,11 +305,14 @@ async function load(background = false): Promise<void> {
         let deposits;
         try {
           deposits = await cregisDepositApi.list();
-        } catch {
+        } catch (cause) {
           if (generation === loadGeneration && account === app.accountKey
               && bindingEpoch === app.accountBindingEpoch && remoteSessionReady.value) {
+            if (!isTransientReadFailure(cause)) {
+              chainHistoryLoaded.value = false;
+              serverRecords.value = [];
+            }
             chainHistoryFailed.value = true;
-            nextPollAt = Date.now() + pollDelay("error", pollFailures++);
           }
           return;
         }
@@ -345,7 +338,6 @@ async function load(background = false): Promise<void> {
           createdAt: row.createdAt, creditedAt: row.creditedAt ?? undefined,
         }));
         phase.value = "ready";
-        pollFailures = 0;
         nextPollAt = Date.now() + pollDelay(phase.value);
       } catch {
         if (generation === loadGeneration && account === app.accountKey
@@ -357,7 +349,6 @@ async function load(background = false): Promise<void> {
           copied.value = false;
           addressRefreshFailed.value = hadSnapshot;
           phase.value = hadSnapshot ? "ready" : "error";
-          nextPollAt = Date.now() + pollDelay("error", pollFailures++);
         }
       } finally {
         if (generation === loadGeneration) requestRunning.value = false;
@@ -371,9 +362,12 @@ async function load(background = false): Promise<void> {
   }, 650);
 }
 useAutoRecovery({
+  // The regular poll resumes after a successful read. Recovery owns failed reads.
   failed: () => fundsServerEnabled && remoteSessionReady.value && !requestRunning.value
     && (phase.value === "error" || (phase.value === "ready" && (addressRefreshFailed.value || chainHistoryFailed.value))),
   retry: () => refresh(true),
+  repeatMs: 30_000,
+  quiet: false,
 });
 useAutoRecovery({
   failed: () => fundsServerEnabled && remoteSessionReady.value && dep.remoteReceiptInitialStatus === "error",
@@ -488,6 +482,11 @@ const sortedRecords = computed(() => {
     ? bankRecords.filter(row => row.channel === "bank-vietqr") : [])]
     .sort((a, b) => b.createdAt - a.createdAt);
 });
+// No row to show, nothing still loading, and a history read failed: the list is unknown, not empty.
+const historyUnknown = computed(() => sortedRecords.value.length === 0
+  && bankHistoryStatus.value !== "idle" && bankHistoryStatus.value !== "loading"
+  && (!fundsServerEnabled || chainHistoryLoaded.value || chainHistoryFailed.value)
+  && (bankHistoryStatus.value === "error" || (fundsServerEnabled && !chainHistoryLoaded.value && chainHistoryFailed.value)));
 /** 法币轨(VietQR / 银行卡)入账后与链上记录同列此区,标题按通道分流。
  *  全键 Record 而非三元表达式:新增通道时 TS 强制补齐,不会静默落进 USDT 文案 ——
  *  卡轨接入本列表时正是先踩了这个(旧写法「非银行轨即 USDT」会把卡入金标成 USDT 充值)。 */
@@ -609,6 +608,7 @@ function progFillStyle(r: PaneDepositRecord): CSSProperties {
     transition: "width 0.4s ease",
   };
 }
+const historyUnknownStyle: CSSProperties = { marginTop: "8px", padding: "18px 0", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
 const noteStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",

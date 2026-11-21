@@ -6,7 +6,7 @@
       <HowHero kind="balance" :title="w.heroTitle" :sub="w.heroSub" :sections="remoteState === 'ready' || remotePool || ruleFacts ? directory : []" :nav-label="guide.contents" />
 
       <view v-if="remoteState === 'loading' && !remotePool && !ruleFacts" class="text-center" style="padding: 48px 20px" role="status" aria-busy="true"><text>{{ t.pool.loading }}</text></view>
-      <EmptyState v-else-if="remoteState !== 'ready' && !remotePool && !ruleFacts" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="loadRemotePool" />
+      <EmptyState v-else-if="remoteState !== 'ready' && !remotePool && !ruleFacts" kind="recoverable-error" page :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="remoteState === 'hold' ? t.pool.retry : t.ui.reload" @cta="loadRemotePool" />
 
       <template v-else>
         <HowSection anchor="rules" :title="w.currentRulesTitle">
@@ -80,7 +80,7 @@ import { useApp } from "@/store/app";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useVRank, type VRank } from "@/store/v-rank";
 import { rankLabel } from "@/lib/v-rank-copy";
-import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
+import { leadershipPoolReadFailure } from "@/lib/leadership-pool-state";
 import { leadershipHowFacts } from "@/lib/leadership-how-facts";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
@@ -151,8 +151,12 @@ async function loadRemotePool(refreshRank = true) {
     remoteState.value = "ready";
   } catch (cause) {
     if (!current()) return;
-    remotePool.value = null; ruleFacts.value = null;
-    remoteState.value = leadershipPoolFailureState(cause);
+    const failure = leadershipPoolReadFailure(cause);
+    if (!failure.retainSnapshot) {
+      remotePool.value = null;
+      ruleFacts.value = null;
+    }
+    remoteState.value = failure.state;
   }
 }
 
@@ -163,7 +167,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, loca
 }, { flush: 'sync' });
 const unsubscribeRemotePoolRun = subscribeRuntimeRevision(() => { if (remoteApiEnabled) void loadRemotePool(); });
 onShow(() => { pageVisible = true; void loadRemotePool(); });
-onHide(() => { pageVisible = false; remoteRequest++; remotePool.value = null; remoteState.value = "loading"; });
+onHide(() => { pageVisible = false; remoteRequest++; remoteState.value = "loading"; });
 onUnmounted(() => { mounted = false; remoteRequest += 1; remotePool.value = null; unsubscribeRemotePoolRun(); });
 function goBack() { navBack("/pages/team/leadership-pool"); }
 

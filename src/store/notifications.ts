@@ -6,6 +6,7 @@ import { notificationPreferenceKind, notificationCategory, type NotificationCate
 import { notificationApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import type { NotificationFilter } from "@/api/notification-api";
 
@@ -36,8 +37,8 @@ function hydrate(accountKey: string): Notification[] {
 let counter = 0;
 
 function emptyRemotePage() {
-  return { items: [] as Notification[], loading: false, loadingMore: false, error: null as string | null,
-    hasRemoteSnapshot: false, nextCursor: null as string | null, historyLoaded: false, failedCursor: undefined as string | undefined };
+  return { items: [] as Notification[], loading: false, loadingMore: false, readError: null as string | null, pageError: null as string | null,
+    hasRemoteSnapshot: false, nextCursor: null as string | null, historyLoaded: false };
 }
 function emptyRemotePages() {
   return { all: emptyRemotePage(), finance: emptyRemotePage(), device: emptyRemotePage(),
@@ -77,7 +78,10 @@ export const useNotifications = defineStore("notifications", () => {
   });
   const loading = computed({ get: () => pageState.value.loading, set: value => { pageState.value.loading = value; } });
   const loadingMore = computed(() => pageState.value.loadingMore);
-  const error = computed({ get: () => pageState.value.error, set: value => { pageState.value.error = value; } });
+  const readError = computed(() => pageState.value.readError);
+  const pageError = computed(() => pageState.value.pageError);
+  const commandError = ref<string | null>(null);
+  const readFailedWithoutData = computed(() => !!readError.value && !hasRemoteSnapshot.value && items.value.length === 0);
   const hasRemoteSnapshot = computed({ get: () => pageState.value.hasRemoteSnapshot, set: value => { pageState.value.hasRemoteSnapshot = value; } });
   const nextCursor = computed({ get: () => pageState.value.nextCursor, set: value => { pageState.value.nextCursor = value; } });
   let refreshGeneration = 0;
@@ -131,7 +135,7 @@ export const useNotifications = defineStore("notifications", () => {
     // Register before loading notifies synchronous page watchers. Polls and page
     // activations then consume the same actual dispatch, including absent summaries.
     rememberPassiveTabRead("notifications", promise, undefined, undefined,
-      () => confirmed && hasRemoteSnapshot.value && remoteAccountEpoch.isCurrent(request) && !loading.value && !error.value);
+      () => confirmed && hasRemoteSnapshot.value && remoteAccountEpoch.isCurrent(request) && !loading.value && !readError.value);
     void readRemote(request, active).then(success => { confirmed = success; resolve(); }, reject);
     return promise;
   }
@@ -149,20 +153,18 @@ export const useNotifications = defineStore("notifications", () => {
     const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request) && stillActive();
     loading.value = true;
     pageState.value.loadingMore = false;
-    error.value = null;
     try {
       const page = await notificationApi.page(undefined, undefined, requestedCategory);
       if (!isCurrent()) return false;
       appendRemote(page, true);
       if (!isCurrent()) return false;
       hasRemoteSnapshot.value = true;
-      pageState.value.failedCursor = undefined;
+      pageState.value.readError = null;
       return isCurrent();
     } catch (cause) {
       if (!isCurrent()) return false;
-      actionableUnread.value = null;
-      hasRemoteSnapshot.value = false;
-      error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
+      if (!isTransientReadFailure(cause)) actionableUnread.value = null;
+      pageState.value.readError = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
       return false;
     } finally {
       if (generation === refreshGeneration && remoteAccountEpoch.isCurrent(request)) loading.value = false;
@@ -183,35 +185,26 @@ export const useNotifications = defineStore("notifications", () => {
     const isCurrent = () => generation === refreshGeneration && remoteAccountEpoch.isCurrent(request);
     loading.value = true;
     pageState.value.loadingMore = true;
-    error.value = null;
+    pageState.value.pageError = null;
     try {
       const page = await notificationApi.page(requestedCursor, undefined, requestedCategory);
       if (!isCurrent()) return;
       if (page.nextCursor === requestedCursor) {
-        pageState.value.failedCursor = requestedCursor;
-        error.value = "NOTIFICATION_PAGE_CURSOR_OVERLAP";
-        return;
+        pageState.value.pageError = "NOTIFICATION_PAGE_CURSOR_OVERLAP";
+        return false;
       }
       appendRemote(page, false);
-      pageState.value.failedCursor = undefined;
+      return true;
     }
     catch (cause) {
-      if (isCurrent()) { pageState.value.failedCursor = requestedCursor; actionableUnread.value = null; error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE"; }
+      if (isCurrent()) {
+        pageState.value.pageError = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
+        return false;
+      }
     }
     finally {
       if (isCurrent()) { loading.value = false; pageState.value.loadingMore = false; }
     }
-  }
-  let retryInFlight: { request: RemoteAccountRequest; cancellation: number } | null = null;
-  async function retryRemote() {
-    if (loading.value || (retryInFlight && retryInFlight.cancellation === cancelGeneration && remoteAccountEpoch.isCurrent(retryInFlight.request))) return;
-    const attempt = { request: remoteAccountEpoch.snapshot(), cancellation: cancelGeneration };
-    retryInFlight = attempt;
-    try {
-      if (pageState.value.failedCursor) await loadMoreRemote();
-      else await refreshRemote(attempt.request);
-    }
-    finally { if (retryInFlight === attempt) retryInFlight = null; }
   }
   function invalidateReads() {
     invalidatePassiveTabRead("notifications");
@@ -241,6 +234,7 @@ export const useNotifications = defineStore("notifications", () => {
     pageState.value.loadingMore = false;
     const queued = queue.tail.then(async () => {
       if (!remoteAccountEpoch.isCurrent(request)) return undefined;
+      commandError.value = null;
       return operation();
     });
     const settled = queued.finally(() => { queue.pending -= 1; });
@@ -263,7 +257,7 @@ export const useNotifications = defineStore("notifications", () => {
       pages.value = emptyRemotePages();
       category.value = "all";
       loading.value = false;
-      error.value = null;
+      commandError.value = null;
       if (boundKey !== "default") void refreshRemote(remoteAccountEpoch.snapshot());
       return;
     }
@@ -287,39 +281,30 @@ export const useNotifications = defineStore("notifications", () => {
     if (unreadByKind.value !== null) return;
     unread.value = Math.max(0, unread.value - 1);
   }
-  async function reconcileConfirmedRead(id: string, request: RemoteAccountRequest, origin = pageState.value) {
-    const hasSummary = unreadByKind.value !== null || actionableUnread.value !== null;
-    actionableUnread.value = null;
-    confirmRead(id);
-    if (!hasSummary) return;
-    try {
-      // Already inside the mutation queue; refreshRemote would wait on itself.
-      const page = await notificationApi.page(undefined, undefined, category.value);
-      if (!remoteAccountEpoch.isCurrent(request)) return;
-      unread.value = page.unread;
-      actionableUnread.value = page.actionableUnread ?? null;
-      unreadByKind.value = page.unreadByKind ? { ...page.unreadByKind } : null;
-    } catch (cause) {
-      if (remoteAccountEpoch.isCurrent(request)) origin.error = cause instanceof Error ? cause.message : 'NOTIFICATION_UPDATE_FAILED';
-    }
-  }
-  async function markRead(id: string, request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
+  async function markRead(id: string, request: RemoteAccountRequest = remoteAccountEpoch.snapshot(), fromAction = false) {
     if (remoteApiEnabled) {
       const origin = pageState.value;
-      return enqueueRemoteMutation(request, async () => {
+      const cancellation = cancelGeneration;
+      const shouldRefresh = await enqueueRemoteMutation(request, async () => {
         const item = origin.items.find((value) => value.id === id);
-        if (!item || item.readAt) return;
+        if (!fromAction && (!item || item.readAt)) return;
         try {
           await notificationApi.markRead(Number(id));
         } catch (cause) {
           if (!remoteAccountEpoch.isCurrent(request)) return;
-          origin.error = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
-          return false;
+          commandError.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+          return;
         }
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        origin.error = null;
-        await reconcileConfirmedRead(id, request, origin);
+        const hasSummary = unreadByKind.value !== null || actionableUnread.value !== null;
+        actionableUnread.value = null;
+        confirmRead(id);
+        return fromAction || hasSummary;
       });
+      if (shouldRefresh && remoteAccountEpoch.isCurrent(request) && cancellation === cancelGeneration) {
+        void refreshRemote(request, () => cancellation === cancelGeneration);
+      }
+      return;
     }
     const item = items.value.find((value) => value.id === id);
     if (!item || item.readAt || !remoteAccountEpoch.isCurrent(request)) return;
@@ -334,11 +319,11 @@ export const useNotifications = defineStore("notifications", () => {
           await notificationApi.markAllRead();
         } catch (cause) {
           if (!remoteAccountEpoch.isCurrent(request)) return;
-          error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+          commandError.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
           return false;
         }
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        error.value = null;
+        commandError.value = null;
         for (const page of Object.values(pages.value)) {
           page.items = page.items.map((item) => item.readAt ? item : { ...item, readAt: Date.now() });
         }
@@ -364,11 +349,11 @@ export const useNotifications = defineStore("notifications", () => {
           await notificationApi.clearRead();
         } catch (cause) {
           if (!remoteAccountEpoch.isCurrent(request)) return;
-          error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
+          commandError.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
           return false;
         }
         if (!remoteAccountEpoch.isCurrent(request)) return;
-        error.value = null;
+        commandError.value = null;
         // Deletion eligibility belongs to the server (critical/locked rows may remain).
         // Unread rows cannot be deleted. Keep their dots while invalidating every
         // category's read cache, even if the user switched filters during the write.
@@ -390,44 +375,29 @@ export const useNotifications = defineStore("notifications", () => {
     if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
     const request = remoteAccountEpoch.snapshot();
     const cancellation = cancelGeneration;
-    type ActionResult =
-      | { kind: "done"; route: string | null }
-      | { kind: "uncertain"; cause: unknown };
-    const queued = await enqueueRemoteMutation(request, async (): Promise<ActionResult> => {
+    const receipt = await enqueueRemoteMutation(request, async () => {
       try {
-        const result = await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
-        if (!remoteAccountEpoch.isCurrent(request)) return { kind: "done", route: null };
-        try {
-          await notificationApi.markRead(numericId);
-        } catch (cause) {
-          if (remoteAccountEpoch.isCurrent(request)) {
-            error.value = cause instanceof Error ? cause.message : "NOTIFICATION_UPDATE_FAILED";
-          }
-          // The primary action is already confirmed. Keep its route even when the
-          // secondary read acknowledgement needs a later retry.
-          return { kind: "done", route: remoteAccountEpoch.isCurrent(request) ? result.route : null };
-        }
-        if (!remoteAccountEpoch.isCurrent(request)) return { kind: "done", route: null };
-        error.value = null;
-        await reconcileConfirmedRead(id, request);
-        return { kind: "done", route: result.route };
+        return await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
       } catch (cause) {
-        return { kind: "uncertain", cause };
+        if (!remoteAccountEpoch.isCurrent(request) || cancellation !== cancelGeneration) return;
+        commandError.value = cause instanceof Error ? cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
+        return false as const;
       }
     });
-    if (!queued || !remoteAccountEpoch.isCurrent(request)) return null;
-    if (queued.kind === "uncertain") {
-      if (cancellation !== cancelGeneration) return null;
-      await refreshRemote(request, () => cancellation === cancelGeneration);
-      if (!remoteAccountEpoch.isCurrent(request)) return null;
-      error.value = queued.cause instanceof Error ? queued.cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
+    if (receipt === undefined || !remoteAccountEpoch.isCurrent(request)) return null;
+    if (receipt === false) {
+      void refreshRemote(request, () => cancellation === cancelGeneration);
       return null;
     }
-    return queued.route;
+    // The action receipt owns the route. A separate acknowledgement and head
+    // read can settle afterward, even if navigation has already begun.
+    void markRead(id, request, true);
+    return receipt.route;
   }
+
   async function recordCta(id: string) { return recordRemoteAction(id, "cta"); }
   async function recordSwipeConversion(id: string) { return recordRemoteAction(id, "swipe_conversion"); }
   function clearAll() { if (remoteApiEnabled) { void refreshRemote(); return; } items.value = []; recount(); persist(); }
   function removeOne(id: string) { if (remoteApiEnabled) return; items.value = items.value.filter((item) => item.id !== id); recount(); persist(); }
-  return { items, category, unread, actionableUnread, unreadByKind, unreadByCategory, unreadByCategoryExact, loading, loadingMore, error, hasRemoteSnapshot, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, selectCategory, loadMoreRemote, retryRemote, recordCta, recordSwipeConversion };
+  return { items, category, unread, actionableUnread, unreadByKind, unreadByCategory, unreadByCategoryExact, loading, loadingMore, readError, pageError, commandError, readFailedWithoutData, hasRemoteSnapshot, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, selectCategory, loadMoreRemote, recordCta, recordSwipeConversion };
 });

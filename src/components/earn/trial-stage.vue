@@ -16,18 +16,20 @@
     </view>
     <text v-if="presentation.status.value === 'grace'" class="trial-stage__note">{{ copy.grace }}</text>
     <text class="trial-stage__note">{{ copy.creditNote }}</text>
-    <view v-if="!presentation.presentationReady.value" class="trial-stage__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view class="trial-stage__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
     <view class="trial-stage__actions">
       <view class="trial-stage__group">
         <view class="trial-stage__pill" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails"><text class="trial-stage__pill-face nx-frosted-button">{{ copy.detailsAction }}</text></view>
-        <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button nx-after-arrow">{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }}</text></view>
+        <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" :aria-label="buyLabel" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button nx-after-arrow">{{ buyText }}</text></view>
       </view>
     </view>
+    <!-- After a failed read the reason sits under the dimmed buy pill (03 §3.1, §3.4); it also covers a stage with no confirmed figures. -->
+    <text v-if="trial.lastReadFailed && !presentation.actionsReady.value" class="trial-stage__reason">{{ presentation.displayReady.value ? copy.retainedCredit : copy.unknown }}</text>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useFreeTrial } from "@/store/free-trial";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
@@ -43,7 +45,9 @@ import JobGauge from "./job-gauge.vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const visibility = useDataVisibility();
-const presentation = useTrialPresentation();
+const trial = useFreeTrial();
+const presentation = useTrialPresentation(undefined, { retainOnReadFailure: true });
+defineExpose({ readFailedWithoutData: presentation.readFailedWithoutData });
 const copy = useTrialFleetCopy();
 const t = useT();
 // The online dot breathes only while the stage is on screen and the page is shown.
@@ -52,14 +56,17 @@ const loopRef = loops.elRef;
 
 const name = computed(() => presentation.deviceName.value || "—");
 const art = computed(() => getProductMedia(presentation.productId.value)?.src ?? null);
-const online = computed(() => presentation.presentationReady.value && presentation.status.value === "active");
-const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
+const online = computed(() => presentation.displayReady.value && presentation.status.value === "active");
+const statusText = computed(() => !presentation.displayReady.value ? copy.value.statusUnknown
   : online.value ? t.value.earn.online : copy.value.grace);
 const remaining = computed(() => presentation.remainingMs.value === null ? "—" : formatTrialCountdown(presentation.remainingMs.value));
 const gaugeProgress = computed(() => visibility.hidden || presentation.offsetProgress.value === null ? null : Math.round(presentation.offsetProgress.value * 100));
 function money(value: number | null) {
   return visibility.mask(value === null ? "—" : `$${formatAmount(value)}`);
 }
+const buyText = computed(() => presentation.status.value === "grace" ? copy.value.buy : copy.value.buyEarly);
+// A failed trial read shows no strip (03 §3.4); the dimmed buy pill still tells screen readers why.
+const buyLabel = computed(() => trial.lastReadFailed && !presentation.actionsReady.value ? `${buyText.value} · ${copy.value.unknown}` : undefined);
 function goDetails() { navTo("/pages/me/trial"); }
 function goBuy() { if (presentation.actionsReady.value) goDetails(); }
 
@@ -85,8 +92,7 @@ function goBuy() { if (presentation.actionsReady.value) goDetails(); }
 .trial-stage__label { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .trial-stage__value { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .trial-stage__note { position: relative; display: block; margin-top: 10px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); text-align: center; }
-.trial-stage__notice { position: relative; margin-top: 8px; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
-.trial-stage__retry { display: flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--v5-brand); }
+.trial-stage__reason { position: relative; display: block; margin: calc(-1 * var(--v5-space-1)) 0 var(--v5-space-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); text-align: right; }
 .trial-stage__actions { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; margin-top: 6px; }
 .trial-stage__group { display: flex; gap: 8px; margin-left: auto; }
 /* 44px hit area; the visible glass pill stays a compact 32px. */

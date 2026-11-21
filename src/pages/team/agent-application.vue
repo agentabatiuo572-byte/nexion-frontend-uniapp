@@ -2,7 +2,7 @@
   <AppChassis active="team">
     <view class="detail-page nx-viz-motion">
       <SubPageHeader :back="AMBASSADOR_ROUTES.records" :title="t.headerTitles.teamAgentApplication" />
-      <EmptyState v-if="readState === 'error' && !pack" kind="recoverable-error" :title="c.detailLoadError" :cta-label="t.agent.retry" @cta="retry" />
+      <EmptyState v-if="readState === 'error' && !pack" kind="recoverable-error" page :title="c.detailLoadError" :cta-label="t.ui.reload" @cta="retry" />
       <view v-else-if="!pack || !row" class="detail-loading" role="status" aria-busy="true"><text>{{ t.agent.loading }}</text></view>
       <CardStagger v-else class="detail-content">
         <!-- Page focus: soft-glass hero with the status tag, the amount and the four-node progress. -->
