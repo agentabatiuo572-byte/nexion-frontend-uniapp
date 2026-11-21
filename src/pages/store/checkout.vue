@@ -303,7 +303,7 @@ import { useAuth } from "@/store/auth";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow, releaseAccountCommandKey } from "@/store/account-scoped-storage";
 import { rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
 import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
-import { orderPaymentRejection } from '@/lib/order-payment-rejection';
+import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
@@ -323,7 +323,7 @@ import { navReplace, navReset, navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
-import { asApiError, isSettledRejection } from "@/api/errors";
+import { asApiError, isApiRefusal, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
@@ -1983,14 +1983,25 @@ function retireRemoteOrderKey(): void {
   remoteOrderCommandKey.clear();
 }
 
+function resetRejectedTradein(recovery: CheckoutTradeinRecovery, clearSelection: boolean) {
+  remoteTradeinRecoveryRequired.value = false;
+  remoteTradeinRecoveryError.value = false;
+  step.value = 'select-payment';
+  if (clearSelection && tradein.appliedTradein?.canonicalQuote?.sourceDeviceId === recovery.tradeinQuote.sourceDeviceId
+      && tradein.appliedTradein.canonicalQuote.sourceRowVersion === recovery.tradeinQuote.sourceRowVersion) {
+    tradein.clearApplied(tradeinOwner);
+    removedTradein.value = true;
+  }
+}
+
 function rejectRemoteTradein(accountKey: string, recovery: CheckoutTradeinRecovery, key: string, message?: string): never {
   if (message === 'PURCHASE_PAYMENT_EXPIRED') markTradeinPurchaseExpired(accountKey, key);
   finishCheckoutTradein(accountKey, recovery);
-  remoteTradeinRecoveryRequired.value = false;
-  remoteTradeinRecoveryError.value = false;
-  if (tradein.appliedTradein?.canonicalQuote?.sourceDeviceId === recovery.tradeinQuote.sourceDeviceId
-      && tradein.appliedTradein.canonicalQuote.sourceRowVersion === recovery.tradeinQuote.sourceRowVersion) tradein.clearApplied();
-  toast.warn(purchaseRecoveryCopy(locale.code).rejected);
+  const reason = tradeinRejectionKey(message);
+  const retryable = message === TRADEIN_RUNTIME_RECOVERING;
+  resetRejectedTradein(recovery, !retryable);
+  if (reason) toast.warn(flowCopy.value.cannotPay, flowCopy.value[reason]);
+  else toast.warn(retryable ? t.value.tradein.errPleaseRetry : purchaseRecoveryCopy(locale.code).rejected);
   throw new Error('PAYMENT_CANCELLED');
 }
 
@@ -2044,10 +2055,19 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
           const paid = await executeSelectedPurchase({amount:recovery.tradeinQuote.payableUsdt,currency:'USDT',summary},
             async authorization=>{
               if (!authorizationIsCurrent()) return null;
-              return deviceE3Api.submit(recovery.tradeinQuote.sourceDeviceId,recovery.productNo,markCommandSubmitted(),recovery.tradeinQuote,authorization);
+              try {
+                return await deviceE3Api.submit(recovery.tradeinQuote.sourceDeviceId,recovery.productNo,markCommandSubmitted(),recovery.tradeinQuote,authorization);
+              } catch (error) {
+                if (scopeIsCurrent() && (tradeinPaymentRejection(error) || isApiRefusal(error, 503, TRADEIN_RUNTIME_RECOVERING))) {
+                  rejectRemoteTradein(submissionScope.accountKey, recovery, key, asApiError(error).message);
+                }
+                throw error;
+              }
             },authorizationIsCurrent,
             {kind:'TRADE_IN',payload:{sourceDeviceId:reviewedQuote.sourceDeviceId,expectedSourceVersion:reviewedQuote.sourceRowVersion,targetProductNo:recovery.productNo,expectedPayableUsdt:reviewedQuote.payableUsdt,expectedDiscountUsdt:reviewedQuote.discountUsdt},
-              commandKey:markCommandSubmitted,tradeinKey:key,parseReceipt:parseCanonicalTradeinResult});
+              commandKey:markCommandSubmitted,tradeinKey:key,
+              onReplacementRefused: () => { if (scopeIsCurrent()) resetRejectedTradein(recovery, true); },
+              parseReceipt:parseCanonicalTradeinResult});
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           if (!paid) {
             // The server no longer holds this payment and its record is released: nothing is left to recover.
@@ -2395,7 +2415,7 @@ async function submitRemoteOrder(): Promise<void> {
     presentSettledPurchase(isFirstHardwareOrder(created.orderNo), () => forgetCheckoutOrder(accountKey, p.id, created.orderNo));
   } catch (error) {
     if (!scopeIsCurrent()) return;
-    if (error instanceof Error && error.message === 'PAYMENT_CANCELLED') { step.value='confirm'; return; }
+    if (error instanceof Error && error.message === 'PAYMENT_CANCELLED') return;
     // A definitive refusal leaves the pending order unpaid; retire its payment key
     // so a later attempt is a new command, and say why instead of "confirming".
     const rejection = orderPaymentRejection(error, locale.code);
