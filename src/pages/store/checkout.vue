@@ -23,9 +23,9 @@
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
 
-      <view v-else-if="catalogStatus === 'error'" class="flex min-h-[50vh] flex-col items-center justify-center text-center" style="padding: var(--v5-space-5)">
+      <view v-else-if="catalogStatus === 'error'" class="checkout-page-center">
         <text class="checkout-page-state">{{ t.store.catalogErrorTitle }}</text>
-        <NxButton :label="t.leaderboard.retry" @click="refreshVisibleCheckout(true)" />
+        <NxButton variant="text" size="small" :label="t.leaderboard.retry" @click="refreshVisibleCheckout(true)" />
       </view>
 
       <view v-else-if="trialQuoteScreenUnavailable" class="text-center" role="status" style="padding: var(--v5-space-6) var(--v5-space-4)">
@@ -1065,6 +1065,7 @@ let interceptFired = false;
 let checkoutCapacityRead: Promise<boolean | undefined> | null = null;
 const remoteCapacityGate = reactive(new RemoteCapacityGate());
 const checkoutCapacityRefusal = ref<"product-unavailable" | "purchase-conditions" | null>(null);
+const checkoutCapacityTradeinRejection = ref<ReturnType<typeof tradeinPaymentRejection>>();
 const checkoutOnboardingRequired = ref(false);
 const checkoutCapacityReadFailed = ref(false);
 let checkoutSetupReturn = false;
@@ -1074,6 +1075,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   checkoutCapacityReadFailed.value = false;
   remoteCapacityGate.reset();
   checkoutCapacityRefusal.value = null;
+  checkoutCapacityTradeinRejection.value = undefined;
   checkoutOnboardingRequired.value = false;
   checkoutSetupReturn = false;
   checkoutCapacityRead = null;
@@ -1137,6 +1139,7 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): 
     if (remoteCapacityGate.pending) return checkoutCapacityRead ?? undefined;
     const requestScope = captureCheckoutRoute();
     checkoutCapacityRefusal.value = null;
+    checkoutCapacityTradeinRejection.value = undefined;
     // Capacity is the mandatory server safety gate; trade-in eligibility is an
     // optional enhancement. A transient eligibility failure must not reject an
     // otherwise ordinary purchase, matching the prototype's local flow where
@@ -1200,10 +1203,10 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): 
       } else if (isApiRefusal(failure, 403, "PURCHASE_GATE_NOT_MET", "PURCHASE_GATE_SOLD_OUT")) {
         checkoutCapacityRefusal.value = "purchase-conditions";
       }
-      const rejection = tradeinPaymentRejection(failure);
-      checkoutCapacityReadFailed.value = !checkoutOnboardingRequired.value && !checkoutCapacityRefusal.value && !rejection;
+      checkoutCapacityTradeinRejection.value = tradeinPaymentRejection(failure);
+      checkoutCapacityReadFailed.value = !checkoutOnboardingRequired.value && !checkoutCapacityRefusal.value
+        && !checkoutCapacityTradeinRejection.value;
       tradeinAvailable.value = false;
-      if (rejection) toast.warn(flowCopy.value.cannotPay, flowCopy.value[rejection]);
     });
     return checkoutCapacityRead;
   }
@@ -1365,9 +1368,11 @@ const checkoutCapacityMessage = computed(() => remoteCapacityGate.pending || !qu
   : checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : checkoutCapacityRefusal.value === "product-unavailable" ? t.value.store.coCapacityProductUnavailable
   : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
+  : checkoutCapacityTradeinRejection.value ? flowCopy.value[checkoutCapacityTradeinRejection.value]
   : remoteCapacityGate.decision === "REPLACE_REQUIRED" ? slotsFullText.value
   : remoteCapacityGate.decision === "NO_ACTIVE_DEVICE" ? t.value.tradein.errNoActiveDevice
-  : t.value.store.coCapacityUnavailable);
+  : checkoutCapacityReadFailed.value ? t.value.store.coCapacityUnavailable
+  : t.value.store.coCapacityChecking);
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
@@ -1470,7 +1475,7 @@ function goConfirm() {
   if (step.value !== "select-payment") return;
   const hasCanonicalTradein = Boolean(appliedTradeinView.value?.canonicalQuote);
   if (checkoutCapacityRequired.value && !remoteCapacityGate.canConfirm(hasCanonicalTradein)) {
-    toast.warn(checkoutCapacityMessage.value);
+    if (!checkoutCapacityTradeinRejection.value && !checkoutCapacityReadFailed.value) toast.warn(checkoutCapacityMessage.value);
     return;
   }
   step.value = "confirm";
@@ -1678,7 +1683,7 @@ async function onConfirmPay() {
     // fresh purchase, including a confirmation retained across page hide/show.
     if (!createdCheckoutOrder.value && checkoutCapacityRequired.value && !remoteCapacityGate.canConfirm(Boolean(appliedTradeinView.value?.canonicalQuote))) {
       confirming = false;
-      toast.warn(checkoutCapacityMessage.value);
+      if (!checkoutCapacityTradeinRejection.value && !checkoutCapacityReadFailed.value) toast.warn(checkoutCapacityMessage.value);
       step.value = "select-payment";
       return;
     }
@@ -2710,6 +2715,7 @@ onHide(() => {
   checkoutCapacityReadFailed.value = false;
   remoteCapacityGate.reset();
   checkoutCapacityRefusal.value = null;
+  checkoutCapacityTradeinRejection.value = undefined;
   checkoutOnboardingRequired.value = false;
   checkoutCapacityRead = null;
   if (dialogsOpen > 0) useUI().clearConfirmsBy(dialogOwner);
@@ -3367,6 +3373,12 @@ button.checkout-policy-link::after { border:0; }
 .checkout-original-open { display:grid; gap:var(--v5-space-2); padding:calc(var(--v5-space-8) * 2) var(--v5-space-4) var(--v5-space-6); text-align:center; }
 /* Page states (catalog failed, product missing): one centred result line, short-body role (DS 03 §3.4, 10.1). */
 .checkout-page-state { display:block; margin-bottom:var(--v5-space-4); color:var(--v5-ink-2); font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); text-wrap:pretty; }
+/* Whole page without content (DS 03 §3.4, §3.5.2): the result and its one 重新加载 centre in the page height left
+   under the header. The chassis scroller has a definite height, so each wrapper down to this state stretches to it. */
+:global(.nx-content > :has(.checkout-page-center)) { display:flex; flex-direction:column; min-height:100%; }
+:global(.nx-page-enter:has(.checkout-page-center)) { flex:1 0 auto; display:flex; flex-direction:column; }
+.checkout-content:has(.checkout-page-center) { flex:1 0 auto; display:flex; flex-direction:column; padding-bottom:0; }
+.checkout-page-center { flex:1 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:var(--v5-space-5); text-align:center; }
 /* Receipt write failure is a solid content card: title, one caption line, in-place retry bottom-right (DS 01 §1.1.2, 03 §3.1). */
 .checkout-receipt-failure { margin:var(--ui-space-card-gap) var(--v5-space-4) 0; padding:var(--ui-space-inset); }
 .checkout-receipt-failure__title { display:block; color:var(--v5-ink); font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
