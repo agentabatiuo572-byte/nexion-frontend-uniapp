@@ -6,7 +6,7 @@
       <view ref="stockBarRef" class="quota-stock" role="img" :aria-label="stockText"><view class="quota-stock__ring" :style="stockRingStyle"><view class="quota-stock__hole nx-num-metric"><text>{{ pending ? '—' : stockLeft }}</text></view></view></view>
     </view>
     <view class="quota-product" role="link" tabindex="0" :aria-label="displayName" @click="openProduct" @keydown.enter.prevent="openProduct">
-      <view class="quota-product__stage"><image v-if="productImage" :src="productImage" mode="aspectFit" class="quota-product__image" :alt="displayName" /></view>
+      <view class="quota-product__stage"><image v-if="imageSrc" :src="imageSrc" mode="aspectFit" class="quota-product__image" :alt="displayName" @error="imageError" /><!-- Missing or failed art: the same neutral placeholder as the product render (04.2). --><svg v-else class="quota-product__placeholder" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg></view>
       <view class="quota-product__name-row"><text class="quota-product__name">{{ displayName }}</text><svg class="quota-product__arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
       <view class="quota-product__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ priceParts[0] }}</text><text v-if="priceParts[1]" class="quota-price-fraction">.{{ priceParts[1] }}</text></view>
     </view>
@@ -45,6 +45,7 @@ import NxTag from '@/components/ui/nx-tag.vue';
 import { useT } from '@/i18n/use-t';
 import { fmt } from '@/i18n/format';
 import { getProductMedia } from '@/lib/product-media';
+import { useProductImage } from '@/composables/use-product-image';
 import { useScrollGrowProgress, VIZ_RING_TRANSITION } from '@/composables/use-scroll-grow-progress';
 export interface QuotaCondition {
   label: string;
@@ -82,6 +83,7 @@ const locale = useLocaleStore();
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const displayName = computed(() => (props.tier.name));
 const productImage = computed(() => getProductMedia(props.tier.productId)?.src ?? props.tier.imageUrl);
+const { imageSrc, imageError } = useProductImage(() => productImage.value ?? undefined);
 const { elRef: stockBarRef, inView: stockBarInView } = useScrollGrowProgress();
 const unlocked = computed(() => {
   const met = props.tier.conditions.map(condition => condition.current >= condition.required);
@@ -124,6 +126,7 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 .quota-tier--compact .quota-product__stage { height:156px; }
 /* Product art carries about 40% transparent margin (04.1 draws machine art at 1.5x its slot); scale it so the machine fills the stage. */
 .quota-product__image { width:100%; height:100%; transform:scale(1.4); pointer-events:none; }
+.quota-product__placeholder { color:var(--v5-ink-3); }
 .quota-product__name-row { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--v5-space-1); margin-top:var(--v5-space-2); }
 .quota-product__name { min-width:0; font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .quota-product__arrow { flex:none; margin-top:3px; color:var(--v5-ink-4); }
