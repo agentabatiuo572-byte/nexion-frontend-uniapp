@@ -721,35 +721,7 @@ async function onChooseFullPrice() {
     refreshKeepRecovery(s.targetKind);
     if (keepRecovery.value) { onRecoverKeep(); return; }
     if (keepRecoveryError.value) { toast.warn(t.value.tradein.errPleaseRetry); return; }
-    const requestGeneration = ++quoteRequestGeneration.value;
-    const requestScope = captureAccountScope();
-    const requestIsCurrent = () => requestGeneration === quoteRequestGeneration.value
-      && isCurrentAccountScope(requestScope);
-    quoteLoading.value = true;
-    try {
-      const quote = await deviceE3Api.capacityQuote(s.targetKind);
-      if (!requestIsCurrent()) return;
-      if (quote.decision === "REPLACE_REQUIRED") {
-        sheet.showCanonicalReplace(s.targetKind, quote.payableUsdt, quote);
-        return;
-      }
-      if (quote.decision === "NO_ACTIVE_DEVICE") {
-        await handleNoActiveDeviceDecision({
-          notify: () => {
-            if (requestIsCurrent()) toast.warn(t.value.tradein.errNoActiveDevice);
-          },
-          refreshFleet: async () => {
-            if (!requestIsCurrent()) return;
-            await app.refreshRemoteFleet();
-          }, // best-effort:失败自吞
-        });
-      }
-      if (requestIsCurrent()) hide();
-    } catch {
-      if (requestIsCurrent()) toast.warn(t.value.tradein.errPleaseRetry);
-    } finally {
-      if (requestIsCurrent()) quoteLoading.value = false;
-    }
+    await refreshCapacityReplacement(s.targetKind);
     return;
   }
   // If slot full, hand off to the replace sheet; else just dismiss (caller's
@@ -758,6 +730,38 @@ async function onChooseFullPrice() {
     sheet.showReplace(s.targetKind, s.newPrice);
   } else {
     hide();
+  }
+}
+
+async function refreshCapacityReplacement(targetKind: DeviceKind) {
+  const requestGeneration = ++quoteRequestGeneration.value;
+  const requestScope = captureAccountScope();
+  const requestIsCurrent = () => requestGeneration === quoteRequestGeneration.value
+    && props.active && isCurrentAccountScope(requestScope);
+  quoteLoading.value = true;
+  try {
+    const quote = await deviceE3Api.capacityQuote(targetKind);
+    if (!requestIsCurrent()) return;
+    if (quote.decision === "REPLACE_REQUIRED") {
+      sheet.showCanonicalReplace(targetKind, quote.payableUsdt, quote);
+      return;
+    }
+    if (quote.decision === "NO_ACTIVE_DEVICE") {
+      await handleNoActiveDeviceDecision({
+        notify: () => {
+          if (requestIsCurrent()) toast.warn(t.value.tradein.errNoActiveDevice);
+        },
+        refreshFleet: async () => {
+          if (!requestIsCurrent()) return;
+          await app.refreshRemoteFleet();
+        }, // best-effort:失败自吞
+      });
+    }
+    if (requestIsCurrent()) hide();
+  } catch {
+    if (requestIsCurrent()) toast.warn(t.value.tradein.errPleaseRetry);
+  } finally {
+    if (requestIsCurrent()) quoteLoading.value = false;
   }
 }
 
@@ -1081,6 +1085,9 @@ function rejectCapacityPurchase(accountKey: string, original: CapacityPending, m
   if (reason) {
     const flow = checkoutFlowCopy(locale.code);
     toast.warn(flow.cannotPay, flow[reason]);
+    if (reason === 'rejectCapacitySourceChanged' && original.operation === 'replace') {
+      void refreshCapacityReplacement(original.quote.targetProductNo as DeviceKind);
+    }
   } else toast.warn(recoveryCopy.value.rejected);
 }
 
@@ -1150,11 +1157,15 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         }
       },purchaseIsCurrent,{kind:effectiveOperation==='replace'?'CAPACITY_REPLACE':'CAPACITY_KEEP',
         payload:{targetProductNo:target,expectedPayableUsdt:payable,...(effectiveOperation==='replace'?{sourceDeviceId:frozen!.sourceDeviceId}: {})},
+        tradeinKey: original?.key,
         commandKey:()=>{const saved=readCapacityPending(scope.accountKey);const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};writeCapacityPending(scope.accountKey,original);return key;},
-        onReplacementRefused: () => {
+        onReplacementRefused: reason => {
           if (!current() || !props.active) return;
           capacityCommandKey.value = null;
+          capacityRecovery.value = null;
+          capacityResumeAllowed.value = false;
           hide();
+          if (reason === 'rejectCapacitySourceChanged') void refreshCapacityReplacement(target as DeviceKind);
         },
         parseReceipt:raw=>effectiveOperation==='replace'?parseCanonicalTradeinResult(raw):parseCanonicalCapacityKeepResult(raw)});
       // The record may have been released with a payment the server no longer holds.

@@ -14,7 +14,8 @@ const REASONS = {
   ORDER_PAYMENT_EXPIRED: 'closed',
 } as const;
 
-const TRADEIN_REASONS = new Map<string, 'rejectTradeinBusy' | 'rejectTradeinOwner'>([
+const TRADEIN_REASONS = new Map<string, 'rejectTradeinBusy' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged'>([
+  ['CAPACITY_REPLACEMENT_SOURCE_CHANGED', 'rejectCapacitySourceChanged'],
   ['SIMULATED_DEVICE_BUSY', 'rejectTradeinBusy'],
   ['COMPUTE_V2_DEVICE_BUSY', 'rejectTradeinBusy'],
   ['COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED', 'rejectTradeinBusy'],

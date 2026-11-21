@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoFixture,demoOrderFitsCapacity,demoProducts,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 const base = '/api/app/purchase-payment';
@@ -25,6 +25,19 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     || paymentMode() === 'usdt-off' && method !== 'HDPAY_BANK');
   const refused = (status, message) => ({status, message, data: null});
   const handles = path => path.startsWith(base);
+  function replacementRefusal(url, request, kind, payload) {
+    if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
+    const fleet = demoFleetFacts(url, locale(), state), id = payload.sourceDeviceId;
+    const sourceId = typeof id === 'string' && /^\+?\d+$/.test(id.trim()) ? Number(id) : id;
+    if (kind === 'CAPACITY_REPLACE' && (!Number.isSafeInteger(sourceId) || demoCapacityReplacementSource(fleet)?.id !== sourceId))
+      return refused(409, 'CAPACITY_REPLACEMENT_SOURCE_CHANGED');
+    const source = fleet.devices.find(device => device.id === sourceId);
+    if (!source) return null;
+    const busy = status => ['RUNNING', 'BUSY'].includes(status);
+    const assignments = demoFixture(new URL('/api/tasks/assignments', url.origin), locale(), state, {...request, method: () => 'GET'});
+    const task = assignments.devices.find(device => device.deviceId === sourceId)?.currentTask;
+    return [source.status, source.runtimeStatus, task?.status].some(busy) ? refused(409, 'SIMULATED_DEVICE_BUSY') : null;
+  }
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   // The account's one order list.
   const ordersOf = origin => demoAccountOrders(new URL(origin), locale(), state);
@@ -202,6 +215,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
           return {status:409,message:'TRIAL_NOT_CONVERTIBLE',data:null};
         if (body.payload.quoteVersion !== trial.quote.quoteVersion) return {status:409,message:'TRIAL_QUOTE_CHANGED',data:null};
       }
+      const refusal = replacementRefusal(url, request, body.kind, body.payload);
+      if (refusal) return refusal;
       const amount = trial ? trial.quote.amountUsdt : order?.amountUsdt ?? body.payload.expectedPayableUsdt;
       // Trial business amounts retain six decimals; the external principal confirms HALF_UP cents.
       const micros = BigInt(Number(amount).toFixed(6).replace('.', ''));
@@ -246,6 +261,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         if (source.payload.quoteVersion !== trial.quote.quoteVersion) return refused(409, 'TRIAL_QUOTE_CHANGED');
         if (Number(trial.quote.amountUsdt).toFixed(6) !== source.quote.businessAmountUsdt) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       }
+      const refusal = replacementRefusal(url, request, subject.kind, source.payload);
+      if (refusal) return refusal;
       if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
       const intentNo = `PPI-PREVIEW-${++sequence}`;
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.

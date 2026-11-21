@@ -17,14 +17,14 @@ import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
-  tradeinKey?: string; onReplacementRefused?: () => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
+  tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinOwner';
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged';
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
@@ -320,7 +320,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     const replacementRefusal = replacement && tradeinPaymentRejection(cause);
     if (replacementRefusal) {
       if (expected.tradeinKey) releasePurchaseCallerRecord(accountKey, expected.kind, expected.tradeinKey);
-      expected.onReplacementRefused?.();
+      expected.onReplacementRefused?.(replacementRefusal);
       conclude(replacementRefusal);
       return;
     }
@@ -406,7 +406,7 @@ async function submitOriginal() {
         release(pending);
         releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
         Object.assign(state, { pending: null, quote: null, intent: null, error: false });
-        context?.onReplacementRefused?.();
+        context?.onReplacementRefused?.(replacementRefusal);
         conclude(replacementRefusal);
         return;
       }
