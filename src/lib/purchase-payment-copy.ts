@@ -1,7 +1,18 @@
 import { uiLocale, type UiLocale } from '@/i18n';
 
 // Purchase payment copy. Never name a payment provider or its domain in the App.
+const originalPaymentEn = {
+  checkingOriginalPayment: 'Checking the original payment…',
+  originalPaymentNotFoundRetry: 'No payment was found for this request. Select Pay again to resend it.',
+  originalPaymentUnavailableTitle: 'Original payment unavailable',
+  originalPaymentUnavailableBody: 'Close this message to return and request a new quote. If you already paid, contact support.',
+};
+
 const zh = {
+  checkingOriginalPayment: '正在核对原付款单…',
+  originalPaymentNotFoundRetry: '未查到这笔付款单。可点击「重新付款」重发原请求。',
+  originalPaymentUnavailableTitle: '原付款记录不可用',
+  originalPaymentUnavailableBody: '关闭后可返回并重新报价。如果已经付款，请联系客服。',
   trc20: "USDT（TRC20）",
   trc20Chain: "TRON 链",
   gasTrc20: "TRC20 网络确认费已计入总额，外部钱包可能另收 TRX／能量费。",
@@ -50,6 +61,7 @@ const zh = {
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
 const en: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON chain",
   gasTrc20: "The TRC20 confirmation fee is included in the total. Your wallet may charge TRX or energy fees separately.",
@@ -98,6 +110,7 @@ const en: typeof zh = {
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "Mạng TRON",
   gasTrc20: "Phí xác nhận TRC20 đã nằm trong tổng tiền. Ví ngoài có thể thu thêm phí TRX hoặc năng lượng.",
@@ -146,6 +159,7 @@ const vi: typeof zh = {
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "Jaringan TRON",
   gasTrc20: "Biaya konfirmasi TRC20 sudah termasuk dalam total. Dompet Anda dapat mengenakan biaya TRX atau energi terpisah.",
@@ -194,6 +208,7 @@ const id: typeof zh = {
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "Rangkaian TRON",
   gasTrc20: "Fi pengesahan TRC20 termasuk dalam jumlah. Dompet anda mungkin mengenakan fi TRX atau tenaga berasingan.",
@@ -242,6 +257,7 @@ const ms: typeof zh = {
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON network",
   gasTrc20: "Kasama sa kabuuan ang TRC20 confirmation fee. Maaaring may hiwalay na singil sa TRX o energy ang wallet mo.",
@@ -290,6 +306,7 @@ const fil: typeof zh = {
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "Сеть TRON",
   gasTrc20: "Комиссия за подтверждение TRC20 включена в итог. Кошелёк может отдельно списать TRX или плату за энергию.",
@@ -338,6 +355,7 @@ const ru: typeof zh = {
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
 const kk: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON желісі",
   gasTrc20: "TRC20 растау ақысы жалпы сомаға кіреді. Әмиян TRX немесе энергия ақысын бөлек алуы мүмкін.",
@@ -386,6 +404,7 @@ const kk: typeof zh = {
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
+  ...originalPaymentEn,
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON tarmogʻi",
   gasTrc20: "TRC20 tasdiqlash haqi jami summaga kiradi. Hamyon TRX yoki energiya haqini alohida olishi mumkin.",

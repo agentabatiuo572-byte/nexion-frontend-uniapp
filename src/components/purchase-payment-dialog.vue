@@ -88,7 +88,7 @@
         </view>
         <template v-if="s.step !== 'methods'">
           <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_TRC20' ? copy.gasTrc20 : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
-          <view v-if="!s.originalRecovery && (s.quote || s.loading || s.retrying)" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying }" aria-hidden="true" /><text>{{ retryMessage || (s.retrying ? copy.retrying : s.quote && quoteLeft !== null ? fill(copy.quoteValid, { t: clock(quoteLeft) }) : copy.loadingFees) }}</text></view>
+          <view v-if="s.originalRecovery || s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying && !s.originalRecovery }" aria-hidden="true" /><text>{{ quoteStatus }}</text></view>
         </template>
         <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="!!s.originalRecovery || (s.step === 'methods' ? !walletEnough : !s.quote || s.loading)" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
       </view>
@@ -298,7 +298,23 @@ const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
 const waitTone = computed(() => s.error || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
-const waitTitle = computed(() => retryMessage.value || (s.error ? copy.value.offline : confirming.value ? copy.value.confirming : ready.value ? copy.value.waiting : copy.value.creating));
+const quoteStatus = computed(() => {
+  const c = copy.value;
+  if (s.originalRecovery) return c.checkingOriginalPayment;
+  if (retryMessage.value) return retryMessage.value;
+  if (s.retrying) return c.retrying;
+  return s.quote && quoteLeft.value !== null ? fill(c.quoteValid, { t: clock(quoteLeft.value) }) : c.loadingFees;
+});
+const waitTitle = computed(() => {
+  const c = copy.value;
+  if (s.originalRecovery) return c.checkingOriginalPayment;
+  if (s.canResubmit) return c.originalPaymentNotFoundRetry;
+  if (s.busy && !s.intent) return c.creating;
+  if (retryMessage.value) return retryMessage.value;
+  if (s.error) return c.offline;
+  if (confirming.value) return c.confirming;
+  return ready.value ? c.waiting : c.checkingOriginalPayment;
+});
 watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment.closeCashier(); });
 
 type Notice = { title: string; body: string; primary: string; secondary?: string; icon: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone: 'warning' | 'danger' | 'brand' | 'neutral'; onPrimary: () => void; onSecondary: () => void };
@@ -366,6 +382,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'existing': return order
       ? { icon: 'info', tone: 'warning', title: c.existingTitle, body: c.existing, primary: c.viewOrder, secondary: c.support, onPrimary: payment.openOrder, onSecondary: payment.support }
       : { icon: 'info', tone: 'warning', title: c.existingTitle, body: c.existing, primary: c.ok, secondary: c.support, onPrimary: payment.close, onSecondary: payment.support };
+    case 'originalUnavailable': return { icon: 'info', tone: 'neutral', title: c.originalPaymentUnavailableTitle,
+      body: c.originalPaymentUnavailableBody, primary: c.close, secondary: c.support, onPrimary: payment.close, onSecondary: payment.support };
     case 'gone': return order
       ? { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
       : { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
