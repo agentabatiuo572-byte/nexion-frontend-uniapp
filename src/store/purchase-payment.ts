@@ -18,6 +18,7 @@ import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
+  scopeCurrent?: () => boolean;
   /** Recheck order facts after any read already in flight. */
   checkCurrent?: () => Promise<PurchaseContextCheck>;
   refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
@@ -442,6 +443,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     quoteTimer = setTimeout(() => { if (owns(version, accountKey)) void select(method); }, Math.min(2147483647, Math.max(1000, Date.parse(quote.expiresAt) - Date.now() - 30000)));
   } catch (error) {
     if (!owns(version, accountKey)) return;
+    if (expected.scopeCurrent?.() === false) { finish(null); return; }
     const cause = asApiError(error);
     const paymentRefusal = paymentRefusalNotice(cause, expected.kind);
     state.retryNotice = paymentRefusal === 'rejectEligibilityUnavailable' ? paymentRefusal : '';

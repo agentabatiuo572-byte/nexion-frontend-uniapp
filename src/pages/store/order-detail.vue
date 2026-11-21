@@ -1000,7 +1000,7 @@ async function handleWalletPayment() {
             throw error;
           }
         },
-        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},checkCurrent:checkPaymentOrder,commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
+        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},scopeCurrent:paymentOrderScopeCurrent,checkCurrent:checkPaymentOrder,commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
           orderNo:requestOrderNo,deadlineAt:liveOrder.value.expiresAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')});
       // A refused payment means this page's order is out of date.
       if (!receipt) { if (isCurrentDetailScope(scope)) void refreshOrder(); return; }
