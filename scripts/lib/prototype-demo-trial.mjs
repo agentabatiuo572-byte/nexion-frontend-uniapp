@@ -120,7 +120,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const productIndex=products.findIndex(product=>product.id===cfg.trialProductId);
     const productName=products[productIndex].name;
     const paidTotalUsdt=(Number((units(amount)+5000n)/10000n)/100).toFixed(2);
-    return {orderNo,productId:productIndex+1,productNo:cfg.trialProductId,productName,trialClaimedDeviceName:cfg.trialProductName,quantity:1,unitPriceUsdt:price,subtotalUsdt:price,discountUsdt:number(units(price)-units(amount)),amountUsdt:amount,paidTotalUsdt,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paymentMethod:'UVEL_USDT_WALLET',placedAt:at,paidAt:at,activatedAt:at,orderType:'SINGLE',itemCount:1,dataCenter:'Singapore',
+    // Wallet conversion has no payment record for the order-history method.
+    return {orderNo,productId:productIndex+1,productNo:cfg.trialProductId,productName,trialClaimedDeviceName:cfg.trialProductName,quantity:1,unitPriceUsdt:price,subtotalUsdt:price,discountUsdt:number(units(price)-units(amount)),amountUsdt:amount,paidTotalUsdt,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paymentMethod:'PENDING',placedAt:at,paidAt:at,activatedAt:at,orderType:'SINGLE',itemCount:1,dataCenter:'Singapore',
       lineItems:[{sku:cfg.trialProductId,name:productName,quantity:1,unitPriceUsdt:price,lineAmountUsdt:price}],
       trialSettlement:{settlementPolicy:quote.settlementPolicy,promoDiscountUsdt:quote.promoDiscountUsdt,offsetUsdt:quote.offsetUsdt,earlyDiscountUsdt:quote.earlyDiscountUsdt,rewardUsdt:quote.remainderUsdt,rewardNex:quote.rewardNex}};
   }
@@ -179,7 +180,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     Object.assign(row,{state:'REDEEMED',finishedAt:now,version:(row.version||1)+1});
     const source='nx_trial_claim + nx_order + nx_order_item';
     return remember({...proof,orderNo,productNo:cfg.trialProductId,amountUsdt:amount,discountUsdt:number(units(current.priceUsdt)-units(amount)),paymentStatus:'PAID',orderStatus:'PAID',
-      paymentRail:order.paymentMethod,...(!paid&&{paidTotalUsdt:order.paidTotalUsdt}),
+      paymentRail:paid?.paymentMethod??'UVEL_USDT_WALLET',...(!paid&&{paidTotalUsdt:order.paidTotalUsdt}),
       settlementPolicy:quote.settlementPolicy,earlyPurchase:quote.earlyPurchase,remainderUsdt:quote.remainderUsdt,rewardNex:quote.rewardNex,
       earlyRewardUsdt:quote.earlyRewardUsdt,earlyRewardNex:quote.earlyRewardNex,earlyDiscountUsdt:quote.earlyDiscountUsdt,source,provenance:{...proof,source}});
   }
