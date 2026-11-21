@@ -14,7 +14,7 @@ import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxi
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
-import { demoNotifications } from './prototype-demo-notifications.mjs';
+import { demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
 import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs';
 import { savedAttemptOptions } from './prototype-demo-auth.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
@@ -57,7 +57,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'published',homeDisplayState:'paused',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,deviceTaskSampleState:'default'};
+export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'published',homeDisplayState:'paused',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,deviceTaskSampleState:'default'};
 export const demoOptions = {
   savedAttemptState: savedAttemptOptions,
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -69,6 +69,7 @@ export const demoOptions = {
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（重试原消息）'],['timeout','确认超时（15 秒转待确认）']],
   messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['author-photo','客服带本人头像'],['recommendations','商品与链接推荐'],['agent-switch','客服已切换提示（有名字/无名字）'],['welcome-unassigned','刚注册 · 未分配客服 · 欢迎语未读'],['welcome-assigned','刚注册 · 已有专属客服 · 欢迎语未读'],['read','会话全部已读'],['transferred','已转接 · 只读旧会话待核对']],
+  notificationPageState:[['normal','正常分页'],['error','下一页失败']],
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
@@ -1397,21 +1398,32 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return data;
   }
   if(pathname==='/api/vouchers/V-DESIGN/claim'){state.voucherClaimed=true;return {...authority,voucherId:'V-DESIGN',grantId:'DEMO-GRANT',status:'AVAILABLE',replay:false,source:'nx_growth_voucher_grant'};}
-  if(pathname==='/api/notifications') {
-    if(empty) return {items:[],nextCursor:null,unread:0,actionableUnread:0};
-    const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices[0];
-    const orders=demoAccountOrders(url,locale,state,now),order=orders.find(item=>item.orderNo==='DEMO-ORDER-002')??orders.find(item=>item.paymentStatus==='PAID');
-    const visibleItems=demoNotifications(locale,state,now,device,order);
-    return {items:visibleItems,nextCursor:null,unread:visibleItems.filter(item=>item.readAt===null).length,actionableUnread:visibleItems.filter(item=>item.readAt===null&&item.kind!=='marketing').length};
-  }
-  if(/^\/api\/notifications\/\d+\/read$/.test(pathname)){state.readIds||=[];state.readIds.push(Number(pathname.split('/')[3]));return null;}
-  if(pathname==='/api/notifications/read-all'){const count=demoFixture(new URL('/api/notifications',url.origin),locale,state,request).unread;state.read=true;return count;}
-  if(pathname==='/api/notifications/read'){const items=demoFixture(new URL('/api/notifications',url.origin),locale,state,request).items.filter(item=>item.readAt!==null);state.clearedNotificationIds=[...(state.clearedNotificationIds||[]),...items.map(item=>item.id)];return items.length;}
-  if(/^\/api\/notifications\/\d+\/actions$/.test(pathname)){
-    const id=Number(pathname.split('/')[3]);
-    const item=demoFixture(new URL('/api/notifications',url.origin),locale,state,request).items.find(row=>row.id===id);
-    if(!item?.ctaHref)throw new Error('DEMO_NOTIFICATION_ACTION_UNAVAILABLE');
-    return {notificationId:id,action:request.postDataJSON()?.action||'cta',route:item.ctaHref,recorded:true};
+  if(pathname==='/api/notifications'||pathname.startsWith('/api/notifications/')) {
+    const notificationRows=()=>{
+      if(empty)return [];
+      const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices[0];
+      const orders=demoAccountOrders(url,locale,state,now);
+      const order=orders.find(item=>item.orderNo==='DEMO-ORDER-002')??orders.find(item=>item.paymentStatus==='PAID');
+      return demoNotifications(locale,state,now,device,order);
+    };
+    if(pathname==='/api/notifications')return demoNotificationPage(notificationRows(),url.searchParams);
+    if(/^\/api\/notifications\/\d+\/read$/.test(pathname)){state.readIds||=[];state.readIds.push(Number(pathname.split('/')[3]));return null;}
+    if(pathname==='/api/notifications/read-all'){
+      const count=notificationRows().filter(item=>item.readAt===null).length;
+      state.read=true;
+      return count;
+    }
+    if(pathname==='/api/notifications/read'){
+      const items=notificationRows().filter(item=>item.readAt!==null);
+      state.clearedNotificationIds=[...(state.clearedNotificationIds||[]),...items.map(item=>item.id)];
+      return items.length;
+    }
+    if(/^\/api\/notifications\/\d+\/actions$/.test(pathname)){
+      const id=Number(pathname.split('/')[3]);
+      const item=notificationRows().find(row=>row.id===id);
+      if(!item?.ctaHref)throw new Error('DEMO_NOTIFICATION_ACTION_UNAVAILABLE');
+      return {notificationId:id,action:request.postDataJSON()?.action||'cta',route:item.ctaHref,recorded:true};
+    }
   }
   return base(pathname+url.search);
 }

@@ -38,3 +38,23 @@ export function demoNotifications(locale, state, now, device, order) {
     readAt: state.read || state.readIds?.includes(row.id) || row.id >= 904 ? now : null,
   })).sort((a, b) => b.id - a.id);
 }
+
+
+export function demoNotificationPage(rows, params) {
+  const rawCursor = params.get('cursor')?.trim();
+  const cursor = rawCursor ? Number(rawCursor) : null;
+  if (cursor !== null && (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(cursor) || cursor <= 0)) {
+    throw Object.assign(new Error('NOTIFICATION_CURSOR_INVALID'), { status: 400 });
+  }
+  // Cap the fixture page so its small sample exercises the real cursor flow.
+  const limit = Math.min(3, Math.max(1, Math.trunc(Number(params.get('limit')) || 3)));
+  const remaining = cursor === null ? rows : rows.filter(row => row.id < cursor);
+  const items = remaining.slice(0, limit);
+  const unread = rows.filter(row => row.readAt === null);
+  return {
+    items,
+    nextCursor: remaining.length > items.length ? String(items.at(-1).id) : null,
+    unread: unread.length,
+    actionableUnread: unread.filter(row => row.kind !== 'marketing').length,
+  };
+}
