@@ -851,7 +851,11 @@ watch(
     if (reveal !== previous[2]) { if (!resumeNativePreviewReading()) scrollToEnd(); return; }
     if (inset !== previous[4]) historyPreparation++;
     const change = conversationScrollChange(previous[0], ids);
-    if (change === 'prepend' || pendingPosition || inset !== previous[4])
+    // Receipt catch-up can return older rows together with a new incoming message.
+    const caughtUpToNewTail = change === 'prepend' && !preparedHistory
+      && ids[ids.length - 1] !== previous[0][previous[0].length - 1];
+    if (caughtUpToNewTail && followingTail && !pendingPosition) scrollToEnd();
+    else if (change === 'prepend' || pendingPosition || inset !== previous[4])
       preservePosition(previous[4], change === 'prepend' ? previous[0][0] : undefined);
     else if ((change === 'append' || (typing && !previous[1])) && followingTail) scrollToEnd();
   },
