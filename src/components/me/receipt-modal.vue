@@ -27,7 +27,7 @@
       <view class="nx-receipt-body" :style="bodyStyle">
       <view :style="summaryStyle">
         <text class="block" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ copy.result }}</text>
-        <text class="nx-receipt-line tabular-nums" :title="summaryAmount" style="font-family: var(--font-amount); margin-top:6px;font-size:26px;line-height:1.3;font-weight:600">{{ summaryAmount }}</text>
+        <text class="nx-receipt-line tabular-nums" :title="summaryAmount" style="font-family: var(--font-amount); margin-top:6px;font-size:26px;line-height:1.3;font-weight:500">{{ summaryAmount }}</text>
       </view>
       <!-- Only identifiers and hashes use monospace; raw values remain unchanged. -->
       <view v-for="(sec, si) in visibleSections" :key="si" :style="sectionStyle(si)">
@@ -290,8 +290,8 @@ const sections = computed<DescSection[]>(() => {
     return [
       {
         rows: [
-          { k: "receipt_no", v: r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5), copyValue: r.receiptNo },
-          { k: "task_no", v: shortenHex(r.taskNo, 7, 5), copyValue: r.taskNo },
+          { k: "receipt_no", v: r.displayReceiptNo || shortenHex(r.receiptNo, 7, 6), copyValue: r.receiptNo },
+          { k: "task_no", v: shortenHex(r.taskNo, 7, 6), copyValue: r.taskNo },
           { k: "task_type", v: workloadLabel(t.value, r.taskClass) },
           { k: "task_name", v: r.taskName },
           ...(!isSimulatedReceipt.value ? [{ k: "model", v: r.model || "—" }] : []),

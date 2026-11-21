@@ -1150,6 +1150,7 @@ async function handleCancelAccountDeletion() {
     title: t.value.security.cancelDeletionRequest,
     message: t.value.security.cancelDeletionMessage,
     confirmLabel: t.value.security.cancelDeletionRequest,
+    cancelLabel: t.value.security.keepDeletionRequest,
     owner: securityConfirmOwner,
   });
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -1441,10 +1442,11 @@ const dangerLabelStyle: CSSProperties = {
 .security-sheet-form { display:flex; flex-direction:column; gap:var(--v5-space-3); }
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
-.security-sheet-note { font-size:13px; line-height:20px; color:var(--v5-ink-3); }
+/* Sheet body copy uses the short-body role (10 §10.1: 弹层正文). */
+.security-sheet-note { font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color:var(--v5-ink-2); }
 .security-reason-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .security-reason-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-width:0; }
-.security-reason-label { min-width:0; font:600 13px/18px var(--font-v5); color:var(--v5-ink-2); }
+.security-reason-label { min-width:0; font:500 13px/18px var(--font-v5); color:var(--v5-ink-2); }
 .security-reason-count { flex:none; font:500 12px/16px var(--font-jet-mono); color:var(--v5-ink-3); }
 .security-reason-count--over { color:var(--v5-danger); }
 .security-reason-input { display:block; box-sizing:border-box; width:100%; height:88px; padding:10px 12px; border-radius:8px; background:var(--v5-surface-2); font-family:var(--font-v5); font-size:var(--ui-type-input); line-height:20px; color:var(--v5-ink); overflow-wrap:break-word; }

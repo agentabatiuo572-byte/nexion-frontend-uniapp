@@ -29,7 +29,7 @@
         <!-- ⑤ 报错/极限态:题面加载或校验网络失败 → 层内失败态 + 重试,不静默关闭 -->
         <view v-else-if="loadFailed" class="cs-fail">
           <text class="cs-fail__t">{{ hintText || t.authOtp.captchaLoadFailed }}</text>
-          <view class="cs-fail__btn" role="button" tabindex="0" @click="onRetry"><text class="cs-fail__btn-t">{{ t.authOtp.captchaRetry }}</text></view>
+          <view class="nx-card-recovery-action cs-fail__btn" role="button" tabindex="0" @click="onRetry"><text>{{ t.authOtp.captchaRetry }}</text></view>
         </view>
       </view>
 
@@ -188,12 +188,10 @@ onUnmounted(()=>{closed=true;generation++;clearSkeleton();if(finishTimer)clearTi
 .cs-piece { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 80%, transparent); border: 1px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
 .cs-refresh { position: absolute; right: 4px; top: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .cs-refresh:active { opacity: 0.7; }
-/* ⑤ 网络失败态:soft tint 重试 pill(零 border,tap ≥44,rest 态自带 affordance) */
+/* ⑤ 网络失败态:原因一句 + 保留的重试(读取挡住唯一操作，03 §3.5.2)，样式为共享文字按钮 13/18、500(10 §10.2) */
 .cs-fail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
 .cs-fail__t { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); text-align: center; text-wrap: pretty; }
-.cs-fail__btn { min-height: 44px; padding: 0 24px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
-.cs-fail__btn:active { opacity: 0.8; transform: scale(0.98); }
-.cs-fail__btn-t { font-size: 13px; font-weight: 600; color: var(--v5-brand); }
+.cs-fail__btn { margin: 0 auto; align-self: center; }
 
 /* 🔴 零-border 扫荡请勿删这条 border:它是**状态通道**,不是卡片描边 ——
    下面 .cs-track--err / --ok 靠改 border-color 传达验证成功/失败反馈,

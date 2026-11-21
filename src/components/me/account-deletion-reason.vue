@@ -17,11 +17,11 @@ const reason = computed(() => normalizeAccountDeletionReason(props.reason));
 </script>
 
 <style scoped>
-.security-reason-sent { display:flex; flex-direction:column; gap:6px; min-width:0; padding:12px; border-radius:8px; background:var(--v5-surface-2); }
+.security-reason-sent { display:flex; flex-direction:column; gap:6px; min-width:0; padding:12px; border-radius:12px; background:var(--v5-surface-2); }
 .security-reason-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-width:0; }
-.security-reason-label { min-width:0; font:600 13px/18px var(--font-v5); color:var(--v5-ink-2); }
+.security-reason-label { min-width:0; font:500 13px/18px var(--font-v5); color:var(--v5-ink-2); }
 .security-reason-lock { flex:none; align-self:center; color:var(--v5-ink-3); }
-.security-reason-sent__text { font:400 14px/20px var(--font-v5); color:var(--v5-ink); white-space:pre-wrap; overflow-wrap:anywhere; }
+.security-reason-sent__text { font:400 14px/20px var(--font-v5); color:var(--v5-ink); white-space:pre-wrap; overflow-wrap:break-word; }
 .security-reason-sent__text--empty { color:var(--v5-ink-3); }
 .security-reason-hint { font-size:12px; line-height:16px; color:var(--v5-ink-3); }
 </style>
