@@ -460,8 +460,10 @@ export function demoFleetFacts(url,locale,state) {
     .map(device=>state.stoppedDevices?.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device)
     .map(device=>{
       const product=products.find(product=>product.id.toUpperCase()===device.productCode);
+      const share=product?.productType==='SHARE'
+        ? {deviceType:'CLOUD',gpuModel:product.gpu,vramTotalGb:0,basePowerW:0} : {};
       const capacity=previewCapacity(device,seed.capacitySchedule,now);
-      const projected={...device,...capacity,monthlyTargetActive:product?.monthlyEstimateUsdt!=null};
+      const projected={...device,...share,...capacity,monthlyTargetActive:product?.monthlyEstimateUsdt!=null};
       // Hidden phones keep their own earnings and never receive a monthly target projection.
       if(!projected.monthlyTargetActive)return projected;
       return {...projected,dailyUsdt:Number((product.dailyEarn*capacity.capacityPct/100).toFixed(6))};
@@ -625,7 +627,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
-  if(!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  if(!request.verifiedPayment&&!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.interfaceLanguages=previewInterfaceLanguages(state.interfaceLanguagesState);
@@ -860,11 +862,15 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const input=request.postDataJSON();
     return tradeinQuote(input.sourceDeviceId,input.targetProductNo);
   }
-  if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'){
+  const verifiedPayment=request.replacementQuote&&request.verifiedPayment;
+  const keepingCapacity=verifiedPayment&&pathname==='/api/app/trade-in/capacity-keep';
+  if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'||keepingCapacity){
     const replacingCapacity=pathname.endsWith('/capacity-replace');
     const input=request.postDataJSON();
     let quote;
-    if(replacingCapacity){
+    if(verifiedPayment){
+      quote=request.replacementQuote;
+    }else if(replacingCapacity){
       const capacity=capacityQuote();
       if(capacity.sourceDeviceId===null||input.sourceDeviceId!==capacity.sourceDeviceId)refuse('CAPACITY_REPLACEMENT_SOURCE_CHANGED');
       if(typeof input.expectedPayableUsdt!=='number'||Math.abs(input.expectedPayableUsdt-capacity.payableUsdt)>0.000001)refuse('CAPACITY_REPLACEMENT_QUOTE_CHANGED');
@@ -873,32 +879,37 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo);
       if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
     }
-    const sourceAssignment=checkWalletSource(quote.sourceDeviceId);
+    const sourceAssignment=verifiedPayment?null:checkWalletSource(quote.sourceDeviceId);
     const currentTask=sourceAssignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true);
-    if(!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
+    if(!verifiedPayment&&!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
     if(replacingCapacity){
       const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===quote.sourceDeviceId);
       (state.deviceActivations??={})[source.id]={status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',rowVersion:source.rowVersion+1};
-    }else (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
+    }else if(!keepingCapacity)(state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
-    postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
+    if(!verifiedPayment)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
       amount:quote.payableUsdt,at:now,category:'purchase',remark:'E3 trade-in upgrade wallet payment'});
     const targetDeviceInstanceNo=demoOrderDeviceInstance(orderNo);
     const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;
     (state.deviceIds??={})[targetDeviceInstanceNo]=targetDeviceId;
     const canonicalStatus=active?'activated':'inventory';
-    const order={...demoOrders(products,state,now)[0],orderNo,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:'WALLET',orderType:'TRADE_IN',itemCount:1,
-      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
-      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null};
+    const order={...demoOrders(products,state,now)[0],orderNo,productId:quote.targetProductId,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:verifiedPayment?.paymentMethod??'WALLET',orderType:keepingCapacity?'CAPACITY_KEEP':'TRADE_IN',itemCount:1,
+      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:keepingCapacity?null:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
+      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:verifiedPayment?.createdAt??now,expiresAt:null,paidAt:verifiedPayment?.paidAt??now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null,
+      ...(verifiedPayment&&{paymentNo:verifiedPayment.intentNo,paidTotalUsdt:verifiedPayment.totalUsdt})};
     (state.createdOrders||=[]).unshift(order);
     if(currentTask?.status==='RUNNING'){
       if(state.computeCycleStarts)delete state.computeCycleStarts[quote.sourceDeviceId];
       recordDemoTaskCancellation(state,sourceAssignment,currentTask);
     }
-    const receipt={tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance};
-    return replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);
+    const payment={orderNo,targetDeviceId,orderStatus:'COMPLETED',walletDebitUsdt:verifiedPayment?0:quote.payableUsdt,
+      walletBalanceAfterUsdt:state.walletBalance??52800.64};
+    if(keepingCapacity)return {...payment,operationNo:'DEMO-KEEP-'+sequence,deviceStatus:'ACTIVE'};
+    const receipt={...payment,tradeinNo:order.tradeinNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceStatus:quote.targetDeviceStatus,
+      applicationStatus:'COMPLETED',discountUsdt:quote.discountUsdt};
+    return verifiedPayment||replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);
   }
   function capacityQuote(){
     const {targetProductNo}=request.postDataJSON();

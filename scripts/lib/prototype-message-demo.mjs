@@ -61,8 +61,11 @@ export function createPrototypeMessages({state,fixtureFor}) {
       if(operation!=='read'&&(typeof key!=='string'||!key||input.clientMessageId!==key))return fail(400,'消息请求标识无效');
       // Versions can change during recovery; the original content and target cannot.
       const fingerprint=JSON.stringify([operation,match[1],input.conversationType,content,input.kind||'TEXT']);
+      const accountId=previewAccountId(state,headers);
       if(operation!=='read'&&receipts.has(key)) {
         const saved=receipts.get(key);
+        if(saved.rejection&&accountId!==saved.rejection.accountId)
+          return accountId?fail(404,'SUPPORT_COMMAND_NOT_FOUND'):fail(401,'AUTH_REQUIRED');
         if(saved.fingerprint!==fingerprint)return fail(409,'消息请求标识已被使用');
         await saved.pending;
         return saved.result?ok(supportUserView(state,saved.result)):structuredClone(saved.response);
@@ -88,8 +91,8 @@ export function createPrototypeMessages({state,fixtureFor}) {
       saved.pending=execute().then(response=>{
         saved.response=structuredClone(response);
         if(response.status!==409||receipts.get(key)!==saved)return;
-        if(operation==='reply'&&response.body.message==='CONVERSATION_PEER_CHANGED'&&/^[A-Za-z0-9_-]{8,128}$/.test(input.clientMessageId)) {
-          saved.rejection={accountId:supportAccountId(state),result:peerChangedReceipt(match[1],key,input.clientMessageId)};
+        if(accountId&&operation==='reply'&&response.body.message==='CONVERSATION_PEER_CHANGED'&&/^[A-Za-z0-9_-]{8,128}$/.test(input.clientMessageId)) {
+          saved.rejection={accountId,result:peerChangedReceipt(match[1],key,input.clientMessageId)};
         } else receipts.delete(key);
       });
       await saved.pending;

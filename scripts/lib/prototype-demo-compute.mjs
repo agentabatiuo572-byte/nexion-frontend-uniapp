@@ -156,7 +156,7 @@ export function computeDemo(url, state, request, now, facts) {
   const receipts = postedTasks.map(posted => {
     const {deviceId}=posted;
     const done=task(deviceId,'COMPLETED',posted);
-    return { ...done, receiptNo:posted.receiptNo, deviceInstanceNo: instance(deviceId), deviceName: deviceName(deviceId), deviceType: deviceType(deviceId), deviceGpu: byId.get(deviceId).gpuModel, vramTotalGb: byId.get(deviceId).vramTotalGb,
+    return { ...done, receiptNo:posted.receiptNo, deviceInstanceNo: instance(deviceId), deviceName: deviceName(deviceId), deviceType: deviceType(deviceId), deviceGpu: byId.get(deviceId).gpuModel, vramTotalGb: deviceType(deviceId)==='CLOUD' ? null : byId.get(deviceId).vramTotalGb,
       rewardNex: 0, earningStatus: 'POSTED', proofHash: simulated ? null : 'a'.repeat(64),
       durationSec: posted.durationSec??60,...(posted.simulation&&demoSimulatedReceiptFields(posted)) };
   });
