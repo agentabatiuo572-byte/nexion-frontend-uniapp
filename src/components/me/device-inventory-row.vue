@@ -185,7 +185,8 @@ function onAction() {
 .device-inventory-row__wait { width: 14px; height: 14px; flex: none; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed var(--v5-ink-3); }
 .device-inventory-row__pending { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .device-inventory-row__pending svg { flex: none; margin-top: 3px; }
-.device-inventory-row__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; min-height: 44px; }
+/* The buttons never shrink (03 §3.6.1): when amounts and buttons do not fit on one line, the buttons wrap to the next line, right-aligned. */
+.device-inventory-row__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 12px; min-height: 44px; }
 .device-inventory-row__money { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .device-inventory-row__total { color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); white-space: nowrap; }
 .device-inventory-row__earned { margin-left: 4px; color: var(--v5-ink); font: 500 13px/18px var(--font-metric, var(--font-jet-mono)); }
@@ -194,7 +195,7 @@ function onAction() {
 .device-inventory-row__info--open { color: var(--v5-brand); }
 /* Keeps a comfortable tap target without spacing the two money lines apart. */
 .device-inventory-row__quote::after { content: ""; position: absolute; inset: -2px -4px -12px; }
-.device-inventory-row__actions { display: flex; gap: 8px; flex: none; }
+.device-inventory-row__actions { display: flex; gap: 8px; flex: none; margin-left: auto; }
 .device-inventory-row__popover { position: relative; margin-top: var(--v5-space-2); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-s); background: var(--v5-surface-2); color: var(--v5-ink-2); font: 400 12px/18px var(--font-v5); }
 .device-inventory-row__popover::before { content: ""; position: absolute; top: -6px; left: 24px; width: 12px; height: 12px; background: inherit; transform: rotate(45deg); }
 .device-inventory-row__popover-copy, .device-inventory-row__popover-footnote { display: block; }
@@ -206,7 +207,6 @@ function onAction() {
   .device-inventory-row__head { grid-template-columns: 68px minmax(0, 1fr) auto; gap: 10px; }
   .device-inventory-row__art { width: 68px; height: 60px; }
   .device-inventory-row__image { width: 66px; height: 54px; }
-  .device-inventory-row__foot { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .device-inventory-row__eq > view { animation: none; } .device-inventory-row__fill { transition: none; } }
 </style>

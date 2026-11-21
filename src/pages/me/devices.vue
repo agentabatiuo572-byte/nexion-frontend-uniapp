@@ -428,7 +428,7 @@ function goStore() {
 .device-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
 .device-stage__aura > view { position: absolute; width: 190px; height: 150px; border-radius: 50%; filter: blur(42px); }
 .device-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent); }
-.device-stage__aura > view:last-child { right: -14px; bottom: 20px; background: color-mix(in srgb, var(--v5-aura-sky) 28%, transparent); }
+.device-stage__aura > view:last-child { right: -10px; bottom: 20px; background: color-mix(in srgb, var(--v5-aura-sky) 28%, transparent); }
 [data-theme="light"] .device-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
 [data-theme="light"] .device-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-aura-sky) 18%, transparent); }
 /* Page focus block: the stage's cyan as one uniform tint (.nx-tint) over the outer aura; bays sit in it as recessed wells. */
