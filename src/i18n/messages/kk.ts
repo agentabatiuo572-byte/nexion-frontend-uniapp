@@ -2321,6 +2321,7 @@ export const kk: Messages = {
     specPower: "Қуат",
     specUptime: "Онлайн SLA",
     specWarranty: "Кепілдік",
+    specWarrantyDuration: "Кепілдік (ай)",
     specWarrantyMonths: "{n} ай",
     specWarrantyYears: "{n} жыл",
     specShareVramNotApplicable: "Қолданылмайды",

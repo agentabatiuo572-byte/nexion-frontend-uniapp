@@ -267,6 +267,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
+import { warrantyMonths } from "@/lib/warranty-months";
 import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { activePhoneDailyRate, storeYieldMultiplier } from "@/lib/store-upgrade";
@@ -498,12 +499,13 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
   const p = product.value;
   if (!p) return [];
   const s = t.value.store;
+  const months = warrantyMonths(p.warranty);
   return [
     { k: s.specGpu, v: specText(t.value, p.gpu, "-") },
     { k: s.specVram, v: specText(t.value, p.vram, "-", "vram") },
     { k: s.specPower, v: specText(t.value, p.power, "-", "power") },
     { k: s.specOnlineRate, v: specText(t.value, p.uptime, "-") },
-    specRow(s.specWarranty, p.warranty),
+    months === undefined ? specRow(s.specWarranty, p.warranty) : { k: s.specWarrantyDuration, v: months },
   ].filter((r): r is SpecRow => r !== null);
 });
 

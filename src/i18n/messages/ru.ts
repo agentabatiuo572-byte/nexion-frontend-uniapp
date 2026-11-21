@@ -2321,6 +2321,7 @@ export const ru: Messages = {
     specPower: "Потребление",
     specUptime: "Доступность по SLA",
     specWarranty: "Гарантия",
+    specWarrantyDuration: "Гарантия (мес.)",
     specWarrantyMonths: "{n} мес.",
     specWarrantyYears: "{n} г.",
     specShareVramNotApplicable: "Не применимо",
