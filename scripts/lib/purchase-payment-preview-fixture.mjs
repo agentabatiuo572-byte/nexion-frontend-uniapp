@@ -250,11 +250,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const existing = openIntent(subject);
       if (existing) {
         if (kind === 'TRIAL_CONVERT') {
-          const trial = demoFixture(new URL('/api/trial/state', url.origin), locale(), state, {...request, method: () => 'GET'});
           const productNo = String(payload.productNo ?? '');
           if (!/^[A-Za-z0-9._-]{2,64}$/.test(productNo)) return refused(422, 'TRIAL_PRODUCT_REQUIRED');
-          const canonical = productNo === 'device-trial-standard' ? 'stellarbox-s1' : productNo;
-          if (canonical !== trial.config.trialProductId) return refused(409, 'TRIAL_PRODUCT_NOT_ELIGIBLE');
+          const canonicalProductNo = value => value === 'device-trial-standard' ? 'stellarbox-s1' : value;
+          if (canonicalProductNo(productNo) !== canonicalProductNo(existing.payload.productNo)) {
+            return refused(409, 'TRIAL_PRODUCT_NOT_ELIGIBLE');
+          }
         }
         return existingIntent(existing);
       }
