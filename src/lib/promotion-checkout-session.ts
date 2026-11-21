@@ -25,18 +25,25 @@ export interface PromotionSessionPorts {
   save(record: PromotionCheckoutRecord): void;
   key(intent: string): string;
   current(): boolean;
+  isExternalPaymentRefused(key: string): boolean;
 }
 /** One durable original command. Querying never issues or retries a mutation. */
 export class PromotionCheckoutSession {
   record: PromotionCheckoutRecord;
   busy = false;
-  unknown = false;
+  private commandUnknown = false;
+  get externalPaymentRefused(): boolean {
+    const pending = this.record.pending;
+    return pending?.operation === 'payOrder' && pending.paymentMethod === 'EXTERNAL'
+      && this.ports.isExternalPaymentRefused(pending.key);
+  }
+  get unknown(): boolean { return this.commandUnknown && !this.externalPaymentRefused; }
   confirmed = false;
   retryOriginal = false;
   private unseenPaymentKey: string | null = null;
   constructor(private ports: PromotionSessionPorts, record?: PromotionCheckoutRecord | null) {
     this.record = record ?? { quote: null, order: null, pending: null };
-    this.unknown = !!this.record.pending;
+    this.commandUnknown = !!this.record.pending;
   }
   setQuote(quote: Quote,voucherId:string|null=null): void {
     if (this.busy || this.record.pending || this.record.order) throw new Error('ORIGINAL_ORDER_UNRESOLVED');
@@ -52,7 +59,7 @@ export class PromotionCheckoutSession {
   releaseExternalPayment(key:string):boolean {
     if(this.record.pending?.key!==key)return false;
     if (!this.persist(withoutPromotionPayment(this.record,key))) return true;
-    this.unknown=false;this.confirmed=!!this.record.order;this.retryOriginal=false;
+    this.commandUnknown=false;this.confirmed=!!this.record.order;this.retryOriginal=false;
     return true;
   }
   rememberLeavePrompt():void {this.persist({...this.record,leavePromptShown:true});}
@@ -64,11 +71,11 @@ export class PromotionCheckoutSession {
     if (stored?.pending?.key === pending.key) return false;
     if (!stored || (stored.paymentIntentRevision ?? 0) <= (this.record.paymentIntentRevision ?? 0)) {
       this.ports.save(this.record);
-      this.unknown = true; this.confirmed = false; this.retryOriginal = false;
+      this.commandUnknown = true; this.confirmed = false; this.retryOriginal = false;
       return false;
     }
     this.record = stored;
-    this.unknown = !!this.record.pending;
+    this.commandUnknown = !!this.record.pending;
     this.confirmed = !!this.record.order && !this.unknown;
     this.retryOriginal = false;
     this.unseenPaymentKey = null;
@@ -81,7 +88,7 @@ export class PromotionCheckoutSession {
     if (!record.pending) {
       if (stored?.pending && stored.pending.key !== this.record.pending?.key) {
         this.record = stored;
-        this.unknown = true; this.confirmed = false; this.retryOriginal = false;
+        this.commandUnknown = true; this.confirmed = false; this.retryOriginal = false;
         this.unseenPaymentKey = null;
         return false;
       }
@@ -93,7 +100,7 @@ export class PromotionCheckoutSession {
   }
   canExecute(operation:PromotionOperation):boolean {
     const pending=this.record.pending;
-    return !this.busy&&!this.unknown&&(!pending||(this.retryOriginal&&(pending.operation===operation
+    return !this.busy&&!this.unknown&&(!pending||operation==='payOrder'&&this.externalPaymentRefused||(this.retryOriginal&&(pending.operation===operation
       ||operation==='cancelOrder'&&pending.operation==='payOrder'&&pending.key===this.unseenPaymentKey)));
   }
   async create(): Promise<void> {
@@ -109,7 +116,7 @@ export class PromotionCheckoutSession {
     const revision = this.record.paymentIntentRevision ?? 0;
     const key = pending?.key??this.ports.key(`payOrder:${order.orderNo}${revision ? `:payment-intent:${revision}` : ''}`);
     if (!this.persist({ ...this.record, pending: { operation: 'payOrder', targetId: order.orderNo, key, paymentMethod: 'EXTERNAL' } })) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
-    this.unknown = true;
+    this.commandUnknown = true;
     this.unseenPaymentKey=null;
     return key;
   }
@@ -149,13 +156,13 @@ export class PromotionCheckoutSession {
     } catch (error) {
       if (operation === 'payOrder' && error instanceof Error && /^PAYMENT_PASSWORD_/.test(error.message)) {
         if (this.ports.current()) {
-          this.unknown = false;
+          this.commandUnknown = false;
           this.confirmed = true;
           this.retryOriginal = true;
         }
         throw error;
       }
-      if (this.ports.current()) { this.unknown = true; this.confirmed = false; }
+      if (this.ports.current()) { this.commandUnknown = true; this.confirmed = false; }
       throw error;
     } finally { this.busy = false; }
   }
@@ -199,7 +206,7 @@ export class PromotionCheckoutSession {
     this.validateOrder(order, quote);
     if (!this.persist({ ...this.record, quote, order, pending: null,
       ...(retireRejectedPayment?{paymentIntentRevision:(this.record.paymentIntentRevision??0)+1}:{}) })) return;
-    this.unknown = false;
+    this.commandUnknown = false;
     this.confirmed = true;
     this.unseenPaymentKey=null;
   }
@@ -220,6 +227,14 @@ export class PromotionCheckoutSession {
       const pending = this.record.pending;
       if (pending) {
         if (pending.operation === 'payOrder') {
+          if (this.externalPaymentRefused) {
+            const order = await this.ports.api.findOrder(pending.targetId);
+            if (!this.ports.current()) return;
+            if (!order) throw new Error('ORIGINAL_ORDER_NOT_FOUND');
+            this.validateOrder(order);
+            if (this.persist({ ...this.record, order })) this.confirmed = true;
+            return;
+          }
           const payment = await this.ports.api.paymentCommand(pending.key);
           if (!this.ports.current()) return;
           this.retryOriginal = false;
@@ -228,7 +243,7 @@ export class PromotionCheckoutSession {
             const order = await this.ports.api.findOrder(pending.targetId);
             if (!this.ports.current()) return;
             if (order) this.acceptOrder(order,true);
-            else { this.unknown = true; this.confirmed = false; }
+            else { this.commandUnknown = true; this.confirmed = false; }
           } else if (payment.status === 'NOT_SEEN' && payment.canResumeSameKey) {
             const order = await this.ports.api.findOrder(pending.targetId);
             if (!this.ports.current()) return;
@@ -237,10 +252,10 @@ export class PromotionCheckoutSession {
               this.validateOrder(order);
               if (!this.persist({...this.record,order})) return;
               const external=pending.paymentMethod==='EXTERNAL';
-              this.unknown = external; this.confirmed = !external; this.retryOriginal = !external;
+              this.commandUnknown = external; this.confirmed = !external; this.retryOriginal = !external;
               if(pending.paymentMethod==='WALLET')this.unseenPaymentKey=pending.key;
-            } else { this.unknown = true; this.confirmed = false; }
-          } else { this.unknown = true; this.confirmed = false; }
+            } else { this.commandUnknown = true; this.confirmed = false; }
+          } else { this.commandUnknown = true; this.confirmed = false; }
           return;
         }
         const result = await this.ports.api.command(pending.key, pending.operation, pending.targetId);
@@ -252,7 +267,7 @@ export class PromotionCheckoutSession {
             // A recovered creation receipt can still carry the status at creation time.
             const liveOrder = await this.ports.api.findOrder(order.orderNo);
             if (!this.ports.current()) return;
-            if (!liveOrder) { this.unknown = true; this.confirmed = false; return; }
+            if (!liveOrder) { this.commandUnknown = true; this.confirmed = false; return; }
             order = { ...liveOrder, ...(order.recoveredQuoteId ? { recoveredQuoteId: order.recoveredQuoteId } : {}) };
           }
           this.acceptOrder(order, false, creation);
@@ -260,12 +275,12 @@ export class PromotionCheckoutSession {
           if(this.record.order){
             const order=await this.ports.api.findOrder(this.record.order.orderNo);
             if(!this.ports.current())return;
-            if(!order){this.unknown=true;this.confirmed=false;return;}
+            if(!order){this.commandUnknown=true;this.confirmed=false;return;}
             this.acceptOrder(order);
-          }else{if(!this.persist({quote:null,order:null,pending:null,...(this.record.leavePromptShown?{leavePromptShown:true}:{})}))return;this.unknown=false;this.confirmed=false;}
+          }else{if(!this.persist({quote:null,order:null,pending:null,...(this.record.leavePromptShown?{leavePromptShown:true}:{})}))return;this.commandUnknown=false;this.confirmed=false;}
           this.retryOriginal=false;
         } else if (result.status === 'NOT_FOUND') {
-          this.unknown = false;
+          this.commandUnknown = false;
           this.retryOriginal = true; // Explicit retry keeps both the original target and key.
           if (this.record.order) {
             const order = await this.ports.api.findOrder(this.record.order.orderNo);
@@ -274,13 +289,13 @@ export class PromotionCheckoutSession {
               if(order.paymentStatus!=='PENDING'){this.acceptOrder(order);return;}
               this.validateOrder(order);this.persist({...this.record,order});this.confirmed=true;
             }
-            else {this.unknown=true;this.confirmed=false;this.retryOriginal=false;}
+            else {this.commandUnknown=true;this.confirmed=false;this.retryOriginal=false;}
           }
-        } else { this.unknown = true; this.confirmed = false; }
+        } else { this.commandUnknown = true; this.confirmed = false; }
       } else if (this.record.order) {
         const order = await this.ports.api.findOrder(this.record.order.orderNo);
         if (this.ports.current() && order) this.acceptOrder(order);
-        else if (this.ports.current()) { this.unknown = true; this.confirmed = false; }
+        else if (this.ports.current()) { this.commandUnknown = true; this.confirmed = false; }
       }
     } finally { this.busy = false; }
   }

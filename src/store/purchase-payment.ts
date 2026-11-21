@@ -18,7 +18,7 @@ import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
-  tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
+  refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
@@ -298,11 +298,11 @@ async function openConditions() {
     // The order detail can retry its own product read.
   }
   if (!owns(version, accountKey)) return;
-  if (orderNo && !productNo) {
+  if (notice === 'rejectConditionsUnmet') {
+    closeAndNavigate(productNo ? `/pages/team/quota?product=${encodeURIComponent(productNo)}` : '/pages/team/quota');
+  } else if (orderNo && !productNo) {
     if (onOrderPage(orderNo)) finish(null);
     else closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
-  } else if (notice === 'rejectConditionsUnmet') {
-    closeAndNavigate(productNo ? `/pages/team/quota?product=${encodeURIComponent(productNo)}` : '/pages/team/quota');
   } else if (productNo) {
     closeAndNavigate(`/pages/store/detail?id=${encodeURIComponent(productNo)}`);
   } else finish(null);
@@ -624,7 +624,11 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload'
 }
 export function requestPurchasePayment(value: PurchasePaymentContext): Promise<PurchaseChoice | null> {
   if (state.open) throw new Error('PURCHASE_PAYMENT_ALREADY_OPEN');
-  const existing = Object.values(rows(account()).records).find(row => row.fingerprint === fingerprint(value) && row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+  const records = rows(account()).records;
+  const scope = fingerprint(value);
+  const existing = value.refusedPaymentKey ? records[value.refusedPaymentKey]
+    : Object.values(records).find(row => row.fingerprint === scope && row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+  if (value.refusedPaymentKey && (!existing?.quotaRefusal || existing.fingerprint !== scope)) throw new Error('ORIGINAL_PAYMENT_MISMATCH');
   context = value;
   open(value, existing ?? null);
   const result = waitForChoice();

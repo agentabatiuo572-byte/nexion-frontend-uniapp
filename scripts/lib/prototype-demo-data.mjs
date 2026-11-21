@@ -179,8 +179,12 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available};
 }
 
+function demoE1PurchaseRule(product) {
+  return {policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+}
+
 function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
-  const e1={policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+  const e1=demoE1PurchaseRule(product);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
   if(state.quotaState==='approved'&&product.id===approvedQuotaSku){
     const quota=demoHardwareQuota(product,state,points,now);
@@ -208,6 +212,15 @@ export function requireDemoExternalPaymentQuota(state,products,items,now) {
   for(const {productNo,quantity} of items){
     const product=products.find(row=>row.id===productNo);
     if(product)requireDemoMonthlyQuota(demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
+  }
+}
+
+export function requireDemoExternalOrderGate(products,items) {
+  for(const {productNo} of items){
+    const product=products.find(row=>row.id===productNo);
+    if(!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+    const e1=demoE1PurchaseRule(product);
+    if(!e1.eligible)refuse(e1.decisionCode);
   }
 }
 

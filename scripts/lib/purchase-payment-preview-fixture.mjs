@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoExternalPaymentQuota,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase} from './prototype-demo-data.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 const base = '/api/app/purchase-payment';
@@ -290,7 +290,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (Number(amount).toFixed(6) !== source.quote.businessAmountUsdt) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       const products = demoProducts(state, url.origin), items = quotaItems(subject, source.payload, order), now = Date.now();
       requireDemoExternalPaymentQuota(state, products, items, now);
-      if (order) requireDemoPurchase(state, products, items, now);
+      if (order) requireDemoExternalOrderGate(products, items);
       const intentNo = `PPI-PREVIEW-${++sequence}`;
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
