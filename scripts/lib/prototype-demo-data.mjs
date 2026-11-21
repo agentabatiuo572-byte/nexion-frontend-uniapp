@@ -73,7 +73,7 @@ export const demoOptions = {
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
-  catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro']],
+  catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
   wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
@@ -139,7 +139,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
       .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
     const dailyEarn=monthlyEstimateUsdt/30,b=.1;
-    const stock=share?null:state.catalogState==='soldout'&&index===0?0:
+    const stock=share?null:['soldout','outofstock'].includes(state.catalogState)&&index===0?0:
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
@@ -786,7 +786,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(pathname==='/api/store/purchase-eligibility'){
       const productNo=url.searchParams.get('productNo');
       const product=products.find(item=>item.id===productNo);
-      if(empty||!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+      if(empty||!product||(state.catalogState==='outofstock'&&product.stock===0))throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
       return {...authority,runId:null,productNo,...demoSkuPurchaseRules(state,product,teamComputePoints,now),
         evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
     }
