@@ -1,6 +1,6 @@
 <template>
   <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" role="status">
-    <view v-for="row in showHistory ? records : pending" :key="row.commandKey" class="purchase-payment__row"><text>{{ row.summary }} · {{ row.lastStatus === 'MANUAL_REVIEW' ? copy.review : row.lastStatus === 'EXPIRED' ? copy.ended : row.businessDelivered ? copy.delivered : copy.resume }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
+    <view v-for="row in showHistory ? records : pending" :key="row.commandKey" class="purchase-payment__row"><text :style="{ flexBasis: rowBasis(row) }">{{ row.summary }} · {{ rowLabel(row) }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
   </view>
 
   <!-- Step sheet: method → network / bank confirmation. -->
@@ -149,8 +149,10 @@
 
       <view class="pp-card">
         <view class="pp-wait" :class="{ 'is-alone': isBank || conclusion, 'is-concluded': conclusion, 'is-paused': networkPaused }" role="status" :style="{ '--pp-st': waitTone }">
-          <view v-if="!conclusion" class="pp-wait__spin" aria-hidden="true" />
-          <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
+          <view class="pp-wait__head">
+            <view v-if="!conclusion" class="pp-wait__spin" aria-hidden="true" />
+            <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
+          </view>
           <text v-if="conclusion" class="pp-wait__s">{{ conclusion.body }}</text>
           <text v-else-if="ready && !s.error" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
         </view>
@@ -404,6 +406,16 @@ const conclusion = computed(() => networkPaused.value
   ? { title: fill(copy.value.networkPausedTitle, { network: networkName.value }), body: copy.value.networkPaused }
   : noticeFor(purchaseConclusion(s.intent)));
 
+type ResumeRow = ReturnType<typeof payment.records>[number];
+function rowLabel(row: ResumeRow) { return row.lastStatus === 'MANUAL_REVIEW' ? copy.value.review : row.lastStatus === 'EXPIRED' ? copy.value.ended : row.businessDelivered ? copy.value.delivered : copy.value.resume; }
+// Footer rule (as in referral-progress): the note stays beside its action while it fits in two lines. Its basis is
+// about half its one-line width (CJK about 1em, other scripts about 0.55em per character) plus 2.5em for word breaks,
+// so the row wraps, putting the action at the bottom-right, only when the note would need a third line.
+function rowBasis(row: ResumeRow) {
+  let em = 2.5;
+  for (const ch of `${row.summary} · ${rowLabel(row)}`) em += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 0.5 : 0.275;
+  return `${em.toFixed(1)}em`;
+}
 function amount(value: string | number) { return formatGroupedAmount(value); }
 function walletAmount(value: number) { return formatGroupedAmount(value, app.user.usdtBalance < 0 ? 6 : 2); }
 function clock(ms: number) { const total = Math.ceil(ms / 1000); return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`; }
@@ -538,10 +550,12 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-copy--plain { width: 44px; height: 44px; margin-right: -10px; cursor: pointer; }
 .pp-copy--plain:active { opacity: .6; }
 .pp-wait { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-bottom: 14px; padding: 0 2px 14px; border-bottom: 1px solid var(--v5-border); }
-.pp-wait__spin { flex: none; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--pp-st) 22%, transparent); border-top-color: var(--pp-st); border-right-color: var(--pp-st); animation: pp-spin 1s linear infinite; }
+/* Spinner and status stay together; a long status wraps beside the spinner, which sits on its first line. */
+.pp-wait__head { flex: 0 1 auto; min-width: 0; display: flex; align-items: flex-start; gap: 10px; }
+.pp-wait__spin { flex: none; margin-top: calc((var(--ui-type-list-title-lh) - 16px) / 2); width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--pp-st) 22%, transparent); border-top-color: var(--pp-st); border-right-color: var(--pp-st); animation: pp-spin 1s linear infinite; }
 @keyframes pp-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pp-wait__spin { animation: none; } }
-.pp-wait__t { white-space: nowrap; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
+.pp-wait__t { min-width: 0; overflow-wrap: break-word; text-wrap: pretty; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .pp-wait__em { color: var(--pp-st); }
 .pp-wait__s { margin-left: auto; text-align: right; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-2); }
@@ -553,13 +567,16 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-addr { display: flex; align-items: center; gap: var(--v5-space-2); margin-top: var(--v5-space-3); padding: 6px 6px 6px 14px; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
 .pp-addr__t { flex: 1; min-width: 0; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-jet-mono); color: var(--v5-ink); overflow-wrap: anywhere; }
 .pp-wait.is-alone { margin: 0; padding: 0 2px; border: 0; }
-.pp-wait.is-concluded .pp-wait__t { white-space: normal; }
+/* While the address is still being prepared nothing follows the status, so it keeps no divider. */
+.pp-wait:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 .pp-wait.is-concluded .pp-wait__s { width: 100%; margin-left: 0; text-align: left; }
 .pp-wait.is-paused { justify-content: center; text-align: center; }
 .pp-wait.is-paused .pp-wait__s { text-align: center; }
 .pp-pay.has-bar { padding-bottom: 120px; }
 .pp-bar { position: absolute; z-index: 2; display: flex; }
 .pp-reopen { display: flex; flex: 1; }
+/* A lone bar action spans the bar like the bank page's reopen button. */
+.pp-bar > .nx-button { flex: 1; }
 .pp-div { height: 1px; margin: 6px 0; background: var(--v5-border); }
 .pp-warn { display: flex; gap: var(--v5-space-2); padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: color-mix(in srgb, var(--v5-warning-soft) 60%, transparent); color: var(--v5-warning); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .pp-warn > :first-child { flex: none; margin-top: 2px; }
@@ -595,8 +612,9 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__foot { flex: none; padding-top: var(--v5-space-3); min-height: 20px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); background: var(--v5-surface); box-shadow: 0 -1px 0 var(--v5-border); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 0 5px color-mix(in srgb, var(--v5-brand) 20%, transparent); }
 
-.purchase-payment__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.purchase-payment__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .purchase-payment__row > text { flex: 1; min-width: 0; }
-.purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; }
+.purchase-payment__row > :last-child { flex-shrink: 0; margin-left: auto; white-space: nowrap; }
+.purchase-payment__row:last-child { border-bottom: 0; }
 .purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 64px); display: grid; gap: var(--v5-space-2); max-height: 160px; overflow: auto; padding: var(--v5-space-2) var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
 </style>
