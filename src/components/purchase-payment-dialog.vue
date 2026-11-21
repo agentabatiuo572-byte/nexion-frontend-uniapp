@@ -334,7 +334,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'leave': return { icon: 'alert', tone: 'warning', title: networkPaused.value ? fill(c.networkPausedTitle, { network: networkName.value }) : c.leaveTitle,
-      body: networkPaused.value ? c.networkPaused : c.leaveBody, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: leavePayment };
+      // Trial conversion, trade-in and capacity payments have no order page; they resume from Orders.
+      body: networkPaused.value ? c.networkPaused : order ? c.leaveBody : c.leaveBodyNoOrder, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: leavePayment };
     case 'networkPaused': return { icon: 'info', tone: 'warning', title: fill(c.networkPausedTitle, { network: networkName.value }), body: c.networkPaused,
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
       ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
