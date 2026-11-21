@@ -7,7 +7,7 @@ import { useApp } from './app';
 import { useOrders } from './orders';
 import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
 import { clearOrderAction, readOrderAction } from '@/lib/order-command-fence';
-import { navTo, navReplace } from '@/lib/route';
+import { navTo, navReplace, navBack } from '@/lib/route';
 import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
@@ -172,21 +172,26 @@ function unsettledCheckoutPayments(includeTradein: boolean) {
 }
 
 /** The progress bar can outlive both a closed payment layer and a released checkout pointer. */
+// Checkout and the floating bar read the same unfinished payments: one read at a time, at most every 10 seconds, shared by both.
+let passiveRead: Promise<unknown> | null = null, passiveReadAt = 0;
+function sharedPassiveRead(run: () => Promise<unknown>) {
+  if (passiveRead || Date.now() - passiveReadAt < 10_000) return passiveRead;
+  passiveRead = run().finally(() => { passiveRead = null; passiveReadAt = Date.now(); });
+  return passiveRead;
+}
 export async function refreshExpiredCheckoutPayments(accountKey: string, current: () => boolean, includeTradein: boolean) {
   if (!current() || account() !== accountKey || state.open) return;
-  await Promise.allSettled(unsettledCheckoutPayments(includeTradein).map(async pending => {
+  await sharedPassiveRead(() => Promise.allSettled(unsettledCheckoutPayments(includeTradein).map(async pending => {
     const result = await readIntent(pending);
     if (!current() || account() !== accountKey || state.open || result?.status !== 'EXPIRED') return;
     matches(result, pending);
     saveExpiry(accountKey, pending.commandKey, pending.kind);
-  }));
+  })));
 }
 /** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
-// One passive read at a time: pages that show the bar at once share it.
-let passiveRead: Promise<unknown> | null = null;
 export function refreshPendingPayments(accountKey: string, current: () => boolean) {
-  if (passiveRead || !current() || account() !== accountKey || state.open) return passiveRead;
-  passiveRead = Promise.allSettled(pendingPayments().map(async pending => {
+  if (!current() || account() !== accountKey || state.open) return passiveRead;
+  return sharedPassiveRead(() => Promise.allSettled(pendingPayments().map(async pending => {
     const intent = await readIntent(pending);
     if (!intent || intent.status === pending.lastStatus || !current() || account() !== accountKey || state.open) return;
     matches(intent, pending);
@@ -195,8 +200,7 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
     const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
     if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
     save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
-  })).finally(() => { passiveRead = null; });
-  return passiveRead;
+  })));
 }
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
@@ -298,11 +302,19 @@ function readPendingPayment() {
 }
 // A checkout owner may defer navigation until its payment operation releases
 // the page leave guard. Cold resumes use ordinary navigation directly.
+/** A purchase page whose payment ends on its order is finished: the order page takes its place, so back skips it.
+ *  When that order's page is right below (a purchase continued from it), going back to it avoids a second copy. */
+export function replaceWithOrder(href: string): Promise<boolean> {
+  const pages = getCurrentPages() as { route?: string; options?: Record<string, string> }[];
+  const below = pages[pages.length - 2], id = /[?&]id=([^&]+)/.exec(href)?.[1];
+  if (below?.route === 'pages/store/order-detail' && id && below.options?.id === decodeURIComponent(id)) { navBack(href); return Promise.resolve(true); }
+  return navReplace(href);
+}
 // A purchase page whose payment ends on its order is finished: replace sends the order page in its place, so back skips it.
 function closeAndNavigate(href: string, replace = false) {
   const owner = context, navigate = owner?.navigate;
   finish(null);
-  if (navigate) navigate(href, replace && !!owner); else if (replace && owner) void navReplace(href); else void navTo(href);
+  if (navigate) navigate(href, replace && !!owner); else if (replace && owner) void replaceWithOrder(href); else void navTo(href);
 }
 async function openConditions() {
   const { accountKey, orderNo, notice } = state;

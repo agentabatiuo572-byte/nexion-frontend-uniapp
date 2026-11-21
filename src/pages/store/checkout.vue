@@ -1,7 +1,7 @@
 <!-- Checkout review presentation. Transaction quotes, confirmation and recovery remain server-authoritative. -->
 <template>
   <AppChassis active="store">
-    <template #pageTop><SubPageHeader class="checkout-header" design :close="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
+    <template #pageTop><SubPageHeader class="checkout-header" design :close="checkoutResultVisible" :back="checkoutBackHref" :back-action="settledResultReplay && !promotionRoute ? closeSettledPurchase : requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
     <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
@@ -1849,7 +1849,7 @@ function requestCheckoutBack() {
   if (paymentSheetOpen.value) { closePaymentSheet(); return; }
   void cancelCheckout();
 }
-// Closing a finished purchase also leaves the product page it started from, so back does not walk through the purchase again.
+// The result's close mark also leaves the product page the purchase started from; system back still goes one page (02 §2.7).
 function closeSettledPurchase() {
   const pages = getCurrentPages() as { route?: string }[];
   if (pages.length > 2 && pages[pages.length - 2]?.route === 'pages/store/detail') uni.navigateBack({ delta: 2 });
@@ -1885,8 +1885,7 @@ async function cancelCheckout() {
   checkoutLeaveError.value = '';
   try {
     const pendingCreate = pendingCheckoutCreate.value ?? readCheckoutCreate(scope.accountKey, scope.productNo);
-    if (settledResultReplay.value) { closeSettledPurchase(); return; }
-    if (!original && !pendingCreate) { navBack(checkoutBackHref.value); return; }
+    if ((!original && !pendingCreate) || settledResultReplay.value) { navBack(checkoutBackHref.value); return; }
     pendingCheckoutCreate.value = pendingCreate;
     if (!original && pendingCreate) {
       // The existing API has no create-command GET. Replay only the exact

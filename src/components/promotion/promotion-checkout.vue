@@ -158,7 +158,7 @@ import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadlin
 import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { onPurchaseRecordReleased, refusedPurchasePayment } from '@/store/purchase-payment';
+import { onPurchaseRecordReleased, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
@@ -524,7 +524,7 @@ async function confirmPayment(){
   }finally{
     paymentConfirming.value=false;
     // The order page replaces a finished checkout, so back does not return to it.
-    if(paymentDestination&&readCurrent(generation))await (paymentReplace?navReplace:navTo)(paymentDestination);
+    if(paymentDestination&&readCurrent(generation))await (paymentReplace?replaceWithOrder:navTo)(paymentDestination);
   }
 }
 let recoveryReadGeneration=-1;

@@ -596,7 +596,8 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .purchase-payment__row > text { flex: 1; min-width: 0; padding-block: 6px; }
 /* The text action's own 8px inline padding sits in the bar padding, so its label keeps the same 16px inset as the row text. */
 .purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; margin-right: -8px; }
-.purchase-payment-resume.has-close { padding-right: 48px; }
+/* The text action's hit area stops short of the close mark's 44px target. */
+.purchase-payment-resume.has-close { padding-right: 56px; }
 .purchase-payment-resume__close { position: absolute; top: 14px; right: var(--v5-space-3); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
 .purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
 .purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 64px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
