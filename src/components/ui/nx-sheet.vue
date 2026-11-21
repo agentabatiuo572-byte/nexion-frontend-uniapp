@@ -2,7 +2,7 @@
   <view v-if="open" class="nx-sheet-mask nx-sheet-fade-in">
     <!-- The tap-to-close layer is a sibling under the sheet, not the sheet's parent: uni H5 hands handlers plain-object
          targets, so @click.self never matched and a mask tap closed nothing. Taps on the sheet never reach this layer. -->
-    <view class="nx-sheet-scrim" aria-hidden="true" @click="$emit('close')" />
+    <view class="nx-sheet-scrim" aria-hidden="true" @click="!persistent && $emit('close')" />
     <view :id="id" class="nx-glass-sheet nx-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="title">
       <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" @click="$emit('close')"><NxIcon name="close" :size="18" /></NxButton></view>
       <view class="nx-sheet__body"><slot /></view>
@@ -16,7 +16,8 @@ import NxButton from './nx-button.vue';
 import NxIcon from './nx-icon.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
-const props = withDefaults(defineProps<{ open: boolean; title: string; nativeBack?: boolean }>(), { nativeBack: true });
+// persistent: a mask tap does not close the sheet (forms whose typed input a stray tap would throw away, 03 §3.5); ✕, Esc and back still do.
+const props = withDefaults(defineProps<{ open: boolean; title: string; nativeBack?: boolean; persistent?: boolean }>(), { nativeBack: true });
 const emit = defineEmits<{ (event: 'close'): void }>();
 const copy = useAuditUiCopy();
 const id = `nx-sheet-${getCurrentInstance()?.uid}`;
