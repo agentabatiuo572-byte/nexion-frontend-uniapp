@@ -32,8 +32,10 @@
             <text class="block mt-1 line-clamp-2" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
             <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
               <text style="color: var(--v5-ink-2)">{{ gpuText }}</text>
-              <text style="color: var(--v5-ink-4)">·</text>
-              <text style="color: var(--v5-ink-2)">{{ vramText }}</text>
+              <template v-if="props.product.productType !== 'SHARE'">
+                <text style="color: var(--v5-ink-4)">·</text>
+                <text style="color: var(--v5-ink-2)">{{ vramText }}</text>
+              </template>
             </view>
           </view>
         </view>

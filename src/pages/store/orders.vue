@@ -456,7 +456,9 @@ const browseBtnStyle: CSSProperties = {
 .orders-filter__badge { min-width: 18px; height: 18px; box-sizing: border-box; margin-left: 1px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); font: 600 11px/18px var(--font-v5); }
 /* Order cards (DS-28): solid surface, machine art as the anchor; the pending card adds one faint warning glow. */
 .orders-list { display: flex; flex-direction: column; gap: var(--ui-space-card-gap); margin: 0 16px; }
-.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); cursor: pointer; }
+.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); }
+/* Only what opens a page shows a pointer: the whole commerce card, or the Genesis card's main row. */
+.order-card[role="button"], .order-card__row[role="button"] { cursor: pointer; }
 .order-card:not(.nx-tint) { background: var(--v5-content-surface); }
 [data-theme="light"] .order-card:not(.nx-tint) { box-shadow: var(--v5-glass-shadow); }
 /* Awaiting payment: tinted warning (it used to be a corner glow). */
@@ -478,7 +480,7 @@ const browseBtnStyle: CSSProperties = {
 .order-card__code-value { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 /* Genesis: the order-number row sits under the tappable row, aligned with the text column; its copy button has a 44px target and does not open the card. */
 .order-card__code--copy { align-items: center; min-height: 44px; margin: 4px 0 -10px; padding-left: 86px; cursor: default; }
-.order-card__code--copy :deep(.copy-code-button) { width: 44px; height: 44px; margin: 0 -10px 0 0; }
+.order-card__code--copy :deep(.copy-code-button) { width: 44px; height: 44px; margin: 0 -10px 0 auto; }
 .order-card__row[role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
 /* Narrow screens: the amount drops to its own right-aligned line instead of clipping. */
 .order-card__bottom { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: auto; }

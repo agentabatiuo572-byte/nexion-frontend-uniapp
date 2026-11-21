@@ -164,11 +164,14 @@ const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !t
 // Only a background re-read from a ready card waits before dimming (CSS delay), so a quick read never flashes.
 // Pills that were already muted (out of stock, unavailable, or a retry after a failed read) stay muted.
 const trialPillWait = computed(() => trialRechecking.value && !retryShown.value);
+// The name reads the state the card's bottom row shows: slots full stays in it while a failed read shows its pill.
 const trialOfferLabel = computed(() => showCapacityManagement.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
+  : showCapacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${trialPill.value[2]}`
   : trial.status === "none" && (eligibility.value.ok || offerState.value === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
   : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[2]}`);
-const trialOfferAria = computed(() => trialRechecking.value ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
+const trialOfferAria = computed(() => trialRechecking.value || (showCapacityManagement.value && trial.authorityStatus === 'loading')
+  ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
 const trialPendingAria = computed(() => {
   if (status.value === 'ended') return `${trialName.value} · ${lifecycleCopy.value.endedTitle} · ${lifecycleCopy.value.buyDevice}`;
   const remaining = trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.value.longRemaining);

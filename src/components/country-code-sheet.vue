@@ -148,6 +148,8 @@ function select(item: CountryRow) {
 .cc-mask { position: fixed; inset: 0; z-index: 9000; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); }
 .cc-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); position: fixed; left: 0; right: 0; bottom: 0; z-index: 9001; display: flex; flex-direction: column; max-height: min(74vh, 620px, calc(100% - var(--nx-overlay-top))); box-sizing: border-box; background: var(--nx-glass-fill); border: none; animation: cc-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes cc-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+/* border: none above outranks the shared sheet outline, so forced colours get it back here. */
+@media (forced-colors: active) { .cc-sheet { border: 1px solid CanvasText; } }
 .cc-grab { flex: 0 0 auto; width: 40px; height: 4px; margin: 10px auto 0; border-radius: 9999px; background: var(--v5-surface-3); }
 .cc-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 6px 20px; }
 .cc-head__title { font-family: var(--font-v5); font-size: var(--ui-type-hero-title); font-weight: var(--ui-type-hero-title-weight); color: var(--v5-ink); }

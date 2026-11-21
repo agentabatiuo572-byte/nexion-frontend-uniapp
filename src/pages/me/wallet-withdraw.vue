@@ -1828,7 +1828,8 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-slab__head { display: flex; align-items: center; justify-content: space-between; }
 .wd-max { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .wd-max::after { content: ""; position: absolute; inset: -6px -8px; }
-.wd-max[aria-disabled="true"] { opacity: .5; }
+/* Locked: the shared disabled text colour, not a faded brand green that still reads as tappable. */
+.wd-max[aria-disabled="true"] { color: var(--v5-ink-4); cursor: default; }
 .wd-amtrow { display: flex; align-items: baseline; margin-top: 4px; }
 .wd-amtrow__cur { margin-right: 2px; color: var(--v5-ink-3); font: 500 22px/48px var(--font-amount); }
 .wd-amtrow__input { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 64px); height: 48px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
