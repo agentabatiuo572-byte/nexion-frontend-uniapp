@@ -237,7 +237,7 @@
     :icon="notice.icon" :tone="notice.tone" :busy="s.busy" @primary="notice.onPrimary" @secondary="notice.onSecondary" />
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import NxButton from '@/components/ui/nx-button.vue';
@@ -497,15 +497,26 @@ async function saveCashierImage(): Promise<CashierImageResult> {
 
 defineExpose({ canSaveCashierImage, saveCashierImage });
 
-// Save result feedback (03 §3.5.1 toast). 'unavailable' (not loaded yet, or a repeat tap) needs no message.
 const savingQr = ref(false);
 async function saveQr() {
   savingQr.value = true;
   try {
     const result = await saveCashierImage();
-    if (result === 'saved') toast.success(copy.value.cashierImageSaved);
-    else if (result === 'permission-denied') toast.warn(copy.value.cashierAlbumPermissionDenied);
-    else if (result === 'failed') toast.error(copy.value.cashierImageSaveFailed);
+    if (result === 'unavailable') return;
+    const feedback = {
+      saved: ['success', copy.value.cashierImageSaved],
+      'permission-denied': ['warn', copy.value.cashierAlbumPermissionDenied],
+      failed: ['error', copy.value.cashierImageSaveFailed],
+    } as const;
+    const [kind, title] = feedback[result];
+    // #ifdef APP-PLUS
+    // Exception to 03 §3.5.1: the native cashier is above the page's DOM toast.
+    if (cashierView && visibleCashierUrl.value) {
+      plus.nativeUI.toast(title, { verticalAlign: 'center', duration: kind === 'success' ? 'short' : 'long' });
+      return;
+    }
+    // #endif
+    toast[kind](title);
   } finally {
     savingQr.value = false;
   }
@@ -529,13 +540,21 @@ function closeNativeCashier() {
   const view = cashierView;
   cashierView = null;
   cashierLoaded.value = false;
-  view?.close();
+  if (!view) return;
+  view.removeFromParent();
+  view.close();
 }
 
 watch(visibleCashierUrl, url => {
   closeNativeCashier();
   if (!url) return;
+  // In App-vue, plus.webview.currentWebview() refers to the hidden logic-layer WebView.
+  const pages = getCurrentPages();
+  const page = pages[pages.length - 1] as { $getAppWebview?: () => PlusWebviewWebviewObject } | undefined;
+  const parent = page?.$getAppWebview?.();
+  if (!parent) return;
   const view = plus.webview.create('', `uvel-purchase-cashier-${Date.now()}`, {
+    // Match the existing cashier frame: status bar + 56px header row + 26px secure row.
     top: `${statusBar + 82}px`, bottom: `${CASHIER_FOOT}px`, plusrequire: 'none',
   });
   cashierView = view;
@@ -551,10 +570,10 @@ watch(visibleCashierUrl, url => {
   view.addEventListener('error', () => setLoaded(false));
   view.addEventListener('close', () => setLoaded(false));
   view.addEventListener('loaded', () => setLoaded(cashierHttps.test(view.getURL())));
-  plus.webview.currentWebview().append(view);
+  parent.append(view);
   view.loadURL(url);
 });
-onUnmounted(closeNativeCashier);
+onBeforeUnmount(closeNativeCashier);
 // #endif
 
 // Leaving for a wallet or bank app keeps the payment open and only pauses reads; navigating away closes it.
