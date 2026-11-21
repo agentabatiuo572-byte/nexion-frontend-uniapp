@@ -9,7 +9,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const receipts = new Map();
   const ok = data => ({status:200,message:'OK',data});
   const external = createPurchasePaymentPreviewFixture(state, locale);
-  const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || external.handles(path);
+  const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || path === '/api/app/trade-in/capacity-replace' || external.handles(path);
   // A reset or scenario change starts a fresh account: replayed receipts and payment command receipts belong to the
   // old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
@@ -30,6 +30,25 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     external.sweep();
     for (const order of state.createdOrders ?? []) if (demoOrderTimedOut(order,state,Date.now())) Object.assign(order,demoTimedOutOrder);
     if (external.handles(path)) return external.handle(url, request);
+    if (path === '/api/app/trade-in/capacity-replace') {
+      const fail = (status, message) => ({status,message,data:null});
+      if (method !== 'POST') return fail(405,'METHOD_NOT_ALLOWED');
+      if (!key) return fail(422,'IDEMPOTENCY_KEY_REQUIRED');
+      const kind = 'capacity-replace', command = kind + ':' + key, recorded = pin.commands.get(command);
+      if (recorded) return recorded.status === 'SUCCEEDED' ? ok(recorded.receipt) : fail(recorded.code,recorded.message);
+      const authorization = pin.authorize(request.postDataJSON());
+      if (authorization.status !== 200) return authorization;
+      let receipt;
+      try { receipt = demoFixture(url,locale(),state,request); }
+      catch (error) {
+        if (!error.status) throw error;
+        pin.commands.set(command,{kind,commandKey:key,status:'REJECTED',canResumeSameKey:false,code:error.status,message:error.message,receipt:null});
+        return fail(error.status,error.message);
+      }
+      pin.state.payWrites++;
+      pin.commands.set(command,{kind,commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt});
+      return ok(receipt);
+    }
     if (path === '/api/orders' && method === 'GET') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/quote') return ok(demoFixture(url,locale(),state,request));
     if (['/api/orders','/api/orders/bundle'].includes(path) && method === 'POST') {
