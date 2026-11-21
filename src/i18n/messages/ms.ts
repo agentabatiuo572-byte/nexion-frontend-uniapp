@@ -3213,7 +3213,7 @@ export const ms: Messages = {
     changePassword: "Tukar kata laluan",
     phoneChangeTitle: "Tukar nombor telefon log masuk",
     phoneChangeSummary: "Ditukar {used} daripada {max} kali dalam {days} hari lepas",
-    phoneChangeUnavailable: "Had penukaran tidak tersedia buat sementara",
+    phoneChangeUnavailable: "Had penukaran tidak tersedia",
     phoneChangeLimit: "Had penukaran dicapai. Tarikh seterusnya:",
     phoneChangeNew: "Nombor telefon baharu",
     phoneChangeSendCodes: "Hantar kod ke kedua-dua nombor",

@@ -2,7 +2,7 @@
   <view v-if="providers.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
     <text class="oauth-title">{{ intent === "LINK" ? t.thirdParty.linkTitle : t.thirdParty.signInTitle }}</text>
     <text v-if="intent === 'LINK' && !providers.length" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
-    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || disabled" :preserve-appearance="disabled && !flow && !submitting" @select="start" />
+    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || disabled" :preserve-appearance="disabled && !flow && !submitting && !unavailableReason" :unavailable-reason="unavailableReason" @select="start" />
     <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
       <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
@@ -45,7 +45,7 @@ import { validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth
 
 // beforeStart lets the host page veto a start (e.g. an invalid typed invite code) before the provider opens.
 // sponsorRejected hands the refused invite code, as sent, back to the host page that owns the invite field.
-const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: ((sent: string | null) => void) | null }>(), {
+const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: ((sent: string | null) => void) | null; unavailableReason?: string }>(), {
   intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null, beforeStart: null, sponsorRejected: null,
 });
 const t = useT();

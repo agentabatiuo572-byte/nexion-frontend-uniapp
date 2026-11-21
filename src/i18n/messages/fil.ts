@@ -3213,7 +3213,7 @@ export const fil: Messages = {
     changePassword: "Palitan ang password",
     phoneChangeTitle: "Palitan ang numero ng phone",
     phoneChangeSummary: "Napalitan nang {used} sa {max} beses sa nakaraang {days} araw",
-    phoneChangeUnavailable: "Pansamantalang hindi available ang bilang ng pagpalit",
+    phoneChangeUnavailable: "Hindi makuha ang limit ng palit",
     phoneChangeLimit: "Naabot ang limit ng pagpalit. Susunod na puwede:",
     phoneChangeNew: "Bagong numero ng phone",
     phoneChangeSendCodes: "Ipadala ang code sa dalawa",
