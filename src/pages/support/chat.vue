@@ -772,8 +772,19 @@ const transferredSessionNotice = computed(() => writableConversationNo.value
 const isReplyAllowed = computed(() => !awaitingHumanDetail.value && !isTransferredSession.value
   && (!conv.value || replyAllowedStatuses.has(conv.value.status)));
 const isClosedSession = computed(() => !!conv.value && !awaitingHumanDetail.value && !isReplyAllowed.value);
-const canCheckHumanSend = computed(() => isClosedSession.value && conv.value?.writeState?.canReply === false
-  && supportSessionReady.value && failedHumanSend.value?.settled === false && !humanSendBusy.value);
+const pendingIndexRevision = ref(0);
+function onPendingIndexStorage(event: StorageEvent) {
+  if (event.key === null || event.key.startsWith("support-pending-commands:")) pendingIndexRevision.value++;
+}
+onMounted(() => { if (typeof window !== "undefined") window.addEventListener("storage", onPendingIndexStorage); });
+onUnmounted(() => { if (typeof window !== "undefined") window.removeEventListener("storage", onPendingIndexStorage); });
+const canCheckHumanSend = computed(() => {
+  const failed = failedHumanSend.value;
+  if (!supportSessionReady.value || !cid.value || failed?.settled !== false || humanSendBusy.value) return false;
+  if (isClosedSession.value) return conv.value?.writeState?.canReply === false;
+  void pendingIndexRevision.value; void humanShowRevision.value;
+  return isReplyAllowed.value && failed.retryable && !convStore.hasIndexedHumanSend(humanComposerKey.value, failed);
+});
 // Account advisor identity belongs to new composition. Existing conversation
 // headers and waiting state use the server's owner for that exact conversation id.
 const advisorApplies = computed(() => !isClosedSession.value && !cid.value && !!startType.value);

@@ -635,13 +635,13 @@ function scroller(): HTMLElement | undefined {
 function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: number } }) {
   if (stopPreviewPreparation) { nativePreviewReading = null; clearPreviewRowHeights(); }
   pendingTailGeneration = undefined;
+  const node = scroller(), top = node?.scrollTop ?? event.detail.scrollTop;
   // The delayed echo of our own pin (same scrollTop) can arrive after late content has grown the list;
   // measuring it against the new height would wrongly mark the reader as having left the tail.
-  const echo = event.detail.scrollTop === lastScrollTop;
+  const echo = top === lastScrollTop;
   // Observe gestures without turning delayed App scroll events back into scroll commands.
-  if (pendingPosition) pendingPosition.top += event.detail.scrollTop - lastScrollTop;
-  lastScrollTop = event.detail.scrollTop;
-  const node = scroller();
+  if (pendingPosition) pendingPosition.top += top - lastScrollTop;
+  lastScrollTop = top;
   // A real gesture ends any pending history restoration anchor.
   if (!echo) historyAnchor = null;
   if (echo) { /* keep followingTail */ }
@@ -696,6 +696,9 @@ async function prepareHistoryPrepend(): Promise<boolean> {
   const current = () => !historyDisposed && threadVisible.value && preparation === historyPreparation
     && owner === historyOwner() && host === listHost.value && root === listRoot();
   if (!current()) return false;
+  // This reader asked for history. Cancel a queued pin before waiting for an in-progress layout adjustment.
+  followingTail = false;
+  clearTimeout(scrollTimer);
   // The parent finishes its data request before the native post-layout callback.
   // Wait for that bounded transaction; never erase its unpaid prefix delta.
   if (pendingPosition && !await pendingPosition.settled) return false;
@@ -751,8 +754,8 @@ function beginPosition(previousInset: number, node?: HTMLElement): PositionAdjus
   return { owner: historyOwner(), host: listHost.value, root: listRoot(), top: node?.scrollTop ?? lastScrollTop, inset: previousInset,
     // A new layout can precede the first queued tail placement. Its old DOM
     // position is not evidence that the user chose to read earlier history.
-    tail: (followingTail && pendingTailGeneration === scrollGeneration)
-      || (node ? node.scrollHeight - node.clientHeight - node.scrollTop <= 24 : followingTail),
+    tail: followingTail && (pendingTailGeneration === scrollGeneration
+      || !node || node.scrollHeight - node.clientHeight - node.scrollTop <= 24),
     expiresAt: Date.now() + HISTORY_MEASURE_MS, settled, settle };
 }
 function preservePosition(previousInset: number, firstId?: string) {
@@ -778,6 +781,8 @@ function preservePosition(previousInset: number, firstId?: string) {
     }
     preparedHistory = null;
     if (prefix === null || !Number.isFinite(prefix)) { cancelScroll(); return; }
+    // A prepend preserves the reading anchor even when the old viewport was near the tail.
+    followingTail = false;
     adjustment.id = firstId; adjustment.prefix = prefix;
   }
   cancelScroll(true); pendingPosition = adjustment;
@@ -802,7 +807,8 @@ function preservePosition(previousInset: number, firstId?: string) {
     }
     settlePosition(true);
     if (target) target.scrollTop = nextTop;
-    scrollTop.value = nextTop; lastScrollTop = nextTop;
+    lastScrollTop = target?.scrollTop ?? nextTop;
+    scrollTop.value = lastScrollTop;
     scheduleBubblePositions();
   };
   void nextTick(() => {
@@ -945,7 +951,7 @@ onScopeDispose(() => composerResizeObserver?.disconnect());
 watch(() => [inputHeight.value, showInputLength.value, inputOverLimit.value, composerVisible.value,
   props.attachRetry, props.imageLabels?.retryPolicy, props.inputLimitHint, props.timeLocale], () => {
   const node = scroller();
-  const atTail = node ? node.scrollHeight - node.clientHeight - node.scrollTop <= 24 : followingTail;
+  const atTail = followingTail && (!node || node.scrollHeight - node.clientHeight - node.scrollTop <= 24);
   // Native fallback is ready immediately; layout measurement replaces it with
   // the exact input, counter and safe-area height once the bridge responds.
   composerSpace.value = inputHeight.value + 62 + (showInputLength.value ? 36 : 0) + (inputOverLimit.value ? 36 : 0) + (props.attachRetry ? 44 : 0);
