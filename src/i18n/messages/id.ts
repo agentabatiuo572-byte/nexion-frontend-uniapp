@@ -2554,7 +2554,7 @@ export const id: Messages = {
     purchaseEligibilityError: "Kelayakan pembelian belum dapat diverifikasi",
     purchaseEligibilityRetry: "Cek ulang kelayakan",
     purchaseEligibilityProductPolicy: "Kelayakan pembelian produk",
-    purchaseEligibilityQuotaDepleted: "Stok bulanan sudah habis",
+    purchaseEligibilityQuotaDepleted: "Kuota penjualan habis",
     trialProductUnavailable: "Stok perangkat uji coba sedang habis. Coba lagi nanti.",
     productUnavailable: "Produk ini sedang tidak tersedia. Kembali ke Toko dan coba lagi.",
     tickerBought: "membeli",

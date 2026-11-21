@@ -2554,7 +2554,7 @@ export const fil: Messages = {
     purchaseEligibilityError: "Hindi namin ma-verify ang eligibility sa pagbili",
     purchaseEligibilityRetry: "Suriin ulit ang eligibility",
     purchaseEligibilityProductPolicy: "Eligibility sa pagbili",
-    purchaseEligibilityQuotaDepleted: "Ubos na ang available na stock ngayong buwan",
+    purchaseEligibilityQuotaDepleted: "Ubos na ang quota ng benta",
     trialProductUnavailable: "Pansamantalang ubos ang stock ng device sa trial. Subukan ulit mamaya.",
     productUnavailable: "Pansamantalang hindi mabibili ang produktong ito. Bumalik sa store at subukan ulit.",
     tickerBought: "bumili ng",

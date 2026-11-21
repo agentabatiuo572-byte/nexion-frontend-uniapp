@@ -2554,7 +2554,7 @@ export const ms: Messages = {
     purchaseEligibilityError: "Kami tidak dapat mengesahkan kelayakan pembelian",
     purchaseEligibilityRetry: "Semak kelayakan semula",
     purchaseEligibilityProductPolicy: "Kelayakan pembelian produk",
-    purchaseEligibilityQuotaDepleted: "Inventori bulanan telah habis dijual",
+    purchaseEligibilityQuotaDepleted: "Kuota jualan telah habis",
     trialProductUnavailable: "Peranti percubaan kehabisan stok buat sementara. Sila cuba lagi nanti.",
     productUnavailable: "Produk ini tidak tersedia buat sementara. Kembali ke kedai dan cuba lagi.",
     tickerBought: "membeli",

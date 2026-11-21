@@ -2554,7 +2554,7 @@ export const ru: Messages = {
     purchaseEligibilityError: "Не удалось проверить условия покупки",
     purchaseEligibilityRetry: "Проверить снова",
     purchaseEligibilityProductPolicy: "Условия покупки товара",
-    purchaseEligibilityQuotaDepleted: "Месячный запас распродан",
+    purchaseEligibilityQuotaDepleted: "Квота продаж исчерпана",
     trialProductUnavailable: "Пробного устройства временно нет в наличии. Повторите попытку позже.",
     productUnavailable: "Этот товар временно недоступен. Вернитесь в магазин и повторите.",
     tickerBought: "купил(а)",

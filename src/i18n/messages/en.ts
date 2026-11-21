@@ -2132,7 +2132,7 @@ chooseMethod: "Choose how to join the UVEL network",
     purchaseEligibilityError: "We couldn't verify purchase eligibility",
     purchaseEligibilityRetry: "Retry eligibility check",
     purchaseEligibilityProductPolicy: "Product purchase eligibility",
-    purchaseEligibilityQuotaDepleted: "Monthly available inventory is sold out",
+    purchaseEligibilityQuotaDepleted: "No sale quota remains",
     // zentao #29: a placeholder policy with no condition facts must not be reported as met.
     trialProductUnavailable: "The trial device is temporarily out of stock. Please try again later.",
     productUnavailable: "This product is temporarily unavailable. Return to the store and try again.",

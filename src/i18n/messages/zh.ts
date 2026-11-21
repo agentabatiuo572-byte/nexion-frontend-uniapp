@@ -2107,7 +2107,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     purchaseEligibilityError: "暂时无法验证购买资格",
     purchaseEligibilityRetry: "重试资格验证",
     purchaseEligibilityProductPolicy: "商品购买资格",
-    purchaseEligibilityQuotaDepleted: "本月可售名额已用尽",
+    purchaseEligibilityQuotaDepleted: "当前可售名额已用尽",
     // zentao #29:服务端只回了「未配置」这类占位策略(没有任何条件事实)时,不得宣称「已满足」——
     // 没有事实支撑的「已满足」等于对购买资格作了一个平台无法兑现的承诺。
     trialProductUnavailable: "试用设备暂时无可售库存，请稍后再试。",

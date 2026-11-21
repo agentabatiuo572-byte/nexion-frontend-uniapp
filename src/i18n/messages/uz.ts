@@ -2554,7 +2554,7 @@ export const uz: Messages = {
     purchaseEligibilityError: "Xarid shartlarini tekshirib boʻlmadi",
     purchaseEligibilityRetry: "Qayta tekshirish",
     purchaseEligibilityProductPolicy: "Xarid shartlari",
-    purchaseEligibilityQuotaDepleted: "Bu oylik sotuv limiti tugadi",
+    purchaseEligibilityQuotaDepleted: "Sotuv kvotasi qolmadi",
     trialProductUnavailable: "Sinov qurilmasi vaqtincha omborda yoʻq. Keyinroq qayta urinib koʻring.",
     productUnavailable: "Bu mahsulotni vaqtincha sotib olib boʻlmaydi. Doʻkonga qaytib, qayta urinib koʻring.",
     tickerBought: "sotib oldi",
