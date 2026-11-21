@@ -1033,14 +1033,6 @@ const expiredVoucherForSku = computed(() => {
 // their ordinary purchase still obeys the shared activation cap. Fire on first mount only: skip when a retire
 // context already targets this SKU (arrived from the devices-page flow) →
 // choice (owns ≥1 retirable device) → slot-full replace → normal payment.
-const KNOWN_KINDS: DeviceKind[] = [
-  "phone",
-  "stellarbox-s1",
-  "stellarbox-pro",
-  "stellarbox-pro-v2",
-  "stellarrack-p1",
-  "stellarrack-p2",
-];
 let interceptFired = false;
 let checkoutCapacityRead: Promise<boolean | undefined> | null = null;
 const remoteCapacityGate = reactive(new RemoteCapacityGate());
@@ -1097,10 +1089,8 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'capacity' 
   // the conversion order is the trial device itself (slot exchange), not an
   // upgrade off an old unit. Normal (non-trial) checkouts intercept as before.
   if (trialConversionMode.value) return;
-  const p = getProduct(productId.value);
-  if (!p) return;
-  if (p.productType === "SHARE") return;
-  if (!KNOWN_KINDS.includes(p.id as DeviceKind)) return;
+  const p = product.value;
+  if (p?.productType !== "DEVICE") return;
   const kind = p.id as DeviceKind;
   if (tradein.appliedTradein?.targetKind === kind) return;
   if (remoteApiEnabled) {
@@ -1114,9 +1104,9 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'capacity' 
     let eligibility: CanonicalTradeinEligibility | null = null;
     checkoutCapacityRead = remoteCapacityGate.resolve(
       async () => {
-        if (mode === 'capacity') return deviceE3Api.capacityQuote(kind);
+        if (mode === 'capacity') return deviceE3Api.capacityQuote(p.id);
         const result = await resolveTradeinCheckoutPreflight(
-          deviceE3Api.eligibility(kind), deviceE3Api.capacityQuote(kind),
+          deviceE3Api.eligibility(p.id), deviceE3Api.capacityQuote(p.id),
         );
         eligibility = result.eligibility;
         return result.capacity;
@@ -1318,8 +1308,7 @@ const isCard = computed(() => payment.value === "card");
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const cappedRaw = computed(() => (app.remoteSlotsUsed ?? app.activeSlotCount + reservedSlots.value) >= app.slotCap);
 const checkoutCapacityRequired = computed(() => remoteApiEnabled && !trialConversionMode.value
-  && !freeTrial.hasPendingConversion() && product.value?.productType !== "SHARE"
-  && KNOWN_KINDS.includes(productId.value as DeviceKind));
+  && !freeTrial.hasPendingConversion() && product.value?.productType === "DEVICE");
 const checkoutCapacityMessage = computed(() => remoteCapacityGate.pending || !quantityReady.value ? t.value.store.coCapacityChecking
   : checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : checkoutCapacityRefusal.value === "product-unavailable" ? t.value.store.coCapacityProductUnavailable
