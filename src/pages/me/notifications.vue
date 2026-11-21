@@ -127,21 +127,23 @@ const section = computed({ get: () => center.section, set: (value: MessageSectio
   preserveSectionInH5();
 } });
 const notificationRecovery = useAutoRecovery({
-  failed: () => remoteApiEnabled && section.value === "notifications" && !!notifs.readError,
+  failed: () => remoteApiEnabled && !!notifs.readError,
   retry: () => notifs.loading ? Promise.resolve() : notifs.refreshRemote(),
   // The fixed message feed has its own scroller outside the chassis pull surface.
   repeatMs: 30_000,
 });
 useAutoRecovery({
-  // The service list recovers these sources while its tab is shown.
-  failed: () => remoteApiEnabled && section.value === "notifications" && !conversations.loading
-    && !conversations.categoryLoading && (!!conversations.error || conversations.categoryAvailabilityStatus === "failed"),
-  retry: () => center.refresh(false),
+  failed: () => remoteApiEnabled && !!center.serviceReadError && !conversations.loading && !conversations.categoryLoading,
+  retry: () => center.refreshService(),
+  repeatMs: 30_000,
 });
 function refreshHealthyNotifications() {
-  if (remoteApiEnabled && section.value === "notifications" && !notifs.loading && !notifs.readError) {
+  if (remoteApiEnabled && !notifs.loading && !notifs.readError) {
     return notifs.refreshRemote();
   }
+}
+function refreshHealthyService() {
+  if (!center.serviceReadError) return center.refreshService();
 }
 let releaseActiveRefresh = () => {};
 function preserveSectionInH5() {
@@ -170,7 +172,7 @@ const sectionOptions = computed(() => [
   { value: "service", label: t.value.notifs.serviceTab, hasUnread: center.serviceUnread > 0 },
 ]);
 const unreadLabel = computed(() => {
-  if (notifs.readFailedWithoutData || conversations.error || conversations.categoryAvailabilityStatus === "failed") {
+  if (notifs.readFailedWithoutData || center.serviceReadError) {
     return t.value.notifs.unreadUnavailable;
   }
   if (center.totalUnread > 0) return fmt(t.value.notifs.unreadCount, { n: center.totalUnread });
@@ -233,7 +235,10 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextE
   }
   preserveSectionInH5();
   expandedId.value = null; filter.value = "all"; resetHeader();
-  if (!disposed && pageVisible.value && foregroundReadAllowed()) void center.refresh();
+  if (!disposed && pageVisible.value && foregroundReadAllowed()) {
+    void refreshHealthyNotifications();
+    void refreshHealthyService();
+  }
 });
 
 function dateHeading(ts: number): string {
@@ -331,8 +336,8 @@ onShow(() => {
 });
 watch([pageVisible, foregroundReadAllowed], ([visible, allowed], [wasVisible]) => {
   if (disposed || !visible || !allowed) return;
-  if (!wasVisible || section.value === "service") void center.refresh(section.value === "service" || !notifs.readError);
-  else void refreshHealthyNotifications();
+  void refreshHealthyNotifications();
+  if (!wasVisible || section.value === "service") void refreshHealthyService();
 });
 onHide(invalidatePage);
 onUnmounted(() => { disposed = true; invalidatePage(); });
