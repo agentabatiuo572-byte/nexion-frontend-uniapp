@@ -1849,6 +1849,7 @@ export const uz: Messages = {
     replaceWarning: "{newKind} onlayn boʻlishi uchun eng kam daromadli faol qurilmangiz oʻrnini boʻshatishi kerak.",
     replaceLowestDeviceLabel: "Boʻshatadi",
     replaceLowestText: "{name} · bugun ${earn}/kun",
+    replaceTaskHint: "Almashtirilgach, joriy vazifa daromadsiz bekor qilinadi, qurilma omborga oʻtadi.",
     replaceReplaceCta: "Almashtirib, {newKind}ni yoqish",
     replaceKeepCta: "{newKind}ni toʻliq narxda olish",
     replaceCancel: "Bekor",

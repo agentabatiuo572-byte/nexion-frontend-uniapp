@@ -178,6 +178,7 @@
         <view class="tis-card tis-card-mb4">
           <text class="tis-card-cap">{{ t.tradein.replaceLowestDeviceLabel }}</text>
           <text class="tis-card-line">{{ replaceView.lowestText }}</text>
+          <text class="tis-card-cap tis-card-note">{{ t.tradein.replaceTaskHint }}</text>
         </view>
 
         <view
@@ -1773,6 +1774,11 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   display: block;
   font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink);
+}
+.tis-card-note {
+  margin-top: 4px;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 .tis-row {
   display: flex;

@@ -1849,6 +1849,7 @@ export const kk: Messages = {
     replaceWarning: "{newKind} іске қосылуы үшін ең аз табыс беретін белсенді құрылғыңыз орнын босатуы керек.",
     replaceLowestDeviceLabel: "Орын босату",
     replaceLowestText: "{name} · бүгін ${earn}/күн",
+    replaceTaskHint: "Ауыстырғанда ағымдағы тапсырма табыссыз жойылады, құрылғы қоймаға көшеді.",
     replaceReplaceCta: "Ауыстырып, белсендіру: {newKind}",
     replaceKeepCta: "Толық бағамен сатып алу: {newKind}",
     replaceCancel: "Бас тарту",
