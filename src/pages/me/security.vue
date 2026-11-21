@@ -126,16 +126,17 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
           </view>
           <view class="flex-1 min-w-0">
-            <text class="block" :style="dangerLabelStyle">{{ t.security.deleteAccount }}</text>
-          </view><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            <text class="block" :style="dangerLabelStyle" :class="{ 'security-danger-label--pending': deletionPending }">{{ t.security.deleteAccount }}</text>
+          </view><svg v-if="!deletionPending" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </view>
-
-        <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:scale-[0.98] transition-transform"
-          :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest"
-          @click="handleCancelAccountDeletion">
-          <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
+        <!-- A request in progress: what was submitted reads as a row of the card, and withdrawing it is the card's last
+             action, in the shared in-card action style (it restores the account, so it is not drawn as a danger action). -->
+        <AccountDeletionReason v-if="remoteApiEnabled && pendingDeletionReason !== null" class="security-danger-reason" :reason="pendingDeletionReason" />
+        <view v-if="remoteApiEnabled && deletionCanCancel" class="nx-card-footer">
+          <view class="nx-card-action" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest" @click="handleCancelAccountDeletion">
+            <text>{{ t.security.cancelDeletionRequest }}</text>
+          </view>
         </view>
-        <AccountDeletionReason v-if="remoteApiEnabled && pendingDeletionReason !== null" :reason="pendingDeletionReason" />
       </view>
       <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
@@ -1434,6 +1435,10 @@ const dangerLabelStyle: CSSProperties = {
 .security-credentials { border-radius:22px 22px 0 0!important; }
 .security-phone-icon { flex:none; display:grid; place-items:center; width:36px; height:36px; border-radius:var(--ui-radius-icon); background:var(--v5-tech-cyan-soft); color:var(--v5-tech-cyan); }
 .security-danger { margin-top:var(--v5-space-8)!important; }
+/* While a request is pending the entry row is not tappable, so its label is muted and it has no chevron. */
+.security-danger-label--pending { color:var(--v5-ink-3)!important; }
+/* In the card the submitted reason is a divided row, not a filled box (the box stays for the retry form in the sheet). */
+.security-danger .security-danger-reason { padding:12px 0 14px; border-radius:0; background:transparent; border-top:1px solid var(--v5-border); }
 .security-sheet-form { display:flex; flex-direction:column; gap:var(--v5-space-3); }
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
