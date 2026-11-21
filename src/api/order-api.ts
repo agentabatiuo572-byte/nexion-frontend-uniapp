@@ -156,7 +156,8 @@ export interface CreateOrderRequest {
 }
 
 export type OrderCreateCommand =
-  | { status: "PROCESSING" | "NOT_FOUND" | "UNKNOWN" | "FAILED" | "UNAVAILABLE" }
+  | { status: "PROCESSING" | "NOT_FOUND" | "UNKNOWN" | "UNAVAILABLE" }
+  | { status: "FAILED"; code: number; message: string }
   | { status: "SUCCEEDED"; orderNo: string };
 
 export interface OrderApi {
@@ -557,9 +558,9 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
             }
             if (payload.status === "FAILED" && payload.order === null) {
               const failure = record(payload.error);
-              if (integer(failure.code, 400) > 599) return invalid();
-              nonEmptyString(failure.message);
-              return { status: "FAILED" };
+              const code = integer(failure.code, 400);
+              if (code > 599) return invalid();
+              return { status: "FAILED", code, message: nonEmptyString(failure.message) };
             }
             if (payload.status === "SUCCEEDED" && payload.error === null) {
               const order = record(payload.order);

@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoFixture,demoOrderTimedOut,demoTimedOutOrder} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
-import {previewAccountId} from './prototype-demo-identity.mjs';
+import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const pin = createPaymentPinFlowFixture();
@@ -34,9 +34,21 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   async function handle(url, request) {
     syncScenario();
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
+    const handlesOrder = path === '/api/orders' || path.startsWith('/api/orders/') || path.startsWith('/api/promotion-commands/');
+    const headers = request.headers();
+    const owner = handlesOrder ? previewAccountId(state, headers) : null;
+    if (handlesOrder && path !== '/api/orders/commands' && owner !== demoAccountId) {
+      if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
+      // The preview has one purchasing account. Other demo accounts have no orders or purchase commands.
+      if (path === '/api/orders' && method === 'GET') {
+        const projection = demoFixture(url,locale(),state,request);
+        return ok({...projection,orders:[],nextCursor:null});
+      }
+      if (path === '/api/orders' || path === '/api/orders/bundle' || path === '/api/orders/quote')
+        return {status:403,message:'PREVIEW_PURCHASE_ACCOUNT_REQUIRED',data:null};
+      return {status:404,message:'ORDER_NOT_FOUND',data:null};
+    }
     if (path === '/api/orders/commands' || (path === '/api/orders' && method === 'POST')) {
-      const headers = request.headers();
-      const owner = previewAccountId(state, headers);
       if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
       // Java String.trim() removes characters no greater than U+0020.
       const trimmed = typeof key === 'string' ? key.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g,'') : '';
@@ -51,6 +63,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         const data = {commandId:'OQC-'+createHash('sha256').update('APP:ORDER_CREATE:USER:'+owner+':'+trimmed).digest('hex'),
           operation:'ORDER_CREATE',idempotencyKey:trimmed,canRetrySameKey:false,order:null,error:null,
           createdAt:entry.createdAt,updatedAt:entry.updatedAt};
+        if (entry.failure) return ok({...data,status:'FAILED',error:{code:entry.failure.status,message:entry.failure.message}});
         if (!entry.receipt) return ok({...data,status:'PROCESSING'});
         const order = state.createdOrders?.find(row => row.orderNo === entry.receipt.orderNo);
         if (!order) return ok({...data,status:'UNKNOWN'});
@@ -59,6 +72,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         return ok({...data,status:'SUCCEEDED',order:{orderNo,status:canonicalStatus,canonicalStatus,
           paymentStatus,orderStatus,activationStatus,amountUsdt,placedAt}});
       }
+      if (entry?.failure) return entry.failure;
       if (entry) return entry.receipt ? ok(entry.receipt) : {status:409,message:'IDEMPOTENCY_RESULT_UNKNOWN',data:null};
       const originalEpoch = epoch;
       const createdAt = new Date().toISOString();
@@ -75,8 +89,13 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         creating.receipt = demoFixture(url,locale(),state,{...request,tracksOrderCreate:true});
         creating.updatedAt = new Date().toISOString();
         return ok(creating.receipt);
+      } catch (error) {
+        if (!(error.status >= 400 && error.status < 500)) throw error;
+        creating.failure = {status:error.status,message:error.message,data:null};
+        creating.updatedAt = new Date().toISOString();
+        return creating.failure;
       } finally {
-        if (!creating.receipt && orderCreates.get(command) === creating) orderCreates.delete(command);
+        if (!creating.receipt && !creating.failure && orderCreates.get(command) === creating) orderCreates.delete(command);
       }
     }
     const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
