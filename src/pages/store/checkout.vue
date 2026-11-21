@@ -3351,7 +3351,8 @@ button.checkout-policy-link::after { border:0; }
 .checkout-receipt-failure__title { display:block; color:var(--v5-ink); font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .checkout-receipt-failure__body { display:block; margin-top:var(--v5-space-1); color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .checkout-receipt-failure__actions { display:flex; justify-content:flex-end; margin:var(--v5-space-1) -8px -8px 0; }
-.checkout-promotion { padding:var(--v5-space-2) var(--v5-space-4) 120px; color:var(--v5-ink); }
+/* Same top offset as the single-item card (content padding 8 + card margin 20). */
+.checkout-promotion { padding:calc(var(--v5-space-2) + var(--v5-space-5)) var(--v5-space-4) 120px; color:var(--v5-ink); }
 .checkout-promotion--result { padding: 0; }
 .checkout-promotion :deep(.promotion-flat) { border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); padding:var(--v5-space-4); }
 .checkout-promotion :deep(.promotion-summary) { min-height:40px; font-size:14px; }

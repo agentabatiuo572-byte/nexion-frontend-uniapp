@@ -7,13 +7,12 @@
     </CheckoutResult>
     <template v-else>
       <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
-      <text v-if="displayQuote||order" class="checkout-review-title">{{ order?.paymentStatus==='PENDING' ? p.pending : p.confirmOrder }}</text>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
       <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="catalogReadFailed" class="promotion-notice" role="alert"><text>{{ t.store.catalogErrorBody }}</text><PromotionAction class="promotion-link" role="button" tabindex="0" :aria-disabled="busy" @click="loadQuote"><text>{{ t.store.catalogRetry }}</text></PromotionAction></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
-          <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" /></view>
+          <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl&&!brokenImages.includes(item.productNo)" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" @error="brokenImages.push(item.productNo)" /></view>
           <view class="promotion-grow"><text class="checkout-item-name">{{ selectedItemName(item) }}</text>
             <CheckoutAmount v-if="displayQuote||order" class="checkout-line-price" :value="itemSubtotal(item)" currency="USD" />
           </view>
@@ -252,6 +251,8 @@ function voucherCondition(def:VoucherDef):string {
 const selection=ref(props.items.map(({productNo,quantity})=>({productNo,quantity})));
 // Lite gates fresh purchases only; an explicit retry of the frozen original command keeps its own items and key.
 const liteSelectionAllowed=computed(()=>selection.value.every(item=>isLiteProduct(getProduct(item.productNo)??{id:item.productNo})));
+// A product image that fails to load is dropped, so its art column collapses like the single-item card's.
+const brokenImages=ref<string[]>([]);
 const keepRecoveryTarget=ref<string|null>(null),keepRecoveryReadError=ref(false),tradein=useTradeinSheet();
 function recoverKeepBeforeNewPurchase(reopen=false):boolean {
   // Original orders and commands always recover before any new purchase gate.
@@ -721,7 +722,6 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 <style scoped>
 .promotion-main { padding-bottom:140px; }
 .promotion-main--result { padding-bottom:var(--ui-space-inset); min-height:calc(100dvh - var(--nx-overlay-top) - var(--ui-space-section-gap) * 3); box-sizing:border-box; }
-.checkout-review-title { display:block; margin:var(--v5-space-2) 0; font:var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); color:var(--v5-ink); }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:22px; background:var(--ui-content-surface); }
 .checkout-section { min-width:0; }
 .checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); }
