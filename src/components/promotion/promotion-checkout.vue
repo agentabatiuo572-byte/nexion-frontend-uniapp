@@ -4,7 +4,7 @@
     <view v-else-if="loading" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
     <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" payment-confirmed :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?.imageUrl ?? undefined" :amount="order.paidTotalUsdt??order.amountUsdt" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices" @support="contactResultSupport" v-slot="{ done }">
       <!-- A secondary action that waits for the result presentation; 查看设备 stays the one primary (PRD purchase payment, line 49). -->
-      <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action" role="button" :tabindex="done?0:-1" :aria-disabled="busy" :aria-hidden="!done" :style="{visibility:done?'visible':'hidden'}" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
+      <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action" role="button" :tabindex="done&&resultSettled?0:-1" :aria-disabled="busy" :aria-hidden="!(done&&resultSettled)" :style="{visibility:done&&resultSettled?'visible':'hidden'}" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
     <template v-else>
       <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
@@ -210,6 +210,8 @@ const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.va
 const displayQuote=computed(()=>current()&&visible.value&&auth.isAuthenticated ? quote.value??(quotePresentation.value?.key===quotePresentationKey()?quotePresentation.value.quote:null):null);
 function quotePresentationKey(){return JSON.stringify([app.accountKey,app.accountBindingEpoch,auth.isAuthenticated,props.activityId,selection.value,eventVoucherId,props.upgradeActivityId??'',manualVoucher()?['manual',voucherId.value]:['auto'],locale.code]);}
 const resultState=ref<'activated'|'inventory'|'processing'|'error'|'failed'>('processing'),resultError=ref(''),resultReading=ref(false);
+// 再买一单 waits for a confirmed result as well as the finished presentation.
+const resultSettled=computed(()=>resultState.value==='activated'||resultState.value==='inventory'||resultState.value==='failed');
 let resultGeneration=0;
 watch(()=>order.value?.orderNo,()=>{
   resultGeneration++;resultReading.value=false;resultState.value='processing';resultError.value='';

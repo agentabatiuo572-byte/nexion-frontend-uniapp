@@ -511,8 +511,8 @@ useSetPageHeader(() => ({
 }));
 
 const pendingCopy = computed(() => checkoutFlowCopy(locale.code));
-const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'|'failed'>(() => remoteOrderError.value ? 'error' : resultOrder.value?.status === 'provisioning_failed'
-  ? 'failed' : resultOrder.value?.status === 'activated'
+// A confirmed provisioning failure stays the result through a later transient read error; only unconfirmed results fall back to the clock.
+const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'|'failed'>(() => resultOrder.value?.status === 'provisioning_failed' ? 'failed' : remoteOrderError.value ? 'error' : resultOrder.value?.status === 'activated'
   ? 'activated' : resultOrder.value?.status === 'inventory' ? 'inventory' : walletPaymentConfirmed.value || resultOrder.value?.status === 'paid' || resultOrder.value?.status === 'provisioning' ? 'processing' : 'error');
 const payingFromWallet = ref(false);
 const cancellingOrder = ref(false);
