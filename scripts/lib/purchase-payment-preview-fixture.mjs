@@ -2,8 +2,9 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
+import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
 
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
@@ -19,7 +20,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const quotes = new Map(), intents = new Map();
   const suspendedIntents = new Map();
   let sequence = 0;
-  const paymentMode = () => state.paymentState === 'read-error' ? state.paymentBeforeReadError ?? 'delivered' : state.paymentState ?? 'delivered';
+  const paymentMode = () => demoPaymentScenario(state);
   // D1 switch closure leaves fee configuration intact (PurchasePaymentPolicyService.current).
   const configured = method => !(paymentMode() === 'bank-off' && method === 'HDPAY_BANK');
   const networkOpen = method => !(paymentMode() === 'erc20-off' && method === 'CREGIS_USDT_ERC20'
@@ -79,11 +80,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   };
   const sameSubject = (row, subject) => row.kind === subject.kind
     && (row.kind === 'ORDER_PAY' ? row.orderNo === subject.orderNo : row.payloadKey === subject.payloadKey);
-  function selectPaymentMode(previousMode) {
+  function selectPaymentMode(wasMissing) {
     sync();
-    const mode = paymentMode();
-    if (mode === previousMode) return;
-    if (mode === 'intent-missing') {
+    const missing = demoPaymentIntentMissing(state);
+    if (missing === wasMissing) return;
+    if (missing) {
       // The alternative scenario has no original unpaid provider order. Retain that
       // sample outside the live intent store so no read, write or observer can use it.
       for (const [no, intent] of intents) {
@@ -92,7 +93,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         intents.delete(no);
         if (intent.orderNo && state.intentOrders) delete state.intentOrders[intent.orderNo];
       }
-    } else if (previousMode === 'intent-missing') {
+    } else {
       for (const [no, intent] of suspendedIntents) {
         if ([...intents.values()].some(row => sameSubject(row, intent))) continue;
         if (intent.orderNo) {
@@ -221,9 +222,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   };
   function paymentCommand(kind, key) {
     sync();
+    if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
     const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
     if (!intent) return null;
-    if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
     const original = {kind, commandKey: key, canResumeSameKey: false};
     const receipt = intent.receipt;
     if (receipt != null) {
@@ -254,7 +255,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (byOrder && method === 'GET') {
       const orderNo = decodeURIComponent(byOrder[1]);
       if (previewAccountId(state, request.headers?.() ?? {}) !== demoAccountId
-          || !ordersOf(url.origin).some(order => order.orderNo === orderNo)) return refused(404, 'ORDER_NOT_FOUND');
+          || !demoHasAccountOrder(url,state,orderNo)) return refused(404, 'ORDER_NOT_FOUND');
       if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_LOOKUP_UNAVAILABLE');
       const intent = openIntent({kind: 'ORDER_PAY', orderNo});
       return {status: 200, message: 'OK', data: {orderNo, state: intent ? 'IN_PROGRESS' : 'NONE', intentNo: intent?.intentNo ?? null}};
@@ -312,6 +313,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!source) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const {subject, deadline} = source, known = [...intents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (known) return known.paymentQuoteId === quoteId ? {status: 200, message: 'OK', data: view(known)} : refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
+      const suspended = [...suspendedIntents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
+      if (suspended && suspended.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       if (!networkOpen(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       // Like PurchasePaymentService.create: the quote is checked again before an intent exists.
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
@@ -332,12 +335,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (source.replacementQuote)
         checkedReplacementPricing(url, request, subject.kind, source.payload, source.replacementQuote);
       if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
-      const intentNo = `PPI-PREVIEW-${++sequence}`;
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
-      const intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
+      const intentNo = suspended?.intentNo ?? `PPI-PREVIEW-${++sequence}`;
+      const intent = suspended ?? {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
         paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
         createdAt: Date.now(), orderNo: subject.orderNo, payloadKey: subject.payloadKey, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin};
+      if (suspended) suspendedIntents.delete(intentNo);
       intents.set(intentNo, intent);
       // The deadline task leaves an order with a payment intent to the payment's own outcome.
       if (subject.orderNo) (state.intentOrders ??= {})[subject.orderNo] = true;
