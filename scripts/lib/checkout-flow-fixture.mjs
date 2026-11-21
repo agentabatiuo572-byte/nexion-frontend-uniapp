@@ -17,11 +17,15 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   // A reset or scenario change starts a fresh account: replayed receipts and payment command receipts belong to the
   // old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
-  function handle(url, request) {
+  function syncScenario() {
+    external.sync();
     if (epoch !== state.scenarioEpoch) {
       epoch = state.scenarioEpoch; receipts.clear();
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
+  }
+  function handle(url, request) {
+    syncScenario();
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
     if (paymentCommand) {
@@ -105,5 +109,5 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     return ok(demoFixture(url,locale(),state,request));
   }
-  return {handles,handle,pin,observePayments:external.sweep,seedRemoteOrderPayment:external.seedRemoteOrderPayment};
+  return {handles,handle,pin,syncScenario,observePayments:external.sweep,seedRemoteOrderPayment:external.seedRemoteOrderPayment};
 }
