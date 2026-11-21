@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { previewAccountId } from './prototype-demo-identity.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { computeDemo, demoComputeFacts } from "./prototype-demo-compute.mjs";
+import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
@@ -270,7 +271,7 @@ const repurchaseSampleDays={inside:12,boundary:30,outside:12};
 const longBillOrderNo='ORD-7F3A9C2E5B8D41F6A0C3E9B27D5F1A84';
 function demoOrders(products,state,now,device41) {
   if (state.accountDeletionState === 'clear') return [];
-  const at=state.sampleOrdersAt??=now;
+  const at=state.sampleOrdersAt??now;
   return Object.entries(orderStates).map(([original],i)=>{
     const longRef=demoHasLongBillRefs(state)&&original==='refunded';
     const orderNo=longRef?longBillOrderNo:'DEMO-ORDER-'+String(i+1).padStart(3,'0');
@@ -289,7 +290,7 @@ function demoOrders(products,state,now,device41) {
     const repurchaseDays=repurchaseSampleDays[state.repurchaseState];
     const placedAt=original==='provisioning_failed'&&repurchaseDays!==undefined
       ? at-repurchaseDays*day-samplePaidAfter
-      : device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
+      : device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[demoPaymentScenario(state)]??0):at-(i+1)*day;
     return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?(longRef?'E4-REFUND-'+orderNo:'DEMO-REFUND-1'):null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:unitPrice,lineAmountUsdt:unitPrice}]};
   }).filter(order=>!accountDeletionWallet(state)||(['COMPLETED','CANCELLED','CLOSED','FAILED','REFUNDED'].includes(order.orderStatus)&&['PAID','FAILED','CANCELLED','REFUNDED','EXPIRED'].includes(order.paymentStatus)));
@@ -323,10 +324,13 @@ function demoScenarioOrders(products,state,now,device41) {
     .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
 }
 const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${unit}`;
+const accountOrderRows=(url,state,now)=>demoScenarioOrders(demoProducts(state,url.origin),state,now,
+  state.fleetSeed?.find(device=>device.id===41));
+export const demoHasAccountOrder=(url,state,orderNo)=>accountOrderRows(url,state,Date.now()).some(order=>order.orderNo===orderNo);
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
   if(!state.fleetSeed)demoFleetFacts(url,locale,state);
-  return demoScenarioOrders(demoProducts(state,url.origin),state,now,state.fleetSeed.find(device=>device.id===41))
+  return accountOrderRows(url,state,now)
     .map(({replacementDevice,...order})=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
       targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?order.targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
@@ -341,7 +345,7 @@ const demoOrderSlots=(orders,orderNo)=>orders
 // whose mixed scope owns a hidden phone, and Lite's computeState, whose compute modes own a Cloud Share) start a fresh,
 // coherent scenario: the preview server clears every record the old scenario owns (session orders, purchases,
 // trade-ins, stopped devices, compute history, trial, command receipts and payment intents on the server, the App's
-// order/payment recovery rows in the browser), and the next read seeds the devices here. A write is applied only in the
+// order/payment recovery rows in the browser), and the scene seeds the devices here. A write is applied only in the
 // scenario it started in, and only from a page of that scenario. dataState=empty is the empty account the empty pages
 // are reviewed with: no devices (hidden phones included), no sample orders, no top-ups and an empty wallet (balance 0,
 // so wallet payments are refused for funds), the trial as its own knobs say. paymentState=low-balance is an account
@@ -414,9 +418,11 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
 }
 // The authoritative fleet from the retained state, independent of presentation knobs.
 export function demoFleetFacts(url,locale,state) {
-  // Read the trial first: a converted trial books its order, which then lists as a device below.
+  // Initialize sample orders and the trial before projecting the fleet.
   const trialSlotCount=demoTrialSlots(url,locale,state);
-  const now=Date.now(),products=demoProducts(state,url.origin),orders=demoScenarioOrders(products,state,now,false);
+  const now=Date.now(),products=demoProducts(state,url.origin);
+  state.sampleOrdersAt??=now;
+  const orders=demoScenarioOrders(products,state,now,false);
   const seed=reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
   const template={...seed.devices[0],runtimeStatus:'ONLINE'};
   const slotCap=6,retired=state.retiredDeviceIds||[],session=[];

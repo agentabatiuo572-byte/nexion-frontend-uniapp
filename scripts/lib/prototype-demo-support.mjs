@@ -34,6 +34,53 @@ export function supportUserView(state,detail) {
 const commandFingerprint=(operation,target,input)=>createHash('sha256').update(JSON.stringify([
   operation,target,input.conversationType,operation==='create'?input.openingText:input.body,input.kind||'TEXT',
 ])).digest('hex');
+const transferSlot=(conversationNo,text)=>'sha256:'+createHash('sha256').update(`conversation-reply:${conversationNo}:text:${text}`).digest('hex');
+
+export function restoreSupportConversationNumbers(state) {
+  const accounts=[state,...Object.values(state.supportAccounts??{})];
+  let sequence=Math.max(1,...accounts.flatMap(account=>[account.supportConversationSequence??0,
+    ...(account.supportConversations??[]).map(detail=>detail.conversation.id)]));
+  const used=new Set();
+  for(const account of accounts) {
+    const renamed=new Map();
+    for(const detail of account.supportConversations??[]) {
+      const row=detail.conversation, oldNo=row.conversationNo;
+      if(used.has(oldNo)) {
+        row.id=++sequence;
+        row.conversationNo='DEMO-SUPPORT-'+row.id;
+        renamed.set(oldNo,row.conversationNo);
+        for(const command of account.supportMessageCommands??[]) {
+          if(command.conversationNo!==oldNo)continue;
+          const message=detail.messages.find(item=>item.clientMessageId===command.key&&item.senderType==='user');
+          const input=message&&{body:message.content,kind:message.kind};
+          if(input&&command.fingerprint===commandFingerprint('reply',oldNo,input))
+            command.fingerprint=commandFingerprint('reply',row.conversationNo,input);
+        }
+      }
+      used.add(row.conversationNo);
+    }
+    if(!renamed.size)continue;
+    const number=no=>renamed.get(no)??no;
+    const remapClear=result=>{
+      result.conversationNos=result.conversationNos.map(number).sort();
+      if(result.peerKey.startsWith('conversation:'))result.peerKey='conversation:'+number(result.peerKey.slice('conversation:'.length));
+    };
+    for(const detail of account.supportConversations??[])
+      if(detail.writeState)detail.writeState.writableConversationNo=number(detail.writeState.writableConversationNo);
+    for(const row of [...(account.supportDismissals??[]),...(account.supportMessageCommands??[])])
+      row.conversationNo=number(row.conversationNo);
+    for(const row of account.supportUserClearMarkers??[])remapClear(row);
+    for(const row of account.supportClearCommands??[])remapClear(row.result);
+    const sample=account.supportTransferSample;
+    if(sample) {
+      sample.conversationNo=number(sample.conversationNo);
+      sample.currentNo=number(sample.currentNo);
+      sample.slot=transferSlot(sample.conversationNo,sample.text);
+    }
+  }
+  state.supportConversationSequence=sequence;
+}
+
 function restoreMessageCommands(state) {
   state.supportMessageCommands??=[];
   const known=new Set(state.supportMessageCommands.map(command=>command.key)),recovered=new Map();
@@ -137,7 +184,7 @@ function addTransferSample(state, nextConversationId, nextMessageId, now) {
   const current=makeDetail(currentId,currentNo,String(state.supportAdvisorId??1),'演示当前客服','你好，我来继续跟进。',true,now);
   state.supportConversations.push(old,current);
   const text='请帮我继续核对这笔订单。';
-  const slot='sha256:'+createHash('sha256').update(`conversation-reply:${conversationNo}:text:${text}`).digest('hex');
+  const slot=transferSlot(conversationNo,text);
   state.supportTransferSample={conversationNo,currentNo,key:'support-conversation-reply-preview-transfer-'+oldId,text,slot,accountId:supportAccountId(state)};
 }
 
