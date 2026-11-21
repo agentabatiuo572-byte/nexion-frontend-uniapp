@@ -231,6 +231,8 @@ export class PromotionCheckoutSession {
             const order = await this.ports.api.findOrder(pending.targetId);
             if (!this.ports.current()) return;
             if (!order) throw new Error('ORIGINAL_ORDER_NOT_FOUND');
+            // A finished order closes any intent under the refused key, so the key stops holding the checkout.
+            if (order.paymentStatus !== 'PENDING') { this.acceptOrder(order, true); return; }
             this.validateOrder(order);
             if (this.persist({ ...this.record, order })) this.confirmed = true;
             return;
