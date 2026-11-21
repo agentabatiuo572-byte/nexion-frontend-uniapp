@@ -466,7 +466,12 @@ function readTradeinRecovery(): "none" | "pending" | "error" {
   return purchaseRecovery.value;
 }
 
-useAutoRecovery({ failed: () => props.active && state.value.kind === "tradein" && purchaseReadFailed.value && purchaseStatus.value === "error", retry: refreshTradeinPurchaseEligibility });
+useAutoRecovery({
+  failed: () => props.active && state.value.kind === "tradein"
+    && (purchaseRecovery.value === "error" || (purchaseReadFailed.value && purchaseStatus.value === "error")),
+  retry: refreshTradeinPurchaseEligibility,
+  repeatMs: 30_000,
+});
 async function refreshTradeinPurchaseEligibility(): Promise<boolean> {
   if (readTradeinRecovery() !== "none") return false;
   const key = purchaseScopeKey.value;
