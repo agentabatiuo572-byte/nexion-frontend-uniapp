@@ -29,7 +29,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
     const fleet = demoFleetFacts(url, locale(), state), id = payload.sourceDeviceId;
     const sourceId = typeof id === 'string' && /^\+?\d+$/.test(id.trim()) ? Number(id) : id;
-    if (kind === 'CAPACITY_REPLACE' && (!Number.isSafeInteger(sourceId) || demoCapacityReplacementSource(fleet)?.id !== sourceId))
+    if (kind === 'CAPACITY_REPLACE' && (!Number.isSafeInteger(sourceId)
+      || demoCapacityReplacementSource(fleet, demoProducts(state, url.origin))?.id !== sourceId))
       return refused(409, 'CAPACITY_REPLACEMENT_SOURCE_CHANGED');
     const source = fleet.devices.find(device => device.id === sourceId);
     if (!source) return null;
