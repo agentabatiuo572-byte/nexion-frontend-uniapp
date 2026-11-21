@@ -535,7 +535,8 @@ function rowStyle(isLast: boolean): CSSProperties {
   font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);
   color: var(--v5-ink-3);
 }
-.nx-search-row__chev {
+/* NxIcon renders a bare svg without this component's scope attribute, so the rule reaches it through the row. */
+.nx-search-row :deep(.nx-search-row__chev) {
   color: var(--v5-ink-4);
 }
 </style>

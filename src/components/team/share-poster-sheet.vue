@@ -588,7 +588,8 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-ch__ic,.ps-ch__arrow { flex: none; display: flex; align-items: center; justify-content: center; }
 /* Action rows read as menu rows (list title, 400); only a channel that opens an outside site carries the external arrow (03 §3.1). */
 .ps-ch__lb { flex: 1; min-width: 0; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
-.ps-ch__arrow { color: var(--v5-ink-4); }
+/* NxIcon renders a bare svg without this component's scope attribute, so the colour reaches it through the row. */
+.ps-ch :deep(.ps-ch__arrow) { flex: none; color: var(--v5-ink-4); }
 .ps-sheet [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .ps-sheet,.ps-skeleton::after { animation: none; } .ps-sw,.ps-sw__knob { transition: none; } }
 </style>
