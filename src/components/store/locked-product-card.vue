@@ -5,7 +5,7 @@
   Detailed specs, progress, queue proof and Notify CTA stay collapsed by default.
 -->
 <template>
-  <view ref="cardRef" class="nx-glass-card relative overflow-hidden" :style="rootStyle">
+  <view ref="cardRef" class="nx-glass-card locked-card relative overflow-hidden" :style="rootStyle">
     <!-- aurora drift bg (paused off screen or while the page is hidden) -->
     <view ref="auroraRef" aria-hidden class="locked-card__aurora" :class="{ 'is-paused': !auroraLoop.running.value }" />
     <!-- 24px grid overlay -->
@@ -41,7 +41,7 @@
         </view>
       </view>
 
-      <!-- Card footer: the notify action is a text action, not a glass button, on this soft glass card (03 §3.1 P-67). -->
+      <!-- Card footer: the notify action is a text action (03 §3.1 P-67 .nx-card-action), kept on the solid card. -->
       <view v-if="detailsOpen" class="nx-card-footer locked-card__footer">
         <view class="nx-card-action locked-card__notify" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="serverSubscribed ? 'm5 12 4 4L19 6' : 'M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'" /><path v-if="!serverSubscribed" d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
@@ -207,9 +207,10 @@ function toggleDetails() {
   if (detailsOpen.value && notificationStatus.value === "idle") void reloadNotificationState();
 }
 
-const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
+// A solid content card (01 §1.1.2): surface fill, the default surface radius; light adds the light shadow (scoped CSS).
+const rootStyle: CSSProperties = {
+  background: "var(--v5-surface)",
+  borderRadius: "var(--ui-radius-surface)",
 };
 
 const lockBoxStyle: CSSProperties = {
@@ -269,8 +270,9 @@ const barFillStyle = computed<CSSProperties>(() => ({
 
 </script>
 <style scoped>
-/* The coming-soon card is drawn with the shared soft glass fill and edge (rootStyle) and carries no corner light and no
-   grid (01 §1.1.2); the decorative layers stay in the markup but do not render. In-card controls have no background (P-67). */
+/* The coming-soon card is a neutral solid content card (01 §1.1.2): no board marks it as a focal block, so it carries no
+   corner light and no grid; the decorative layers stay in the markup but do not render. In-card icon controls have no fill. */
+[data-theme="light"] .locked-card { box-shadow: var(--v5-glass-shadow); }
 .locked-card__aurora, .locked-card__grid { display: none; }
 /* The lock dot is a static mark: only live state loops (07 §7.1, design-rules Motion). */
 .locked-card__dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--v5-tech-cyan); border: 2px solid var(--v5-surface); }
