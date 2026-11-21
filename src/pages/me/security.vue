@@ -29,7 +29,8 @@
         <text class="block" style="font-size: var(--ui-type-list-subtitle); line-height: 1.5">{{ t.topupChrome.flowRetired }}</text>
       </view>
 
-      <view v-if="remoteApiEnabled" class="mx-4 security-providers"><ThirdPartyAuth :key="app.accountKey + ':' + app.accountBindingEpoch" intent="LINK" sheet :disabled="securityBusy || !remoteSecurity" @busy="oauthBusy = $event" /></view>
+      <view v-if="remoteApiEnabled" class="mx-4 security-providers"><ThirdPartyAuth :key="app.accountKey + ':' + app.accountBindingEpoch" intent="LINK" sheet :disabled="securityBusy || !remoteSecurity"
+        :unavailable-reason="remoteSecurityReadFailed ? t.wallet.syncFailedTitle : undefined" @busy="oauthBusy = $event" /></view>
       <view v-if="phoneBound === false" class="mx-4 nx-glass-card" style="padding: var(--v5-space-4); margin-bottom: 16px" role="status">
         <text class="block">{{ t.security.phoneBindingRequired }}</text>
         <view role="button" tabindex="0" style="min-height: 44px; color: var(--v5-brand); display: flex; align-items: center" @click="navTo('/pages/me/phone-binding')"><text class="nx-after-arrow">{{ t.security.phoneBindingTitle }}</text></view>
@@ -54,7 +55,7 @@
           <view class="flex-1 min-w-0">
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text><text class="block" :style="rowSubStyle">{{ t.security.twoFactorHint }}</text>
           </view>
-          <text v-if="displayTwoFactorEnabled === null" :style="unavailableValueStyle">—</text>
+          <text v-if="displayTwoFactorEnabled === null" :style="unavailableValueStyle">{{ unknownMark(remoteSecurityReadFailed) }}</text>
           <view v-else class="shrink-0 flex items-center justify-center transition-opacity" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'" style="width: 44px; height: 44px" role="switch"
             :tabindex="sessionWriteDisabled ? -1 : 0" :aria-label="withReadReason(t.security.twoFactorSwitchLabel, remoteSecurityReadFailed)" :aria-checked="displayTwoFactorEnabled" :aria-disabled="sessionWriteDisabled" @click="openTwoFactorSheet">
             <view :style="toggleTrackStyle">
@@ -73,7 +74,7 @@
             <text class="block" :style="rowLabelStyle">{{ t.security.phoneChangeTitle }}</text>
             <text class="block" :style="rowSubStyle">{{ phonePolicy
               ? fmt(t.security.phoneChangeSummary, { days: phonePolicy.windowDays, max: phonePolicy.maxChanges, used: phonePolicy.usedChanges })
-              : "—" }}</text>
+              : unknownMark(phonePolicyReadFailed) }}</text>
           </view>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
         </view>
@@ -84,7 +85,7 @@
       <text class="block mx-4" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
       <view class="nx-glass-card mx-4" :style="[cardStyle, groupGap]">
         <view v-if="remoteApiEnabled && !securityPresentation" class="flex items-center" :style="rowStyle">
-          <text :style="unavailableValueStyle">—</text>
+          <text :style="unavailableValueStyle">{{ unknownMark(remoteSecurityReadFailed) }}</text>
         </view>
         <view v-for="(s, i) in displaySessions" :key="s.id" class="flex items-center" :style="i === 0 ? rowStyle : rowBorderedStyle">
           <view class="grid place-items-center shrink-0" :style="iconBox(s.current ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
@@ -140,7 +141,7 @@
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !deletionStatus ? "—" : deletionStatus?.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !deletionStatus ? unknownMark(deletionStatusReadFailed) : deletionStatus?.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
     <NxSheet :open="editingPwd" :title="t.security.passwordTitle" @close="cancelPwd" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CURRENT" :aria-invalid="pwdErrorField === PWD_FIELD_CURRENT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CURRENT ? 'security-pwd-error-current' : undefined" @input="onCurrent" />
@@ -158,12 +159,12 @@
     <NxSheet :open="twoFactorSheetOpen" :title="t.security.twoFactorTitle" @close="closeTwoFactorSheet" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :aria-invalid="twoFactorPasswordError ? 'true' : 'false'" :aria-describedby="twoFactorPasswordError ? 'security-2fa-password-error' : undefined" :focus="twoFactorPasswordFocus" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
           <text v-if="twoFactorPasswordError" id="security-2fa-password-error" class="block" :style="errStyle" role="alert">{{ twoFactorPasswordError }}</text>
-          <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: var(--v5-space-2); margin-top: 8px">
-            <input class="flex-1" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
-            <NxButton variant="primary" size="medium" class="flex items-center justify-center active:opacity-80" :busy="securityBusy" @click="confirmTwoFactorChallenge"><text>{{ t.addrRebind.otpConfirmCta }}</text></NxButton>
-          </view>
+          <template v-if="remoteApiEnabled && twoFactorChallengeNo">
+            <input class="w-full" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" maxlength="6" @input="onTwoFactorCode" />
+            <NxButton variant="primary" class="flex items-center justify-center active:opacity-80" :busy="securityBusy" @click="confirmTwoFactorChallenge"><text>{{ twoFactorTarget ? t.security.twoFactorEnable : t.security.twoFactorDisable }}</text></NxButton>
+          </template>
           <text v-if="remoteApiEnabled && twoFactorChallengeNo" class="block" :style="rowSubStyle">{{ fmt(t.addrRebind.otpBody, { phone: twoFactorPhoneMasked }) }}</text>
-        </view><template #footer><NxButton v-if="!twoFactorChallengeNo" variant="primary" :busy="securityBusy" @click="toggleTwoFactor(requestedTwoFactor)">{{ t.ui.confirm }}</NxButton></template></NxSheet>
+        </view><template #footer><NxButton v-if="!twoFactorChallengeNo" variant="primary" :busy="securityBusy" @click="toggleTwoFactor(requestedTwoFactor)">{{ requestedTwoFactor ? t.security.twoFactorEnable : t.security.twoFactorDisable }}</NxButton></template></NxSheet>
     <NxSheet :open="phoneEditing" :title="t.security.phoneChangeTitle" @close="!securityBusy && (phoneEditing = false)" class="security-half-sheet"><view class="security-sheet-form">
           <text v-if="!phoneChallenge && phonePolicy?.remainingChanges === 0" class="block" :style="rowSubStyle">
             {{ t.security.phoneChangeLimit }} {{ phonePolicy.nextAvailableAt ? formatDisplayDate(phonePolicy.nextAvailableAt, dateLocale()) : "" }}
@@ -212,7 +213,14 @@
             <text v-if="!deletionReasonValidation.ok" id="security-deletion-reason-error" class="block" :style="errStyle" role="alert">{{ fmt(t.security.deletionReasonTooLong, { n: ACCOUNT_DELETION_REASON_MAX_LENGTH }) }}</text>
           </view>
           <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.deletionPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
-        </template></view><template #footer><NxButton variant="primary" :busy="securityBusy" :disabled="deletionSubmittedReason === null && !deletionReasonValidation.ok" @click="handleDeleteAccount">{{ t.security.deleteAccount }}</NxButton></template></NxSheet>
+        </template></view><template #footer>
+          <view v-if="deletionReadBlocked" class="security-policy-blocked security-deletion-blocked">
+            <text class="security-policy-blocked__copy">{{ t.wallet.syncFailedTitle }}</text>
+            <view class="nx-card-recovery-action nx-card-recovery-action--inline" :class="deletionReadsLoading ? 'opacity-50' : 'active:opacity-70'"
+              role="button" :tabindex="deletionReadsLoading ? -1 : 0" :aria-disabled="deletionReadsLoading" @click="retryDeletionReads"><text>{{ t.ui.retry }}</text></view>
+          </view>
+          <NxButton variant="primary" :busy="securityBusy" :disabled="(deletionSubmittedReason === null && !deletionReasonValidation.ok) || deletionReadBlocked" @click="handleDeleteAccount">{{ t.security.deleteAccount }}</NxButton>
+        </template></NxSheet>
     <!-- Wallet debt blocks deletion: top up is the way forward, support stays one tap away, cancel only closes. -->
     <NxNoticeDialog :open="deletionDebtOpen" :title="t.security.deleteAccount" :body="fmt(t.security.deleteAccountBlockedByDebt, { usdt: formatAmount(-app.user.usdtBalance, 'full') })"
       :primary="t.security.deleteAccountTopUp" :secondary="t.ui.cancel" @primary="leaveForDebt('/pages/me/wallet-topup')" @secondary="deletionDebtOpen = false">
@@ -402,6 +410,10 @@ const deletionCancelDimmed = computed(() => deletionCancelDisabled.value
   && (securityBusy.value || !!deletionReadback.value || remoteSecurityReadFailed.value || deletionStatusReadFailed.value
     || !(remoteSecurityLoading.value || deletionStatusLoading.value)));
 // A write control greyed by a failed read names the reason for screen readers (03 §3.4); the page itself stays quiet.
+// An unread value shows "…" while its first read is pending and "—" once that read has failed (03 §3.4).
+function unknownMark(readFailed: boolean) {
+  return readFailed ? "—" : "…";
+}
 function withReadReason(label: string, readFailed: boolean) {
   return readFailed ? `${label} · ${t.value.wallet.syncFailedTitle}` : label;
 }
@@ -704,7 +716,7 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.a
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.accountId], refreshSecurityForCurrentAccount);
 
 const passwordHintLine = computed(() => {
-  if (remoteApiEnabled && !securityPresentation.value) return "—";
+  if (remoteApiEnabled && !securityPresentation.value) return unknownMark(remoteSecurityReadFailed.value);
   return t.value.security.passwordHint.replace("{when}", formatDisplayDateTime(
     remoteApiEnabled ? securityPresentation.value?.passwordChangedAt : security.passwordChangedAt, dateLocale(),
   ));
@@ -796,6 +808,16 @@ const deletionRecovery = useAutoRecovery({
   failed: () => remoteApiEnabled && deletionStatusReadFailed.value && !deletionStatusLoading.value,
   retry: loadRemoteDeletionStatus,
 });
+
+// The deletion sheet blocks pull-to-refresh, so a failed read that blocks its submit keeps an in-place retry (03 §3.5.2).
+const deletionReadBlocked = computed(() => remoteApiEnabled && !!deletionWriteUnavailableReason.value
+  && (remoteSecurityReadFailed.value || deletionStatusReadFailed.value));
+const deletionReadsLoading = computed(() => remoteSecurityLoading.value || deletionStatusLoading.value);
+function retryDeletionReads() {
+  if (deletionReadsLoading.value) return;
+  if (remoteSecurityReadFailed.value) void overviewRecovery.retry();
+  if (deletionStatusReadFailed.value) void deletionRecovery.retry();
+}
 
 const securityReadbacks = {
   overview: { pending: overviewReadback, read: loadRemoteSecurity, restartBackoff: overviewRecovery.restartBackoff },
@@ -1300,6 +1322,7 @@ async function handleCancelAccountDeletion() {
     message: t.value.security.cancelDeletionMessage,
     danger: true,
     confirmLabel: t.value.security.cancelDeletionRequest,
+    cancelLabel: t.value.security.keepDeletionRequest,
     owner: securityConfirmOwner,
   });
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -1584,6 +1607,7 @@ const dangerLabelStyle: CSSProperties = {
 .security-sheet-note { font-size:13px; line-height:20px; color:var(--v5-ink-3); }
 /* A failed policy read that blocks sending: reason under the send button in 辅助色, retry as a text button on the right (03 §3.1, §3.5.2). */
 .security-policy-blocked { display:flex; align-items:center; gap:12px; margin-top:-4px; }
+.security-deletion-blocked { margin:0 0 8px; }
 .security-policy-blocked__copy { flex:1; min-width:0; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .security-reason-field, .security-reason-sent { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .security-reason-sent { padding:12px; border-radius:8px; background:var(--v5-surface-2); }

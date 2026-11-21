@@ -3285,6 +3285,7 @@ export const uz: Messages = {
     deleteAccountToast: "Oʻchirish soʻrovi yuborildi — akkauntdan chiqdingiz",
     deleteAccountCancelledReplay: "Hisobni o‘chirish bo‘yicha oldingi so‘rovingiz bekor qilingan. Yangi so‘rov yuboring.",
     cancelDeletionRequest: "Oʻchirish soʻrovini bekor etish",
+    keepDeletionRequest: "Soʻrovni qoldirish",
     cancelDeletionMessage: "Faqat joriy oʻchirish soʻrovi bekor qilinadi. Keyinroq yangi soʻrov yuborish mumkin.",
     cancelDeletionSuccess: "Oʻchirish soʻrovi bekor qilindi",
     deleteAccountBlocked: "Oʻchirish toʻxtatildi: {reason}",

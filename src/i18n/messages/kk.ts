@@ -3285,6 +3285,7 @@ export const kk: Messages = {
     deleteAccountToast: "Жою сұрауы жіберілді — аккаунттан шықтыңыз",
     deleteAccountCancelledReplay: "Алдыңғы аккаунтты жою өтінішіңіз тоқтатылды. Жаңа өтініш жіберіңіз.",
     cancelDeletionRequest: "Жою сұрауынан бас тарту",
+    keepDeletionRequest: "Сұрауды қалдыру",
     cancelDeletionMessage: "Тек ағымдағы жою сұрауынан бас тартылады. Жаңа сұрауды кейін жіберуге болады.",
     cancelDeletionSuccess: "Жою сұрауынан бас тартылды",
     deleteAccountBlocked: "Жою тоқтатылды: {reason}",

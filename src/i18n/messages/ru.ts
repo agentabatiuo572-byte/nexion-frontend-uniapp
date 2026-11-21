@@ -3285,6 +3285,7 @@ export const ru: Messages = {
     deleteAccountToast: "Заявка на удаление отправлена — вы вышли из аккаунта",
     deleteAccountCancelledReplay: "Предыдущая заявка на удаление аккаунта отменена. Подайте новую заявку.",
     cancelDeletionRequest: "Отменить заявку на удаление",
+    keepDeletionRequest: "Оставить заявку",
     cancelDeletionMessage: "Отменится только текущая заявка на удаление. Новую можно отправить позже.",
     cancelDeletionSuccess: "Заявка на удаление отменена",
     deleteAccountBlocked: "Удаление невозможно: {reason}",
