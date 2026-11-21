@@ -45,6 +45,18 @@ export class PromotionCheckoutSession {
     this.record = record ?? { quote: null, order: null, pending: null };
     this.commandUnknown = !!this.record.pending;
   }
+  /** Adopt only recovery for this session's intent, leaving a live review quote alone. */
+  restoreForegroundRecovery(): boolean {
+    const stored = this.ports.read();
+    if (this.busy || (!stored?.pending && !stored?.order)) return false;
+    if (JSON.stringify([stored.pending, stored.order]) === JSON.stringify([this.record.pending, this.record.order])) return false;
+    this.record = stored;
+    this.commandUnknown = !!stored.pending;
+    this.confirmed = false;
+    this.retryOriginal = false;
+    this.unseenPaymentKey = null;
+    return true;
+  }
   setQuote(quote: Quote,voucherId:string|null=null): void {
     if (this.busy || this.record.pending || this.record.order) throw new Error('ORIGINAL_ORDER_UNRESOLVED');
     this.persist({ ...this.record, quote, order: null, pending: null,voucherId,voucherMode:this.record.voucherMode??(this.record.voucherId!==undefined?'manual':'auto') });

@@ -1142,7 +1142,7 @@ function writeCapacityPending(accountKey:string,pending:CapacityPending|null):vo
   capacityResumeAllowed.value=false;
 }
 
-function rejectCapacityPurchase(accountKey: string, original: CapacityPending, message?: string) {
+function rejectCapacityPurchase(accountKey: string, original: CapacityPending, message?: string, stayOnCheckout=false) {
   if (!releaseAccountCommandKey(CAPACITY_COMMAND_TABLE, accountKey, original.intent, original.key)) throw new Error('CAPACITY_COMMAND_RELEASE_FAILED');
   writeCapacityPending(accountKey, null);
   capacityCommandKey.value = null;
@@ -1150,26 +1150,26 @@ function rejectCapacityPurchase(accountKey: string, original: CapacityPending, m
     toast.warn(t.value.tradein.errPleaseRetry);
     return;
   }
-  hide();
+  if (!stayOnCheckout) hide();
   const reason = original.operation === 'replace' ? tradeinRejectionKey(message) : undefined;
   if (reason) {
     const flow = checkoutFlowCopy(locale.code);
     toast.warn(flow.cannotPay, flow[reason]);
-    if (reason === 'rejectCapacitySourceChanged' && original.operation === 'replace') {
+    if (!stayOnCheckout && reason === 'rejectCapacitySourceChanged' && original.operation === 'replace') {
       void refreshCapacityReplacement(original.quote.targetProductNo as DeviceKind);
     }
   } else toast.warn(recoveryCopy.value.rejected);
 }
 
 async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requestedQuote:CanonicalCapacityReplaceQuote|null,
-    newKind:DeviceKind,allowOriginalResume=false,readOnlyCurrent?:()=>boolean):Promise<void> {
+    newKind:DeviceKind,allowOriginalResume=false,readOnlyCurrent?:()=>boolean,stayOnCheckout=false):Promise<void> {
   if (capacityRecoveryBusy.value || capacityReadBusy.value) return;
   const scope=captureAccountScope(),requestedIntent=requestedQuote?capacityIntent(operation,requestedQuote):null;
   const current=()=>isCurrentAccountScope(scope)&&(!readOnlyCurrent||readOnlyCurrent());
   if (readOnlyCurrent) capacityReadBusy.value=true;
   else capacityRecoveryBusy.value=true;
   try {
-    let original=readCapacityPending(scope.accountKey);
+    let original=readCapacityPending(scope.accountKey, stayOnCheckout ? newKind : undefined);
     // Background recovery cannot create/replay a command, even if the saved row was released.
     if (readOnlyCurrent&&!original) return;
     if (!original) {
@@ -1191,7 +1191,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
       if (result.status==='SUCCEEDED') receipt=original.operation==='replace'
         ?parseCanonicalTradeinResult(result.receipt):parseCanonicalCapacityKeepResult(result.receipt);
       else if (result.status==='REJECTED') {
-        rejectCapacityPurchase(scope.accountKey, original, result.message);
+        rejectCapacityPurchase(scope.accountKey, original, result.message, stayOnCheckout);
         return;
       } else {
         capacityResumeAllowed.value=result.status==='NOT_SEEN'&&result.canResumeSameKey;
@@ -1250,8 +1250,8 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         || (effectiveOperation==='replace'&&(receipt as CanonicalTradeinResult).sourceDeviceId!==frozen!.sourceDeviceId))
       throw new Error('CAPACITY_RECEIPT_QUOTE_MISMATCH');
     if (effectiveOperation==='replace') await submitCanonicalCapacityReplacement(frozen!,target as DeviceKind,
-      {key:original.key,receipt:receipt as CanonicalTradeinResult},readOnlyCurrent);
-    else await submitCanonicalKeepBuy(target as DeviceKind,frozen,{key:original.key,intent:original.intent,receipt:receipt as CanonicalCapacityKeepResult},readOnlyCurrent);
+      {key:original.key,receipt:receipt as CanonicalTradeinResult},readOnlyCurrent,stayOnCheckout);
+    else await submitCanonicalKeepBuy(target as DeviceKind,frozen,{key:original.key,intent:original.intent,receipt:receipt as CanonicalCapacityKeepResult},readOnlyCurrent,stayOnCheckout);
   } catch {
     if (current()&&!readOnlyCurrent) toast.warn(recoveryCopy.value.paymentPending);
   } finally {
@@ -1260,23 +1260,31 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
   }
 }
 
-async function recoverCapacityPurchase(resume=false):Promise<void> {
+async function recoverCapacityPurchase(resume=false, checkoutTarget?: string):Promise<void> {
   if (!props.active||!capacityPageShown.value||capacityReadBusy.value||capacityRecoveryBusy.value||confirming.value) return;
   const scope=captureAccountScope(),generation=capacityRecoveryGeneration;
   const current=()=>isCurrentAccountScope(scope)&&props.active&&capacityPageShown.value&&generation===capacityRecoveryGeneration;
   try {
-    const pending=readCapacityPending(app.accountKey);
+    const pending=readCapacityPending(app.accountKey, checkoutTarget);
     if (!pending) {savedCapacity.value=null;capacityResumeAllowed.value=false;capacityRecoveryUnavailable.value=false;refreshKeepRecovery();return;}
     capacityRecoveryUnavailable.value=false;
-    await runCanonicalCapacityPurchase(pending.operation,pending.quote,(pending.quote?pending.quote.targetProductNo:pending.targetProductNo) as DeviceKind,resume,resume?undefined:current);
+    await runCanonicalCapacityPurchase(pending.operation,pending.quote,(pending.quote?pending.quote.targetProductNo:pending.targetProductNo) as DeviceKind,resume,resume?undefined:current,!!checkoutTarget);
   } catch { if(current())capacityRecoveryUnavailable.value=true; }
 }
+
+async function readCapacityRecoveryInReview(target: string): Promise<boolean> {
+  capacityResumeAllowed.value = false;
+  await recoverCapacityPurchase(false, target);
+  return capacityResumeAllowed.value;
+}
+defineExpose({ readCapacityRecoveryInReview });
 
 async function submitCanonicalCapacityReplacement(
   quote: CanonicalCapacityReplaceQuote,
   newKind: DeviceKind,
   recovered?:{key:string;receipt:CanonicalTradeinResult},
   readOnlyCurrent?:()=>boolean,
+  stayOnCheckout = false,
 ): Promise<void> {
   if (!recovered) return runCanonicalCapacityPurchase('replace',quote,newKind);
   const requestScope = captureAccountScope();
@@ -1345,6 +1353,7 @@ async function submitCanonicalCapacityReplacement(
         }
         capacityCommandKey.value = null;
         writeCapacityPending(requestScope.accountKey,null);
+        if (stayOnCheckout) return;
         toast.success(fmt(t.value.tradein.replaceSuccessToast, {
           newKind: kindLabel(newKind),
           oldKind: quote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
@@ -1458,6 +1467,7 @@ async function submitCanonicalKeepBuy(
   quote: CanonicalCapacityReplaceQuote | null,
   recovered?:{key:string;intent:string;receipt:CanonicalCapacityKeepResult},
   readOnlyCurrent?:()=>boolean,
+  stayOnCheckout = false,
 ): Promise<void> {
   if (!recovered) return runCanonicalCapacityPurchase('keep',quote,newKind);
   const requestScope = captureAccountScope();
@@ -1522,6 +1532,7 @@ async function submitCanonicalKeepBuy(
         }
         capacityCommandKey.value = null;
         writeCapacityPending(requestScope.accountKey,null);
+        if (stayOnCheckout) return;
         toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(newKind) }));
         hide();
         goDevices();
