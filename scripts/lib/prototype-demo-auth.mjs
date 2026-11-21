@@ -1,5 +1,6 @@
 // Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
+import { demoPhoneAccessToken } from './prototype-demo-identity.mjs';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
 const recoverPath = /^\/auth\/users\/login\/attempts\/([^/]+)\/recover$/;
@@ -18,6 +19,8 @@ export function createAuthDemo(state) {
   function issue(data) {
     state.sessionState = 'signed-in';
     state.authUser = data.user;
+    if (data.accessToken === demoPhoneAccessToken) state.phoneSessionAccountId = String(data.user.userId);
+    else delete state.phoneSessionAccountId;
     return success(data);
   }
 
@@ -25,6 +28,7 @@ export function createAuthDemo(state) {
     reset() {
       saved = null;
       delete state.authUser;
+      delete state.phoneSessionAccountId;
     },
     savedAttempt() {
       if (saved || state.savedAttemptState === 'none') return null;
@@ -58,12 +62,13 @@ export function createAuthDemo(state) {
         }
         return issue({
           ...session({ ...existing, nickname: 'Formal Probe' }),
-          accessToken: 'formal-probe-access-token',
+          accessToken: demoPhoneAccessToken,
         });
       }
       if (path === '/auth/users/logout') {
         state.sessionState = 'signed-out';
         delete state.authUser;
+        delete state.phoneSessionAccountId;
         state.savedAttemptState = 'none';
         saved = null;
         return success(null);
