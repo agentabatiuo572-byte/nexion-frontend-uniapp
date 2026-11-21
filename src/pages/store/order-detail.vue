@@ -449,6 +449,7 @@ useSetPageHeader(() => ({
     ? t.value.orders.detailTitle
     : (showRemoteOrderLoading.value || remoteOrderError.value ? t.value.orders.title : t.value.orders.notFound),
   backHref: ordersBackHref.value,
+  noBack: showTrialResult.value || paymentResultVisible.value,
 }));
 
 // While on this page, tick orders every 3s so the provisioning bar moves

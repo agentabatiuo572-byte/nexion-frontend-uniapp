@@ -10,9 +10,7 @@
   <view v-if="sheetOpen" class="pp-mask nx-sheet-fade-in" @click.self="payment.close">
     <view id="pp-sheet" class="pp-sheet nx-glass-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="sheetTitle">
       <view class="pp-head">
-        <view v-if="s.step !== 'methods'" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-        </view>
+        <!-- Payment steps close only (user 2026-11-22): no back arrow; closing and paying again starts at the methods. -->
         <view class="pp-head__text">
           <text class="pp-title" role="heading">{{ sheetTitle }}</text>
           <view v-if="s.step === 'methods' && deadlineLeft !== null" class="pp-cd" :class="{ 'is-urgent': deadlineLeft < URGENT_MS }">
@@ -102,7 +100,9 @@
   <view v-if="pageOpen" id="pp-page" class="pp-page" role="dialog" aria-modal="true" :aria-label="pageTitle" :style="{ paddingTop: statusBar + 'px' }">
     <DeviceStatusBar />
     <view class="pp-nav">
-      <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="leavePage" @keydown.enter.prevent="leavePage">
+      <!-- The funds-received status page shows no top control; 查看订单 is its way on. -->
+      <view v-if="received" class="pp-nav__gap" aria-hidden="true" />
+      <view v-else class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="leavePage" @keydown.enter.prevent="leavePage">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
       <text class="pp-nav__t" role="heading">{{ pageTitle }}</text>
@@ -197,7 +197,7 @@
     <DeviceStatusBar />
     <view class="pp-cashier__bar" :style="{ paddingTop: statusBar + 'px' }">
       <view class="pp-cashier__row">
-        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.closeCashier" @click="payment.closeCashier" @keydown.enter.prevent="payment.closeCashier">
+        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.closeCashier" @click="leaveCashier" @keydown.enter.prevent="leaveCashier">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
         <view class="pp-cashier__mid">
@@ -335,7 +335,7 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'leave': return { icon: 'alert', tone: 'warning', title: networkPaused.value ? fill(c.networkPausedTitle, { network: networkName.value }) : c.leaveTitle,
       // Trial conversion, trade-in and capacity payments have no order page; they resume from Orders.
-      body: networkPaused.value ? c.networkPaused : order ? c.leaveBody : c.leaveBodyNoOrder, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: leavePayment };
+      body: networkPaused.value ? c.networkPaused : order ? c.leaveBody : c.leaveBodyNoOrder, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: networkPaused.value ? dismiss : continuePaying, onSecondary: payment.leaveToStore };
     case 'networkPaused': return { icon: 'info', tone: 'warning', title: fill(c.networkPausedTitle, { network: networkName.value }), body: c.networkPaused,
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
       ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
@@ -411,9 +411,12 @@ function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
   next?.focus();
   if (choose && next) next.click();
 }
-function leavePage() { if (received.value) leavePayment(); else payment.notify('leave'); }
-// Leaving an order payment that a purchase page started ends that purchase on the order page; a resumed payment only closes.
-function leavePayment() { if (s.kind === 'ORDER_PAY' && s.orderNo && !s.coldResume) payment.openOrder(); else payment.close(); }
+// The top close ends the payment on the store home; a payment already started asks first (user 2026-11-22).
+function leavePage() { if (received.value) payment.leaveToStore(); else payment.notify('leave'); }
+// The bank page sits in a native view above the notice, so it closes before the question is asked.
+function leaveCashier() { payment.closeCashier(); payment.notify('leave'); }
+// Continuing a bank payment means its bank page; other payments stay on their payment page.
+function continuePaying() { dismiss(); if (isBank.value && ready.value) payment.openCashier(); }
 
 useDialogA11y(sheetOpen, '#pp-sheet', payment.close, true, 3);
 useDialogA11y(computed(() => pageOpen.value && !s.cashier && !s.notice), '#pp-page', leavePage, true, 3);

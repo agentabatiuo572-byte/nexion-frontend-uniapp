@@ -709,6 +709,8 @@ export function usePurchasePayment() {
         + (deadlineAt ? `&deadline=${deadlineAt}` : '');
       closeAndNavigate(`/pages/me/wallet-topup?${query}`);
     },
+    // Every close at the top of a payment page ends on the store home (user 2026-11-22); records and the bar stay.
+    leaveToStore: () => closeAndNavigate('/pages/store/store'),
     openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`, true); else finish(null); },
     support: () => closeAndNavigate('/pages/me/support'),
     openConditions,
