@@ -449,7 +449,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const epoch = accountBindingEpoch;
     const ready = await runPassiveTabRead("trial-state", () => refreshRemote(), undefined, () => authorityStatus.value === "ready");
     if (ready || !eligibilityFallback || epoch !== accountBindingEpoch || !canReadVisible()) return ready;
-    return runPassiveTabRead("trial-eligibility", () => refreshEligibilityRemote());
+    return runPassiveTabRead("trial-eligibility", () => refreshEligibilityRemote(), undefined, () => authorityStatus.value === "ready");
   }
 
   async function refreshAtBoundary(boundary: number): Promise<boolean> {

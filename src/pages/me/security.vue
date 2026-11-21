@@ -135,6 +135,7 @@
           @click="handleCancelAccountDeletion">
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
+        <AccountDeletionReason v-if="remoteApiEnabled && pendingDeletionReason !== null" :reason="pendingDeletionReason" />
       </view>
       <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
@@ -197,13 +198,9 @@
         </view></NxSheet>
     <NxSheet :open="deletionSheetOpen" :title="t.security.deleteAccount" @close="closeDeletionSheet" class="security-half-sheet"><view class="security-sheet-form"><text class="security-sheet-note">{{ t.security.deleteAccountHint }}</text><template v-if="remoteApiEnabled && !deletionPending">
           <!-- Optional reason before the password. A retry after an unknown result resends the submitted reason, so it shows read-only. -->
-          <view v-if="deletionSubmittedReason !== null" class="security-reason-sent" role="group" :aria-label="t.security.deletionReasonSubmitted">
-            <view class="security-reason-head"><text class="security-reason-label">{{ t.security.deletionReasonSubmitted }}</text><svg class="security-reason-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg></view>
-            <text class="security-reason-sent__text" :class="{ 'security-reason-sent__text--empty': !deletionSubmittedReason.trim() }">{{ deletionSubmittedReason.trim() || t.security.deletionReasonNone }}</text>
-            <text class="security-reason-hint">{{ t.security.deletionReasonLocked }}</text>
-          </view>
+          <AccountDeletionReason v-if="deletionSubmittedReason !== null" :reason="deletionSubmittedReason" retry />
           <view v-else class="security-reason-field">
-            <view class="security-reason-head"><text class="security-reason-label">{{ t.security.deletionReasonLabel }}</text><text id="security-deletion-reason-count" class="security-reason-count" :class="{ 'security-reason-count--over': !deletionReasonValidation.ok }">{{ deletionReason.length }}/{{ ACCOUNT_DELETION_REASON_MAX_LENGTH }}</text></view>
+            <view class="security-reason-head"><text class="security-reason-label">{{ t.security.deletionReasonLabel }}</text><text id="security-deletion-reason-count" class="security-reason-count" :class="{ 'security-reason-count--over': !deletionReasonValidation.ok }">{{ deletionReasonValidation.length }}/{{ ACCOUNT_DELETION_REASON_MAX_LENGTH }}</text></view>
             <textarea class="security-reason-input" :value="deletionReason" :placeholder="t.security.deletionReasonPlaceholder" placeholder-class="security-reason-ph" :aria-label="t.security.deletionReasonLabel" :aria-invalid="deletionReasonValidation.ok ? 'false' : 'true'" :aria-describedby="deletionReasonValidation.ok ? 'security-deletion-reason-count' : 'security-deletion-reason-error'" :maxlength="-1" :disabled="securityBusy" @input="deletionReason = detailVal($event)" />
             <text v-if="!deletionReasonValidation.ok" id="security-deletion-reason-error" class="block" :style="errStyle" role="alert">{{ fmt(t.security.deletionReasonTooLong, { n: ACCOUNT_DELETION_REASON_MAX_LENGTH }) }}</text>
           </view>
@@ -224,6 +221,7 @@ import { displayTimestamp, formatDisplayDate, formatDisplayDateTime } from "@/li
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import AccountDeletionReason from "@/components/me/account-deletion-reason.vue";
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
@@ -317,6 +315,10 @@ const phoneError = ref("");
 const deletionStatus = ref<AccountDeletionStatus>({ status: "NONE" });
 const deletionPending = computed(() => deletionStatus.value.status !== "NONE"
   && (deletionStatus.value.status === "REQUESTED" || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED"));
+const pendingDeletionReason = computed(() => {
+  const request = deletionStatus.value;
+  return deletionPending.value && request.status !== "NONE" ? request.originalReason ?? "" : null;
+});
 const deletionBlockedReason = computed(() => {
   const request = deletionStatus.value;
   if (request.status !== "BLOCKED") return "";
@@ -1436,22 +1438,17 @@ const dangerLabelStyle: CSSProperties = {
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
 .security-sheet-note { font-size:13px; line-height:20px; color:var(--v5-ink-3); }
-.security-reason-field, .security-reason-sent { display:flex; flex-direction:column; gap:6px; min-width:0; }
-.security-reason-sent { padding:12px; border-radius:8px; background:var(--v5-surface-2); }
+.security-reason-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .security-reason-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-width:0; }
 .security-reason-label { min-width:0; font:600 13px/18px var(--font-v5); color:var(--v5-ink-2); }
 .security-reason-count { flex:none; font:500 12px/16px var(--font-jet-mono); color:var(--v5-ink-3); }
 .security-reason-count--over { color:var(--v5-danger); }
-.security-reason-lock { flex:none; align-self:center; color:var(--v5-ink-3); }
 .security-reason-input { display:block; box-sizing:border-box; width:100%; height:88px; padding:10px 12px; border-radius:8px; background:var(--v5-surface-2); font-family:var(--font-v5); font-size:var(--ui-type-input); line-height:20px; color:var(--v5-ink); overflow-wrap:break-word; }
 .security-reason-input[aria-invalid="true"] { box-shadow:inset 0 0 0 1px var(--v5-danger); }
 .security-reason-input:focus-within { outline:2px solid var(--v5-brand); outline-offset:2px; }
 .security-reason-ph { color:var(--v5-ink-4); }
 /* uni's textarea placeholder breaks anywhere; keep whole words (decision 8). */
 .security-reason-input :deep(.uni-textarea-placeholder) { word-break:normal; overflow-wrap:break-word; }
-.security-reason-sent__text { font:400 14px/20px var(--font-v5); color:var(--v5-ink); white-space:pre-wrap; overflow-wrap:anywhere; }
-.security-reason-sent__text--empty { color:var(--v5-ink-3); }
-.security-reason-hint { font-size:12px; line-height:16px; color:var(--v5-ink-3); }
 .security-debt-support { display:flex; align-items:center; justify-content:center; min-height:44px; margin-top:8px; padding:0 12px; border-radius:var(--v5-radius-full); font:400 14px/20px var(--font-v5); color:var(--v5-ink-2); text-decoration:underline; text-underline-offset:3px; }
 .security-debt-support:active { opacity:.7; }
 .security-debt-support:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }

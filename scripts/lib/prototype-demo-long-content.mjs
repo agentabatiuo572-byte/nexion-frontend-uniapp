@@ -1,5 +1,6 @@
 // Preview presets share the same order, task and withdrawal fixtures as the individual controls.
 import { createHash } from 'node:crypto';
+import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 
 export const contentOptions = [
   ['normal', '普通长度'],
@@ -7,8 +8,7 @@ export const contentOptions = [
 ];
 export const demoLongContentAvailable = state => state.dataState !== 'empty' && state.fleetState !== 'none'
   && (state.accountDeletionState ?? 'follow') === 'follow'
-  && !['low-balance', 'reward-clawback-debt'].includes(state.paymentState === 'read-error'
-    ? state.paymentBeforeReadError : state.paymentState);
+  && !['low-balance', 'reward-clawback-debt'].includes(demoPaymentScenario(state));
 export const demoHasLongContent = state => demoLongContentAvailable(state) && state.contentState === 'long';
 export const demoHasLongBillRefs = state => demoLongContentAvailable(state)
   && (state.contentState === 'long' || state.billRefsState === 'long-refs');

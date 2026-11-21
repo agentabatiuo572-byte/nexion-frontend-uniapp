@@ -1,5 +1,6 @@
 // Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
+import { clearPreviewAccessToken, demoPhoneAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
 const recoverPath = /^\/auth\/users\/login\/attempts\/([^/]+)\/recover$/;
@@ -10,7 +11,7 @@ const registrationReceipt = {
 };
 const success = data => ({ status: 200, body: { code: 0, message: 'OK', data } });
 const failure = (status, message) => ({ status, body: { code: status, message, data: null } });
-const session = user => ({ accessToken: 'local-demo-token', refreshToken: null, tokenType: 'Bearer', user });
+const session = user => ({ refreshToken: null, tokenType: 'Bearer', user });
 
 export function createAuthDemo(state) {
   let saved = null;
@@ -18,13 +19,15 @@ export function createAuthDemo(state) {
   function issue(data) {
     state.sessionState = 'signed-in';
     state.authUser = data.user;
-    return success(data);
+    const accessToken = issuePreviewAccessToken(state, data.user.userId, data.accessToken);
+    return success({...data, accessToken});
   }
 
   return {
     reset() {
       saved = null;
       delete state.authUser;
+      clearPreviewAccessToken(state);
     },
     savedAttempt() {
       if (saved || state.savedAttemptState === 'none') return null;
@@ -58,20 +61,21 @@ export function createAuthDemo(state) {
         }
         return issue({
           ...session({ ...existing, nickname: 'Formal Probe' }),
-          accessToken: 'formal-probe-access-token',
+          accessToken: demoPhoneAccessToken,
         });
       }
       if (path === '/auth/users/logout') {
         state.sessionState = 'signed-out';
         delete state.authUser;
+        clearPreviewAccessToken(state);
         state.savedAttemptState = 'none';
         saved = null;
         return success(null);
       }
       if (path === '/auth/users/refresh') {
-        return state.sessionState === 'signed-out'
+        return state.sessionState === 'signed-out' || headers.authorization && !previewAccountId(state, headers)
           ? failure(401, 'AUTH_REQUIRED')
-          : success(session(state.authUser ?? existing));
+          : issue(session(state.authUser ?? existing));
       }
       const recovery = recoverPath.exec(path);
       const id = recovery?.[1] ?? headers['x-nexgrid-login-attempt-id'];

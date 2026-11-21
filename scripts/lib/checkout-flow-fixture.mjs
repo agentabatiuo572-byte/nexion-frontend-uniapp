@@ -25,13 +25,13 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
     if (paymentCommand) {
-      const result = external.paymentCommand(paymentCommand[1], decodeURIComponent(paymentCommand[2]));
+      const [,kind,encodedKey] = paymentCommand, commandKey = decodeURIComponent(encodedKey);
+      if (state.paymentState === 'read-error' && pin.commands.has(kind+':'+commandKey)) return pin.handle(url, request);
+      const result = external.paymentCommand(kind, commandKey);
       if (result) return ok(result);
     }
     if (path.startsWith('/api/app/security/payment-password') || path.startsWith('/api/app/payment-commands/')) return pin.handle(url, request);
-    if (method === 'GET' && path.startsWith('/api/app/purchase-payment-intents/by-order/')) return external.handle(url, request);
-    // Model the server's payment observer and deadline task in this isolated fixture, not in product code.
-    external.sweep();
+    if (method === 'GET' && external.handles(path)) return external.handle(url, request);
     for (const order of state.createdOrders ?? []) if (demoOrderTimedOut(order,state,Date.now())) Object.assign(order,demoTimedOutOrder);
     if (external.handles(path)) return external.handle(url, request);
     const kind = tradeinCommands.get(path);
@@ -66,13 +66,10 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     if (action && method === 'POST') {
       const orderNo = decodeURIComponent(action[1]);
       let order = state.createdOrders?.find(item => item.orderNo === orderNo);
-      const sample = !order;
-      if (sample) {
+      if (!order) {
         order = demoFixture(new URL('/api/orders',url.origin),locale(),state,{...request,method:()=> 'GET'}).orders.find(item=>item.orderNo===orderNo);
         if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
       }
-      // A sample row is adopted into the writable store only for a pay that commerce settles; a cancellation (settled
-      // by the commerce fixture through its order status) or a refused command leaves the account's orders untouched.
       if (external.openOrderPayment(orderNo)) return {status:409,message:'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS',data:null};
       if (action[2] === 'cancel') return ok(demoFixture(url,locale(),state,request));
       // Like AppPaymentPasswordService: a command key answers the outcome recorded for it.
@@ -87,23 +84,19 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       const authorization = pin.authorize(request.postDataJSON());
       if (authorization.status !== 200) return authorization;
       const firstPayment=order.paymentStatus==='PENDING';
-      if (sample&&firstPayment) { state.createdOrders ??= []; state.createdOrders.push(order); }
       let settled;
       try { settled = demoFixture(url,locale(),state,request); }
       catch (error) {
-        if (sample&&firstPayment) state.createdOrders.splice(state.createdOrders.indexOf(order),1);
         const refusal = {status:error.status??409,message:error.message,data:null};
         if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
         return refusal;
       }
-      if(firstPayment){
-        order.paymentNo=settled.paymentNo;
-        pin.state.payWrites++;
-      }
+      if(firstPayment)pin.state.payWrites++;
       if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
       return {...ok(settled),drop:pin.state.dropNextPayment?(pin.state.dropNextPayment=false,true):false};
     }
     return ok(demoFixture(url,locale(),state,request));
   }
-  return {handles,handle,pin,seedRemoteOrderPayment:external.seedRemoteOrderPayment};
+  return {handles,handle,pin,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
+    selectPaymentMode:external.selectPaymentMode};
 }
