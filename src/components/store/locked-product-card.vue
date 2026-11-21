@@ -271,9 +271,8 @@ const barFillStyle = computed<CSSProperties>(() => ({
   background:
     radial-gradient(40% 50% at 85% 15%, var(--v5-brand-2-soft) 0%, transparent 60%),
     radial-gradient(35% 45% at 15% 85%, var(--v5-tech-cyan-soft) 0%, transparent 60%);
-  animation: v5-aurora-drift 14s ease-in-out infinite;
 }
-.locked-card__aurora.is-paused, .nx-chassis[data-scrolling="true"] .locked-card__aurora { animation-play-state: paused; }
+/* The aurora stays still: only live state loops (07 §7.1, design-rules Motion), and this card shows none. */
 /* Lock-dot heartbeat: a pre-drawn halo animated by transform/opacity only retraces the former 0→8px box-shadow
    pulse (50% → 0 cyan by 70%); a copy of the dot drawn above it keeps the halo outside the dot, as a shadow was. */
 .locked-card__dot::before { content: ""; position: absolute; inset: -10px; border-radius: 50%; background: rgb(12, 196, 214); opacity: 0; transform: scale(.3333); animation: locked-card-dot-pulse 2.4s ease-in-out infinite; }
@@ -287,7 +286,7 @@ const barFillStyle = computed<CSSProperties>(() => ({
     linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px),
     linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px);
 }
-@media (prefers-reduced-motion: reduce) { .locked-card__aurora, .locked-card__dot::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .locked-card__dot::before { animation: none; } }
 /* In-card action on a solid card: the shared neutral glass M (03 §3.1), button role 15/20 at 500. */
 .locked-card__notify { gap: 6px; min-height: 40px; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
 .locked-card__notify:active { transform: scale(.98); }

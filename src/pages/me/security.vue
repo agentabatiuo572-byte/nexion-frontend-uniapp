@@ -130,12 +130,11 @@
           </view><svg v-if="!deletionPending" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </view>
         <!-- A request in progress: what was submitted reads as a row of the card, and withdrawing it is the card's last
-             action, in the shared in-card action style (it restores the account, so it is not drawn as a danger action). -->
+             action. The card is solid, so the in-card secondary action is neutral glass M at the bottom right (03 §3.1);
+             it restores the account, so it is not drawn as a danger action. -->
         <AccountDeletionReason v-if="remoteApiEnabled && pendingDeletionReason !== null" class="security-danger-reason" :reason="pendingDeletionReason" />
-        <view v-if="remoteApiEnabled && deletionCanCancel" class="nx-card-footer">
-          <view class="nx-card-action" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest" @click="handleCancelAccountDeletion">
-            <text>{{ t.security.cancelDeletionRequest }}</text>
-          </view>
+        <view v-if="remoteApiEnabled && deletionCanCancel" class="security-danger-actions">
+          <NxButton variant="secondary" size="medium" :label="t.security.cancelDeletionRequest" @click="handleCancelAccountDeletion" />
         </view>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
@@ -1439,6 +1438,8 @@ const dangerLabelStyle: CSSProperties = {
 .security-danger-label--pending { color:var(--v5-ink-3)!important; }
 /* In the card the submitted reason is a divided row, not a filled box (the box stays for the retry form in the sheet). */
 .security-danger .security-danger-reason { padding:12px 0 14px; border-radius:0; background:transparent; border-top:1px solid var(--v5-border); }
+/* The M button's 44px hit area adds 2px above and below its 40px surface, so 14px here leaves the card's 16px inset. */
+.security-danger-actions { display:flex; justify-content:flex-end; padding-bottom:14px; }
 .security-sheet-form { display:flex; flex-direction:column; gap:var(--v5-space-3); }
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
