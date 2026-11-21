@@ -1,5 +1,5 @@
 import { reactive } from 'vue';
-import { apiClient } from '@/api/runtime';
+import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
@@ -292,7 +292,20 @@ async function openConditions() {
       const orders = useOrders();
       const order = orders.getById(orderNo) ?? await orders.ensureRemoteOrder(orderNo);
       if (!owns(version, accountKey)) return;
-      if (order && (order.lineItems?.length ?? 1) === 1) productNo = order.lineItems?.[0]?.sku ?? order.productId;
+      const items = order?.lineItems;
+      if (order && (items?.length ?? 1) === 1) {
+        productNo = items?.[0]?.sku ?? order.productId;
+      } else if (!productNo && notice !== 'rejectConditionsUnmet' && items && items.length > 1) {
+        for (const { sku } of items) {
+          if (!owns(version, accountKey)) return;
+          const eligibility = await purchaseEligibilityApi.get(sku);
+          if (!owns(version, accountKey)) return;
+          if (eligibility.policies.some(policy => policy.policy === 'E1' && !policy.eligible)) {
+            productNo = sku;
+            break;
+          }
+        }
+      }
     }
   } catch {
     // The order detail can retry its own product read.
