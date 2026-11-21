@@ -91,17 +91,17 @@ onMounted(() => {
 .invite-rules-content { display: flex; flex-direction: column; gap: 18px; font-family: var(--font-v5); }
 .invite-rules__overview { --nx-tint: var(--v5-brand); display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: 20px; }
 .invite-rules__summary { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
-.invite-rules__label { display: block; color: var(--v5-ink-2); font: 400 14px/20px var(--font-v5); }
-.invite-rules__amount { display: block; color: var(--v5-brand); font: 600 20px/24px var(--font-metric); }
-.invite-rules__note { display: block; color: var(--v5-ink-4); font: 400 12px/16px var(--font-v5); }
+.invite-rules__label { display: block; color: var(--v5-ink-3); font: 400 14px/20px var(--font-v5); }
+.invite-rules__amount { display: block; color: var(--v5-brand); font: 500 20px/24px var(--font-metric); }
+.invite-rules__note { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .invite-rules__art { --team-art-size: 96px; height: 72px; }
 /* Numbered steps hang on one line like a timeline. */
 .invite-rules__steps { display: flex; flex-direction: column; padding: 4px 0; }
 .invite-rules__step { position: relative; display: flex; gap: 14px; padding-bottom: 20px; }
 .invite-rules__step:last-child { padding-bottom: 0; }
 .invite-rules__step:not(:last-child)::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: color-mix(in srgb, var(--v5-brand) 30%, transparent); }
-.invite-rules__number { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: 600 14px/1 var(--font-metric); }
+.invite-rules__number { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 14px/1 var(--font-metric); }
 .invite-rules__step-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.invite-rules__step-title { display: block; color: var(--v5-ink); font: 600 15px/32px var(--font-v5); }
+.invite-rules__step-title { display: block; color: var(--v5-ink); font: var(--ui-type-subheading-weight) 15px/32px var(--font-v5); }
 .invite-rules__step-body { display: block; margin-top: -4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 </style>

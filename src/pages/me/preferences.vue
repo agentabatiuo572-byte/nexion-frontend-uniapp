@@ -9,7 +9,7 @@
       <SubPageHeader back="/pages/me/me" plain />
       <!-- Sound -->
       <view class="mx-4">
-        <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
+        <text class="block pref-heading" :style="headingStyle">{{ w.feedbackHeading }}</text>
         <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow :label="w.soundLabel" :hint="w.soundHint" :value="prefs.soundEnabled" last @toggle="prefs.toggleSound">
             <template #icon>
@@ -21,15 +21,14 @@
 
       <!-- Notification kinds -->
       <view class="mx-4" style="margin-top: 20px">
-        <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
-        <text v-if="!prefs.remoteReady" class="block" role="status" aria-live="polite">{{ prefs.readFailedWithoutData ? w.notifUnavailable : w.loading }}</text>
+        <text class="block pref-heading" :style="headingStyle">{{ w.notifHeading }}</text>
         <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
             :key="k"
             :label="w.notifKinds[k]"
             :value="prefs.remoteReady ? prefs.notifPrefs[k] : null"
-            :unknown-label="t.uiChrome.unavailable"
+            :unknown-label="w.notifUnknown"
             :last="i === notifKinds.length - 1"
             @toggle="saveNotificationPreference(k)"
           >
@@ -38,6 +37,8 @@
             </template>
           </ToggleRow>
         </view>
+        <!-- Until the server answers, the switches show "—"; one line under the card says why, so the card itself never moves (03 §3.4). -->
+        <text v-if="!prefs.remoteReady" class="block mx-1 pref-notif-status" role="status" aria-live="polite">{{ prefs.readFailedWithoutData ? w.notifUnavailable : w.loading }}</text>
         <text class="block mx-1" :style="footerStyle">{{ w.notifFooter }}</text>
       </view>
     </view>
@@ -115,7 +116,6 @@ const headingStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "var(--ui-type-section)",
   fontWeight: 600,
-  letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
   marginBottom: "12px",
   paddingLeft: "2px",
@@ -127,11 +127,12 @@ const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
   overflow: "hidden",
 };
+// Footer note: 注释 role in ink-3; ink-4 carries no information (01 §1.1.1, 10 §10.1).
 const footerStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-  lineHeight: 1.625,
+  fontSize: "var(--ui-type-note)",
+  color: "var(--v5-ink-3)",
+  lineHeight: "var(--ui-type-note-lh)",
 };
 
 
@@ -140,4 +141,8 @@ const footerStyle: CSSProperties = {
 <style src="@/styles/message-family.css"></style>
 
 <style scoped>
+/* Section titles: -0.01em for 17px Latin titles, none for Chinese (01 §1.2); a class, since an inline style cannot follow :lang. */
+.pref-heading { letter-spacing: -0.01em; }
+.pref-heading:lang(zh) { letter-spacing: 0; }
+.pref-notif-status { margin-top: var(--v5-space-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 </style>

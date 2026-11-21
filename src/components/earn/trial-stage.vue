@@ -15,13 +15,15 @@
       <view class="trial-stage__stat"><text class="trial-stage__label">{{ copy.estimate }}</text><text class="trial-stage__value">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
     </view>
     <text v-if="presentation.status.value === 'grace'" class="trial-stage__note">{{ copy.grace }}</text>
-    <text class="trial-stage__note">{{ trial.lastReadFailed && !presentation.actionsReady.value ? (presentation.displayReady.value ? copy.retainedCredit : copy.unknown) : copy.creditNote }}</text>
+    <text class="trial-stage__note">{{ copy.creditNote }}</text>
     <view class="trial-stage__actions">
       <view class="trial-stage__group">
         <view class="trial-stage__pill" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails"><text class="trial-stage__pill-face nx-frosted-button">{{ copy.detailsAction }}</text></view>
-        <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button nx-after-arrow">{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }}</text></view>
+        <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" :aria-label="buyLabel" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button nx-after-arrow">{{ buyText }}</text></view>
       </view>
     </view>
+    <!-- After a failed read the reason sits under the dimmed buy pill (03 §3.1, §3.4); it also covers a stage with no confirmed figures. -->
+    <text v-if="trial.lastReadFailed && !presentation.actionsReady.value" class="trial-stage__reason">{{ presentation.displayReady.value ? copy.retainedCredit : copy.unknown }}</text>
   </view>
 </template>
 
@@ -62,6 +64,9 @@ const gaugeProgress = computed(() => visibility.hidden || presentation.offsetPro
 function money(value: number | null) {
   return visibility.mask(value === null ? "—" : `$${formatAmount(value)}`);
 }
+const buyText = computed(() => presentation.status.value === "grace" ? copy.value.buy : copy.value.buyEarly);
+// A failed trial read shows no strip (03 §3.4); the dimmed buy pill still tells screen readers why.
+const buyLabel = computed(() => trial.lastReadFailed && !presentation.actionsReady.value ? `${buyText.value} · ${copy.value.unknown}` : undefined);
 function goDetails() { navTo("/pages/me/trial"); }
 function goBuy() { if (presentation.actionsReady.value) goDetails(); }
 
@@ -87,6 +92,7 @@ function goBuy() { if (presentation.actionsReady.value) goDetails(); }
 .trial-stage__label { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .trial-stage__value { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .trial-stage__note { position: relative; display: block; margin-top: 10px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); text-align: center; }
+.trial-stage__reason { position: relative; display: block; margin: calc(-1 * var(--v5-space-1)) 0 var(--v5-space-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); text-align: right; }
 .trial-stage__actions { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; margin-top: 6px; }
 .trial-stage__group { display: flex; gap: 8px; margin-left: auto; }
 /* 44px hit area; the visible glass pill stays a compact 32px. */

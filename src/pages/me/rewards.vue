@@ -20,6 +20,8 @@
       <SubPageHeader back="/pages/me/me" :title="t.rewards.title" />
 
       <text class="block" :style="heroStyle">{{ t.rewards.heroTitle }}</text>
+      <!-- A refresh failed after totals were confirmed: the money stays, with one quiet line 4px under the title (03 §3.4, 01 §1.3). -->
+      <text v-if="billsShowingRetained && displayUsdtTotal !== null" class="block reward-retained" role="status">{{ t.rewards.retainedTotals }}</text>
 
       <view class="reward-grid">
         <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-tint': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
@@ -187,7 +189,7 @@ const cats = computed<CatCard[]>(() => [
     label: t.value.rewards.catUsdt,
     big: displayUsdtTotal.value === null ? "—" : `$${formatAmount(displayUsdtTotal.value)}`,
     unit: "USDT",
-    desc: billsShowingRetained.value && displayUsdtTotal.value !== null ? t.value.rewards.retainedTotals : t.value.rewards.catUsdtDesc,
+    desc: t.value.rewards.catUsdtDesc,
   },
   {
     key: "uvt",
@@ -319,6 +321,7 @@ const hintStyle: CSSProperties = {
 </script>
 
 <style scoped>
+.reward-retained { margin: calc(-1 * var(--v5-space-3)) var(--v5-space-5) var(--v5-space-4); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .reward-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin: 0 16px; }
 .reward-tile { position: relative; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); color: var(--v5-ink); cursor: pointer; animation: reward-enter 480ms cubic-bezier(.16,1,.3,1) both; }
 .reward-tile:not(.nx-tint) { background: var(--v5-surface); }
@@ -326,7 +329,7 @@ const hintStyle: CSSProperties = {
 .reward-tile__title { display: block; font: 500 15px/22px var(--font-v5); }
 .reward-tile__amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: var(--v5-space-2); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; }
 .reward-tile__unit { font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); }
-.reward-tile__desc { display: block; margin-top: 6px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.reward-tile__desc { display: block; margin-top: 6px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 /* The USDT card keeps its coral corner light as one uniform tint (.nx-tint). */
 .reward-tile--usdt { --nx-tint: var(--v5-brand-2); grid-column: 1 / -1; padding: 18px; }
 .reward-tile--usdt .reward-tile__amount { font-size: 40px; line-height: 48px; margin-top: 6px; padding-right: 28px; }
