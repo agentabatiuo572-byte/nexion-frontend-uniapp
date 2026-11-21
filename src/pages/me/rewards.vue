@@ -20,6 +20,8 @@
       <SubPageHeader back="/pages/me/me" :title="t.rewards.title" />
 
       <text class="block" :style="heroStyle">{{ t.rewards.heroTitle }}</text>
+      <!-- A refresh failed after totals were confirmed: the money stays, with one quiet line (03 §3.4). -->
+      <text v-if="billsReadFailed && !billsReadFailedWithoutData" class="block reward-retained" role="status">{{ t.rewards.retainedTotals }}</text>
 
       <view class="reward-grid">
         <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-tint': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
@@ -313,6 +315,7 @@ const hintStyle: CSSProperties = {
 </script>
 
 <style scoped>
+.reward-retained { margin: calc(-1 * var(--v5-space-1)) var(--v5-space-5) var(--v5-space-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .reward-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin: 0 16px; }
 .reward-tile { position: relative; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); color: var(--v5-ink); cursor: pointer; animation: reward-enter 480ms cubic-bezier(.16,1,.3,1) both; }
 .reward-tile:not(.nx-tint) { background: var(--v5-surface); }

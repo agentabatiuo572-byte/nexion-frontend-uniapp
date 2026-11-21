@@ -1014,6 +1014,8 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
       system: "Hệ thống / tuân thủ / pháp lý",
     },
     notifFooter: "Tắt một nhóm sẽ ẩn các mục tương ứng trong trung tâm thông báo. Thông báo tuân thủ quan trọng không thể tắt.",
+    notifUnknown: "Chưa tải",
+    notifUnavailable: "Chưa tải được cài đặt thông báo. Bạn có thể thay đổi sau khi tải xong.",
   },
 
   // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token
@@ -1779,6 +1781,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     secExpired: "Voucher đã hết hạn",
     empty: "Chưa có phần thưởng nào",
     emptyHint: "Voucher đã nhận và phần thưởng hoạt động sẽ hiện ở đây.",
+    retainedTotals: "Thưởng USDT và UVT là số tiền đã xác nhận lần trước.",
     expiredBadge: "Đã hết hạn",
     useCta: "Dùng",
     typeBonus: "Thưởng",
@@ -5106,7 +5109,7 @@ openSeaErrorPool: {
     drawerTitle: "Tin nhắn",
     unreadCount: "{n} chưa đọc",
     allCaughtUp: "Đã xem hết",
-    unreadUnavailable: "-",
+    unreadUnavailable: "—",
     prefsFooter: "Tùy chọn thông báo ở Cài đặt",
     // Card-binding push templates (FEAT-CARDS02; built by mock/card-notifications.ts —
     // production: backend events card.unbound / card.rebind_notified).

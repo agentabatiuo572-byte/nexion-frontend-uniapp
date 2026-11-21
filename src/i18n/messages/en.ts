@@ -1016,6 +1016,8 @@ trustReserve: "No verifiable reserve information available.",
       system: "System / compliance / regulatory",
     },
     notifFooter: "Disabling a category suppresses its notification center entries. Critical compliance notifications cannot be disabled.",
+    notifUnknown: "Not loaded",
+    notifUnavailable: "Notification settings haven't loaded yet. You can change them once they load.",
   },
 
   // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token(zh 的
@@ -1802,6 +1804,7 @@ chooseMethod: "Choose how to join the UVEL network",
     secExpired: "Expired vouchers",
     empty: "No rewards yet",
     emptyHint: "Claimed vouchers and activity rewards show up here.",
+    retainedTotals: "USDT and UVT rewards show the last confirmed amounts.",
     expiredBadge: "Expired",
     useCta: "Use",
     typeBonus: "Bonus",
@@ -5202,7 +5205,7 @@ openSeaErrorPool: {
     drawerTitle: "Messages",
     unreadCount: "{n} unread",
     allCaughtUp: "All caught up",
-    unreadUnavailable: "-",
+    unreadUnavailable: "—",
     prefsFooter: "Notification preferences in Settings",
     // Card-binding push templates (FEAT-CARDS02; built by mock/card-notifications.ts —
     // production: backend events card.unbound / card.rebind_notified).

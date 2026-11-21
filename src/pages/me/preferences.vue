@@ -42,14 +42,13 @@
       <!-- Notification kinds -->
       <view class="mx-4" style="margin-top: 20px">
         <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
-        <text v-if="!prefs.remoteReady && !prefs.error" class="block" role="status" aria-live="polite">{{ w.loading }}</text>
         <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
             :key="k"
             :label="w.notifKinds[k]"
             :value="prefs.remoteReady ? prefs.notifPrefs[k] : null"
-            :unknown-label="t.uiChrome.unavailable"
+            :unknown-label="w.notifUnknown"
             :last="i === notifKinds.length - 1"
             @toggle="saveNotificationPreference(k)"
           >
@@ -58,6 +57,8 @@
             </template>
           </ToggleRow>
         </view>
+        <!-- Until the server answers, the switches show "—"; one line under the card says why, so the card itself never moves (03 §3.4). -->
+        <text v-if="!prefs.remoteReady" class="block mx-1 pref-notif-status" role="status" aria-live="polite">{{ prefs.readFailedWithoutData ? w.notifUnavailable : w.loading }}</text>
         <text class="block mx-1" :style="footerStyle">{{ w.notifFooter }}</text>
       </view>
       <!-- #ifdef APP-PLUS -->
@@ -191,6 +192,7 @@ const footerStyle: CSSProperties = {
 <style src="@/styles/message-family.css"></style>
 
 <style scoped>
+.pref-notif-status { margin-top: var(--v5-space-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .push-settings-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 12px 14px; cursor: pointer; }
 .push-settings-row:active { opacity: .75; }
 .push-settings-icon { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; background: var(--v5-surface-2); color: var(--v5-brand); }

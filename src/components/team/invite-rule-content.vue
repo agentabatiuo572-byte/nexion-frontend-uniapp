@@ -5,7 +5,7 @@
         <template v-if="state === 'ready' || state === 'unavailable'">
           <text class="invite-rules__label">{{ copy.inviteRulePerFriend }}</text>
           <!-- An unconfirmed amount shows "—" and recovers on its own (03 §3.4); the steps below stay. -->
-          <text class="invite-rules__amount">{{ state === 'ready' ? `${formatAmount(rulePresentation!.amount)} UVT` : '—' }}</text>
+          <text class="invite-rules__amount">{{ state === 'ready' ? `${formatAmount(rulePresentation!.amount)}\u00a0UVT` : '—' }}</text>
         </template>
         <text v-else class="invite-rules__label">{{ loading ? t.team.rewardLoading : t.team.referralRewardsDisabled }}</text>
       </view>

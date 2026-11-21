@@ -22,6 +22,8 @@
         <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" :aria-label="buyLabel" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button nx-after-arrow">{{ buyText }}</text></view>
       </view>
     </view>
+    <!-- Retained credit after a failed read: the reason sits under the dimmed buy pill (03 §3.1, §3.4). -->
+    <text v-if="trial.lastReadFailed && presentation.displayReady.value && !presentation.actionsReady.value" class="trial-stage__reason">{{ copy.retainedCredit }}</text>
   </view>
 </template>
 
@@ -89,6 +91,7 @@ function goBuy() { if (presentation.actionsReady.value) goDetails(); }
 .trial-stage__label { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .trial-stage__value { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .trial-stage__note { position: relative; display: block; margin-top: 10px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); text-align: center; }
+.trial-stage__reason { position: relative; display: block; margin: calc(-1 * var(--v5-space-1)) 0 var(--v5-space-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); text-align: right; }
 .trial-stage__actions { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; margin-top: 6px; }
 .trial-stage__group { display: flex; gap: 8px; margin-left: auto; }
 /* 44px hit area; the visible glass pill stays a compact 32px. */

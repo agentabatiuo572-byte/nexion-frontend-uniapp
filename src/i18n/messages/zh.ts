@@ -999,6 +999,8 @@ trustReserve: "暂无可核验的储备资料。",
       system: "系统 / 合规 / 监管",
     },
     notifFooter: "禁用某类后,通知中心不再推送对应条目。关键合规通知不可禁用。",
+    notifUnknown: "未加载",
+    notifUnavailable: "通知设置暂未加载，加载后即可修改。",
   },
 
   // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token
@@ -1783,6 +1785,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     secExpired: "已过期优惠券",
     empty: "暂无奖励",
     emptyHint: "领取的优惠券和活动奖励会显示在这里。",
+    retainedTotals: "USDT、UVT 奖励为上次确认的金额",
     expiredBadge: "已过期",
     useCta: "去使用",
     typeBonus: "奖励",
@@ -5111,7 +5114,7 @@ openSeaErrorPool: {
     drawerTitle: "消息",
     unreadCount: "{n} 条未读",
     allCaughtUp: "全部已读",
-    unreadUnavailable: "-",
+    unreadUnavailable: "—",
     prefsFooter: "通知偏好设置在「设置」中",
     // Card-binding push templates (FEAT-CARDS02; built by mock/card-notifications.ts —
     // production: backend events card.unbound / card.rebind_notified).

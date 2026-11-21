@@ -22,7 +22,7 @@
 .message-center .message-subtitle { display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--v5-ink-2); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
 .message-center .message-mark-all { flex-shrink: 0; min-width: 44px; margin-left: auto; padding: 0; border-radius: 0; font-size: 12px; text-align: end; white-space: nowrap; }
 .message-center .message-summary-recovery { display: flex; justify-content: center; }
-.message-center .message-summary-recovery .message-button, .message-center .message-retry { width: 100%; padding: 0; color: var(--v5-brand); background: none; border: 0; box-shadow: none; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); }
+.message-center .message-summary-recovery .message-button { width: 100%; padding: 0; color: var(--v5-brand); background: none; border: 0; box-shadow: none; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); }
 @media (max-width:350px) { .message-center .message-heading-row { gap: 6px; } .message-center .message-title { font-size: 24px; line-height: 32px; } }
 .message-center .message-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); flex-shrink: 0; }
 .message-center .message-primary-inner { padding-top: 4px; }
@@ -53,6 +53,9 @@
 .message-center .notification-cta > .nx-liquid-glass { inset: 6px 0; }
 .message-center .message-state { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 0; font-size: 13px; line-height: 1.6; color: var(--v5-ink-3); text-align: center; }
 /* Nothing to show after the first read failed: the one sentence and 重新加载 sit in the middle of the feed (03 §3.4). */
+/* The one 重新加载 uses the shared recovery text button (03 §3.1); here it only sits centred under the sentence. */
+.message-center .message-state > .nx-card-recovery-action { margin: 0; align-self: center; }
+.message-center .message-state > .nx-card-recovery-action[aria-disabled="true"] { opacity: .5; pointer-events: none; }
 .message-center .notification-feed--failed { min-height: 100%; display: flex; flex-direction: column; justify-content: center; }
 .message-center .message-state--inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; text-align: start; }
 .message-center .message-state--inline > text { min-width: 0; overflow-wrap: anywhere; }
