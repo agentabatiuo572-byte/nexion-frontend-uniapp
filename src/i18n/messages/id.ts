@@ -264,7 +264,7 @@ export const id: Messages = {
     loading: "Memuat informasi terbaru",
     disabled: "Promo ini tidak tersedia",
     activityConflictNote: "Perangkat ini sedang memiliki beberapa promo, jadi kami belum dapat memilihkannya untuk Anda. Buka promo yang Anda inginkan dan beli dari halaman tersebut.",
-    disabledNote: "Penawaran ini belum terkonfirmasi tersedia. Lihat alasannya atau muat ulang.",
+    disabledNote: "Penawaran ini belum bisa dipakai untuk memesan. Tinjau penawaran terbaru atau ubah pilihan.",
     ordinary: "Lanjut tanpa promo",
     quick: "Akses cepat",
     devices: "Perangkat saya",

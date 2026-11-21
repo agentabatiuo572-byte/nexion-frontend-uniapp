@@ -264,7 +264,7 @@ export const fil: Messages = {
     loading: "Nilo-load ang bagong impormasyon",
     disabled: "Hindi available ang promo na ito",
     activityConflictNote: "May higit sa isang alok para sa device na ito, kaya hindi kami makapili para sa iyo. Buksan ang alok na gusto mo at doon bumili.",
-    disabledNote: "Hindi pa kumpirmadong available ang quote na ito. Tingnan ang dahilan o i-reload.",
+    disabledNote: "Hindi pa magagamit ang quote na ito sa pag-order. Suriin ang bagong quote o baguhin ang pinili.",
     ordinary: "Magpatuloy nang walang promo",
     quick: "Mabilisang access",
     devices: "Aking mga device",
