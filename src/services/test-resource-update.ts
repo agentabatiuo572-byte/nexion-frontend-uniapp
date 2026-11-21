@@ -25,11 +25,24 @@ interface ResourcePolicy extends ResourceFields {
 
 type Device = { platform: "android" | "ios"; build: number; resourceBuild?: number; hostPackage?: string };
 
+export function readHostPackage(platform: Device["platform"]): string | undefined {
+  try {
+    if (platform === "android") return String(plus.android.invoke(plus.android.runtimeMainActivity(), "getPackageName"));
+    const bundle = plus.ios.invoke("NSBundle", "mainBundle");
+    try { return String(plus.ios.invoke(bundle, "bundleIdentifier")); }
+    finally { plus.ios.deleteObject(bundle); }
+  } catch {
+    // Whole-package updates are still available when the native package name cannot be read.
+    return undefined;
+  }
+}
+
 export function verifiedResource(origin: string, platform: string, p: ResourcePolicy, device: Device): boolean {
   const debugHost = p.appId === "HBuilder" && platform === "android" && device.hostPackage === "io.dcloud.HBuilder"
     && p.minNativeBuild === 1532 && p.maxNativeBuild === 1532;
+  const productHost = p.appId === appId && device.hostPackage === "ai.uvel.app";
   if (origin.replace(/\/+$/, "") !== testResourceOrigin || p.updateType !== "resource" || p.minBuild !== 1
-      || platform !== device.platform || (!debugHost && p.appId !== appId) || plus.runtime.appid !== p.appId
+      || platform !== device.platform || (!debugHost && !productHost) || plus.runtime.appid !== p.appId
       || !/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(p.versionName)
       || !/^[0-9a-f]{64}$/.test(p.sha256) || !/^[0-9a-f]{128}$/.test(p.signature ?? "")
       || !Number.isSafeInteger(p.latestBuild) || p.latestBuild <= 0

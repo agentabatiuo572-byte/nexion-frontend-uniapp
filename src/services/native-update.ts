@@ -6,7 +6,7 @@ import { useAuth } from "@/store/auth";
 import { useLocaleStore } from "@/store/locale";
 import { serverLanguage, type ServerLanguage } from "@/i18n";
 import { updateCopy } from "@/i18n/native-update";
-import { installResource, verifiedResource, type ResourceFields } from "./test-resource-update";
+import { installResource, readHostPackage, verifiedResource, type ResourceFields } from "./test-resource-update";
 
 type Platform = "android" | "ios";
 type Copy = Record<ServerLanguage, string>;
@@ -69,9 +69,7 @@ async function readCurrent() {
     const resource = await new Promise<import("@/lib/app-version").ResourceVersion>(readNativeResourceVersion);
     const resourceBuild = Number(resource.versionCode);
     const device: Device = { platform: os === "Android" ? "android" : "ios", build, name: plus.runtime.version || String(build) };
-    if (os === "Android" && plus.runtime.appid === "HBuilder" && build === 1532) {
-      device.hostPackage = String(plus.android.invoke(plus.android.runtimeMainActivity(), "getPackageName"));
-    }
+    device.hostPackage = readHostPackage(device.platform);
     if (Number.isSafeInteger(resourceBuild) && resourceBuild > 0) device.resourceBuild = resourceBuild;
     installed.value = device;
     const key = cacheKey(device);
