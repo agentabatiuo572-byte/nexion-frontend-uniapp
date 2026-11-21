@@ -250,9 +250,9 @@
         <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
-        <text v-if="checkoutOutOfStock || checkoutCapacityBlocked" class="nx-tray-note w-full">{{ checkoutOutOfStock ? t.store.temporarilyOutOfStock : checkoutCapacityMessage }}</text>
+        <text v-if="checkoutTrayBlock" class="nx-tray-note w-full">{{ checkoutTrayBlock }}</text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
-        <NxButton variant="primary" :disabled="checkoutOutOfStock || checkoutCapacityBlocked || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
+        <NxButton variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
     </template>
     <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout" /></view></NxSheet>
@@ -487,9 +487,15 @@ const serverOrderRecovery = shallowRef<{ key: string; promise: Promise<boolean> 
 const originalOrderNavigationFailed = ref(false);
 const checkoutPurchaseChecking = computed(() => remoteApiEnabled && !createdCheckoutOrder.value
   && (serverOrderRecovery.value !== null || (!ordinaryCheckoutInitialized.value && !originalOrderNavigationFailed.value)));
-type PurchaseEligibilityResult = "eligible" | "ineligible" | "outOfStock" | "stale";
+type PurchaseEligibilityResult = "eligible" | "ineligible" | "outOfStock" | "productUnavailable" | "unavailable" | "stale";
 const checkoutStockRefused = ref(false);
-watch(productId, () => { checkoutStockRefused.value = false; });
+const eligibilityCatalogUnconfirmed = ref(false);
+const recoveredCreateRefusal = ref(false);
+watch(productId, () => {
+  checkoutStockRefused.value = false;
+  eligibilityCatalogUnconfirmed.value = false;
+  recoveredCreateRefusal.value = false;
+});
 let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
 const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
@@ -539,6 +545,8 @@ function isCurrentCheckoutRoute(scope: CheckoutRouteScope): boolean {
 
 function clearRemotePurchaseEligibility(): void {
   purchaseEligibilityRequestSequence += 1;
+  eligibilityCatalogUnconfirmed.value = false;
+  recoveredCreateRefusal.value = false;
   remotePurchaseEligibility.value = null;
   remotePurchaseEligibilityStatus.value = "idle";
 }
@@ -559,22 +567,38 @@ async function refreshCheckoutWallet(): Promise<void> {
 async function refreshPurchaseEligibility(scope = captureCheckoutRoute()): Promise<PurchaseEligibilityResult> {
   if (!remoteApiEnabled) return purchaseGate.value.blocked ? "ineligible" : "eligible";
   const sequence = ++purchaseEligibilityRequestSequence;
-  if (!isCurrentCheckoutRoute(scope)) return "stale";
+  const current = () => sequence === purchaseEligibilityRequestSequence && isCurrentCheckoutRoute(scope);
+  if (!current()) return "stale";
   remotePurchaseEligibilityStatus.value = "loading";
   try {
     const snapshot = await purchaseEligibilityApi.get(scope.productNo);
-    if (sequence !== purchaseEligibilityRequestSequence || !isCurrentCheckoutRoute(scope)) return "stale";
+    if (!current()) return "stale";
     remotePurchaseEligibility.value = snapshot;
     remotePurchaseEligibilityStatus.value = "ready";
+    eligibilityCatalogUnconfirmed.value = false;
     return snapshot.eligible ? "eligible" : "ineligible";
   } catch (error) {
-    if (sequence !== purchaseEligibilityRequestSequence || !isCurrentCheckoutRoute(scope)) return "stale";
+    if (!current()) return "stale";
     remotePurchaseEligibility.value = null;
     remotePurchaseEligibilityStatus.value = "error";
-    if (checkoutQuoteBlock(error) === 'outOfStock') {
-      checkoutStockRefused.value = true;
-      return "outOfStock";
+    if (isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
+      const ready = await settleProductCatalogRefresh(refreshProductCatalog(true));
+      if (!current()) return "stale";
+      if (ready) {
+        const listing = productCatalogPresentation.value?.products.find(entry => entry.id === scope.productNo);
+        if (!listing?.available) {
+          eligibilityCatalogUnconfirmed.value = false;
+          return "productUnavailable";
+        }
+        if (productOutOfStock(listing)) {
+          eligibilityCatalogUnconfirmed.value = false;
+          checkoutStockRefused.value = true;
+          return "outOfStock";
+        }
+      }
+      eligibilityCatalogUnconfirmed.value = true;
     }
+    if (eligibilityCatalogUnconfirmed.value) return "unavailable";
     return "ineligible";
   }
 }
@@ -595,6 +619,26 @@ function purchaseEligibilityFailureCopy(): string {
   return purchaseGate.value.soldOut
     ? t.value.store.gateSoldOutToast
     : t.value.store.gateBlockedToast;
+}
+
+function dropResumeInvoice(scope: CheckoutRouteScope): void {
+  if (!resumeSessionId) return;
+  // Keep the saved invoice available if the current product can no longer be bought.
+  if (pending.get(resumeSessionId)?.productId === scope.productNo) toast.warn(t.value.store.pendingResumeBlocked);
+  resumeSessionId = null;
+}
+
+function leaveUnavailableProduct(scope: CheckoutRouteScope, listing: Product | undefined): void {
+  dropResumeInvoice(scope);
+  if (listing) {
+    toast.info(t.value.store.releaseComingToast);
+    navTo("/store");
+    return;
+  }
+  const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.productUnavailable;
+  if (trialCheckoutSource) navBack("/pages/me/trial");
+  else navTo("/store");
+  setTimeout(() => { toast.info(unavailableCopy, undefined, 2600); }, 120);
 }
 
 let refusedCapacityTarget: string | null = null;
@@ -670,20 +714,8 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
     // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
     const pp = getProduct(routeScope.productNo);
-    // 三道跳转门任一命中且带 ?resume=:这张票在这个 SKU 上暂时付不了。**不销毁**它 —— 用户可能已经按地址转账,
-    // 静默删票 = 地址与金额从本地消失、资金孤儿化(审计 R9 P1;R3 曾为断「浮动条→门→弹回」循环而删票,方向反了)。
-    // 处置:票保留在册,明确告知「待支付订单已保留 / 已转账请联系客服」;到点自然作废,或用户从扫码步取消。
-    const dropResumeInvoice = () => {
-      if (!resumeSessionId) return;
-      if (pending.get(resumeSessionId)?.productId === routeScope.productNo) toast.warn(t.value.store.pendingResumeBlocked);
-      resumeSessionId = null;
-    };
     if (!pp) {
-      dropResumeInvoice();
-      const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.productUnavailable;
-      if (trialCheckoutSource) navBack("/pages/me/trial");
-      else navTo("/store");
-      setTimeout(() => { toast.info(unavailableCopy, undefined, 2600); }, 120);
+      leaveUnavailableProduct(routeScope, pp);
       return;
     }
     // The existing trade-in action can read a refused original before any new-purchase gate.
@@ -693,7 +725,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     }
     const trialConversion = trialQuoteAt(mockServerNow()).applied;
     if (!trialConversion && pp.purchaseBlocked && pp.purchaseBlockedReason !== "PRODUCT_OUT_OF_STOCK") {
-      dropResumeInvoice();
+      dropResumeInvoice(routeScope);
       toast.info(t.value.store.specUnavailable);
       navTo("/store");
       return;
@@ -703,22 +735,28 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       const mockEarlyWindow = pp.available === undefined && pp.unlocksAtPhase
         && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
       if (!mockEarlyWindow) {
-        dropResumeInvoice();
-        toast.info(t.value.store.releaseComingToast);
-        navTo("/store");
+        leaveUnavailableProduct(routeScope, pp);
         return;
       }
     }
     const eligibility = checkoutOutOfStock.value ? "outOfStock"
       : trialConversion ? "eligible" : await refreshPurchaseEligibility(routeScope);
     if (!isCurrentCheckoutRoute(routeScope) || eligibility === "stale") return;
+    if (eligibility === "productUnavailable") {
+      leaveUnavailableProduct(routeScope, product.value);
+      return;
+    }
     if (eligibility === "outOfStock") {
       if (resumeSessionId && resumePendingSession(resumeSessionId)) return;
       ordinaryCheckoutInitialized.value = true;
       return;
     }
+    if (eligibility === "unavailable" || (eligibility === "ineligible" && recoveredCreateRefusal.value)) {
+      ordinaryCheckoutInitialized.value = true;
+      return;
+    }
     if (eligibility === "ineligible") {
-      dropResumeInvoice();
+      dropResumeInvoice(routeScope);
       toast.info(purchaseEligibilityFailureCopy());
       if (resolvePurchaseEligibilityMessage(remotePurchaseEligibilityStatus.value, remotePurchaseEligibility.value) === "quotaDepleted") {
         navTo(`/pages/store/detail?id=${routeScope.productNo}`);
@@ -755,9 +793,24 @@ const product = computed<Product | undefined>(() => !productId.value || (remoteA
     ? productCatalogPresentation.value?.products.find((entry) => entry.id === productId.value)
     : getProduct(productId.value));
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
+function productOutOfStock(product: Product | undefined): boolean {
+  return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
+    || product?.inventoryMode === "FINITE" && product.stock === 0;
+}
 const checkoutOutOfStock = computed(() => !hasOriginalCheckout.value && !activeSession.value
-  && (checkoutStockRefused.value || product.value?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
-    || product.value?.inventoryMode === "FINITE" && product.value.stock === 0));
+  && (checkoutStockRefused.value || productOutOfStock(product.value)));
+const checkoutEligibilityBlock = computed(() => {
+  if (hasOriginalCheckout.value || activeSession.value) return "";
+  if (eligibilityCatalogUnconfirmed.value) return t.value.store.purchaseEligibilityError;
+  if (!recoveredCreateRefusal.value) return "";
+  switch (resolvePurchaseEligibilityMessage(remotePurchaseEligibilityStatus.value, remotePurchaseEligibility.value)) {
+    case "quotaDepleted": return t.value.store.purchaseEligibilityQuotaDepleted;
+    case "ineligible": return t.value.store.coCapacityPurchaseConditions;
+    case "error": return remotePurchaseEligibilityStatus.value === "error" || remotePurchaseEligibility.value?.eligible === false
+      ? t.value.store.purchaseEligibilityError : "";
+    default: return "";
+  }
+});
 // Hard purchase gate (等级门 + 锁额) — single source via usePurchaseGate.
 const { gate: purchaseGate } = usePurchaseGate(product);
 
@@ -1142,7 +1195,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   if (remoteApiEnabled && checkoutRouteInitialized && pageAlive && pageVisible) void initializeCheckout(beginCheckoutRoute());
 });
 async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): Promise<boolean | undefined> {
-  if (interceptFired || checkoutOutOfStock.value) return;
+  if (interceptFired || checkoutOutOfStock.value || checkoutEligibilityBlock.value) return;
   if (remoteApiEnabled && !foregroundReadAllowed()) {
     checkoutCapacityReadFailed.value = true;
     return;
@@ -1390,6 +1443,8 @@ const checkoutCapacityMessage = computed(() => checkoutCapacityTradeinRejection.
   : remoteCapacityGate.decision === "NO_ACTIVE_DEVICE" ? t.value.tradein.errNoActiveDevice
   : checkoutCapacityReadFailed.value ? t.value.store.coCapacityUnavailable
   : t.value.store.coCapacityChecking);
+const checkoutTrayBlock = computed(() => checkoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
+  : checkoutEligibilityBlock.value || (checkoutCapacityBlocked.value ? checkoutCapacityMessage.value : ""));
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
@@ -1451,7 +1506,7 @@ const stepLabels = computed(() => [
 ]);
 const stepDisplay = computed(() => ['confirmed','activating','live'].includes(step.value) ? 2 : ['pay-instructions','awaiting'].includes(step.value) ? 1 : 0);
 async function submitReview() {
-  if (checkoutOutOfStock.value || checkoutCapacityBlocked.value || pendingCreateUnresolved.value || checkoutPurchaseChecking.value || originalOrderNavigationFailed.value) return;
+  if (checkoutTrayBlock.value || pendingCreateUnresolved.value || checkoutPurchaseChecking.value || originalOrderNavigationFailed.value) return;
   const scope = captureCheckoutRoute();
   // A tap during a trial read waits for it, then goes on with fresh authority.
   if (trialQuoteUnavailable.value && !trialQuoteScreenUnavailable.value) {
@@ -2325,10 +2380,14 @@ async function readPendingCheckoutCreate() {
     createLookupUnavailable.value = false;
     step.value = 'select-payment';
     const failure = new ApiError({ kind: 'http', status: result.code, code: result.code, message: result.message });
-    const reason = isApiRefusal(failure, 409, 'PURCHASE_GATE_SOLD_OUT')
+    const outOfStock = isApiRefusal(failure, 409, 'PRODUCT_OUT_OF_STOCK');
+    recoveredCreateRefusal.value = !ordinaryCheckoutInitialized.value;
+    if (outOfStock) checkoutStockRefused.value = true;
+    const reason = outOfStock ? t.value.store.temporarilyOutOfStock
+      : isApiRefusal(failure, 409, 'PURCHASE_GATE_SOLD_OUT', 'F4B_MONTHLY_QUOTA_EXHAUSTED')
       ? t.value.store.purchaseEligibilityQuotaDepleted
       : isApiRefusal(failure, 403, 'PURCHASE_GATE_NOT_MET', 'PURCHASE_GATE_SOLD_OUT')
-        || isApiRefusal(failure, 409, 'PURCHASE_GATE_NOT_MET')
+        || isApiRefusal(failure, 409, 'PURCHASE_GATE_NOT_MET', 'F4B_REQUIREMENTS_NOT_MET')
         ? t.value.store.coCapacityPurchaseConditions
         : isApiRefusal(failure, 404, 'PRODUCT_NOT_AVAILABLE')
           ? t.value.store.coCapacityProductUnavailable
@@ -2410,8 +2469,9 @@ async function submitRemoteOrder(): Promise<void> {
   if (eligibility !== "eligible") {
     confirming = false;
     if (scopeIsCurrent() && eligibility !== "stale") {
-      if (eligibility !== "outOfStock") toast.warn(purchaseEligibilityFailureCopy());
       step.value = "select-payment";
+      if (eligibility === "productUnavailable") leaveUnavailableProduct(submissionScope, product.value);
+      else if (eligibility === "ineligible" && !checkoutEligibilityBlock.value) toast.warn(purchaseEligibilityFailureCopy());
     }
     return;
   }
@@ -2589,7 +2649,8 @@ async function submitRemoteOrder(): Promise<void> {
       retireRemoteOrderKey();
     }
     if (remoteTradeinRecoveryRequired.value) remoteTradeinRecoveryError.value = true;
-    if (!remoteTradeinRecoveryRequired.value && !canonicalOrderCommitted && checkoutQuoteBlock(apiError) === 'outOfStock') {
+    if (!remoteTradeinRecoveryRequired.value && !canonicalOrderCommitted
+        && (isApiRefusal(apiError, 409, 'PRODUCT_OUT_OF_STOCK') || checkoutQuoteBlock(apiError) === 'outOfStock')) {
       checkoutStockRefused.value = true;
     } else if (apiError.message === "ACCOUNT_COMMAND_STORAGE_UNAVAILABLE") {
       toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
@@ -2620,7 +2681,12 @@ function isTopCheckoutPage(): boolean {
   return !!checkoutPage && (top === checkoutPage || top?.$vm === checkoutPage);
 }
 const purchasePayment = usePurchasePayment();
-// Saved external payments the user can go back to; the payment layer covers the tray while it is open.
+useAutoRecovery({
+  failed: () => eligibilityCatalogUnconfirmed.value && !hasOriginalCheckout.value
+    && !promotionRoute.value && !checkoutLeaving.value && isTopCheckoutPage(),
+  retry: async () => { if (!activeCheckoutLoad) await initializeCheckout(beginCheckoutRoute()); },
+  repeatMs: 30_000,
+});
 useAutoRecovery({
   failed: () => remoteApiEnabled && pendingCreateUnresolved.value && !createLookupUnavailable.value
     && !paymentFlowBusy.value && !checkoutLeaving.value && isTopCheckoutPage(),
@@ -2642,6 +2708,7 @@ useAutoRecovery({
 });
 useAutoRecovery({
   // The recovery show hook runs before checkout sets pageVisible for this visit.
+  // Saved external payments the user can go back to; the payment layer covers the tray while it is open.
   failed: () => remoteApiEnabled && pageAlive && auth.isAuthenticated
     && isTopCheckoutPage() && !purchasePayment.state.open
     && purchasePayment.unsettledCheckoutPayments(!remoteTradeinRecoveryRequired.value).length > 0,

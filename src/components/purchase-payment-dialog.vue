@@ -336,7 +336,7 @@ const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
-const waitingOffline = computed(() => !appReadOnline.value || s.error);
+const waitingOffline = computed(() => !appReadOnline.value || s.disconnected);
 const waitTone = computed(() => waitingOffline.value || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
 const quoteStatus = computed(() => {
   const c = copy.value;

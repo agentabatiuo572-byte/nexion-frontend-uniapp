@@ -72,11 +72,17 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         return ok({...data,status:'SUCCEEDED',order:{orderNo,status:canonicalStatus,canonicalStatus,
           paymentStatus,orderStatus,activationStatus,amountUsdt,placedAt}});
       }
+      const input = request.postDataJSON();
+      // Hash the fixed order-create fields within the same owner and key scope as U-21.
+      const fingerprint = createHash('sha256').update(JSON.stringify([owner, entry?.key ?? trimmed,
+        input.orderNo ?? null, input.productId ?? null, input.productNo ?? null,
+        input.quantity ?? null, input.voucherId ?? null, input.promotionQuoteId ?? null])).digest('hex');
+      if (entry && entry.fingerprint !== fingerprint) return {status:409,message:'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',data:null};
       if (entry?.failure) return entry.failure;
       if (entry) return entry.receipt ? ok(entry.receipt) : {status:409,message:'IDEMPOTENCY_RESULT_UNKNOWN',data:null};
       const originalEpoch = epoch;
       const createdAt = new Date().toISOString();
-      const creating = {owner,key:trimmed,receipt:null,createdAt,updatedAt:createdAt};
+      const creating = {owner,key:trimmed,fingerprint,receipt:null,createdAt,updatedAt:createdAt};
       orderCreates.set(command, creating);
       try {
         if (delayCreate && delayCreate.scenario === state.scenarioEpoch) {
@@ -86,7 +92,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         if (state.scenarioEpoch !== originalEpoch || owner !== previewAccountId(state, headers)) {
           return {status:409,message:'PREVIEW_CREATE_SCOPE_CHANGED',data:null};
         }
-        creating.receipt = demoFixture(url,locale(),state,{...request,tracksOrderCreate:true});
+        creating.receipt = demoFixture(url,locale(),state,{...request,postDataJSON:()=>input,tracksOrderCreate:true});
         creating.updatedAt = new Date().toISOString();
         return ok(creating.receipt);
       } catch (error) {
