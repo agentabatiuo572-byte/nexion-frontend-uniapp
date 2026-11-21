@@ -1921,6 +1921,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     coCardHint: "即时 · 加收 {rate} 手续费",
     coSlotsFull:
       "{max} 个激活名额已用完，暂无法直接购买。请到设备仓库取消激活一台设备，或使用旧机置换后再购买。",
+    coVoucherBlocksReplace: "优惠券不能与旧机置换同时使用。",
     coCapacityChecking: "正在核对激活名额，请稍候。",
     coCapacityUnavailable: "暂时无法核对激活名额，请重试。",
     coCapacityProductUnavailable: "这款设备暂时无法购买，可稍后再试。",

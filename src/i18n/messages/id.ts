@@ -2377,6 +2377,7 @@ export const id: Messages = {
     coHintErc20: "15 mnt",
     coCardHint: "Instan · biaya +{rate}",
     coSlotsFull: "Semua {max} slot aktivasi terpakai. Untuk membeli perangkat lain, nonaktifkan satu di Inventaris perangkat atau gunakan opsi penggantian perangkat yang ada.",
+    coVoucherBlocksReplace: "Voucher tidak dapat digunakan bersamaan dengan penggantian perangkat yang ada.",
     coCapacityChecking: "Memeriksa slot aktivasi. Mohon tunggu.",
     coCapacityUnavailable: "Slot aktivasi belum dapat diperiksa. Coba lagi.",
     coCapacityProductUnavailable: "Perangkat ini belum dapat dibeli saat ini. Coba lagi nanti.",

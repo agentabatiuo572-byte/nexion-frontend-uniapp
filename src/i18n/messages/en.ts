@@ -1944,6 +1944,7 @@ chooseMethod: "Choose how to join the UVEL network",
     coCardHint: "Instant · +{rate} fee",
     coSlotsFull:
       "All {max} activation slots are in use. To buy another device, deactivate one in Device Inventory or use the existing device replacement option.",
+    coVoucherBlocksReplace: "A voucher can't be used together with device replacement.",
     coCapacityChecking: "Checking activation slots. Please wait.",
     coCapacityUnavailable: "Unable to check activation slots. Please retry.",
     coCapacityProductUnavailable: "This device isn't available to buy right now. Try again later.",

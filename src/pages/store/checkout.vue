@@ -142,11 +142,13 @@
             <view v-if="tradeinPlacementText" class="checkout-note"><text>{{ tradeinPlacementText }}</text></view>
             <view v-if="(checkoutOnboardingRequired && !freeTrial.hasPendingConversion()) || (checkoutCapacityRequired && !hasTradein && !remoteCapacityGate.canConfirm(false))" class="checkout-note checkout-note--warning" role="status" data-testid="checkout-capacity-notice" :data-capacity-refusal="checkoutCapacityRefusal">
               <text>{{ checkoutCapacityMessage }}</text>
+              <text v-if="hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED'" class="checkout-capacity-hint">{{ t.store.coVoucherBlocksReplace }}</text>
               <view class="checkout-capacity-actions">
                 <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.help.contactSupport" @click="navTo('/pages/support/messages')" />
                 <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
                 <NxButton v-if="checkoutCapacityRefusal && !remoteCapacityGate.pending && quantityReady" variant="text" size="small" :label="t.store.coBrowseOtherDevices" @click="goStore" />
                 <NxButton v-if="!hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" icon="chevron-right" :busy="reAddingTradein" @click="reAddTradein" />
+                <NxButton v-else-if="hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.promotion.noVoucher" :busy="voucherSelecting" @click="selectAutomaticVoucher(false)" />
                 <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
               </view>
             </view>
@@ -3236,6 +3238,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-3); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle); line-height:var(--ui-type-list-subtitle-lh); font-weight:600; color:var(--v5-ink-2); }
 .checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .checkout-note--warning { padding:10px 12px; border-radius:12px; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
+.checkout-capacity-hint { display:block; margin-top:4px; text-wrap:pretty; }
 .checkout-capacity-actions { display:flex; flex-wrap:wrap; gap:var(--v5-space-1) var(--v5-space-3); margin-top:6px; }
 .checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 12.5px/20px var(--font-v5); color:var(--v5-ink-3); text-align:center; }
 .checkout-legal-link { display:inline; color:var(--v5-brand); cursor:pointer; }

@@ -2377,6 +2377,7 @@ export const fil: Messages = {
     coHintErc20: "~15 min",
     coCardHint: "Agad · +{rate} fee",
     coSlotsFull: "Gamit na ang lahat ng {max} activation slot. Para makabili ng isa pang device, i-deactivate ang isa sa Imbentaryo ng device o gamitin ang opsyong palitan ang kasalukuyang device.",
+    coVoucherBlocksReplace: "Hindi maaaring gamitin ang voucher kasabay ng pagpapalit ng kasalukuyang device.",
     coCapacityChecking: "Sinusuri ang mga activation slot. Sandali lang.",
     coCapacityUnavailable: "Hindi masuri ang mga activation slot. Subukan ulit.",
     coCapacityProductUnavailable: "Hindi pa mabibili ang device na ito ngayon. Subukan ulit mamaya.",
