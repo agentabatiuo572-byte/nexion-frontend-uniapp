@@ -9,7 +9,11 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const receipts = new Map();
   const ok = data => ({status:200,message:'OK',data});
   const external = createPurchasePaymentPreviewFixture(state, locale);
-  const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || path === '/api/app/trade-in/capacity-replace' || external.handles(path);
+  const tradeinCommands = new Map([
+    ['/api/app/trade-in/submit', 'trade-in'],
+    ['/api/app/trade-in/capacity-replace', 'capacity-replace'],
+  ]);
+  const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || tradeinCommands.has(path) || external.handles(path);
   // A reset or scenario change starts a fresh account: replayed receipts and payment command receipts belong to the
   // old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
@@ -30,11 +34,12 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     external.sweep();
     for (const order of state.createdOrders ?? []) if (demoOrderTimedOut(order,state,Date.now())) Object.assign(order,demoTimedOutOrder);
     if (external.handles(path)) return external.handle(url, request);
-    if (path === '/api/app/trade-in/capacity-replace') {
+    const kind = tradeinCommands.get(path);
+    if (kind) {
       const fail = (status, message) => ({status,message,data:null});
       if (method !== 'POST') return fail(405,'METHOD_NOT_ALLOWED');
       if (!key) return fail(422,'IDEMPOTENCY_KEY_REQUIRED');
-      const kind = 'capacity-replace', command = kind + ':' + key, recorded = pin.commands.get(command);
+      const command = kind + ':' + key, recorded = pin.commands.get(command);
       if (recorded) return recorded.status === 'SUCCEEDED' ? ok(recorded.receipt) : fail(recorded.code,recorded.message);
       const authorization = pin.authorize(request.postDataJSON());
       if (authorization.status !== 200) return authorization;

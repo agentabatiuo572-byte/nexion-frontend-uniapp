@@ -24,7 +24,7 @@ type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: st
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged';
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged';
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
@@ -317,7 +317,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (error instanceof Error && error.message === 'PURCHASE_CONTEXT_CHANGED') { state.notice = 'changed'; return; }
     const cause = asApiError(error);
     const replacement = expected.kind === 'TRADE_IN' || expected.kind === 'CAPACITY_REPLACE';
-    const replacementRefusal = replacement && tradeinPaymentRejection(cause);
+    const replacementRefusal = replacement && tradeinPaymentRejection(cause, 'external');
     if (replacementRefusal) {
       if (expected.tradeinKey) releasePurchaseCallerRecord(accountKey, expected.kind, expected.tradeinKey);
       expected.onReplacementRefused?.(replacementRefusal);
@@ -399,7 +399,7 @@ async function submitOriginal() {
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
       const replacement = pending.kind === 'TRADE_IN' || pending.kind === 'CAPACITY_REPLACE';
-      const replacementRefusal = replacement && tradeinPaymentRejection(cause);
+      const replacementRefusal = replacement && tradeinPaymentRejection(cause, 'external');
       if (replacementRefusal) {
         // An existing intent is returned before the replacement precheck. This response ends the saved create attempt.
         releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);

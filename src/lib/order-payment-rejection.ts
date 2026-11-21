@@ -17,6 +17,11 @@ const REASONS = {
 const TRADEIN_REASONS = new Map<string, 'rejectTradeinBusy' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged'>([
   ['CAPACITY_REPLACEMENT_SOURCE_CHANGED', 'rejectCapacitySourceChanged'],
   ['SIMULATED_DEVICE_BUSY', 'rejectTradeinBusy'],
+  ['SIMULATED_RUNTIME_OWNER_CHANGED', 'rejectTradeinBusy'],
+  ['SIMULATED_RUNTIME_IDENTITY_CONFLICT', 'rejectTradeinBusy'],
+  ['SIMULATED_TASK_IDENTITY_CONFLICT', 'rejectTradeinBusy'],
+  ['SIMULATED_TASK_ALREADY_POSTED', 'rejectTradeinBusy'],
+  ['SIMULATED_TASK_CANCELLATION_CONFLICT', 'rejectTradeinBusy'],
   ['COMPUTE_V2_DEVICE_BUSY', 'rejectTradeinBusy'],
   ['COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED', 'rejectTradeinBusy'],
   ['COMPUTE_V2_OWNER_CHANGED', 'rejectTradeinOwner'],
@@ -28,9 +33,11 @@ export function tradeinRejectionKey(message?: string) {
   return message ? TRADEIN_REASONS.get(message) : undefined;
 }
 
-export function tradeinPaymentRejection(error: unknown) {
+export function tradeinPaymentRejection(error: unknown, entry: 'wallet' | 'external' = 'wallet') {
   const { message } = asApiError(error);
-  return isApiRefusal(error, 409, message) ? tradeinRejectionKey(message) : undefined;
+  if (!isApiRefusal(error, 409, message)) return undefined;
+  if (entry === 'external' && message === 'SIMULATED_DEVICE_BUSY') return 'rejectTradeinWalletOnly';
+  return tradeinRejectionKey(message);
 }
 
 /** The user-facing reason for a definitive payment refusal, or null when the outcome is not a known refusal. */

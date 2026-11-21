@@ -792,6 +792,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo);
       if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
     }
+    const sourceAssignment=read('/api/tasks/assignments').devices.find(device=>device.deviceId===quote.sourceDeviceId);
+    const currentTask=sourceAssignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true);
     if(!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
@@ -810,6 +812,12 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
       paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null};
     (state.createdOrders||=[]).unshift(order);
+    if(currentTask?.executionMode==='SIMULATED'&&currentTask.status==='RUNNING'){
+      const cancelledTask={...currentTask,status:'CANCELLED',rewardUsdt:0,rewardAmount:'0.000000'};
+      (state.cancelledReplacementAssignments??={})[quote.sourceDeviceId]={
+        ...sourceAssignment,currentTask:null,recentTasks:[cancelledTask,...sourceAssignment.recentTasks],simulationState:'STOPPED',
+      };
+    }
     const receipt={tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance};
     return replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);
   }

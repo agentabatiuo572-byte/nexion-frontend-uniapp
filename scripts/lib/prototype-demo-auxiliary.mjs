@@ -84,7 +84,9 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
         completableAt:completedAt??new Date(now+300000).toISOString(),completedAt,
         receiptNo:completed?sample.receiptNo:null,proofNonce:null,proofExpiresAt:null};
     };
-    return {...proof,serverCanonical:true,serverNow:iso,devices:devices.map(device=>{
+    const cancelledAssignments=v3?state.cancelledReplacementAssignments??{}:{};
+    const assignments=devices.map(device=>{
+      if(cancelledAssignments[device.id])return cancelledAssignments[device.id];
       const hasSample=device.id===settlement?.deviceId;
       const currentSample=hasSample?{...settlement,taskNo:'DEMO-TASK-4',durationSec:600}:null;
       if(currentSample?.simulation) {
@@ -96,7 +98,11 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
         recentTasks:hasSample?(settlement.simulation?settledTasks:[settlement]).map(sample=>task(sample,'COMPLETED')):[],
         ...(v3&&{phoneValidUntil:null,simulationState:currentSample&&device.activatedAt!==null?'CLOSING':'WAITING_CONFIG'}),
         ...(v2&&{recoveryPending:false,recoveryReason:null})};
-    }),...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})};
+    });
+    // Recycled devices leave the fleet, but their terminal task remains readable.
+    assignments.push(...Object.values(cancelledAssignments).filter(assignment=>
+      !devices.some(device=>device.id===assignment.deviceId)));
+    return {...proof,serverCanonical:true,serverNow:iso,devices:assignments,...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})};
   }
   if(p==='/api/tasks/v2/settlements'||p.startsWith('/api/tasks/v2/settlements/')) {
     const tasks=demoSettledTasks(state,state.previewFactsAt??now).filter(task=>task.batchNo);
