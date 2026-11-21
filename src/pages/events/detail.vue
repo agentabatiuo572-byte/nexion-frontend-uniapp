@@ -55,7 +55,7 @@ import { useT } from "@/i18n/use-t";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
-import { ApiError } from "@/api/errors";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { apiClient, eventsApi, remoteApiEnabled } from "@/api/runtime";
 import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { createEventDetailApi, type EventDetail } from "@/api/event-detail-api";
@@ -98,7 +98,7 @@ async function load() {
         commandError.value = false; unconfirmedAction = null;
       }
     }
-  } catch (cause) { if (current()) { error.value = true; if (!(cause instanceof ApiError && cause.kind === "network")) detail.value = null; } }
+  } catch (cause) { if (current()) { error.value = true; if (!isTransientReadFailure(cause)) detail.value = null; } }
   finally { if (current()) loading.value = false; }
 }
 async function run() {
