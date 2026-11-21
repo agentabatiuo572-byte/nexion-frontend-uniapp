@@ -104,7 +104,6 @@
           </view>
         </view>
         <text v-if="retireView.statusText" class="tis-disclaimer" role="status" :aria-busy="retireView.loading">{{ retireView.statusText }}</text>
-        <view v-if="retireView.retry" class="nx-card-recovery-action" role="button" tabindex="0" @click="retryRemoteRetireTargets" @keydown.enter.prevent="retryRemoteRetireTargets" @keydown.space.prevent="retryRemoteRetireTargets"><text>{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
@@ -113,8 +112,7 @@
       <!-- ─────────── 2. tradein — 置换确认(去结算) ─────────── -->
       <template v-else-if="state.kind === 'tradein' && purchaseRecovery !== 'none'">
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ t.tradein.recoveryPending }}</text></view>
-        <text v-if="purchaseRecovery === 'error'" class="tis-disclaimer" role="alert">{{ t.tradein.errPleaseRetry }}</text>
-        <view class="tis-cta" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
+        <view v-if="purchaseRecovery === 'pending'" class="tis-cta" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && remoteApiEnabled && purchaseMessage === 'error'">
@@ -435,7 +433,6 @@ const purchaseConfirmed = computed(() => !remoteApiEnabled || purchaseMessage.va
 const purchaseActionBusy = computed(() => confirming.value || remoteApiEnabled && (purchaseStatus.value === "loading" || !props.active));
 const purchaseActionDisabled = computed(() => purchaseActionBusy.value || remoteApiEnabled && purchaseMessage.value === "quotaDepleted");
 const purchaseActionText = computed(() => purchaseRecovery.value === "pending" ? t.value.tradein.purchaseResume
-  : purchaseRecovery.value === "error" ? t.value.store.purchaseEligibilityRetry
   : !remoteApiEnabled || purchaseMessage.value === "eligible"
   ? tradeinView.value?.ctaText ?? ""
   : purchaseStatus.value === "loading" || purchaseStatus.value === "idle" ? t.value.store.purchaseEligibilityLoading
@@ -454,11 +451,20 @@ function readTradeinRecovery(): "none" | "pending" | "error" {
   return purchaseRecovery.value;
 }
 
-useAutoRecovery({ failed: () => props.active && state.value.kind === "tradein" && purchaseReadFailed.value && purchaseStatus.value === "error", retry: refreshTradeinPurchaseEligibility });
-async function refreshTradeinPurchaseEligibility(): Promise<boolean> {
-  if (readTradeinRecovery() !== "none") return false;
+useAutoRecovery({
+  active: () => props.active && state.value.kind === "tradein",
+  failed: () => purchaseRecovery.value === "error"
+    || (purchaseRecovery.value === "none" && purchaseReadFailed.value && purchaseStatus.value === "error"),
+  retry: refreshTradeinPurchaseEligibility,
+  repeatMs: 30_000,
+});
+async function refreshTradeinPurchaseEligibility(recovery = readTradeinRecovery()): Promise<boolean> {
+  if (recovery !== "none" || !remoteApiEnabled || !purchaseMounted) return false;
   const key = purchaseScopeKey.value;
-  if (!remoteApiEnabled || !key || !purchaseMounted) return false;
+  if (!key) {
+    purchaseStatus.value = "error";
+    return false;
+  }
   const request = ++purchaseReadGeneration;
   const account = captureAccountScope();
   const origin = { ...apiRuntimeConfig };
@@ -505,8 +511,7 @@ watch([purchaseScopeKey, state, () => app.accountKey, () => app.accountBindingEp
   confirming.value = false;
   if (readTradeinRecovery() !== "none") { purchaseOpeningRead = null; return; }
   if (remoteApiEnabled && props.active && state.value.kind === "tradein") {
-    if (purchaseScopeKey.value) void refreshTradeinPurchaseEligibility();
-    else purchaseStatus.value = "error";
+    void refreshTradeinPurchaseEligibility("none");
   } else purchaseOpeningRead = null;
 }, { flush: "sync" });
 function restoreTradeinAfterConditions(): void {
@@ -792,15 +797,7 @@ async function loadRemoteRetireTargets() {
   if (!remoteApiEnabled || !props.active || !purchaseMounted || current.kind !== "retire") return;
   const config = canonicalTradeinConfig.value;
   const source = app.devices.find((device) => device.id === current.oldDeviceId);
-  if (!config || !source || productCatalogState.status !== "ready") {
-    remoteRetireEligibleTargets.value = new Set();
-    if (!config) void loadCanonicalTradeinConfig(true);
-    return;
-  }
-  if (!config.enabled) {
-    remoteRetireEligibleTargets.value = new Set();
-    return;
-  }
+  if (!config?.enabled || !source || productCatalogState.status !== "ready") return;
 
   const request = ++remoteRetireRequest;
   const requestScope = captureAccountScope();
@@ -812,6 +809,7 @@ async function loadRemoteRetireTargets() {
     && requestOrigin.environment === apiRuntimeConfig.environment && requestOrigin.baseUrl === apiRuntimeConfig.baseUrl;
   const paid = source.paidPriceUsdt ?? 0;
   const candidates = PRODUCTS.filter((product) => !config.requireHigherPrice || product.price > paid);
+  remoteRetireLoadError.value = false;
   remoteRetirePending.value = candidates.length > 0;
   await Promise.allSettled(candidates.map(async ({ id }) => {
     try {
@@ -819,7 +817,11 @@ async function loadRemoteRetireTargets() {
       if (!requestIsCurrent()) return;
       if (eligibility.targetProductNo !== id) { remoteRetireLoadError.value = true; return; }
       if (!eligibility.enabled || !eligibility.eligible || !eligibility.sources.some((candidate) => candidate.eligible
-        && candidate.sourceDeviceId === Number(current.oldDeviceId))) return;
+        && candidate.sourceDeviceId === Number(current.oldDeviceId))) {
+        remoteRetireEligibleTargets.value.delete(id);
+        remoteRetirePayables.value.delete(id);
+        return;
+      }
       remoteRetireEligibleTargets.value = new Set([...remoteRetireEligibleTargets.value, id]);
       // Each authorized row appears immediately. A pending/failed quote stays "—".
       const quote = await deviceE3Api.quote(Number(current.oldDeviceId), id);
@@ -843,18 +845,22 @@ async function loadRemoteRetireTargets() {
   }
 }
 
-function retryRemoteRetireTargets() {
-  if (!remoteApiEnabled || !props.active || !purchaseMounted || state.value.kind !== "retire" || remoteRetirePending.value) return;
-  if (!canonicalTradeinConfig.value || productCatalogState.status !== "ready") {
-    if (!canonicalTradeinConfig.value) void loadCanonicalTradeinConfig(true);
-    if (productCatalogState.status !== "ready") void refreshProductCatalog();
-    return;
-  }
-  remoteRetireEligibleTargets.value = new Set();
-  remoteRetirePayables.value = new Map();
-  remoteRetireLoadError.value = false;
-  void loadRemoteRetireTargets();
-}
+useAutoRecovery({
+  active: () => remoteApiEnabled && props.active && state.value.kind === "retire",
+  failed: () => canonicalTradeinConfigStatus.value === "error" || productCatalogState.status === "error"
+    || (!remoteRetirePending.value && remoteRetireLoadError.value),
+  async retry() {
+    if (remoteRetireLoadError.value && !remoteRetirePending.value) {
+      await loadRemoteRetireTargets();
+      return;
+    }
+    await Promise.all([
+      canonicalTradeinConfigStatus.value === "error" ? loadCanonicalTradeinConfig(true) : undefined,
+      productCatalogState.status === "error" ? refreshProductCatalog() : undefined,
+    ]);
+  },
+  repeatMs: 30_000,
+});
 
 watch([remoteRetireLoadKey, state], () => {
   remoteRetireRequest++;
@@ -873,7 +879,7 @@ const retireView = computed(() => {
     const failed = productCatalogState.status === "error" || canonicalTradeinConfigStatus.value === "error";
     return {
       subtitle: failed ? t.value.store.purchaseEligibilityError : t.value.store.purchaseEligibilityLoading,
-      targets: [], loading: !failed, retry: failed, statusText: "",
+      targets: [], loading: !failed, statusText: "",
     };
   }
   const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
@@ -908,7 +914,6 @@ const retireView = computed(() => {
       : remoteApiEnabled && remoteRetirePending.value ? t.value.store.purchaseEligibilityLoading
       : remoteApiEnabled && remoteRetireLoadError.value ? t.value.store.purchaseEligibilityError : t.value.tradein.retireNoTargets,
     targets, loading: remoteApiEnabled && remoteRetirePending.value,
-    retry: remoteApiEnabled && !remoteRetirePending.value && remoteRetireLoadError.value,
     statusText: !remoteApiEnabled || !targets.length ? "" : remoteRetirePending.value ? t.value.store.purchaseEligibilityLoading
       : remoteRetireLoadError.value ? t.value.store.purchaseEligibilityError : "",
   };
