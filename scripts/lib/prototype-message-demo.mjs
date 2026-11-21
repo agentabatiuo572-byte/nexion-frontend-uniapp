@@ -31,14 +31,14 @@ export function createPrototypeMessages({state,fixtureFor}) {
         if(transfer?.key===key&&!transfer.committed)return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
         const clearance=state.supportClearCommands?.find(row=>row.accountId===supportAccountId(state)&&row.key===key);
         if(clearance)return ok({resultType:'CONVERSATION_USER_CLEAR',result:structuredClone(clearance.result)});
-        if(!saved) {
-          const command=state.supportMessageCommands?.find(row=>row.key===key);
-          const detail=command&&state.supportConversations?.find(row=>row.conversation.conversationNo===command.conversationNo);
-          return ok(detail?{resultType:'CONVERSATION',result:supportUserView(state,detail)}:null);
+        const conversationNo=saved?.result?.conversation.conversationNo
+          ??state.supportMessageCommands?.find(row=>row.key===key)?.conversationNo;
+        if(conversationNo) {
+          const detail=state.supportConversations?.find(row=>row.conversation.conversationNo===conversationNo);
+          return detail?ok({resultType:'conversation',result:supportUserView(state,detail)}):fail(404,'CONVERSATION_NOT_FOUND');
         }
-        if(saved?.scenario==='timeout'&&!saved.result)await delay(4000);
-        // Keep the uncertain outcome visible until an explicit retry of the original command.
-        return ok(saved?.result&&!saved.hidden?{resultType:'CONVERSATION',result:supportUserView(state,saved.result)}:null);
+        if(!saved)return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
+        return fail(409,saved.response?'SUPPORT_COMMAND_FAILED_RETRYABLE':'SUPPORT_COMMAND_IN_PROGRESS');
       }
       const match=commandPath.exec(url.pathname);
       if(!match||request.method()!=='POST')return fail(422,'该演示操作尚未配置');
@@ -59,10 +59,9 @@ export function createPrototypeMessages({state,fixtureFor}) {
         const saved=receipts.get(key);
         if(saved.fingerprint!==fingerprint)return fail(409,'消息请求标识已被使用');
         await saved.pending;
-        saved.hidden=false;
         return saved.result?ok(supportUserView(state,saved.result)):structuredClone(saved.response);
       }
-      const saved={fingerprint,scenario:state.messageSendState,hidden:operation!=='read'&&['unknown','timeout'].includes(state.messageSendState)};
+      const saved={fingerprint};
       const epoch=generation,scenario=state.messageSendState||'normal';
       const execute=async()=>{
         if(operation!=='read'&&scenario==='delayed')await delay(2000);
@@ -87,9 +86,8 @@ export function createPrototypeMessages({state,fixtureFor}) {
       });
       await saved.pending;
       if(operation!=='read'&&scenario==='unknown'&&saved.response.status===200) {
-        saved.hidden=true;
-        // A lost acknowledgement leaves the client uncertain despite the saved result.
-        return {...fail(504,'发送结果待确认，请重试原消息'),deliveryUnknown:true};
+        // Lose the acknowledgement while leaving the recorded receipt readable.
+        return {...fail(504,'SUPPORT_COMMAND_RESULT_UNKNOWN'),deliveryUnknown:true};
       }
       return saved.result?ok(supportUserView(state,saved.result)):structuredClone(saved.response);
     },

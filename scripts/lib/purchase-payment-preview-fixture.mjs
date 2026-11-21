@@ -119,7 +119,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (intent.kind === 'TRIAL_CONVERT') return deliverTrial(intent);
     // Trade-in and capacity fixtures cover open, unknown and rejected commands. Their
     // business delivery/fleet mutation is not simulated here.
-    if (intent.kind !== 'ORDER_PAY') throw Object.assign(new Error('PURCHASE_PAYMENT_DELIVERY_NOT_MODELED'), {status:503});
+    if (intent.kind !== 'ORDER_PAY') return Object.assign(intent, {status: 'FUNDS_CONFIRMED'});
     const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
     // Delivery needs the order; funds for an order that cannot be found never become a success.
     if (!order) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
@@ -145,7 +145,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, payloadKey, pricingAt, paidAt, ...row} = advance(intent), open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, payloadKey, pricingAt, paidAt, ...row} = intent, open = Date.now() < deadline;
     const networkEnabled = networkGate(row.paymentMethod) === null;
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
@@ -154,7 +154,6 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
     if (!intent) return null;
     if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
-    advance(intent);
     const original = {kind, commandKey: key, canResumeSameKey: false};
     const receipt = intent.receipt;
     if (receipt != null) {
@@ -167,10 +166,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return {...original, status: intent.status === 'DELIVERED' ? 'INDETERMINATE' : 'PROCESSING',
       message: intent.reason ?? 'PURCHASE_PAYMENT_PROCESSING'};
   }
-  // The server's own observation of open order payments, so an order read follows them without the App polling.
-  function sweep() {
+  // The preview server observes providers independently of order, intent and receipt reads.
+  function observePayments() {
     sync();
-    for (const intent of intents.values()) if (intent.kind === 'ORDER_PAY') advance(intent);
+    for (const intent of intents.values()) advance(intent);
   }
   // AppOrderCommandService refuses a wallet pay or a cancel while an order's external payment is open.
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
@@ -300,5 +299,5 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return handle(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}));
   }
-  return {handles, handle, paymentCommand, sweep, openOrderPayment, seedRemoteOrderPayment};
+  return {handles, handle, paymentCommand, observePayments, openOrderPayment, seedRemoteOrderPayment};
 }

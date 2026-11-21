@@ -30,8 +30,6 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     if (path.startsWith('/api/app/security/payment-password') || path.startsWith('/api/app/payment-commands/')) return pin.handle(url, request);
     if (method === 'GET' && path.startsWith('/api/app/purchase-payment-intents/by-order/')) return external.handle(url, request);
-    // Model the server's payment observer and deadline task in this isolated fixture, not in product code.
-    external.sweep();
     for (const order of state.createdOrders ?? []) if (demoOrderTimedOut(order,state,Date.now())) Object.assign(order,demoTimedOutOrder);
     if (external.handles(path)) return external.handle(url, request);
     const kind = tradeinCommands.get(path);
@@ -105,5 +103,5 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     return ok(demoFixture(url,locale(),state,request));
   }
-  return {handles,handle,pin,seedRemoteOrderPayment:external.seedRemoteOrderPayment};
+  return {handles,handle,pin,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments};
 }
