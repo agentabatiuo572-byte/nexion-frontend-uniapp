@@ -1,8 +1,7 @@
 import type { CreateOrderRequest, OrderCreateCommand } from '@/api/order-api';
 import { readAccountRow, writeAccountRow } from '@/store/account-scoped-storage';
 
-export const CHECKOUT_CREATE_TABLE = 'uvel-checkout-create-recovery-v1';
-const KEY = CHECKOUT_CREATE_TABLE;
+const KEY = 'uvel-checkout-create-recovery-v1';
 export interface PendingCheckoutCreate {
   request: CreateOrderRequest;
   intent: string;

@@ -1,8 +1,8 @@
 <!-- Checkout review presentation. Transaction quotes, confirmation and recovery remain server-authoritative. -->
 <template>
-  <AppChassis active="store">
+  <AppChassis ref="checkoutChassis" active="store">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
-    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
+    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :read-capacity-recovery="readCapacityRecoveryInReview">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
       </template>
@@ -14,7 +14,7 @@
       </view>
       <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : purchaseRecoveryCopy(locale.code).original }}</text>
-        <NxButton :label="t.tradein.keepRecoveryAction" @click="recoverCapacityBeforePurchase([keepCheckoutTarget])" />
+        <NxButton v-if="!foregroundCapacityTarget || foregroundCapacityResumable" :label="t.tradein.keepRecoveryAction" @click="recoverCapacityBeforePurchase([keepCheckoutTarget])" />
       </view>
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);white-space:pre-line;text-wrap:pretty">{{ t.tradein.recoveryChecking }}</text>
@@ -280,10 +280,9 @@ import { useConversations } from '@/store/conversations';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
-import { foregroundReadAllowed } from "@/lib/foreground-read";
+import { documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
-import { CAPACITY_RECOVERY_TABLE, readCapacityPending } from '@/lib/capacity-command-recovery';
-import { CHECKOUT_FLEET_TABLE } from '@/lib/checkout-fleet-change';
+import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { checkoutQuoteBlock, validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
 import { takeNavigationQuery } from '@/lib/route';
 import { promotionCheckoutHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
@@ -307,9 +306,9 @@ import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
-import { acquireAccountCommandKey, readAccountRow, readAccountStorageEventRow, writeAccountRow } from "@/store/account-scoped-storage";
-import { CHECKOUT_ORDER_TABLE, rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
-import { CHECKOUT_CREATE_TABLE, readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
+import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { readCheckoutOrderPointer, rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
+import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
 import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
@@ -332,7 +331,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -379,17 +378,19 @@ const locale = useLocaleStore();
 const flowCopy = computed(() => checkoutFlowCopy(locale.code));
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
+const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
 const confirmedMissingCreateKey = ref<string | null>(null);
 const createLookupUnavailable = ref(false);
 const pendingCreateFound = ref(false);
-const pendingCreateUnresolved = computed(() => !!pendingCheckoutCreate.value && !createdCheckoutOrder.value
-  && pendingCheckoutCreate.value.request.idempotencyKey !== confirmedMissingCreateKey.value);
+const pendingCreateUnresolved = computed(() => !createdCheckoutOrder.value
+  && (!!pendingCreatePointer.value || (!!pendingCheckoutCreate.value
+    && pendingCheckoutCreate.value.request.idempotencyKey !== confirmedMissingCreateKey.value)));
 const pendingCreateDescription = computed(() => originalOrderNavigationFailed.value
   ? (pendingCreateFound.value ? t.value.store.coPendingCreateFound : t.value.store.coOriginalOrderOpenHint)
   : (createLookupUnavailable.value ? t.value.store.coResubmitOrderHint : t.value.store.coPendingCreateChecking));
 // A definitive server refusal of this payment: shown with its reason and a cancel-order exit.
 const paymentBlocked = ref('');
-const hasOriginalCheckout = computed(() => !!createdCheckoutOrder.value || !!pendingCheckoutCreate.value);
+const hasOriginalCheckout = computed(() => !!createdCheckoutOrder.value || !!pendingCheckoutCreate.value || !!pendingCreatePointer.value);
 const purchasePolicyOpen = ref(false);
 function openCheckoutLegal(kind: 'aftersales' | 'terms') {
   if (kind === 'aftersales') purchasePolicyOpen.value = true;
@@ -497,10 +498,12 @@ type CheckoutLoadMode = "entry" | "read-only";
 const checkoutStockRefused = ref(false);
 const eligibilityCatalogUnconfirmed = ref(false);
 const recoveredCreateRefusal = ref(false);
+const foregroundEligibilityBlocked = ref(false);
 watch(productId, () => {
   checkoutStockRefused.value = false;
   eligibilityCatalogUnconfirmed.value = false;
   recoveredCreateRefusal.value = false;
+  foregroundEligibilityBlocked.value = false;
 });
 let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
@@ -553,6 +556,7 @@ function clearRemotePurchaseEligibility(): void {
   purchaseEligibilityRequestSequence += 1;
   eligibilityCatalogUnconfirmed.value = false;
   recoveredCreateRefusal.value = false;
+  foregroundEligibilityBlocked.value = false;
   remotePurchaseEligibility.value = null;
   remotePurchaseEligibilityStatus.value = "idle";
 }
@@ -570,7 +574,7 @@ async function refreshCheckoutWallet(): Promise<void> {
 }
 
 /** A stale response is not a denial and must not drive a navigation or mutation. */
-async function refreshPurchaseEligibility(scope = captureCheckoutRoute()): Promise<PurchaseEligibilityResult> {
+async function refreshPurchaseEligibility(scope = captureCheckoutRoute(), refreshCatalogOnMissing = true): Promise<PurchaseEligibilityResult> {
   if (!remoteApiEnabled) return purchaseGate.value.blocked ? "ineligible" : "eligible";
   const sequence = ++purchaseEligibilityRequestSequence;
   const current = () => sequence === purchaseEligibilityRequestSequence && isCurrentCheckoutRoute(scope);
@@ -587,7 +591,7 @@ async function refreshPurchaseEligibility(scope = captureCheckoutRoute()): Promi
     if (!current()) return "stale";
     remotePurchaseEligibility.value = null;
     remotePurchaseEligibilityStatus.value = "error";
-    if (isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
+    if (refreshCatalogOnMissing && isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
       const ready = await settleProductCatalogRefresh(refreshProductCatalog(true));
       if (!current()) return "stale";
       if (ready) {
@@ -648,7 +652,7 @@ function leaveUnavailableProduct(scope: CheckoutRouteScope, listing: Product | u
 }
 
 let refusedCapacityTarget: string | null = null;
-function recoverCapacityBeforePurchase(targets: string[], explicit = false): boolean {
+function recoverCapacityBeforePurchase(targets: string[], explicit = false, showRecovery = true): boolean {
   refusedCapacityTarget = null;
   keepCheckoutRecovery.value = null;
   if (!remoteApiEnabled) return false;
@@ -669,7 +673,7 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false): boo
     catch { /* A failed read still blocks a new purchase. */ }
     keepCheckoutRecovery.value = { target, accountKey, commandKey };
     productId.value = target;
-    tradein.showKeepRecovery(target as DeviceKind);
+    if (showRecovery) tradein.showKeepRecovery(target as DeviceKind);
     return true;
   }
   return false;
@@ -812,7 +816,7 @@ const checkoutOutOfStock = computed(() => !hasOriginalCheckout.value && !activeS
 const checkoutEligibilityBlock = computed(() => {
   if (hasOriginalCheckout.value || activeSession.value) return "";
   if (eligibilityCatalogUnconfirmed.value) return t.value.store.purchaseEligibilityError;
-  if (!recoveredCreateRefusal.value) return "";
+  if (!recoveredCreateRefusal.value && !foregroundEligibilityBlocked.value) return "";
   switch (resolvePurchaseEligibilityMessage(remotePurchaseEligibilityStatus.value, remotePurchaseEligibility.value)) {
     case "quotaDepleted": return t.value.store.purchaseEligibilityQuotaDepleted;
     case "ineligible": return t.value.store.coCapacityPurchaseConditions;
@@ -1178,6 +1182,10 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   orderId.value = null;
   createdCheckoutOrder.value = null;
   pendingCheckoutCreate.value = null;
+  pendingCreatePointer.value = null;
+  foregroundCapacityTarget.value = null;
+  foregroundTradeinSignature = null;
+  foregroundPaymentSignature = null;
   confirmedMissingCreateKey.value = null;
   createLookupUnavailable.value = false;
   pendingCreateFound.value = false;
@@ -1205,7 +1213,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   // initializeCheckout still recovers an original command before new quotes.
   if (remoteApiEnabled && checkoutRouteInitialized && pageAlive && pageVisible) void initializeCheckout(beginCheckoutRoute());
 });
-async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): Promise<boolean | undefined> {
+async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'foreground' = 'review'): Promise<boolean | undefined> {
   if (interceptFired || checkoutOutOfStock.value || checkoutEligibilityBlock.value) return;
   if (remoteApiEnabled && !foregroundReadAllowed()) {
     checkoutCapacityReadFailed.value = true;
@@ -1222,7 +1230,7 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): 
   const kind = p.id as DeviceKind;
   if (tradein.appliedTradein?.targetKind === kind) return;
   if (remoteApiEnabled) {
-    if (checkoutOnboardingRequired.value) return;
+    if (checkoutOnboardingRequired.value && mode !== "foreground") return;
     if (remoteCapacityGate.pending) return checkoutCapacityRead ?? undefined;
     const requestScope = captureCheckoutRoute();
     checkoutCapacityRefusal.value = null;
@@ -1244,6 +1252,7 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): 
     ).then(async (quote) => {
       if (!isCurrentCheckoutRoute(requestScope)) return;
       checkoutCapacityReadFailed.value = false;
+      checkoutOnboardingRequired.value = false;
       checkoutCapacityTradeinRejection.value = undefined;
       if (mode === 'interactive' && hasVoucher.value) return;
       const sourceIds = eligibility?.sources.filter((source) => source.eligible)
@@ -1259,6 +1268,7 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): 
         return true;
       }
       if (quote.decision === "NO_ACTIVE_DEVICE") {
+        if (mode === "foreground") return;
         await handleNoActiveDeviceDecision({
           notify: () => {
             if (isCurrentCheckoutRoute(requestScope)) toast.warn(t.value.tradein.errNoActiveDevice);
@@ -2393,9 +2403,20 @@ async function navigateOriginalCheckoutOrder(url: string, scope: CheckoutRouteSc
 
 async function readPendingCheckoutCreate() {
   const pending = pendingCheckoutCreate.value;
+  const pointer = pendingCreatePointer.value;
   const scope = captureCheckoutRoute();
-  if (!pending || !isCurrentCheckoutRoute(scope) || !isTopCheckoutPage() || !foregroundReadAllowed()) return;
-  const result = await orderApi.createCommand(pending.request.idempotencyKey);
+  if ((!pending && !pointer) || !isCurrentCheckoutRoute(scope) || !isTopCheckoutPage() || !foregroundReadAllowed()) return;
+  const result = await orderApi.createCommand(pending?.request.idempotencyKey ?? pointer!.commandKey);
+  if (!pending) {
+    if (!pointer || pendingCreatePointer.value !== pointer || !isCurrentCheckoutRoute(scope)
+        || !isTopCheckoutPage() || !foregroundReadAllowed()) return;
+    if (result.status === "SUCCEEDED" && result.orderNo === pointer.orderNo) {
+      pendingCreatePointer.value = null;
+      pendingCreateFound.value = true;
+      await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(result.orderNo)}&readback=1`, scope);
+    } else if (result.status === "FAILED" || result.status === "NOT_FOUND") pendingCreatePointer.value = null;
+    return;
+  }
   if (!isCurrentCheckoutRoute(scope) || !isTopCheckoutPage() || !foregroundReadAllowed()
       || pendingCheckoutCreate.value?.request.idempotencyKey !== pending.request.idempotencyKey) return;
   if (result.status === 'UNAVAILABLE') {
@@ -2438,7 +2459,7 @@ async function readPendingCheckoutCreate() {
     forgetCheckoutCreate(scope.accountKey, pending);
     pendingCheckoutCreate.value = null;
     pendingCreateFound.value = true;
-    await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(result.orderNo)}`, scope);
+    await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(result.orderNo)}&readback=1`, scope);
   }
 }
 
@@ -2720,6 +2741,37 @@ function isTopCheckoutPage(): boolean {
   return !!checkoutPage && (top === checkoutPage || top?.$vm === checkoutPage);
 }
 const purchasePayment = usePurchasePayment();
+const checkoutChassis = ref<{ readCapacityRecoveryInReview(target: string): Promise<boolean> } | null>(null);
+const foregroundCapacityTarget = ref<string | null>(null);
+const foregroundCapacityResumable = ref(false);
+const foregroundCapacityReading = ref(false);
+let foregroundTradeinSignature: string | null = null;
+let foregroundPaymentSignature: string | null = null;
+
+function readCapacityRecoveryInReview(target: string) {
+  return checkoutChassis.value?.readCapacityRecoveryInReview(target) ?? Promise.resolve(false);
+}
+async function recoverForegroundCapacity() {
+  const target = foregroundCapacityTarget.value;
+  if (!target || foregroundCapacityReading.value || !foregroundReadAllowed()) return;
+  const scope = captureCheckoutRoute();
+  foregroundCapacityReading.value = true;
+  try {
+    const canResume = await readCapacityRecoveryInReview(target);
+    if (!isCurrentCheckoutRoute(scope)) return;
+    foregroundCapacityResumable.value = canResume;
+    if (!recoverCapacityBeforePurchase([target], false, false)) {
+      foregroundCapacityTarget.value = null;
+      await retryCheckoutCapacity();
+    }
+  } finally { foregroundCapacityReading.value = false; }
+}
+useAutoRecovery({
+  failed: () => !!foregroundCapacityTarget.value && !foregroundCapacityReading.value
+    && !foregroundCapacityResumable.value && isTopCheckoutPage(),
+  retry: recoverForegroundCapacity,
+  repeatMs: 30_000,
+});
 const stopCheckoutCapacityRelease = onPurchaseRecordReleased((accountKey, commandKey) => {
   const recovery = keepCheckoutRecovery.value;
   if (recovery?.accountKey !== accountKey || recovery.commandKey !== commandKey) return;
@@ -2780,7 +2832,7 @@ useAutoRecovery({
   repeatMs: 15_000,
 });
 watch(foregroundReadAllowed, allowed => {
-  if (allowed && pageVisible && checkoutRouteInitialized && !promotionRoute.value) void freeTrial.refreshVisible();
+  if (allowed && pageVisible && checkoutRouteInitialized && !promotionRoute.value && !checkoutBrowserReturning()) void freeTrial.refreshVisible();
 });
 let tradeinMirror: NonNullable<typeof tradein.appliedTradein> | null = null;
 watch(() => tradein.appliedTradein, (v) => {
@@ -2845,85 +2897,110 @@ function showCheckout() {
   restoreReceiptRecovery();
 }
 
+function checkoutBrowserReturning(): boolean {
+  // #ifdef H5
+  return checkoutDocumentHidden;
+  // #endif
+  // #ifndef H5
+  return false;
+  // #endif
+}
+
 // #ifdef H5
 let checkoutHistoryEntry: { href: string; position: number | undefined } | null = null;
 let checkoutShownFromHistory = false;
-type CheckoutSync = { scope: CheckoutRouteScope; orderNo?: string; recovery?: boolean; capacity?: boolean };
-type CheckoutOrderEventRow = { orders?: Record<string, Partial<CheckoutTradeinRecovery>> };
-type CheckoutCreateEventRow = { creates?: Record<string, unknown> };
-const checkoutSync = shallowRef<CheckoutSync | null>(null);
-let checkoutSyncInFlight = false;
+const FOREGROUND_CHECKOUT_INTERVAL = 30_000;
+let checkoutDocumentHidden = false;
+let foregroundReadAt = -Infinity;
+let foregroundReadTimer: ReturnType<typeof setTimeout> | undefined;
+let foregroundReadInFlight = false;
 
-function onCheckoutStorage(event: StorageEvent) {
-  if (!remoteApiEnabled || !pageVisible || !checkoutRouteInitialized || promotionRoute.value
-      || event.storageArea !== window.localStorage || event.oldValue === event.newValue) return;
+function pauseForegroundCheckout() {
+  clearTimeout(foregroundReadTimer);
+  foregroundReadTimer = undefined;
+}
+
+function refreshForegroundCheckout() {
+  if (!remoteApiEnabled || !pageVisible || !pageAlive || !foregroundReadAllowed()) return;
+  const wait = FOREGROUND_CHECKOUT_INTERVAL - (Date.now() - foregroundReadAt);
+  if (wait > 0) {
+    foregroundReadTimer ??= setTimeout(() => {
+      foregroundReadTimer = undefined;
+      refreshForegroundCheckout();
+    }, wait);
+    return;
+  }
+  const promotion = promotionCheckout.value;
+  if (promotionRoute.value) {
+    if (promotion?.refreshForegroundReview()) foregroundReadAt = Date.now();
+    return;
+  }
+  if (!checkoutRouteInitialized || activeCheckoutLoad || foregroundReadInFlight || paymentFlowBusy.value
+      || checkoutLeaving.value || purchasePayment.state.open || settledResultReplay.value) return;
+  foregroundReadAt = Date.now();
+  foregroundReadInFlight = true;
+  void refreshForegroundOrdinaryCheckout().catch(() => {
+    // Existing command and page read recovery handle unavailable storage or authority.
+  }).finally(() => { foregroundReadInFlight = false; });
+}
+
+async function refreshForegroundOrdinaryCheckout() {
   const scope = captureCheckoutRoute();
-  const change: CheckoutSync = { scope };
-  switch (event.key) {
-    case CHECKOUT_ORDER_TABLE: {
-      const before = readAccountStorageEventRow<CheckoutOrderEventRow>(event.oldValue, scope.accountKey)?.orders?.[scope.productNo];
-      const after = readAccountStorageEventRow<CheckoutOrderEventRow>(event.newValue, scope.accountKey)?.orders?.[scope.productNo];
-      if (JSON.stringify(before) === JSON.stringify(after)) return;
-      const pointer = after ?? before;
-      const orderNo = pointer?.tradeinQuote ? pointer.tradeinResult?.orderNo : pointer?.orderNo;
-      if (typeof orderNo === "string" && orderNo) change.orderNo = orderNo;
-      else change.recovery = true;
-      break;
-    }
-    case CHECKOUT_CREATE_TABLE: {
-      const before = readAccountStorageEventRow<CheckoutCreateEventRow>(event.oldValue, scope.accountKey)?.creates?.[scope.productNo];
-      const after = readAccountStorageEventRow<CheckoutCreateEventRow>(event.newValue, scope.accountKey)?.creates?.[scope.productNo];
-      if (JSON.stringify(before) === JSON.stringify(after)) return;
-      change.recovery = true;
-      break;
-    }
-    case CAPACITY_RECOVERY_TABLE:
-    case CHECKOUT_FLEET_TABLE:
-      if (JSON.stringify(readAccountStorageEventRow(event.oldValue, scope.accountKey))
-          === JSON.stringify(readAccountStorageEventRow(event.newValue, scope.accountKey))) return;
-      change.capacity = true;
-      break;
-    default:
-      return;
+  const pendingCreate = readCheckoutCreate(scope.accountKey, scope.productNo);
+  if (pendingCreate && pendingCheckoutCreate.value?.request.idempotencyKey !== pendingCreate.request.idempotencyKey) {
+    pendingCheckoutCreate.value = pendingCreate;
+    pendingCreatePointer.value = null;
+    createLookupUnavailable.value = false;
   }
-  const queued = checkoutSync.value;
-  checkoutSync.value = queued && isCurrentCheckoutRoute(queued.scope) ? { ...queued, ...change } : change;
-}
+  if (!pendingCheckoutCreate.value && !createdCheckoutOrder.value) {
+    const recent = readCheckoutOrderPointer(scope.accountKey, scope.productNo);
+    if (pendingCreatePointer.value?.commandKey !== recent?.commandKey) pendingCreatePointer.value = recent;
+  }
+  // The existing B60 recovery owns the read, backoff and order navigation.
+  if (pendingCreateUnresolved.value) return;
 
-async function syncCheckoutFromOtherTab() {
-  const change = checkoutSync.value;
-  if (!change || checkoutSyncInFlight || activeCheckoutLoad || paymentFlowBusy.value || purchasePayment.state.open
-      || checkoutLeaving.value || remoteCapacityGate.pending || !foregroundReadAllowed() || !isTopCheckoutPage()) return;
-  checkoutSync.value = null;
-  if (!isCurrentCheckoutRoute(change.scope) || createdCheckoutOrder.value || settledResultReplay.value) return;
-  checkoutSyncInFlight = true;
-  try {
-    if (change.orderNo) {
-      await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(change.orderNo)}`, change.scope);
-      return;
+  const tradeinRecord = readCheckoutTradein(scope.accountKey, scope.productNo);
+  if (tradeinRecord) {
+    const signature = JSON.stringify([tradeinRecord, hasTradeinPurchaseIntent(scope.accountKey, tradeinRecord.commandKey.replace("h7-order:", "e3-tradein:"))]);
+    if (signature !== foregroundTradeinSignature) {
+      foregroundTradeinSignature = signature;
+      await resumePendingRemoteTradein(scope, { readOnly: true });
     }
-    if (change.recovery) {
-      pendingCheckoutCreate.value = readCheckoutCreate(change.scope.accountKey, change.scope.productNo);
-      if (pendingCheckoutCreate.value || await resumePendingRemoteTradein(change.scope, { navigate: true, readOnly: true })) return;
+    return;
+  }
+  if (foregroundTradeinSignature) {
+    foregroundTradeinSignature = null;
+    remoteTradeinRecoveryRequired.value = false;
+    remoteTradeinRecoveryError.value = false;
+  }
+
+  const knownOrder = createdCheckoutOrder.value?.orderNo;
+  if (knownOrder) {
+    const signature = JSON.stringify([readOrderAction(scope.accountKey, knownOrder), pendingOrderPayment(scope.accountKey, knownOrder)]);
+    if (foregroundPaymentSignature === signature) return;
+    foregroundPaymentSignature = signature;
+    const order = await orders.ensureRemoteOrder(knownOrder);
+    if (isCurrentCheckoutRoute(scope) && order && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status)) {
+      orderId.value = knownOrder;
+      presentSettledPurchase(false);
     }
-    if (change.capacity && isCurrentCheckoutRoute(change.scope)) {
-      const oldRecovery = keepCheckoutRecovery.value;
-      if (recoverCapacityBeforePurchase([change.scope.productNo])) return;
-      if (oldRecovery && tradein.state.kind === "keep-recovery") tradein.hide();
-      if (checkoutCapacityRequired.value) await retryCheckoutCapacity();
-    }
-  } catch {
-    // Existing checkout recovery owns unreadable records.
-  } finally {
-    checkoutSyncInFlight = false;
-    if (checkoutSync.value) void syncCheckoutFromOtherTab();
+    return;
+  }
+  if (recoverCapacityBeforePurchase([scope.productNo], false, false)) {
+    foregroundCapacityTarget.value = scope.productNo;
+    await recoverForegroundCapacity();
+    return;
+  }
+  foregroundCapacityTarget.value = null;
+  if (!ordinaryCheckoutInitialized.value || !product.value || activeSession.value) return;
+  const eligibility = await refreshPurchaseEligibility(scope, false);
+  if (!isCurrentCheckoutRoute(scope) || eligibility === "stale") return;
+  foregroundEligibilityBlocked.value = eligibility !== "eligible";
+  if (checkoutCapacityRequired.value && eligibility === "eligible") {
+    interceptFired = false;
+    await fireTradeinIntercept("foreground");
   }
 }
-
-watch([checkoutSync, foregroundReadAllowed, quantityReady, ordinaryCheckoutInitialized, paymentFlowBusy, checkoutLeaving,
-  () => purchasePayment.state.open, () => remoteCapacityGate.pending], () => {
-  void syncCheckoutFromOtherTab();
-});
 
 function restoreCheckoutFromHistory() {
   if (!pageAlive || pageVisible || !checkoutHistoryEntry
@@ -2933,16 +3010,25 @@ function restoreCheckoutFromHistory() {
   checkoutShownFromHistory = true;
   showCheckout();
 }
-onMounted(() => {
-  window.addEventListener("popstate", restoreCheckoutFromHistory);
-  window.addEventListener("storage", onCheckoutStorage);
-});
+watch([documentReadVisible, foregroundReadAllowed], ([visible, allowed]) => {
+  if (!remoteApiEnabled || !pageVisible || !pageAlive) return;
+  if (!visible) {
+    checkoutDocumentHidden = true;
+    pauseForegroundCheckout();
+    promotionCheckout.value?.pauseBrowserTab();
+  } else if (allowed && checkoutDocumentHidden) {
+    checkoutDocumentHidden = false;
+    promotionCheckout.value?.resumeBrowserTab();
+    refreshForegroundCheckout();
+  }
+}, { flush: "post" });
+onMounted(() => window.addEventListener("popstate", restoreCheckoutFromHistory));
 // #endif
 
 onShow(() => {
   // #ifdef H5
   // uni-app also calls page onShow when the browser tab becomes visible.
-  if (remoteApiEnabled && !promotionRoute.value && pageVisible && checkoutHistoryEntry) return;
+  if (remoteApiEnabled && pageVisible && checkoutHistoryEntry) return;
   checkoutHistoryEntry = { href: window.location.href, position: window.history.state?.position };
   if (checkoutShownFromHistory) return;
   // #endif
@@ -2959,7 +3045,9 @@ onHide(() => {
   // #ifdef H5
   // A hidden document pauses background reads through foregroundReadAllowed.
   // Keep the checkout route and its confirmed quote for the same page.
-  if (remoteApiEnabled && !promotionRoute.value && document.hidden) return;
+  pauseForegroundCheckout();
+  if (remoteApiEnabled && document.hidden) return;
+  checkoutDocumentHidden = false;
   // #endif
   pageVisible = false;
   if(promotionRoute.value){promotionCheckout.value?.hide();return;}
@@ -3373,7 +3461,7 @@ function cleanup() {
   if (!pageAlive) return;
   // #ifdef H5
   window.removeEventListener("popstate", restoreCheckoutFromHistory);
-  window.removeEventListener("storage", onCheckoutStorage);
+  pauseForegroundCheckout();
   // #endif
   stopCheckoutCapacityRelease();
   closePaymentSheet();

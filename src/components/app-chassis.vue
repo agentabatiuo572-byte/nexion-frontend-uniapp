@@ -152,7 +152,7 @@
       <TrialClaimSheet />
       <VoucherClaimSheet />
       <SlotActionSheet />
-      <TradeinSheets :active="pageVisible && hostVisible" />
+      <TradeinSheets ref="tradeinSheets" :active="pageVisible && hostVisible" />
       <LuckySpinSheet />
       <StickyCtaBar />
       <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
@@ -606,7 +606,11 @@ function receiveChassisRefresh(visit: string) {
   if (pageVisible.value && props.hostVisible && visit === chromeConfiguration.value.visit
     && scrollLocks.value === 0 && !refresh.isRefreshing) void refresh.refresh();
 }
-defineExpose({ receiveNativeScrollLoadMore, receiveChassisScrolling, receiveChassisRefresh });
+const tradeinSheets = ref<InstanceType<typeof TradeinSheets> | null>(null);
+function readCapacityRecoveryInReview(target: string): Promise<boolean> {
+  return tradeinSheets.value?.readCapacityRecoveryInReview(target) ?? Promise.resolve(false);
+}
+defineExpose({ receiveNativeScrollLoadMore, receiveChassisScrolling, receiveChassisRefresh, readCapacityRecoveryInReview });
 declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void };
 const navigationOptions = computed(() => tabs.value.map(tab => ({ ...tab, value: tab.key })));
 const navigationFrom = consumeGlassNavigation(activeTab.value);

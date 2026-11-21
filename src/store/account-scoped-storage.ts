@@ -38,16 +38,6 @@ export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T)
   }
 }
 
-/** uni-app wraps H5 storage records in {type, data}. Compare only the current account's data. */
-export function readAccountStorageEventRow<T = unknown>(raw: string | null, accountKey: string): T | undefined {
-  if (!raw) return undefined;
-  try {
-    return JSON.parse(raw)?.data?.[normalizeAccountKey(accountKey)];
-  } catch {
-    return undefined;
-  }
-}
-
 /** Remove one display row without disturbing other account rows. */
 export function removeAccountRow(tableKey: string, accountKey: string): boolean {
   try {
