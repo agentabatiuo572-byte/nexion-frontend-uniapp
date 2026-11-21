@@ -1,13 +1,12 @@
 import { uiLocale, type UiLocale } from '@/i18n';
 
 // Purchase payment copy. Never name a payment provider or its domain in the App.
-const originalPaymentEn = { choosePaymentMethodAgain: 'Choose a payment method again' };
 
 const zh = {
   checkingOriginalPayment: "正在确认原付款单…",
   originalPaymentNotFoundRetry: "原付款请求未送达。点「重新付款」按原请求重新发送。",
   originalPaymentUnavailableTitle: "查不到原付款记录",
-  originalPaymentUnavailableBody: "退出后可重新选择付款方式。如已付款，请联系客服。",
+  originalPaymentUnavailableBody: "如已付款，请联系客服。",
   choosePaymentMethodAgain: '重新选择付款方式',
   trc20: "USDT（TRC20）",
   trc20Chain: "TRON 链",
@@ -59,11 +58,11 @@ const zh = {
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
 const en: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Confirming the original payment…",
   originalPaymentNotFoundRetry: "The original request did not arrive. Tap Pay again to resend it.",
   originalPaymentUnavailableTitle: "Original payment not found",
-  originalPaymentUnavailableBody: "Exit to choose a payment method again. If you already paid, contact support.",
+  originalPaymentUnavailableBody: "If you already paid, contact support.",
+  choosePaymentMethodAgain: 'Choose a payment method again',
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON chain",
   gasTrc20: "The TRC20 confirmation fee is included in the total. Your wallet may charge TRX or energy fees separately.",
@@ -114,11 +113,11 @@ const en: typeof zh = {
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Đang xác nhận khoản thanh toán ban đầu…",
   originalPaymentNotFoundRetry: "Yêu cầu ban đầu chưa đến được hệ thống. Nhấn “Thanh toán lại” để gửi lại.",
   originalPaymentUnavailableTitle: "Không tìm thấy khoản thanh toán ban đầu",
-  originalPaymentUnavailableBody: "Thoát ra để chọn lại phương thức thanh toán. Nếu bạn đã thanh toán, vui lòng liên hệ hỗ trợ.",
+  originalPaymentUnavailableBody: "Nếu bạn đã thanh toán, vui lòng liên hệ hỗ trợ.",
+  choosePaymentMethodAgain: 'Chọn lại phương thức thanh toán',
   trc20: "USDT (TRC20)",
   trc20Chain: "Mạng TRON",
   gasTrc20: "Phí xác nhận TRC20 đã nằm trong tổng tiền. Ví ngoài có thể thu thêm phí TRX hoặc năng lượng.",
@@ -169,11 +168,11 @@ const vi: typeof zh = {
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Mengonfirmasi pembayaran awal…",
   originalPaymentNotFoundRetry: "Permintaan awal tidak terkirim. Ketuk “Bayar lagi” untuk mengirim ulang.",
   originalPaymentUnavailableTitle: "Pembayaran awal tidak ditemukan",
-  originalPaymentUnavailableBody: "Keluar untuk memilih metode pembayaran lagi. Jika sudah membayar, hubungi CS.",
+  originalPaymentUnavailableBody: "Jika sudah membayar, hubungi CS.",
+  choosePaymentMethodAgain: 'Pilih ulang metode pembayaran',
   trc20: "USDT (TRC20)",
   trc20Chain: "Jaringan TRON",
   gasTrc20: "Biaya konfirmasi TRC20 sudah termasuk dalam total. Dompet Anda dapat mengenakan biaya TRX atau energi terpisah.",
@@ -224,11 +223,11 @@ const id: typeof zh = {
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Mengesahkan pembayaran asal…",
   originalPaymentNotFoundRetry: "Permintaan asal tidak sampai. Ketik “Bayar semula” untuk menghantarnya semula.",
   originalPaymentUnavailableTitle: "Pembayaran asal tidak ditemui",
-  originalPaymentUnavailableBody: "Keluar untuk memilih kaedah pembayaran semula. Jika anda sudah membayar, hubungi bantuan.",
+  originalPaymentUnavailableBody: "Jika anda sudah membayar, hubungi bantuan.",
+  choosePaymentMethodAgain: 'Pilih semula kaedah pembayaran',
   trc20: "USDT (TRC20)",
   trc20Chain: "Rangkaian TRON",
   gasTrc20: "Fi pengesahan TRC20 termasuk dalam jumlah. Dompet anda mungkin mengenakan fi TRX atau tenaga berasingan.",
@@ -279,11 +278,11 @@ const ms: typeof zh = {
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Kinukumpirma ang orihinal na bayad…",
   originalPaymentNotFoundRetry: "Hindi dumating ang orihinal na request. I-tap ang “Magbayad ulit” para ipadala ito ulit.",
   originalPaymentUnavailableTitle: "Hindi makita ang orihinal na bayad",
-  originalPaymentUnavailableBody: "Lumabas para pumili ulit ng paraan ng pagbabayad. Kung nakapagbayad ka na, kontakin ang support.",
+  originalPaymentUnavailableBody: "Kung nakapagbayad ka na, kontakin ang support.",
+  choosePaymentMethodAgain: 'Pumili ulit ng paraan ng pagbabayad',
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON network",
   gasTrc20: "Kasama sa kabuuan ang TRC20 confirmation fee. Maaaring may hiwalay na singil sa TRX o energy ang wallet mo.",
@@ -334,11 +333,11 @@ const fil: typeof zh = {
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Подтверждаем исходный платёж…",
   originalPaymentNotFoundRetry: "Исходный запрос не дошёл. Нажмите «Оплатить снова», чтобы отправить его повторно.",
   originalPaymentUnavailableTitle: "Исходный платёж не найден",
-  originalPaymentUnavailableBody: "Выйдите, чтобы снова выбрать способ оплаты. Если вы уже оплатили, обратитесь в поддержку.",
+  originalPaymentUnavailableBody: "Если вы уже оплатили, обратитесь в поддержку.",
+  choosePaymentMethodAgain: 'Выбрать способ оплаты заново',
   trc20: "USDT (TRC20)",
   trc20Chain: "Сеть TRON",
   gasTrc20: "Комиссия за подтверждение TRC20 включена в итог. Кошелёк может отдельно списать TRX или плату за энергию.",
@@ -389,11 +388,11 @@ const ru: typeof zh = {
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
 const kk: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Бастапқы төлем расталуда…",
   originalPaymentNotFoundRetry: "Бастапқы сұраныс жетпеді. Қайта жіберу үшін «Қайта төлеу» түймесін басыңыз.",
   originalPaymentUnavailableTitle: "Бастапқы төлем табылмады",
-  originalPaymentUnavailableBody: "Шығып, төлем әдісін қайта таңдаңыз. Төлеп қойған болсаңыз, қолдау қызметіне жазыңыз.",
+  originalPaymentUnavailableBody: "Төлеп қойған болсаңыз, қолдау қызметіне жазыңыз.",
+  choosePaymentMethodAgain: 'Төлем әдісін қайта таңдау',
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON желісі",
   gasTrc20: "TRC20 растау ақысы жалпы сомаға кіреді. Әмиян TRX немесе энергия ақысын бөлек алуы мүмкін.",
@@ -444,11 +443,11 @@ const kk: typeof zh = {
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
-  ...originalPaymentEn,
   checkingOriginalPayment: "Asl toʻlov tasdiqlanmoqda…",
   originalPaymentNotFoundRetry: "Asl soʻrov yetib bormadi. Qayta yuborish uchun «Qayta toʻlash» tugmasini bosing.",
   originalPaymentUnavailableTitle: "Asl toʻlov topilmadi",
-  originalPaymentUnavailableBody: "Chiqib, toʻlov usulini qayta tanlang. Agar toʻlagan boʻlsangiz, yordam xizmatiga murojaat qiling.",
+  originalPaymentUnavailableBody: "Agar toʻlagan boʻlsangiz, yordam xizmatiga murojaat qiling.",
+  choosePaymentMethodAgain: 'Toʻlov usulini qayta tanlash',
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON tarmogʻi",
   gasTrc20: "TRC20 tasdiqlash haqi jami summaga kiradi. Hamyon TRX yoki energiya haqini alohida olishi mumkin.",
