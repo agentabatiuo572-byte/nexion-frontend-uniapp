@@ -448,10 +448,11 @@ const positionInset = computed(() => (props.topInset || 0) + historyPrefixHeight
 let scrollGeneration = 0, scrollTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingTailGeneration: number | undefined;
 let lastScrollTop = 0;
+let scrollRevision = 0, nativeScrollEnd: number | undefined;
 let followingTail = true, measuredViewportHeight = 0;
 const HISTORY_MEASURE_MS = 500;
 let positionTimer: ReturnType<typeof setTimeout> | undefined, historyDisposed = false;
-let preparedHistory: { id: string; prefix: number; inset: number; owner: string; host: unknown; root: unknown; atEnd: boolean } | null = null;
+let preparedHistory: { id: string; prefix: number; inset: number; owner: string; host: unknown; root: unknown; atEnd: boolean; scrollRevision: number } | null = null;
 type PositionAdjustment = { owner: string; host: unknown; root: unknown; top: number; inset: number; tail: boolean; id?: string; prefix?: number; resumeTail?: boolean; anchor?: { id: string; offset: number };
   expiresAt: number; settled: Promise<boolean>; settle: (applied: boolean) => void };
 let pendingPosition: PositionAdjustment | null = null;
@@ -622,7 +623,7 @@ function cancelScroll(keepPosition = false) {
   pendingTailGeneration = undefined;
   if (!keepPosition) settlePosition();
 }
-function invalidateHistoryPosition() { cancelScroll(); preparedHistory = null; historyAnchor = null; historyPreparation++; }
+function invalidateHistoryPosition() { cancelScroll(); preparedHistory = null; historyAnchor = null; nativeScrollEnd = undefined; historyPreparation++; }
 onScopeDispose(() => { historyDisposed = true; invalidateHistoryPosition(); });
 onHide(invalidateHistoryPosition);
 watch(() => [historyOwner(), listHost.value, listRoot()], invalidateHistoryPosition, { flush: 'sync' });
@@ -636,6 +637,11 @@ function scroller(): HTMLElement | undefined {
 }
 function scrollEnd(node: HTMLElement): number { return Math.max(0, node.scrollHeight - node.clientHeight); }
 function atScrollEnd(top: number, end: number): boolean { return end - top < 1; }
+function atObservedScrollEnd(): boolean {
+  const node = scroller();
+  return node ? atScrollEnd(node.scrollTop, scrollEnd(node))
+    : nativeScrollEnd !== undefined && atScrollEnd(lastScrollTop, nativeScrollEnd);
+}
 function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: number } }) {
   if (stopPreviewPreparation) { nativePreviewReading = null; clearPreviewRowHeights(); }
   pendingTailGeneration = undefined;
@@ -647,11 +653,15 @@ function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: num
   if (pendingPosition) pendingPosition.top += top - lastScrollTop;
   lastScrollTop = top;
   // A real gesture ends any pending history restoration anchor.
-  if (!echo) historyAnchor = null;
-  if (echo) { /* keep followingTail */ }
-  else if (node) followingTail = node.scrollHeight - node.clientHeight - node.scrollTop <= 24;
-  else if (event.detail.scrollHeight !== undefined && measuredViewportHeight > 0)
-    followingTail = event.detail.scrollHeight - measuredViewportHeight - lastScrollTop <= 24;
+  if (!echo) { historyAnchor = null; scrollRevision++; }
+  if (!node && event.detail.scrollHeight !== undefined && measuredViewportHeight > 0)
+    nativeScrollEnd = Math.max(0, event.detail.scrollHeight - measuredViewportHeight);
+  if (!echo && !preparedHistory) {
+    // An upward gesture ends follow even if it leaves only a small gap.
+    if (node) followingTail = atScrollEnd(top, scrollEnd(node));
+    else if (event.detail.scrollHeight !== undefined && measuredViewportHeight > 0 && nativeScrollEnd !== undefined)
+      followingTail = atScrollEnd(top, nativeScrollEnd);
+  }
   if (threadVisible.value && nativePreviewReading?.returning) {
     nativePreviewReading.top = lastScrollTop; nativePreviewReading.inset = positionInset.value; nativePreviewReading.tail = followingTail;
   }
@@ -707,6 +717,7 @@ async function prepareHistoryPrepend(): Promise<boolean> {
   if (!current()) return false;
   const node = scroller();
   const wasAtEnd = node ? atScrollEnd(node.scrollTop, scrollEnd(node)) : undefined;
+  const revision = scrollRevision;
   // This reader asked for history. Cancel a queued pin before waiting for an in-progress layout adjustment.
   followingTail = false;
   clearTimeout(scrollTimer);
@@ -727,12 +738,26 @@ async function prepareHistoryPrepend(): Promise<boolean> {
       const valid = typeof prefix === 'number' && Number.isFinite(prefix) && current()
         && props.messages[0]?.id === id && inset === positionInset.value;
       if (valid) preparedHistory = { id, prefix: prefix as number, inset, owner, host, root,
-        atEnd: wasAtEnd ?? (!!scroll && atScrollEnd(scroll.top, scroll.end)) };
+        atEnd: wasAtEnd ?? (!!scroll && atScrollEnd(scroll.top, scroll.end)), scrollRevision: revision };
       resolve(valid);
     });
   });
 }
-defineExpose({ prepareHistoryPrepend });
+function finishHistoryPrepend() {
+  const prepared = preparedHistory;
+  preparedHistory = null;
+  if (!prepared?.atEnd || prepared.scrollRevision !== scrollRevision) return;
+  if (scroller()) {
+    followingTail = atObservedScrollEnd();
+    return;
+  }
+  const preparation = historyPreparation;
+  measurePrefix(prepared.id, (prefix, scroll) => {
+    if (prefix !== null && scroll && preparation === historyPreparation && prepared.scrollRevision === scrollRevision)
+      followingTail = atScrollEnd(scroll.top, scroll.end);
+  });
+}
+defineExpose({ prepareHistoryPrepend, finishHistoryPrepend });
 function scrollToEnd() {
   cancelScroll(); const ticket = scrollGeneration;
   pendingTailGeneration = ticket;
@@ -854,7 +879,7 @@ watch(
     // Receipt catch-up can return older rows together with a new incoming message.
     const caughtUpToNewTail = change === 'prepend' && !preparedHistory
       && ids[ids.length - 1] !== previous[0][previous[0].length - 1];
-    if (caughtUpToNewTail && followingTail && !pendingPosition) scrollToEnd();
+    if (caughtUpToNewTail && followingTail && !pendingPosition && atObservedScrollEnd()) scrollToEnd();
     else if (change === 'prepend' || pendingPosition || inset !== previous[4])
       preservePosition(previous[4], change === 'prepend' ? previous[0][0] : undefined);
     else if ((change === 'append' || (typing && !previous[1])) && followingTail) scrollToEnd();
