@@ -1,5 +1,8 @@
 <template>
-  <view v-if="open" class="nx-sheet-mask nx-sheet-fade-in" @click.self="$emit('close')">
+  <view v-if="open" class="nx-sheet-mask nx-sheet-fade-in">
+    <!-- The tap-to-close layer is a sibling under the sheet, not the sheet's parent: uni H5 hands handlers plain-object
+         targets, so @click.self never matched and a mask tap closed nothing. Taps on the sheet never reach this layer. -->
+    <view class="nx-sheet-scrim" aria-hidden="true" @click="$emit('close')" />
     <view :id="id" class="nx-glass-sheet nx-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="title">
       <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" @click="$emit('close')"><NxIcon name="close" :size="18" /></NxButton></view>
       <view class="nx-sheet__body"><slot /></view>
@@ -21,7 +24,8 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => emit('close'), props.n
 </script>
 <style scoped>
 .nx-sheet-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: #0008; }
-.nx-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: min(88%, calc(100% - var(--nx-overlay-top))); box-sizing: border-box; background: var(--nx-glass-fill); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); color: var(--v5-ink); }
+.nx-sheet-scrim { position: absolute; inset: 0; }
+.nx-sheet { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: min(88%, calc(100% - var(--nx-overlay-top))); box-sizing: border-box; background: var(--nx-glass-fill); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); color: var(--v5-ink); }
 .nx-sheet__header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--v5-border); }
 .nx-sheet__title { font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
 .nx-sheet__body { min-height: 0; overflow-y: auto; padding: 20px; }
