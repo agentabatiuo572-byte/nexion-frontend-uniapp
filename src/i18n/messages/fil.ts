@@ -1824,7 +1824,7 @@ export const fil: Messages = {
     purchaseQuotaDepleted: "Ubos na ang quota ng benta",
     purchaseQuotaRequired: "Kailangan ding may natitirang quota ng benta",
     purchaseViewConditions: "Paano i-unlock",
-    purchaseResume: "Kumpirmahin ang resulta ng naunang upgrade",
+    purchaseResume: "Kumpirmahin ang naunang trade-in",
     purchaseGap: "Kulang pa: {amount}",
     purchaseRemaining: "Natitira: {amount}",
     purchasePeople: "{n} tao",
