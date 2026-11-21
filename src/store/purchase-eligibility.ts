@@ -1,5 +1,5 @@
 import { computed, reactive, watch, type Ref } from "vue";
-import { ApiError, isApiRefusal } from "@/api/errors";
+import { isApiRefusal } from "@/api/errors";
 import { purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { remoteAccountScope, type RemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -69,7 +69,6 @@ export function createPurchaseEligibilityStore(
 
     entry.status = "loading";
     entry.eligible = false;
-    entry.snapshot = null;
     entry.error = "";
     const request = api.get(normalized)
       .then((snapshot) => {
@@ -82,13 +81,13 @@ export function createPurchaseEligibilityStore(
       })
       .catch((error: unknown) => {
         if (!scope.isCurrent(requestScope) || inFlight.get(key) !== request) return false;
-        if (error instanceof ApiError && error.status === 404 && isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
+        if (isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
+          entry.snapshot = null;
           entry.status = "unavailable";
           return false;
         }
         entry.status = "error";
         entry.eligible = false;
-        entry.snapshot = null;
         entry.error = error instanceof Error ? error.message : "PURCHASE_ELIGIBILITY_UNAVAILABLE";
         return false;
       })
@@ -134,12 +133,15 @@ export function bindPurchaseEligibility(
   const eligibility = computed(() => {
     const entry = store.state(product.value);
     const status = entry.status;
-    // Keep the snapshot-only contract of these surfaces. The bundle reads the
-    // store directly to distinguish product availability from a failed read.
+    // Keep the actionable snapshot fresh. The conditions page can retain the
+    // presentation for this account and SKU while a fresh decision is pending.
     return {
       ...entry,
       status: status === "unavailable" ? "error" as const : status,
       error: status === "unavailable" ? "PRODUCT_NOT_AVAILABLE" : entry.error,
+      unavailable: status === "unavailable",
+      snapshot: status === "ready" ? entry.snapshot : null,
+      displaySnapshot: entry.snapshot,
     };
   });
   const readActive = computed(() => typeof active === "function" ? active() : active.value);

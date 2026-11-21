@@ -755,6 +755,9 @@ const footer = computed(() => {
   const rawAmount = order.value?.amountUsdt ?? displayQuote.value?.amountUsdt;
   const currency='USD' as const,amount=formatCheckoutReviewAmount(rawAmount,currency,{unit:true}),amountValue=rawAmount;
   if (order.value?.paymentStatus === 'PENDING') return { amount, amountValue, currency, label: p.value.pay, disabled: rawAmount==null||!canPay.value||leaving.value||paymentConfirming.value||paymentEntryChecking.value, action: pay };
+  if (!order.value && quoteBlock.value === 'capacity') return { amount, amountValue, currency,
+    label: t.value.myDevices.inventoryTitle, disabled: !visible.value||leaving.value,
+    action: () => navTo('/pages/me/devices'), note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
   if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder, note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
   return null;
 });

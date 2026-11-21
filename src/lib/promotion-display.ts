@@ -11,6 +11,7 @@ export function checkoutQuoteBlockCopy(block: CheckoutQuoteBlock | null, copy: M
     case 'outOfStock': return copy.store.temporarilyOutOfStock;
     case 'soldOut': return copy.store.purchaseEligibilityQuotaDepleted;
     case 'purchaseConditions': return copy.store.coCapacityPurchaseConditions;
+    case 'capacity': return copy.promotion.capacityUnavailable;
     case 'productMissing': return copy.store.coCapacityProductUnavailable;
     case 'unavailable': return copy.wallet.syncFailedBody;
     default: return '';

@@ -1,16 +1,14 @@
 <template>
   <AppChassis active="team">
     <view class="quota-page nx-viz-motion">
-      <SubPageHeader :back="conditionsOnly ? '/pages/me/devices' : focusedProductId ? `/pages/store/detail?id=${encodeURIComponent(focusedProductId)}` : '/pages/team/team'" :title="conditionsOnly ? t.store.purchaseEligibilityProductPolicy : t.quota.pageTitle" plain design />
-      <!-- Nothing to show: one sentence and the page's single reload, centred (03 §3.4, §3.5.2); automatic recovery keeps
-           running. Once the conditions are on screen there is no retry. -->
-      <view v-if="conditionsOnly && conditionEligibility.status === 'error'" class="quota-content quota-page-failure" role="alert">
-        <text class="quota-page-failure__copy">{{ t.store.purchaseEligibilityError }}</text>
-        <view class="nx-card-recovery-action quota-page-failure__reload" role="button" tabindex="0" @click="retryConditionEligibility" @keydown.enter.prevent="retryConditionEligibility" @keydown.space.prevent="retryConditionEligibility"><text>{{ t.ui.reload }}</text></view>
+      <SubPageHeader :back="conditionsOnly ? conditionBackHref : focusedProductId ? `/pages/store/detail?id=${encodeURIComponent(focusedProductId)}` : '/pages/team/team'" :title="conditionsOnly ? t.store.purchaseEligibilityProductPolicy : t.quota.pageTitle" plain design />
+      <view v-if="conditionsOnly && conditionPageEmpty" class="quota-content quota-page-failure" role="alert">
+        <text class="quota-page-failure__copy">{{ conditionEligibility.unavailable ? t.store.coCapacityProductUnavailable : t.store.purchaseEligibilityError }}</text>
+        <view class="nx-card-recovery-action quota-page-failure__reload" role="button" tabindex="0" @click="conditionPageAction" @keydown.enter.prevent="conditionPageAction" @keydown.space.prevent="conditionPageAction"><text>{{ conditionEligibility.unavailable ? t.profile.back : t.ui.reload }}</text></view>
       </view>
       <view v-else-if="conditionsOnly" class="quota-content">
         <text class="quota-headline">{{ focusedProductName }}</text>
-        <PurchaseEligibilityPanel :status="conditionEligibility.status" :snapshot="conditionEligibility.snapshot" />
+        <PurchaseEligibilityPanel :status="conditionEligibility.displaySnapshot ? 'ready' : conditionEligibility.status" :snapshot="conditionEligibility.displaySnapshot" />
       </view>
       <view v-else-if="!focusedTierPresent" class="quota-content quota-state">
         <text class="quota-headline">{{ focusedProductName }}</text>
@@ -54,7 +52,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
-import { navTo, takeNavigationQuery } from "@/lib/route";
+import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -217,9 +215,20 @@ const activeDirectText = computed(() => remoteApiEnabled && !remoteSnapshot.valu
  */
 const focusedProductId = ref("");
 const conditionsOnly = ref(false);
-const { eligibility: conditionEligibility, retry: retryConditionEligibility } = useRemotePurchaseEligibility(
+const conditionBackHref = "/pages/me/devices";
+const { eligibility: conditionEligibility, retry: readConditionEligibility } = useRemotePurchaseEligibility(
   focusedProductId, () => conditionsOnly.value,
 );
+const conditionPageEmpty = computed(() => conditionEligibility.value.unavailable
+  || (conditionEligibility.value.status === "error" && !conditionEligibility.value.displaySnapshot));
+function retryConditionEligibility(): Promise<boolean> {
+  const { status, unavailable } = conditionEligibility.value;
+  return unavailable || status === "loading" ? Promise.resolve(false) : readConditionEligibility();
+}
+function conditionPageAction(): void {
+  if (conditionEligibility.value.unavailable) navBack(conditionBackHref);
+  else void retryConditionEligibility();
+}
 // Clear synchronously, including A→B→A, before a scheduled account read can run.
 watch([() => app.accountKey, () => app.accountBindingEpoch,
   () => apiRuntimeConfig.environment, () => apiRuntimeConfig.baseUrl, focusedProductId], resetQuotaPageState, { flush: 'sync' });
@@ -361,7 +370,8 @@ const quotaReady = computed(() => !remoteApiEnabled || (catalogDisplayReady.valu
 const quotaBlockedNote = computed(() => quotaReady.value ? "" : remoteError.value || productCatalogState.status === "error" ? t.value.quota.unconfirmedNote : t.value.quota.updatingNote);
 useAutoRecovery({ failed: () => remoteApiEnabled && !conditionsOnly.value && !!remoteError.value && !remoteRefreshing.value, retry: refreshRemoteQuota });
 useAutoRecovery({ failed: () => remoteApiEnabled && productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
-useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && conditionEligibility.value.status === "error", retry: retryConditionEligibility });
+useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && conditionEligibility.value.status === "error"
+  && !conditionEligibility.value.unavailable, retry: retryConditionEligibility });
 </script>
 
 <style scoped>

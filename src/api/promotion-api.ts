@@ -9,12 +9,13 @@ const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USD
 export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null};
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
-export type CheckoutQuoteBlock = 'outOfStock' | 'soldOut' | 'purchaseConditions' | 'productMissing' | 'unavailable';
+export type CheckoutQuoteBlock = 'outOfStock' | 'soldOut' | 'purchaseConditions' | 'productMissing' | 'capacity' | 'unavailable';
 export function checkoutQuoteBlock(cause: unknown): CheckoutQuoteBlock | null {
   if (isApiRefusal(cause, 404, 'PRODUCT_NOT_AVAILABLE')
       || isApiRefusal(cause, 409, 'BUNDLE_PRODUCT_NOT_AVAILABLE')) return 'outOfStock';
   if (isApiRefusal(cause, 409, 'PURCHASE_GATE_SOLD_OUT', 'F4B_MONTHLY_QUOTA_EXHAUSTED')) return 'soldOut';
   if (isApiRefusal(cause, 409, 'F4B_REQUIREMENTS_NOT_MET', 'PURCHASE_GATE_NOT_MET')) return 'purchaseConditions';
+  if (isApiRefusal(cause, 409, 'CAPACITY_REPLACEMENT_REQUIRED')) return 'capacity';
   if (isApiRefusal(cause, 404, 'PROMOTION_RESOURCE_NOT_FOUND')) return 'productMissing';
   if (cause instanceof ApiError) {
     const status = cause.kind === 'http' ? cause.status : cause.kind === 'business' ? cause.code : undefined;
