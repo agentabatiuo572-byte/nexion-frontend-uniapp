@@ -29,10 +29,20 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const handles = path => path.startsWith(base);
   // The preview models one purchasing account, including its seeded payments.
   const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoAccountId;
-  const existingIntent = intent => ({
-    ...refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'),
-    data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo},
-  });
+  function existingIntentRefusal(intent, payload) {
+    if (intent.kind === 'TRIAL_CONVERT') {
+      const productNo = String(payload.productNo ?? '');
+      if (!/^[A-Za-z0-9._-]{2,64}$/.test(productNo)) return refused(422, 'TRIAL_PRODUCT_REQUIRED');
+      const canonicalProductNo = value => value === 'device-trial-standard' ? 'stellarbox-s1' : value;
+      if (canonicalProductNo(productNo) !== canonicalProductNo(intent.payload.productNo)) {
+        return refused(409, 'TRIAL_PRODUCT_NOT_ELIGIBLE');
+      }
+    }
+    return {
+      ...refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'),
+      data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo},
+    };
+  }
   function replacementRefusal(url, request, kind, sourceId) {
     if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
     const fleet = demoFleetFacts(url, locale(), state);
@@ -304,17 +314,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!Object.hasOwn(commandKinds, kind) || !payload) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       const products = demoProducts(state, url.origin), subject = purchaseSubject(kind, payload, products);
       const existing = openIntent(subject);
-      if (existing) {
-        if (kind === 'TRIAL_CONVERT') {
-          const productNo = String(payload.productNo ?? '');
-          if (!/^[A-Za-z0-9._-]{2,64}$/.test(productNo)) return refused(422, 'TRIAL_PRODUCT_REQUIRED');
-          const canonicalProductNo = value => value === 'device-trial-standard' ? 'stellarbox-s1' : value;
-          if (canonicalProductNo(productNo) !== canonicalProductNo(existing.payload.productNo)) {
-            return refused(409, 'TRIAL_PRODUCT_NOT_ELIGIBLE');
-          }
-        }
-        return existingIntent(existing);
-      }
+      if (existing) return existingIntentRefusal(existing, payload);
       if (!networkOpen(body.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       const order = kind === 'ORDER_PAY' ? ordersOf(url.origin).find(row => row.orderNo === subject.orderNo) : null;
       if (kind === 'ORDER_PAY' && !order) return refused(404, 'ORDER_NOT_FOUND');
@@ -362,7 +362,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (suspended && suspended.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       const existing = openIntent(subject);
-      if (existing) return existingIntent(existing);
+      if (existing) return existingIntentRefusal(existing, source.payload);
       if (!networkOpen(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
       if (Date.parse(source.quote.expiresAt) <= Date.now()) return refused(409, 'PURCHASE_PAYMENT_QUOTE_EXPIRED');
