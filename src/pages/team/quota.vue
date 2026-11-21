@@ -25,8 +25,8 @@
         <view v-if="remoteApiEnabled && !catalogDisplayReady" class="quota-state"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><text>—</text></view>
         <view v-if="quotaReady && !focusedTiers.length" class="quota-state" role="status"><text>{{ t.empty.listTitle }}</text></view>
         <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" :label="t.empty.devicesCta" @click="go('/pages/store/store')"><text class="nx-after-chevron">{{ t.empty.devicesCta }}</text></NxButton></view>
-        <!-- One tier: a full-width card that carries only what the hero lacks. Several: a carousel with position dots (04.2). -->
-        <QuotaTierCard v-if="focusedTiers.length === 1" class="quota-single" :tier="focusedTiers[0]" wide :hide-product="!!focusedProductId" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" />
+        <!-- One tier: a full-width card. Two or more: a carousel where the next card peeks in, with position dots (04.2). -->
+        <QuotaTierCard v-if="focusedTiers.length === 1" class="quota-single" :tier="focusedTiers[0]" wide :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" />
         <template v-else-if="focusedTiers.length">
           <scroll-view scroll-x class="quota-carousel" :show-scrollbar="false" @scroll="onCarouselScroll">
             <view class="quota-carousel__track"><QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" /></view>
@@ -396,10 +396,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-carousel :deep(.uni-scroll-view) { scroll-snap-type: x mandatory; scroll-padding-inline: var(--v5-space-5); scrollbar-width: none; }
 .quota-carousel :deep(.uni-scroll-view::-webkit-scrollbar) { display: none; }
 .quota-carousel__track { display: inline-flex; align-items: stretch; gap: var(--ui-space-inline); padding: 0 var(--v5-space-5) var(--v5-space-1); vertical-align: top; white-space: normal; }
-.quota-carousel__track > :deep(.quota-tier) { flex: none; width: 280px; width: calc(100cqw - 72px); scroll-snap-align: start; }
+/* Each card leaves 36px of the next one showing, so it reads as more to swipe. */
+.quota-carousel__track > :deep(.quota-tier) { flex: none; width: 280px; width: calc(100cqw - 88px); scroll-snap-align: start; }
 .quota-dots { display:flex; justify-content:center; gap:6px; margin-top:var(--v5-space-3); }
-.quota-dot { width:6px; height:6px; border-radius:999px; background:color-mix(in srgb,var(--v5-ink) 20%,transparent); transition:width .2s ease, background-color .2s ease; }
+.quota-dot { width:6px; height:6px; border-radius:999px; background:color-mix(in srgb,var(--v5-ink) 20%,transparent); }
 .quota-dot--active { width:16px; background:var(--v5-brand); }
-@media (prefers-reduced-motion: reduce) { .quota-dot { transition:none; } }
-@media (max-width: 374px) { .quota-carousel { margin-inline: calc(-1 * var(--v5-space-4)); } .quota-carousel :deep(.uni-scroll-view) { scroll-padding-inline: var(--v5-space-4); } .quota-carousel__track { padding-inline: var(--v5-space-4); } .quota-carousel__track > :deep(.quota-tier) { width: calc(100cqw - 64px); } }
+@media (max-width: 374px) { .quota-carousel { margin-inline: calc(-1 * var(--v5-space-4)); } .quota-carousel :deep(.uni-scroll-view) { scroll-padding-inline: var(--v5-space-4); } .quota-carousel__track { padding-inline: var(--v5-space-4); } .quota-carousel__track > :deep(.quota-tier) { width: calc(100cqw - 80px); } }
 </style>

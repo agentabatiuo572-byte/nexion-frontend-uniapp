@@ -1,14 +1,16 @@
 <template>
-  <view class="quota-tier nx-viz-motion" :class="{ 'quota-tier--wide': wide }" :aria-busy="pending">
-    <view v-if="!hideProduct" class="quota-product" role="link" tabindex="0" :aria-label="displayName" @click="openProduct" @keydown.enter.prevent="openProduct">
-      <image v-if="productImage" :src="productImage" mode="aspectFit" class="quota-product__image" :alt="displayName" />
-      <view class="quota-product__copy"><text class="quota-product__name">{{ displayName }}</text><view class="quota-product__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ priceParts[0] }}</text><text v-if="priceParts[1]" class="quota-price-fraction">.{{ priceParts[1] }}</text></view></view>
-      <svg class="quota-product__arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-    </view>
-    <view class="quota-tier__head">
-      <text v-if="tier.conditions.length" class="quota-section-label">{{ tier.unlockKind === 'either' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
+  <view class="quota-tier nx-viz-motion" :class="wide ? 'quota-tier--wide' : 'quota-tier--compact'" :aria-busy="pending">
+    <!-- Status tag left, stock ring top-right, laid over the enlarged machine image. -->
+    <view class="quota-tier__top">
       <NxTag :tone="!visibility.hidden && !pending && unlocked ? 'success' : 'neutral'" :label="visibility.mask(pending ? '—' : unlocked ? t.quota.unlocked : t.quota.locked)" />
+      <view ref="stockBarRef" class="quota-stock" role="img" :aria-label="stockText"><view class="quota-stock__ring" :style="stockRingStyle"><view class="quota-stock__hole nx-num-metric"><text>{{ pending ? '—' : stockLeft }}</text></view></view></view>
     </view>
+    <view class="quota-product" role="link" tabindex="0" :aria-label="displayName" @click="openProduct" @keydown.enter.prevent="openProduct">
+      <view class="quota-product__stage"><image v-if="productImage" :src="productImage" mode="aspectFit" class="quota-product__image" :alt="displayName" /></view>
+      <view class="quota-product__name-row"><text class="quota-product__name">{{ displayName }}</text><svg class="quota-product__arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
+      <view class="quota-product__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ priceParts[0] }}</text><text v-if="priceParts[1]" class="quota-price-fraction">.{{ priceParts[1] }}</text></view>
+    </view>
+    <text v-if="tier.conditions.length" class="quota-section-label">{{ tier.unlockKind === 'either' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
     <view v-if="tier.conditions.length" class="quota-conditions">
       <view v-for="(condition, index) in tier.conditions" :key="index" class="quota-condition">
         <view class="quota-stat-line"><text>{{ conditionLabel(condition) }}</text><text class="quota-condition__values nx-num-metric" :aria-label="conditionValue(condition)">{{ conditionValue(condition, true) }}</text></view>
@@ -16,14 +18,16 @@
       </view>
     </view>
     <view class="quota-meta">
-      <view ref="stockBarRef" class="quota-stock"><view class="quota-stock__ring" :style="stockRingStyle" aria-hidden="true"><view class="quota-stock__hole" /></view><text>{{ fmt(t.quota.leftLabel, { n: pending ? '—' : stockLeft }) }} · {{ fmt(t.quota.soldPct, { pct: pending ? '—' : Math.round(stockPct * 100) }) }}</text></view>
+      <text>{{ stockText }}</text>
       <text v-for="(perk, index) in tier.perks" :key="index">{{ perk }}</text>
     </view>
     <view class="quota-actions" :class="{ 'quota-pending-action': actionBlocked }">
-      <view v-if="pending" class="nx-card-footer quota-text-action"><text class="nx-card-action" aria-disabled="true">{{ fmt(t.quota.buyCta, { name: displayName }) }}</text></view>
+      <view v-if="pending" class="nx-card-footer quota-text-action"><text class="nx-card-action" aria-disabled="true" :aria-label="fmt(t.quota.buyCta, { name: displayName })">{{ wide ? fmt(t.quota.buyCta, { name: displayName }) : t.quota.buy }}</text></view>
       <NxButton v-else-if="unlocked && stockLeft > 0 && tier.available !== false" class="quota-buy" :variant="wide ? 'primary' : 'brand'" :size="wide ? 'large' : 'medium'" :label="fmt(t.quota.buyCta, { name: displayName })" :disabled="actionBlocked" @click="openAction"><text>{{ t.quota.buy }}</text></NxButton>
       <text v-else-if="stockLeft <= 0" class="quota-unavailable" aria-disabled="true">{{ t.quota.stockUnavailable }}</text>
       <text v-else-if="unlocked && tier.available === false" class="quota-unavailable" aria-disabled="true">{{ auditCopy.quotaUnavailable }}</text>
+      <!-- Compact cards are too narrow for the one-line entry; the status reads as text and the product row above opens the same detail page. -->
+      <text v-else-if="!wide" class="quota-unavailable">{{ t.store.purchaseEligibilityIneligible }}</text>
       <view v-else class="nx-card-footer quota-text-action"><view class="nx-card-action nx-card-action--muted" role="button" :tabindex="actionBlocked ? -1 : 0" :aria-disabled="actionBlocked" @click="!actionBlocked && openAction()" @keydown.enter.prevent="!$event.repeat && !actionBlocked && openAction()" @keydown.space.prevent="!$event.repeat && !actionBlocked && openAction()"><text>{{ t.store.purchaseEligibilityIneligible }}</text><svg class="nx-card-link__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
     </view>
   </view>
@@ -69,9 +73,8 @@ export interface QuotaTier {
 }
 
 
-// wide: the only tier on the page, shown full width with the page's primary action.
-// hideProduct: the page hero already shows this product's name, price and image.
-const props = defineProps<{ tier: QuotaTier; pending?: boolean; actionBlocked?: boolean; wide?: boolean; hideProduct?: boolean }>();
+// wide: the only tier on the page, full width with the page's primary action. Otherwise a carousel card.
+const props = defineProps<{ tier: QuotaTier; pending?: boolean; actionBlocked?: boolean; wide?: boolean }>();
 const emit = defineEmits<{ navigate: [url: string] }>();
 const t = useT();
 const visibility = useDataVisibility();
@@ -86,6 +89,7 @@ const unlocked = computed(() => {
 });
 const stockPct = computed(() => props.tier.monthlyStock > 0 ? Math.min(1, props.tier.soldThisMonth / props.tier.monthlyStock) : 1);
 const stockLeft = computed(() => Math.max(0, props.tier.monthlyStock - props.tier.soldThisMonth));
+const stockText = computed(() => `${fmt(t.value.quota.leftLabel, { n: props.pending ? '—' : stockLeft.value })} · ${fmt(t.value.quota.soldPct, { pct: props.pending ? '—' : Math.round(stockPct.value * 100) })}`);
 const priceParts = computed(() => formatFinanceAmount(props.tier.price).split('.'));
 const stockRingStyle = computed(() => ({ '--nx-viz-ring': props.pending || stockBarInView.value === false ? 0 : stockPct.value * 100, transition: props.pending || stockBarInView.value === false ? 'none' : VIZ_RING_TRANSITION }));
 function conditionLabel(condition: QuotaCondition) {
@@ -105,34 +109,41 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 </script>
 <style scoped>
 .quota-pending-action :deep(.nx-button--disabled), .quota-pending-action { opacity: 1; }
-/* Solid content card (01 §1.1.2): peers in the carousel and the single conditions card below the tinted hero. */
-.quota-tier { box-sizing:border-box; padding:var(--ui-space-inset); border-radius:var(--ui-radius-surface); background:var(--v5-surface); color:var(--v5-ink); }
-:global([data-theme="light"]) .quota-tier { box-shadow:var(--v5-glass-shadow); }
-.quota-product { display:flex; align-items:center; gap:var(--ui-space-inline); margin-bottom:var(--ui-space-inset); cursor:pointer; }
-.quota-product__image { flex:none; width:72px; height:72px; }
-.quota-product__copy { flex:1; min-width:0; }
-.quota-product__name { display:block; font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); overflow-wrap:break-word; }
+/* Solid content card (01 §1.1.2) below the tinted hero; a column so cards side by side end on the same action line. */
+.quota-tier { position:relative; display:flex; flex-direction:column; box-sizing:border-box; min-width:0; padding:var(--ui-space-inset); border-radius:var(--ui-radius-surface); background:var(--v5-surface); color:var(--v5-ink); }
+[data-theme="light"] .quota-tier { box-shadow:var(--v5-glass-shadow); }
+.quota-tier__top { position:absolute; z-index:1; top:var(--ui-space-inset); left:var(--ui-space-inset); right:var(--ui-space-inset); display:flex; align-items:flex-start; justify-content:space-between; gap:var(--v5-space-2); pointer-events:none; }
+.quota-stock { flex:none; }
+.quota-stock__ring { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; background:conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%),var(--v5-surface-3) 0); }
+.quota-stock__hole { display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:var(--v5-surface); color:var(--v5-ink); font:500 13px/18px var(--font-metric); }
+.quota-tier--compact .quota-stock__ring { width:40px; height:40px; }
+.quota-tier--compact .quota-stock__hole { width:32px; height:32px; font-size:12px; line-height:16px; }
+.quota-product { display:block; margin-bottom:var(--ui-space-inset); cursor:pointer; }
+/* The machine is the card's subject: the image fills the card width; the tag and ring may sit over it. */
+.quota-product__stage { display:flex; align-items:center; justify-content:center; height:184px; margin:0 calc(-1 * var(--v5-space-2)); overflow:hidden; }
+.quota-tier--compact .quota-product__stage { height:156px; }
+/* Product art carries about 40% transparent margin (04.1 draws machine art at 1.5x its slot); scale it so the machine fills the stage. */
+.quota-product__image { width:100%; height:100%; transform:scale(1.4); pointer-events:none; }
+.quota-product__name-row { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--v5-space-1); margin-top:var(--v5-space-2); }
+.quota-product__name { min-width:0; font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); overflow-wrap:break-word; }
+.quota-product__arrow { flex:none; margin-top:3px; color:var(--v5-ink-4); }
 .quota-product__price { display:flex; align-items:baseline; margin-top:var(--v5-space-1); font:500 18px/24px var(--font-amount); color:var(--v5-ink); }
 .quota-price-symbol { margin-right:2px; font-size:12px; color:var(--v5-ink-3); }
 .quota-price-fraction { color:var(--v5-ink-3); }
-.quota-product__arrow { flex:none; color:var(--v5-ink-4); }
 .quota-product:focus-visible { outline:2px solid var(--v5-brand); outline-offset:4px; border-radius:12px; }
-.quota-tier__head { display:flex; align-items:center; flex-wrap:wrap; gap:var(--v5-space-2); }
-.quota-tier__head :deep(.nx-tag) { margin-left:auto; }
-.quota-section-label { min-width:0; font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); overflow-wrap:break-word; }
+.quota-section-label { display:block; margin-top:var(--v5-space-1); font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); overflow-wrap:break-word; }
 .quota-condition { margin-top:var(--v5-space-3); }
 .quota-stat-line { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-1) var(--v5-space-3); font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
-.quota-condition__values { margin-left:auto; font:500 13px/18px var(--font-metric); color:var(--v5-ink); font-variant-numeric:tabular-nums; text-align:right; }
+.quota-condition__values { margin-left:auto; font:500 13px/18px var(--font-metric); color:var(--v5-ink); font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+.quota-tier--compact .quota-condition__values { font-size:12px; line-height:16px; }
 /* Progress (design-rules Progress): thin ink-8% track, brand fill fading in toward a small solid head. */
 .quota-condition :deep(.quota-progress) { height:4px; margin:var(--v5-space-2) 3px 0; background:color-mix(in srgb,var(--v5-ink) 8%,transparent); overflow:visible; }
 .quota-condition :deep(.quota-progress > view) { position:relative; background:linear-gradient(90deg,color-mix(in srgb,var(--v5-brand) 12%,transparent),color-mix(in srgb,var(--v5-brand) 70%,transparent)); }
 .quota-condition :deep(.quota-progress > view::after) { content:""; position:absolute; top:50%; right:-3px; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:var(--v5-brand); }
 .quota-meta { display:flex; flex-direction:column; gap:var(--v5-space-1); margin-top:var(--ui-space-inset); padding-top:var(--v5-space-3); border-top:1px solid color-mix(in srgb,var(--v5-ink) 8%,transparent); font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
-.quota-stock { display:flex; align-items:center; gap:var(--v5-space-2); }
-.quota-stock__ring { flex:none; display:grid; place-items:center; width:16px; height:16px; border-radius:50%; background:conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%),color-mix(in srgb,var(--v5-ink) 12%,transparent) 0); }
-.quota-stock__hole { width:8px; height:8px; border-radius:50%; background:var(--v5-surface); }
-.quota-actions { display:flex; justify-content:flex-end; margin-top:var(--ui-space-inset); }
-.quota-tier--wide .quota-actions :deep(.quota-buy) { flex:1; box-sizing:border-box; }
+.quota-actions { display:flex; justify-content:flex-end; margin-top:auto; padding-top:var(--ui-space-inset); }
+.quota-actions :deep(.quota-buy) { flex:1; box-sizing:border-box; }
 .quota-text-action { flex:1; min-height:44px; border-top:0; }
 .quota-unavailable { display:block; font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
+.quota-tier--compact .quota-unavailable { flex:1; }
 </style>
