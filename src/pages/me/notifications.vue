@@ -26,7 +26,7 @@
       </GlassSegments>
       <scroll-view :key="section" scroll-y class="message-scroll" :class="{ 'message-scroll--notifications': section === 'notifications' }" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
       <ServiceMessageList v-if="section === 'service'" />
-      <view v-else class="notification-feed" :aria-busy="notifs.loading">
+      <view v-else class="notification-feed" :class="{ 'notification-feed--failed': notifs.readFailedWithoutData }" :aria-busy="notifs.loading">
         <view v-if="!notifs.loading && !notifs.readFailedWithoutData && notifs.nextCursor && filtered.length === 0" role="status" class="message-state"><text>{{ t.notifs.moreToCheck }}</text></view>
         <EmptyState v-if="!notifs.loading && !notifs.readFailedWithoutData && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
         <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
@@ -38,8 +38,8 @@
           </view>
           <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ keepUnits(platformDisplayText(n.body)) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="16" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
         </view>
-        <view v-if="notifs.readFailedWithoutData" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notificationRecovery.retry()"><text>{{ t.ui.retry }}</text></view></view>
-        <view v-if="notifs.loading && !filtered.length" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
+        <view v-if="notifs.readFailedWithoutData" data-testid="notification-error" class="message-state" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.reload" @click="notificationRecovery.retry()"><text>{{ t.ui.reload }}</text></view></view>
+        <view v-if="notifs.loading && !filtered.length && !notifs.readFailedWithoutData" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
         <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="loadMoreNotifications()"><LiquidGlass :radius="22" /><text>{{ notifs.loadingMore ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
       </view>
       <view class="message-scroll-compensation" :style="{ height: headerCompensation + 'px' }" aria-hidden="true" />

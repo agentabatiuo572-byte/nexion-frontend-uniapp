@@ -3104,6 +3104,7 @@ export const uz: Messages = {
     dismiss: "Yopish",
     gotIt: "Tushunarli",
     retry: "Takrorlash",
+    reload: "Yangilash",
     close: "Yopish",
     dangerDismissBlocked: "Bu amal aniq tasdiqni talab qiladi",
     save: "Saqlash",

@@ -2,12 +2,12 @@
   <view class="invite-rules-content" role="status" aria-live="polite" :aria-busy="loading">
     <view class="invite-rules__overview nx-tint">
       <view class="invite-rules__summary">
-        <template v-if="state === 'ready'">
+        <template v-if="state === 'ready' || state === 'unavailable'">
           <text class="invite-rules__label">{{ copy.inviteRulePerFriend }}</text>
-          <text class="invite-rules__amount">{{ formatAmount(rulePresentation!.amount) }} UVT</text>
+          <!-- An unconfirmed amount shows "—" and recovers on its own (03 §3.4); the steps below stay. -->
+          <text class="invite-rules__amount">{{ state === 'ready' ? `${formatAmount(rulePresentation!.amount)} UVT` : '—' }}</text>
         </template>
-        <text v-else class="invite-rules__label">{{ loading ? t.team.rewardLoading : state === 'disabled' ? t.team.referralRewardsDisabled : copy.inviteRuleSummary }}</text>
-        <view v-if="state === 'unavailable'" class="invite-rules-retry" role="button" tabindex="0" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry">{{ t.network.retry }}</view>
+        <text v-else class="invite-rules__label">{{ loading ? t.team.rewardLoading : t.team.referralRewardsDisabled }}</text>
       </view>
       <TeamArt v-if="art" class="invite-rules__art" kind="invite" :size="96" />
     </view>
@@ -81,10 +81,6 @@ const readFailedWithoutData = computed(() => (environmentInvalidated || liveStat
 const state = computed(() => environmentInvalidated ? 'unavailable'
   : canRetainRule.value ? rulePresentation.value!.state : liveState.value === 'ready' ? 'unavailable' : liveState.value);
 defineExpose({ readFailedWithoutData });
-async function retry() {
-  if (loading.value) return;
-  await Promise.all([cfg.load(), rewards.refresh()]);
-}
 onMounted(() => {
   void cfg.revalidate();
   if (remoteApiEnabled) void rewards.ensure();
@@ -95,9 +91,9 @@ onMounted(() => {
 .invite-rules-content { display: flex; flex-direction: column; gap: 18px; font-family: var(--font-v5); }
 .invite-rules__overview { --nx-tint: var(--v5-brand); display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: 20px; }
 .invite-rules__summary { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
-.invite-rules__label { display: block; color: var(--v5-ink-2); font: 400 14px/20px var(--font-v5); }
-.invite-rules__amount { display: block; color: var(--v5-brand); font: 600 20px/24px var(--font-metric); }
-.invite-rules__note { display: block; color: var(--v5-ink-4); font: 400 12px/16px var(--font-v5); }
+.invite-rules__label { display: block; color: var(--v5-ink-3); font: 400 14px/20px var(--font-v5); }
+.invite-rules__amount { display: block; color: var(--v5-brand); font: 500 20px/24px var(--font-metric); }
+.invite-rules__note { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .invite-rules__art { --team-art-size: 96px; height: 72px; }
 /* Numbered steps hang on one line like a timeline. */
 .invite-rules__steps { display: flex; flex-direction: column; padding: 4px 0; }
@@ -108,6 +104,4 @@ onMounted(() => {
 .invite-rules__step-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .invite-rules__step-title { display: block; color: var(--v5-ink); font: 600 15px/32px var(--font-v5); }
 .invite-rules__step-body { display: block; margin-top: -4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
-.invite-rules-retry { min-height: 44px; display: flex; align-items: center; color: var(--v5-brand); font: 600 13px/20px var(--font-v5); }
-.invite-rules-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 </style>

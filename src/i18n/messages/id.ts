@@ -3104,6 +3104,7 @@ export const id: Messages = {
     dismiss: "Tutup",
     gotIt: "Mengerti",
     retry: "Coba lagi",
+    reload: "Muat ulang",
     close: "Tutup",
     dangerDismissBlocked: "Tindakan ini memerlukan konfirmasi yang jelas",
     save: "Simpan",

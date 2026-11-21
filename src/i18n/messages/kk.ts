@@ -3104,6 +3104,7 @@ export const kk: Messages = {
     dismiss: "Жабу",
     gotIt: "Түсінікті",
     retry: "Қайталау",
+    reload: "Жаңарту",
     close: "Жабу",
     dangerDismissBlocked: "Бұл әрекет нақты растауды талап етеді",
     save: "Сақтау",

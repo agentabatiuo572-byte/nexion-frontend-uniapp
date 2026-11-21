@@ -21,11 +21,6 @@
 
       <text class="block" :style="heroStyle">{{ t.rewards.heroTitle }}</text>
 
-      <view v-if="summaryFailed" class="flex items-center justify-between" :style="summaryErrorStyle">
-        <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-        <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshRewardSummary()"><text>{{ t.store.catalogRetry }}</text></view>
-      </view>
-
       <view class="reward-grid">
         <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-tint': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
           <view v-if="c.key === 'promotion'" class="reward-gift" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h18v4H3zM5 12v9h14v-9M12 8v13M12 8H7.5a2.5 2.5 0 1 1 2.4-3.2L12 8Zm0 0h4.5a2.5 2.5 0 1 0-2.4-3.2L12 8Z" /></svg></view>
@@ -132,7 +127,6 @@ function creditedTotal(symbol: "USDT" | "UVT"): number {
 const usdtTotal = computed(() => creditedTotal("USDT"));
 const nexTotal = computed(() => creditedTotal("UVT"));
 const summaryReady = computed(() => !fundsServerEnabled || bills.summaryStatus === "ready");
-const summaryFailed = computed(() => billsReadFailed.value || voucherReadFailed.value);
 const remoteUsdtTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsUsdt ?? null : null);
 const remoteNexTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsNex ?? null : null);
 // A background refresh (this page re-shows on every return from a detail page)
@@ -314,7 +308,6 @@ const hintStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.6,
 };
-const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px 12px", borderRadius: "var(--v5-radius-s)", background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)", color: "var(--v5-danger)", fontSize: "12px", gap: "12px" };
 
 
 </script>
@@ -327,7 +320,7 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-tile__title { display: block; font: 500 15px/22px var(--font-v5); }
 .reward-tile__amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: var(--v5-space-2); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; }
 .reward-tile__unit { font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); }
-.reward-tile__desc { display: block; margin-top: 6px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.reward-tile__desc { display: block; margin-top: 6px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 /* The USDT card keeps its coral corner light as one uniform tint (.nx-tint). */
 .reward-tile--usdt { --nx-tint: var(--v5-brand-2); grid-column: 1 / -1; padding: 18px; }
 .reward-tile--usdt .reward-tile__amount { font-size: 40px; line-height: 48px; margin-top: 6px; padding-right: 28px; }

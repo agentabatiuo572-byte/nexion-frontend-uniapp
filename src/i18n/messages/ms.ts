@@ -3104,6 +3104,7 @@ export const ms: Messages = {
     dismiss: "Tutup",
     gotIt: "Faham",
     retry: "Cuba lagi",
+    reload: "Muat semula",
     close: "Tutup",
     dangerDismissBlocked: "Tindakan ini memerlukan pengesahan jelas",
     save: "Simpan",

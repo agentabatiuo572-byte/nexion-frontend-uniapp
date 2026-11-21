@@ -3104,6 +3104,7 @@ export const fil: Messages = {
     dismiss: "Isara",
     gotIt: "Sige",
     retry: "Subukan ulit",
+    reload: "I-reload",
     close: "Isara",
     dangerDismissBlocked: "Kailangan ng tahasang kumpirmasyon ang aksyong ito",
     save: "I-save",

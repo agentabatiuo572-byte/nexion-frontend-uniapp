@@ -27,13 +27,6 @@
         </view>
       </view>
       <!-- #endif -->
-      <view v-if="prefs.error" class="mx-4 nx-inline-recovery" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
-        <text class="nx-inline-recovery__copy">{{ preferenceError }}</text>
-        <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryPreferences()">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
-
       <!-- Sound -->
       <view class="mx-4">
         <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
@@ -84,7 +77,7 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
-import { computed, onUnmounted, ref, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
@@ -94,6 +87,7 @@ import { onHide, onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { toast } from "@/store/ui";
 // #ifdef APP-PLUS
 import { nativePushPermission, nativePushRegistrationUnavailable, openNativePushSettings, requestNativePushPermission, refreshNativePush } from "@/services/native-push";
 import { nativePushCopy } from "@/i18n/native-push";
@@ -115,16 +109,12 @@ function managePushPermission() {
 const t = useT();
 const w = computed(() => t.value.preferences);
 const prefs = usePreferences();
-const recovery = useAutoRecovery({
+useAutoRecovery({
   failed: () => remoteApiEnabled && !!prefs.readError,
   retry: () => prefs.refreshRemote(),
 });
 function refreshHealthyPreferences() {
   if (remoteApiEnabled && !prefs.readError && !prefs.loading) return prefs.refreshRemote();
-}
-function retryPreferences() {
-  if (prefs.loading) return;
-  return prefs.readError ? recovery.retry() : refreshHealthyPreferences();
 }
 let releaseActiveRefresh = () => {};
 onShow(() => {
@@ -137,10 +127,9 @@ onUnmounted(() => releaseActiveRefresh());
 // #ifdef APP-PLUS
 onShow(() => refreshNativePush());
 // #endif
-const preferenceError = computed(() => {
-  const labels = t.value.preferences as typeof t.value.preferences & Record<"updateFailed" | "unavailable", string>;
-  return prefs.error === "updateFailed" ? labels.updateFailed : labels.unavailable;
-});
+// Reads recover on their own and show "—" (03 §3.4). A switch the server did not save is the
+// user's own action: one toast, and the switch is back at its confirmed value (03 §3.5.1).
+watch(() => prefs.mutationError, error => { if (error) toast.error(t.value.preferences.updateFailed); }, { flush: "sync" });
 
 // Mandatory kinds cannot be switched off, so they are not listed.
 const notifKinds = (["commission", "team", "market", "genesis", "system"] as NotifKind[]).filter(k => !isMandatoryNotifKind(k));

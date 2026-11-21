@@ -3104,6 +3104,7 @@ export const ru: Messages = {
     dismiss: "Закрыть",
     gotIt: "Понятно",
     retry: "Повторить",
+    reload: "Обновить",
     close: "Закрыть",
     dangerDismissBlocked: "Это действие нужно явно подтвердить",
     save: "Сохранить",
