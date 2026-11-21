@@ -94,8 +94,8 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       const quote=quotes.get(body.promotionQuoteId);if(!quote)return fail(422,'QUOTE_REQUIRED');
       quote.quantity=quote.items.reduce((total,item)=>total+item.quantity,0);
       const now=Date.now(), orderNo='PIN-FLOW-'+(orders.size+1), amount=Number(quote.amountUsdt);
-      const order={orderNo,productId:1,productNo:quote.items[0].productNo,productName:'UVEL Box S1',quantity:quote.quantity,subtotalUsdt:Number(quote.subtotalUsdt),unitPriceUsdt:1299,discountUsdt:0,amountUsdt:quote.amountUsdt,promotionQuoteId:quote.quoteId,paymentMethod:'WALLET',paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',orderType:quote.items.length>1?'BUNDLE':'SINGLE',placedAt:now,expiresAt:now+300000,paidAt:null,activatedAt:null,refundedAt:null,refundAmountUsdt:null,refundChannel:null,refundBillNo:null,dataCenter:null,tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:null,itemCount:quote.itemCount,payBy:new Date(now+300000).toISOString(),rewards:[],items:quote.items.map((item,i)=>({...item,lineId:'pin-line-'+i,productName:'UVEL Box S1'})),lineItems:null};
-      orders.set(orderNo,order);return ok(order);
+      const order={orderNo,productId:1,productNo:quote.items[0].productNo,productName:'UVEL Box S1',quantity:quote.quantity,subtotalUsdt:Number(quote.subtotalUsdt),unitPriceUsdt:1299,discountUsdt:0,amountUsdt:quote.amountUsdt,promotionQuoteId:quote.quoteId,paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',orderType:quote.items.length>1?'BUNDLE':'SINGLE',placedAt:now,expiresAt:now+300000,paidAt:null,activatedAt:null,refundedAt:null,refundAmountUsdt:null,refundChannel:null,refundBillNo:null,dataCenter:null,tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:null,itemCount:quote.itemCount,payBy:new Date(now+300000).toISOString(),rewards:[],items:quote.items.map((item,i)=>({...item,lineId:'pin-line-'+i,productName:'UVEL Box S1'})),lineItems:null};
+      orders.set(orderNo,order);return ok({...order,paymentMethod:null});
     }
     const pay=path.match(/^\/api\/orders\/([^/]+)\/pay$/);
     if(pay&&method==='POST'){
@@ -103,8 +103,9 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       if(order.paymentStatus==='PAID')return ok(order);
       const authorization=authorize(body);
       if(authorization.status!==200)return authorization;
-      state.payWrites++;state.balance-=Number(order.amountUsdt);
-      Object.assign(order,{paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paidAt:Date.now(),activatedAt:Date.now(),targetDeviceId:90301,targetDeviceInstanceNo:'PIN-FLOW-DEVICE',paymentNo:'PIN-FLOW-PAYMENT'});
+      const amount=Number(order.amountUsdt);
+      state.payWrites++;state.balance-=amount;
+      Object.assign(order,{paymentMethod:amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt:amount.toFixed(2),paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paidAt:Date.now(),activatedAt:Date.now(),targetDeviceId:90301,targetDeviceInstanceNo:'PIN-FLOW-DEVICE',paymentNo:'PIN-FLOW-PAYMENT'});
       commands.set('order-pay:'+key,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,receipt:order});
       return {...ok(order),drop:state.dropNextPayment?(state.dropNextPayment=false,true):false};
     }
