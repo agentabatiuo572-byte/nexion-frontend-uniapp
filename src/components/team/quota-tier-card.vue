@@ -123,7 +123,7 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 .quota-stock__ring { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; background:conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%),var(--v5-surface-3) 0); }
 .quota-stock__hole { display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:var(--v5-surface); color:var(--v5-ink); font:500 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-metric); }
 /* Nothing left: a neutral fill, so a full ring does not read as done (dark brand = success). */
-.quota-stock__ring--out { background:conic-gradient(var(--v5-ink-4) calc(var(--nx-viz-ring) * 1%),var(--v5-surface-3) 0); }
+.quota-stock__ring--out { background:conic-gradient(var(--v5-ink-3) calc(var(--nx-viz-ring) * 1%),var(--v5-surface-3) 0); }
 .quota-tier--compact .quota-stock__ring { width:40px; height:40px; }
 /* All-caps English tag gets +0.04em; other languages are sentence case (01 §1.2). */
 .quota-tier__top :deep(.nx-tag):lang(en) { letter-spacing:.04em; }
