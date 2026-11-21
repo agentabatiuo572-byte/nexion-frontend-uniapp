@@ -744,6 +744,7 @@ export const useApp = defineStore("app", () => {
       rowVersion: device.rowVersion,
       kind: canonicalKind(device),
       productCode: device.productCode,
+      imageUrl: device.imageUrl,
       monthlyTargetActive: device.monthlyTargetActive,
       name: device.name,
       gpu: device.gpuModel,

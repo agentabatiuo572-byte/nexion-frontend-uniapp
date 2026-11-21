@@ -46,7 +46,7 @@
           @keydown.enter.stop.prevent="d.kind && goDetail(d.kind)"
         >
           <text class="earn-ranking-row__no">#{{ d.rank }}</text>
-          <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.kind ? getProductMedia(d.kind)?.src ?? null : null" />
+          <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.imageUrl" />
           <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text></view>
           <view class="earn-ranking-value">
             <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
@@ -86,6 +86,7 @@ interface WorkloadPrice {
 }
 
 interface DeviceRanking {
+  imageUrl?: string;
   rank: number;
   /** 商品品牌名(不翻译);手机档没有商品名,走 t.market.yourPhone。 */
   name?: string;
@@ -124,8 +125,8 @@ const workloadCopy = (row: WorkloadPrice) => {
   return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
 };
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
-  : DEVICE_RANKINGS);
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, imageUrl: row.imageUrl, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  : DEVICE_RANKINGS.map(row => ({ ...row, imageUrl: getProductMedia(row.kind)?.src })));
 
 function arrow(w: WorkloadPrice): string {
   return w.delta !== null && w.delta > 0.05 ? "nx-before-arrow-up" : w.delta !== null && w.delta < -0.05 ? "nx-before-arrow-down" : "nx-before-arrow-right";

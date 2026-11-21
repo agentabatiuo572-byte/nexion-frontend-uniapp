@@ -52,7 +52,6 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
 import TeamArt from '@/components/team/team-art.vue';
-import { getProductMedia } from '@/lib/product-media';
 import QuotaTierCard, { type QuotaTier, type QuotaCondition } from "@/components/team/quota-tier-card.vue";
 import PurchaseEligibilityPanel from "@/components/store/purchase-eligibility-panel.vue";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
@@ -314,7 +313,7 @@ const focusedTiers = computed(() => focusedProductId.value
 const tiers = computed<QuotaTier[]>(() =>
   remoteApiEnabled
     ? (!catalogDisplayReady.value ? [] : remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
-      productId: tier.productId, imageUrl: catalogProduct(tier.productId)?.imageUrl, name: catalogProductName(tier.productId, tier.name), price: catalogProduct(tier.productId)?.price ?? tier.price,
+      productId: tier.productId, imageUrl: tier.imageUrl, name: catalogProductName(tier.productId, tier.name), price: catalogProduct(tier.productId)?.price ?? tier.price,
       monthlyStock: tier.monthlyStock, soldThisMonth: tier.soldThisMonth, usedThisMonth: tier.usedThisMonth, remaining: tier.remaining,
       available: tier.available,
       unlockKind: tier.unlockKind === "EITHER" ? "either" : "all",
@@ -338,7 +337,7 @@ function go(url: string) {
 
 const heroTier = computed(() => focusedTiers.value[0]);
 const heroPriceParts = computed(() => formatFinanceAmount(heroTier.value?.price).split('.'));
-const heroImage = computed(() => heroTier.value ? getProductMedia(heroTier.value.productId)?.src ?? heroTier.value.imageUrl : undefined);
+const heroImage = computed(() => heroTier.value?.imageUrl);
 const quotaReady = computed(() => !remoteApiEnabled || (catalogDisplayReady.value && remoteSnapshot.value !== null && !remoteRefreshing.value && !remoteError.value && productCatalogState.status === 'ready'));
 useAutoRecovery({ failed: () => remoteApiEnabled && !conditionsOnly.value && !!remoteError.value && !remoteRefreshing.value, retry: refreshRemoteQuota });
 useAutoRecovery({ failed: () => remoteApiEnabled && productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });

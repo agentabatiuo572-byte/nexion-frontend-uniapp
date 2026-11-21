@@ -81,7 +81,6 @@ import { useProductPhase } from '@/composables/use-product-phase';
 import { isProductAvailable } from '@/store/product-availability';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
-import { catalogProductImageUrl } from '@/lib/product-image';
 import { productTaskLevelsText } from '@/lib/product-copy';
 import { localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
@@ -111,7 +110,7 @@ const catalog=computed(()=>productCatalogPresentation.value?.products??[]);
 const productFor=(id:string)=>catalog.value.find(product=>product.id===id);
 const levelsFor=(id:string)=>productTaskLevelsText(t.value,productFor(id)?.taskLevels??[]);
 const nameFor=(id:string)=>productFor(id)?.name??t.value.uiChrome.unavailable;
-const imageFor=(id:string)=>catalogProductImageUrl(productFor(id)?.imageUrl,'')??'';
+const imageFor=(id:string)=>scopeId.value?activity.value?.productImages?.[id]:productFor(id)?.imageUrl;
 const ruleTerms=computed(()=>activity.value?[
   localized(activity.value.terms,locale.code),
   ...activity.value.rewardRules.map(rule=>[

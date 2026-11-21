@@ -103,11 +103,10 @@ function displayString(value: unknown): string | undefined {
   return normalized || undefined;
 }
 
-function productMediaUrl(value: unknown): string | undefined {
-  const raw = optionalString(value);
-  if (!raw) return undefined;
+export function productMediaUrl(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
   try {
-    const parsed = new URL(raw);
+    const parsed = new URL(value);
     if ((parsed.protocol !== "http:" && parsed.protocol !== "https:")
       || parsed.username || parsed.password || parsed.hash) return undefined;
     return parsed.toString();

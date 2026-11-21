@@ -1,4 +1,7 @@
+import { productMediaUrl } from "@/api/product-catalog-contract";
+
 export interface OrderLineItem {
+  imageUrl?: string;
   sku: string;
   name: string;
   quantity: number;
@@ -22,7 +25,7 @@ export function parseOrderLineItems(value: unknown): OrderLineItem[] {
         || Math.abs(quantity * unitPriceUsdt - lineAmountUsdt) > 0.000001) {
       throw new Error("ORDER_LINE_ITEMS_INVALID");
     }
-    return { sku, name, quantity, unitPriceUsdt, lineAmountUsdt };
+    return { sku, name, quantity, unitPriceUsdt, lineAmountUsdt, imageUrl: productMediaUrl(row.imageUrl) };
   });
   if (new Set(items.map((item) => item.sku)).size !== items.length) throw new Error("ORDER_LINE_ITEMS_INVALID");
   return items;

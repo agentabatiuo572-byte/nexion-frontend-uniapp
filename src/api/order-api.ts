@@ -1,3 +1,4 @@
+import { productMediaUrl } from "./product-catalog-contract";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
@@ -58,6 +59,7 @@ export interface CanonicalOrder {
   orderNo: string;
   productId: number;
   productNo: string;
+  imageUrl?: string;
   productName: string;
   quantity: number;
   subtotalUsdt: number;
@@ -305,6 +307,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     orderNo: nonEmptyString(source.orderNo),
     productId: integer(source.productId, 1),
     productNo: nonEmptyString(source.productNo),
+    imageUrl: productMediaUrl(source.imageUrl),
     productName: nonEmptyString(source.productName),
     quantity: integer(source.quantity, 1),
     subtotalUsdt: historyNumber(source,"subtotalUsdt"),

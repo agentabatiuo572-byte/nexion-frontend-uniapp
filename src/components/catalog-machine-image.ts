@@ -8,8 +8,8 @@ export function promotionMachineSlots(activity: PublicPromotion) {
   if (!rule) return [];
   const reward = rule.buyerReward;
   return [
-    { role: 'purchase' as const, sku: rule.productNo },
-    ...(reward?.type === 'DEVICE' ? [{ role: 'gift' as const, sku: reward.giftProductNo }] : []),
+    { role: 'purchase' as const, sku: rule.productNo, imageUrl: activity.productImages?.[rule.productNo] ?? null },
+    ...(reward?.type === 'DEVICE' ? [{ role: 'gift' as const, sku: reward.giftProductNo, imageUrl: activity.productImages?.[reward.giftProductNo] ?? null }] : []),
   ];
 }
 

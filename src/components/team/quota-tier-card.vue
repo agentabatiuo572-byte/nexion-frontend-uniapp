@@ -7,7 +7,7 @@
       </view>
     </view>
     <view class="quota-product" role="link" tabindex="0" :aria-label="displayName" @click="openProduct" @keydown.enter.prevent="openProduct">
-      <image v-if="productImage" :src="productImage" mode="aspectFit" class="quota-product__image" :alt="displayName" />
+      <image v-if="tier.imageUrl" :src="tier.imageUrl" mode="aspectFit" class="quota-product__image" :alt="displayName" />
       <view class="quota-product__copy"><text class="quota-product__name">{{ displayName }}</text><view class="quota-product__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ priceParts[0] }}</text><text v-if="priceParts[1]" class="quota-price-fraction">.{{ priceParts[1] }}</text></view></view>
       <svg class="quota-product__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
     </view>
@@ -39,7 +39,6 @@ import QuotaConditionBar from './quota-condition-bar.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
 import { useT } from '@/i18n/use-t';
 import { fmt } from '@/i18n/format';
-import { getProductMedia } from '@/lib/product-media';
 import { useScrollGrowProgress, VIZ_RING_TRANSITION } from '@/composables/use-scroll-grow-progress';
 export interface QuotaCondition {
   label: string;
@@ -79,7 +78,6 @@ const visibility = useDataVisibility();
 const locale = useLocaleStore();
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const displayName = computed(() => (props.tier.name));
-const productImage = computed(() => getProductMedia(props.tier.productId)?.src ?? props.tier.imageUrl);
 const { elRef: stockBarRef, inView: stockBarInView } = useScrollGrowProgress();
 const unlocked = computed(() => {
   const met = props.tier.conditions.map(condition => condition.current >= condition.required);

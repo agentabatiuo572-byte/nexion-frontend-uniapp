@@ -1,3 +1,4 @@
+import { productMediaUrl } from "@/api/product-catalog-contract";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
@@ -7,7 +8,7 @@ export type TeamQuotaEnvironment = "PRODUCTION";
 export interface TeamQuotaFacts { rank: number; directRefs: number; directInvites: number | null; activeDirect: number; teamComputePoints: number }
 export interface TeamQuotaCondition { kind: "rank" | "directRefs" | "teamComputePoints"; required: number; current: number }
 export interface TeamQuotaTier {
-  productId: string; quotaCode: string; name: string; price: number; monthlyStock: number; soldThisMonth: number;
+  productId: string; imageUrl?: string; quotaCode: string; name: string; price: number; monthlyStock: number; soldThisMonth: number;
   unlockKind: "ALL" | "EITHER"; conditions: TeamQuotaCondition[]; perks: string[]; available: boolean;
   usedThisMonth: number; pendingThisMonth: number; remaining: number;
 }
@@ -43,7 +44,7 @@ function parse(value: unknown, mode: ApiEnvironment): TeamQuotaSnapshot {
     const usedThisMonth = "usedThisMonth" in item ? num(item.usedThisMonth, true) : soldThisMonth;
     const pendingThisMonth = "pendingThisMonth" in item ? num(item.pendingThisMonth, true) : 0;
     const remaining = "remaining" in item ? num(item.remaining, true) : Math.max(0, monthlyStock - usedThisMonth);
-    return { productId: text(item.productId), quotaCode: text(item.quotaCode), name: text(item.name), price: num(item.price),
+    return { productId: text(item.productId), imageUrl: productMediaUrl(item.imageUrl), quotaCode: text(item.quotaCode), name: text(item.name), price: num(item.price),
       monthlyStock, soldThisMonth, usedThisMonth, pendingThisMonth, remaining, unlockKind,
       conditions, perks: item.perks.map((perk) => text(perk)), available: item.available };
   });

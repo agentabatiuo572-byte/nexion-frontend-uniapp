@@ -71,7 +71,6 @@ import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { formatTrialCountdown } from "@/i18n/trial-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
-import { getProductMedia } from "@/lib/product-media";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useFleetSlots, type FleetSlot } from "@/composables/use-fleet-slots";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
@@ -106,7 +105,7 @@ const jobsText = computed(() => tasksReady.value && fleet.fleetReady.value
   ? fmt(copy.value.jobs, { n: fleet.devices.value.filter(deviceTaskRunning).length }) : "—");
 const dockLabel = computed(() => `${expanded.value ? t.value.home.collapseMyDevices : t.value.home.expandMyDevices}: ${onlineText.value}, ${jobsText.value}`);
 
-const trialArt = computed(() => getProductMedia(fleet.trial.productId.value)?.src ?? null);
+const trialArt = fleet.trial.imageUrl;
 const trialStatusText = computed(() => !fleet.trial.presentationReady.value ? trialCopy.value.statusUnknown
   : fleet.trialOnline.value ? t.value.earn.online : trialCopy.value.grace);
 const trialRemaining = computed(() => fleet.trial.remainingMs.value === null ? "—" : formatTrialCountdown(fleet.trial.remainingMs.value));

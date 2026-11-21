@@ -64,8 +64,8 @@ const baseShort = computed(() => calculator.value
   : "");
 // Phone and GPU bases are already named "your phone" / "your computer GPU"; only SKUs take "vs your {base}".
 const generalBase = computed(() => calculator.value?.base.kind === "phone" || calculator.value?.base.kind === "pc-gpu");
-const baseArt = useDeviceProductImage(() => ({ kind: calculator.value?.base.kind ?? "cloud-share", productCode: calculator.value?.base.productNo ?? "", capacitySource: "server" }));
-const targetArt = useDeviceProductImage(() => ({ kind: calculator.value?.target.kind ?? "cloud-share", productCode: calculator.value?.target.productNo ?? "", capacitySource: "server" }));
+const baseArt = useDeviceProductImage(() => ({ kind: calculator.value?.base.kind ?? "cloud-share", imageUrl: calculator.value?.base.imageUrl }));
+const targetArt = useDeviceProductImage(() => ({ kind: calculator.value?.target.kind ?? "cloud-share", imageUrl: calculator.value?.target.imageUrl }));
 
 // Hidden statistics use one neutral placeholder height so the ratio does not leak.
 const pillarHeights = computed(() => visibility.hidden || !calculator.value

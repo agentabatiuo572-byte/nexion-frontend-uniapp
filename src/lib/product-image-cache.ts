@@ -11,7 +11,7 @@ export function productImageCacheKey(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash
-      || !/^\/api\/store\/media\/images\/[A-Za-z0-9._-]+\/[A-Za-z0-9_-]{20,240}$/.test(parsed.pathname)
+      || !/^\/api\/store\/media\/(?:images|business-images)\/[A-Za-z0-9._-]+\/[A-Za-z0-9_-]{20,240}$/.test(parsed.pathname)
       || !/^[A-Za-z0-9_-]{43}$/.test(parsed.searchParams.get("signature") ?? "")
       || !/^\d{1,12}$/.test(parsed.searchParams.get("expires") ?? "")
       || Number(parsed.searchParams.get("expires")) * 1000 <= Date.now()) return null;

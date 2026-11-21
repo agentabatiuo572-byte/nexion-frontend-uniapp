@@ -14,7 +14,7 @@ export interface PromotionEntrySnapshot {
   title: LocalizedText; startsAt: string; endsAt: string; serverTime: string;
   bannerImageUrl: string | null; kind: "gift" | "coupon" | "spark" | "plain";
   benefit: string; href: string;
-  slots: Array<{ role: "purchase" | "gift"; sku: string }>;
+  slots: Array<{ role: "purchase" | "gift"; sku: string; imageUrl?: string | null }>;
 }
 export interface TabSnapshotData {
   home: { earnings: { today: AppHomePeriod; week: AppHomePeriod; month: AppHomePeriod; all: AppHomePeriod }; latest: AppHomeEarningsLedgerRow | null };
@@ -49,7 +49,7 @@ let context: Context | null = null, accepted = false, binding = 0;
 let restored = new Set<TabSnapshotKey>();
 
 // The storage boundary validates this new format once. No migration or whole-store hydration.
-type Schema = "signedNumber" | "number" | "count" | "percent" | "string" | "boolean" | { nullable: Schema } | { list: Schema } | { oneOf: readonly unknown[] } | { fields: Record<string, Schema> };
+type Schema = "signedNumber" | "number" | "count" | "percent" | "string" | "boolean" | { nullable: Schema } | { list: Schema } | { oneOf: readonly unknown[] } | { anyOf: Schema[] } | { fields: Record<string, Schema> };
 const n: Schema = "number", c: Schema = "count", pct: Schema = "percent", s: Schema = "string", b: Schema = "boolean";
 const nullable = (value: Schema): Schema => ({ nullable: value });
 const fields = (value: Record<string, Schema>): Schema => ({ fields: value });
@@ -57,6 +57,7 @@ const list = (value: Schema): Schema => ({ list: value });
 const amount = nullable(fields({ usd: n, nex: n }));
 const period = fields({ usdt: nullable(n), nex: nullable(n), jobCount: nullable(c) });
 const localized = fields({ zh: s, en: s, vi: s });
+const promotionSlot = { role: { oneOf: ["purchase", "gift"] }, sku: s };
 const schemas: Record<TabSnapshotKey, Schema> = {
   home: fields({ earnings: fields({ today: period, week: period, month: period, all: period }), latest: nullable(fields({ id: s, client: s, model: s, rewardUsdt: n, completedAt: s, synthetic: b })) }),
   wallet: fields({ usdt: "signedNumber", nex: n, today: fields({ usdt: n, nex: n }) }),
@@ -69,7 +70,7 @@ const schemas: Record<TabSnapshotKey, Schema> = {
   promotions: list(fields({ displayOnly: { oneOf: [true] }, activityId: s, version: c,
     template: { oneOf: ["SKU_GIFT", "FIRST_PURCHASE", "DIRECT_REFERRAL", "MULTI_PRODUCT", "REPURCHASE"] }, title: localized,
     startsAt: s, endsAt: s, serverTime: s, bannerImageUrl: nullable(s), kind: { oneOf: ["gift", "coupon", "spark", "plain"] }, benefit: s, href: s,
-    slots: list(fields({ role: { oneOf: ["purchase", "gift"] }, sku: s })) })),
+    slots: list({ anyOf: [fields(promotionSlot), fields({ ...promotionSlot, imageUrl: nullable(s) })] }) })),
   catalogYield: fields({ entry: amount, pro: amount, rack: amount, ladder: list(fields({ id: { oneOf: ["phone", "entry", "pro", "proV2", "rack", "rackP2"] }, amount, widthPct: n })) }),
   phoneYield: amount,
 };
@@ -81,6 +82,7 @@ function valid(value: unknown, schema: Schema): boolean {
   if (typeof schema === "string") return typeof value === schema;
   if ("nullable" in schema) return value === null || valid(value, schema.nullable);
   if ("oneOf" in schema) return schema.oneOf.includes(value);
+  if ("anyOf" in schema) return schema.anyOf.some(choice => valid(value, choice));
   if ("list" in schema) return Array.isArray(value) && value.every(item => valid(item, schema.list));
   return record(value) && Object.keys(value).length === Object.keys(schema.fields).length
     && Object.entries(schema.fields).every(([key, child]) => valid(value[key], child));

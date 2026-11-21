@@ -35,7 +35,7 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
+        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -196,8 +196,6 @@ import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from "@/components/checkout/CheckoutResult.vue";
 import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
-import { getOrderProductMedia } from "@/lib/product-media";
-import { revalidateProductCatalog } from "@/store/product-catalog";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import { useT } from "@/i18n/use-t";
@@ -323,7 +321,6 @@ async function refreshOrderWallet(): Promise<boolean> {
 }
 async function refreshOrder() {
   if (!remoteApiEnabled || !detailVisible || !id.value.trim() || !remoteOrderBoundAccount.value) return;
-  void revalidateProductCatalog();
   if (remoteOrderRefreshing.value && activeRemoteOrderScope
     && isCurrentDetailScope(activeRemoteOrderScope)) return remoteOrderRead;
   const scope = captureDetailScope();
@@ -674,9 +671,7 @@ const externalPayment = computed(() => { purchasePaymentState.revision; return o
 watch(() => purchasePaymentState.notice, notice => {
   if (notice === 'existing' && purchasePaymentState.orderNo === id.value) paymentLookupScope = null;
 });
-const heroImage = computed(() => order.value
-  ? getOrderProductMedia(order.value.productId, order.value.lineItems)?.src
-  : undefined);
+const heroImage = computed(() => order.value?.imageUrl);
 
 // lucide outline paths per status (Clock / CheckCircle2 / Server / Cpu / XCircle)
 function iconFor(status: OrderStatus): string[] {
