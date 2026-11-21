@@ -392,6 +392,7 @@ type ConfirmedSecurityReadback = {
   message: () => string;
   releaseReceipt?: () => void;
   tone?: "warn";
+  cancelledRequestNo?: string;
 };
 const overviewReadback = shallowRef<ConfirmedSecurityReadback | null>(null);
 const deletionReadback = shallowRef<ConfirmedSecurityReadback | null>(null);
@@ -830,7 +831,9 @@ async function loadRemoteDeletionStatus(): Promise<boolean> {
     deletionStatus.value = status;
     deletionStatusCurrent.value = true;
     deletionStatusReadFailed.value = false;
-    settleSecurityReadback(deletionReadback);
+    if (status.status === "CANCELLED" && status.requestNo === deletionReadback.value?.cancelledRequestNo) {
+      settleSecurityReadback(deletionReadback);
+    }
     return true;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
@@ -1377,6 +1380,7 @@ async function handleCancelAccountDeletion() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     const current = deletionStatus.value;
     if (!current || current.status === "NONE") return;
+    const requestKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)?.commands?.[DELETION_REQUEST_INTENT];
     const intent = `account-deletion-cancel:${current.requestNo}:${current.version}`;
     const key = acquireAccountCommandKey(
       SECURITY_COMMAND_TABLE,
@@ -1386,12 +1390,14 @@ async function handleCancelAccountDeletion() {
     );
     const cancelled = await accountApi.cancelAccountDeletion(current.version, key);
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cancelled.status !== "CANCELLED") throw new Error("ACCOUNT_DELETION_CANCEL_RESPONSE_INVALID");
+    if (cancelled.status !== "CANCELLED" || cancelled.requestNo !== current.requestNo) {
+      throw new Error("ACCOUNT_DELETION_CANCEL_RESPONSE_INVALID");
+    }
     await readBackConfirmedSecurityCommand("deletion", {
+      cancelledRequestNo: cancelled.requestNo,
       message: () => t.value.security.cancelDeletionSuccess,
       releaseReceipt: () => {
         releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, key);
-        const requestKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)?.commands?.[DELETION_REQUEST_INTENT];
         if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, requestKey);
         syncDeletionSubmittedReason(accountKey);
       },
