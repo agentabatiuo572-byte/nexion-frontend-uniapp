@@ -31,7 +31,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoAccountId;
   const existingIntent = intent => ({
     ...refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'),
-    data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo, commandKey: intent.commandKey},
+    data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo},
   });
   function replacementRefusal(url, request, kind, sourceId) {
     if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
@@ -399,6 +399,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
       const intent = [...intents.values()].find(row => row.kind === url.searchParams.get('kind') && row.commandKey === url.searchParams.get('commandKey'));
       return readIntent(intent);
+    }
+    const snapshot = path.match(/^\/api\/app\/purchase-payment-intents\/snapshots\/([^/]+)$/);
+    if (snapshot && method === 'GET') {
+      if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
+      return readIntent(intents.get(decodeURIComponent(snapshot[1])));
     }
     const one = path.match(/^\/api\/app\/purchase-payment-intents\/([^/]+)$/);
     if (one && method === 'GET') {
