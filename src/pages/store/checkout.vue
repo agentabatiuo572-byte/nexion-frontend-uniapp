@@ -1,6 +1,6 @@
 <!-- Checkout review presentation. Transaction quotes, confirmation and recovery remain server-authoritative. -->
 <template>
-  <AppChassis active="store">
+  <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
     <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
       <template #review-footer>
@@ -2530,6 +2530,17 @@ async function submitRemoteOrder(): Promise<void> {
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
 const purchasePayment = usePurchasePayment();
+function resumeCheckoutAfterCapacity(target: string) {
+  if (promotionRoute.value) {
+    promotionCheckout.value?.resumeAfterCapacityRecovery(target);
+    return;
+  }
+  if (keepCheckoutTarget.value !== target || !isCurrentCheckoutRoute(captureCheckoutRoute())) return;
+  keepCheckoutRecovery.value = null;
+  const sheet = tradein.state;
+  if (sheet.kind === "keep-recovery" && sheet.targetKind === target) tradein.hide();
+  refreshVisibleCheckout();
+}
 const stopCheckoutCapacityRelease = onPurchaseRecordReleased((accountKey, commandKey) => {
   const recovery = keepCheckoutRecovery.value;
   if (recovery?.accountKey !== accountKey || recovery.commandKey !== commandKey) return;
@@ -2537,11 +2548,7 @@ const stopCheckoutCapacityRelease = onPurchaseRecordReleased((accountKey, comman
   // Some releases notify in the same turn as they remove the saved payment.
   void nextTick(() => {
     if (!pageAlive || app.accountKey !== accountKey || keepCheckoutRecovery.value !== recovery) return;
-    keepCheckoutRecovery.value = null;
-    if (!isCurrentCheckoutRoute(scope) || scope.productNo !== recovery.target) return;
-    const sheet = tradein.state;
-    if (sheet.kind === "keep-recovery" && sheet.targetKind === recovery.target) tradein.hide();
-    refreshVisibleCheckout();
+    if (isCurrentCheckoutRoute(scope) && scope.productNo === recovery.target) resumeCheckoutAfterCapacity(recovery.target);
   });
 });
 useAutoRecovery({

@@ -277,6 +277,13 @@ function recoverKeepBeforeNewPurchase(reopen=false):boolean {
   }
   return false;
 }
+function resumeAfterCapacityRecovery(target: string) {
+  if (!current() || !visible.value || keepRecoveryTarget.value !== target) return;
+  keepRecoveryTarget.value = null;
+  keepRecoveryReadError.value = false;
+  if (tradein.state.kind === 'keep-recovery' && tradein.state.targetKind === target) tradein.hide();
+  void loadQuote();
+}
 const rewardsReleased=computed(()=>!!order.value&&['CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus));
 const items=computed<Array<{productNo:string;quantity:number;productName?:string;imageUrl?:string|null;subtotalUsdt?:string}>>(()=>order.value?.items??displayQuote.value?.items??selection.value);const rewards=computed(()=>order.value?.rewards??displayQuote.value?.expectedRewards??[]);
 // Match the published device FAQ's scope in store/detail; do not extend it to SHARE.
@@ -717,7 +724,7 @@ const footer = computed(() => {
 });
 const backDisabled=computed(()=>busy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
 const resultVisible = computed(() => order.value?.paymentStatus === 'PAID');
-defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible});
+defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,keepRecoveryTarget,resumeAfterCapacityRecovery});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{

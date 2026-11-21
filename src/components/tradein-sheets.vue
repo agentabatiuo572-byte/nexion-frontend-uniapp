@@ -309,8 +309,10 @@ import { acquireAccountCommandKey, releaseAccountCommandKey,readAccountRow,write
 import { readCheckoutTradein } from "@/lib/checkout-order-recovery";
 import { CAPACITY_RECOVERY_TABLE, capacityIntent, readCapacityPending, type CapacityPending } from '@/lib/capacity-command-recovery';
 import { CAPACITY_COMMAND_TABLE, readPendingKeepCommand, type PendingKeepCommand } from "@/lib/keep-command-recovery";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 
-const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
+const props = withDefaults(defineProps<{ active?: boolean; checkoutCapacityTarget?: string | null }>(), { active: true });
+const emit = defineEmits<{ (event: "checkout-capacity-cleared", target: string): void }>();
 // Each step renders exactly one .tis-title; the dialog takes its accessible name from whichever one is on screen.
 const titleId = `tis-title-${getCurrentInstance()?.uid}`;
 const sheet = useTradeinSheet();
@@ -386,22 +388,27 @@ const stopCapacityRelease = onPurchaseRecordReleased((accountKey, key) => {
   capacityResumeAllowed.value = false;
   refreshKeepRecovery();
 });
-onUnmounted(stopCapacityRelease);
+onUnmounted(() => { capacityRecoveryGeneration++; stopCapacityRelease(); });
 // Once the original payment is confirmed gone, a keep-recovery sheet has nothing left to show or resume: close it
 // instead of leaving an empty dialog.
 watch(() => props.active && state.value.kind === 'keep-recovery' && !capacityRecovery.value && !capacityRecoveryUnavailable.value && !keepRecoveryError.value,
   empty => { if (empty) hide(); });
-watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,state,
+// A checkout owns the read for the whole visible visit, including after its sheet closes.
+watch([()=>props.active,()=>props.checkoutCapacityTarget,()=>props.checkoutCapacityTarget ? null : state.value,
   ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl],()=>{
   capacityRecoveryGeneration++;
+},{flush:'sync'});
+watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,()=>props.checkoutCapacityTarget,state,
+  ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl],()=>{
   capacityResumeAllowed.value=false;
   try { savedCapacity.value=remoteApiEnabled?readCapacityPending(app.accountKey):null;capacityRecoveryUnavailable.value=false; }
   catch { capacityRecoveryUnavailable.value=true; }
 },{immediate:true,flush:'sync'});
 useAutoRecovery({
-  failed: () => remoteApiEnabled && props.active && capacityPageShown.value && state.value.kind !== 'none'
+  failed: () => remoteApiEnabled && props.active && capacityPageShown.value
     && !capacityReadBusy.value && !capacityRecoveryBusy.value && !confirming.value && !capacityResumeAllowed.value
-    && !!(capacityRecovery.value || capacityRecoveryUnavailable.value || keepRecoveryError.value),
+    && (!!props.checkoutCapacityTarget || (state.value.kind !== 'none'
+      && !!(capacityRecovery.value || capacityRecoveryUnavailable.value || keepRecoveryError.value))),
   retry: () => recoverCapacityPurchase(false),
   repeatMs: 15_000,
 });
@@ -1120,7 +1127,7 @@ function rejectCapacityPurchase(accountKey: string, original: CapacityPending, m
 }
 
 async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requestedQuote:CanonicalCapacityReplaceQuote|null,
-    newKind:DeviceKind,allowOriginalResume=false,readOnlyCurrent?:()=>boolean):Promise<void> {
+    newKind:DeviceKind,allowOriginalResume=false,readOnlyCurrent?:()=>boolean):Promise<"rejected" | void> {
   if (capacityRecoveryBusy.value || capacityReadBusy.value) return;
   const scope=captureAccountScope(),requestedIntent=requestedQuote?capacityIntent(operation,requestedQuote):null;
   const current=()=>isCurrentAccountScope(scope)&&(!readOnlyCurrent||readOnlyCurrent());
@@ -1150,7 +1157,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         ?parseCanonicalTradeinResult(result.receipt):parseCanonicalCapacityKeepResult(result.receipt);
       else if (result.status==='REJECTED') {
         rejectCapacityPurchase(scope.accountKey, original, result.message);
-        return;
+        return "rejected";
       } else {
         capacityResumeAllowed.value=result.status==='NOT_SEEN'&&result.canResumeSameKey;
         if (!capacityResumeAllowed.value || !allowOriginalResume) return;
@@ -1220,12 +1227,23 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
 async function recoverCapacityPurchase(resume=false):Promise<void> {
   if (!props.active||!capacityPageShown.value||capacityReadBusy.value||capacityRecoveryBusy.value||confirming.value) return;
   const scope=captureAccountScope(),generation=capacityRecoveryGeneration;
-  const current=()=>isCurrentAccountScope(scope)&&props.active&&capacityPageShown.value&&generation===capacityRecoveryGeneration;
+  const target = props.checkoutCapacityTarget;
+  const current=()=>isCurrentAccountScope(scope)&&props.active&&capacityPageShown.value&&generation===capacityRecoveryGeneration
+    && (resume || foregroundReadAllowed());
+  if (!current()) return;
   try {
-    const pending=readCapacityPending(app.accountKey);
-    if (!pending) {savedCapacity.value=null;capacityResumeAllowed.value=false;capacityRecoveryUnavailable.value=false;refreshKeepRecovery();return;}
+    const pending=readCapacityPending(scope.accountKey, target ?? undefined);
+    if (!pending || (target && !resume && refusedPurchasePayment(scope.accountKey, pending.key))) {
+      savedCapacity.value = null;
+      capacityResumeAllowed.value = false;
+      capacityRecoveryUnavailable.value = false;
+      refreshKeepRecovery();
+      if (target) emit("checkout-capacity-cleared", target);
+      return;
+    }
     capacityRecoveryUnavailable.value=false;
-    await runCanonicalCapacityPurchase(pending.operation,pending.quote,(pending.quote?pending.quote.targetProductNo:pending.targetProductNo) as DeviceKind,resume,resume?undefined:current);
+    const result = await runCanonicalCapacityPurchase(pending.operation,pending.quote,(pending.quote?pending.quote.targetProductNo:pending.targetProductNo) as DeviceKind,resume,resume?undefined:current);
+    if (result === "rejected" && target && current()) emit("checkout-capacity-cleared", target);
   } catch { if(current())capacityRecoveryUnavailable.value=true; }
 }
 
@@ -1235,7 +1253,7 @@ async function submitCanonicalCapacityReplacement(
   recovered?:{key:string;receipt:CanonicalTradeinResult},
   readOnlyCurrent?:()=>boolean,
 ): Promise<void> {
-  if (!recovered) return runCanonicalCapacityPurchase('replace',quote,newKind);
+  if (!recovered) { await runCanonicalCapacityPurchase('replace',quote,newKind); return; }
   const requestScope = captureAccountScope();
   const intent = capacityIntent("replace", quote);
   let commandKey = "";
@@ -1416,7 +1434,7 @@ async function submitCanonicalKeepBuy(
   recovered?:{key:string;intent:string;receipt:CanonicalCapacityKeepResult},
   readOnlyCurrent?:()=>boolean,
 ): Promise<void> {
-  if (!recovered) return runCanonicalCapacityPurchase('keep',quote,newKind);
+  if (!recovered) { await runCanonicalCapacityPurchase('keep',quote,newKind); return; }
   const requestScope = captureAccountScope();
   let intent = "";
   let key = "";
