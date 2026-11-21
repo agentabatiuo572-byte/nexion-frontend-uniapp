@@ -3272,7 +3272,7 @@ export const id: Messages = {
     timeDaysAgo: "{n} hari lalu",
     deleteAccount: "Ajukan penghapusan akun",
     deleteAccountHint: "Selesaikan saldo, staking, dan pesanan sebelum penghapusan. Dana tidak hangus karena penghapusan. Catatan keuangan dan keamanan yang wajib disimpan menurut hukum tidak langsung dihapus.",
-    deleteAccountPending: "Permintaan penghapusan akun sudah dikirim. Jangan kirim ulang.",
+    deleteAccountPending: "Permintaan penghapusan akun sudah dikirim dan sedang ditinjau.",
     deleteAccountConfirm: "Ajukan penghapusan akun UVEL?\n\nAnda akan dikeluarkan dari akun. Cek status permintaan penghapusan untuk melihat kapan selesai.",
     deleteAccountSettlementRequirements: "Sebelum penghapusan dapat diselesaikan:\n• Saldo USDT dan UVT yang tersedia harus nol, tanpa dana yang dibekukan untuk penarikan.\n• Tidak ada penarikan, deposit, atau penukaran yang sedang diproses.\n• Semua staking dan pesanan perangkat harus sudah berakhir.\n\nDana tidak hangus karena penghapusan. Dana atau pesanan yang belum selesai akan menghalangi penghapusan. Setelah selesai, batalkan permintaan lama dan ajukan kembali.",
     deleteAccountBlockedByBalance: "Tersedia: {usdt}\u00A0USDT dan {nex}\u00A0UVT. Tarik atau tukarkan sendiri jika tersedia. Jika jumlahnya terlalu kecil untuk ditarik atau ditukar, hubungi dukungan untuk membantu menyelesaikan saldo sebelum melanjutkan penghapusan. Dana tidak hangus karena penghapusan.",

@@ -2886,7 +2886,7 @@ autoDetect: "auto-detect coming soon",
     timeDaysAgo: "{n}d ago",
     deleteAccount: "Request account deletion",
     deleteAccountHint: "Settle balances, stakes and orders before deletion. Deletion does not forfeit your funds or immediately erase financial and security records required by law.",
-    deleteAccountPending: "Deletion request submitted. Please do not submit it again.",
+    deleteAccountPending: "Deletion request submitted and under review.",
     deleteAccountConfirm:
       "Submit a UVEL account deletion request?\n\nYou will be signed out. Check the deletion request status for completion.",
     deleteAccountSettlementRequirements: "Before deletion can be completed:\n• Available USDT and UVT balances must both be zero, with no funds frozen for withdrawal.\n• No withdrawals, deposits or exchanges may be in progress.\n• All stakes and device orders must have ended.\n\nDeletion does not forfeit your funds. Unsettled funds or orders will block completion. Once settled, cancel the original request and submit a new one.",

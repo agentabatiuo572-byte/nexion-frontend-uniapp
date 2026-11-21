@@ -1149,7 +1149,6 @@ async function handleCancelAccountDeletion() {
   const ok = await uiConfirm({
     title: t.value.security.cancelDeletionRequest,
     message: t.value.security.cancelDeletionMessage,
-    danger: true,
     confirmLabel: t.value.security.cancelDeletionRequest,
     owner: securityConfirmOwner,
   });

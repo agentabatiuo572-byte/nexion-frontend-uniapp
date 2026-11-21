@@ -3272,7 +3272,7 @@ export const uz: Messages = {
     timeDaysAgo: "{n} kun oldin",
     deleteAccount: "Akkauntni oʻchirish soʻrovi",
     deleteAccountHint: "O‘chirishdan oldin balans, steyking va buyurtmalarni yakunlang. O‘chirish mablag‘larni bekor qilmaydi. Qonun bo‘yicha saqlanishi kerak bo‘lgan moliyaviy va xavfsizlik qaydlari darhol o‘chirilmaydi.",
-    deleteAccountPending: "Akkauntni oʻchirish soʻrovi yuborildi. Qayta yubormang.",
+    deleteAccountPending: "Akkauntni oʻchirish soʻrovi yuborildi va koʻrib chiqilmoqda.",
     deleteAccountConfirm: "UVEL akkauntini oʻchirish soʻrovi yuborilsinmi?\n\nSiz akkauntdan chiqarilasiz. Yakunlanishini soʻrov holatidan kuzating.",
     deleteAccountSettlementRequirements: "O‘chirishni yakunlash shartlari:\n• Mavjud USDT va UVT balanslari nol bo‘lishi, yechish uchun muzlatilgan mablag‘ bo‘lmasligi kerak.\n• Jarayondagi yechish, to‘ldirish yoki ayirboshlash bo‘lmasligi kerak.\n• Barcha steykinglar va qurilma buyurtmalari tugagan bo‘lishi kerak.\n\nO‘chirish mablag‘larni bekor qilmaydi. Yakunlanmagan mablag‘ yoki buyurtmalar o‘chirishni to‘sadi. Yakunlagach, eski so‘rovni bekor qilib, yangisini yuboring.",
     deleteAccountBlockedByBalance: "Mavjud: {usdt}\u00A0USDT va {nex}\u00A0UVT. Imkon bo‘lsa, mablag‘ni o‘zingiz yeching yoki ayirboshlang. Miqdor yechish yoki ayirboshlash uchun juda kichik bo‘lsa, o‘chirishni davom ettirishdan oldin balansni yakunlashda yordam olish uchun yordam xizmatiga murojaat qiling. O‘chirish mablag‘larni bekor qilmaydi.",
