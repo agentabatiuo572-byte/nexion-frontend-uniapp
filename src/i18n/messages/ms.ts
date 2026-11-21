@@ -1855,6 +1855,7 @@ export const ms: Messages = {
     replaceWarning: "Peranti aktif dengan pendapatan terendah perlu dinyahaktifkan sebelum {newKind} boleh beroperasi.",
     replaceLowestDeviceLabel: "Nyahaktifkan",
     replaceLowestText: "{name} · ${earn}/hari (hari ini)",
+    replaceTaskHint: "Selepas diganti, tugasan semasa dibatalkan tanpa pendapatan; peranti masuk inventori.",
     replaceReplaceCta: "Ganti dan aktifkan {newKind}",
     replaceKeepCta: "Beli {newKind} harga penuh",
     replaceCancel: "Batal",

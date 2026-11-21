@@ -1855,6 +1855,7 @@ export const fil: Messages = {
     replaceWarning: "Kailangang umalis ang aktibong device na may pinakamababang kita bago mag-online ang {newKind}.",
     replaceLowestDeviceLabel: "Aalis",
     replaceLowestText: "{name} · ${earn}/d ngayon",
+    replaceTaskHint: "Kapag pinalitan, kanselado ang task nito nang walang kita at mapupunta sa inventory.",
     replaceReplaceCta: "Palitan at i-activate ang {newKind}",
     replaceKeepCta: "Bilhin ang {newKind} sa buong presyo",
     replaceCancel: "I-cancel",
