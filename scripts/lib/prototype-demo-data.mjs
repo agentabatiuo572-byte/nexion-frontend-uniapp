@@ -430,9 +430,9 @@ export function demoFleetFacts(url,locale,state) {
     // A session device starts its own purchase history at its paid order.
     // Saved conversions made before the separate snapshot stored the claim name on the order.
     const name=order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name;
-    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:Number(order.amountUsdt)/order.quantity,
+    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
       activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
-      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null}),...order.replacementDevice});
+      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null}),...order.replacementDevice,actualPaidUsdt:Number(order.amountUsdt)/order.quantity});
   }
   let reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
@@ -908,7 +908,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         replacementDevice:{deviceType:product.productType,gpuModel:product.gpu,
           vramTotalGb:Number.parseInt(product.vram,10),basePowerW:Number.parseInt(product.power,10),
           status:quote.targetDeviceStatus,runtimeStatus:active?'ONLINE':'OFFLINE',lastSeenAt:active?now:null,
-          purchasedAt:now,actualPaidUsdt:quote.targetPriceUsdt,sourceOrderNo:orderNo,
+          purchasedAt:now,sourceOrderNo:orderNo,
           sourceChannel:keepingCapacity?'ORDER':'TRADE_IN',pendingDeactivate:false}})};
     (state.createdOrders||=[]).unshift(order);
     if(currentTask?.status==='RUNNING'){

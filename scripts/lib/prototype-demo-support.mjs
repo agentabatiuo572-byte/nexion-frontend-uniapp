@@ -1,10 +1,17 @@
 // Local-only conversation samples; no message leaves the preview server.
 import { createHash } from 'node:crypto';
-import { demoAccountId } from './prototype-demo-identity.mjs';
+import { demoAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 
-// The preview has one authenticated demo account. Tests may switch that server
-// identity; the browser never supplies the account used to select a marker.
-export const supportAccountId=state=>String(state.supportAccountId??900001);
+const supportAccountId=state=>String(state.supportAccountId??demoAccountId);
+
+// Keep the original account's exported sample shape. Other accounts seed their
+// own conversations, commands and read markers from the same preview settings.
+export function supportStateFor(state,accountId) {
+  if(accountId===supportAccountId(state))return state;
+  const account=(state.supportAccounts??={})[accountId]??={supportAccountId:accountId};
+  const {messageState,dataState,supportAdvisorId,supportReadbackState}=state;
+  return Object.assign(account,{messageState,dataState,supportAdvisorId,supportReadbackState});
+}
 const peerKey=detail=>detail.conversation.ownerAgentId?'agent:'+detail.conversation.ownerAgentId:'conversation:'+detail.conversation.conversationNo;
 const clearMarker=(state,detail)=>state.supportUserClearMarkers?.find(row=>row.accountId===supportAccountId(state)&&row.peerKey===peerKey(detail));
 
@@ -30,10 +37,11 @@ const commandFingerprint=(operation,target,input)=>createHash('sha256').update(J
 function restoreMessageCommands(state) {
   state.supportMessageCommands??=[];
   const known=new Set(state.supportMessageCommands.map(command=>command.key)),recovered=new Map();
+  const accountId=supportAccountId(state);
   const remember=(key,fingerprint,detail)=>{
     if(typeof key!=='string'||!key||known.has(key))return;
     // Multiple legacy owners cannot authorize replay to either conversation.
-    recovered.set(key,{key,fingerprint:recovered.has(key)?null:fingerprint,conversationNo:detail.conversation.conversationNo});
+    recovered.set(key,{key,accountId,fingerprint:recovered.has(key)?null:fingerprint,conversationNo:detail.conversation.conversationNo});
   };
   const isText=message=>message?.senderType==='user'&&typeof message.content==='string'
     &&(!message.kind||message.kind==='TEXT')&&!message.attachmentId;
@@ -160,6 +168,10 @@ export function setTransferSampleOutcome(state) {
 export function supportDemo(url,locale,state,request) {
   const root='/api/app/support',p=url.pathname;
   if(!p.startsWith(root))return undefined;
+  const senderAccountId=request.accountId??(request.headers
+    ? previewAccountId(state,request.headers()) : supportAccountId(state));
+  if(!senderAccountId)throw Object.assign(new Error('AUTH_REQUIRED'),{status:401});
+  state=supportStateFor(state,senderAccountId);
   const method=request.method(),input=method==='GET'?{}:request.postDataJSON(),now=new Date().toISOString();
   const text=(zh,en,vi)=>locale==='zh'?zh:locale==='vi'?vi:en;
   // B16 registration welcome: one copy per language, the same for every new account.
@@ -170,7 +182,6 @@ export function supportDemo(url,locale,state,request) {
     clearedPeers:(state.supportUserClearMarkers||[]).filter(row=>row.accountId===supportAccountId(state)).map(({accountId,...marker})=>structuredClone(marker))};
   if(p===root+'/attachments/policy')return {available:false,allowedMimeTypes:[],maxBytes:null,maxPixels:null,ttlSeconds:null,unavailableReason:text('演示暂不上传附件','Attachments are unavailable in this demo','Bản mẫu chưa hỗ trợ tệp đính kèm')};
   if(p===root+'/conversation-categories')return [{type:'advisor',enabled:true},{type:'support',enabled:true},{type:'ai',enabled:false}];
-  const senderAccountId=request.accountId??demoAccountId;
   const scenario=state.messageState||'normal';
   if(state.supportConversations==null) {
     // The demo account's advisor conversation opens with the registration welcome.

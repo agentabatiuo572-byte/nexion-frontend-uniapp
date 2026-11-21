@@ -30,6 +30,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return reason === 'NETWORK_SWITCH_OFF' ? refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED') : null;
   };
   const handles = path => path.startsWith(base);
+  const readableIntent = intent => state.paymentState === 'intent-missing' ? undefined : intent;
   function replacementRefusal(url, request, kind, payload) {
     if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
     const fleet = demoFleetFacts(url, locale(), state), id = payload.sourceDeviceId;
@@ -192,7 +193,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   };
   function paymentCommand(kind, key) {
     sync();
-    const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
+    const intent = readableIntent([...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key));
     if (!intent) return null;
     if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
     const original = {kind, commandKey: key, canResumeSameKey: false};
@@ -216,7 +217,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
   function readIntent(intent) {
     if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE');
-    if (state.paymentState === 'intent-missing') return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
+    intent = readableIntent(intent);
     return intent ? {status: 200, message: 'OK', data: view(intent)} : refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
   }
   function handle(url, request) {
@@ -228,7 +229,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (previewAccountId(state, request.headers?.() ?? {}) !== demoAccountId
           || !ordersOf(url.origin).some(order => order.orderNo === orderNo)) return refused(404, 'ORDER_NOT_FOUND');
       if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_LOOKUP_UNAVAILABLE');
-      const intent = openIntent({kind: 'ORDER_PAY', orderNo});
+      const intent = readableIntent(openIntent({kind: 'ORDER_PAY', orderNo}));
       return {status: 200, message: 'OK', data: {orderNo, state: intent ? 'IN_PROGRESS' : 'NONE', intentNo: intent?.intentNo ?? null}};
     }
     if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
