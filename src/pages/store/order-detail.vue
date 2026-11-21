@@ -43,7 +43,7 @@
           <view v-if="resultOrder.trialReward.nex > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUvt }}</text><text class="trial-result-uvt">+{{ formatAmount(resultOrder.trialReward.nex) }} UVT</text></view>
         </view>
         <view v-if="showTrialResult && orderSaved > 0" class="trial-result-summary">
-          <view class="trial-result-line"><text>{{ purchaseCopy.resultSaved }}</text><text class="trial-result-saved">{{ formatAmount(orderSaved) }} USDT</text></view>
+          <view class="trial-result-line"><text>{{ purchaseCopy.resultSaved }}</text><text class="trial-result-saved">{{ resultSavings }}</text></view>
         </view>
         <view class="trial-result-actions">
           <view class="trial-result-secondary active:opacity-85" role="button" tabindex="0" :aria-label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false"><text>{{ purchaseCopy.resultOrder }}</text></view>
@@ -1102,6 +1102,8 @@ const orderSaved = computed(() => {
   const saved = Number(current.subtotal) - Number(current.total);
   return Number.isFinite(saved) && saved > 0 ? +saved.toFixed(2) : 0;
 });
+const resultSavings = computed(() => paymentResultAmount.value?.currency === 'USD'
+  ? `$${formatAmount(orderSaved.value)}` : usdt(orderSaved.value));
 const resultRunningText = computed(() => {
   const current = order.value;
   const device = current ? commerceOrderTitle(current, locale.code) : "";
