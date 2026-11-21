@@ -21,7 +21,7 @@
 
       <text class="block" :style="heroStyle">{{ t.rewards.heroTitle }}</text>
       <!-- A refresh failed after totals were confirmed: the money stays, with one quiet line (03 §3.4). -->
-      <text v-if="billsReadFailed && !billsReadFailedWithoutData" class="block reward-retained" role="status">{{ t.rewards.retainedTotals }}</text>
+      <text v-if="billsShowingRetained && displayUsdtTotal !== null" class="block reward-retained" role="status">{{ t.rewards.retainedTotals }}</text>
 
       <view class="reward-grid">
         <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-tint': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
@@ -156,6 +156,13 @@ watch(() => app.accountBindingEpoch, () => {
 const voucherReadFailedWithoutData = computed(() => voucherReadFailed.value && availableCount.value === null);
 const billsReadFailedWithoutData = computed(() => billsReadFailed.value && displayUsdtTotal.value === null);
 defineExpose({ voucherReadFailedWithoutData, billsReadFailedWithoutData });
+// The retained-totals line stays while the shown amounts come from before a failed read, through automatic retries,
+// until a fresh summary arrives (03 §3.4).
+const billsShowingRetained = ref(false);
+watch(() => bills.summaryStatus, status => {
+  if (status === "error") billsShowingRetained.value = displayUsdtTotal.value !== null;
+  else if (status !== "loading") billsShowingRetained.value = false;
+});
 
 const allZero = computed(
   () => summaryReady.value && voucherReady.value && availableCount.value === 0 && expiredCount.value === 0 && displayUsdtTotal.value === 0 && displayNexTotal.value === 0,
