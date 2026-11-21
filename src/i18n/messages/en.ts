@@ -1016,6 +1016,8 @@ trustReserve: "No verifiable reserve information available.",
       system: "System / compliance / regulatory",
     },
     notifFooter: "Disabling a category suppresses its notification center entries. Critical compliance notifications cannot be disabled.",
+    notifUnknown: "Not loaded",
+    notifUnavailable: "Notification settings haven't loaded yet. You can change them once they load.",
   },
 
   // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token(zh 的
@@ -1803,6 +1805,7 @@ chooseMethod: "Choose how to join the UVEL network",
     secExpired: "Expired vouchers",
     empty: "No rewards yet",
     emptyHint: "Claimed vouchers and activity rewards show up here.",
+    retainedTotals: "USDT and UVT rewards show the last confirmed amounts.",
     expiredBadge: "Expired",
     useCta: "Use",
     typeBonus: "Bonus",
@@ -2202,6 +2205,7 @@ rankBenefits: "View rank benefits",
 },
   wallet: {
     loadingTransactions: "Loading transaction history…",
+    lookupUnavailable: "This transaction can't be loaded right now",
     title: "Wallet",
     usdtBalance: "USDT balance",
     nexBalance: "UVT Balance",
@@ -5219,7 +5223,7 @@ openSeaErrorPool: {
     drawerTitle: "Messages",
     unreadCount: "{n} unread",
     allCaughtUp: "All caught up",
-    unreadUnavailable: "-",
+    unreadUnavailable: "—",
     prefsFooter: "Notification preferences in Settings",
     // Card-binding push templates (FEAT-CARDS02; built by mock/card-notifications.ts —
     // production: backend events card.unbound / card.rebind_notified).
@@ -5593,9 +5597,9 @@ openSeaErrorPool: {
     // The server sends `duration` as "<n> min"; the page renders it through
     // `courseDurationText` so the unit follows the interface language.
     durationMinutes: "{n} min",
-    centerOffline: "The learning center needs a trusted network connection; please connect and retry.",
-    centerGeoUnresolved: "We can't confirm which courses are available in your region right now. Check your connection and retry.",
-    centerUnavailable: "The learning center is unavailable right now; please retry shortly.",
+    centerOffline: "Connect to a trusted network to view courses",
+    centerGeoUnresolved: "Courses for your region can't be confirmed right now",
+    centerUnavailable: "Courses can't be loaded right now",
     courseLoading: "Loading the course…",
     courseVersionMeta: "Version {version} · {nex}\u00A0UVT reward",
     courseIdMissing: "The course link is incomplete. Return to the learning center and reopen it.",

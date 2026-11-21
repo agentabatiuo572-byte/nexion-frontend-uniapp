@@ -17,7 +17,7 @@
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
-      <EmptyState v-if="remoteOrderError && !resultOrder" kind="recoverable-error" :title="t.orders.refreshFailed" :cta-label="t.store.catalogRetry" @cta="refreshOrder" />
+      <EmptyState v-if="remoteOrderError && !resultOrder" kind="recoverable-error" page :title="t.orders.refreshFailed" :cta-label="t.ui.reload" @cta="refreshOrder" />
 
       <view v-if="showRemoteOrderLoading" class="text-center" role="status" aria-live="polite" style="padding: 20px">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>

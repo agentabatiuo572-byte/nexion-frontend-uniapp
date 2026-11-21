@@ -64,3 +64,9 @@ FCM 服务账号所属项目必须与客户端和目标项目一致；APNs 私�
 用户已安装 3005，并实机确认点击后台通知直接进入对应客服会话。服务端核对的是 PC 实际回复 3813/3814/3816 → 通知 43896/43897/43899 → 投递 244/246/252，均 APNS_ACCEPTED、attempt 1、epoch 3，目标会话一致，GET/POST opened 全为 HTTP 200 且 `opened_at` 已落库；`onboardingComplete` 仍为 0。后发测试通知 43901 未被点击、`opened_at` 为空，不计入此次点击证明。
 
 上述通过范围为真实后台客服通知、对应会话导航与打开回执；尚未完成 iOS 三态或五类业务全链实机验收，Android 仍保留前述资源验收边界。后续状态以部署回执和 PRD 为准，没有生产启用或生产发布结论。
+
+## iOS 极光构建配置
+
+- 在隔离 iOS stage 解压极光官方 JPush iOS 6.3.0 安装包，运行 `node src/uni_modules/uvel-native-push/configure-jpush-ios.mjs <stage目录> <极光SDK解压目录> <AppKey文件>`。AppKey 文件由 UVEL 极光应用控制台提供。脚本在 stage 注入 Info.plist、极光隐私清单和原生库所需的 Objective-C 模块定义。
+- JCore 使用锁定的 5.6.0-noidfa。构建配置设置 `VITE_UVEL_JPUSH_ENABLED=true`，沿用 `ai.uvel.app`、TEST API、Production APNs 和 Apple Distribution 描述文件。极光 Master Secret 与 APNs 私钥只用于服务端或极光控制台。
+- iOS 新装或升级首次打开时由用户主动选择。用户同意且开启系统通知后，现有推送模块才初始化极光。已有 iOS 业务通知继续使用 APNs，Android 继续使用 FCM。

@@ -2,7 +2,7 @@
   <AppChassis active="home"><view class="event-detail" :aria-busy="loading">
     <SubPageHeader back="/pages/events/events?source=legacy" :title="copy.title" />
     <text v-if="loading && !detail" class="event-copy" role="status">{{ copy.loading }}</text>
-    <EmptyState v-else-if="!detail" kind="recoverable-error" :title="copy.unavailable" :cta-label="copy.retry" @cta="load" />
+    <EmptyState v-else-if="!detail" kind="recoverable-error" page :title="copy.unavailable" :cta-label="uiT.ui.reload" @cta="load" />
     <template v-else>
       <view class="nx-glass-card event-section">
         <text class="event-title">{{ detail.event.title }}</text>
@@ -51,6 +51,7 @@ import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import EmptyState from "@/components/empty-state.vue";
+import { useT } from "@/i18n/use-t";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
@@ -72,6 +73,7 @@ import { uiLocale, serverLanguage } from "@/i18n";
 const app = useApp(), locale = useLocaleStore(), api = createEventDetailApi(apiClient);
 const language = computed(() => serverLanguage(locale.code));
 const copy = computed(() => eventDetailCopy[uiLocale(locale.code)]);
+const uiT = useT();
 const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));

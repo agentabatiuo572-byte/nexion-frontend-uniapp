@@ -106,7 +106,7 @@
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
           </view>
           <view v-if="remoteApiEnabled && docsNotReleased" class="rounded-xl" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
-          <EmptyState v-else-if="remoteApiEnabled && docsLoadFailed && !docs" kind="recoverable-error" :title="t.developer.resourceLoadFailed" :cta-label="t.network.retry" @cta="loadDocs" />
+          <view v-else-if="remoteApiEnabled && docsLoadFailed && !docs" class="rounded-lg" :style="requestStatusStyle"><text>—</text></view>
           <template v-else-if="!remoteApiEnabled || docs">
             <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
@@ -192,7 +192,6 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { ref, computed, nextTick, onUnmounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
-import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -216,6 +215,7 @@ import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs
 import { useLocaleStore } from "@/store/locale";
 import { validateDeveloperAccess, validateDeveloperWebhook, type DeveloperFormIssue } from "./developer-form-validation";
 import { developerAccessReviewReasonKey, developerAccessState, isDeveloperApprovalRequired, isDeveloperCapabilityUnavailable, isDeveloperDocsNotReleased, type DeveloperAccessCopyKey } from "./developer-access-state";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
@@ -587,10 +587,10 @@ async function loadDocs() {
     docs.value = value;
   } catch (cause) {
     if (!docsFenceCurrent(fence)) return;
-    docs.value = null;
     // "No documentation published yet" is a product state, not a failed load.
-    if (isDeveloperDocsNotReleased(cause)) docsNotReleased.value = true;
-    else docsLoadFailed.value = true;
+    docsNotReleased.value = isDeveloperDocsNotReleased(cause);
+    if (docsNotReleased.value || !isTransientReadFailure(cause)) docs.value = null;
+    docsLoadFailed.value = !docsNotReleased.value;
   }
 }
 async function revokeApiKey(id: number) {

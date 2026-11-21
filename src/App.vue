@@ -5,7 +5,7 @@ import { refreshActivePage } from "@/lib/active-page-refresh";
 import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
-import { installNativePush, refreshNativePush, flushNativePushClick } from "@/services/native-push";
+import { installNativePush, refreshNativePush, flushNativePushClick, showJPushPrivacyPrompt } from "@/services/native-push";
 // #ifdef APP-PLUS
 import { checkUpdate, guardUpdate, installUpdateGuard } from "@/services/native-update";
 // #endif
@@ -1355,6 +1355,7 @@ onShow(() => {
   useTheme().refreshSystemTheme();
   void checkUpdate();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");
+  showJPushPrivacyPrompt();
   refreshNativePush();
   // #endif
   attachSessionWatch();

@@ -16,11 +16,12 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
   const totalUnread = computed(() => notifications.unread + serviceUnread.value);
   // The inbox still shows reading-unread. Bells use only the separate authority.
   // Never count loaded notification rows or reinterpret unreadByKind as backend policy.
-  const actionableUnread = computed(() => notifications.actionableUnread == null || error.value
+  const actionableUnread = computed(() => notifications.actionableUnread == null || serviceReadError.value
     ? null : notifications.actionableUnread + serviceUnread.value);
   const loading = computed(() => notifications.loading || conversations.loading);
-  const error = computed(() => notifications.error || conversations.error
+  const serviceReadError = computed(() => conversations.error
     || (conversations.categoryAvailabilityStatus === "failed" ? "SUPPORT_CATEGORIES_UNAVAILABLE" : null));
+  const error = computed(() => notifications.readError || serviceReadError.value);
   let epoch = 0;
   let inFlight: Promise<void> | undefined;
   let opening: Promise<boolean> | undefined;
@@ -36,15 +37,12 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
       .finally(() => { opening = undefined; });
   }
 
-  async function refresh(): Promise<void> {
+  async function refreshService(): Promise<void> {
     if (inFlight) return inFlight;
     const requestEpoch = epoch;
     const active = () => requestEpoch === epoch;
-    const requests: Promise<unknown>[] = [];
-    // A page-triggered request already supplies this snapshot; do not race pagination.
-    if (!notifications.loading) requests.push(notifications.refreshRemote(undefined, active));
-    requests.push(conversations.refresh(active), conversations.refreshCategories(active));
-    const job = Promise.allSettled(requests).then(() => undefined);
+    const job = Promise.allSettled([conversations.refresh(active), conversations.refreshCategories(active)])
+      .then(() => undefined);
     inFlight = job;
     try { await job; }
     finally { if (inFlight === job) inFlight = undefined; }
@@ -58,5 +56,5 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
   }
 
   return { section, show, advisorUnread, supportUnread, humanUnread, serviceUnread, totalUnread, actionableUnread,
-    loading, error, refresh, bindAccount };
+    loading, error, serviceReadError, refreshService, bindAccount };
 });

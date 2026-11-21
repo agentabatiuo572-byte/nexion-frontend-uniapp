@@ -20,7 +20,7 @@
     <view style="color: var(--v5-ink); padding-bottom: 24px">
       <SubPageHeader back="/pages/me/rewards" :title="pageTitle" />
 
-      <PromotionRewardList v-if="cat === 'promotion'" :activity-id="activityId" :order-no="orderNo" />
+      <PromotionRewardList v-if="cat === 'promotion'" :activity-id="activityId" :order-no="orderNo" embedded />
 
       <!-- ── Vouchers (ticket-style cards: value stub + perforation + body) ── -->
       <template v-else-if="cat === 'voucher'">

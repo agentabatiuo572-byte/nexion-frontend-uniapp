@@ -169,7 +169,7 @@ trade-in/replace composer 等跨 store 操作:任一步失败全 rollback(设备
 |---|---|---|---|---|---|
 | `/me/wallet` | 钱包总览 | iOS Settings 风资金导航 | `useApp.wallet`、`usePoints` | 3 action Top-up/Withdraw/Exchange | §9.1 |
 | `/me/wallet/topup` | 充值 | 5 渠道(4 链上+1 法币) | 5 channel、PSP Checkout.com | **分流** CARD→CardPayForm/链上→DepositCard;`?kyc=1` | §9.2 |
-| `/me/wallet/withdraw` | 提现 | 链上提现+积分门槛+风险 gate | `useApp.submitWithdrawal`、`usePoints`、`useRiskDisclosure`、`useProductPhase` | ≥$20;每$100 耗 10 积分;首次需 KYC;risk gate 前置;P5+ compliance banner | §9.3 |
+| `/me/wallet/withdraw` | 提现 | 链上提现+风险 gate | `useApp.submitWithdrawal`、`useRiskDisclosure`、`useProductPhase` | ≥$20;首次需 KYC;risk gate 前置;P5+ compliance banner | §9.3 |
 | `/me/wallet/withdraw/tracking` | 提现追踪 | 5 状态进度 | submitted→…→confirmed | 每态时间戳+进度条 | §9.3.6 |
 | `/me/wallet/exchange` | NEX↔USDT 兑换 | 双向兑换+三层风控 | `useExchange`、`useMarket`、三阈值 | 3 gate(kyc/user-cap/platform-cap);`?kyc=1` | §9.4 |
 | `/me/wallet/repurchase` | 复投激励 | 引导重投得积分+锁仓 | `debitBalance`+`points.earn`+`stake(amount,90)` | 90 天锁仓;每$2=+1 积分 | §9.5 |
@@ -263,7 +263,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 | Store | 关键字段 | persist key | 不变量 | § |
 |---|---|---|---|---|
 | `useQuest` | `completed:QuestTaskId[]`·`claimedFinal`·`startedAt` | `nexgrid-quest-v1` | 24h 窗(86,400,000);claimFinal +500 NEX+badge | §12.11 |
-| `usePoints` | `points(def8)`·`history[](50 ring)`·`lastSignedInAt`·`signInStreak`·`longestStreak`·`streakSavers(def1)`·`claimedMilestones[]` | `nexgrid-points` | `pointsRequiredFor=ceil(usdt/10)`;断签 48h;Saver 恢复 ≤min(longest,30) | §12.12 |
+| `usePoints` | `points(def8)`·`history[](50 ring)`·`lastSignedInAt`·`signInStreak`·`longestStreak`·`streakSavers(def1)`·`claimedMilestones[]` | `nexgrid-points` | 断签 48h;Saver 恢复 ≤min(longest,30) | §12.12 |
 | `useWeeklyQuest` | `weekKey`·`tier1Completed/Claimed`·`tier2Completed/Claimed[]`·`bonusClaimed` | `nexgrid-weekly-quest-v1` | `rollWeekIfStale` 跨周清 | §12.13 |
 | `useMonthlyChallenge` | `monthKey`·`claimedIds:ChallengeId[]` | `nexgrid-monthly-challenge-v1` | `rollMonthIfStale` 跨月清(基于 joinedAt 月数分段) | §12.14 |
 | `useEventQuest` | `joined[]`·`claimed[]`·`joinedAt:Record` | `nexgrid-event-quest-v1` | 仅 trackable 持久化;claim→creditNex+achievements | §12.15 |
@@ -325,12 +325,12 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **周期**:`trialDays=3`→`graceDays=7`→`extensionDays=3`(start 时 snapshot)。
 - **终态**:failed/cancelled → shadow 归零不入账;终态后 `cooldownDays=30` cooldown(`canStart()=false`)。
 
-### 3.F 平台运营阶段(Phase Dial — 后台引擎,UI 不暴露)— §13.4
+### 3.F 平台运营阶段(Phase Dial — 后台引擎,UI 不暴露)
 
 - **2026-11-08 TRC20 增量（B42 更新提现规则）**：充值和共用购买支付弹窗按服务端显式能力增加 TRC20，覆盖商城、组合、原单续付、试用／换购／活动；旧接口缺该网络时隐藏，读取政策不建址。TRON Base58Check 地址保持大小写，原生 txID 为无 0x 的 64 位十六进制。提现与 BEP20/ERC20 共用下述加强合规规则，不再每笔独立等待；审核／到期均不等于到账。九语、原恢复与 App/Lite 入口边界保留，详见[TRC20 收付增量](UVEL_TRC20收付与阶段等待_20261108.md)。
 - **当前 phase** = `useProductPhaseOverride.pinned ?? getPhaseForMonth(getMonthsSince(joinedAt))`。
 - **月段**:P1 0-2月/P2 2-4/P3 4-6/P4 6-8/P5 8-10/P6 10+。
-- **7 时变 dial**:`inviteBonusMultiplier`(P1=2.0/P2=1.5/P3+=1.0)· `withdrawalPointsPer100`(P1-4=10/P5-6=20)· `withdrawalCooldownDays`(P1-4=30d/P5-6=45d)· `binaryDailyCapUSD`(P1-3=$5000/P4-6=$2000)· `premiumSubscriptionAvailable`(P4+)· `nexV2LockAvailable`(P6)· `complianceHoldEnabled`(P5+)。
+- **阶段参数**:`inviteBonusMultiplier`(P1=2.0/P2=1.5/P3+=1.0)· `withdrawalCooldownDays`(P1-4=30d/P5-6=45d)· `binaryDailyCapUSD`(P1-3=$5000/P4-6=$2000)· `premiumSubscriptionAvailable`(P4+)· `nexV2LockAvailable`(P6)· `complianceHoldEnabled`(P5+)。
 - **约束**:server 权威(pages 不 hardcode 门槛);phase id/name 永不在用户 UI 出现。
 - **2026-11-08 TRC20/BEP20/ERC20 统一合规（B42）**：提现页合规开关、窗口与大额门槛读取服务端提现 policy，实际本笔人工／等待取 eligibility；关闭时按普通小额免审、强审门槛及 K3/K4 处理，无额外固定 N 天等待；开启时三网所有新提现均人工复核、小额免审暂停，本金严格超过服务端门槛（本轮 1,000 USDT）才从原提交时刻起附加 N 天，N=0 仍人工。小额不显示 N 天，审核通过或窗口到期不代表到账。追踪保留原单审计并服从当前状态与服务端截止；旧 TRC20 原审计可读，但截止清空后不继续显示原等待，也不由旧审计虚构当前强制人工。没有截止／到账时间时保持未知，不用本机时间补值。App／H5 Lite 九语与各自测试分支同步，费用、地址、开放网络和银行卡页面不变；仅本次新版客户端，详见主文档 §9.3.5–9.3.6。
 
@@ -341,7 +341,6 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **KYC 触发**:累计兑换 ≥ `KYC_LIFETIME_THRESHOLD_USD=100` lifetime 且未 KYC → 阻断引导 KYC。
 
 ### 3.H 积分/签到/里程碑 — §9.8/§13.3
-- **提现积分门槛** = `pointsRequiredFor(usd) = ceil(usd/10)`(每 $100 耗 10 积分,P5/P6=20)。
 - **积分来源**:签到 +1/连7天 +5;复投 +50/$100;邀请激活 +20;新手任务 +5。
 - **Lucky multiplier**:签到时 15% 概率 ×1.5,5% 概率 ×2(server roll,不在 render)。
 - **Streak 中断**:`now − lastSignedInAt > 48h` 重置 0;**Saver 恢复** 消耗 1 张 → `signInStreak = min(longestStreak, 30)`。
@@ -426,7 +425,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 | `/api/bills?cursor=` | GET | 拉账单(唯一账本,client 不写) | SC;Bill ID server | §9.11d.2 |
 | `/api/wallet/topup` | POST | 充值写入(PSP webhook→写 bill+更 cumulativeDepositUsdt) | TBD | §9.11c.1 |
 | `/api/wallet/reinvest` | POST | 复投(原子 debit/points/stake/bill) | IK | §9.11e |
-| `/api/withdrawals` | POST | 提交提现(原子 spend points/debit/queue) | IK;返 withdrawalId;失败态全 server | §9.11e/f |
+| `/api/withdrawals` | POST | 提交提现(原子扣款并入队) | IK;返 withdrawalId;失败态全 server | §9.11e/f |
 | `/api/users/me` · `/me.cumulativeDepositUsdt` | GET | 用户档案/累计充值(trade-in 资格源) | SC(仅 recordDeposit 写) | §9.11c.1 |
 
 ### 4.4 Staking(§9.6)
@@ -525,7 +524,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 
 ### 5.5 Withdrawal 提现(§9.3.6)
 已实现:`submitted→review-passed→processing→sent→confirmed`(线性)。**缺失态须扩展**:`review-rejected/address-invalid/tx-failed/tx-orphaned/refunded/frozen`。
-提交前守卫:金额≥$20;地址>10 字符;积分门槛 `ceil(usd/10)`;首次需 KYC+地址一致;risk disclosure gate;P5+ compliance hold(>$1,000 进 45d 增强审查)。全 server canonical;劝阻卡不阻止提现。
+提交前守卫:金额≥$20;地址>10 字符;首次需 KYC+地址一致;risk disclosure gate;P5+ compliance hold(>$1,000 进 45d 增强审查)。全 server canonical;劝阻卡不阻止提现。
 
 ### 5.6 Staking position(§9.6/§12.6)
 已实现:`active/matured/early-withdrawn(终)/claimed(终)`。**目标扩展**:`pending_lock/active/mature_unclaimed/early_withdrawn/claimed/slashed/refunded`。
@@ -542,8 +541,8 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 ### 5.9 Phone 任务中断(§12.2)
 `status: online|offline`(无 paused)。接单门槛 `pausedReason`(每 tick 算):`no-charger`(!isCharging)/`no-network`(!isWifiConnected,fail-closed)/`null`(正常)。中断宽限子机:进入记 `interruptedAt`,窗口 `INTERRUPT_GRACE_MS=30s`(`INTERRUPT_MAX_RETRIES=5` 每 6s);窗口内恢复→续跑原任务(startedAt 顺延);超时→取消任务派新。server 权威,client 仅 mirror pausedReason 不参与 gating。
 
-### 5.10 Phase 12 月节奏(§13.4,6 phase)
-`getPhaseForMonth(getMonthsSince(joinedAt))` 单调推进 P1→P6(`pinned` 可锁);每 phase 派 7 dial(见 §3.F)。server 权威,phase id/name 永不在用户 UI 出现。
+### 5.10 Phase 12 月节奏(6 phase)
+`getPhaseForMonth(getMonthsSince(joinedAt))` 单调推进 P1→P6(`pinned` 可锁);阶段参数见 §3.F。server 权威,phase id/name 永不在用户 UI 出现。
 
 ### 5.11 新手任务(server 权威)
 任务行状态 `PENDING→COMPLETED/CLAIMABLE→CLAIMED`,超过 `eligibleUntil` 为 `EXPIRED`;期限由后台配置并随任务行下发,不固定为注册当天。全部需完成任务均已完成且仍在期限内时,新手任务卡显示「领取新手任务奖励」,领取前重读确认,领取后读回;奖励入账显示在钱包流水「任务奖励」。前端不本地推进完成或派奖。

@@ -1,13 +1,10 @@
 <template>
   <view>
     <SubPageHeader :back="back" />
-    <view v-if="loading && !content" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status"><text>{{ t.howPublished.loading }}</text></view>
+    <view v-if="loading && !content && !failureShown" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status"><text>{{ t.howPublished.loading }}</text></view>
     <view v-if="content" class="pb-8">
       <view v-if="languageFallback" class="mx-4" style="margin: 16px; padding: 14px; border-radius: 12px; background: var(--v5-surface-2);" role="status" aria-live="polite">
         <text class="block" :style="bodyStyle">{{ t.howPublished.languageFallback }}</text>
-        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
-          <text>{{ t.ui.retry }}</text>
-        </view>
       </view>
       <!-- A page may render the accepted publication itself (scoped slot); loading, fallback and
            failure stay here so every guide keeps the same acceptance and refresh boundary. -->
@@ -32,7 +29,7 @@
       </template>
       </template>
     </view>
-    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :desc="t.howPublished.unavailableBody" :cta-label="t.ui.retry" @cta="load" />
+    <EmptyState v-if="failureShown && !content" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
   </view>
 </template>
 
@@ -63,6 +60,9 @@ const t = useT();
 const content = ref<HowContentDocument | null>(null);
 const loading = ref(true);
 const error = ref(false);
+// View only: once a read has failed the result stays on screen while a re-read runs, so each
+// automatic retry does not swap it for the loading line and back.
+const failureShown = ref(false);
 const bodyStyle = { fontSize: "var(--ui-type-long-form)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-long-form-lh)" };
 const requestFence = new PublishedContentRequestFence();
 
@@ -93,10 +93,12 @@ async function load() {
     if (props.contentKey === "team-unilevel-how" && (!next.blocks.some(block => block.id === "direct-referral-scope")
       || (next.schemaVersion === 2 && (next.templateId !== "unilevel-v2" || !next.blocks.some(block => block.id === "seven-layer-scope"))))) throw new Error("TEAM_PUBLICATION_REQUIRED");
     content.value = next;
+    failureShown.value = false;
   } catch (failure) {
     if (!requestFence.isCurrent(generation)) return;
     if (!(failure instanceof ApiError && failure.kind === "network")) content.value = null;
     error.value = true;
+    failureShown.value = true;
     emit("unavailable");
   } finally {
     if (!requestFence.isCurrent(generation)) return;
@@ -110,6 +112,7 @@ watch(
     requestFence.invalidate();
     content.value = null;
     error.value = false;
+    failureShown.value = false;
     if (remoteApiEnabled) {
       void load();
       return;

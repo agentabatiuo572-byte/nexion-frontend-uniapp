@@ -44,23 +44,14 @@
         <GlassSegments :label="t.events.categoryGroupLabel" v-model="tab" :options="tabOptions" layout="scroll"  />
 
         <!-- Event list -->
-        <view v-if="remoteEventsLoading && filtered.length === 0" class="space-y-2.5" aria-busy="true" role="status" :aria-label="loadingLabel">
+        <!-- A failed first read keeps the same still placeholder cards and recovers on its own (03 §3.5.2). -->
+        <view v-if="!remoteEvents && (remoteEventsLoading || remoteEventsError)" class="space-y-2.5" :aria-busy="remoteEventsLoading ? 'true' : undefined" :role="remoteEventsLoading ? 'status' : undefined" :aria-label="remoteEventsLoading ? loadingLabel : undefined" :aria-hidden="remoteEventsLoading ? undefined : 'true'">
           <view v-for="row in 3" :key="row" class="nx-glass-card" style="height: 132px; padding: 18px">
             <view style="width: 58%; height: 18px; border-radius: 6px; background: var(--v5-surface-3)" />
             <view style="width: 86%; height: 12px; margin-top: 16px; border-radius: 4px; background: var(--v5-surface-2)" />
             <view style="width: 35%; height: 12px; margin-top: 10px; border-radius: 4px; background: var(--v5-surface-2)" />
           </view>
         </view>
-        <EmptyState
-          v-else-if="remoteEventsError && !remoteEvents.length"
-          kind="recoverable-error"
-          :title="t.events.loadErrorTitle"
-          :desc="t.events.loadErrorBody"
-          :cta-label="t.events.retry"
-          :cta-disabled="remoteEventsLoading"
-          :cta-busy="remoteEventsLoading"
-          @cta="retryRemoteEvents"
-        />
         <EmptyState v-else-if="filtered.length === 0 && emptyKey" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
         <view v-else class="space-y-2.5">
           <EventsCard
@@ -99,7 +90,7 @@ import PromotionEntry from "@/components/promotion/promotion-entry.vue";
 import { useT } from "@/i18n/use-t";
 import { isStakingVisibilityRoute, navTo, takeNavigationQuery } from '@/lib/route';
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { ApiError } from "@/api/errors";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { eventsApi, remoteApiEnabled,sessionVault } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
@@ -146,7 +137,7 @@ const raffleCopy = computed(() => genesisRaffleCopy[uiLocale(locale.code)]);
 const loadingLabel = computed(() => ({ zh: "加载中", en: "Loading", vi: "Đang tải", id: "Memuat", ms: "Memuatkan", fil: "Naglo-load", ru: "Загрузка", kk: "Жүктелуде", uz: "Yuklanmoqda" })[uiLocale(locale.code)]);
 
 const tab = ref<TabId>("ongoing");
-const remoteEvents = ref<CanonicalEvent[]>([]);
+const remoteEvents = ref<CanonicalEvent[] | null>(null);
 const remoteEventsError = ref(false);
 const remoteEventsLoading = ref(remoteApiEnabled);
 const commandBusy = ref<string | null>(null);
@@ -182,15 +173,12 @@ async function loadRemoteEvents() {
     remoteEventsError.value = false;
   } catch (cause) {
     if (remoteRequestFence.isCurrent(scope)) {
-      if (!(cause instanceof ApiError && cause.kind === "network")) remoteEvents.value = [];
+      if (!isTransientReadFailure(cause)) remoteEvents.value = null;
       remoteEventsError.value = true;
     }
   } finally {
     if (remoteRequestFence.isCurrent(scope)) remoteEventsLoading.value = false;
   }
-}
-function retryRemoteEvents() {
-  void loadRemoteEvents();
 }
 const stopRuntimeRefresh = subscribeRuntimeRevision(() => {
   if (mounted) void loadRemoteEvents();
@@ -201,7 +189,7 @@ const eventVisibility = createPageVisibilityRefresh((reason) => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(app.accountKey);
   if (reason === "initial") {
-    remoteEvents.value = [];
+    remoteEvents.value = null;
     remoteEventsError.value = false;
     remoteEventsLoading.value = true;
   }
@@ -240,7 +228,7 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => langua
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(accountKey);
   remoteRequestFence.invalidate();
-  remoteEvents.value = [];
+  remoteEvents.value = null;
   remoteEventsError.value = false;
   remoteEventsLoading.value = true;
   void loadRemoteEvents();
@@ -249,13 +237,13 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => langua
 // Enrich each event with live join/claim state from the store.
 const enrichedEvents = computed<EnrichedEvent[]>(() =>
   (remoteApiEnabled
-    ? remoteEvents.value.map((event) => remoteEventView(event, eventActionLabels.value))
+    ? (remoteEvents.value ?? []).map((event) => remoteEventView(event, eventActionLabels.value))
     : EVENTS.map((event) => ({ ...event, runtimeSource: "mock" as const }))
   ).filter((ev) => stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(ev.href ?? ""))
     .map((ev) => {
     const trackable = ev.trackable === true;
     const remoteStatus = remoteApiEnabled
-      ? remoteEvents.value.find((event) => event.eventCode === ev.id)?.userStatus
+      ? remoteEvents.value?.find((event) => event.eventCode === ev.id)?.userStatus
       : undefined;
     const joinedFromStore = eventQuest.isJoined(ev.id);
     const claimedFromStore = eventQuest.isClaimed(ev.id);

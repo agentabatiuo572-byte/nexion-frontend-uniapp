@@ -36,7 +36,8 @@
 
       <!-- FAQ list -->
       <view class="mx-4" :style="faqWrapStyle">
-        <EmptyState v-if="faqLoadError && faqs.length === 0" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="retryFaqs" />
+        <!-- A failed first read shows the unknown placeholder and recovers on its own (03 §3.5.2). -->
+        <view v-if="faqLoadError && faqs.length === 0" class="flex items-center" :style="faqHeadStyle"><text :style="faqUnknownStyle">—</text></view>
         <EmptyState v-else-if="filtered.length === 0 && faqPageNum > 0 && !faqLoading && !faqLoadError && !canLoadMoreFaqs" :kind="query.trim() || requestedFaqId ? 'no-search-results' : 'empty-list'" :title="query.trim() || requestedFaqId ? t.empty.searchTitle : t.empty.listTitle" :desc="query.trim() || requestedFaqId ? t.empty.searchDesc : t.empty.listDesc" compact />
         <template v-else>
           <view
@@ -356,6 +357,7 @@ const emptyTextStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)"
 const faqDividerStyle: CSSProperties = { borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const faqHeadStyle: CSSProperties = { gap: "12px", padding: "14px 0", minHeight: "48px" };
 const faqQStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
+const faqUnknownStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 function chevStyle(open: boolean): CSSProperties {
   return { transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 150ms ease" };
 }

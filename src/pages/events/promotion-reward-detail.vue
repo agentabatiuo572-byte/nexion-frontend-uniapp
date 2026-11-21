@@ -1,7 +1,7 @@
 <template>
   <AppChassis active="me"><view class="promotion promotion-main promotion-reward-detail">
     <view v-if="loading&&!reward" class="promotion-flat" role="status"><text>{{ p.loading }}</text></view>
-    <EmptyState v-if="error && !reward && !loading" kind="recoverable-error" :title="p.error" :cta-label="id ? p.retry : undefined" @cta="load" />
+    <EmptyState v-if="error && !reward && !loading" kind="recoverable-error" page :title="p.error" :cta-label="id ? t.ui.reload : undefined" @cta="load" />
     <view v-if="error && !reward && !loading" class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.space.prevent="navTo('/pages/me/rewards-list?cat=promotion')"><text>{{ p.back }}</text></view>
     <template v-if="reward">
       <view class="promotion-flat"><text class="promotion-title">{{ localized(reward.disclosure.title,locale.code) }}</text><RewardRows :rewards="[reward]" :link-details="false" /><text class="promotion-copy">{{ displayDeadline(reward.updatedAt,locale.code) }}</text><view v-if="['RETRYABLE_FAILED','MANUAL_REVIEW'].includes(reward.state)" class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/support')"><text>{{ t.help.contactSupport }}</text></view></view>

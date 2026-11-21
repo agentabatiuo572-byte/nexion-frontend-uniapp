@@ -20,11 +20,8 @@
       <SubPageHeader back="/pages/me/me" :title="t.rewards.title" />
 
       <text class="block" :style="heroStyle">{{ t.rewards.heroTitle }}</text>
-
-      <view v-if="summaryFailed" class="flex items-center justify-between" :style="summaryErrorStyle">
-        <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-        <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshRewardSummary"><text>{{ t.store.catalogRetry }}</text></view>
-      </view>
+      <!-- A refresh failed after totals were confirmed: the money stays, with one quiet line (03 §3.4). -->
+      <text v-if="billsShowingRetained && displayUsdtTotal !== null" class="block reward-retained" role="status">{{ t.rewards.retainedTotals }}</text>
 
       <view class="reward-grid">
         <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-tint': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
@@ -59,6 +56,8 @@ import { useRewardsSeen } from "@/store/rewards-seen";
 import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
 import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import type { RewardsCat } from "./course-reward-link";
 
@@ -69,24 +68,46 @@ const rewardsSeen = useRewardsSeen();
 const app = useApp();
 let rewardViewActive = true;
 let rewardViewRequest = 0;
-function invalidateRewardView() { rewardViewActive = false; rewardViewRequest++; }
+let releaseActiveRefresh = () => {};
+function invalidateRewardView() {
+  rewardViewActive = false;
+  rewardViewRequest++;
+  releaseActiveRefresh();
+}
 onHide(invalidateRewardView);
 onUnmounted(invalidateRewardView);
 
-async function refreshRewardSummary() {
+const voucherReadFailed = computed(() => remoteApiEnabled && voucher.remoteStatus === "error");
+const billsReadFailed = computed(() => fundsServerEnabled && bills.summaryStatus === "error");
+const voucherRecovery = useAutoRecovery({ failed: () => voucherReadFailed.value, retry: () => voucher.refreshRemote() });
+const billsRecovery = useAutoRecovery({ failed: () => billsReadFailed.value, retry: refreshBillsSummary });
+
+async function refreshBillsSummary() {
   const accountKey = app.accountKey;
   const accountScope = remoteAccountScope.snapshot();
   const request = ++rewardViewRequest;
-  if (remoteApiEnabled) void voucher.refreshRemote();
-  if (!fundsServerEnabled) {
-    rewardsSeen.markSeen();
-    return;
-  }
-  try { await bills.refreshSummary(); } catch { return; /* failed or superseded reads never acknowledge a later summary */ }
+  if (fundsServerEnabled) await bills.refreshSummary();
   if (rewardViewActive && request === rewardViewRequest && remoteAccountScope.isCurrent(accountScope)
-      && accountKey === app.accountKey && bills.summaryStatus === "ready") rewardsSeen.markSeen();
+      && accountKey === app.accountKey && (!fundsServerEnabled || bills.summaryStatus === "ready")) {
+    rewardsSeen.markSeen();
+  }
 }
-onShow(() => { rewardViewActive = true; void refreshRewardSummary(); });
+
+function refreshRewardSummary(retryFailed = true) {
+  const voucherRead = voucherReadFailed.value
+    ? retryFailed ? voucherRecovery.retry() : undefined
+    : remoteApiEnabled && voucher.remoteStatus !== "loading" ? voucher.refreshRemote() : undefined;
+  const billsRead = billsReadFailed.value
+    ? retryFailed ? billsRecovery.retry() : undefined
+    : bills.summaryStatus !== "loading" || retryFailed ? refreshBillsSummary() : undefined;
+  return Promise.allSettled([voucherRead, billsRead]);
+}
+onShow(() => {
+  rewardViewActive = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(() => refreshRewardSummary(false), "pages/me/rewards");
+  void refreshRewardSummary();
+});
 
 const voucherReady = computed(() => !remoteApiEnabled || voucher.remoteStatus === "ready");
 const remoteAvailableCount = computed<number | null>(() => voucherReady.value ? voucher.claimedUnused.length : null);
@@ -108,8 +129,6 @@ function creditedTotal(symbol: "USDT" | "UVT"): number {
 const usdtTotal = computed(() => creditedTotal("USDT"));
 const nexTotal = computed(() => creditedTotal("UVT"));
 const summaryReady = computed(() => !fundsServerEnabled || bills.summaryStatus === "ready");
-const summaryFailed = computed(() => (fundsServerEnabled && bills.summaryStatus === "error")
-  || (remoteApiEnabled && voucher.remoteStatus === "error"));
 const remoteUsdtTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsUsdt ?? null : null);
 const remoteNexTotal = computed<number | null>(() => summaryReady.value ? bills.summary?.rewardsNex ?? null : null);
 // A background refresh (this page re-shows on every return from a detail page)
@@ -127,6 +146,23 @@ const displayUsdtTotal = computed(() =>
 const displayNexTotal = computed(() =>
   fundsServerEnabled ? (remoteNexTotal.value ?? lastNexTotal.value) : nexTotal.value,
 );
+
+watch(() => app.accountBindingEpoch, () => {
+  lastAvailableCount.value = null;
+  lastExpiredCount.value = null;
+  lastUsdtTotal.value = null;
+  lastNexTotal.value = null;
+}, { flush: "sync" });
+const voucherReadFailedWithoutData = computed(() => voucherReadFailed.value && availableCount.value === null);
+const billsReadFailedWithoutData = computed(() => billsReadFailed.value && displayUsdtTotal.value === null);
+defineExpose({ voucherReadFailedWithoutData, billsReadFailedWithoutData });
+// The retained-totals line stays while the shown amounts come from before a failed read, through automatic retries,
+// until a fresh summary arrives (03 §3.4).
+const billsShowingRetained = ref(false);
+watch(() => bills.summaryStatus, status => {
+  if (status === "error") billsShowingRetained.value = displayUsdtTotal.value !== null;
+  else if (status !== "loading") billsShowingRetained.value = false;
+});
 
 const allZero = computed(
   () => summaryReady.value && voucherReady.value && availableCount.value === 0 && expiredCount.value === 0 && displayUsdtTotal.value === 0 && displayNexTotal.value === 0,
@@ -281,12 +317,12 @@ const hintStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.6,
 };
-const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px 12px", borderRadius: "var(--v5-radius-s)", background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)", color: "var(--v5-danger)", fontSize: "12px", gap: "12px" };
 
 
 </script>
 
 <style scoped>
+.reward-retained { margin: calc(-1 * var(--v5-space-1)) var(--v5-space-5) var(--v5-space-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .reward-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin: 0 16px; }
 .reward-tile { position: relative; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); color: var(--v5-ink); cursor: pointer; animation: reward-enter 480ms cubic-bezier(.16,1,.3,1) both; }
 .reward-tile:not(.nx-tint) { background: var(--v5-surface); }
@@ -294,7 +330,7 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-tile__title { display: block; font: 500 15px/22px var(--font-v5); }
 .reward-tile__amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: var(--v5-space-2); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; }
 .reward-tile__unit { font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); }
-.reward-tile__desc { display: block; margin-top: 6px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.reward-tile__desc { display: block; margin-top: 6px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 /* The USDT card keeps its coral corner light as one uniform tint (.nx-tint). */
 .reward-tile--usdt { --nx-tint: var(--v5-brand-2); grid-column: 1 / -1; padding: 18px; }
 .reward-tile--usdt .reward-tile__amount { font-size: 40px; line-height: 48px; margin-top: 6px; padding-right: 28px; }

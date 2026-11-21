@@ -27,13 +27,6 @@
         </view>
       </view>
       <!-- #endif -->
-      <view v-if="prefs.error" class="mx-4 nx-inline-recovery" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
-        <text class="nx-inline-recovery__copy">{{ preferenceError }}</text>
-        <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
-
       <!-- Sound -->
       <view class="mx-4">
         <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
@@ -49,22 +42,23 @@
       <!-- Notification kinds -->
       <view class="mx-4" style="margin-top: 20px">
         <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
-        <text v-if="!prefs.remoteReady && !prefs.error" class="block" role="status" aria-live="polite">{{ w.loading }}</text>
         <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
             :key="k"
             :label="w.notifKinds[k]"
             :value="prefs.remoteReady ? prefs.notifPrefs[k] : null"
-            :unknown-label="t.uiChrome.unavailable"
+            :unknown-label="w.notifUnknown"
             :last="i === notifKinds.length - 1"
-            @toggle="prefs.toggleNotifKind(k)"
+            @toggle="saveNotificationPreference(k)"
           >
             <template #icon>
               <view :style="dotStyle(k)" />
             </template>
           </ToggleRow>
         </view>
+        <!-- Until the server answers, the switches show "—"; one line under the card says why, so the card itself never moves (03 §3.4). -->
+        <text v-if="!prefs.remoteReady" class="block mx-1 pref-notif-status" role="status" aria-live="polite">{{ prefs.readFailedWithoutData ? w.notifUnavailable : w.loading }}</text>
         <text class="block mx-1" :style="footerStyle">{{ w.notifFooter }}</text>
       </view>
       <!-- #ifdef APP-PLUS -->
@@ -84,15 +78,20 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
 import { useT } from "@/i18n/use-t";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
+import { onHide, onShow } from "@dcloudio/uni-app";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { toast } from "@/store/ui";
 // #ifdef APP-PLUS
-import { onShow } from "@dcloudio/uni-app";
-import { nativePushPermission, nativePushRegistrationUnavailable, openNativePushSettings, requestNativePushPermission, refreshNativePush } from "@/services/native-push";
+import { nativePushPermission, nativePushRegistrationUnavailable, manageNativePushPermission, refreshNativePush } from "@/services/native-push";
 import { nativePushCopy } from "@/i18n/native-push";
 import { useLocaleStore } from "@/store/locale";
 import { uiLocale } from "@/i18n";
@@ -104,21 +103,48 @@ const pushSettingsFailed = ref(false);
 const pushCopy = computed(() => nativePushCopy[uiLocale(pushLocale.code)]);
 function managePushPermission() {
   pushSettingsFailed.value = false;
-  if (nativePushPermission.value === 'unknown') void requestNativePushPermission();
-  else openNativePushSettings(() => { pushSettingsFailed.value = true; });
+  void manageNativePushPermission(() => { pushSettingsFailed.value = true; });
 }
 // #endif
 
 const t = useT();
 const w = computed(() => t.value.preferences);
 const prefs = usePreferences();
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!prefs.readError,
+  retry: () => prefs.refreshRemote(),
+});
+function refreshHealthyPreferences() {
+  if (remoteApiEnabled && !prefs.readError && !prefs.loading) return prefs.refreshRemote();
+}
+let pageVisit = 0;
+let pageVisible = false;
+let releaseActiveRefresh = () => {};
+onShow(() => {
+  pageVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshHealthyPreferences, "pages/me/preferences");
+  void refreshHealthyPreferences();
+});
+function leavePreferences() {
+  pageVisible = false;
+  pageVisit++;
+  releaseActiveRefresh();
+}
+onHide(leavePreferences);
+onUnmounted(leavePreferences);
 // #ifdef APP-PLUS
 onShow(() => refreshNativePush());
 // #endif
-const preferenceError = computed(() => {
-  const labels = t.value.preferences as typeof t.value.preferences & Record<"updateFailed" | "unavailable", string>;
-  return prefs.error === "updateFailed" ? labels.updateFailed : labels.unavailable;
-});
+async function saveNotificationPreference(kind: NotifKind) {
+  if (!pageVisible || !prefs.remoteReady) return;
+  const visit = pageVisit;
+  const account = remoteAccountScope.snapshot();
+  const result = await prefs.toggleNotifKind(kind);
+  if (result === "failed" && pageVisible && visit === pageVisit && remoteAccountScope.isCurrent(account)) {
+    toast.error(t.value.preferences.updateFailed);
+  }
+}
 
 // Mandatory kinds cannot be switched off, so they are not listed.
 const notifKinds = (["commission", "team", "market", "genesis", "system"] as NotifKind[]).filter(k => !isMandatoryNotifKind(k));
@@ -165,6 +191,7 @@ const footerStyle: CSSProperties = {
 <style src="@/styles/message-family.css"></style>
 
 <style scoped>
+.pref-notif-status { margin-top: var(--v5-space-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .push-settings-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 12px 14px; cursor: pointer; }
 .push-settings-row:active { opacity: .75; }
 .push-settings-icon { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; background: var(--v5-surface-2); color: var(--v5-brand); }

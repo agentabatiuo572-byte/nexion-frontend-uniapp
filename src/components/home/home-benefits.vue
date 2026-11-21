@@ -159,7 +159,7 @@ const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !t
   && (trialPill.value[2] === copy.value.benefitTrialClaim || trialPill.value[2] === copy.value.benefitTrialAgain));
 // Only a background re-read from a ready card waits before dimming (CSS delay), so a quick read never flashes.
 // Pills that were already muted (out of stock, unavailable, or a retry after a failed read) stay muted.
-const trialPillWait = computed(() => trialRechecking.value && !retryShown.value);
+const trialPillWait = computed(() => trialRechecking.value && !trialReadFailed.value);
 // The name reads the state the card's bottom row shows: slots full stays in it while a failed read shows its pill.
 const trialOfferLabel = computed(() => showCapacityManagement.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
   : showCapacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${trialPill.value[2]}`
@@ -209,8 +209,8 @@ function openTrialOffer() {
   trialSheet.show();
 }
 function openTrialDetails() { navTo('/pages/me/trial'); }
-// A failed read keeps the pill muted until the automatic recovery above succeeds.
-const retryShown = computed(() => trial.lastReadFailed || trial.authorityStatus === 'error');
+// A failed read recovers on its own (03 §3.5.2); it also holds across the next read and a tab remount.
+const trialReadFailed = computed(() => trial.lastReadFailed || trial.authorityStatus === 'error');
 </script>
 <style scoped>
 .hb-stack { display:flex;flex-direction:column;gap:12px; }
