@@ -7,7 +7,7 @@ import { useApp } from './app';
 import { useOrders } from './orders';
 import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
 import { clearOrderAction, readOrderAction } from '@/lib/order-command-fence';
-import { navTo, navReplace } from '@/lib/route';
+import { navTo, navReplace, navBack } from '@/lib/route';
 import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
@@ -19,7 +19,7 @@ import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
-  refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
+  refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
@@ -28,7 +28,7 @@ export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receip
 export type PurchaseStep = 'methods' | 'network' | 'bank';
 type DefinitePaymentNotice = 'rejectQuotaPaused' | 'rejectQuotaMonthFull' | 'rejectQuotaSoldOut' | 'rejectConditionsUnmet' | 'rejectGateConditionsUnmet' | 'rejectPurchaseSetup' | 'trialConversionClosed' | 'trialNotConvertible';
 type EligibilityRetry = 'rejectEligibilityUnavailable';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'originalUnavailable' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | DefinitePaymentNotice;
+export type PurchaseNotice = '' | 'keepOrder' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'originalUnavailable' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | DefinitePaymentNotice;
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
@@ -166,20 +166,35 @@ function pendingPayments() {
     return [];
   }
 }
+// Rows closed on the floating bar, for this run of the App only. The records stay; a new payment or a new status shows again.
+const dismissedResume = reactive(new Set<string>());
+const resumeKey = (row: PendingExternal) => [account(), row.commandKey, row.lastStatus ?? '', row.businessDelivered ? 1 : 0].join('|');
 function unsettledCheckoutPayments(includeTradein: boolean) {
   return pendingPayments().filter(row => (row.kind === 'ORDER_PAY' || (includeTradein && row.kind === 'TRADE_IN'))
     && row.lastStatus !== 'MANUAL_REVIEW' && row.lastStatus !== 'DELIVERED' && !row.businessDelivered);
 }
 
 /** The progress bar can outlive both a closed payment layer and a released checkout pointer. */
-export async function refreshExpiredCheckoutPayments(accountKey: string, current: () => boolean, includeTradein: boolean) {
-  if (!current() || account() !== accountKey || state.open) return;
-  await Promise.allSettled(unsettledCheckoutPayments(includeTradein).map(async pending => {
-    const result = await readIntent(pending);
-    if (!current() || account() !== accountKey || state.open || result?.status !== 'EXPIRED') return;
-    matches(result, pending);
-    saveExpiry(accountKey, pending.commandKey, pending.kind);
-  }));
+// Checkout and the floating bar read the same unfinished payments: one read at a time, at most every 10 seconds, shared by both.
+let passiveRead: Promise<unknown> | null = null, passiveReadAt = 0;
+function sharedPassiveRead(run: () => Promise<unknown>): Promise<unknown> {
+  if (passiveRead || Date.now() - passiveReadAt < 10_000) return passiveRead ?? Promise.resolve();
+  passiveRead = run().finally(() => { passiveRead = null; passiveReadAt = Date.now(); });
+  return passiveRead;
+}
+/** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
+export function refreshPendingPayments(accountKey: string, current: () => boolean): Promise<unknown> {
+  if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
+  return sharedPassiveRead(() => Promise.allSettled(pendingPayments().map(async pending => {
+    const intent = await readIntent(pending);
+    if (!intent || intent.status === pending.lastStatus || !current() || account() !== accountKey || state.open) return;
+    matches(intent, pending);
+    if (intent.status === 'EXPIRED') { saveExpiry(accountKey, pending.commandKey, pending.kind); return; }
+    if (!settled(intent)) return;
+    const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
+    if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
+    save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
+  })));
 }
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
@@ -279,10 +294,18 @@ export function refusedPurchasePayment(accountKey: string, commandKey: string): 
 
 // A checkout owner may defer navigation until its payment operation releases
 // the page leave guard. Cold resumes use ordinary navigation directly.
-function closeAndNavigate(href: string) {
-  const navigate = context?.navigate;
+/** A purchase page whose payment ends on its order is finished: the order page takes its place, so back skips it.
+ *  When that order's page is right below (a purchase continued from it), going back to it avoids a second copy. */
+export function replaceWithOrder(href: string): Promise<boolean> {
+  const pages = getCurrentPages(), below = pages[pages.length - 2] as { route?: string } | undefined, id = /[?&]id=([^&]+)/.exec(href)?.[1];
+  if (below?.route === 'pages/store/order-detail' && id && pageQuery(below)?.id === decodeURIComponent(id)) { navBack(href); return Promise.resolve(true); }
+  return navReplace(href);
+}
+// A purchase page whose payment ends on its order is finished: replace sends the order page in its place, so back skips it.
+function closeAndNavigate(href: string, replace = false) {
+  const owner = context, navigate = owner?.navigate;
   finish(null);
-  if (navigate) navigate(href); else void navTo(href);
+  if (navigate) navigate(href, replace && !!owner); else if (replace && owner) void replaceWithOrder(href); else void navTo(href);
 }
 async function openConditions() {
   const { accountKey, orderNo, notice } = state;
@@ -724,9 +747,14 @@ function waitForResumedChoice() {
     if (typeof orderNo === 'string' && orderNo) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
   });
 }
+// The App runtime keeps a page's query on $page.options; H5 also sets options.
+function pageQuery(page: unknown) {
+  const value = page as { options?: Record<string, string>; $page?: { options?: Record<string, string> } } | undefined;
+  return value?.options ?? value?.$page?.options;
+}
 function onOrderPage(orderNo: string) {
-  const pages = getCurrentPages(), top = pages[pages.length - 1] as { route?: string; options?: Record<string, string> } | undefined;
-  return top?.route === 'pages/store/order-detail' && top.options?.id === orderNo;
+  const pages = getCurrentPages(), top = pages[pages.length - 1] as { route?: string } | undefined;
+  return top?.route === 'pages/store/order-detail' && pageQuery(top)?.id === orderNo;
 }
 export function usePurchasePayment() {
   return { state, select, choose, proceed, confirm, query, retryOriginal, restart, choosePaymentMethodAgain, loadPolicy, close: () => finish(null),
@@ -743,11 +771,16 @@ export function usePurchasePayment() {
         + (deadlineAt ? `&deadline=${deadlineAt}` : '');
       closeAndNavigate(`/pages/me/wallet-topup?${query}`);
     },
-    openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); else finish(null); },
+    // Every close at the top of a payment page ends on the store home (user 2026-11-22); records and the bar stay.
+    leaveToStore: () => closeAndNavigate('/pages/store/store'),
+    openOrders: () => closeAndNavigate('/pages/store/orders'),
+    openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`, true); else finish(null); },
     support: () => closeAndNavigate('/pages/me/support'),
     openConditions,
     reorder: () => { const again = context?.reorder, orderNo = state.orderNo; finish(null); if (again) again(); else if (orderNo && !onOrderPage(orderNo)) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
     pending: pendingPayments, unsettledCheckoutPayments, resume,
+    resumeDismissed: (row: PendingExternal) => dismissedResume.has(resumeKey(row)),
+    dismissResume: (rows: PendingExternal[]) => { rows.forEach(row => dismissedResume.add(resumeKey(row))); },
     records: () => { try { return displayRecords(); } catch { return []; } },
     viewOrder: () => { const intent = state.intent, pending = state.pending; if (!intent?.receipt || !pending) return; const orderNo = validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt); finish(null); void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
   };

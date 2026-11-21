@@ -40,7 +40,7 @@ const zh = {
   cashierTitle: '银行卡支付', cashierCloses: '{t} 后订单关闭', secure: '安全支付页面', autoReturn: "付款后可随时返回，确认到账后此页会自动关闭。", closeCashier: '关闭支付页面', paidReturn: "我已付款，返回",
   resultTitle: '付款结果', received: '已收到付款', provisioning: '正在为你开通设备，完成后自动跳转', provisionTrack: '开通进度', trackPaid: '已付款', trackProvision: '开通设备',
   paidAmount: '实付金额', paidMethod: '付款方式', product: '商品', leaveOk: '可以离开此页，开通结果会通知你', viewOrder: '查看订单',
-  leaveTitle: '付款还在进行中', leaveBody: '离开后可在订单详情继续付款，请勿重复付款。', continuePay: '继续付款', leave: '离开',
+  leaveTitle: '付款还在进行中', leaveBody: '离开后可在订单详情继续付款，请勿重复付款。', leaveBodyNoOrder: '离开后可在「我的订单」页继续这笔付款，请勿重复付款。', continuePay: '继续付款', leave: '离开',
   bankFailedTitle: '银行付款未成功', bankFailed: '可以重新付款或换一种方式。', retryPay: '重新付款', switchMethod: '换支付方式',
   timeoutTitle: '付款超时，订单已取消', timeout: '订单已超过付款时间并取消。如已付款，请勿重复付款，联系客服核对。',
   timeoutOtherTitle: '付款超时', timeoutOther: '本次付款已超过截止时间并关闭。如已付款，请勿重复付款，联系客服核对。', reorder: '重新下单', ok: '知道了',
@@ -54,6 +54,8 @@ const zh = {
   goneTitle: '付款记录已失效', gone: '这笔付款记录已不存在，请到订单详情查看，不要重复付款。',
   existingTitle: '已有付款在处理中', existing: '已有一笔付款在处理中，请勿重复付款。如已付款，请等待到账确认；有疑问可联系客服。',
   topupFor: '为订单充值', topupNeed: '{name} 还差 ', topupNeedTail: '，充值到账后可回到订单继续支付。', topupCloses: '订单 {t} 后自动关闭', topupDone: '余额已到账', topupEnough: '可用余额 {amt}\u00A0USDT，足够支付这笔订单。', topupForPurchase: '为本次购买充值', topupNeedTailPurchase: '，到账后返回上一页继续支付。', topupEnoughPurchase: '可用余额 {amt}\u00A0USDT，够支付本次购买，返回上一页继续。', backToPay: '返回继续支付',
+  keepOrderTitle: '订单已保留', keepOrderBody: '离开后可在「我的订单」继续付款，未付款的订单到截止时间会自动取消。',
+  resumeCount: '当前有 {n} 笔付款进行中', viewProgress: '查看进度',
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
 const en: typeof zh = {
@@ -93,7 +95,7 @@ const en: typeof zh = {
   cashierTitle: 'Bank card payment', cashierCloses: 'Order closes in {t}', secure: 'Secure payment page', autoReturn: "Return any time after paying. This page closes once the payment is confirmed.", closeCashier: 'Close payment page', paidReturn: "I've paid, go back",
   resultTitle: 'Payment result', received: 'Payment received', provisioning: 'Setting up your device. You will be taken there when it is ready.', provisionTrack: 'Setup progress', trackPaid: 'Paid', trackProvision: 'Setting up',
   paidAmount: 'Amount paid', paidMethod: 'Paid with', product: 'Item', leaveOk: 'You can leave this page. We will notify you when setup is done.', viewOrder: 'View order',
-  leaveTitle: 'Payment in progress', leaveBody: 'You can continue from the order details later. Please do not pay twice.', continuePay: 'Continue paying', leave: 'Leave',
+  leaveTitle: 'Payment in progress', leaveBody: 'You can continue from the order details later. Please do not pay twice.', leaveBodyNoOrder: 'You can continue this payment later from Orders. Please do not pay twice.', continuePay: 'Continue paying', leave: 'Leave',
   bankFailedTitle: 'Bank payment failed', bankFailed: 'Try again or choose another method.', retryPay: 'Pay again', switchMethod: 'Change method',
   timeoutTitle: 'Payment timed out. Order cancelled', timeout: 'The payment deadline has passed and the order is cancelled. If you already paid, do not pay again. Contact support to check your payment.',
   timeoutOtherTitle: 'Payment timed out', timeoutOther: 'The payment deadline has passed and this payment has closed. If you already paid, do not pay again. Contact support to check your payment.', reorder: 'Order again', ok: 'OK',
@@ -107,6 +109,8 @@ const en: typeof zh = {
   goneTitle: 'Payment record unavailable', gone: 'This payment record no longer exists. Check the order details and don’t pay again.',
   existingTitle: 'Payment already in progress', existing: 'A payment is already being processed. Don’t pay again. If you’ve paid, wait for confirmation, or contact support if you have questions.',
   topupFor: 'Top up for your order', topupNeed: '{name} needs ', topupNeedTail: ' more. Once the top-up arrives, return to the order to pay.', topupCloses: 'Order closes in {t}', topupDone: 'Balance received', topupEnough: '{amt}\u00A0USDT available, enough for this order.', topupForPurchase: 'Top up for this purchase', topupNeedTailPurchase: ' more. Once it arrives, go back to the previous page to pay.', topupEnoughPurchase: '{amt}\u00A0USDT available, enough for this purchase. Go back to pay.', backToPay: 'Back to payment',
+  keepOrderTitle: 'Your order is saved', keepOrderBody: 'You can pay later from Orders. An unpaid order is cancelled automatically at its deadline.',
+  resumeCount: 'Payments in progress: {n}', viewProgress: 'View progress',
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
@@ -146,7 +150,7 @@ const vi: typeof zh = {
   cashierTitle: 'Thanh toán bằng thẻ', cashierCloses: 'Đơn đóng sau {t}', secure: 'Trang thanh toán an toàn', autoReturn: "Thanh toán xong có thể quay lại ngay. Trang tự đóng khi khoản thanh toán được xác nhận.", closeCashier: 'Đóng trang thanh toán', paidReturn: "Tôi đã thanh toán, quay lại",
   resultTitle: 'Kết quả thanh toán', received: 'Đã nhận thanh toán', provisioning: 'Đang kích hoạt thiết bị, xong sẽ tự chuyển trang', provisionTrack: 'Tiến độ kích hoạt', trackPaid: 'Đã thanh toán', trackProvision: 'Kích hoạt',
   paidAmount: 'Số tiền đã trả', paidMethod: 'Phương thức', product: 'Sản phẩm', leaveOk: 'Bạn có thể rời trang này, chúng tôi sẽ báo khi kích hoạt xong', viewOrder: 'Xem đơn hàng',
-  leaveTitle: 'Thanh toán đang diễn ra', leaveBody: 'Bạn có thể tiếp tục trong chi tiết đơn hàng. Vui lòng không thanh toán lại.', continuePay: 'Tiếp tục thanh toán', leave: 'Rời đi',
+  leaveTitle: 'Thanh toán đang diễn ra', leaveBody: 'Bạn có thể tiếp tục trong chi tiết đơn hàng. Vui lòng không thanh toán lại.', leaveBodyNoOrder: 'Bạn có thể tiếp tục thanh toán này sau trong mục Đơn hàng. Vui lòng không thanh toán lại.', continuePay: 'Tiếp tục thanh toán', leave: 'Rời đi',
   bankFailedTitle: 'Thanh toán ngân hàng không thành công', bankFailed: 'Bạn có thể thanh toán lại hoặc chọn cách khác.', retryPay: 'Thanh toán lại', switchMethod: 'Đổi phương thức',
   timeoutTitle: 'Quá hạn thanh toán, đơn đã hủy', timeout: 'Đã hết thời hạn thanh toán và đơn đã hủy. Nếu bạn đã thanh toán, vui lòng không trả lại lần nữa và liên hệ hỗ trợ để kiểm tra.',
   timeoutOtherTitle: 'Quá hạn thanh toán', timeoutOther: 'Đã hết thời hạn và lần thanh toán này đã đóng. Nếu bạn đã thanh toán, vui lòng không trả lại lần nữa và liên hệ hỗ trợ để kiểm tra.', reorder: 'Đặt lại', ok: 'Đã hiểu',
@@ -160,6 +164,8 @@ const vi: typeof zh = {
   goneTitle: 'Bản ghi thanh toán không còn hiệu lực', gone: 'Bản ghi thanh toán này không còn tồn tại. Vui lòng xem chi tiết đơn hàng và không thanh toán lại.',
   existingTitle: 'Đã có thanh toán đang xử lý', existing: 'Đã có một khoản thanh toán đang được xử lý. Vui lòng không thanh toán lại. Nếu bạn đã thanh toán, hãy chờ xác nhận; nếu có thắc mắc, hãy liên hệ hỗ trợ.',
   topupFor: 'Nạp tiền cho đơn hàng', topupNeed: '{name} còn thiếu ', topupNeedTail: '. Nạp tiền xong có thể quay lại đơn để thanh toán tiếp.', topupCloses: 'Đơn tự đóng sau {t}', topupDone: 'Tiền đã vào ví', topupEnough: 'Số dư khả dụng {amt}\u00A0USDT, đủ để thanh toán đơn này.', topupForPurchase: 'Nạp tiền cho lần mua này', topupNeedTailPurchase: '. Tiền vào ví rồi hãy quay lại trang trước để thanh toán.', topupEnoughPurchase: 'Số dư khả dụng {amt}\u00A0USDT, đủ cho lần mua này. Quay lại để thanh toán.', backToPay: 'Quay lại thanh toán',
+  keepOrderTitle: 'Đơn hàng đã được giữ', keepOrderBody: 'Bạn có thể thanh toán sau trong mục Đơn hàng. Đơn chưa thanh toán sẽ tự hủy khi hết hạn.',
+  resumeCount: 'Có {n} khoản thanh toán đang diễn ra', viewProgress: 'Xem tiến độ',
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
@@ -199,7 +205,7 @@ const id: typeof zh = {
   cashierTitle: 'Pembayaran kartu bank', cashierCloses: 'Pesanan ditutup dalam {t}', secure: 'Halaman pembayaran aman', autoReturn: "Setelah membayar, Anda bisa kembali kapan saja. Halaman ini tertutup setelah pembayaran dikonfirmasi.", closeCashier: 'Tutup halaman pembayaran', paidReturn: "Sudah bayar, kembali",
   resultTitle: 'Hasil pembayaran', received: 'Pembayaran diterima', provisioning: 'Menyiapkan perangkat Anda. Anda akan diarahkan ke sana setelah siap.', provisionTrack: 'Progres penyiapan', trackPaid: 'Dibayar', trackProvision: 'Disiapkan',
   paidAmount: 'Jumlah dibayar', paidMethod: 'Dibayar dengan', product: 'Barang', leaveOk: 'Anda boleh meninggalkan halaman ini. Kami akan memberi tahu saat penyiapan selesai.', viewOrder: 'Lihat pesanan',
-  leaveTitle: 'Pembayaran sedang berjalan', leaveBody: 'Anda bisa melanjutkan dari detail pesanan nanti. Jangan membayar dua kali.', continuePay: 'Lanjut bayar', leave: 'Keluar',
+  leaveTitle: 'Pembayaran sedang berjalan', leaveBody: 'Anda bisa melanjutkan dari detail pesanan nanti. Jangan membayar dua kali.', leaveBodyNoOrder: 'Anda bisa melanjutkan pembayaran ini nanti dari Pesanan. Jangan membayar dua kali.', continuePay: 'Lanjut bayar', leave: 'Keluar',
   bankFailedTitle: 'Pembayaran bank gagal', bankFailed: 'Coba lagi atau pilih metode lain.', retryPay: 'Bayar lagi', switchMethod: 'Ganti metode',
   timeoutTitle: 'Waktu pembayaran habis. Pesanan dibatalkan', timeout: 'Batas waktu pembayaran sudah lewat dan pesanan dibatalkan. Jika sudah membayar, jangan bayar lagi. Hubungi layanan pelanggan untuk mengecek pembayaran Anda.',
   timeoutOtherTitle: 'Waktu pembayaran habis', timeoutOther: 'Batas waktu pembayaran sudah lewat dan pembayaran ini ditutup. Jika sudah membayar, jangan bayar lagi. Hubungi layanan pelanggan untuk mengecek pembayaran Anda.', reorder: 'Pesan lagi', ok: 'OK',
@@ -213,6 +219,8 @@ const id: typeof zh = {
   goneTitle: 'Catatan pembayaran tidak tersedia', gone: 'Catatan pembayaran ini sudah tidak ada. Periksa detail pesanan dan jangan bayar lagi.',
   existingTitle: 'Pembayaran sedang diproses', existing: 'Sudah ada pembayaran yang sedang diproses. Jangan bayar lagi. Jika sudah membayar, tunggu konfirmasi atau hubungi dukungan jika ada pertanyaan.',
   topupFor: 'Top up untuk pesanan Anda', topupNeed: '{name} masih kurang ', topupNeedTail: '. Setelah top up masuk, kembali ke pesanan untuk membayar.', topupCloses: 'Pesanan ditutup dalam {t}', topupDone: 'Saldo masuk', topupEnough: '{amt}\u00A0USDT tersedia, cukup untuk pesanan ini.', topupForPurchase: 'Top up untuk pembelian ini', topupNeedTailPurchase: '. Setelah masuk, kembali ke halaman sebelumnya untuk membayar.', topupEnoughPurchase: '{amt}\u00A0USDT tersedia, cukup untuk pembelian ini. Kembali untuk membayar.', backToPay: 'Kembali ke pembayaran',
+  keepOrderTitle: 'Pesanan disimpan', keepOrderBody: 'Anda bisa membayar nanti dari Pesanan. Pesanan yang belum dibayar otomatis dibatalkan saat batas waktu.',
+  resumeCount: '{n} pembayaran sedang berjalan', viewProgress: 'Lihat progres',
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
@@ -252,7 +260,7 @@ const ms: typeof zh = {
   cashierTitle: 'Bayaran kad bank', cashierCloses: 'Pesanan ditutup dalam {t}', secure: 'Halaman bayaran selamat', autoReturn: "Selepas membayar, anda boleh kembali bila-bila masa. Halaman ini ditutup sebaik bayaran disahkan.", closeCashier: 'Tutup halaman bayaran', paidReturn: "Sudah bayar, kembali",
   resultTitle: 'Keputusan bayaran', received: 'Bayaran diterima', provisioning: 'Menyediakan peranti anda. Halaman seterusnya akan dibuka secara automatik apabila peranti sedia.', provisionTrack: 'Kemajuan penyediaan', trackPaid: 'Dibayar', trackProvision: 'Menyediakan',
   paidAmount: 'Jumlah dibayar', paidMethod: 'Dibayar dengan', product: 'Item', leaveOk: 'Anda boleh meninggalkan halaman ini. Kami akan memaklumkan apabila penyediaan selesai.', viewOrder: 'Lihat pesanan',
-  leaveTitle: 'Bayaran sedang berjalan', leaveBody: 'Anda boleh meneruskan dari butiran pesanan kemudian. Jangan bayar dua kali.', continuePay: 'Teruskan bayaran', leave: 'Keluar',
+  leaveTitle: 'Bayaran sedang berjalan', leaveBody: 'Anda boleh meneruskan dari butiran pesanan kemudian. Jangan bayar dua kali.', leaveBodyNoOrder: 'Anda boleh meneruskan bayaran ini kemudian dari Pesanan. Jangan bayar dua kali.', continuePay: 'Teruskan bayaran', leave: 'Keluar',
   bankFailedTitle: 'Bayaran bank gagal', bankFailed: 'Cuba lagi atau pilih kaedah lain.', retryPay: 'Bayar semula', switchMethod: 'Tukar kaedah',
   timeoutTitle: 'Tempoh bayaran tamat. Pesanan dibatalkan', timeout: 'Tarikh akhir bayaran telah lepas dan pesanan dibatalkan. Jika anda sudah membayar, jangan bayar lagi. Hubungi khidmat pelanggan untuk menyemak bayaran anda.',
   timeoutOtherTitle: 'Tempoh bayaran tamat', timeoutOther: 'Tarikh akhir bayaran telah lepas dan bayaran ini ditutup. Jika anda sudah membayar, jangan bayar lagi. Hubungi khidmat pelanggan untuk menyemak bayaran anda.', reorder: 'Pesan semula', ok: 'OK',
@@ -266,6 +274,8 @@ const ms: typeof zh = {
   goneTitle: 'Rekod bayaran tidak tersedia', gone: 'Rekod bayaran ini tidak wujud lagi. Semak butiran pesanan dan jangan bayar lagi.',
   existingTitle: 'Bayaran sedang diproses', existing: 'Sudah ada bayaran yang sedang diproses. Jangan bayar lagi. Jika anda sudah membayar, tunggu pengesahan atau hubungi sokongan jika ada pertanyaan.',
   topupFor: 'Tambah nilai untuk pesanan', topupNeed: '{name} perlu ', topupNeedTail: ' lagi. Setelah tambah nilai diterima, kembali ke pesanan untuk membayar.', topupCloses: 'Ditutup automatik dalam {t}', topupDone: 'Baki diterima', topupEnough: '{amt}\u00A0USDT tersedia, cukup untuk pesanan ini.', topupForPurchase: 'Tambah nilai untuk pembelian ini', topupNeedTailPurchase: ' lagi. Selepas diterima, kembali ke halaman sebelumnya untuk membayar.', topupEnoughPurchase: '{amt}\u00A0USDT tersedia, cukup untuk pembelian ini. Kembali untuk membayar.', backToPay: 'Kembali ke bayaran',
+  keepOrderTitle: 'Pesanan disimpan', keepOrderBody: 'Anda boleh bayar kemudian dari Pesanan. Pesanan yang belum dibayar dibatalkan secara automatik apabila tamat tempoh.',
+  resumeCount: '{n} bayaran sedang berjalan', viewProgress: 'Lihat kemajuan',
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
@@ -305,7 +315,7 @@ const fil: typeof zh = {
   cashierTitle: 'Bayad via card', cashierCloses: 'Magsasara ang order sa {t}', secure: 'Secure na page ng bayad', autoReturn: "Puwede kang bumalik pagkabayad. Kusang magsasara ang page kapag nakumpirma ang bayad.", closeCashier: 'Isara ang page ng bayad', paidReturn: "Nakabayad na, bumalik",
   resultTitle: 'Resulta ng bayad', received: 'Natanggap ang bayad', provisioning: 'Sine-setup ang device mo. Dadalhin ka roon kapag handa na.', provisionTrack: 'Progreso ng setup', trackPaid: 'Bayad na', trackProvision: 'Sine-setup',
   paidAmount: 'Halagang ibinayad', paidMethod: 'Paraan ng bayad', product: 'Item', leaveOk: 'Puwede mo nang iwan ang page na ito. Aabisuhan ka namin kapag tapos na ang setup.', viewOrder: 'Tingnan ang order',
-  leaveTitle: 'Nagbabayad pa', leaveBody: 'Puwede mong ituloy mamaya mula sa detalye ng order. Huwag magbayad nang dalawang beses.', continuePay: 'Ituloy ang bayad', leave: 'Umalis',
+  leaveTitle: 'Nagbabayad pa', leaveBody: 'Puwede mong ituloy mamaya mula sa detalye ng order. Huwag magbayad nang dalawang beses.', leaveBodyNoOrder: 'Puwede mong ituloy ang bayad na ito mamaya sa Mga order. Huwag magbayad nang dalawang beses.', continuePay: 'Ituloy ang bayad', leave: 'Umalis',
   bankFailedTitle: 'Nabigo ang bayad sa bangko', bankFailed: 'Subukan ulit o pumili ng ibang paraan.', retryPay: 'Magbayad ulit', switchMethod: 'Palitan ang paraan',
   timeoutTitle: 'Lampas na ang oras. Kinansela ang order', timeout: 'Lampas na ang deadline ng bayad at kinansela ang order. Kung nakapagbayad ka na, huwag magbayad ulit. Makipag-ugnayan sa support para masuri ang bayad mo.',
   timeoutOtherTitle: 'Lampas na sa oras', timeoutOther: 'Lumampas na sa deadline ang transaksyong ito at isinara na. Kung nakapagbayad ka na, huwag magbayad ulit. Makipag-ugnayan sa support para masuri ang bayad mo.', reorder: 'Mag-order ulit', ok: 'OK',
@@ -319,6 +329,8 @@ const fil: typeof zh = {
   goneTitle: 'Wala nang record ng bayad', gone: 'Wala na ang record ng bayad na ito. Tingnan ang detalye ng order at huwag magbayad ulit.',
   existingTitle: 'May bayad nang pinoproseso', existing: 'May bayad nang pinoproseso. Huwag nang magbayad ulit. Kung nakapagbayad ka na, hintayin ang kumpirmasyon o makipag-ugnayan sa support kung may tanong.',
   topupFor: 'Mag-top up para sa order mo', topupNeed: 'Para sa {name}, kulang pa ng ', topupNeedTail: ' — pagdating ng top-up, bumalik sa order para magbayad.', topupCloses: 'Magsasara ang order sa {t}', topupDone: 'Pumasok na ang pondo', topupEnough: '{amt}\u00A0USDT ang available, sapat para sa order na ito.', topupForPurchase: 'Mag-top up para sa bibilhin mo', topupNeedTailPurchase: ' — pagdating nito, bumalik sa nakaraang page para magbayad.', topupEnoughPurchase: '{amt}\u00A0USDT ang available, sapat para sa bibilhin mo. Bumalik para magbayad.', backToPay: 'Bumalik sa bayad',
+  keepOrderTitle: 'Naka-save ang order', keepOrderBody: 'Puwede kang magbayad mamaya sa Mga order. Awtomatikong makakansela ang order na hindi nabayaran pagdating ng deadline.',
+  resumeCount: '{n} bayad ang isinasagawa', viewProgress: 'Tingnan ang progreso',
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
@@ -358,7 +370,7 @@ const ru: typeof zh = {
   cashierTitle: 'Оплата картой', cashierCloses: 'Закроется через {t}', secure: 'Защищённая страница оплаты', autoReturn: "Вернуться можно сразу после оплаты. После подтверждения страница закроется сама.", closeCashier: 'Закрыть оплату', paidReturn: "Оплачено, вернуться",
   resultTitle: 'Результат оплаты', received: 'Оплата получена', provisioning: 'Подключаем устройство. Когда оно будет готово, его страница откроется автоматически.', provisionTrack: 'Ход подключения', trackPaid: 'Оплачено', trackProvision: 'Подключение',
   paidAmount: 'Оплачено', paidMethod: 'Способ', product: 'Товар', leaveOk: 'Можно уйти со страницы. Мы сообщим, когда подключение завершится.', viewOrder: 'Открыть заказ',
-  leaveTitle: 'Оплата ещё идёт', leaveBody: 'Продолжить можно позже в деталях заказа. Не платите дважды.', continuePay: 'Продолжить', leave: 'Уйти',
+  leaveTitle: 'Оплата ещё идёт', leaveBody: 'Продолжить можно позже в деталях заказа. Не платите дважды.', leaveBodyNoOrder: 'Продолжить эту оплату можно позже в разделе «Заказы». Не платите дважды.', continuePay: 'Продолжить', leave: 'Уйти',
   bankFailedTitle: 'Оплата через банк не прошла', bankFailed: 'Повторите или выберите другой способ.', retryPay: 'Оплатить снова', switchMethod: 'Другой способ',
   timeoutTitle: 'Время вышло, заказ отменён', timeout: 'Срок оплаты истёк, заказ отменён. Если вы уже заплатили, не платите повторно — напишите в поддержку для проверки.',
   timeoutOtherTitle: 'Время оплаты вышло', timeoutOther: 'Срок оплаты истёк, платёж закрыт. Если вы уже заплатили, не платите повторно — напишите в поддержку для проверки.', reorder: 'Заказать снова', ok: 'Понятно',
@@ -372,6 +384,8 @@ const ru: typeof zh = {
   goneTitle: 'Запись об оплате недоступна', gone: 'Этой записи об оплате больше нет. Проверьте детали заказа и не платите повторно.',
   existingTitle: 'Оплата уже обрабатывается', existing: 'Оплата уже обрабатывается. Не оплачивайте повторно. Если вы уже оплатили, дождитесь подтверждения или обратитесь в поддержку.',
   topupFor: 'Пополнить для заказа', topupNeed: 'Для {name} не хватает ', topupNeedTail: '. Когда пополнение поступит, вернитесь к заказу и оплатите.', topupCloses: 'Закроется через {t}', topupDone: 'Пополнение поступило', topupEnough: 'Доступно {amt}\u00A0USDT — хватает на этот заказ.', topupForPurchase: 'Пополнить для покупки', topupNeedTailPurchase: '. Когда средства поступят, вернитесь на предыдущую страницу и оплатите.', topupEnoughPurchase: 'Доступно {amt}\u00A0USDT — хватает на покупку. Вернитесь, чтобы оплатить.', backToPay: 'Вернуться к оплате',
+  keepOrderTitle: 'Заказ сохранён', keepOrderBody: 'Оплатить можно позже в разделе «Заказы». Неоплаченный заказ отменится автоматически по истечении срока.',
+  resumeCount: 'Оплат в процессе: {n}', viewProgress: 'Ход оплаты',
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
 const kk: typeof zh = {
@@ -411,7 +425,7 @@ const kk: typeof zh = {
   cashierTitle: 'Банк картасымен төлеу', cashierCloses: 'Тапсырыстың жабылуына: {t}', secure: 'Қауіпсіз төлем беті', autoReturn: "Төлегеннен кейін кез келген уақытта оралуға болады. Төлем расталғанда бет өзі жабылады.", closeCashier: 'Төлем бетін жабу', paidReturn: "Төледім, оралу",
   resultTitle: 'Төлем нәтижесі', received: 'Төлем түсті', provisioning: 'Құрылғыңыз бапталуда. Дайын болғанда сонда өтесіз.', provisionTrack: 'Баптау барысы', trackPaid: 'Төленді', trackProvision: 'Бапталуда',
   paidAmount: 'Төленген сома', paidMethod: 'Төлеу әдісі', product: 'Тауар', leaveOk: 'Бұл беттен шыға аласыз. Баптау аяқталғанда хабарлаймыз.', viewOrder: 'Тапсырысты қарау',
-  leaveTitle: 'Төлем жүріп жатыр', leaveBody: 'Кейін тапсырыс мәліметінен жалғастыра аласыз. Екі рет төлемеңіз.', continuePay: 'Төлеуді жалғастыру', leave: 'Шығу',
+  leaveTitle: 'Төлем жүріп жатыр', leaveBody: 'Кейін тапсырыс мәліметінен жалғастыра аласыз. Екі рет төлемеңіз.', leaveBodyNoOrder: 'Бұл төлемді кейін «Тапсырыстар» бөлімінен жалғастыра аласыз. Екі рет төлемеңіз.', continuePay: 'Төлеуді жалғастыру', leave: 'Шығу',
   bankFailedTitle: 'Банк төлемі сәтсіз', bankFailed: 'Қайталаңыз немесе басқа әдісті таңдаңыз.', retryPay: 'Қайта төлеу', switchMethod: 'Әдісті өзгерту',
   timeoutTitle: 'Төлем уақыты бітті. Тапсырыс жойылды', timeout: 'Төлем мерзімі өтіп, тапсырыс жойылды. Төлеп қойсаңыз, қайта төлемеңіз. Төлеміңізді тексеру үшін қолдау қызметіне жазыңыз.',
   timeoutOtherTitle: 'Төлем уақыты бітті', timeoutOther: 'Төлем мерзімі өтіп, бұл төлем жабылды. Төлеп қойсаңыз, қайта төлемеңіз. Төлеміңізді тексеру үшін қолдау қызметіне жазыңыз.', reorder: 'Жаңа тапсырыс', ok: 'Жарайды',
@@ -425,6 +439,8 @@ const kk: typeof zh = {
   goneTitle: 'Төлем жазбасы қолжетімсіз', gone: 'Бұл төлем жазбасы енді жоқ. Тапсырыс мәліметтерін тексеріңіз және қайта төлемеңіз.',
   existingTitle: 'Төлем өңделуде', existing: 'Төлем өңделіп жатыр. Қайта төлемеңіз. Төлеп қойсаңыз, растауды күтіңіз немесе сұрақ болса, қолдау қызметіне жазыңыз.',
   topupFor: 'Тапсырыс үшін толтыру', topupNeed: '{name} үшін тағы ', topupNeedTail: ' қажет. Ақша шотқа түскеннен кейін тапсырысқа оралып, төлеңіз.', topupCloses: 'Тапсырыстың жабылуына: {t}', topupDone: 'Қаражат түсті', topupEnough: 'Қолжетімді {amt}\u00A0USDT, бұл тапсырысқа жеткілікті.', topupForPurchase: 'Сатып алу үшін толтыру', topupNeedTailPurchase: ' қажет. Қаражат түскен соң алдыңғы бетке оралып, төлеңіз.', topupEnoughPurchase: 'Қолжетімді {amt}\u00A0USDT, сатып алуға жеткілікті. Төлеу үшін оралыңыз.', backToPay: 'Төлемге оралу',
+  keepOrderTitle: 'Тапсырыс сақталды', keepOrderBody: 'Кейін «Тапсырыстар» бөлімінен төлей аласыз. Төленбеген тапсырыс мерзімі біткенде автоматты түрде жойылады.',
+  resumeCount: 'Жүріп жатқан төлемдер: {n}', viewProgress: 'Барысты қарау',
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
@@ -464,7 +480,7 @@ const uz: typeof zh = {
   cashierTitle: 'Karta bilan toʻlov', cashierCloses: 'Buyurtma yopilishiga {t}', secure: 'Xavfsiz toʻlov sahifasi', autoReturn: "Toʻlovdan soʻng istalgan vaqtda qaytishingiz mumkin. Toʻlov tasdiqlanganda sahifa oʻzi yopiladi.", closeCashier: 'Toʻlov sahifasini yopish', paidReturn: "Toʻladim, qaytish",
   resultTitle: 'Toʻlov natijasi', received: 'Toʻlov qabul qilindi', provisioning: 'Qurilmangiz sozlanmoqda. Tayyor boʻlgach, unga oʻtasiz.', provisionTrack: 'Sozlash jarayoni', trackPaid: 'Toʻlandi', trackProvision: 'Sozlanmoqda',
   paidAmount: 'Toʻlangan summa', paidMethod: 'Toʻlov usuli', product: 'Mahsulot', leaveOk: 'Bu sahifadan chiqishingiz mumkin. Sozlash tugagach, xabar beramiz.', viewOrder: 'Buyurtma',
-  leaveTitle: 'Toʻlov jarayonda', leaveBody: 'Keyinroq buyurtma tafsilotlaridan davom etishingiz mumkin. Ikki marta toʻlamang.', continuePay: 'Toʻlashni davom ettirish', leave: 'Chiqish',
+  leaveTitle: 'Toʻlov jarayonda', leaveBody: 'Keyinroq buyurtma tafsilotlaridan davom etishingiz mumkin. Ikki marta toʻlamang.', leaveBodyNoOrder: 'Bu toʻlovni keyinroq «Buyurtmalar» boʻlimidan davom ettirishingiz mumkin. Ikki marta toʻlamang.', continuePay: 'Toʻlashni davom ettirish', leave: 'Chiqish',
   bankFailedTitle: 'Bank toʻlovi amalga oshmadi', bankFailed: 'Qayta urining yoki boshqa usulni tanlang.', retryPay: 'Qayta toʻlash', switchMethod: 'Usulni almashtirish',
   timeoutTitle: 'Toʻlov vaqti tugadi. Buyurtma bekor qilindi', timeout: 'Toʻlov muddati oʻtdi va buyurtma bekor qilindi. Agar allaqachon toʻlagan boʻlsangiz, qayta toʻlamang. Toʻlovni tekshirish uchun yordam xizmatiga murojaat qiling.',
   timeoutOtherTitle: 'Toʻlov vaqti tugadi', timeoutOther: 'Toʻlov muddati oʻtdi va bu toʻlov yopildi. Agar allaqachon toʻlagan boʻlsangiz, qayta toʻlamang. Toʻlovni tekshirish uchun yordam xizmatiga murojaat qiling.', reorder: 'Qayta buyurtma', ok: 'OK',
@@ -478,6 +494,8 @@ const uz: typeof zh = {
   goneTitle: 'Toʻlov yozuvi mavjud emas', gone: 'Bu toʻlov yozuvi endi yoʻq. Buyurtma tafsilotlarini tekshiring va qayta toʻlamang.',
   existingTitle: 'Toʻlov koʻrib chiqilmoqda', existing: 'Toʻlov allaqachon koʻrib chiqilmoqda. Qayta toʻlamang. Toʻlagan boʻlsangiz, tasdiqlashni kuting yoki savollar boʻlsa, yordam xizmatiga murojaat qiling.',
   topupFor: 'Buyurtma uchun toʻldirish', topupNeed: '{name} uchun yana ', topupNeedTail: ' kerak. Mablagʻ hisobga tushgach, toʻlash uchun buyurtmaga qayting.', topupCloses: 'Buyurtma yopilishiga {t}', topupDone: 'Balans toʻldirildi', topupEnough: 'Mavjud: {amt}\u00A0USDT — bu buyurtma uchun yetarli.', topupForPurchase: 'Xarid uchun toʻldirish', topupNeedTailPurchase: ' kerak. Mablagʻ tushgach, toʻlash uchun oldingi sahifaga qayting.', topupEnoughPurchase: 'Mavjud: {amt}\u00A0USDT — xarid uchun yetarli. Toʻlash uchun qayting.', backToPay: 'Toʻlovga qaytish',
+  keepOrderTitle: 'Buyurtma saqlandi', keepOrderBody: 'Keyinroq «Buyurtmalar» boʻlimidan toʻlashingiz mumkin. Toʻlanmagan buyurtma muddat tugaganda avtomatik bekor qilinadi.',
+  resumeCount: 'Jarayondagi toʻlovlar: {n}', viewProgress: 'Jarayonni koʻrish',
   resume: 'Toʻlov jarayonda', view: 'Toʻlovni koʻrish', review: 'Toʻlovingiz tasdiqlanmoqda', ended: 'Bu toʻlov yakunlangan', delivered: 'Toʻlov yakunlandi',
 };
 export type PurchasePaymentCopy = typeof zh;
