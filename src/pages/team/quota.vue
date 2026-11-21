@@ -24,11 +24,15 @@
         <view v-if="remoteApiEnabled && !remoteSnapshot && !remoteError" class="quota-state" role="status" aria-live="polite" :aria-busy="remoteRefreshing"><text>{{ remoteRefreshing ? auditCopy.loading : '—' }}</text></view>
         <view v-if="remoteApiEnabled && !catalogDisplayReady" class="quota-state"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><text>—</text></view>
         <view v-if="quotaReady && !focusedTiers.length" class="quota-state" role="status"><text>{{ t.empty.listTitle }}</text></view>
-        <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" :label="t.empty.devicesCta" @click="go('/pages/store/store')" /></view>
-        <!-- Tiers swipe sideways as large product cards (P-41). -->
-        <view v-if="focusedTiers.length" class="quota-carousel">
-        <QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" />
-        </view>
+        <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" :label="t.empty.devicesCta" @click="go('/pages/store/store')"><text class="nx-after-chevron">{{ t.empty.devicesCta }}</text></NxButton></view>
+        <!-- One tier: a full-width card that carries only what the hero lacks. Several: a carousel with position dots (04.2). -->
+        <QuotaTierCard v-if="focusedTiers.length === 1" class="quota-single" :tier="focusedTiers[0]" wide :hide-product="!!focusedProductId" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" />
+        <template v-else-if="focusedTiers.length">
+          <scroll-view scroll-x class="quota-carousel" :show-scrollbar="false" @scroll="onCarouselScroll">
+            <view class="quota-carousel__track"><QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" /></view>
+          </scroll-view>
+          <view class="quota-dots" aria-hidden="true"><view v-for="(tier, index) in focusedTiers" :key="tier.productId" class="quota-dot" :class="{ 'quota-dot--active': index === carouselIndex }" /></view>
+        </template>
 
         <view class="quota-footer">
           <NxButton variant="secondary" :label="t.rank.conditionsLabel" @click="go('/pages/team/rank')" />
@@ -337,6 +341,15 @@ function go(url: string) {
   navTo(url);
 }
 
+// Which carousel card is in view, for the position dots. One step is a card plus the 12px gap;
+// the track's 20px side padding is taken off the scroll width first.
+const carouselIndex = ref(0);
+function onCarouselScroll(event: { detail: { scrollLeft: number; scrollWidth: number } }) {
+  const count = focusedTiers.value.length;
+  const step = (event.detail.scrollWidth - 40 + 12) / count;
+  carouselIndex.value = Math.min(count - 1, Math.round(event.detail.scrollLeft / step));
+}
+
 const heroTier = computed(() => focusedTiers.value[0]);
 const heroPriceParts = computed(() => formatFinanceAmount(heroTier.value?.price).split('.'));
 const heroImage = computed(() => heroTier.value ? getProductMedia(heroTier.value.productId)?.src ?? heroTier.value.imageUrl : undefined);
@@ -348,54 +361,45 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 
 <style scoped>
 .quota-page { color:var(--v5-ink);padding-bottom:28px; }.quota-content { padding:var(--v5-space-3) var(--v5-space-5) 0; }
-.quota-hero { padding:var(--ui-space-inline) 0 26px;border-bottom:1px solid var(--v5-border); }.quota-hero__main { display:flex;align-items:center;gap:var(--v5-space-2); }.quota-hero__copy { flex:1;min-width:0; }
-.quota-eyebrow { display:block;margin-bottom:var(--ui-space-row-y);font:400 12px/1.5 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }.quota-headline { display:block;font:600 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5);letter-spacing:-.02em;overflow-wrap:anywhere; }.quota-hero__price { display:block;margin-top:var(--ui-space-row-y);font:500 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
-.quota-hero__image { flex:none;width:42%;height:128px;object-fit:contain; }.quota-invite-count { display:flex;justify-content:space-between;align-items:center;gap:var(--ui-space-inset);margin:18px 0;font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);color:var(--v5-ink-2); }.quota-invite-count > view { display:flex;align-items:baseline;gap:var(--v5-space-2);flex-wrap:wrap; }.quota-invite-count__number { font:600 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-v5);color:var(--v5-ink); }
-.quota-body { display:block;margin-top:var(--v5-space-2);font:400 var(--ui-type-list-subtitle)/1.7 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }.quota-caption { display:block;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
-.quota-state { padding-block:28px;display:flex;flex-direction:column;gap:var(--ui-space-inset); }.quota-footer { margin-top:28px; }.quota-footer > :deep(.nx-button) { width:100%;box-sizing:border-box; }
-.quota-state.nx-inline-recovery { display:grid; align-items:center; gap:var(--v5-space-3); }
-.quota-route { display:flex;justify-content:space-between;align-items:center;gap:14px;padding:var(--ui-space-inset) 0;min-height:44px;font:500 var(--ui-type-list-subtitle)/1.6 var(--font-v5);color:var(--v5-ink-2);cursor:pointer; }.quota-route + .quota-route { border-top:1px solid var(--v5-border); }.quota-route > view { flex:1;min-width:0;overflow-wrap:anywhere; }.quota-route svg { flex:none; }.quota-route:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
-/* Tiers are separate sections; conditions remain inside their owning product. */
-.quota-content :deep(.quota-tier) { padding: 26px 0; margin: 0; border: 0; border-bottom: 1px solid var(--v5-border); border-radius: 0; }
-.quota-content :deep(.quota-product__name) { font-size: var(--ui-type-subheading); line-height: var(--ui-type-subheading-lh); }
-.quota-content :deep(.quota-product__price) { font-size:18px; line-height:24px; }
-.quota-content :deep(.quota-product__qualification) { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
-.quota-content :deep(.quota-product__image) { width: 64px; height: 72px; }
-.quota-content :deep(.quota-section-label) { font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; }
-.quota-content :deep(.quota-conditions) { padding-top: 18px; border-top: 1px solid var(--v5-border); }
-.quota-invite-count { align-items: flex-start; margin-top: var(--v5-space-2); }
-.quota-invite-count > view { justify-content: flex-end; text-align: right; max-width: 58%; overflow-wrap: anywhere; }
-.quota-invite-count > text { padding-top: var(--v5-space-2); flex: 1; }
+.quota-hero__main { display:flex;align-items:center;gap:var(--v5-space-2); }.quota-hero__copy { flex:1;min-width:0; }
+.quota-headline { display:block;font:600 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5);letter-spacing:-.02em;overflow-wrap:break-word; }
+.quota-hero__image { flex:none;width:42%;height:128px;object-fit:contain; }
+.quota-body { display:block;margin-top:var(--v5-space-2);font:400 var(--ui-type-list-subtitle)/1.7 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }.quota-caption { display:block;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.quota-state { padding-block:28px;display:flex;flex-direction:column;gap:var(--ui-space-inset); }
 @media(max-width:374px) { .quota-content { padding-inline:var(--v5-space-4); } .quota-hero__image { height:112px; } }
-/* P-41: hero card with the invite ring; tiers as a horizontal carousel of tinted product cards. */
-.quota-hero { --nx-tint: var(--v5-brand); margin-top: var(--v5-space-1); padding: var(--v5-space-5); border: 0; border-radius: 28px; }
-.quota-invite-count { align-items: center; }
-.quota-invite-count > .quota-ring { display:grid; place-items:center; align-items:center; justify-content:center; gap:0; max-width:none; text-align:initial; }
-.quota-ring { display: grid; place-items: center; flex: none; width: 72px; height: 72px; border-radius: 999px; background: conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%), var(--v5-surface-3) 0); }
-.quota-ring__hole { display:flex; align-items:center; justify-content:center; width:58px; height:58px; border-radius:999px; background:var(--v5-surface); font:600 17px/22px var(--font-metric); color:var(--v5-ink); white-space:nowrap; }
-.quota-ring__hole .quota-invite-count__number { font:inherit; }
-.quota-invite-count > .quota-invite-count__copy { display:block; flex:1; min-width:0; max-width:none; text-align:left; }
-.quota-invite-count__copy > text:first-child { font-weight:500; }
-.quota-invite-count .quota-body { margin-top:var(--v5-space-1); font-size:12px; line-height:1.6; }
-.quota-devices-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); margin-top:14px; }
-.quota-section-title { font:600 var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
-.quota-invite-count__step { display:block; margin:2px 0; font:600 16px/22px var(--font-v5); color:var(--v5-ink); }
-.quota-hero > .quota-invite-count:last-child { margin-bottom:0; }
+/* Hero: the page's one focal card, brand tint (01 §1.1.2); overview title, amount and the invite ring. */
+.quota-hero { --nx-tint: var(--v5-brand); margin-top: var(--v5-space-1); padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); }
+.quota-hero .quota-headline { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); letter-spacing:-.01em; }
+.quota-hero__price { display:flex; align-items:baseline; margin-top:var(--v5-space-1); font:500 24px/32px var(--font-amount); letter-spacing:-.02em; }
+.quota-price-symbol { margin-right:2px; font-size:max(12px, .55em); color:var(--v5-ink-3); }
+.quota-price-fraction { color:var(--v5-ink-3); }
+.quota-invite-count { display:flex; align-items:center; gap:var(--ui-space-inset); margin-top:var(--ui-space-inset); }
 .quota-hero > .quota-invite-count:first-child { margin-top:0; }
+.quota-ring { display: grid; place-items: center; flex: none; width: 72px; height: 72px; border-radius: 999px; background: conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%), var(--v5-surface-3) 0); }
+.quota-ring__hole { display:flex; align-items:center; justify-content:center; width:58px; height:58px; border-radius:999px; background:var(--v5-surface); font:500 17px/22px var(--font-metric); color:var(--v5-ink); white-space:nowrap; }
+.quota-invite-count__copy { flex:1; min-width:0; font:400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
+.quota-invite-count__copy > text { display:block; }
+.quota-invite-count__step { margin-top:2px; font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color:var(--v5-ink); }
+.quota-invite-count .quota-body { margin-top:var(--v5-space-1); font:inherit; color:inherit; }
+/* Section title and its link share a line; the link drops to the next line, right-aligned, when they do not fit (03 §3.9). */
+.quota-devices-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; column-gap:var(--v5-space-3); margin-top:var(--ui-space-section-gap); }
+/* The link keeps its 44px hit area but overflows the 24px title line, so the section gap stays 32 and title-to-content 12. */
+.quota-devices-heading > :deep(.nx-button) { margin-left:auto; margin-block:-10px; }
+.quota-section-title { font:600 var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
+.quota-single { margin-top:var(--v5-space-3); }
 /* Two equal buttons side by side; when their one-line labels do not both fit (vi), the row wraps and each takes the full width. */
-.quota-footer { display:flex; flex-wrap:wrap; gap:var(--v5-space-3); margin-top:var(--v5-space-4); }
+.quota-footer { display:flex; flex-wrap:wrap; gap:var(--v5-space-3); margin-top:var(--ui-space-section-gap); }
 .quota-footer > :deep(.nx-button) { flex:1 1 0; min-width:max-content; box-sizing:border-box; }
 .quota-invite-hint { margin-top:var(--v5-space-3); }
-.quota-hero__price { display:flex; align-items:baseline; font:550 24px/32px var(--font-amount); letter-spacing:-.03em; }
-.quota-price-symbol { margin-right:2px; font-size:12px; color:var(--v5-ink-3); }
-.quota-price-fraction { color:var(--v5-ink-3); }
-.quota-carousel { display: flex; gap: var(--ui-space-inline); margin: var(--ui-space-inset) -20px 0; padding: 0 var(--v5-space-5) var(--v5-space-1); overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--v5-space-5); scrollbar-width: none; }
-.quota-carousel::-webkit-scrollbar { display: none; }
-.quota-content .quota-carousel :deep(.quota-tier) { flex: none; width: 260px; box-sizing: border-box; padding: var(--ui-space-inset); border: 0; border-radius: 28px; scroll-snap-align: start; }
-.quota-content .quota-carousel :deep(.quota-product) { flex-direction: column; align-items: flex-start; gap: var(--v5-space-2); }
-.quota-content .quota-carousel :deep(.quota-product__image) { align-self: center; width: 100%; height: 120px; }
-.quota-content .quota-carousel :deep(.quota-product__arrow) { display: none; }
-.quota-content .quota-carousel :deep(.quota-product__name) { font: 600 var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
-.quota-content .quota-carousel :deep(.quota-conditions) { padding-top: var(--ui-space-inline); }
-@media (max-width: 374px) { .quota-carousel { margin-inline: -16px; padding-inline: var(--v5-space-4); } .quota-content .quota-carousel :deep(.quota-tier) { width: 248px; } }
+/* Carousel (2+ tiers): the next card peeks, the last card ends on the page margin. */
+.quota-carousel { display: block; width: auto; margin: var(--v5-space-3) calc(-1 * var(--v5-space-5)) 0; container-type: inline-size; white-space: nowrap; }
+.quota-carousel :deep(.uni-scroll-view) { scroll-snap-type: x mandatory; scroll-padding-inline: var(--v5-space-5); scrollbar-width: none; }
+.quota-carousel :deep(.uni-scroll-view::-webkit-scrollbar) { display: none; }
+.quota-carousel__track { display: inline-flex; align-items: stretch; gap: var(--ui-space-inline); padding: 0 var(--v5-space-5) var(--v5-space-1); vertical-align: top; white-space: normal; }
+.quota-carousel__track > :deep(.quota-tier) { flex: none; width: 280px; width: calc(100cqw - 72px); scroll-snap-align: start; }
+.quota-dots { display:flex; justify-content:center; gap:6px; margin-top:var(--v5-space-3); }
+.quota-dot { width:6px; height:6px; border-radius:999px; background:color-mix(in srgb,var(--v5-ink) 20%,transparent); transition:width .2s ease, background-color .2s ease; }
+.quota-dot--active { width:16px; background:var(--v5-brand); }
+@media (prefers-reduced-motion: reduce) { .quota-dot { transition:none; } }
+@media (max-width: 374px) { .quota-carousel { margin-inline: calc(-1 * var(--v5-space-4)); } .quota-carousel :deep(.uni-scroll-view) { scroll-padding-inline: var(--v5-space-4); } .quota-carousel__track { padding-inline: var(--v5-space-4); } .quota-carousel__track > :deep(.quota-tier) { width: calc(100cqw - 64px); } }
 </style>
