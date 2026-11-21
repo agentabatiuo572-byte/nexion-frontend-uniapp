@@ -147,7 +147,8 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
-      releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,purchaseGate:null,
+      releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
+      purchaseGate:state.catalogState==='restricted'&&id==='stellarbox-s1'?{mode:'all',enforce:true,rankMin:8}:null,
       purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
       dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
       shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
@@ -179,8 +180,17 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available};
 }
 
+function demoE1PurchaseRules(state,product,now) {
+  const required=product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
+  const current=required?demoH4Account(state,now).rank:0;
+  const gap=Math.max(0,required-current);
+  const eligible=product.available&&gap===0;
+  return {policy:'E1',eligible,decisionCode:!product.available?'PRODUCT_NOT_RELEASED':eligible?'ELIGIBLE':'PURCHASE_GATE_NOT_MET',
+    mode:'ALL',conditions:required?[{kind:'rank',required,current,gap,met:gap===0}]:[]};
+}
+
 function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
-  const e1={policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+  const e1=demoE1PurchaseRules(state,product,now);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
   if(state.quotaState==='approved'&&product.id===approvedQuotaSku){
     const quota=demoHardwareQuota(product,state,points,now);
@@ -850,12 +860,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
     const reason=tradeinTargetReason(product);
     if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
-    const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
-    const purchase=demoSkuPurchaseRules(state,product,points,now);
-    if(!purchase.eligible){
-      const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
-      throw Object.assign(new Error(code),{status:403});
-    }
+    const purchase=demoE1PurchaseRules(state,product,now);
+    if(!purchase.eligible)throw Object.assign(new Error(purchase.decisionCode),{status:403});
     const data=structuredClone(base('/api/app/trade-in/capacity-quote'));
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
     const fleet=demoFleetFacts(url,locale,state),active=fleet.devices.filter(device=>device.activatedAt!==null),full=fleet.slotsUsed>=fleet.slotCap;

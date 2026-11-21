@@ -100,7 +100,7 @@
               <view v-if="trialOffsetView.offsetUSD > 0" class="checkout-option"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ t.store.coRowTrialOffset }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.offsetUSD, true) }}</text></view>
               <view v-if="trialOffsetView.earlyDiscountUSD > 0" class="checkout-option" data-testid="checkout-trial-early-discount"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ trialCopy.earlyDiscountLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.earlyDiscountUSD, true) }}</text></view>
               <!-- Trade-in remains a separate, reversible action, never a payment switch. -->
-              <view v-if="hasTradein || removedTradein || tradeinAvailable" class="checkout-option checkout-tradein">
+              <view v-if="!hasVoucher && (hasTradein || removedTradein || tradeinAvailable)" class="checkout-option checkout-tradein">
                 <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h13m1 12 4-4-4-4M21 16H8" /></svg></view>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-row-description">{{ tradeinChipText }}</text></view>
                 <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
@@ -146,7 +146,7 @@
                 <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
                 <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
                 <NxButton v-if="checkoutCapacityRefusal && !remoteCapacityGate.pending && quantityReady" variant="text" size="small" :label="t.store.coBrowseOtherDevices" @click="goStore" />
-                <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" icon="chevron-right" :busy="reAddingTradein" @click="reAddTradein" />
+                <NxButton v-if="!hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" icon="chevron-right" :busy="reAddingTradein" @click="reAddTradein" />
                 <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
               </view>
             </view>
@@ -304,7 +304,7 @@ import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
-import { acquireAccountCommandKey, readAccountRow, writeAccountRow, releaseAccountCommandKey } from "@/store/account-scoped-storage";
+import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
 import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
 import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
@@ -327,7 +327,7 @@ import { navReplace, navReset, navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
-import { asApiError, isApiRefusal, isSettledRejection } from "@/api/errors";
+import { asApiError, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
@@ -893,6 +893,11 @@ async function selectAutomaticVoucher(enabled:boolean):Promise<void> {
     }
     if(enabled&&!await voucher.refreshRemote())throw new Error('VOUCHER_STATE_UNAVAILABLE');
     if(!isCurrentCheckoutRoute(scope))return;
+    if (!enabled && hasVoucher.value && remoteApiEnabled && product.value?.productType === 'DEVICE') {
+      tradeinAvailable.value = false;
+      await retryCheckoutCapacity();
+      if (!isCurrentCheckoutRoute(scope)) return;
+    }
     const preferences=readAccountRow<Record<string,boolean>>(VOUCHER_PREFERENCE_KEY,scope.accountKey,true)??{};
     if(!writeAccountRow(VOUCHER_PREFERENCE_KEY,scope.accountKey,{...preferences,[scope.productNo]:enabled}))throw new Error('STORAGE_UNAVAILABLE');
     voucherAutomatic.value=enabled;step.value='select-payment';
@@ -975,7 +980,7 @@ function removeTradein() {
 }
 // 移除后的找回入口(PR-D 债 #2:intercept 一次性,移除后本页原无恢复路径)。
 async function reAddTradein() {
-  if (reAddingTradein.value || (remoteApiEnabled && remoteCapacityGate.pending)) return;
+  if (hasVoucher.value || reAddingTradein.value || (remoteApiEnabled && remoteCapacityGate.pending)) return;
   if (remoteApiEnabled && remoteTradeinRecoveryRequired.value) {
     toast.warn(t.value.tradein.errPleaseRetry);
     return;
@@ -1115,7 +1120,7 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'capacity' 
       () => {},
       () => isCurrentCheckoutRoute(requestScope),
     ).then(async (quote) => {
-      if (!isCurrentCheckoutRoute(requestScope)) return;
+      if (!isCurrentCheckoutRoute(requestScope) || (mode === 'interactive' && hasVoucher.value)) return;
       const sourceIds = eligibility?.sources.filter((source) => source.eligible)
         .map((source) => String(source.sourceDeviceId)) ?? [];
       if (quote.decision === "REPLACE_REQUIRED") {
@@ -1869,27 +1874,17 @@ async function retryOriginalCheckout() {
 }
 async function cancelCheckout() {
   if (checkoutLeaving.value || paymentFlowBusy.value || confirming) return;
-  let original = createdCheckoutOrder.value;
+  const created = createdCheckoutOrder.value;
+  if (!created || settledResultReplay.value) {
+    // Keep the unresolved create command for explicit recovery on the next visit.
+    navBack(checkoutBackHref.value);
+    return;
+  }
   const scope = captureCheckoutRoute();
   const attempt = ++checkoutLeaveAttempt;
   checkoutLeaving.value = true;
   let leaveError = '';
   try {
-    const pendingCreate = pendingCheckoutCreate.value ?? readCheckoutCreate(scope.accountKey, scope.productNo);
-    if ((!original && !pendingCreate) || settledResultReplay.value) { navBack(checkoutBackHref.value); return; }
-    pendingCheckoutCreate.value = pendingCreate;
-    if (!original && pendingCreate) {
-      // The existing API has no create-command GET. Replay only the exact
-      // persisted creation key/payload, then cancel that original order.
-      original = await orderApi.create(pendingCreate.request);
-      if (!isCurrentCheckoutRoute(scope)) return;
-      createdCheckoutOrder.value = original;
-      rememberCheckoutOrder(scope.accountKey, { productNo: scope.productNo, orderNo: original.orderNo, intent: pendingCreate.intent, commandKey: pendingCreate.request.idempotencyKey });
-      forgetCheckoutCreate(scope.accountKey, pendingCreate);
-      pendingCheckoutCreate.value = null;
-    }
-    const created = original;
-    if (!created) return;
     const action = readOrderAction(scope.accountKey, created.orderNo);
     let unseenPaymentKey: string | null = null;
     if (action?.kind === 'pay') {
@@ -1929,15 +1924,7 @@ async function cancelCheckout() {
     retireRemoteOrderKey();
     createdCheckoutOrder.value = null;
     navBack(checkoutBackHref.value);
-  } catch (error) {
-    if (!original && pendingCheckoutCreate.value && isCurrentCheckoutRoute(scope) && isSettledRejection(error)) {
-      const pendingCreate = pendingCheckoutCreate.value;
-      forgetCheckoutCreate(scope.accountKey, pendingCreate);
-      releaseAccountCommandKey(REMOTE_CHECKOUT_COMMANDS_KEY, scope.accountKey, pendingCreate.intent, pendingCreate.request.idempotencyKey);
-      pendingCheckoutCreate.value = null;
-      navBack(checkoutBackHref.value);
-      return;
-    }
+  } catch {
     leaveError = t.value.orders.resultReadback;
   } finally {
     // Hiding invalidates route writes, but must still release this attempt's UI.
