@@ -1810,6 +1810,7 @@ export const uz: Messages = {
     sheetCta: "Tasdiqlash · ${amount} toʻlash",
     sheetCancel: "Bekor",
     recoveryPending: "Oldingi almashtirish natijasi hali tasdiqlanmagan.",
+    recoveryReading: "Oldingi almashtirish tekshirilmoqda. Ekran oʻzi yangilanadi, hech narsa qilish shart emas.",
     recoveryChecking: "Oldingi almashtirish natijasi tekshirilmoqda. Qayta toʻlamang.\nSahifa avtomatik yangilanadi.",
     keepRecoveryPending: "Eski qurilmani saqlab xarid qilish natijasi tasdiqlanmagan. Avval asl xaridni tiklang.",
     keepRecoveryAction: "Asl xaridni tekshirish",

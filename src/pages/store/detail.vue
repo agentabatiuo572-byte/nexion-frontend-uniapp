@@ -613,9 +613,9 @@ function publishStickyCTA() {
       sticky.show({
         href: `/pages/store/detail?id=${product.value.id}`,
         amount: `${priceText.value}`,
-        buttonLabel: eligibility.value.status === "loading" || eligibility.value.status === "idle"
-          ? t.value.store.purchaseEligibilityLoading
-          : t.value.store.cardBuyNow,
+        // Loading and silent recovery read the same to the user: the reason sits above the disabled button (03 §3.1, 04 §4.0).
+        note: t.value.store.purchaseEligibilityLoading,
+        buttonLabel: t.value.store.cardBuyNow,
         disabled: true,
         showTabBar: false,
       }, stickyOwner);
