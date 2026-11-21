@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 
 /** Isolate the background M3 transport without inventing business-command receipts. */
-export async function installProbeConversationRealtime(page, { authenticated = true } = {}) {
-  const tickets = new Set();
+export async function installProbeConversationRealtime(page, { authenticated = true, resolveAccount } = {}) {
+  const tickets = new Map();
   await page.route((url) => url.pathname === "/api/app/support/realtime-ticket", async (route) => {
-    const allowed = authenticated && route.request().method() === "POST";
+    const request = route.request();
+    const accountId = resolveAccount?.(request.headers());
+    const allowed = authenticated && request.method() === "POST" && (!resolveAccount || !!accountId);
     const ticket = allowed ? `probe-realtime-${randomUUID()}` : null;
-    if (ticket) tickets.add(ticket);
+    if (ticket) tickets.set(ticket, accountId);
     return route.fulfill({
-      status: 200, contentType: "application/json",
+      status: resolveAccount && !allowed ? 401 : 200, contentType: "application/json",
       body: JSON.stringify(allowed
         ? { code: 0, message: "OK", data: { ticket } }
         : { code: 401, message: "AUTH_REQUIRED", data: null }),
@@ -21,11 +23,14 @@ export async function installProbeConversationRealtime(page, { authenticated = t
       let frame;
       try { frame = JSON.parse(String(message)); } catch { socket.close({ code: 1008, reason: "INVALID_FRAME" }); return; }
       if (!ready) {
-        if (!authenticated || frame?.type !== "auth" || !tickets.delete(frame.ticket)) {
+        if (!authenticated || frame?.type !== "auth" || !tickets.has(frame.ticket)) {
           socket.send(JSON.stringify({ type: "error", code: 401 }));
           socket.close({ code: 1008, reason: "AUTH_REQUIRED" });
           return;
         }
+        const accountId = tickets.get(frame.ticket);
+        tickets.delete(frame.ticket);
+        socket.bindAccount?.(accountId);
         ready = true;
         socket.send(JSON.stringify({ type: "ready" }));
         return;

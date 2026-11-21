@@ -15,6 +15,7 @@ import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { setTransferSampleOutcome } from './lib/prototype-demo-support.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
+import { previewAccountId } from './lib/prototype-demo-identity.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
@@ -42,7 +43,12 @@ if(process.env.DEMO_STATE_FILE){
   restoreDemoBankWithdrawals(state,startedAt);
   initializeDemoH4State(state,startedAt);
   initializeLegacyStreakSavers(state);
-  if(state.computeTaskSnapshots)state.computeResumeAt=startedAt;
+  if(state.computeTaskSnapshots){
+    state.computeResumeAt=startedAt;
+    for(const {device} of Object.values(state.computeTaskSnapshots)){
+      if(device.productCode==='CLOUD-SHARE'&&device.deviceType==='CLOUD')device.deviceType='SHARE';
+    }
+  }
 }else state.catalogAvailableAt=startedAt;
 initializeDemoPreviewAccount(state,startedAt);
 if(state.dataState==='empty')state.withdrawLimitState='open';
@@ -61,7 +67,7 @@ Object.assign(trialPin.state,{loggedIn:true,password:'246802',version:1});
 const fixtureFor=(url,request)=>demoFixture(url,locale,state,request);
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
-await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor});
+await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor,realtimeAccount:headers=>previewAccountId(state,headers)});
 const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{explicitChoice:'zh'}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
@@ -296,7 +302,6 @@ const server=http.createServer(async(req,res)=>{
         const response=trialPin.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
       }
-      if(url.pathname==='/auth/users/refresh')return sendJson(res,{code:0,message:'OK',data:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:{userId:900001,countryCode:'+86',phone:'13800000000',nickname:'Alex',onboardingComplete:true}}});
       const withdrawalRequest = handlesWithdrawalRequest(url.pathname, req.method);
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
       const modeledBankTopup=req.method==='POST'&&/^\/api\/app\/deposits\/vietqr\/intents(?:\/[^/]+\/cancel)?$/.test(url.pathname);
