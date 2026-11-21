@@ -1,0 +1,12 @@
+{
+  "id": "uvel-system-bars",
+  "displayName": "UVEL system bars",
+  "version": "1.0.0",
+  "description": "Repository-owned UTS bridge that paints the Android navigation bar with the page floor",
+  "engines": { "HBuilderX": "^5.32.0" },
+  "uni_modules": {
+    "dependencies": [],
+    "encrypt": [],
+    "platforms": { "client": { "Vue": { "vue2": "n", "vue3": "y" }, "App": { "app-android": "y", "app-ios": "y" } } }
+  }
+}

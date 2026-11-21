@@ -1,0 +1,2 @@
+// iOS has no navigation bar; pages already run under the home indicator.
+export function setNavigationBarTheme(dark: boolean): void {}
