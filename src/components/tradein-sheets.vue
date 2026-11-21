@@ -111,7 +111,11 @@
 
       <!-- ─────────── 2. tradein — 置换确认(去结算) ─────────── -->
       <template v-else-if="state.kind === 'tradein' && purchaseRecovery !== 'none'">
-        <view class="tis-head"><text :id="titleId" class="tis-title">{{ t.tradein.recoveryPending }}</text></view>
+        <view class="tis-head">
+          <text :id="titleId" class="tis-title">{{ purchaseRecovery === 'error' ? t.tradein.retireTitle : t.tradein.recoveryPending }}</text>
+          <!-- The recovery record could not be read yet: it is re-read automatically (03 §3.5.2), so only say so, no button. -->
+          <text v-if="purchaseRecovery === 'error'" class="tis-status" role="status" aria-busy="true">{{ t.tradein.recoveryReading }}</text>
+        </view>
         <view v-if="purchaseRecovery === 'pending'" class="tis-cta" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
@@ -1725,6 +1729,13 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   display: block;
   font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);
   color: var(--v5-ink);
+}
+.tis-status {
+  display: block;
+  margin-top: 4px;
+  font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);
+  color: var(--v5-ink-2);
+  text-wrap: pretty;
 }
 .tis-subtitle {
   display: block;
