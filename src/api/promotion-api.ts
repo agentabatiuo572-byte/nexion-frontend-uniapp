@@ -1,5 +1,5 @@
 import type { ApiClient } from './api-client';
-import { ApiError } from './errors';
+import { ApiError, isApiRefusal } from './errors';
 import { readPaymentCommand } from './payment-command-api';
 import { parseServerTimestamp } from './server-time';
 import type { PublicPromotion, PublicPromotionPage, Quote, QuoteInput, Reward, RewardPage, ReferralProgress, OrderReceipt as ContractOrderReceipt, CommandReceipt } from './promotion-contracts';
@@ -9,6 +9,10 @@ const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USD
 export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null};
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
+export function isCheckoutQuoteOutOfStock(cause: unknown): boolean {
+  return isApiRefusal(cause, 404, 'PRODUCT_NOT_AVAILABLE')
+    || isApiRefusal(cause, 409, 'BUNDLE_PRODUCT_NOT_AVAILABLE');
+}
 export type PromotionOperation='createOrder'|'createBundle'|'payOrder'|'cancelOrder';
 let quoteSequence=0;
 // IDEMPOTENCY-FRESH-OK: Each explicit quote read is a new estimate without reservation; transport retries retain this request's key.

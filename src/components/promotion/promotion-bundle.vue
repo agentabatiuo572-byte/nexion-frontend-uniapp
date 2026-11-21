@@ -41,7 +41,7 @@
     <view class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.expected }}</text>
       <text v-if="quoteStatus==='loading'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-      <text v-else-if="quoteStatus==='error'" class="promotion-copy" role="alert">{{ t.promotion.errorNote }}</text>
+      <text v-else-if="quoteStatus==='error'||quoteStatus==='unavailable'||quoteStatus==='outOfStock'" class="promotion-copy" role="alert">{{ quoteStatus==='outOfStock' ? t.store.temporarilyOutOfStock : t.promotion.errorNote }}</text>
       <text v-else-if="!quote" class="promotion-copy">{{ t.promotion.awaitingQuote }}</text>
       <template v-if="quote">
         <RewardRows :expected="quote.expectedRewards" :lines="quote.items" />
@@ -72,6 +72,8 @@ import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
 import { commerceCopy } from '@/lib/commerce-review';
 import { promotionApi,sessionVault } from '@/api/runtime';
+import { ApiError } from '@/api/errors';
+import { isCheckoutQuoteOutOfStock } from '@/api/promotion-api';
 import type { Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
 import { useApp } from '@/store/app';
@@ -94,7 +96,7 @@ const props=defineProps<{activityId:string;initialItems:EntryItem[]}>();
 const app=useApp(),locale=useLocaleStore(),t=useT(),phase=useProductPhase();
 const scopeId=ref(props.activityId),selection=ref<EntryItem[]>([]),termsOpen=ref(false);
 const {activity,status:contextStatus,available,refresh:refreshContext}=usePromotionContext(scopeId);
-const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'>('idle');
+const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'|'unavailable'|'outOfStock'>('idle');
 const fence=createPromotionReadFence();let visible=true;
 const clockNow=()=>typeof performance!=='undefined'?performance.now():Date.now();
 let quoteReceivedAt=0;let expiryTimer:ReturnType<typeof setInterval>|null=null;
@@ -128,11 +130,16 @@ const singleActivityProduct=computed(()=>{if(!scopeId.value||!available.value||c
 function openSingleProduct(){if(singleActivityProduct.value)void navTo(promotionDetailHref(singleActivityProduct.value.id,scopeId.value));}
 const suggestions=computed(()=>catalog.value.filter(product=>!selection.value.some(item=>item.productNo===product.id)&&product.productType!=='SHARE'&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(product.id))));
 const productsReady=computed(()=>catalogStatus.value==='ready'&&selection.value.every(item=>{const product=productFor(item.productNo);return product&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(item.productNo));}));
-const canQuote=computed(()=>signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value)&&quoteStatus.value!=='loading');
+const canQuote=computed(()=>signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value)&&quoteStatus.value!=='loading'&&quoteStatus.value!=='outOfStock');
 const canContinue=computed(()=>canQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE');
-function invalidate(){fence.invalidate();quote.value=null;quoteStatus.value='idle';}
+useAutoRecovery({failed:()=>quoteStatus.value==='unavailable'&&canQuote.value,retry:refreshQuote});
+function invalidate(preserveOutOfStock=false){
+  fence.invalidate();
+  quote.value=null;
+  if(!preserveOutOfStock||quoteStatus.value!=='outOfStock')quoteStatus.value='idle';
+}
 watch(selection,()=>{invalidate();writeAccountRow(storageKey,app.accountKey,{items:selection.value,entryItems:props.initialItems});},{deep:true,flush:'sync'});
-watch([scopeId,()=>activity.value?.version,()=>locale.code],()=>{invalidate();termsOpen.value=false;},{flush:'sync'});
+watch([()=>activity.value?.version,()=>locale.code],()=>{invalidate(true);termsOpen.value=false;},{flush:'sync'});
 watch([()=>app.accountKey,()=>app.accountBindingEpoch],()=>{invalidate();termsOpen.value=false;restore();});
 function add(productNo:string){if(selection.value.length>=8||totalUnits.value>=100||!suggestions.value.some(product=>product.id===productNo))return;selection.value=[...selection.value,{productNo,quantity:1}];}
 function remove(productNo:string){selection.value=selection.value.filter(item=>item.productNo!==productNo);}
@@ -140,20 +147,24 @@ function changeQuantity(productNo:string,delta:number){const item=selection.valu
 function clearScope(){invalidate();void navTo(promotionStoreHref());}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(promotionBundleHref(scopeId.value,selection.value)));}
 async function refreshQuote(){
-  if(!canQuote.value)return;
+  if(!visible||!canQuote.value)return;
   const ticket=fence.next(),identity=`${app.accountKey}:${app.accountBindingEpoch}`,chosen=selection.value.map(item=>({...item}));
   quote.value=null;quoteStatus.value='loading';
   try{
     const result=await promotionApi.quote(chosen,scopeId.value||null);
     if(!visible||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
     quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
-  }catch{if(visible&&fence.current(ticket))quoteStatus.value='error';}
+  }catch(cause){
+    if(!visible||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
+    if(isCheckoutQuoteOutOfStock(cause))quoteStatus.value='outOfStock';
+    else quoteStatus.value=cause instanceof ApiError&&cause.status===503?'unavailable':'error';
+  }
 }
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
-function continueCheckout(){if(!freshQuote()){invalidate();return;}if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));}
+function continueCheckout(){if(!quote.value)return;if(!freshQuote()){invalidate();return;}if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));}
 onMounted(()=>{expiryTimer=setInterval(()=>{if(quote.value&&!freshQuote())invalidate();},1000);});
-onHide(()=>{visible=false;invalidate();termsOpen.value=false;});
-onShow(()=>{visible=true;invalidate();});
+onHide(()=>{visible=false;invalidate(true);termsOpen.value=false;});
+onShow(()=>{visible=true;invalidate(true);});
 onBeforeUnmount(()=>{visible=false;fence.invalidate();if(expiryTimer)clearInterval(expiryTimer);});
 </script>
 <style src="./promotion.css"></style>
