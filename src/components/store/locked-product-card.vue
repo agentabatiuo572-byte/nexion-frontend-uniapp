@@ -20,7 +20,7 @@
         </view>
         <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" :aria-expanded="detailsOpen" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
-            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
+            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 500; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
               <view class="grid place-items-center" :style="toggleStyle">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
@@ -43,7 +43,7 @@
 
       <!-- Bottom row — Notify + queue social proof -->
       <view v-if="detailsOpen" class="mt-3 flex items-center" style="gap: 10px">
-        <view class="flex-1 inline-flex items-center justify-center" :style="notifyBtnStyle" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
+        <view class="flex-1 inline-flex items-center justify-center nx-frosted-button locked-card__notify" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path :d="serverSubscribed ? 'm5 12 4 4L19 6' : 'M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'" /><path v-if="!serverSubscribed" d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text>{{ notifyBusy || notificationStatus === 'loading' ? t.store.coLoading : notificationStatus === 'error' ? t.ui.retry : t.store.lockedNotifyMe }}</text>
         </view>
@@ -72,8 +72,8 @@ const app = useApp();
 const t = useT();
 const locale = useLocaleStore();
 const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
-const gpuText = computed(() => specText(t.value, props.product.gpu, "-"));
-const vramText = computed(() => specText(t.value, props.product.vram, "-", "vram"));
+const gpuText = computed(() => specText(t.value, props.product.gpu, "—"));
+const vramText = computed(() => specText(t.value, props.product.vram, "—", "vram"));
 
 const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: number }> = {
   P3: { current: 1, total: 3, pct: 33 },
@@ -248,13 +248,11 @@ const toggleStyle = computed<CSSProperties>(() => ({
   transform: detailsOpen.value ? "rotate(180deg)" : "rotate(0deg)",
 }));
 
+// The product name is the card's display title (10 §10.1 展示标题, 26/34 at 390), read from the role variables.
 const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
+  font: "var(--ui-type-display-title-weight) var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-v5)",
   color: "var(--v5-ink)",
-  letterSpacing: "-0.018em",
-  lineHeight: 1.2,
+  letterSpacing: "-0.02em",
 };
 
 const barFillStyle = computed<CSSProperties>(() => ({
@@ -264,19 +262,6 @@ const barFillStyle = computed<CSSProperties>(() => ({
   transition: cardInView.value ? PROGRESS_GROW_TRANSITION : "none",
   willChange: "width",
 }));
-
-const notifyBtnStyle: CSSProperties = {
-  gap: "6px",
-  minHeight: "44px",
-  height: "42px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  border: "1px solid var(--v5-border)",
-  color: "var(--v5-ink-2)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "13px",
-};
 
 
 </script>
@@ -303,4 +288,7 @@ const notifyBtnStyle: CSSProperties = {
     linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px);
 }
 @media (prefers-reduced-motion: reduce) { .locked-card__aurora, .locked-card__dot::before { animation: none; } }
+/* In-card action on a solid card: the shared neutral glass M (03 §3.1), button role 15/20 at 500. */
+.locked-card__notify { gap: 6px; min-height: 40px; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
+.locked-card__notify:active { transform: scale(.98); }
 </style>
