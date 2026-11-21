@@ -250,6 +250,8 @@
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <text v-if="checkoutCapacityBlocked" class="nx-tray-note w-full">{{ checkoutCapacityMessage }}</text>
+        <!-- A saved external payment is a note above the button with a link back to it (04 §4.0 tray note), not a floating card. -->
+        <text v-for="row in resumeRows" :key="row.commandKey" class="checkout-sticky-note nx-tray-note" role="status">{{ row.summary }} · {{ paymentRowStatus(paymentCopy, row) }} <text class="checkout-resume-link nx-after-chevron" role="link" tabindex="0" @click="purchasePayment.resume(row)" @keydown.enter.prevent="purchasePayment.resume(row)">{{ paymentCopy.view }}</text></text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="checkoutCapacityBlocked || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
@@ -290,6 +292,7 @@ import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { commerceCopy } from '@/lib/commerce-review';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
+import { purchasePaymentCopy, paymentRowStatus } from '@/lib/purchase-payment-copy';
 import { useLocaleStore } from "@/store/locale";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
@@ -865,8 +868,9 @@ const trialEarlyDiscountText = computed(() => formatAmount(trialOffsetView.value
 const trialCreditText = computed(() => {
   const quote = remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote : null;
   if (!quote) return "";
-  const nex = `${formatGroupedAmount(quote.rewardNEX)} UVT`;
-  return quote.remainderUSD > 0 ? `${formatGroupedAmount(quote.remainderUSD)} USDT · ${nex}` : nex;
+  // Number and unit never split (03 §3.6.1): U+00A0 between them.
+  const nex = `${formatGroupedAmount(quote.rewardNEX)}\u00A0UVT`;
+  return quote.remainderUSD > 0 ? `${formatGroupedAmount(quote.remainderUSD)}\u00A0USDT · ${nex}` : nex;
 });
 // An empty trial discount cap means no cap: drop the "up to" clause instead of printing "0".
 const promoRowLabel = computed(() => {
@@ -2563,6 +2567,9 @@ function isTopCheckoutPage(): boolean {
   return !!checkoutPage && (top === checkoutPage || top?.$vm === checkoutPage);
 }
 const purchasePayment = usePurchasePayment();
+const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
+// Saved external payments the user can go back to; the payment layer covers the tray while it is open.
+const resumeRows = computed(() => { app.accountKey; purchasePayment.state.revision; return purchasePayment.state.open ? [] : purchasePayment.pending(); });
 useAutoRecovery({
   failed: () => remoteApiEnabled && pendingCreateUnresolved.value && !createLookupUnavailable.value
     && !paymentFlowBusy.value && !checkoutLeaving.value && isTopCheckoutPage(),
@@ -3348,6 +3355,10 @@ button.checkout-policy-link::after { border:0; }
 .checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
 .checkout-sticky { position:absolute; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; }
 .checkout-sticky-copy { min-width:0; }
+.checkout-sticky-note { flex:1 0 100%; }
+/* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
+.checkout-resume-link { display:inline-block; padding:13px 4px; margin:-13px -4px; font:var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color:var(--v5-ink-3); white-space:nowrap; cursor:pointer; }
+.checkout-resume-link:active { opacity:.6; }
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }
 .checkout-sticky--single :deep(.nx-button) { flex:1 1 auto; }

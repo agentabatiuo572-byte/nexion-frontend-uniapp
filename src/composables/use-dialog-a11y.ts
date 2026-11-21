@@ -84,6 +84,56 @@ export function useDialogScrollLock(open: Ref<boolean>): void {
   onBeforeUnmount(() => { release?.(); release = null; });
 }
 
+const shown = (el: Element) => el.isConnected && el.getClientRects().length > 0;
+// The last element that held focus. A trigger that is redrawn as the dialog opens (the checkout pay button turns busy
+// while the order is created) has already let focus fall to <body> by the time the open watch runs.
+let lastFocus: HTMLElement | SVGElement | null = null;
+let tracking = false;
+function trackFocus(): void {
+  if (tracking || typeof document === "undefined") return;
+  tracking = true;
+  document.addEventListener("focusin", (ev) => {
+    if (ev.target instanceof HTMLElement || ev.target instanceof SVGElement) lastFocus = ev.target;
+  }, true);
+}
+// Dialogs that close in the same tick (a notice over the payment page, both closed by one exit) return focus once:
+// the one opened first owns the trigger; the ones stacked on it drop theirs.
+let openSeq = 0;
+const closing: { order: number; run: () => void; drop: () => void }[] = [];
+function scheduleRestore(order: number, run: () => void, drop: () => void): void {
+  closing.push({ order, run, drop });
+  if (closing.length > 1) return;
+  void nextTick(() => {
+    const batch = closing.splice(0).sort((a, b) => a.order - b.order);
+    batch[0]?.run();
+    batch.slice(1).forEach((entry) => entry.drop());
+  });
+}
+const accessibleName = (el: Element) => (el.getAttribute("aria-label") || el.textContent || "").trim();
+
+/** The trigger's replacement: same test id, else same role, name and first class; else the page's bottom-bar action; else the visible heading. */
+function relocate(trace: { testid: string | null; role: string | null; name: string; cls: string | null }): HTMLElement | SVGElement | null {
+  const visible = <T extends Element>(list: ArrayLike<T>): T[] => Array.from(list).filter(shown);
+  if (trace.testid) {
+    const [hit] = visible(document.querySelectorAll<HTMLElement>(`[data-testid="${CSS.escape(trace.testid)}"]`));
+    if (hit) return hit;
+  }
+  if (trace.name) {
+    const same = trace.role ? `[role="${CSS.escape(trace.role)}"]` : '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea';
+    // Same name and same first class: a redrawn copy of the control, not another control that happens to share its name.
+    const hit = visible(document.querySelectorAll<HTMLElement>(same)).find((x) => accessibleName(x) === trace.name && (!trace.cls || x.classList.contains(trace.cls)));
+    if (hit) return hit;
+  }
+  // Next: the page's main action in its bottom bar, the reasonable next step (03 §3.5).
+  const [action] = visible(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse();
+  if (action) return action;
+  const [heading] = visible(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'));
+  if (!heading) return null;
+  // A heading is not in the Tab order; tabindex -1 lets it take focus without adding a Tab stop.
+  if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+  return heading;
+}
+
 /**
  * 弹层的键盘可用性:焦点移入 → Tab 只在层内循环 → Esc 关闭 → 关闭后焦点归还。
  *
@@ -125,7 +175,13 @@ export function useDialogA11y(
   registerNativeDialog(open, close, nativeBack, nativePriority);
   // #endif
   useDialogScrollLock(open);
+  trackFocus();
   let previousFocus: HTMLElement | SVGElement | null = null;
+  // How to find the trigger again when the page re-rendered it while the dialog was open (a fresh checkout creates the
+  // order and redraws its pay button): its test id, else its role and accessible name.
+  let previousTrace: { testid: string | null; role: string | null; name: string; cls: string | null } | null = null;
+  let openedAt = 0;
+  const forget = () => { previousFocus = null; previousTrace = null; };
 
   const rootEl = (): HTMLElement | null | undefined =>
     typeof root === "string"
@@ -169,6 +225,20 @@ export function useDialogA11y(
     }
   }
 
+  /** 关闭后把焦点还回触发它的那个控件,否则焦点回到文档开头,用户要重新 Tab 一遍。
+   *  触发控件已被重绘或藏起时,回到同一位置的新控件,再不行落到页面主操作或可见标题(03 §3.5)。 */
+  function restore(): void {
+    // Another modal opened as this one closed (the payment sheet hands over to the payment page) and holds focus: leave it there.
+    const holder = document.activeElement?.closest('[aria-modal="true"]');
+    if (holder && holder !== rootEl() && shown(holder)) { previousFocus = null; previousTrace = null; return; }
+    // Fall back only when focus is really lost: a parent dialog closing in the same step may already have restored it.
+    const lost = !document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected;
+    const back = previousFocus && shown(previousFocus) ? previousFocus : previousTrace && lost ? relocate(previousTrace) : null;
+    back?.focus();
+    previousFocus = null;
+    previousTrace = null;
+  }
+
   function detach(): void {
     if (typeof document === "undefined") return;
     // capture 阶段:要赶在层内控件自己的 handler 之前拿到 Tab/Esc。
@@ -179,7 +249,10 @@ export function useDialogA11y(
     if (typeof document === "undefined") return;
     detach();
     if (isOpen) {
-      previousFocus = document.activeElement instanceof HTMLElement || document.activeElement instanceof SVGElement ? document.activeElement : null;
+      const active = document.activeElement;
+      previousFocus = active instanceof HTMLElement && active !== document.body || active instanceof SVGElement ? active : lastFocus;
+      openedAt = ++openSeq;
+      previousTrace = previousFocus && previousFocus !== document.body ? { testid: previousFocus.getAttribute("data-testid"), role: previousFocus.getAttribute("role"), name: accessibleName(previousFocus), cls: previousFocus.classList[0] ?? null } : null;
       document.addEventListener("keydown", onKeydown, true);
       await nextTick();
       // 焦点必须真的移进来:不移的话读屏用户不知道弹层开了,键盘用户按 Tab 时
@@ -187,15 +260,16 @@ export function useDialogA11y(
       focusables()[0]?.focus();
       return;
     }
-    await nextTick();
-    // 关闭后把焦点还回触发它的那个控件,否则焦点回到文档开头,用户要重新 Tab 一遍。
-    previousFocus?.focus();
-    previousFocus = null;
+    scheduleRestore(openedAt, restore, forget);
   // immediate:有些弹层不是靠自身的 v-if 开关,而是**整个组件被父级 v-if 挂载**
   // (captcha-slider 就是这样)。它们的 open 恒为 true,不给 immediate 的话 watch
   // 永远不触发,焦点管理一次都不会生效。对 open 初值为 false 的弹层,immediate 只会
   // 走一次"关闭"分支,而那时 previousFocus 是 null,无副作用。
   }, { immediate: true });
 
-  onBeforeUnmount(detach);
+  // A dialog removed by its parent's v-if while still open (open stays true) is closing too: return focus the same way.
+  onBeforeUnmount(() => {
+    detach();
+    if (open.value && (previousFocus || previousTrace)) scheduleRestore(openedAt, restore, forget);
+  });
 }
