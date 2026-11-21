@@ -75,7 +75,7 @@
       <!-- Results -->
       <view v-if="searchResultState.body === 'results'" class="mx-4 mt-3 space-y-3">
         <view v-for="grp in groupedList" :key="grp.group">
-          <text class="block font-mono-tabular" :style="groupLabelStyle">{{ groupLabel(grp.group) }}</text>
+          <text class="block" :style="groupLabelStyle">{{ groupLabel(grp.group) }}</text>
           <view :style="resultCardStyle">
             <view
               v-for="(h, i) in grp.hits"
@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navTo } from "@/lib/route";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -322,7 +322,7 @@ const results = computed<Hit[]>(() => {
       out.push({
         group: "product",
         label: p.name,
-        sublabel: `$${formatAmount(p.price)}${detail ? ` · ${detail}` : ""}`,
+        sublabel: `$${formatGroupedAmount(p.price)}${detail ? ` · ${detail}` : ""}`,
         href: `/pages/store/detail?id=${p.id}`,
       });
     }
@@ -456,11 +456,11 @@ const navigationErrorStyle: CSSProperties = {
 };
 const navigationErrorTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
 const navigationRetryStyle: CSSProperties = { color: "var(--v5-brand)" };
+// Group label: note role in the interface face, no tracking (01 §1.2: no 0.14–0.18em spacing, Mono only for codes).
 const groupLabelStyle: CSSProperties = {
   marginBottom: "6px",
   paddingLeft: "2px",
-  fontSize: "12px",
-  letterSpacing: "0.16em",
+  font: "var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5)",
   color: "var(--v5-ink-3)",
 };
 // Transparent hairline group (earnings-ledger idiom): border-top opens the

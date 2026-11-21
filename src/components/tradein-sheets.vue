@@ -59,7 +59,7 @@
       <template v-if="capacityRecovery || capacityRecoveryUnavailable || keepRecoveryError">
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
-        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
+        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatGroupedAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
         <view v-if="capacityResumeAllowed" class="tis-secondary nx-frosted-button" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-secondary-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
@@ -101,6 +101,8 @@
           <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onPickTarget(p.id)"  @keydown.enter.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /></svg>
             <text class="tis-opt-text">{{ p.label }}</text>
+            <!-- Each target opens its confirm step: a list entry, so a trailing chevron (03 §3.1). -->
+            <svg class="tis-opt-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </view>
         </view>
         <text v-if="retireView.statusText" class="tis-disclaimer" role="status" :aria-busy="retireView.loading">{{ retireView.statusText }}</text>
@@ -157,10 +159,9 @@
         </view>
 
         <PurchaseEligibilityPanel v-if="remoteApiEnabled" class="tis-purchase" :status="purchaseStatus" :snapshot="purchaseSnapshot" :blocking-only="purchaseBlocked" />
-        <text v-if="purchaseConfirmed && remoteApiEnabled && canonicalQuote && !canonicalQuote.sufficientFunds" class="tis-disclaimer">{{ fmt(t.tradein.purchaseFundsGap, { amount: formatAmount(canonicalQuote.walletShortfallUsdt) }) }}</text>
+        <text v-if="purchaseConfirmed && remoteApiEnabled && canonicalQuote && !canonicalQuote.sufficientFunds" class="tis-disclaimer">{{ fmt(t.tradein.purchaseFundsGap, { amount: formatGroupedAmount(canonicalQuote.walletShortfallUsdt) }) }}</text>
 
-        <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ tradeinView.placementHint }}</text>
-        <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ t.tradein.sheetDisclaimer }}</text>
+        <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ tradeinView.note }}</text>
 
         <view class="tis-cta" :class="{ 'tis-cta-disabled': purchaseActionDisabled }" role="button" :tabindex="purchaseActionDisabled ? -1 : 0" :aria-disabled="purchaseActionDisabled" :aria-busy="purchaseActionBusy" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
           <text class="tis-cta-text">{{ purchaseActionText }}</text>
@@ -266,7 +267,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
@@ -687,7 +688,7 @@ const choiceSources = computed(() => {
         ? `${deviceName(t.value, d)} · ${t.value.tradein.remoteQuoteCreditLabel}`
         : fmt(t.value.tradein.choiceTradeInOption, {
         name: deviceName(t.value, d),
-        credit: formatAmount(previewCredit(d, s.newPrice)),
+        credit: formatGroupedAmount(previewCredit(d, s.newPrice)),
       }),
     }));
 });
@@ -940,11 +941,11 @@ const retireView = computed(() => {
       && (!remoteApiEnabled || canonicalTradeinConfig.value?.earlyAccessEnabled === true);
     const remotePayable = remoteRetirePayables.value.get(p.id);
     const net = remoteApiEnabled
-      ? (remotePayable == null ? "—" : formatAmount(remotePayable))
-      : formatAmount(Math.max(0, p.price - previewCredit(device, p.price)));
+      ? (remotePayable == null ? "—" : formatGroupedAmount(remotePayable))
+      : formatGroupedAmount(Math.max(0, p.price - previewCredit(device, p.price)));
     const base = fmt(t.value.tradein.retireTargetOption, {
       name: p.name,
-      price: formatAmount(p.price),
+      price: formatGroupedAmount(p.price),
       net,
     });
     return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
@@ -997,17 +998,19 @@ const tradeinView = computed(() => {
     }),
     // 只给设备名——内部 id 是工程标识,禁止渲染(页面文案禁字段名/枚举值)。
     oldDeviceText: oldDevice.name,
-    earned: formatAmount(earned),
+    earned: formatGroupedAmount(earned),
     bandText: remoteQuote
       ? fmt(t.value.tradein.remoteQuoteBandLabel, { pct: remoteQuote.creditRatePct })
       : band
       ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
       : "—",
-    credit: formatAmount(credit),
-    placementHint: (remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null)
-      ? t.value.tradein.inheritActiveHint : t.value.tradein.inheritInventoryHint,
-    estNet: formatAmount(estNet),
-    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatAmount(estNet) }),
+    credit: formatGroupedAmount(credit),
+    // What happens to the old device, then the credit rule, as one paragraph (no space after 。 in Chinese).
+    note: [(remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null)
+      ? t.value.tradein.inheritActiveHint : t.value.tradein.inheritInventoryHint, t.value.tradein.sheetDisclaimer]
+      .join(locale.code === "zh" ? "" : " "),
+    estNet: formatGroupedAmount(estNet),
+    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet) }),
   };
 });
 
@@ -1081,7 +1084,7 @@ const replaceView = computed(() => {
       warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
       lowestText: fmt(t.value.tradein.replaceLowestText, {
         name: s.canonicalCapacityQuote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
-        earn: "—",
+        earn: "—", // unknown today's earnings stay a bare dash (01 §1.2)
       }),
       insufficient: false, // The shared payment selector checks wallet balance; external methods remain available.
       replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
@@ -1095,7 +1098,7 @@ const replaceView = computed(() => {
     warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
     lowestText: fmt(t.value.tradein.replaceLowestText, {
       name: lowest.name,
-      earn: formatAmount(lowest.todayEarnings),
+      earn: `$${formatGroupedAmount(lowest.todayEarnings)}`,
     }),
     insufficient,
     replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
@@ -1418,7 +1421,7 @@ function onReplace() {
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatGroupedAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1564,7 +1567,7 @@ function onKeepBuy() {
     // 新机已落盘(addDevice 只在落盘成功时给 id),撤销也必须落盘;撤不掉登记待对账(审计 R8 P1:直写内存不落盘 → 白得一台)
 
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatGroupedAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1676,7 +1679,7 @@ function onForce() {
     app.patchDevice(lowest.id, { currentTask: taskSnapshot });
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatGroupedAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1809,6 +1812,10 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-opt-ico {
   flex-shrink: 0;
+}
+.tis-opt-chev {
+  flex-shrink: 0;
+  color: var(--v5-ink-4);
 }
 /* Option rows carry a name and price: list title role, content-row weight (10 §10.1). */
 .tis-opt-text {

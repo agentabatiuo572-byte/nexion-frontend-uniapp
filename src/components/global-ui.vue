@@ -157,7 +157,7 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);
   color: var(--v5-ink-2);
   white-space: pre-line;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 /* Primary on top, quiet cancel below. Cancel stays first in the DOM, so a money confirm still opens with focus on it. */
 .nx-modal__actions {
@@ -192,8 +192,8 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 [data-theme="light"] .nx-modal__rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .nx-modal__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
 .nx-modal__row + .nx-modal__row { border-top: 1px solid var(--v5-border); }
-.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: anywhere; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
-.nx-modal__v { min-width: 0; overflow-wrap: anywhere; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
+.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
 .nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
 .nx-modal--detail .nx-modal__actions { margin-top: 20px; }
 .nx-btn__label {

@@ -26,7 +26,7 @@
       <view class="ps-stage">
         <!-- 画布(随面板 v-if 挂载/销毁;draw 后导出预览图,自身移出视口不占布局) -->
         <canvas canvas-id="sharePosterCv" id="sharePosterCv" class="ps-canvas" />
-        <view v-if="genState === 'ready'" class="ps-preview">
+        <view v-if="genState === 'ready'" class="ps-preview" role="img" :aria-label="posterRewardLine">
           <image :src="imgSrc" mode="widthFix" class="ps-preview__img" />
         </view>
         <view v-else-if="genState === 'failed'" class="ps-fail">
@@ -42,8 +42,8 @@
       <!-- 模板轮播(yield 无设备自动隐藏,异常3) -->
       <GlassSegments :model-value="tpl" :options="templateOptions" surface="open" class="ps-thumbs" :label="t.share.posterTitle" @select="pickTpl" />
 
-      <view class="ps-reward">
-        <text class="ps-reward__t">{{ posterRewardLine }}</text>
+      <view v-if="!welcomeGiftAvailable || rewardEffectiveAtText" class="ps-reward">
+        <text v-if="!welcomeGiftAvailable" class="ps-reward__t">{{ posterRewardLine }}</text>
         <text v-if="rewardEffectiveAtText" class="ps-reward__t">{{ rewardEffectiveAtText }}</text>
       </view>
 
@@ -54,20 +54,8 @@
         </view>
       </view>
 
-      <!-- 渠道行:保存 / 复制 + 链接渠道(与渠道面板同一 intent 实现) -->
-      <view class="ps-chrow">
-        <view class="ps-ch"   :aria-disabled="genState !== 'ready'" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="saveImage"  @keydown.enter.prevent="saveImage" @keydown.space.prevent="saveImage">
-          <view class="ps-ch__ic ps-ch__ic--hl">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /><path d="m7 10 5 5 5-5" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg>
-          </view>
-          <text class="ps-ch__lb">{{ t.share.saveImage }}</text>
-        </view>
-        <view class="ps-ch"   :aria-disabled="genState !== 'ready'" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="copyLinkAction"  @keydown.enter.prevent="copyLinkAction" @keydown.space.prevent="copyLinkAction">
-          <view class="ps-ch__ic ps-ch__ic--hl">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-          </view>
-          <text class="ps-ch__lb">{{ t.share.copyLink }}</text>
-        </view>
+      <!-- 链接渠道(与渠道面板同一 intent 实现);保存 / 复制在底部固定操作区 -->
+      <view v-if="linkChannels.length" class="ps-chrow">
         <view
           v-for="c in linkChannels"
           :key="c.key"
@@ -88,6 +76,11 @@
           <text class="ps-ch__lb">{{ channelLabel(c.key) }}</text><NxIcon v-if="c.intentType === 'web'" class="ps-ch__arrow" name="arrow-up-right" :size="18" />
         </view>
       </view>
+      </view>
+      <!-- Main actions stay on screen under the scrolling poster (03 §3.5): copy is the neutral glass, save the one primary. -->
+      <view class="ps-foot">
+        <NxButton class="ps-foot__btn" variant="secondary" :disabled="genState !== 'ready'" :label="t.share.copyLink" @click="copyLinkAction" />
+        <NxButton class="ps-foot__btn" variant="primary" :disabled="genState !== 'ready'" :label="t.share.saveImage" @click="saveImage" />
       </view>
     </view>
   </view>
@@ -558,7 +551,11 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-grab { flex-shrink: 0; width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: var(--ui-space-row-y) auto 0; }
 .ps-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: var(--ui-space-row-y) 20px; }
 /* The safe-area inset sits inside the scroller, so the list scrolls down to the screen edge instead of being cut by an opaque band. */
-.ps-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: calc(8px + var(--nx-overlay-safe-bottom)); }
+.ps-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: var(--ui-space-inset); }
+/* Fixed action band under the scroller; it carries the safe-area inset so the sheet colour runs to the screen edge. */
+.ps-foot { flex: none; display: flex; gap: var(--ui-space-inline, 8px); padding: 12px 20px calc(12px + var(--nx-overlay-safe-bottom)); border-top: 1px solid var(--v5-border); }
+.ps-foot { flex-wrap: wrap; }
+.ps-foot .ps-foot__btn { flex: 1 1 0; }
 .ps-head__t { font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); color: var(--v5-ink); }
 /* 44×44 点按区(移动端最小触控标准,对齐 tradein-ladder-sheet 既有修法)。 */
 .ps-head__x { position: relative; isolation: isolate; flex: none; width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
@@ -585,7 +582,7 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-sw--on { background: var(--v5-brand); }
 .ps-sw__knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 9999px; background: var(--v5-surface); transition: left 0.18s; }
 .ps-sw--on .ps-sw__knob { left: 21px; }
-.ps-chrow { margin: var(--ui-space-inset) 20px 10px; }
+.ps-chrow { margin: var(--ui-space-inset) 20px 0; }
 .ps-ch { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 58px; padding: var(--ui-space-row-y) 0; border-top: 1px solid var(--v5-border); color: var(--v5-ink); }
 .ps-ch--off { opacity: .5; cursor: default; }
 .ps-ch__ic,.ps-ch__arrow { flex: none; display: flex; align-items: center; justify-content: center; }

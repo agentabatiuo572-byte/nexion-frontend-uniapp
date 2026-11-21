@@ -9,7 +9,7 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved) && !paymentFlowBusy" class="checkout-original-open nx-step-in">
+      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || createLookupUnavailable }">
         <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle" :description="pendingCreateDescription" />
       </view>
       <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:var(--v5-space-5)">
@@ -78,7 +78,7 @@
               <view class="checkout-option checkout-voucher" role="button" tabindex="0" :aria-expanded="voucherDetailsOpen" @click="voucherDetailsOpen = !voucherDetailsOpen" @keydown.enter.prevent="voucherDetailsOpen = !voucherDetailsOpen" @keydown.space.prevent="voucherDetailsOpen = !voucherDetailsOpen">
                 <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 0 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z" /><path d="M14 6v2m0 3v2m0 3v2" /></svg></view>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.voucher.checkoutRowLabel }}</text><text class="checkout-row-description">{{ remoteApiEnabled && trialConversionMode ? trialCopy.voucherUnavailable : hasVoucher ? auditCopy.autoApplyVoucher : !voucherAutomatic ? t.promotion.noVoucher : expiredVoucherForSku ? t.voucher.expiredNote : t.voucher.noneAvailable }}</text></view>
-                <text v-if="hasVoucher" class="checkout-discount">{{ reviewMoney(voucherDiscount, true) }}</text><svg class="checkout-chevron" :class="{ 'checkout-chevron--open': voucherDetailsOpen }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                <text v-if="hasVoucher" class="checkout-discount">{{ reviewMoney(voucherDiscount, true) }}</text><svg class="checkout-chevron" :class="{ 'checkout-chevron--open': voucherDetailsOpen }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
               </view>
               <view v-if="voucherDetailsOpen" class="checkout-voucher-details">
                 <text v-if="voucherMatch" class="checkout-row-description checkout-voucher-match">{{ voucherMatch.def.name }}</text>
@@ -134,12 +134,13 @@
             </view>
             <text v-if="trialZeroDue" class="checkout-note">{{ t.store.coTrialZeroNote }}</text>
             <view v-if="tradeinPlacementText" class="checkout-note"><text>{{ tradeinPlacementText }}</text></view>
-            <view v-if="checkoutCapacityBlocked && (checkoutOnboardingRequired || checkoutCapacityRefusal || remoteCapacityGate.decision)" class="checkout-note checkout-note--warning" role="status" data-testid="checkout-capacity-notice" :data-capacity-refusal="checkoutCapacityRefusal">
-              <text>{{ checkoutCapacityMessage }}</text>
+            <!-- The reason is said once, in the tray above the disabled button (03 §3.1); here only the exits remain.
+                 用旧机抵扣 appears once on the page: the 优惠 row owns it whenever that row offers it. -->
+            <view v-if="checkoutCapacityBlocked && (checkoutOnboardingRequired || checkoutCapacityRefusal || remoteCapacityGate.decision)" class="checkout-capacity-notice" :class="{ 'checkout-note checkout-note--warning': hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED' }" data-testid="checkout-capacity-notice" :data-capacity-refusal="checkoutCapacityRefusal">
               <text v-if="hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED'" class="checkout-capacity-hint">{{ t.store.coVoucherBlocksReplace }}</text>
               <!-- In-place actions (brand text buttons) lead; next-level links (muted, trailing chevron) sit at the end (DS 03 §3.1, §3.9). -->
               <view class="checkout-capacity-actions">
-                <NxButton v-if="!hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
+                <NxButton v-if="!hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED' && !tradeinRowOffersReAdd" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
                 <NxButton v-else-if="hasVoucher && remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.promotion.noVoucher" :busy="voucherSelecting" @click="selectAutomaticVoucher(false)" />
                 <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
                 <view v-if="(checkoutCapacityRefusal && !remoteCapacityGate.pending && quantityReady) || remoteCapacityGate.decision" class="checkout-capacity-links">
@@ -236,7 +237,7 @@
         <view v-for="section in [t.store.faq.location,t.store.faq.demand]" :key="section.q" class="checkout-policy-section"><text class="checkout-policy-title">{{ section.q }}</text><text>{{ section.a }}</text></view>
         <text class="checkout-policy-section">{{ policyCopy.review }}</text>
         <text v-if="promotionRoute && promotionCheckout?.hasRewardTerms" class="checkout-policy-section">{{ policyCopy.rewards }}</text>
-        <view class="checkout-policy-links"><button class="checkout-policy-link" @click="navTo('/pages/onboarding/terms')">{{ auditCopy.terms }}</button><button class="checkout-policy-link" @click="navTo('/pages/me/risk-disclosure')">{{ t.me.riskRow }}</button></view>
+        <view class="checkout-policy-links"><button class="checkout-policy-link" @click="navTo('/pages/onboarding/terms')"><text class="nx-after-chevron">{{ auditCopy.terms }}</text></button><button class="checkout-policy-link" @click="navTo('/pages/me/risk-disclosure')"><text class="nx-after-chevron">{{ t.me.riskRow }}</text></button></view>
       </view>
     </NxSheet>
     <template #pageFixed>
@@ -249,7 +250,7 @@
         <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
-        <text v-if="checkoutOutOfStock || checkoutCapacityBlocked" class="nx-tray-note w-full">{{ checkoutOutOfStock ? t.store.temporarilyOutOfStock : checkoutCapacityMessage }}</text>
+        <text v-if="checkoutOutOfStock || checkoutCapacityBlocked" class="nx-tray-note w-full" role="status">{{ checkoutOutOfStock ? t.store.temporarilyOutOfStock : checkoutTrayCapacityNote }}</text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="checkoutOutOfStock || checkoutCapacityBlocked || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
@@ -1442,6 +1443,11 @@ function totalStillConfirmed(confirmed: number) {
 const cardFeeText = computed(() => formatAmount(cardFee.value));
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
 const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
+// Display only: the tray names the full-slot reason in one short line; the page offers the ways out.
+const checkoutTrayCapacityNote = computed(() => checkoutCapacityMessage.value === slotsFullText.value
+  ? fmt(flowCopy.value.slotsFullShort, { max: app.slotCap }) : checkoutCapacityMessage.value);
+// Display only: whether the 优惠 row already shows 用旧机抵扣 (mirrors that row's own v-if chain).
+const tradeinRowOffersReAdd = computed(() => !hasVoucher.value && !hasTradein.value && (removedTradein.value || tradeinAvailable.value));
 const activatingSubText = computed(() => {
   const raw = completedOrder.value?.dataCenter?.trim();
   if (!raw) return reviewCopy.value.provisioningLocationPending;
@@ -3383,7 +3389,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-row-description { display:block; margin-top:2px; font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .checkout-discount { flex:none; color:var(--v5-brand); font:500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); font-variant-numeric:tabular-nums; }
 .checkout-chevron { flex:none; width:16px; height:16px; color:var(--v5-ink-4); transition:transform 180ms ease; }
-.checkout-chevron--open { transform:rotate(90deg); }
+.checkout-chevron--open { transform:rotate(180deg); }
 .checkout-voucher { cursor:pointer; }
 /* Voucher choice is a single-select list aligned with the row copy, then a muted link to the voucher list. */
 .checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
@@ -3418,7 +3424,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-legal-link { display:inline; color:var(--v5-brand); cursor:pointer; }
 .checkout-legal-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:2px; }
 .checkout-policy-notice { margin-top:var(--v5-space-3); font:400 var(--ui-type-list-subtitle)/20px var(--font-v5); color:var(--v5-ink-2); overflow-wrap:anywhere; }
-button.checkout-policy-link { display:block; width:100%; min-height:44px; margin:0; padding:var(--v5-space-2) 0; border:0; border-radius:0; background:transparent; color:var(--v5-brand); font:500 13px/20px var(--font-v5); text-align:left; overflow-wrap:anywhere; }
+button.checkout-policy-link { display:block; width:100%; min-height:44px; margin:0; padding:var(--v5-space-2) 0; border:0; border-radius:0; background:transparent; color:var(--v5-ink-3); font:var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); text-align:left; overflow-wrap:break-word; }
 .checkout-policy-notice > button.checkout-policy-link { text-align:center; }
 button.checkout-policy-link::after { border:0; }
 .checkout-policy-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
@@ -3436,7 +3442,9 @@ button.checkout-policy-link::after { border:0; }
 .checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }
 .checkout-summary-total :deep(.checkout-amount) { font-size:var(--ui-type-section); }
 .checkout-exit-error { display:grid; gap:var(--v5-space-5); color:var(--v5-ink-2); line-height:1.6; }
-.checkout-original-open { display:grid; gap:var(--v5-space-2); padding:calc(var(--v5-space-8) * 2) var(--v5-space-4) var(--v5-space-6); text-align:center; }
+/* Unknown last-order result is a whole-page state too: centred like the catalog failure (03 §3.4). */
+.checkout-original-open { gap:var(--v5-space-2); }
+.checkout-original-open > * { width:100%; }
 /* Page states (catalog failed, product missing): one centred result line, short-body role (DS 03 §3.4, 10.1). */
 .checkout-page-state { display:block; margin-bottom:var(--v5-space-4); color:var(--v5-ink-2); font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); text-wrap:pretty; }
 /* Whole page without content (DS 03 §3.4, §3.5.2): the result and its one 重新加载 centre in the page height left
@@ -3445,6 +3453,9 @@ button.checkout-policy-link::after { border:0; }
 :global(.nx-page-enter:has(.checkout-page-center)) { flex:1 0 auto; display:flex; flex-direction:column; }
 .checkout-content:has(.checkout-page-center) { flex:1 0 auto; display:flex; flex-direction:column; padding-bottom:0; }
 .checkout-page-center { flex:1 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:var(--v5-space-5); text-align:center; }
+/* With the floating 重新提交 button the group centres in the space above it (button 48 + offset 22 + gap 16). */
+.checkout-content:has(.checkout-original-open--action) { padding-bottom:calc(48px + var(--nx-tray-bottom, 22px) + 16px); }
+.checkout-capacity-notice { display:block; margin:var(--v5-space-2) 2px 0; }
 /* Receipt write failure is a solid content card: title, one caption line, in-place retry bottom-right (DS 01 §1.1.2, 03 §3.1). */
 .checkout-receipt-failure { margin:var(--ui-space-card-gap) var(--v5-space-4) 0; padding:var(--ui-space-inset); }
 .checkout-receipt-failure__title { display:block; color:var(--v5-ink); font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
