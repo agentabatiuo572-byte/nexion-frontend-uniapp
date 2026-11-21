@@ -59,7 +59,7 @@
     <!-- Keeps the last link clear of the page's bottom action tray (04 §4.0): an invisible copy of the tray's rows. -->
     <view v-if="footer" class="bundle-bar-space" aria-hidden="true">
       <text v-if="footer.note" class="bundle-bar-space__note">{{ footer.note }}</text>
-      <template v-if="footer.signedIn"><text class="bundle-bar-space__text">{{ t.promotion.quote }}</text><text class="bundle-bar-space__cta">{{ t.promotion.continue }}</text></template>
+      <template v-if="footer.signedIn"><text class="bundle-bar-space__text">{{ t.promotion.quote }}</text><text class="bundle-bar-space__cta">{{ footer.continueLabel }}</text></template>
       <text v-else class="bundle-bar-space__cta">{{ t.promotion.signIn }}</text>
     </view>
   </view>
@@ -133,6 +133,7 @@ const productsReady=computed(()=>catalogStatus.value==='ready'&&selection.value.
 const canReadQuote=computed(()=>visible.value&&signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
 const canQuote=computed(()=>canReadQuote.value&&quoteStatus.value!=='loading'&&!quoteBlock.value);
 const canContinue=computed(()=>canQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE');
+const canOpenDevices=computed(()=>visible.value&&signedIn.value&&quoteBlock.value==='capacity');
 useAutoRecovery({
   active:()=>visible.value,
   failed:()=>quoteBlock.value==='unavailable'&&canReadQuote.value,
@@ -168,16 +169,22 @@ async function refreshQuote(){
     quoteStatus.value=quoteBlock.value?'idle':'error';
   }
 }
-// Display-only hand-off to the page's bottom action tray (pages/store/bundle.vue #pageFixed); the reason a disabled
-// primary has sits above it there (03 §3.1, 04 §4.0).
+// The page renders these states and actions in its existing tray.
 const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
   note:checkoutQuoteBlockCopy(quoteBlock.value,t.value)||(selection.value.length<2?t.value.promotion.selectTwo:quote.value&&quote.value.eligibility!=='ELIGIBLE'?t.value.promotion.disabledNote:signedIn.value&&!quote.value&&quoteStatus.value==='idle'?t.value.promotion.awaitingQuote:''),
-  signedIn:signedIn.value,canQuote:canQuote.value,canContinue:canContinue.value,quote:requestQuote,continue:continueCheckout,signIn,
+  signedIn:signedIn.value,canQuote:canQuote.value,canContinue:canOpenDevices.value||canContinue.value,
+  continueLabel:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.promotion.continue,
+  quote:requestQuote,continue:continueCheckout,signIn,
 });
 defineExpose({footer});
 function requestQuote(){if(canQuote.value)void refreshQuote();}
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
-function continueCheckout(){if(!quote.value)return;if(!freshQuote()){invalidate();return;}if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));}
+function continueCheckout(){
+  if(canOpenDevices.value){void navTo('/pages/me/devices');return;}
+  if(!quote.value)return;
+  if(!freshQuote()){invalidate();return;}
+  if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
+}
 onMounted(()=>{expiryTimer=setInterval(()=>{if(quote.value&&!freshQuote())invalidate();},1000);});
 onHide(()=>{visible.value=false;invalidate(true);termsOpen.value=false;});
 onShow(()=>{visible.value=true;invalidate(true);});

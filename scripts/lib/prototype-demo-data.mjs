@@ -1000,6 +1000,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }
     requireDemoQuoteStock(quoteProducts);
     requireDemoPurchase(state,products,input.items,now);
+    if(!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
     const items=input.items.map((item,index)=>{
       const product=quoteProducts[index];
       return {...item,lineId:'demo-line-'+index,unitPriceUsdt:product.price.toFixed(2),subtotalUsdt:(product.price*item.quantity).toFixed(2),discountUsdt:'0.00',payableUsdt:(product.price*item.quantity).toFixed(2)};
@@ -1039,10 +1040,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       Object.assign(quote,{promotionDiscountUsdt:(Number(quote.promotionDiscountUsdt??0)+discount).toFixed(2),discountUsdt:(Number(quote.discountUsdt)+discount).toFixed(2),amountUsdt:(Number(quote.amountUsdt)-discount).toFixed(2)});
     }
     if(quote.promotionDiscountUsdt&&Number(quote.amountUsdt)<=0)refuse('PROMOTION_DISCOUNT_REQUIRES_PAYMENT');
-    if(!demoOrderFitsCapacity(url,locale,state,products,items)){
-      quote.eligibility='INELIGIBLE';
-      quote.warnings.push({zh:'设备槽不足，请先在设备管理中腾出位置或减少购买数量。',en:'Not enough device slots. Free up a slot in device management or reduce the quantity.',vi:'Không đủ vị trí thiết bị. Hãy giải phóng vị trí trong phần quản lý thiết bị hoặc giảm số lượng mua.'});
-    }
     state.quotes||={};state.quotes[quote.quoteId]={...quote,voucherGrantId:voucher?.grantId};return quote;
   }
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);
