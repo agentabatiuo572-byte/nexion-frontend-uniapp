@@ -17,11 +17,8 @@
       <view v-if="modeLabel" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
       </view>
-      <view v-if="remoteApiEnabled && !securityPresentation" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" role="status" aria-live="polite">
-        <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? computeCopy.loading : t.security.opFailed }}</text>
-        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity">
-          <text :style="remoteSecurityRetryTextStyle">{{ t.ui.retry }}</text>
-        </view>
+      <view v-if="remoteApiEnabled && !securityPresentation && remoteSecurityLoading" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" role="status" aria-live="polite">
+        <text :style="remoteSecurityUnavailableTextStyle">{{ computeCopy.loading }}</text>
       </view>
 
       <view
@@ -226,6 +223,7 @@ import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import AppChassis from "@/components/app-chassis.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -274,7 +272,6 @@ onLoad((options) => {
     retiredFlow.value = true;
     toast.info(t.value.topupChrome.flowRetired);
   }
-  if (remoteApiEnabled) void loadRemoteSecurity();
 });
 const security = useSecurity();
 const auth = useAuth();
@@ -369,6 +366,7 @@ function syncDeletionSubmittedReason(accountKey: string) {
 }
 
 const remoteSecurityLoading = ref(false);
+const remoteSecurityReadFailed = ref(false);
 const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
@@ -460,7 +458,10 @@ function isCurrentSecurityRequest(
 }
 
 function clearSecurityAccountState(keepPresentation = false) {
-  if (!keepPresentation) securityPresentation.value = null;
+  if (!keepPresentation) {
+    securityPresentation.value = null;
+    remoteSecurityReadFailed.value = false;
+  }
   twoFactorSheetOpen.value = false;
   deletionSheetOpen.value = false;
   deletionDebtOpen.value = false;
@@ -498,7 +499,7 @@ function clearSecurityAccountState(keepPresentation = false) {
 
 function refreshSecurityForCurrentAccount() {
   if (securityPageVisible && remoteApiEnabled) {
-    void loadRemoteSecurity();
+    if (!remoteSecurityReadFailed.value && !remoteSecurityLoading.value) void loadRemoteSecurity();
     void loadPhonePolicy();
   }
 }
@@ -643,18 +644,25 @@ async function loadRemoteSecurity(): Promise<boolean> {
     remoteSecurity.value = securityState;
     securityPresentation.value = { ...securityState, sessions: [...securityState.sessions] };
     deletionStatus.value = accountDeletion;
+    remoteSecurityReadFailed.value = false;
     return true;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
-    securityPresentation.value = null;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+    else remoteSecurityReadFailed.value = true;
     console.warn("[security] overview load failed:", cause);
-    err.value = t.value.security.opFailed;
     return false;
   } finally {
     if (isCurrentSecurityRequest(pageScope, scope, accountKey)) remoteSecurityLoading.value = false;
   }
 }
+
+useAutoRecovery({
+  failed: () => remoteApiEnabled && remoteSecurityReadFailed.value && !remoteSecurityLoading.value,
+  retry: loadRemoteSecurity,
+  repeatMs: 30_000,
+  quiet: false,
+});
 
 async function loadMoreSessions(): Promise<void> {
   const snapshot = remoteSecurity.value;
@@ -1297,10 +1305,6 @@ const remoteSecurityUnavailableTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
-};
-const remoteSecurityRetryTextStyle: CSSProperties = {
-  font: "600 13px/20px var(--font-v5)",
-  color: "var(--v5-brand)",
 };
 const unavailableValueStyle: CSSProperties = {
   marginLeft: "auto",
