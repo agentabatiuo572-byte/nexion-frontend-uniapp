@@ -2378,6 +2378,8 @@ export const fil: Messages = {
     coOriginalOrderOpenFailed: "Hindi mabuksan ang orihinal na order",
     coOriginalOrderOpenHint: "Tingnan muna ang orihinal na order bago mag-order ulit.",
     coOpenOriginalOrder: "Tingnan ang orihinal na order",
+    coPendingCreateTitle: "Hindi pa kumpirmado ang resulta ng huling order",
+    coBrowseOtherDevices: "Pumili ng ibang device",
     coSetupRequired: "Tapusin muna ang unang setup, saka bumalik para bumili.",
     coContinue: "Magpatuloy",
     coReviewOrder: "Suriin ang order",

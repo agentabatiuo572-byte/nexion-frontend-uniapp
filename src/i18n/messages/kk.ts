@@ -2378,6 +2378,8 @@ export const kk: Messages = {
     coOriginalOrderOpenFailed: "Бастапқы тапсырысты ашу мүмкін болмады",
     coOriginalOrderOpenHint: "Жаңа тапсырыс бермес бұрын бастапқы тапсырысты тексеріңіз.",
     coOpenOriginalOrder: "Бастапқы тапсырысты көру",
+    coPendingCreateTitle: "Алдыңғы тапсырыс нәтижесі әлі расталмаған",
+    coBrowseOtherDevices: "Басқа құрылғыны таңдау",
     coSetupRequired: "Алғашқы баптауды аяқтап, сатып алуға оралыңыз.",
     coContinue: "Жалғастыру",
     coReviewOrder: "Тапсырысты тексеру",

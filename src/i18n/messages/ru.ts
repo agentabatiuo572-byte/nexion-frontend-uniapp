@@ -2378,6 +2378,8 @@ export const ru: Messages = {
     coOriginalOrderOpenFailed: "Не удалось открыть исходный заказ",
     coOriginalOrderOpenHint: "Перед новым заказом проверьте исходный.",
     coOpenOriginalOrder: "Открыть исходный заказ",
+    coPendingCreateTitle: "Результат прошлого заказа ещё не подтверждён",
+    coBrowseOtherDevices: "Выбрать другое",
     coSetupRequired: "Завершите начальную настройку и вернитесь к покупке.",
     coContinue: "Продолжить",
     coReviewOrder: "Проверить заказ",

@@ -2378,6 +2378,8 @@ export const uz: Messages = {
     coOriginalOrderOpenFailed: "Asl buyurtmani ochib boʻlmadi",
     coOriginalOrderOpenHint: "Yangi buyurtma berishdan oldin asl buyurtmani tekshiring.",
     coOpenOriginalOrder: "Asl buyurtmani koʻrish",
+    coPendingCreateTitle: "Oldingi buyurtma natijasi hali tasdiqlanmagan",
+    coBrowseOtherDevices: "Boshqa qurilma tanlash",
     coSetupRequired: "Dastlabki sozlashni yakunlab, xaridga qayting.",
     coContinue: "Davom etish",
     coReviewOrder: "Buyurtmani tekshirish",

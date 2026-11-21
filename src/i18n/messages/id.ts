@@ -2378,6 +2378,8 @@ export const id: Messages = {
     coOriginalOrderOpenFailed: "Pesanan awal belum dapat dibuka",
     coOriginalOrderOpenHint: "Periksa pesanan awal sebelum membuat pesanan baru.",
     coOpenOriginalOrder: "Lihat pesanan awal",
+    coPendingCreateTitle: "Hasil pesanan sebelumnya belum dikonfirmasi",
+    coBrowseOtherDevices: "Pilih perangkat lain",
     coSetupRequired: "Selesaikan pengaturan awal, lalu kembali untuk membeli.",
     coContinue: "Lanjut",
     coReviewOrder: "Tinjau pesanan",
