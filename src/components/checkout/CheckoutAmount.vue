@@ -1,5 +1,5 @@
 <template>
-  <text class="checkout-amount"><text v-if="showCurrency && currency === 'USD'" class="checkout-amount__symbol">$</text><text>{{ parts.whole }}</text><text v-if="parts.fraction" class="checkout-amount__fraction">.{{ parts.fraction }}</text><text v-if="showCurrency && currency === 'USDT'" class="checkout-amount__unit">USDT</text></text>
+  <text class="checkout-amount"><text v-if="showCurrency && parts.known && currency === 'USD'" class="checkout-amount__symbol">$</text><text>{{ parts.whole }}</text><text v-if="parts.fraction" class="checkout-amount__fraction">.{{ parts.fraction }}</text><text v-if="showCurrency && parts.known && currency === 'USDT'" class="checkout-amount__unit">USDT</text></text>
 </template>
 <script setup lang="ts">
 import { computed } from 'vue';
@@ -7,9 +7,9 @@ import { formatGroupedAmount } from '@/lib/amount-display';
 const props = withDefaults(defineProps<{ value: string | number | null | undefined; currency?: 'USD' | 'USDT'; showCurrency?: boolean }>(), { currency: 'USD', showCurrency: true });
 const parts = computed(() => {
   const formatted = formatGroupedAmount(props.value);
-  if (formatted === '-') return { whole: '—', fraction: '' };
+  if (formatted === '-') return { whole: '—', fraction: '', known: false };
   const [whole, fraction] = formatted.split('.');
-  return { whole, fraction };
+  return { whole, fraction, known: true };
 });
 </script>
 <style scoped>

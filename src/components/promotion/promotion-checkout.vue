@@ -8,7 +8,7 @@
     <template v-else>
       <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
-      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
+      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteOutOfStock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="catalogReadFailed" class="promotion-notice" role="alert"><text>{{ t.store.catalogErrorBody }}</text><PromotionAction class="promotion-link" role="button" tabindex="0" :aria-disabled="busy" @click="loadQuote"><text>{{ t.store.catalogRetry }}</text></PromotionAction></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
@@ -136,7 +136,7 @@ import { promotionApi,deviceE3Api,purchaseEligibilityApi,sessionVault } from '@/
 import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api';
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { PromotionItem } from '@/api/promotion-api';
-import { validatePromotionItems } from '@/api/promotion-api';
+import { isCheckoutQuoteOutOfStock, validatePromotionItems } from '@/api/promotion-api';
 import type { RewardDisclosure,Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
@@ -221,6 +221,7 @@ function itemSubtotal(item:{productNo:string;quantity:number;subtotalUsdt?:strin
   return (order.value?receiptQuote.value:displayQuote.value)?.items.find(line=>line.productNo===item.productNo&&line.quantity===item.quantity)?.subtotalUsdt;
 }
 const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=ref(false),error=ref(''),activityConflict=ref(false),termsOpen=ref(false);
+const quoteOutOfStock=ref(false);
 const paymentSheetOpen=ref(false),paymentConfirming=ref(false),leaving=ref(false);
 const paymentEntryChecking=ref(false);
 const eventVoucherId=props.voucherId?.trim()??'';
@@ -309,7 +310,7 @@ watch(quotePresentationKey,()=>{
   quotePresentation.value=null;freshQuoteReady.value=false;receivedAt=null;quoteFresh.value=false;readGeneration++;
 },{flush:'sync'});
 watch(()=>locale.code,()=>{
-  if(!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
+  if(quoteOutOfStock.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
   if(busy.value)refreshOnIdle=true;else void loadQuote();
 },{flush:'post'});
 function updateClock(){
@@ -326,7 +327,7 @@ async function loadOrderClock(){
   orderClock={serverNow:fleet.serverNow,at:sampledAt};updateClock();
 }
 const catalogReadFailed=computed(()=>freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&productCatalogState.status==='error');
-const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
+const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!quoteOutOfStock.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
 const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
@@ -338,6 +339,7 @@ async function run(action:()=>Promise<void>){if(busy.value||!current())return;bu
 async function loadQuote(){
   if(busy.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
   if(recoverKeepBeforeNewPurchase())return;
+  quoteOutOfStock.value=false;
   // A failed later read invalidates the successful catalog promise saved at mount.
   if(productCatalogState.status==='error')catalogRefresh=null;
   const generation=++readGeneration,inputKey=quotePresentationKey();
@@ -407,7 +409,12 @@ async function loadQuote(){
       if(result.items.length!==requestedItems.length||requestedItems.some(item=>!result.items.some(line=>line.productNo===item.productNo&&line.quantity===item.quantity)))throw new Error('QUOTE_INPUT_CHANGED');
       voucherId.value=selectedId;
       session.setQuote(result,selectedId);quotePresentation.value={key:quotePresentationKey(),quote:result};freshQuoteReady.value=true;receivedAt=sampledAt;revision.value++;updateClock();
-    }catch(cause){if(readCurrent(generation)){if(!(cause instanceof ApiError&&cause.kind==='network')){quotePresentation.value=null;promotion.value=null;}throw cause;}}
+    }catch(cause){
+      if(!readCurrent(generation))return;
+      if(!(cause instanceof ApiError&&cause.kind==='network')){quotePresentation.value=null;promotion.value=null;}
+      if(isCheckoutQuoteOutOfStock(cause)){quoteOutOfStock.value=true;return;}
+      throw cause;
+    }
   });
 }
 async function claimEventVoucher(){
@@ -684,7 +691,7 @@ function show(){
   startWalletTimer();
   if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(allowAuxiliaryNavigation);
   if(busy.value){refreshOnIdle=true;return;}
-  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);void loadQuote();}
+  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);if(!quoteOutOfStock.value)void loadQuote();}
 }
 watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible.value&&current())show();}});
 const footer = computed(() => {
@@ -692,7 +699,7 @@ const footer = computed(() => {
   const rawAmount = order.value?.amountUsdt ?? displayQuote.value?.amountUsdt;
   const currency='USD' as const,amount=formatCheckoutReviewAmount(rawAmount,currency,{unit:true}),amountValue=rawAmount;
   if (order.value?.paymentStatus === 'PENDING') return { amount, amountValue, currency, label: p.value.pay, disabled: rawAmount==null||!canPay.value||leaving.value||paymentConfirming.value||paymentEntryChecking.value, action: pay };
-  if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder };
+  if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder, note: quoteOutOfStock.value ? t.value.store.temporarilyOutOfStock : '' };
   return null;
 });
 const backDisabled=computed(()=>busy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
@@ -703,7 +710,7 @@ function startWalletTimer(){
   walletTimer=setInterval(()=>{
     if(!visible.value||!current()||loading.value||busy.value||paymentConfirming.value||paymentSheetOpen.value||leaving.value||termsOpen.value||voucherOpen.value||voucherLoading.value)return;
     if(walletState.value!=='loading')void refreshWallet(true);
-    if(!session.record.order&&!session.record.pending)void loadQuote();
+    if(!quoteOutOfStock.value&&!session.record.order&&!session.record.pending)void loadQuote();
   },30000);
 }
 onMounted(async()=>{
