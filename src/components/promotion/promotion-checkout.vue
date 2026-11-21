@@ -7,21 +7,20 @@
     </CheckoutResult>
     <template v-else>
       <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
-      <text v-if="displayQuote||order" class="checkout-review-title">{{ order?.paymentStatus==='PENDING' ? p.pending : p.confirmOrder }}</text>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
       <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="catalogReadFailed" class="promotion-notice" role="alert"><text>{{ t.store.catalogErrorBody }}</text><PromotionAction class="promotion-link" role="button" tabindex="0" :aria-disabled="busy" @click="loadQuote"><text>{{ t.store.catalogRetry }}</text></PromotionAction></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
-          <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" /></view>
-          <view class="promotion-grow"><text class="checkout-item-name">{{ selectedItemName(item) }}</text><text class="promotion-copy">{{ p.quantity }} · {{ item.quantity }}</text>
+          <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl&&!brokenImages.includes(item.productNo)" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" @error="brokenImages.push(item.productNo)" /></view>
+          <view class="promotion-grow"><text class="checkout-item-name">{{ selectedItemName(item) }}</text>
             <CheckoutAmount v-if="displayQuote||order" class="checkout-line-price" :value="itemSubtotal(item)" currency="USD" />
           </view>
-          <view class="checkout-item-quantity" :aria-label="selectedItemName(item)+' · '+p.quantity">
-            <view class="checkout-item-quantity-button" data-testid="checkout-item-decrease" role="button" :tabindex="canChangeQuantity(item.productNo,-1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,-1)" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.productNo,-1)" @keydown.enter.prevent="changeQuantity(item.productNo,-1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,-1,$event)"><NxIcon name="minus" /></view>
+          <view class="checkout-item-quantity-row"><text class="promotion-copy">{{ p.quantity }}</text><view class="checkout-item-quantity" :aria-label="selectedItemName(item)+' · '+p.quantity">
+            <view class="checkout-item-quantity-button" data-testid="checkout-item-decrease" role="button" :tabindex="canChangeQuantity(item.productNo,-1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,-1)" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.productNo,-1)" @keydown.enter.prevent="changeQuantity(item.productNo,-1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,-1,$event)"><NxIcon name="minus" :size="20" /></view>
             <text class="checkout-item-quantity-value" aria-live="polite">{{ item.quantity }}</text>
-            <view class="checkout-item-quantity-button" data-testid="checkout-item-increase" role="button" :tabindex="canChangeQuantity(item.productNo,1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,1)" :aria-label="t.uiChrome.increaseQty" @click="changeQuantity(item.productNo,1)" @keydown.enter.prevent="changeQuantity(item.productNo,1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,1,$event)"><NxIcon name="plus" /></view>
-          </view>
+            <view class="checkout-item-quantity-button" data-testid="checkout-item-increase" role="button" :tabindex="canChangeQuantity(item.productNo,1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,1)" :aria-label="t.uiChrome.increaseQty" @click="changeQuantity(item.productNo,1)" @keydown.enter.prevent="changeQuantity(item.productNo,1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,1,$event)"><NxIcon name="plus" :size="20" /></view>
+          </view></view>
         </view>
       </view>
       <view v-if="displayQuote||order||eventVoucherId" class="checkout-section" data-testid="checkout-discounts">
@@ -248,6 +247,8 @@ function voucherCondition(def:VoucherDef):string {
   return [scope,fmt(p.value.voucherMinimum,{amount:formatAmount(def.minPurchaseUSD??0)}),def.endAt?p.value.deadline+' · '+displayDeadline(new Date(def.endAt).toISOString(),locale.code):''].filter(Boolean).join(' · ');
 }
 const selection=ref(props.items.map(({productNo,quantity})=>({productNo,quantity})));
+// A product image that fails to load is dropped, so its art column collapses like the single-item card's.
+const brokenImages=ref<string[]>([]);
 const keepRecoveryTarget=ref<string|null>(null),keepRecoveryReadError=ref(false),tradein=useTradeinSheet();
 function recoverKeepBeforeNewPurchase(reopen=false):boolean {
   // Original orders and commands always recover before any new purchase gate.
@@ -729,13 +730,15 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 <style scoped>
 .promotion-main { padding-bottom:140px; }
 .promotion-main--result { padding-bottom:var(--ui-space-inset); min-height:calc(100dvh - var(--nx-overlay-top) - var(--ui-space-section-gap) * 3); box-sizing:border-box; }
-.checkout-review-title { display:block; margin:var(--v5-space-2) 0; font:var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); color:var(--v5-ink); }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:22px; background:var(--ui-content-surface); }
 .checkout-section { min-width:0; }
 .checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); }
-.checkout-product-line { display:grid; grid-template-columns:68px minmax(0,1fr); align-items:center; gap:var(--ui-space-row-y) var(--ui-space-inset); padding:var(--ui-space-section) var(--ui-space-inset); border-color:color-mix(in srgb,var(--v5-border) 40%,transparent); }
-.checkout-product-art { display:grid; place-items:center; width:68px; height:68px; border-radius:16px; overflow:hidden; }
-.checkout-product-art .promotion-image { width:74px; height:74px; }
+/* Same product summary as checkout.vue: device image as the main visual, quantity on its own full-width row. */
+.checkout-product-line { --checkout-art:120px; --checkout-art-h:76px; --checkout-art-image:128px; display:grid; grid-template-columns:var(--checkout-art) minmax(0,1fr); align-items:center; gap:0 var(--v5-space-3); padding:var(--ui-space-inset-hero) var(--ui-space-inset-hero) var(--v5-space-1); border-color:color-mix(in srgb,var(--v5-border) 40%,transparent); }
+.checkout-product-art { position:relative; width:var(--checkout-art); height:var(--checkout-art-h); }
+.checkout-product-art .promotion-image { position:absolute; left:50%; top:50%; width:var(--checkout-art-image); height:var(--checkout-art-image); transform:translate(-50%, -57%); pointer-events:none; }
+.checkout-product-line:has(> .checkout-product-art:empty) { grid-template-columns:minmax(0,1fr); }
+.checkout-product-art:empty { display:none; }
 .checkout-discount-row { display:flex; align-items:center; gap:var(--ui-space-inline); min-height:64px; box-sizing:border-box; padding:var(--ui-space-inline) var(--ui-space-inset); border-bottom:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-discount-row:last-child { border-bottom:0; }
 .checkout-discount-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); color:var(--v5-ink-2); }
@@ -770,17 +773,21 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-fees .promotion-summary { box-sizing:border-box; align-items:center; min-height:calc(var(--ui-space-inset) * 3); font-variant-numeric:tabular-nums; border-bottom:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-fees .promotion-summary:last-child { border-bottom:0; }
 .checkout-fees .promotion-summary > :last-child { max-width:65%; }
-.checkout-item-name { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
-.checkout-line-price { display:block; margin-top:6px; line-height:1.5; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.checkout-item-name { display:block; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
+.checkout-line-price { display:block; margin-top:var(--v5-space-2); font-size:var(--ui-type-list-title); line-height:var(--ui-type-list-title-lh); }
+.checkout-line-price :deep(.checkout-amount__symbol) { font-size:max(12px, .55em); }
 .checkout-voucher-options { display:flex; flex-direction:column; gap:var(--ui-space-inline); }
 .checkout-voucher-option { align-items:flex-start; flex-direction:column; gap:6px; text-align:left; }
 .checkout-voucher-options [aria-pressed="true"] { background:var(--v5-brand-soft); box-shadow:inset 0 0 0 1px var(--v5-brand); }
-.checkout-item-quantity { grid-column:2; justify-self:start; display:inline-flex; align-items:center; border:1px solid var(--v5-border); border-radius:999px; background:var(--ui-content-surface-2); }
-.checkout-item-quantity-button { display:grid; place-items:center; width:44px; min-height:44px; border-radius:999px; font:400 18px/20px var(--font-v5); cursor:pointer; }
-.checkout-item-quantity-button[aria-disabled="true"] { opacity:.35; cursor:default; }
+.checkout-item-quantity-row { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:52px; margin-top:var(--v5-space-4); border-top:1px solid var(--v5-border); }
+.checkout-item-quantity-row .promotion-copy { line-height:var(--ui-type-list-subtitle-lh); }
+/* 20px glyphs in 44px targets: pull the row right so the + stroke, not its hit area, meets the divider end. */
+.checkout-item-quantity { display:flex; flex:none; align-items:center; margin-right:-16px; }
+.checkout-item-quantity-button { display:grid; place-items:center; width:44px; min-height:44px; border-radius:999px; color:var(--v5-ink); cursor:pointer; }
+.checkout-item-quantity-button[aria-disabled="true"] { opacity:.5; cursor:default; }
 .checkout-item-quantity-button:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
-.checkout-item-quantity-value { min-width:24px; text-align:center; font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
+.checkout-item-quantity-value { min-width:24px; text-align:center; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); font-variant-numeric:tabular-nums; }
 .promotion-summary.total { min-height:55px; box-sizing:border-box; }
-@media(min-width:390px) { .checkout-product-line { grid-template-columns:68px minmax(0,1fr) auto; }.checkout-item-quantity { grid-column:3;grid-row:1; }.checkout-item-quantity-value { min-width:20px; } }
+@media(max-width:374px) { .checkout-product-line { --checkout-art:104px; --checkout-art-h:66px; --checkout-art-image:112px; } }
 @media(prefers-reduced-motion:reduce) { .promotion-action:active { transform:none; } }
 </style>
