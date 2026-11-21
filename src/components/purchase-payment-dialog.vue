@@ -234,6 +234,7 @@ import { usePurchasePayment, purchaseConclusion, type PurchaseNotice } from '@/s
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
+import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { hostedPaymentUrlPattern, validateHostedPaymentUrl } from '@/lib/hosted-payment';
@@ -328,6 +329,11 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       body: s.quote ? `${c.changed} ${c.total}: ${s.method === 'HDPAY_BANK' ? '$' : ''}${amount(s.quote.totalUsdt)}${s.method === 'HDPAY_BANK' ? '' : ' USDT'}` : c.changed,
       primary: c.ok, onPrimary: dismiss, onSecondary: dismiss };
     case 'changed': return { icon: 'info', tone: 'warning', title: c.changedTitle, body: c.changed, primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close, ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
+    case 'rejectTradeinBusy':
+    case 'rejectTradeinOwner': {
+      const flow = checkoutFlowCopy(locale.code);
+      return { icon: 'info', tone: 'warning', title: flow.cannotPay, body: flow[kind], primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
+    }
     case 'orderExpired': return { ...refused, title: c.orderExpiredTitle, body: c.orderExpired };
     case 'orderClosed': return { ...refused, title: c.orderClosedTitle, body: c.orderClosed };
     // There is no order to open, so only ordering again remains.

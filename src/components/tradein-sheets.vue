@@ -298,6 +298,9 @@ import { purchasePrincipalUsdt } from "@/api/device-e3-api";
 import { readPaymentCommand } from "@/api/payment-command-api";
 import { parseCanonicalTradeinResult,parseCanonicalCapacityKeepResult,type CanonicalTradeinResult,type CanonicalCapacityKeepResult } from "@/api/device-e3-api";
 import { purchaseRecoveryCopy } from "@/lib/purchase-recovery-copy";
+import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
+import { tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from "@/lib/order-payment-rejection";
+import { asApiError, isApiRefusal } from "@/api/errors";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { acquireAccountCommandKey, releaseAccountCommandKey,readAccountRow,writeAccountRow } from "@/store/account-scoped-storage";
@@ -1065,6 +1068,22 @@ function writeCapacityPending(accountKey:string,pending:CapacityPending|null):vo
   capacityResumeAllowed.value=false;
 }
 
+function rejectCapacityPurchase(accountKey: string, original: CapacityPending, message?: string) {
+  if (!releaseAccountCommandKey(CAPACITY_COMMAND_TABLE, accountKey, original.intent, original.key)) throw new Error('CAPACITY_COMMAND_RELEASE_FAILED');
+  writeCapacityPending(accountKey, null);
+  capacityCommandKey.value = null;
+  if (original.operation === 'replace' && message === TRADEIN_RUNTIME_RECOVERING) {
+    toast.warn(t.value.tradein.errPleaseRetry);
+    return;
+  }
+  hide();
+  const reason = original.operation === 'replace' ? tradeinRejectionKey(message) : undefined;
+  if (reason) {
+    const flow = checkoutFlowCopy(locale.code);
+    toast.warn(flow.cannotPay, flow[reason]);
+  } else toast.warn(recoveryCopy.value.rejected);
+}
+
 async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requestedQuote:CanonicalCapacityReplaceQuote|null,
     newKind:DeviceKind,allowOriginalResume=false,readOnlyCurrent?:()=>boolean):Promise<void> {
   if (capacityRecoveryBusy.value || capacityReadBusy.value) return;
@@ -1093,8 +1112,8 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
       if (result.status==='SUCCEEDED') receipt=original.operation==='replace'
         ?parseCanonicalTradeinResult(result.receipt):parseCanonicalCapacityKeepResult(result.receipt);
       else if (result.status==='REJECTED') {
-        if (!releaseAccountCommandKey(CAPACITY_COMMAND_TABLE,scope.accountKey,original.intent,original.key)) throw new Error('CAPACITY_COMMAND_RELEASE_FAILED');
-        writeCapacityPending(scope.accountKey,null);hide();toast.warn(recoveryCopy.value.rejected);return;
+        rejectCapacityPurchase(scope.accountKey, original, result.message);
+        return;
       } else {
         capacityResumeAllowed.value=result.status==='NOT_SEEN'&&result.canResumeSameKey;
         if (!capacityResumeAllowed.value || !allowOriginalResume) return;
@@ -1110,7 +1129,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
     const summary=frozen?frozen.targetProductName:kindLabel(target as DeviceKind);
     if (!receipt) {
       if (readOnlyCurrent) return;
-      const current=()=>isCurrentAccountScope(scope)&&props.active&&(state.value.kind==='replace'||state.value.kind==='choice'||allowOriginalResume&&state.value.kind==='keep-recovery')
+      const purchaseIsCurrent=()=>current()&&props.active&&(state.value.kind==='replace'||state.value.kind==='choice'||allowOriginalResume&&state.value.kind==='keep-recovery')
         &&(allowOriginalResume?readCapacityPending(scope.accountKey)?.intent===intent
           :state.value.kind==='replace'&&state.value.newKind===newKind&&!!state.value.canonicalCapacityQuote&&capacityIntent(operation,state.value.canonicalCapacityQuote)===requestedIntent);
       receipt=await executeSelectedPurchase({amount:payable,currency:'USDT',summary},async authorization=>{
@@ -1119,13 +1138,24 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);
         original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};
         writeCapacityPending(scope.accountKey,original);
-        return effectiveOperation==='replace'
-          ?deviceE3Api.capacityReplace(frozen!.sourceDeviceId!,target,key,frozen!,authorization)
-          :allowOriginalResume?deviceE3Api.replayCapacityKeep(target,key,payable,authorization)
-          :deviceE3Api.capacityKeep(target,key,frozen!,authorization);
-      },current,{kind:effectiveOperation==='replace'?'CAPACITY_REPLACE':'CAPACITY_KEEP',
+        if (effectiveOperation !== 'replace') return allowOriginalResume
+          ? deviceE3Api.replayCapacityKeep(target,key,payable,authorization)
+          : deviceE3Api.capacityKeep(target,key,frozen!,authorization);
+        try {
+          return await deviceE3Api.capacityReplace(frozen!.sourceDeviceId!,target,key,frozen!,authorization);
+        } catch (error) {
+          if (!current() || !(tradeinPaymentRejection(error) || isApiRefusal(error, 503, TRADEIN_RUNTIME_RECOVERING))) throw error;
+          rejectCapacityPurchase(scope.accountKey, original, asApiError(error).message);
+          return null;
+        }
+      },purchaseIsCurrent,{kind:effectiveOperation==='replace'?'CAPACITY_REPLACE':'CAPACITY_KEEP',
         payload:{targetProductNo:target,expectedPayableUsdt:payable,...(effectiveOperation==='replace'?{sourceDeviceId:frozen!.sourceDeviceId}: {})},
         commandKey:()=>{const saved=readCapacityPending(scope.accountKey);const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};writeCapacityPending(scope.accountKey,original);return key;},
+        onReplacementRefused: () => {
+          if (!current() || !props.active) return;
+          capacityCommandKey.value = null;
+          hide();
+        },
         parseReceipt:raw=>effectiveOperation==='replace'?parseCanonicalTradeinResult(raw):parseCanonicalCapacityKeepResult(raw)});
       // The record may have been released with a payment the server no longer holds.
       if (!receipt) { capacityRecovery.value=readCapacityPending(scope.accountKey); return; }

@@ -11,19 +11,20 @@ import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { getT } from '@/i18n/use-t';
 import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
-  tradeinKey?: string; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
+  tradeinKey?: string; onReplacementRefused?: () => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing';
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinOwner';
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
@@ -278,7 +279,7 @@ function hideChannel(method: ExternalPaymentMethod) {
 }
 /** Before an intent exists, leave an unavailable channel and try another payment method. */
 function reconcileChannel() {
-  if (state.pending || state.step === 'methods' || available(state.method)) return;
+  if (state.concluded || state.pending || state.step === 'methods' || available(state.method)) return;
   state.notice = ''; reviewedQuote = confirmedQuote = null;
   const other = state.method === 'HDPAY_BANK' ? null : (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC', 'CREGIS_USDT_TRC20'] as const)
     .find(method => method !== state.method && available(method));
@@ -315,13 +316,22 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     if (error instanceof Error && error.message === 'PURCHASE_CONTEXT_CHANGED') { state.notice = 'changed'; return; }
     const cause = asApiError(error);
+    const replacement = expected.kind === 'TRADE_IN' || expected.kind === 'CAPACITY_REPLACE';
+    const replacementRefusal = replacement && tradeinPaymentRejection(cause);
+    if (replacementRefusal) {
+      if (expected.tradeinKey) releasePurchaseCallerRecord(accountKey, expected.kind, expected.tradeinKey);
+      expected.onReplacementRefused?.();
+      conclude(replacementRefusal);
+      return;
+    }
     if (channelUnavailable(cause, method)) {
       hideChannel(method);
       reconcileChannel();
       return;
     }
     // Only a network failure or a 5xx can change on retry; anything else is the server's answer.
-    if (cause.kind !== 'network' && (cause.status ?? 0) < 500) {
+    if (cause.kind !== 'network' && (cause.status ?? 0) < 500
+        && !(replacement && isApiRefusal(cause, 503, TRADEIN_RUNTIME_RECOVERING))) {
       const refusal = ORDER_REFUSALS[cause.message];
       if (refusal) conclude(refusal); else state.notice = 'changed';
       return;
@@ -388,6 +398,24 @@ async function submitOriginal() {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
+      const replacement = pending.kind === 'TRADE_IN' || pending.kind === 'CAPACITY_REPLACE';
+      const replacementRefusal = replacement && tradeinPaymentRejection(cause);
+      if (replacementRefusal) {
+        // An existing intent is returned before the replacement precheck. This response ends the saved create attempt.
+        releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+        release(pending);
+        releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+        Object.assign(state, { pending: null, quote: null, intent: null, error: false });
+        context?.onReplacementRefused?.();
+        conclude(replacementRefusal);
+        return;
+      }
+      if (replacement && isApiRefusal(cause, 503, TRADEIN_RUNTIME_RECOVERING)) {
+        // The precheck is temporarily unavailable. Retry the same create through the existing backoff.
+        state.unavailable = true;
+        state.error = true;
+        return;
+      }
       if (isApiRefusal(cause, 409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED')) {
         // Another command owns this quote. Never retry its POST; only the server's own not-found releases this one.
         const readOnly = { ...pending, lookupOnly: true };
