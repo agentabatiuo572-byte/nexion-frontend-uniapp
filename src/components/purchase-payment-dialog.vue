@@ -233,7 +233,8 @@ import NxButton from '@/components/ui/nx-button.vue';
 import NxNoticeDialog from '@/components/ui/nx-notice-dialog.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
-import { usePurchasePayment, purchaseConclusion, type PurchaseNotice } from '@/store/purchase-payment';
+import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, type PurchaseNotice } from '@/store/purchase-payment';
+import { foregroundReadAllowed } from '@/lib/foreground-read';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
@@ -248,7 +249,7 @@ import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
 import qrcode from 'qrcode-generator';
 const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale = useLocaleStore();
 // The order detail shows its own payment state in the hero, so it hides the floating bar.
-withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
+const props = withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
 const URGENT_MS = 5 * 60000;
 const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
@@ -257,6 +258,11 @@ const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code
 const pending = computed(() => { app.accountKey; s.revision; return payment.pending().filter(row => !payment.resumeDismissed(row)); });
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
 const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
+// The bar reads its payments while it shows (03 §3.5.2), so a payment that ended leaves it instead of staying "in progress".
+const resumeShown = computed(() => props.showResume && active.value && !s.open && pending.value.length > 0);
+function readResumeRows() { const accountKey = app.accountKey; void refreshPendingPayments(accountKey, () => resumeShown.value && app.accountKey === accountKey && foregroundReadAllowed()); }
+watch(resumeShown, shown => { if (shown) readResumeRows(); }, { immediate: true });
+useVisibleInterval(readResumeRows, 15000, () => resumeShown.value);
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().safeAreaInsets?.bottom ?? 0, 30); } catch { return 30; } })();
 

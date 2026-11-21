@@ -181,6 +181,20 @@ export async function refreshExpiredCheckoutPayments(accountKey: string, current
     saveExpiry(accountKey, pending.commandKey, pending.kind);
   }));
 }
+/** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
+export async function refreshPendingPayments(accountKey: string, current: () => boolean) {
+  if (!current() || account() !== accountKey || state.open) return;
+  await Promise.allSettled(pendingPayments().map(async pending => {
+    const intent = await readIntent(pending);
+    if (!intent || intent.status === pending.lastStatus || !current() || account() !== accountKey || state.open) return;
+    matches(intent, pending);
+    if (intent.status === 'EXPIRED') { saveExpiry(accountKey, pending.commandKey, pending.kind); return; }
+    if (!settled(intent)) return;
+    const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
+    if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
+    save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
+  }));
+}
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
 }
