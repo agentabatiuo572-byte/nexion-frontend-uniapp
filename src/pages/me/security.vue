@@ -17,8 +17,8 @@
       <view v-if="modeLabel" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
       </view>
-      <view v-if="remoteApiEnabled && !securityPresentation" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
-        <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? "…" : t.security.opFailed }}</text>
+      <view v-if="remoteApiEnabled && !securityPresentation" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" role="status" aria-live="polite">
+        <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? computeCopy.loading : t.security.opFailed }}</text>
         <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity">
           <text :style="remoteSecurityRetryTextStyle">{{ t.ui.retry }}</text>
         </view>
@@ -231,6 +231,7 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { parseServerTimestamp } from "@/api/server-time";
 import { useT } from "@/i18n/use-t";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { fmt } from "@/i18n/format";
 import { useSecurity } from "@/store/security";
 import { captureAccountScope, isCurrentAccountScope, rebindAccountScopedStores } from "@/lib/account-scope";
@@ -262,6 +263,8 @@ const SECURITY_COMMAND_TABLE = "nexgrid-security-command-accounts-v1";
 const DELETION_REQUEST_INTENT = "account-deletion-request";
 
 const t = useT();
+// The shared 「正在读取…」 status, in all nine languages, replaces a bare 「…」 while the security state loads (03 §3.6.1).
+const computeCopy = useComputeV2Copy();
 const retiredFlow = ref(false);
 
 // 已下线验证流深链兜底：toast 提供即时反馈，页内 notice 保持可发现，
