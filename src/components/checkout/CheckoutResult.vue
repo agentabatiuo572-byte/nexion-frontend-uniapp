@@ -19,11 +19,12 @@
         <text v-if="productName" class="checkout-result__product">{{ productName }}</text>
         <view v-if="showPaidAmount" class="checkout-result__amount"><text>{{ copy.paidAmount }}</text><CheckoutAmount :value="amount" :currency="currency ?? 'USDT'" /></view>
       </view>
-      <slot />
+      <!-- done: the page's own exits wait for the result presentation to finish (PRD purchase payment, line 49). -->
+      <slot :done="phase === 'complete'" />
     </view>
     <view class="checkout-result__actions">
-      <NxButton v-if="state === 'inventory' || (state === 'activated' && phase === 'complete')" :label="copy.devices" variant="primary" @click="emit('devices')" />
-      <template v-else-if="state === 'error' || state === 'processing'">
+      <NxButton v-if="(state === 'inventory' || state === 'activated') && phase === 'complete'" :label="copy.devices" variant="primary" @click="emit('devices')" />
+      <template v-else-if="(state === 'error' || state === 'processing') && phase === 'complete'">
         <NxButton :label="copy.deviceInventory" variant="text" @click="emit('devices')" />
       </template>
       <view v-else class="checkout-result__action-space" aria-hidden="true" />
@@ -63,9 +64,11 @@ const title = computed(() => phase.value === 'confirmed' ? copy.value.paid
 const description = computed(() => phase.value === 'confirmed' ? props.state === 'activated' ? copy.value.paidHint : copy.value.paidInventoryHint
   : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activatingHint : copy.value.activatedHint
   : props.state === 'inventory' ? copy.value.inventoryHint : props.state === 'processing' ? copy.value.processingHint : props.error || copy.value.resultErrorHint);
-// Head tone follows the status map (03 §3.8): paid and done are success, activating and processing are in progress, failure is danger.
-const headTone = computed(() => phase.value === 'confirmed' ? 'success' : props.state === 'error' ? 'danger'
-  : props.state === 'processing' || phase.value === 'activating' ? 'warning' : 'success');
+// Head tone follows the status map (03 §3.8): paid and done are success; activating, processing and a paid order whose
+// read-back failed and is being re-read are in progress. 'error' here is never a confirmed delivery failure (03 §3.5.2:
+// no failure before the server confirms one), so it does not use danger.
+const headTone = computed(() => phase.value === 'confirmed' ? 'success'
+  : props.state === 'processing' || props.state === 'error' || phase.value === 'activating' ? 'warning' : 'success');
 const sparks = Array.from({ length: 36 }, (_, index) => ({ index, style: {
   '--x': `${12 + (index * 17) % 77}%`, '--dx': `${(index * 73) % 241 - 120}px`,
   '--dy': `${110 + (index * 37) % 170}px`, '--spin': `${120 + (index * 67) % 540}deg`,

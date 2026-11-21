@@ -1069,6 +1069,8 @@ body {
 .nx-float-panel { background: var(--v5-sticky-bar-bg); box-shadow: var(--ui-glass-edge-shadow); backdrop-filter: blur(12px) saturate(125%); -webkit-backdrop-filter: blur(12px) saturate(125%); }
 [data-theme="light"] .nx-float-panel { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .nx-float-panel { background: var(--v5-surface-2); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+/* Without backdrop-filter the translucent fill would show the content through it unblurred: use the solid surface. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .nx-float-panel { background: var(--v5-surface-2); } }
 @media (forced-colors: active) { .nx-float-panel { background: Canvas; box-shadow: none; outline: 1px solid CanvasText; outline-offset: -1px; backdrop-filter: none; -webkit-backdrop-filter: none; } }
 .nx-glass-bar .nx-tray-note { display: block; padding: 4px 12px 0; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: anywhere; text-wrap: pretty; }
 .nx-glass-bar .nx-button--primary.nx-button--disabled, .nx-tray-float.nx-button--primary.nx-button--disabled { opacity: 1; }

@@ -98,7 +98,7 @@ const en: typeof zh = {
   existingTitle: 'Payment already in progress', existing: 'A payment is already being processed. Don’t pay again. If you’ve paid, wait for confirmation, or contact support if you have questions.',
   topupFor: 'Top up for your order', topupNeed: '{name} needs ', topupNeedTail: ' more. Once the top-up arrives, return to the order to pay.', topupCloses: 'Order closes in {t}', topupDone: 'Balance received', topupEnough: '{amt}\u00A0USDT available, enough for this order.', topupForPurchase: 'Top up for this purchase', topupNeedTailPurchase: ' more. Once it arrives, go back to the previous page to pay.', topupEnoughPurchase: '{amt}\u00A0USDT available, enough for this purchase. Go back to pay.', backToPay: 'Back to payment',
   keepOrderTitle: 'Your order is saved', keepOrderBody: 'You can pay later from Orders. An unpaid order is cancelled automatically at its deadline.',
-  resumeCount: 'Payments in progress: {n}', viewProgress: 'View progress',
+  resumeCount: 'Payments in progress: {n}', viewProgress: 'View',
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
@@ -148,7 +148,7 @@ const vi: typeof zh = {
   existingTitle: 'Đã có thanh toán đang xử lý', existing: 'Đã có một khoản thanh toán đang được xử lý. Vui lòng không thanh toán lại. Nếu bạn đã thanh toán, hãy chờ xác nhận; nếu có thắc mắc, hãy liên hệ hỗ trợ.',
   topupFor: 'Nạp tiền cho đơn hàng', topupNeed: '{name} còn thiếu ', topupNeedTail: '. Nạp tiền xong có thể quay lại đơn để thanh toán tiếp.', topupCloses: 'Đơn tự đóng sau {t}', topupDone: 'Tiền đã vào ví', topupEnough: 'Số dư khả dụng {amt}\u00A0USDT, đủ để thanh toán đơn này.', topupForPurchase: 'Nạp tiền cho lần mua này', topupNeedTailPurchase: '. Tiền vào ví rồi hãy quay lại trang trước để thanh toán.', topupEnoughPurchase: 'Số dư khả dụng {amt}\u00A0USDT, đủ cho lần mua này. Quay lại để thanh toán.', backToPay: 'Quay lại thanh toán',
   keepOrderTitle: 'Đơn hàng đã được giữ', keepOrderBody: 'Bạn có thể thanh toán sau trong mục Đơn hàng. Đơn chưa thanh toán sẽ tự hủy khi hết hạn.',
-  resumeCount: 'Có {n} khoản thanh toán đang diễn ra', viewProgress: 'Xem tiến độ',
+  resumeCount: 'Đang thanh toán: {n}', viewProgress: 'Xem tiến độ',
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
@@ -198,7 +198,7 @@ const id: typeof zh = {
   existingTitle: 'Pembayaran sedang diproses', existing: 'Sudah ada pembayaran yang sedang diproses. Jangan bayar lagi. Jika sudah membayar, tunggu konfirmasi atau hubungi dukungan jika ada pertanyaan.',
   topupFor: 'Top up untuk pesanan Anda', topupNeed: '{name} masih kurang ', topupNeedTail: '. Setelah top up masuk, kembali ke pesanan untuk membayar.', topupCloses: 'Pesanan ditutup dalam {t}', topupDone: 'Saldo masuk', topupEnough: '{amt}\u00A0USDT tersedia, cukup untuk pesanan ini.', topupForPurchase: 'Top up untuk pembelian ini', topupNeedTailPurchase: '. Setelah masuk, kembali ke halaman sebelumnya untuk membayar.', topupEnoughPurchase: '{amt}\u00A0USDT tersedia, cukup untuk pembelian ini. Kembali untuk membayar.', backToPay: 'Kembali ke pembayaran',
   keepOrderTitle: 'Pesanan disimpan', keepOrderBody: 'Anda bisa membayar nanti dari Pesanan. Pesanan yang belum dibayar otomatis dibatalkan saat batas waktu.',
-  resumeCount: '{n} pembayaran sedang berjalan', viewProgress: 'Lihat progres',
+  resumeCount: '{n} pembayaran sedang berjalan', viewProgress: 'Lihat',
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
@@ -248,7 +248,7 @@ const ms: typeof zh = {
   existingTitle: 'Bayaran sedang diproses', existing: 'Sudah ada bayaran yang sedang diproses. Jangan bayar lagi. Jika anda sudah membayar, tunggu pengesahan atau hubungi sokongan jika ada pertanyaan.',
   topupFor: 'Tambah nilai untuk pesanan', topupNeed: '{name} perlu ', topupNeedTail: ' lagi. Setelah tambah nilai diterima, kembali ke pesanan untuk membayar.', topupCloses: 'Ditutup automatik dalam {t}', topupDone: 'Baki diterima', topupEnough: '{amt}\u00A0USDT tersedia, cukup untuk pesanan ini.', topupForPurchase: 'Tambah nilai untuk pembelian ini', topupNeedTailPurchase: ' lagi. Selepas diterima, kembali ke halaman sebelumnya untuk membayar.', topupEnoughPurchase: '{amt}\u00A0USDT tersedia, cukup untuk pembelian ini. Kembali untuk membayar.', backToPay: 'Kembali ke bayaran',
   keepOrderTitle: 'Pesanan disimpan', keepOrderBody: 'Anda boleh bayar kemudian dari Pesanan. Pesanan yang belum dibayar dibatalkan secara automatik apabila tamat tempoh.',
-  resumeCount: '{n} bayaran sedang berjalan', viewProgress: 'Lihat kemajuan',
+  resumeCount: '{n} bayaran sedang berjalan', viewProgress: 'Lihat',
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
@@ -298,7 +298,7 @@ const fil: typeof zh = {
   existingTitle: 'May bayad nang pinoproseso', existing: 'May bayad nang pinoproseso. Huwag nang magbayad ulit. Kung nakapagbayad ka na, hintayin ang kumpirmasyon o makipag-ugnayan sa support kung may tanong.',
   topupFor: 'Mag-top up para sa order mo', topupNeed: 'Para sa {name}, kulang pa ng ', topupNeedTail: ' — pagdating ng top-up, bumalik sa order para magbayad.', topupCloses: 'Magsasara ang order sa {t}', topupDone: 'Pumasok na ang pondo', topupEnough: '{amt}\u00A0USDT ang available, sapat para sa order na ito.', topupForPurchase: 'Mag-top up para sa bibilhin mo', topupNeedTailPurchase: ' — pagdating nito, bumalik sa nakaraang page para magbayad.', topupEnoughPurchase: '{amt}\u00A0USDT ang available, sapat para sa bibilhin mo. Bumalik para magbayad.', backToPay: 'Bumalik sa bayad',
   keepOrderTitle: 'Naka-save ang order', keepOrderBody: 'Puwede kang magbayad mamaya sa Mga order. Awtomatikong makakansela ang order na hindi nabayaran pagdating ng deadline.',
-  resumeCount: '{n} bayad ang isinasagawa', viewProgress: 'Tingnan ang progreso',
+  resumeCount: '{n} bayad ang isinasagawa', viewProgress: 'Tingnan',
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
@@ -398,7 +398,7 @@ const kk: typeof zh = {
   existingTitle: 'Төлем өңделуде', existing: 'Төлем өңделіп жатыр. Қайта төлемеңіз. Төлеп қойсаңыз, растауды күтіңіз немесе сұрақ болса, қолдау қызметіне жазыңыз.',
   topupFor: 'Тапсырыс үшін толтыру', topupNeed: '{name} үшін тағы ', topupNeedTail: ' қажет. Ақша шотқа түскеннен кейін тапсырысқа оралып, төлеңіз.', topupCloses: 'Тапсырыстың жабылуына: {t}', topupDone: 'Қаражат түсті', topupEnough: 'Қолжетімді {amt}\u00A0USDT, бұл тапсырысқа жеткілікті.', topupForPurchase: 'Сатып алу үшін толтыру', topupNeedTailPurchase: ' қажет. Қаражат түскен соң алдыңғы бетке оралып, төлеңіз.', topupEnoughPurchase: 'Қолжетімді {amt}\u00A0USDT, сатып алуға жеткілікті. Төлеу үшін оралыңыз.', backToPay: 'Төлемге оралу',
   keepOrderTitle: 'Тапсырыс сақталды', keepOrderBody: 'Кейін «Тапсырыстар» бөлімінен төлей аласыз. Төленбеген тапсырыс мерзімі біткенде автоматты түрде жойылады.',
-  resumeCount: 'Жүріп жатқан төлемдер: {n}', viewProgress: 'Барысты қарау',
+  resumeCount: 'Жүріп жатқан төлемдер: {n}', viewProgress: 'Қарау',
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
@@ -448,7 +448,7 @@ const uz: typeof zh = {
   existingTitle: 'Toʻlov koʻrib chiqilmoqda', existing: 'Toʻlov allaqachon koʻrib chiqilmoqda. Qayta toʻlamang. Toʻlagan boʻlsangiz, tasdiqlashni kuting yoki savollar boʻlsa, yordam xizmatiga murojaat qiling.',
   topupFor: 'Buyurtma uchun toʻldirish', topupNeed: '{name} uchun yana ', topupNeedTail: ' kerak. Mablagʻ hisobga tushgach, toʻlash uchun buyurtmaga qayting.', topupCloses: 'Buyurtma yopilishiga {t}', topupDone: 'Balans toʻldirildi', topupEnough: 'Mavjud: {amt}\u00A0USDT — bu buyurtma uchun yetarli.', topupForPurchase: 'Xarid uchun toʻldirish', topupNeedTailPurchase: ' kerak. Mablagʻ tushgach, toʻlash uchun oldingi sahifaga qayting.', topupEnoughPurchase: 'Mavjud: {amt}\u00A0USDT — xarid uchun yetarli. Toʻlash uchun qayting.', backToPay: 'Toʻlovga qaytish',
   keepOrderTitle: 'Buyurtma saqlandi', keepOrderBody: 'Keyinroq «Buyurtmalar» boʻlimidan toʻlashingiz mumkin. Toʻlanmagan buyurtma muddat tugaganda avtomatik bekor qilinadi.',
-  resumeCount: 'Jarayondagi toʻlovlar: {n}', viewProgress: 'Jarayonni koʻrish',
+  resumeCount: 'Jarayondagi toʻlovlar: {n}', viewProgress: 'Koʻrish',
   resume: 'Toʻlov jarayonda', view: 'Toʻlovni koʻrish', review: 'Toʻlovingiz tasdiqlanmoqda', ended: 'Bu toʻlov yakunlangan', delivered: 'Toʻlov yakunlandi',
 };
 export type PurchasePaymentCopy = typeof zh;

@@ -21,8 +21,10 @@
         <template v-else><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></template>
       </svg>
     </view>
-    <view class="nx-result-head__live" :role="speaks ? 'status' : undefined" :aria-live="speaks ? 'polite' : undefined" :aria-atomic="speaks ? 'true' : undefined"><text class="nx-result-head__title" role="heading" aria-level="1" :data-testid="titleTestid">{{ title }}</text></view>
-    <text v-if="description" class="nx-result-head__desc">{{ description }}</text>
+    <view class="nx-result-head__live" :role="speaks ? 'status' : undefined" :aria-live="speaks ? 'polite' : undefined" :aria-atomic="speaks ? 'true' : undefined">
+      <text class="nx-result-head__title" role="heading" aria-level="1" :data-testid="titleTestid">{{ title }}</text>
+      <text v-if="description" class="nx-result-head__desc">{{ description }}</text>
+    </view>
     <slot />
   </view>
 </template>
@@ -50,7 +52,7 @@ const speaks = computed(() => props.live && armed.value);
 .nx-result-head--brand { --nx-result-tone: var(--v5-brand); }
 .nx-result-head--neutral { --nx-result-tone: var(--v5-ink-2); }
 .nx-result-head--neutral .nx-result-head__icon { background: color-mix(in srgb, var(--v5-ink-3) 18%, transparent); }
-.nx-result-head__live { max-width: 100%; }
+.nx-result-head__live { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
 .nx-result-head__title { display: block; max-width: 100%; margin-top: var(--v5-space-4); font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); text-wrap: balance; }
 .nx-result-head__desc { display: block; max-width: 320px; margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap: pretty; }
 </style>

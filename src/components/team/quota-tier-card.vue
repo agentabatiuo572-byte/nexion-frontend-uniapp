@@ -11,13 +11,6 @@
       <view class="quota-product__copy"><text class="quota-product__name">{{ displayName }}</text><view class="quota-product__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ priceParts[0] }}</text><text v-if="priceParts[1]" class="quota-price-fraction">.{{ priceParts[1] }}</text></view></view>
       <svg class="quota-product__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
     </view>
-    <view class="quota-actions">
-      <view v-if="pending" class="nx-card-footer quota-text-action"><text class="nx-card-action" aria-disabled="true">{{ fmt(t.quota.buyCta, { name: displayName }) }}</text></view>
-      <view v-else-if="unlocked && stockLeft > 0 && tier.available !== false" class="nx-card-footer quota-text-action"><text v-if="actionBlocked" class="nx-card-footer__note">{{ t.quota.updatingNote }}</text><view class="nx-card-action quota-buy" role="button" :tabindex="actionBlocked ? -1 : 0" :aria-disabled="actionBlocked" :aria-label="fmt(t.quota.buyCta, { name: displayName })" @click="openAction" @keydown.enter.prevent="!$event.repeat && openAction()" @keydown.space.prevent="!$event.repeat && openAction()"><text>{{ t.quota.buy }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></view></view>
-      <text v-else-if="stockLeft <= 0" class="quota-unavailable" aria-disabled="true">{{ t.quota.stockUnavailable }}</text>
-      <text v-else-if="unlocked && tier.available === false" class="quota-unavailable" aria-disabled="true">{{ auditCopy.quotaUnavailable }}</text>
-      <view v-else class="nx-card-footer quota-text-action"><text v-if="actionBlocked" class="nx-card-footer__note">{{ t.quota.updatingNote }}</text><view class="nx-card-action nx-card-action--muted" role="button" :tabindex="actionBlocked ? -1 : 0" :aria-disabled="actionBlocked" @click="!actionBlocked && openAction()" @keydown.enter.prevent="!$event.repeat && !actionBlocked && openAction()" @keydown.space.prevent="!$event.repeat && !actionBlocked && openAction()"><text>{{ t.store.purchaseEligibilityIneligible }}</text><svg class="nx-card-link__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
-    </view>
     <view v-if="tier.conditions.length" class="quota-conditions">
       <text class="quota-section-label">{{ tier.unlockKind === 'either' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
       <view v-for="(condition, index) in tier.conditions" :key="index" class="quota-condition">
@@ -26,6 +19,14 @@
       </view>
     </view>
     <view v-if="tier.perks.length" class="quota-perks"><text v-for="(perk, index) in tier.perks" :key="index">{{ perk }}</text></view>
+    <!-- P-67: the action row closes the card, under a 1px divider, after the conditions and perks it depends on. -->
+    <view class="quota-actions">
+      <view v-if="pending" class="nx-card-footer quota-text-action"><text class="nx-card-action" aria-disabled="true">{{ fmt(t.quota.buyCta, { name: displayName }) }}</text></view>
+      <view v-else-if="unlocked && stockLeft > 0 && tier.available !== false" class="nx-card-footer quota-text-action"><text v-if="actionBlocked" class="nx-card-footer__note">{{ t.quota.updatingNote }}</text><view class="nx-card-action quota-buy" role="button" :tabindex="actionBlocked ? -1 : 0" :aria-disabled="actionBlocked" :aria-label="fmt(t.quota.buyCta, { name: displayName })" @click="openAction" @keydown.enter.prevent="!$event.repeat && openAction()" @keydown.space.prevent="!$event.repeat && openAction()"><text>{{ t.quota.buy }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></view></view>
+      <text v-else-if="stockLeft <= 0" class="nx-card-footer quota-unavailable" aria-disabled="true">{{ t.quota.stockUnavailable }}</text>
+      <text v-else-if="unlocked && tier.available === false" class="nx-card-footer quota-unavailable" aria-disabled="true">{{ auditCopy.quotaUnavailable }}</text>
+      <view v-else class="nx-card-footer quota-text-action"><text v-if="actionBlocked" class="nx-card-footer__note">{{ t.quota.updatingNote }}</text><view class="nx-card-action nx-card-action--muted" role="button" :tabindex="actionBlocked ? -1 : 0" :aria-disabled="actionBlocked" @click="!actionBlocked && openAction()" @keydown.enter.prevent="!$event.repeat && !actionBlocked && openAction()" @keydown.space.prevent="!$event.repeat && !actionBlocked && openAction()"><text>{{ t.store.purchaseEligibilityIneligible }}</text><svg class="nx-card-link__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
+    </view>
   </view>
 </template>
 <script setup lang="ts">
@@ -106,8 +107,6 @@ function openProduct() { emit('navigate', `/pages/store/detail?id=${encodeURICom
 function openAction() { if (!props.pending && !props.actionBlocked) openProduct(); }
 </script>
 <style scoped>
-/* The conditions block below already draws the divider; the text action row adds none (P-67). */
-.quota-text-action { padding-top: 0; border-top: 0; }
 /* P-41 tinted tier card: the shared tinted solid in brand (it used to be a top glow). */
 .quota-tier { --nx-tint:var(--v5-brand);padding:var(--ui-space-section) 18px 22px;margin-bottom:18px;border:1px solid var(--v5-border);border-radius:24px;color:var(--v5-ink); }
 .quota-product { display:flex;align-items:center;gap:14px;min-height:80px;cursor:pointer; }
@@ -117,7 +116,7 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 .quota-stock { margin-top:18px; }.quota-stat-line { display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 14px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
 .quota-stock__track { height:3px;background:var(--v5-surface-3);border-radius:9px;overflow:hidden;margin-top:var(--v5-space-2); }.quota-stock__track > view { height:100%;background:var(--v5-ink-3);border-radius:inherit; }
 .quota-conditions { margin-top:22px; }.quota-section-label { display:block;font:600 13px/1.5 var(--font-v5); }.quota-condition { margin-top:var(--ui-space-inset); }.quota-condition__values { margin-left:auto;font:500 13px/18px var(--font-metric);color:var(--v5-brand);font-variant-numeric:tabular-nums;text-align:right; }
-.quota-perks { display:flex;flex-direction:column;gap:6px;margin-top:18px;color:var(--v5-ink-3);font:400 12px/1.6 var(--font-v5);overflow-wrap:break-word; }.quota-actions { margin-top:var(--ui-space-section); }
+.quota-perks { display:flex;flex-direction:column;gap:6px;margin-top:18px;color:var(--v5-ink-3);font:400 12px/1.6 var(--font-v5);overflow-wrap:break-word; }.quota-actions { margin-top:var(--ui-space-inset); }
 .quota-unavailable { display:block;font:var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .quota-product:focus-visible { outline:2px solid var(--v5-brand);outline-offset:4px; }
 .quota-tier__top { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--v5-space-3); margin-bottom:var(--v5-space-3); }

@@ -631,5 +631,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .purchase-payment-resume.has-close { padding-right: 64px; }
 .purchase-payment-resume__close { position: absolute; top: 14px; right: var(--v5-space-3); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
 .purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
+/* The bar already blurs what is behind it; the close disc keeps the shared fill and rim without a second filter (03 §3.2). */
+.purchase-payment-resume__close { backdrop-filter: none; -webkit-backdrop-filter: none; }
 .purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border-radius: 28px; color: var(--v5-ink); font-size: var(--ui-type-description); }
 </style>
