@@ -1214,7 +1214,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {items:items.filter(r=>['state','activityId','orderNo'].every(key=>!url.searchParams.get(key)||r[key]===url.searchParams.get(key))),nextCursor:null,hasMore:false};
   }
   if(/^\/api\/promotions\/demo-promo-\d+\/referral-progress$/.test(pathname))return {activityId:pathname.split('/')[3],qualifyingOrders:2,ownRewards:[],serverTime:iso};
-  if(pathname==='/api/app/security/phone-number')return {windowDays:30,maxChanges:2,usedChanges:0,remainingChanges:2,nextAvailableAt:iso};
   const contentLocale=url.searchParams.get('locale')?.trim().toLowerCase().split('-')[0] || 'en';
   if(pathname==='/api/quests/state') {
     const data=reviewFixture(url,contentLocale,{...state,taskState:state.dayOneClaimed?'claimed':state.taskState},request);
@@ -1357,7 +1356,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       direction:'IN',amount:rewardNex,at:now,category:'achievement'});
     return remember('earningMilestone',id,{...authority,fired:[{milestoneId:id,thresholdUsd,rewardNex,lifetimeEarningsUsd}],count:1},null);
   }
-  if(pathname==='/api/app/security') return {twoFactorEnabled:true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};
   if(pathname==='/api/app/referral-rewards'){
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
     const limit=Math.max(1,Math.min(20,Math.trunc(Number(url.searchParams.get('limit')??10))||10));

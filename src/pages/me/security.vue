@@ -12,7 +12,8 @@
 -->
 <template>
   <AppChassis active="me">
-    <view class="pb-6 security-page" style="color: var(--v5-ink)">
+    <view class="pb-6 security-page" style="color: var(--v5-ink)"
+      :data-overview-readback-pending="!!overviewReadback" :data-deletion-readback-pending="!!deletionReadback">
       <SubPageHeader back="/pages/me/me" :title="t.security.title" />
       <view v-if="modeLabel" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
@@ -101,17 +102,22 @@
             <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
-          <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" role="button" tabindex="0" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)">
+          <view v-else class="grid place-items-center" :class="sessionWriteDisabled ? 'opacity-50' : 'active:opacity-70'"
+            :style="revokeBtnStyle" role="button" :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled"
+            :data-disabled-reason="sessionWriteUnavailableReason" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
-        <view v-if="displaySessions.some(s => !s.current)" class="flex items-center justify-center active:scale-[0.98] transition-transform" :style="revokeAllRowStyle" role="button" tabindex="0" :aria-disabled="!remoteSecurity || remoteSecurityLoading" :aria-label="t.security.revokeAll" @click="handleRevokeAll">
+        <view v-if="displaySessions.some(s => !s.current)" class="flex items-center justify-center transition-transform"
+          :class="sessionWriteDisabled ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
+          :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled" :data-disabled-reason="sessionWriteUnavailableReason"
+          :aria-label="t.security.revokeAll" @click="handleRevokeAll">
           <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
         </view>
       </view>
       <view v-if="securityPresentation?.nextCursor" class="mx-4 flex justify-center" :style="revokeAllRowStyle"
         role="button" :tabindex="sessionPageLoading ? -1 : 0" :aria-disabled="sessionPageLoading || !remoteSecurity || remoteSecurityLoading"
-        @click="loadMoreSessions()">
+        @click="loadMoreSessions">
         <text>{{ t.notifs.loadMore }}</text>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.sessionsHint }}</text>
@@ -127,13 +133,15 @@
           </view><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </view>
 
-        <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:scale-[0.98] transition-transform"
-          :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest"
+        <view v-if="remoteApiEnabled && deletionPending" class="flex items-center justify-center transition-transform"
+          :class="deletionCancelDisabled ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
+          :tabindex="deletionCancelDisabled ? -1 : 0" :aria-disabled="deletionCancelDisabled" :data-disabled-reason="deletionWriteUnavailableReason"
+          :aria-label="t.security.cancelDeletionRequest"
           @click="handleCancelAccountDeletion">
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !securityPresentation ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !deletionStatus ? "—" : deletionStatus?.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
     <NxSheet :open="editingPwd" :title="t.security.passwordTitle" @close="cancelPwd" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CURRENT" :aria-invalid="pwdErrorField === PWD_FIELD_CURRENT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CURRENT ? 'security-pwd-error-current' : undefined" @input="onCurrent" />
@@ -146,7 +154,7 @@
 
         </view><template #footer><view class="flex" style="gap: var(--v5-space-2); margin-top: 4px">
             <NxButton variant="secondary" size="medium" class="flex-1 flex items-center justify-center" :disabled="securityBusy" @click="cancelPwd"><text>{{ t.ui.cancel }}</text></NxButton>
-            <NxButton variant="primary" size="medium" class="flex-1 flex items-center justify-center" :disabled="securityBusy" @click="submitPasswordChange"><text>{{ t.ui.save }}</text></NxButton>
+            <NxButton variant="primary" size="medium" class="flex-1 flex items-center justify-center" :disabled="securityBusy || !!overviewReadback" @click="submitPasswordChange"><text>{{ t.ui.save }}</text></NxButton>
           </view></template></NxSheet>
     <NxSheet :open="twoFactorSheetOpen" :title="t.security.twoFactorTitle" @close="closeTwoFactorSheet" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :aria-invalid="twoFactorPasswordError ? 'true' : 'false'" :aria-describedby="twoFactorPasswordError ? 'security-2fa-password-error' : undefined" :focus="twoFactorPasswordFocus" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
@@ -158,7 +166,7 @@
           <text v-if="remoteApiEnabled && twoFactorChallengeNo" class="block" :style="rowSubStyle">{{ fmt(t.addrRebind.otpBody, { phone: twoFactorPhoneMasked }) }}</text>
         </view><template #footer><NxButton v-if="!twoFactorChallengeNo" variant="primary" :busy="securityBusy" @click="toggleTwoFactor(requestedTwoFactor)">{{ t.ui.confirm }}</NxButton></template></NxSheet>
     <NxSheet :open="phoneEditing" :title="t.security.phoneChangeTitle" @close="!securityBusy && (phoneEditing = false)" class="security-half-sheet"><view class="security-sheet-form">
-          <text v-if="phonePolicy && phonePolicy.remainingChanges === 0" class="block" :style="rowSubStyle">
+          <text v-if="!phoneChallenge && phonePolicy?.remainingChanges === 0" class="block" :style="rowSubStyle">
             {{ t.security.phoneChangeLimit }} {{ phonePolicy.nextAvailableAt ? formatDisplayDate(phonePolicy.nextAvailableAt, dateLocale()) : "" }}
           </text>
           <template v-else-if="!phoneChallenge">
@@ -188,7 +196,7 @@
             </view>
           </template>
           <text v-if="phoneError" class="block" :style="errStyle" role="alert">{{ phoneError }}</text>
-          <view v-if="!phonePolicy || phonePolicyReadFailed" role="button" tabindex="0" :style="[rowSubStyle, { minHeight: '44px', display: 'flex', alignItems: 'center', font: '600 13px/20px var(--font-v5)' }]" @click="loadPhonePolicy">
+          <view v-if="phonePolicyBlocksSend" role="button" :tabindex="phonePolicyLoading ? -1 : 0" :aria-disabled="phonePolicyLoading" :style="[rowSubStyle, { minHeight: '44px', display: 'flex', alignItems: 'center', font: '600 13px/20px var(--font-v5)' }]" @click="retryPhonePolicy()">
             {{ t.ui.retry }}
           </view>
         </view></NxSheet>
@@ -223,7 +231,7 @@ import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, shallowRef, watch, type CSSProperties, type ShallowRef } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
@@ -305,7 +313,8 @@ readPhoneBinding();
 const phonePolicy = ref<PhoneNumberChangePolicy | null>(null);
 const phonePolicyLoading = ref(false);
 const phonePolicyReadFailed = ref(false);
-const phoneChangeAllowed = computed(() => !!phonePolicy.value && !phonePolicyReadFailed.value && phonePolicy.value.remainingChanges > 0);
+const phonePolicyCurrent = ref(false);
+const phoneChangeAllowed = computed(() => phonePolicyCurrent.value && !!phonePolicy.value && phonePolicy.value.remainingChanges > 0);
 const phoneEditing = ref(false);
 const showPhoneCountries = ref(false);
 function selectPhoneCountry(value: string) { phoneCountry.value = value.slice(1); }
@@ -316,12 +325,18 @@ const phoneOldCode = ref("");
 const phoneNewCode = ref("");
 const phoneChallenge = ref<PhoneNumberChangeChallenge | null>(null);
 const phoneError = ref("");
-const deletionStatus = ref<AccountDeletionStatus>({ status: "NONE" });
-const deletionPending = computed(() => deletionStatus.value.status !== "NONE"
-  && (deletionStatus.value.status === "REQUESTED" || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED"));
+const phonePolicyBlocksSend = computed(() => !phoneChallenge.value && phonePolicyReadFailed.value && phonePolicy.value?.remainingChanges !== 0);
+const deletionStatus = ref<AccountDeletionStatus | null>(null);
+const deletionStatusCurrent = ref(false);
+const deletionStatusLoading = ref(false);
+const deletionStatusReadFailed = ref(false);
+const deletionPending = computed(() => {
+  const status = deletionStatus.value?.status;
+  return status === "REQUESTED" || status === "IN_REVIEW" || status === "BLOCKED";
+});
 const deletionBlockedReason = computed(() => {
   const request = deletionStatus.value;
-  if (request.status !== "BLOCKED") return "";
+  if (request?.status !== "BLOCKED") return "";
   const reason = request.blockReason ?? request.reason;
   switch (reason) {
     case "UNSETTLED_FUNDS_OR_ORDERS": return t.value.security.deleteAccountPendingReason;
@@ -330,8 +345,6 @@ const deletionBlockedReason = computed(() => {
       ? t.value.security.deleteAccountUnknownReason : reason;
   }
 });
-const deletionCanCancel = computed(() => deletionStatus.value.status === "REQUESTED"
-  || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED");
 const oauthBusy = ref(false);
 const localSecurityBusy = ref(false);
 const securityBusy = computed({ get: () => localSecurityBusy.value || oauthBusy.value, set: (value: boolean) => { localSecurityBusy.value = value; } });
@@ -367,12 +380,26 @@ function syncDeletionSubmittedReason(accountKey: string) {
 
 const remoteSecurityLoading = ref(false);
 const remoteSecurityReadFailed = ref(false);
+type ConfirmedSecurityReadback = {
+  message: () => string;
+  releaseReceipt?: () => void;
+  tone?: "warn";
+};
+const overviewReadback = shallowRef<ConfirmedSecurityReadback | null>(null);
+const deletionReadback = shallowRef<ConfirmedSecurityReadback | null>(null);
+const sessionWriteUnavailableReason = computed(() => remoteApiEnabled && !remoteSecurity.value ? "overview-unavailable" : undefined);
+const sessionWriteDisabled = computed(() => securityBusy.value || !!sessionWriteUnavailableReason.value || !!overviewReadback.value);
+const deletionWriteUnavailableReason = computed(() => {
+  if (sessionWriteUnavailableReason.value) return sessionWriteUnavailableReason.value;
+  if (remoteApiEnabled && !deletionStatusCurrent.value) return "deletion-status-unavailable";
+  return undefined;
+});
+const deletionCancelDisabled = computed(() => securityBusy.value || !!deletionWriteUnavailableReason.value || !!deletionReadback.value);
 const securityUnavailableText = computed(() => {
   if (remoteSecurityReadFailed.value) return `${t.value.wallet.syncFailedTitle} · ${t.value.wallet.syncFailedBody}`;
   return remoteSecurityLoading.value ? "…" : t.value.wallet.syncFailedTitle;
 });
 const sessionPageLoading = ref(false);
-const sessionPageReadFailed = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
   : security.twoFactorEnabled);
@@ -451,6 +478,10 @@ function securityErrorMessage(cause: unknown): string {
   }
 }
 
+function notifySecurityReadUnavailable() {
+  toast.info(t.value.wallet.syncFailedTitle);
+}
+
 function isCurrentSecurityRequest(
   pageScope: P318AccountPageScope,
   accountScope = captureAccountScope(),
@@ -465,7 +496,10 @@ function isCurrentSecurityRequest(
 function clearSecurityAccountState(keepPresentation = false) {
   if (!keepPresentation) {
     securityPresentation.value = null;
-    deletionStatus.value = { status: "NONE" };
+    deletionStatus.value = null;
+    phonePolicy.value = null;
+    overviewReadback.value = null;
+    deletionReadback.value = null;
   }
   twoFactorSheetOpen.value = false;
   deletionSheetOpen.value = false;
@@ -476,9 +510,11 @@ function clearSecurityAccountState(keepPresentation = false) {
   remoteSecurityLoading.value = false;
   remoteSecurityReadFailed.value = false;
   sessionPageLoading.value = false;
-  sessionPageReadFailed.value = false;
   remoteSecurity.value = null;
-  phonePolicy.value = null;
+  deletionStatusCurrent.value = false;
+  deletionStatusLoading.value = false;
+  deletionStatusReadFailed.value = false;
+  phonePolicyCurrent.value = false;
   phonePolicyLoading.value = false;
   phonePolicyReadFailed.value = false;
   phoneEditing.value = false;
@@ -508,16 +544,17 @@ function clearSecurityAccountState(keepPresentation = false) {
 function refreshSecurityForCurrentAccount() {
   if (securityPageVisible && remoteApiEnabled) {
     void loadRemoteSecurity();
+    void loadRemoteDeletionStatus();
     void loadPhonePolicy();
   }
 }
 
 async function refreshVisibleSecurity() {
   if (!remoteApiEnabled || !securityPageVisible) return;
-  // The shared recovery registry already handles failed overview and policy reads on this pull.
-  const refreshOverview = !remoteSecurityReadFailed.value && !remoteSecurityLoading.value && !sessionPageLoading.value;
+  // The shared recovery registry already handles any failed sections on this pull.
   await Promise.all([
-    refreshOverview && (sessionPageReadFailed.value ? loadMoreSessions(true) : loadRemoteSecurity()),
+    !remoteSecurityReadFailed.value && !remoteSecurityLoading.value && loadRemoteSecurity(),
+    !deletionStatusReadFailed.value && !deletionStatusLoading.value && loadRemoteDeletionStatus(),
     !phonePolicyReadFailed.value && loadPhonePolicy(),
   ]);
 }
@@ -528,11 +565,13 @@ async function loadPhonePolicy() {
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  phonePolicyCurrent.value = false;
   phonePolicyLoading.value = true;
   try {
     const policy = await accountApi.phoneNumberPolicy();
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     phonePolicy.value = policy;
+    phonePolicyCurrent.value = true;
     phonePolicyReadFailed.value = false;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -546,9 +585,11 @@ async function loadPhonePolicy() {
   }
 }
 
-useAutoRecovery({
+const { retry: retryPhonePolicy } = useAutoRecovery({
   failed: () => remoteApiEnabled && phonePolicyReadFailed.value && !phonePolicyLoading.value,
   retry: loadPhonePolicy,
+  repeatMs: 30_000,
+  repeatWhile: () => phoneEditing.value,
 });
 
 function phoneChangeMessage(cause: unknown) {
@@ -663,6 +704,27 @@ const passwordHintLine = computed(() => {
   ));
 });
 
+async function readBackConfirmedSecurityCommand(
+  section: keyof typeof securityReadbacks,
+  confirmation: ConfirmedSecurityReadback,
+) {
+  const { pending, read, restartBackoff } = securityReadbacks[section];
+  pending.value = confirmation;
+  if (!(await read()) && pending.value === confirmation && securityPageVisible) {
+    restartBackoff();
+    toast.info(confirmation.message(), t.value.wallet.syncFailedTitle);
+  }
+}
+
+function settleSecurityReadback(pending: ShallowRef<ConfirmedSecurityReadback | null>) {
+  const confirmation = pending.value;
+  if (!confirmation) return;
+  pending.value = null;
+  confirmation.releaseReceipt?.();
+  if (confirmation.tone === "warn") toast.warn(confirmation.message());
+  else toast.success(confirmation.message());
+}
+
 async function loadRemoteSecurity(): Promise<boolean> {
   const pageScope = securityPageFence.capture("security-overview");
   const scope = captureAccountScope();
@@ -672,16 +734,12 @@ async function loadRemoteSecurity(): Promise<boolean> {
   sessionPageLoading.value = false;
   remoteSecurity.value = null;
   try {
-    const [securityState, accountDeletion] = await Promise.all([
-      accountApi.securityOverview(),
-      accountApi.accountDeletionStatus(),
-    ]);
+    const securityState = await accountApi.securityOverview();
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
     remoteSecurity.value = securityState;
     securityPresentation.value = { ...securityState, sessions: [...securityState.sessions] };
-    deletionStatus.value = accountDeletion;
     remoteSecurityReadFailed.value = false;
-    sessionPageReadFailed.value = false;
+    settleSecurityReadback(overviewReadback);
     return true;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
@@ -697,12 +755,49 @@ async function loadRemoteSecurity(): Promise<boolean> {
   }
 }
 
-useAutoRecovery({
+async function loadRemoteDeletionStatus(): Promise<boolean> {
+  const pageScope = securityPageFence.capture("deletion-status");
+  const scope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+  deletionStatusCurrent.value = false;
+  deletionStatusLoading.value = true;
+  try {
+    const status = await accountApi.accountDeletionStatus();
+    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+    deletionStatus.value = status;
+    deletionStatusCurrent.value = true;
+    deletionStatusReadFailed.value = false;
+    settleSecurityReadback(deletionReadback);
+    return true;
+  } catch (cause) {
+    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+      clearSecurityAccountState();
+    } else {
+      deletionStatusReadFailed.value = true;
+    }
+    return false;
+  } finally {
+    if (isCurrentSecurityRequest(pageScope, scope, accountKey)) deletionStatusLoading.value = false;
+  }
+}
+
+const overviewRecovery = useAutoRecovery({
   failed: () => remoteApiEnabled && remoteSecurityReadFailed.value && !remoteSecurityLoading.value,
   retry: loadRemoteSecurity,
 });
+const deletionRecovery = useAutoRecovery({
+  failed: () => remoteApiEnabled && deletionStatusReadFailed.value && !deletionStatusLoading.value,
+  retry: loadRemoteDeletionStatus,
+});
 
-async function loadMoreSessions(fromPull = false): Promise<void> {
+const securityReadbacks = {
+  overview: { pending: overviewReadback, read: loadRemoteSecurity, restartBackoff: overviewRecovery.restartBackoff },
+  deletion: { pending: deletionReadback, read: loadRemoteDeletionStatus, restartBackoff: deletionRecovery.restartBackoff },
+};
+
+async function loadMoreSessions(): Promise<void> {
   const snapshot = remoteSecurity.value;
   if (!snapshot?.nextCursor || sessionPageLoading.value || remoteSecurityLoading.value) return;
   const pageScope = securityPageFence.capture("security-sessions-page");
@@ -717,13 +812,10 @@ async function loadMoreSessions(fromPull = false): Promise<void> {
     remoteSecurity.value = { ...snapshot, nextCursor: nextPage.nextCursor,
       sessions: [...snapshot.sessions, ...nextPage.sessions.filter((row) => !existing.has(row.id))] };
     securityPresentation.value = { ...remoteSecurity.value, sessions: [...remoteSecurity.value.sessions] };
-    sessionPageReadFailed.value = false;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey) || remoteSecurity.value !== snapshot) return;
     const unauthorized = cause instanceof ApiError && (cause.status === 401 || cause.status === 403);
     if (unauthorized) clearSecurityAccountState();
-    else sessionPageReadFailed.value = true;
-    if (fromPull) throw cause;
     toast.error(unauthorized ? securityErrorMessage(cause) : t.value.empty.errorTitle);
   } finally {
     if (isCurrentSecurityRequest(pageScope, scope, accountKey)) sessionPageLoading.value = false;
@@ -790,9 +882,7 @@ function lastActiveLabel(ms: number | null): string {
   return fmt(t.value.security.timeDaysAgo, { n: Math.floor(diff / (24 * 3600 * 1000)) });
 }
 
-function cancelPwd() {
-  // Clearing the form cannot cancel a pending command or its authoritative readback.
-  if (securityBusy.value) return;
+function clearPasswordForm() {
   editingPwd.value = false;
   err.value = "";
   pwdErrorField.value = "";
@@ -801,8 +891,12 @@ function cancelPwd() {
   confirmPwd.value = "";
 }
 
+function cancelPwd() {
+  if (!securityBusy.value) clearPasswordForm();
+}
+
 async function submitPasswordChange() {
-  if (securityBusy.value) return;
+  if (securityBusy.value || overviewReadback.value) return;
   const pageScope = securityPageFence.capture("password-change");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
@@ -830,49 +924,42 @@ async function submitPasswordChange() {
   const currentPassword = current.value;
   const newPassword = next.value;
   securityBusy.value = true;
-  let commandKey: string | null = null;
-  let recovered = false;
   try {
-      if (remoteApiEnabled) {
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        commandKey = acquireAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", "password");
-        const priorReceipt = await accountApi.passwordCommandReceipt(commandKey);
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (priorReceipt) recovered = true;
-        else await accountApi.changePassword(currentPassword, newPassword, commandKey);
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", commandKey);
+    if (remoteApiEnabled) {
+      const commandKey = acquireAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", "password");
+      const priorReceipt = await accountApi.passwordCommandReceipt(commandKey);
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+      if (!priorReceipt) await accountApi.changePassword(currentPassword, newPassword, commandKey);
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+      clearPasswordForm();
+      await readBackConfirmedSecurityCommand("overview", {
+        message: () => priorReceipt ? t.value.security.passwordRecovered : t.value.security.passwordSaved,
+        releaseReceipt: () => { releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", commandKey); },
+      });
     } else {
       security.changePassword(currentPassword, newPassword);
+      clearPasswordForm();
+      toast.success(t.value.security.passwordSaved);
     }
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
     // Keep the operation number until a committed receipt is confirmed; never store passwords.
     err.value = securityErrorMessage(cause);
-    return;
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
-  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-  current.value = "";
-  next.value = "";
-  confirmPwd.value = "";
-  editingPwd.value = false;
-  toast.success(recovered ? t.value.security.passwordRecovered : t.value.security.passwordSaved);
 }
 
 async function toggleTwoFactor(value: boolean) {
-  if (securityBusy.value) return;
+  if (securityBusy.value || overviewReadback.value) return;
   if (!requireAccountPhone()) return;
   const pageScope = securityPageFence.capture("two-factor");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-  if (remoteApiEnabled && !remoteSecurity.value) {
-    err.value = t.value.security.opFailed;
+  if (sessionWriteUnavailableReason.value) {
+    notifySecurityReadUnavailable();
     return;
   }
   if (!twoFactorPassword.value) {
@@ -898,6 +985,10 @@ async function toggleTwoFactor(value: boolean) {
     value ? toast.success(t.value.security.twoFactorEnabledToast) : toast.warn(t.value.security.twoFactorDisabledToast);
     return;
   }
+  if (sessionWriteUnavailableReason.value) {
+    notifySecurityReadUnavailable();
+    return;
+  }
   securityBusy.value = true;
   try {
     const challenge = await accountApi.sendTwoFactorChallenge(value, twoFactorPassword.value);
@@ -918,7 +1009,7 @@ async function toggleTwoFactor(value: boolean) {
 }
 
 async function confirmTwoFactorChallenge() {
-  if (securityBusy.value || twoFactorTarget.value === null || !twoFactorChallengeNo.value) return;
+  if (securityBusy.value || overviewReadback.value || twoFactorTarget.value === null || !twoFactorChallengeNo.value) return;
   if (!/^\d{6}$/.test(twoFactorCode.value)) {
     err.value = t.value.addrRebind.otpExpired;
     return;
@@ -931,14 +1022,11 @@ async function confirmTwoFactorChallenge() {
   try {
     await accountApi.updateTwoFactor(target, twoFactorPassword.value, twoFactorChallengeNo.value, twoFactorCode.value);
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
-    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    twoFactorPassword.value = "";
-    twoFactorCode.value = "";
-    twoFactorChallengeNo.value = "";
-    twoFactorPhoneMasked.value = "";
-    twoFactorTarget.value = null;
-    target ? toast.success(t.value.security.twoFactorEnabledToast) : toast.warn(t.value.security.twoFactorDisabledToast);
+    clearTwoFactorSheet();
+    await readBackConfirmedSecurityCommand("overview", {
+      message: () => target ? t.value.security.twoFactorEnabledToast : t.value.security.twoFactorDisabledToast,
+      tone: target ? undefined : "warn",
+    });
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
@@ -950,8 +1038,7 @@ async function confirmTwoFactorChallenge() {
 }
 
 async function handleRevoke(s: SessionListItem) {
-  if (remoteApiEnabled && (!remoteSecurity.value || remoteSecurityLoading.value)) return;
-  if (securityBusy.value) return;
+  if (sessionWriteDisabled.value) return;
   const pageScope = securityPageFence.capture("session-revoke");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
@@ -962,22 +1049,23 @@ async function handleRevoke(s: SessionListItem) {
     danger: true,
     owner: securityConfirmOwner,
   });
-  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey) || sessionWriteDisabled.value) return;
   if (ok) {
     securityBusy.value = true;
     try {
       if (remoteApiEnabled) {
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (!remoteSecurity.value || remoteSecurityLoading.value) return;
         await accountApi.revokeSession(s.id);
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      } else session.revokeSession(s.id);
-      toast.success(t.value.security.sessionRevoked);
+        await readBackConfirmedSecurityCommand("overview", {
+          message: () => t.value.security.sessionRevoked,
+        });
+      } else {
+        session.revokeSession(s.id);
+        toast.success(t.value.security.sessionRevoked);
+      }
     } catch (cause) {
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
       toast.error(securityErrorMessage(cause));
     } finally {
       if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
@@ -986,8 +1074,7 @@ async function handleRevoke(s: SessionListItem) {
 }
 
 async function handleRevokeAll() {
-  if (remoteApiEnabled && (!remoteSecurity.value || remoteSecurityLoading.value)) return;
-  if (!hasOtherSessions.value || securityBusy.value) return;
+  if (sessionWriteDisabled.value || !hasOtherSessions.value) return;
   const pageScope = securityPageFence.capture("session-revoke-all");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
@@ -998,22 +1085,23 @@ async function handleRevokeAll() {
     danger: true,
     owner: securityConfirmOwner,
   });
-  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey) || sessionWriteDisabled.value) return;
   if (ok) {
     securityBusy.value = true;
     try {
       if (remoteApiEnabled) {
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (!remoteSecurity.value || remoteSecurityLoading.value) return;
         await accountApi.revokeOtherSessions();
         if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      } else session.revokeAllOtherSessions();
-      toast.success(t.value.security.revokeAllDone);
+        await readBackConfirmedSecurityCommand("overview", {
+          message: () => t.value.security.revokeAllDone,
+        });
+      } else {
+        session.revokeAllOtherSessions();
+        toast.success(t.value.security.revokeAllDone);
+      }
     } catch (cause) {
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
       toast.error(securityErrorMessage(cause));
     } finally {
       if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
@@ -1030,8 +1118,8 @@ async function handleDeleteAccount() {
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-  if (remoteApiEnabled && !remoteSecurity.value) {
-    toast.error(t.value.security.opFailed);
+  if (deletionWriteUnavailableReason.value) {
+    notifySecurityReadUnavailable();
     return;
   }
   if (deletionPending.value) {
@@ -1120,7 +1208,10 @@ async function handleDeleteAccount() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (ok) {
       if (remoteApiEnabled) {
-        if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+        if (deletionWriteUnavailableReason.value) {
+          notifySecurityReadUnavailable();
+          return;
+        }
         let command: ReturnType<typeof acquireAccountCommand> | undefined;
         try {
           const retainedKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey, true)
@@ -1136,6 +1227,7 @@ async function handleDeleteAccount() {
           syncDeletionSubmittedReason(accountKey);
           if (request.status === "CANCELLED") {
             deletionStatus.value = request;
+            deletionStatusCurrent.value = true;
             toast.info(t.value.security.deleteAccountCancelledReplay);
             return;
           }
@@ -1191,7 +1283,7 @@ async function handleDeleteAccount() {
 }
 
 async function handleCancelAccountDeletion() {
-  if (!remoteApiEnabled || !remoteSecurity.value || !deletionCanCancel.value || securityBusy.value) return;
+  if (!remoteApiEnabled || !deletionPending.value || deletionCancelDisabled.value) return;
   const pageScope = securityPageFence.capture("account-deletion-cancel");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
@@ -1204,12 +1296,12 @@ async function handleCancelAccountDeletion() {
     owner: securityConfirmOwner,
   });
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-  if (!ok) return;
+  if (!ok || !deletionPending.value || deletionCancelDisabled.value) return;
   securityBusy.value = true;
   try {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     const current = deletionStatus.value;
-    if (current.status === "NONE") return;
+    if (!current || current.status === "NONE") return;
     const intent = `account-deletion-cancel:${current.requestNo}:${current.version}`;
     const key = acquireAccountCommandKey(
       SECURITY_COMMAND_TABLE,
@@ -1217,22 +1309,24 @@ async function handleCancelAccountDeletion() {
       intent,
       "app-security:account-deletion-cancel",
     );
-    await accountApi.cancelAccountDeletion(current.version, key);
+    const cancelled = await accountApi.cancelAccountDeletion(current.version, key);
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
-    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (deletionStatus.value.status !== "CANCELLED") throw new Error("SECURITY_READBACK_FAILED");
-    releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, key);
-    const requestKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)
-      ?.commands?.[DELETION_REQUEST_INTENT];
-    if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, requestKey);
-    syncDeletionSubmittedReason(accountKey);
-    toast.success(t.value.security.cancelDeletionSuccess);
+    if (cancelled.status !== "CANCELLED") throw new Error("ACCOUNT_DELETION_CANCEL_RESPONSE_INVALID");
+    await readBackConfirmedSecurityCommand("deletion", {
+      message: () => t.value.security.cancelDeletionSuccess,
+      releaseReceipt: () => {
+        releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, key);
+        const requestKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)?.commands?.[DELETION_REQUEST_INTENT];
+        if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, DELETION_REQUEST_INTENT, requestKey);
+        syncDeletionSubmittedReason(accountKey);
+      },
+    });
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+    const unauthorized = cause instanceof ApiError && (cause.status === 401 || cause.status === 403);
+    if (unauthorized) clearSecurityAccountState();
     toast.error(securityErrorMessage(cause));
-    await loadRemoteSecurity();
+    if (!unauthorized) await loadRemoteDeletionStatus();
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
@@ -1240,12 +1334,11 @@ async function handleCancelAccountDeletion() {
 
 // UI carriers only: the existing security commands retain their validation and request fences.
 function openTwoFactorSheet() {
-  if (securityBusy.value || (remoteApiEnabled && (!remoteSecurity.value || remoteSecurityLoading.value))) return;
+  if (sessionWriteDisabled.value) return;
   requestedTwoFactor.value = !twoFactorEnabled.value;
   twoFactorSheetOpen.value = true;
 }
-function closeTwoFactorSheet() {
-  if (securityBusy.value) return;
+function clearTwoFactorSheet() {
   twoFactorSheetOpen.value = false;
   twoFactorCode.value = "";
   twoFactorChallengeNo.value = "";
@@ -1253,6 +1346,9 @@ function closeTwoFactorSheet() {
   twoFactorTarget.value = null;
   twoFactorPassword.value = "";
   twoFactorPasswordError.value = "";
+}
+function closeTwoFactorSheet() {
+  if (!securityBusy.value) clearTwoFactorSheet();
 }
 function closeDeletionSheet() {
   if (securityBusy.value) return;

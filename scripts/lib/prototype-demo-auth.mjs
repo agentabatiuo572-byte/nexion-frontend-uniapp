@@ -1,5 +1,6 @@
 // Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
+import { demoAccountPasswordMatches } from './prototype-demo-account.mjs';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
 const recoverPath = /^\/auth\/users\/login\/attempts\/([^/]+)\/recover$/;
@@ -53,7 +54,7 @@ export function createAuthDemo(state) {
     },
     handle(path, headers, body) {
       if (path === '/auth/users/login') {
-        if (body.countryCode !== existing.countryCode || body.phone !== existing.phone || body.password !== 'Local404Pass!') {
+        if (body.countryCode !== existing.countryCode || body.phone !== existing.phone || !demoAccountPasswordMatches(state, body.password)) {
           return failure(401, 'USER_CREDENTIAL_INVALID');
         }
         return issue({
