@@ -3208,7 +3208,7 @@ export const id: Messages = {
     changePassword: "Ubah kata sandi",
     phoneChangeTitle: "Ganti nomor ponsel",
     phoneChangeSummary: "Diganti {used} dari {max} kali dalam {days} hari terakhir",
-    phoneChangeUnavailable: "Jatah penggantian sementara tidak tersedia",
+    phoneChangeUnavailable: "Jatah penggantian tidak tersedia",
     phoneChangeLimit: "Batas penggantian tercapai. Tanggal berikutnya:",
     phoneChangeNew: "Nomor ponsel baru",
     phoneChangeSendCodes: "Kirim kode ke kedua nomor",
