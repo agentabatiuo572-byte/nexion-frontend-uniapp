@@ -185,7 +185,7 @@
         <text v-if="promotionBundle.footer.note" class="nx-tray-note" role="status">{{ promotionBundle.footer.note }}</text>
         <template v-if="promotionBundle.footer.signedIn">
           <view class="promotion-bar__text nx-tray-text" role="button" :tabindex="promotionBundle.footer.canQuote ? 0 : -1" :aria-disabled="!promotionBundle.footer.canQuote" @click="promotionBundle.footer.quote" @keydown="activate($event, promotionBundle.footer.quote)"><text>{{ t.promotion.quote }}</text></view>
-          <view class="promotion-bar__cta" role="button" :tabindex="promotionBundle.footer.canContinue ? 0 : -1" :aria-disabled="!promotionBundle.footer.canContinue" @click="promotionBundle.footer.continue" @keydown="activate($event, promotionBundle.footer.continue)"><text>{{ t.promotion.continue }}</text><NxIcon v-if="promotionBundle.footer.canContinue" name="arrow-right" :size="20" /></view>
+          <view class="promotion-bar__cta" role="button" :tabindex="promotionBundle.footer.canContinue ? 0 : -1" :aria-disabled="!promotionBundle.footer.canContinue" @click="promotionBundle.footer.continue" @keydown="activate($event, promotionBundle.footer.continue)"><text>{{ t.promotion.continue }}</text><NxIcon name="arrow-right" :size="20" /></view>
         </template>
         <view v-else class="promotion-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
       </view>

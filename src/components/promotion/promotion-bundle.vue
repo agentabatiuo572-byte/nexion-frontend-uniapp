@@ -195,4 +195,5 @@ onBeforeUnmount(()=>{visible=false;fence.invalidate();if(expiryTimer)clearInterv
 .bundle-bar-space__note { flex:1 1 100%; padding:4px 12px 0; font:var(--ui-type-meta-weight,400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:anywhere; text-wrap:pretty; }
 .bundle-bar-space__text,.bundle-bar-space__cta { flex:1 1 auto; box-sizing:border-box; min-height:48px; padding:14px 20px; font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space:nowrap; }
 .bundle-bar-space__text { padding-inline:12px; }
+.bundle-bar-space__cta { padding-right:46px; } /* 20 + the 6 gap and 20 arrow the real button always carries */
 </style>
