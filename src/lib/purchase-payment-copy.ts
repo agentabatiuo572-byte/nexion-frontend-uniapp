@@ -306,7 +306,7 @@ const fil: typeof zh = {
   originalPaymentNotFoundRetry: "Hindi dumating ang orihinal na request. I-tap ang “Magbayad ulit” para ipadala ito ulit.",
   originalPaymentUnavailableTitle: "Hindi makita ang orihinal na bayad",
   originalPaymentUnavailableBody: "Kung nakapagbayad ka na, kontakin ang support.",
-  choosePaymentMethodAgain: 'Pumili ulit ng paraan ng pagbabayad',
+  choosePaymentMethodAgain: 'Pumili ulit ng paraan',
   trc20: "USDT (TRC20)",
   trc20Chain: "TRON network",
   gasTrc20: "Kasama sa kabuuan ang TRC20 confirmation fee. Maaaring may hiwalay na singil sa TRX o energy ang wallet mo.",
