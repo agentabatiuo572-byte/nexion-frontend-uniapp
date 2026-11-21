@@ -19,7 +19,7 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
   const actionableUnread = computed(() => notifications.actionableUnread == null || error.value
     ? null : notifications.actionableUnread + serviceUnread.value);
   const loading = computed(() => notifications.loading || conversations.loading);
-  const error = computed(() => notifications.error || conversations.error
+  const error = computed(() => notifications.readError || conversations.error
     || (conversations.categoryAvailabilityStatus === "failed" ? "SUPPORT_CATEGORIES_UNAVAILABLE" : null));
   let epoch = 0;
   let inFlight: Promise<void> | undefined;
@@ -36,13 +36,13 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
       .finally(() => { opening = undefined; });
   }
 
-  async function refresh(): Promise<void> {
+  async function refresh(includeNotifications = true): Promise<void> {
     if (inFlight) return inFlight;
     const requestEpoch = epoch;
     const active = () => requestEpoch === epoch;
     const requests: Promise<unknown>[] = [];
     // A page-triggered request already supplies this snapshot; do not race pagination.
-    if (!notifications.loading) requests.push(notifications.refreshRemote(undefined, active));
+    if (includeNotifications && !notifications.loading) requests.push(notifications.refreshRemote(undefined, active));
     requests.push(conversations.refresh(active), conversations.refreshCategories(active));
     const job = Promise.allSettled(requests).then(() => undefined);
     inFlight = job;

@@ -401,7 +401,7 @@ async function refreshRemoteMe() {
     ["funds", refreshRemoteFunds],
     ["orders", () => remoteOrdersFailed.value ? undefined : refreshRemoteOrders(true)],
     ["security", refreshRemoteSecurity],
-    ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.error)],
+    ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.readError)],
     ["conversations", () => runPassiveTabRead('conversations', () => conversations.refresh(), { owner: conversations.scopeInvalidated }, () => !conversations.loading && !conversations.error)],
     ["trial", () => trial.refreshVisible(true)],
     ["vouchers", () => voucher.revalidateRemote()],
