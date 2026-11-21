@@ -116,12 +116,12 @@
           </view>
           <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
           <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
-          <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`−${summaryMoney(order.discount)}`" brand />
-          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="`−${summaryMoney(order.tradeInCredit ?? 0)}`" brand />
+          <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="discountMoney(order.discount)" brand />
+          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="discountMoney(order.tradeInCredit ?? 0)" brand />
           <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
-          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="`−${summaryMoney(order.promoDiscountUSD ?? 0)}`" brand />
-          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`−${summaryMoney(order.trialOffsetUSD ?? 0)}`" brand />
-          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="`−${summaryMoney(order.earlyDiscountUSD ?? 0)}`" brand />
+          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="discountMoney(order.promoDiscountUSD ?? 0)" brand />
+          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="discountMoney(order.trialOffsetUSD ?? 0)" brand />
+          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="discountMoney(order.earlyDiscountUSD ?? 0)" brand />
           <DetailRow v-if="summaryPaid" :label="paymentCopy.payable" :value="summaryMoney(order.total, true)" />
           <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" brand />
           <template v-if="order.status === 'refunded'">
@@ -186,6 +186,7 @@ import { commerceOrderAmount, commerceOrderHasPayment, commerceOrderTitle, comme
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+import { formatCheckoutReviewAmount } from "@/lib/checkout-review-amount";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
 import { ref, computed, watch, nextTick, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
@@ -1144,6 +1145,10 @@ const usdt = (value: number | string) => `${formatAmount(value)} USDT`;
 function summaryMoney(value: number | string, unit = false): string {
   if (!unit) return formatAmount(value);
   return order.value && commerceOrderAmount(order.value).currency === 'USDT' ? usdt(value) : `$${formatAmount(value)}`;
+}
+// Deduction rows read −$50.00 as on checkout (the same formatter); USDT-paid orders keep the unit like their subtotal and total rows.
+function discountMoney(value: number): string {
+  return formatCheckoutReviewAmount(value, order.value ? commerceOrderAmount(order.value).currency : 'USD', { discount: true, unit: true });
 }
 const trialRewardText = computed(() => {
   const reward = order.value?.trialReward;
