@@ -4903,7 +4903,7 @@ export const ms: Messages = {
     pageTitle: "Kuota perkakasan",
     yourInvites: "Rakan diaktifkan",
     totalSuffix: "/ {n}",
-    heroBody: "Capai syarat pangkat atau jemputan untuk membeli peranti premium. Stok yang dipaparkan ialah jumlah tersedia bagi tempoh ini.",
+    heroBody: "Capai syarat pangkat atau jemputan untuk membeli peranti premium. Kuota yang dipaparkan ialah jumlah tersedia bagi tempoh ini.",
     unlocked: "DIBUKA",
     locked: "DIKUNCI",
     priceLine: "${price}",
