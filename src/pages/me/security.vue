@@ -18,9 +18,6 @@
       <view v-if="modeLabel" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
       </view>
-      <view v-if="remoteApiEnabled && !securityPresentation" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
-        <text :style="remoteSecurityUnavailableTextStyle">{{ securityUnavailableText }}</text>
-      </view>
 
       <view
         v-if="retiredFlow"
@@ -58,7 +55,8 @@
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text><text class="block" :style="rowSubStyle">{{ t.security.twoFactorHint }}</text>
           </view>
           <text v-if="displayTwoFactorEnabled === null" :style="unavailableValueStyle">—</text>
-          <view v-else class="shrink-0 flex items-center justify-center active:opacity-70 transition-opacity" style="width: 44px; height: 44px" role="switch" tabindex="0" :aria-label="t.security.twoFactorSwitchLabel" :aria-checked="displayTwoFactorEnabled" :aria-disabled="remoteApiEnabled && (!remoteSecurity || remoteSecurityLoading)" @click="openTwoFactorSheet">
+          <view v-else class="shrink-0 flex items-center justify-center transition-opacity" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'" style="width: 44px; height: 44px" role="switch"
+            :tabindex="sessionWriteDisabled ? -1 : 0" :aria-label="withReadReason(t.security.twoFactorSwitchLabel, remoteSecurityReadFailed)" :aria-checked="displayTwoFactorEnabled" :aria-disabled="sessionWriteDisabled" @click="openTwoFactorSheet">
             <view :style="toggleTrackStyle">
               <view class="security-toggle-thumb" :style="toggleThumbStyle" />
             </view>
@@ -75,7 +73,7 @@
             <text class="block" :style="rowLabelStyle">{{ t.security.phoneChangeTitle }}</text>
             <text class="block" :style="rowSubStyle">{{ phonePolicy
               ? fmt(t.security.phoneChangeSummary, { days: phonePolicy.windowDays, max: phonePolicy.maxChanges, used: phonePolicy.usedChanges })
-              : t.security.phoneChangeUnavailable }}</text>
+              : "—" }}</text>
           </view>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
         </view>
@@ -102,29 +100,30 @@
             <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
-          <view v-else class="grid place-items-center" :class="sessionWriteDisabled ? 'opacity-50' : 'active:opacity-70'"
+          <view v-else class="grid place-items-center" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'"
             :style="revokeBtnStyle" role="button" :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled"
-            :data-disabled-reason="sessionWriteUnavailableReason" :aria-label="`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`" @click="handleRevoke(s)">
+            :data-disabled-reason="sessionWriteUnavailableReason" :aria-label="withReadReason(`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`, remoteSecurityReadFailed)" @click="handleRevoke(s)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
         <view v-if="displaySessions.some(s => !s.current)" class="flex items-center justify-center transition-transform"
-          :class="sessionWriteDisabled ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
+          :class="sessionWriteDimmed ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
           :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled" :data-disabled-reason="sessionWriteUnavailableReason"
-          :aria-label="t.security.revokeAll" @click="handleRevokeAll">
+          :aria-label="withReadReason(t.security.revokeAll, remoteSecurityReadFailed)" @click="handleRevokeAll">
           <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
         </view>
       </view>
-      <view v-if="securityPresentation?.nextCursor" class="mx-4 flex justify-center" :style="revokeAllRowStyle"
+      <view v-if="securityPresentation?.nextCursor" class="mx-4 flex items-center justify-center" :style="loadMoreRowStyle"
+        :class="sessionPageLoading || (!remoteSecurity && !remoteSecurityLoading) || remoteSecurityReadFailed ? 'opacity-50' : 'active:opacity-70'"
         role="button" :tabindex="sessionPageLoading ? -1 : 0" :aria-disabled="sessionPageLoading || !remoteSecurity || remoteSecurityLoading"
         @click="loadMoreSessions">
-        <text>{{ t.notifs.loadMore }}</text>
+        <text :style="loadMoreLabelStyle">{{ t.notifs.loadMore }}</text>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.sessionsHint }}</text>
 
       <!-- ───── Danger zone ───── -->
       <view class="nx-glass-card mx-4 security-danger" :style="[cardStyle, groupGap]">
-        <view class="flex items-center" :class="deletionPending ? '' : 'active:opacity-90'" :style="rowStyle" role="button" :tabindex="deletionPending ? -1 : 0" :aria-disabled="deletionPending ? 'true' : 'false'" @click="openDeletionSheet">
+        <view class="flex items-center" :class="deletionPending ? 'opacity-50' : 'active:opacity-90'" :style="rowStyle" role="button" :tabindex="deletionPending ? -1 : 0" :aria-disabled="deletionPending ? 'true' : 'false'" @click="openDeletionSheet">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
           </view>
@@ -134,9 +133,9 @@
         </view>
 
         <view v-if="remoteApiEnabled && deletionPending" class="flex items-center justify-center transition-transform"
-          :class="deletionCancelDisabled ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
+          :class="deletionCancelDimmed ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
           :tabindex="deletionCancelDisabled ? -1 : 0" :aria-disabled="deletionCancelDisabled" :data-disabled-reason="deletionWriteUnavailableReason"
-          :aria-label="t.security.cancelDeletionRequest"
+          :aria-label="withReadReason(t.security.cancelDeletionRequest, remoteSecurityReadFailed || deletionStatusReadFailed)"
           @click="handleCancelAccountDeletion">
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
@@ -153,8 +152,8 @@
           <text v-else-if="err" class="block" :style="errStyle" role="alert">{{ err }}</text>
 
         </view><template #footer><view class="flex" style="gap: var(--v5-space-2); margin-top: 4px">
-            <NxButton variant="secondary" size="medium" class="flex-1 flex items-center justify-center" :disabled="securityBusy" @click="cancelPwd"><text>{{ t.ui.cancel }}</text></NxButton>
-            <NxButton variant="primary" size="medium" class="flex-1 flex items-center justify-center" :disabled="securityBusy || !!overviewReadback" @click="submitPasswordChange"><text>{{ t.ui.save }}</text></NxButton>
+            <NxButton variant="secondary" class="flex-1 flex items-center justify-center" :disabled="securityBusy" @click="cancelPwd"><text>{{ t.ui.cancel }}</text></NxButton>
+            <NxButton variant="primary" class="flex-1 flex items-center justify-center" :disabled="securityBusy || !!overviewReadback" @click="submitPasswordChange"><text>{{ t.ui.save }}</text></NxButton>
           </view></template></NxSheet>
     <NxSheet :open="twoFactorSheetOpen" :title="t.security.twoFactorTitle" @close="closeTwoFactorSheet" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :aria-invalid="twoFactorPasswordError ? 'true' : 'false'" :aria-describedby="twoFactorPasswordError ? 'security-2fa-password-error' : undefined" :focus="twoFactorPasswordFocus" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
@@ -178,9 +177,14 @@
             </view>
             <input class="w-full" :style="pwdInputStyle" password :value="phonePassword" :placeholder="t.security.currentPassword"
               :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="phonePassword = detailVal($event)" />
-            <NxButton variant="primary" size="medium" class="flex items-center justify-center active:opacity-80"
+            <NxButton variant="primary" class="flex items-center justify-center active:opacity-80"
               :disabled="securityBusy || !phoneChangeAllowed"
               @click="startPhoneChange"><text>{{ t.security.phoneChangeSendCodes }}</text></NxButton>
+            <view v-if="phonePolicyBlocksSend" class="security-policy-blocked">
+              <text class="security-policy-blocked__copy">{{ t.security.phoneChangeUnavailable }}</text>
+              <view class="nx-card-recovery-action nx-card-recovery-action--inline" :class="phonePolicyLoading ? 'opacity-50' : 'active:opacity-70'"
+                role="button" :tabindex="phonePolicyLoading ? -1 : 0" :aria-disabled="phonePolicyLoading" @click="retryPhonePolicy()"><text>{{ t.ui.retry }}</text></view>
+            </view>
           </template>
           <template v-else>
             <text class="block" :style="rowSubStyle">{{ fmt(t.security.phoneChangeCodesSent,
@@ -189,16 +193,11 @@
               :aria-label="t.security.phoneChangeOldCode" maxlength="6" @input="phoneOldCode = detailVal($event)" />
             <input class="w-full" :style="pwdInputStyle" type="number" :value="phoneNewCode" :placeholder="t.security.phoneChangeNewCode"
               :aria-label="t.security.phoneChangeNewCode" maxlength="6" @input="phoneNewCode = detailVal($event)" />
-            <NxButton variant="primary" size="medium" class="flex items-center justify-center active:opacity-80" :disabled="securityBusy"
+            <NxButton variant="primary" class="flex items-center justify-center active:opacity-80" :disabled="securityBusy"
               @click="confirmPhoneChange"><text>{{ t.security.phoneChangeConfirm }}</text></NxButton>
-            <view role="button" tabindex="0" :style="rowSubStyle" @click="resetPhoneChallenge">
-              {{ t.security.phoneChangeRestart }}
-            </view>
+            <NxButton variant="text" size="small" class="self-center" :disabled="securityBusy" @click="resetPhoneChallenge"><text>{{ t.security.phoneChangeRestart }}</text></NxButton>
           </template>
           <text v-if="phoneError" class="block" :style="errStyle" role="alert">{{ phoneError }}</text>
-          <view v-if="phonePolicyBlocksSend" role="button" :tabindex="phonePolicyLoading ? -1 : 0" :aria-disabled="phonePolicyLoading" :style="[rowSubStyle, { minHeight: '44px', display: 'flex', alignItems: 'center', font: '600 13px/20px var(--font-v5)' }]" @click="retryPhonePolicy()">
-            {{ t.ui.retry }}
-          </view>
         </view></NxSheet>
     <NxSheet :open="deletionSheetOpen" :title="t.security.deleteAccount" @close="closeDeletionSheet" class="security-half-sheet"><view class="security-sheet-form"><text class="security-sheet-note">{{ t.security.deleteAccountHint }}</text><template v-if="remoteApiEnabled && !deletionPending">
           <!-- Optional reason before the password. A retry after an unknown result resends the submitted reason, so it shows read-only. -->
@@ -395,10 +394,17 @@ const deletionWriteUnavailableReason = computed(() => {
   return undefined;
 });
 const deletionCancelDisabled = computed(() => securityBusy.value || !!deletionWriteUnavailableReason.value || !!deletionReadback.value);
-const securityUnavailableText = computed(() => {
-  if (remoteSecurityReadFailed.value) return `${t.value.wallet.syncFailedTitle} · ${t.value.wallet.syncFailedBody}`;
-  return remoteSecurityLoading.value ? "…" : t.value.wallet.syncFailedTitle;
-});
+// Dimming shows a real block (failed read, pending readback, running command). A healthy refresh in flight keeps the
+// retained controls' look, so a pull does not flash them grey (03 §3.4); they stay inert through the disabled guards.
+const sessionWriteDimmed = computed(() => sessionWriteDisabled.value
+  && (securityBusy.value || !!overviewReadback.value || !remoteSecurityLoading.value || remoteSecurityReadFailed.value));
+const deletionCancelDimmed = computed(() => deletionCancelDisabled.value
+  && (securityBusy.value || !!deletionReadback.value || remoteSecurityReadFailed.value || deletionStatusReadFailed.value
+    || !(remoteSecurityLoading.value || deletionStatusLoading.value)));
+// A write control greyed by a failed read names the reason for screen readers (03 §3.4); the page itself stays quiet.
+function withReadReason(label: string, readFailed: boolean) {
+  return readFailed ? `${label} · ${t.value.wallet.syncFailedTitle}` : label;
+}
 const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
@@ -1047,6 +1053,7 @@ async function handleRevoke(s: SessionListItem) {
     title: t.value.security.sessionRevoke,
     message: `${t.value.security.sessionRevokeConfirm}\n\n${sessionDeviceLabel(s)} · ${t.value.security.sessionLocation}`,
     danger: true,
+    confirmLabel: t.value.security.sessionRevoke,
     owner: securityConfirmOwner,
   });
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey) || sessionWriteDisabled.value) return;
@@ -1083,6 +1090,7 @@ async function handleRevokeAll() {
     title: t.value.security.revokeAll,
     message: t.value.security.revokeAllConfirm,
     danger: true,
+    confirmLabel: t.value.security.revokeAll,
     owner: securityConfirmOwner,
   });
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey) || sessionWriteDisabled.value) return;
@@ -1408,7 +1416,7 @@ const rowSubStyle: CSSProperties = {
   lineHeight: "16px",
   color: "var(--v5-ink-3)",
 };
-const passwordHintStyle: CSSProperties = { ...rowSubStyle, lineHeight: "16px", whiteSpace: "normal", overflowWrap: "anywhere" };
+const passwordHintStyle: CSSProperties = { ...rowSubStyle, lineHeight: "16px", whiteSpace: "normal", overflowWrap: "break-word" };
 const chevronStyle: CSSProperties = { flexShrink: 0 };
 const footerStyle: CSSProperties = {
   marginTop: "var(--v5-space-2)",
@@ -1430,17 +1438,6 @@ const mockModeBannerTextStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-warning)",
-};
-const remoteSecurityUnavailableStyle: CSSProperties = {
-  marginTop: "10px",
-  padding: "10px 12px",
-  borderRadius: "8px",
-  background: "var(--v5-surface-2)",
-};
-const remoteSecurityUnavailableTextStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
 };
 const unavailableValueStyle: CSSProperties = {
   marginLeft: "auto",
@@ -1548,6 +1545,11 @@ const revokeAllLabelStyle: CSSProperties = {
   fontSize: "var(--ui-type-body)",
   color: "var(--v5-danger)",
 };
+const loadMoreRowStyle: CSSProperties = { minHeight: "44px", marginTop: "var(--v5-space-1)" };
+const loadMoreLabelStyle: CSSProperties = {
+  font: "var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5)",
+  color: "var(--v5-brand)",
+};
 const dangerLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "var(--ui-type-body)",
@@ -1581,6 +1583,9 @@ const dangerLabelStyle: CSSProperties = {
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
 .security-sheet-note { font-size:13px; line-height:20px; color:var(--v5-ink-3); }
+/* A failed policy read that blocks sending: reason under the send button in 辅助色, retry as a text button on the right (03 §3.1, §3.5.2). */
+.security-policy-blocked { display:flex; align-items:center; gap:12px; margin-top:-4px; }
+.security-policy-blocked__copy { flex:1; min-width:0; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .security-reason-field, .security-reason-sent { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .security-reason-sent { padding:12px; border-radius:8px; background:var(--v5-surface-2); }
 .security-reason-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-width:0; }
