@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
+import { previewAccountId } from './prototype-demo-identity.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { computeDemo, demoComputeFacts } from "./prototype-demo-compute.mjs";
+import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
@@ -75,7 +77,7 @@ export const demoOptions = {
   trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
-  messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（重试原消息）'],['timeout','确认超时（15 秒转待确认）']],
+  messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（自动按原键核对）'],['timeout','确认超时（15 秒转待确认）']],
   messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['author-photo','客服带本人头像'],['recommendations','商品与链接推荐'],['agent-switch','客服已切换提示（有名字/无名字）'],['welcome-unassigned','刚注册 · 未分配客服 · 欢迎语未读'],['welcome-assigned','刚注册 · 已有专属客服 · 欢迎语未读'],['read','会话全部已读'],['transferred','已转接 · 只读旧会话待核对']],
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
@@ -269,7 +271,7 @@ const repurchaseSampleDays={inside:12,boundary:30,outside:12};
 const longBillOrderNo='ORD-7F3A9C2E5B8D41F6A0C3E9B27D5F1A84';
 function demoOrders(products,state,now,device41) {
   if (state.accountDeletionState === 'clear') return [];
-  const at=state.sampleOrdersAt??=now;
+  const at=state.sampleOrdersAt??now;
   return Object.entries(orderStates).map(([original],i)=>{
     const longRef=demoHasLongBillRefs(state)&&original==='refunded';
     const orderNo=longRef?longBillOrderNo:'DEMO-ORDER-'+String(i+1).padStart(3,'0');
@@ -288,7 +290,7 @@ function demoOrders(products,state,now,device41) {
     const repurchaseDays=repurchaseSampleDays[state.repurchaseState];
     const placedAt=original==='provisioning_failed'&&repurchaseDays!==undefined
       ? at-repurchaseDays*day-samplePaidAfter
-      : device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
+      : device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[demoPaymentScenario(state)]??0):at-(i+1)*day;
     return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?(longRef?'E4-REFUND-'+orderNo:'DEMO-REFUND-1'):null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:unitPrice,lineAmountUsdt:unitPrice}]};
   }).filter(order=>!accountDeletionWallet(state)||(['COMPLETED','CANCELLED','CLOSED','FAILED','REFUNDED'].includes(order.orderStatus)&&['PAID','FAILED','CANCELLED','REFUNDED','EXPIRED'].includes(order.paymentStatus)));
@@ -322,11 +324,14 @@ function demoScenarioOrders(products,state,now,device41) {
     .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
 }
 const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${unit}`;
+const accountOrderRows=(url,state,now)=>demoScenarioOrders(demoProducts(state,url.origin),state,now,
+  state.fleetSeed?.find(device=>device.id===41));
+export const demoHasAccountOrder=(url,state,orderNo)=>accountOrderRows(url,state,Date.now()).some(order=>order.orderNo===orderNo);
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
   if(!state.fleetSeed)demoFleetFacts(url,locale,state);
-  return demoScenarioOrders(demoProducts(state,url.origin),state,now,state.fleetSeed.find(device=>device.id===41))
-    .map(order=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
+  return accountOrderRows(url,state,now)
+    .map(({replacementDevice,...order})=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
       targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?order.targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
     }:order);
@@ -340,7 +345,7 @@ const demoOrderSlots=(orders,orderNo)=>orders
 // whose mixed scope owns a hidden phone, and Lite's computeState, whose compute modes own a Cloud Share) start a fresh,
 // coherent scenario: the preview server clears every record the old scenario owns (session orders, purchases,
 // trade-ins, stopped devices, compute history, trial, command receipts and payment intents on the server, the App's
-// order/payment recovery rows in the browser), and the next read seeds the devices here. A write is applied only in the
+// order/payment recovery rows in the browser), and the scene seeds the devices here. A write is applied only in the
 // scenario it started in, and only from a page of that scenario. dataState=empty is the empty account the empty pages
 // are reviewed with: no devices (hidden phones included), no sample orders, no top-ups and an empty wallet (balance 0,
 // so wallet payments are refused for funds), the trial as its own knobs say. paymentState=low-balance is an account
@@ -390,7 +395,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   // reward cycle, so in those scenarios the account owns a Cloud Share there from the start (its kind, catalog price and
   // trade-in facts agree); the App mode owns a UVELBox Pro.
   const second=(state.computeState??'app')==='app'?{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}
-    :clone(42,'CLOUD-SHARE','Cloud Share',0.6,19.9,{instanceNo:'DEMO-CLOUD',deviceType:'CLOUD',todayEarningsUsdt:.2,todayEarningsNex:0});
+    :clone(42,'CLOUD-SHARE','Cloud Share',0.6,19.9,{instanceNo:'DEMO-CLOUD',deviceType:'SHARE',todayEarningsUsdt:.2,todayEarningsNex:0});
   let devices=state.fleetState==='none'?[]:[template,...phones,second];
   if(state.fleetState==='inventory')devices.push(clone(51,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='decayed'){
@@ -398,7 +403,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
     const older={purchasedAt:decayedPurchaseAt,activatedAt:decayedPurchaseAt};
     devices=[clone(41,'STELLARBOX-S1','UVELBox S1',6.2,1299,older),...phones,
       clone(53,'STELLARBOX-S1','UVELBox S1',6.2,1299,{...older,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}),
-      clone(51,'CLOUD-SHARE','Cloud Share',.6,19.9,{deviceType:'CLOUD',capacityConfigKey:'capacityApplyToCloudShare',status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',purchasedAt:Date.now()})];
+      clone(51,'CLOUD-SHARE','Cloud Share',.6,19.9,{deviceType:'SHARE',capacityConfigKey:'capacityApplyToCloudShare',status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',purchasedAt:Date.now()})];
   }
   devices=devices.filter(live);
   if(state.fleetState==='full'||state.trialState==='capacity-full'||state.checkoutState==='replace'){
@@ -413,9 +418,11 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
 }
 // The authoritative fleet from the retained state, independent of presentation knobs.
 export function demoFleetFacts(url,locale,state) {
-  // Read the trial first: a converted trial books its order, which then lists as a device below.
+  // Initialize sample orders and the trial before projecting the fleet.
   const trialSlotCount=demoTrialSlots(url,locale,state);
-  const now=Date.now(),products=demoProducts(state,url.origin),orders=demoScenarioOrders(products,state,now,false);
+  const now=Date.now(),products=demoProducts(state,url.origin);
+  state.sampleOrdersAt??=now;
+  const orders=demoScenarioOrders(products,state,now,false);
   const seed=reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
   const template={...seed.devices[0],runtimeStatus:'ONLINE'};
   const slotCap=6,retired=state.retiredDeviceIds||[],session=[];
@@ -429,9 +436,9 @@ export function demoFleetFacts(url,locale,state) {
     // A session device starts its own purchase history at its paid order.
     // Saved conversions made before the separate snapshot stored the claim name on the order.
     const name=order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name;
-    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:Number(order.amountUsdt)/order.quantity,
+    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
       activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
-      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
+      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null}),...order.replacementDevice,actualPaidUsdt:Number(order.amountUsdt)/order.quantity});
   }
   let reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
@@ -460,8 +467,10 @@ export function demoFleetFacts(url,locale,state) {
     .map(device=>state.stoppedDevices?.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device)
     .map(device=>{
       const product=products.find(product=>product.id.toUpperCase()===device.productCode);
+      const share=product?.productType==='SHARE'
+        ? {deviceType:'SHARE',gpuModel:product.gpu,vramTotalGb:0,basePowerW:0} : {};
       const capacity=previewCapacity(device,seed.capacitySchedule,now);
-      const projected={...device,...capacity,monthlyTargetActive:product?.monthlyEstimateUsdt!=null};
+      const projected={...device,...share,...capacity,monthlyTargetActive:product?.monthlyEstimateUsdt!=null};
       // Hidden phones keep their own earnings and never receive a monthly target projection.
       if(!projected.monthlyTargetActive)return projected;
       return {...projected,dailyUsdt:Number((product.dailyEarn*capacity.capacityPct/100).toFixed(6))};
@@ -625,7 +634,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
-  if(!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  if(!request.verifiedPayment&&!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.interfaceLanguages=previewInterfaceLanguages(state.interfaceLanguagesState);
@@ -860,11 +869,15 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const input=request.postDataJSON();
     return tradeinQuote(input.sourceDeviceId,input.targetProductNo);
   }
-  if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'){
+  const verifiedPayment=request.replacementQuote&&request.verifiedPayment;
+  const keepingCapacity=verifiedPayment&&pathname==='/api/app/trade-in/capacity-keep';
+  if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'||keepingCapacity){
     const replacingCapacity=pathname.endsWith('/capacity-replace');
     const input=request.postDataJSON();
     let quote;
-    if(replacingCapacity){
+    if(verifiedPayment){
+      quote=request.replacementQuote;
+    }else if(replacingCapacity){
       const capacity=capacityQuote();
       if(capacity.sourceDeviceId===null||input.sourceDeviceId!==capacity.sourceDeviceId)refuse('CAPACITY_REPLACEMENT_SOURCE_CHANGED');
       if(typeof input.expectedPayableUsdt!=='number'||Math.abs(input.expectedPayableUsdt-capacity.payableUsdt)>0.000001)refuse('CAPACITY_REPLACEMENT_QUOTE_CHANGED');
@@ -873,32 +886,47 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo);
       if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
     }
-    const sourceAssignment=checkWalletSource(quote.sourceDeviceId);
+    const sourceAssignment=verifiedPayment?null:checkWalletSource(quote.sourceDeviceId);
     const currentTask=sourceAssignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true);
-    if(!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
+    if(!verifiedPayment&&!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
+    const source=(replacingCapacity||(verifiedPayment&&quote.sourceDeviceId!=null))
+      ? demoFleetFacts(url,locale,state).devices.find(device=>device.id===quote.sourceDeviceId) : null;
     if(replacingCapacity){
-      const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===quote.sourceDeviceId);
-      (state.deviceActivations??={})[source.id]={status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',rowVersion:source.rowVersion+1};
-    }else (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
+      (state.deviceActivations??={})[source.id]={status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',rowVersion:source.rowVersion+1,
+        ...(verifiedPayment&&{status:'INVENTORY',deactivatedAt:now,pendingDeactivate:false})};
+    }else if(!keepingCapacity)(state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
+    const sourceProduct=verifiedPayment&&source
+      ? products.find(item=>item.id.toUpperCase()===source.productCode) : null;
+    const computePoints=verifiedPayment?Math.max(0,product.computePoints-(sourceProduct?.computePoints??0)):product.computePoints;
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
-    postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
+    if(!verifiedPayment)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
       amount:quote.payableUsdt,at:now,category:'purchase',remark:'E3 trade-in upgrade wallet payment'});
     const targetDeviceInstanceNo=demoOrderDeviceInstance(orderNo);
     const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;
     (state.deviceIds??={})[targetDeviceInstanceNo]=targetDeviceId;
     const canonicalStatus=active?'activated':'inventory';
-    const order={...demoOrders(products,state,now)[0],orderNo,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:'WALLET',orderType:'TRADE_IN',itemCount:1,
-      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
-      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null};
+    const order={...demoOrders(products,state,now)[0],orderNo,productId:quote.targetProductId,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:verifiedPayment?.paymentMethod??'WALLET',orderType:keepingCapacity?'CAPACITY_KEEP':'TRADE_IN',itemCount:1,
+      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:keepingCapacity?null:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
+      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:verifiedPayment?.createdAt??now,expiresAt:null,paidAt:verifiedPayment?.paidAt??now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null,
+      ...(verifiedPayment&&{paymentNo:verifiedPayment.intentNo,paidTotalUsdt:verifiedPayment.totalUsdt,
+        replacementDevice:{deviceType:product.productType,gpuModel:product.gpu,
+          vramTotalGb:Number.parseInt(product.vram,10),basePowerW:Number.parseInt(product.power,10),
+          status:quote.targetDeviceStatus,runtimeStatus:active?'ONLINE':'OFFLINE',lastSeenAt:active?now:null,
+          purchasedAt:now,sourceOrderNo:orderNo,
+          sourceChannel:keepingCapacity?'ORDER':'TRADE_IN',pendingDeactivate:false}})};
     (state.createdOrders||=[]).unshift(order);
     if(currentTask?.status==='RUNNING'){
       if(state.computeCycleStarts)delete state.computeCycleStarts[quote.sourceDeviceId];
       recordDemoTaskCancellation(state,sourceAssignment,currentTask);
     }
-    const receipt={tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance};
-    return replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);
+    const payment={orderNo,targetDeviceId,orderStatus:'COMPLETED',walletDebitUsdt:verifiedPayment?0:quote.payableUsdt,
+      walletBalanceAfterUsdt:state.walletBalance??52800.64};
+    if(keepingCapacity)return {...payment,operationNo:'DEMO-KEEP-'+sequence,deviceStatus:'ACTIVE'};
+    const receipt={...payment,tradeinNo:order.tradeinNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceStatus:quote.targetDeviceStatus,
+      applicationStatus:'COMPLETED',discountUsdt:quote.discountUsdt};
+    return verifiedPayment||replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);
   }
   function capacityQuote(){
     const {targetProductNo}=request.postDataJSON();
@@ -1009,14 +1037,16 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
   if(orderAction){
-    const [,orderNo,action]=orderAction,order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);
+    const [,orderNo,action]=orderAction;
+    let order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);
     if(!order) return {};
+    const writable=state.createdOrders?.find(row=>row.orderNo===orderNo);
     const replay=order.paymentStatus==='PAID',amount=Number(order.amountUsdt);
     if(action==='cancel'){
       if(replay)refuse('ORDER_NOT_CANCELLABLE');
       (state.orderStatuses??={})[orderNo]='cancelled';
-      if(state.createdOrders?.includes(order)){
-        Object.assign(order,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
+      if(writable){
+        order=Object.assign(writable,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
           activationStatus:'WAITING_PAYMENT',paidAt:null,activatedAt:null});
       }
       return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
@@ -1037,10 +1067,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
           amount,at:now,category:'purchase',remark:'UVEL wallet order settlement'});
       }
       (state.orderStatuses??={})[orderNo]='activated';
-      if(state.createdOrders?.includes(order)){
-        Object.assign(order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
-          activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
-      }
+      if(!writable)(state.createdOrders??=[]).push(order);
+      order=Object.assign(writable??order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
+        activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
     }
     const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,
@@ -1053,7 +1082,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const sample=base('/api/promotions').items[0];
     const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
     const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
-    const authenticated=['Bearer local-demo-token','Bearer formal-probe-access-token'].includes(request?.headers?.().authorization);
+    const authenticated=Boolean(previewAccountId(state,request?.headers?.()??{}));
     const exact=state.repurchaseState==='boundary'||state.repurchaseState==='outside';
     const repurchaseWindow=exact?{minDays:30,maxDays:30}:{minDays:state.repurchaseState==='inside'?7:0,maxDays:90};
     const readsPurchaseHistory=authenticated&&!empty&&state.eventState!=='empty';

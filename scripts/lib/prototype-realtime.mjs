@@ -22,10 +22,11 @@ export function createPrototypeRealtime({state,messages,fixtureFor}) {
           socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');return;
         }
         wss.handleUpgrade(request,socket,head,ws=>{
-          const peer={socket:ws,ready:false,watched:null};peers.add(peer);
+          const peer={socket:ws,ready:false,watched:null,accountId:null};peers.add(peer);
           let onMessage;
           route.handler({
             onMessage:handler=>{onMessage=handler;},
+            bindAccount:accountId=>{peer.accountId=accountId;},
             close:({code,reason})=>ws.close(code,reason),
             send:message=>{
               if(JSON.parse(message).type==='ready') {
@@ -51,7 +52,7 @@ export function createPrototypeRealtime({state,messages,fixtureFor}) {
             if(suffix===null){send(ws,{type:'ack',requestId:frame.requestId,result:{code:422,message:'该演示操作尚未配置',data:null}});return;}
             try {
               const result=await messages.request(new URL('/api/app/support/conversations'+suffix,url),{
-                method:()=> 'POST',postDataJSON:()=>frame.body,headers:()=>({'idempotency-key':frame.idempotencyKey}),
+                method:()=> 'POST',accountId:peer.accountId,postDataJSON:()=>frame.body,headers:()=>({'idempotency-key':frame.idempotencyKey}),
               });
               if(result.deliveryUnknown){ws.close(1011,'DEMO_DELIVERY_UNKNOWN');return;}
               send(ws,{type:'ack',requestId:frame.requestId,result:result.body});
@@ -61,11 +62,11 @@ export function createPrototypeRealtime({state,messages,fixtureFor}) {
       });
       server.on('close',()=>{for(const peer of peers)peer.socket.terminate();wss.close();});
     },
-    stateChanged(update) {
+    stateChanged(update, accountId) {
       if(update.reset)messages.reset();
       if(update.messageState||update.reset) {
         // Scenario application was lazy; materialize before the event so reconcile reads it.
-        fixtureFor(new URL('http://127.0.0.1/api/app/support/conversations/cursor'),{method:()=> 'GET'});
+        if(accountId)fixtureFor(new URL('http://127.0.0.1/api/app/support/conversations/cursor'),{method:()=> 'GET',accountId});
         changed();
       }
       for(const peer of peers) {
