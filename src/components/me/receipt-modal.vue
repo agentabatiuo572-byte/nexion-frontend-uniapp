@@ -85,6 +85,7 @@ import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { workloadLabel } from "@/lib/workload-label";
 import { toast } from "@/store/ui";
+import { useApp } from "@/store/app";
 import { uiLocale, type UiLocale } from "@/i18n";
 
 const props = defineProps<{ receipt: Receipt | CanonicalComputeReceipt | null }>();
@@ -270,6 +271,16 @@ function detailRows(d: ReceiptDetails): DescRow[] {
   }
 }
 
+// A Cloud Share is pooled compute, so its receipt shows no video memory (user 2026-11-21). Identity: the fleet's own
+// Share classification for this device, or the receipt's device type, which the backend writes from the product type.
+const app = useApp();
+const shareReceipt = computed(() => {
+  const r = props.receipt;
+  if (!r || !isCanonicalComputeReceipt(r)) return false;
+  return app.devices.find((device) => device.id === String(r.deviceId))?.kind === "cloud-share"
+    || ["SHARE", "CLOUD_SHARE"].includes(r.deviceType.toUpperCase());
+});
+
 // Stable internal keys also identify copied fields. The current review explicitly
 // replaces the former raw-key presentation with localized, grouped labels.
 const sections = computed<DescSection[]>(() => {
@@ -298,7 +309,7 @@ const sections = computed<DescSection[]>(() => {
           { k: "device_instance", v: shortenHex(r.deviceInstanceNo, 8, 6), copyValue: r.deviceInstanceNo },
           { k: "device_type", v: r.deviceType },
           ...(r.deviceGpu ? [{ k: "gpu", v: r.deviceGpu }] : []),
-          ...(r.vramTotalGb !== null ? [{ k: "vram", v: `${r.vramTotalGb} GB` }] : []),
+          ...(r.vramTotalGb !== null && !shareReceipt.value ? [{ k: "vram", v: `${r.vramTotalGb} GB` }] : []),
         ],
       },
       {

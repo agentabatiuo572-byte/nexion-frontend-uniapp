@@ -170,7 +170,8 @@ const trialOfferLabel = computed(() => showCapacityManagement.value ? `${trialNa
   : trial.status === "none" && (eligibility.value.ok || offerState.value === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
   : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[2]}`);
-const trialOfferAria = computed(() => trialRechecking.value || (showCapacityManagement.value && trial.authorityStatus === 'loading')
+// Slots full and a read in flight (a background recheck, or a retry after a failed read): say it is checking.
+const trialOfferAria = computed(() => trialRechecking.value || (showCapacityFull.value && trial.authorityStatus === 'loading')
   ? `${trialOfferLabel.value} · ${t.value.trial.entryChecking}` : trialOfferLabel.value);
 const trialPendingAria = computed(() => {
   if (status.value === 'ended') return `${trialName.value} · ${lifecycleCopy.value.endedTitle} · ${lifecycleCopy.value.buyDevice}`;
