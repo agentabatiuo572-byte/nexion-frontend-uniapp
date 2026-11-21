@@ -71,6 +71,7 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
   loading: false, retrying: false, busy: false, error: false, unavailable: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
+let originalRecovery: { intentNo: string; kind: PurchaseKind; fingerprint: string; summary: string } | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
 let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void } | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
@@ -239,6 +240,7 @@ function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, {
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
   requestVersion++; stopTimers(); openCashierOnReady = false;
+  originalRecovery = null;
   reviewedQuote = confirmedQuote = null;
   Object.assign(state, { open: false, loading: false, retrying: false, busy: false, cashier: false, notice: '', concluded: false });
   const choice = activeChoice; activeChoice = null; context = null; choice?.resolve(result);
@@ -324,7 +326,7 @@ async function openConditions() {
 function schedule(version: number, accountKey: string, failed: boolean) {
   pollFailures = failed ? pollFailures + 1 : 0;
   clearTimeout(pollTimer); pollTimer = undefined;
-  if (paused || !owns(version, accountKey) || !state.pending || settled(state.intent) || state.concluded) return;
+  if (paused || !owns(version, accountKey) || !(state.pending || originalRecovery) || settled(state.intent) || state.concluded) return;
   pollTimer = setTimeout(() => { if (owns(version, accountKey)) void readPendingPayment(); },
     failed ? POLL_BACKOFF[Math.min(pollFailures - 1, POLL_BACKOFF.length - 1)]! : POLL_MS);
 }
@@ -363,7 +365,7 @@ function hideChannel(method: ExternalPaymentMethod) {
 }
 /** Before an intent exists, leave an unavailable channel and try another payment method. */
 function reconcileChannel() {
-  if (state.concluded || state.pending || state.step === 'methods' || available(state.method)) return;
+  if (state.concluded || state.pending || originalRecovery || state.step === 'methods' || available(state.method)) return;
   state.notice = ''; reviewedQuote = confirmedQuote = null;
   const other = state.method === 'HDPAY_BANK' ? null : (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC', 'CREGIS_USDT_TRC20'] as const)
     .find(method => method !== state.method && available(method));
@@ -371,7 +373,7 @@ function reconcileChannel() {
   else choose('WALLET');
 }
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
-  if (state.busy || state.pending || state.concluded || !context) return;
+  if (state.busy || state.pending || originalRecovery || state.concluded || !context) return;
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
   if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; state.retryNotice = ''; }
@@ -399,6 +401,11 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   } catch (error) {
     if (!owns(version, accountKey)) return;
     const cause = asApiError(error);
+    if (cause.purchaseIntentNo && expected.kind !== 'ORDER_PAY') {
+      originalRecovery = { intentNo: cause.purchaseIntentNo, kind: expected.kind, fingerprint: fingerprint(expected), summary: expected.summary };
+      await query();
+      return;
+    }
     const paymentRefusal = paymentRefusalNotice(cause, expected.kind);
     state.retryNotice = paymentRefusal === 'rejectEligibilityUnavailable' ? paymentRefusal : '';
     if (error instanceof Error && error.message === 'PURCHASE_CONTEXT_CHANGED') { state.notice = 'changed'; return; }
@@ -430,6 +437,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
 /** An order past its deadline can no longer be paid; other purchases get a fresh quote and deadline from their own page. */
 function deadlinePassed() { state.retryNotice = ''; if (state.kind === 'ORDER_PAY') conclude('orderExpired'); else state.notice = 'changed'; }
 function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
+  if (originalRecovery) return;
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
   // Preserve ERC20/BEP20 priority; TRC20 is selectable only when explicitly open.
@@ -451,11 +459,40 @@ function proceed() {
 }
 async function query() {
   const pending = state.pending;
-  if (!pending || state.busy || state.concluded || settled(state.intent)) return;
+  const recovery = originalRecovery;
+  if (!(pending || recovery) || state.busy || state.concluded || settled(state.intent)) return;
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false;
   state.busy = true; state.unavailable = false;
   try {
+    if (recovery) {
+      const intent = await api.get(recovery.intentNo);
+      if (!owns(version, accountKey) || state.concluded) return;
+      if (intent && (intent.intentNo !== recovery.intentNo || intent.kind !== recovery.kind)) {
+        throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
+      }
+      if (pending && pending.commandKey !== intent?.commandKey) releaseUncreatedPayment(pending, accountKey);
+      state.error = false; state.retrying = false;
+      if (intent) {
+        const payload = JSON.parse(recovery.fingerprint)[1] as Record<string, unknown>;
+        if (intent.kind === 'TRIAL_CONVERT') payload.expectedAmountUsdt = intent.subtotalUsdt;
+        else if (intent.businessAmountUsdt) payload.expectedPayableUsdt = intent.businessAmountUsdt;
+        const original = { ...recovery, fingerprint: JSON.stringify([recovery.kind, payload]),
+          commandKey: intent.commandKey, paymentQuoteId: intent.paymentQuoteId, lookupOnly: true };
+        if (context) {
+          const caller = activeChoice;
+          context = null;
+          state.coldResume = true;
+          waitForResumedChoice();
+          caller?.resolve(null);
+        }
+        openCashierOnReady = false;
+        accept(intent, original);
+      } else conclude('existing');
+      originalRecovery = null;
+      return;
+    }
+    if (!pending) return;
     const result = await readIntent(pending);
     if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
@@ -470,7 +507,8 @@ async function query() {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
       state.error = true;
-      if (pending.quotaRefusal) conclude(pending.quotaRefusal);
+      if (recovery) state.retrying = true;
+      else if (pending?.quotaRefusal) conclude(pending.quotaRefusal);
     }
   }
   finally { if (owns(version, accountKey)) { state.busy = false; schedule(version, accountKey, failed); } }
@@ -479,7 +517,7 @@ async function query() {
 async function submitOriginal() {
   const pending = state.pending;
   if (!pending || state.busy || state.concluded) return;
-  if (pending.intentNo || pending.lookupOnly || pending.quotaRefusal) return query();
+  if (originalRecovery || pending.intentNo || pending.lookupOnly || pending.quotaRefusal) return query();
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false, lookup = false;
   state.busy = true; state.unavailable = false;
@@ -492,6 +530,11 @@ async function submitOriginal() {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
+      if (cause.purchaseIntentNo && pending.kind !== 'ORDER_PAY') {
+        originalRecovery = { intentNo: cause.purchaseIntentNo, kind: pending.kind, fingerprint: pending.fingerprint, summary: pending.summary };
+        lookup = true;
+        return;
+      }
       const paymentRefusal = paymentRefusalNotice(cause, pending.kind);
       state.retryNotice = '';
       if (paymentRefusal === 'rejectEligibilityUnavailable') {
@@ -582,7 +625,7 @@ async function submitOriginal() {
   }
 }
 async function confirm() {
-  if (!context || state.loading || state.busy || state.pending || account() !== state.accountKey) return;
+  if (!context || state.loading || state.busy || state.pending || originalRecovery || account() !== state.accountKey) return;
   if (!context.current()) { state.notice = 'changed'; return; }
   if (state.method === 'WALLET') { finish({ method: 'WALLET' }); return; }
   const quote = state.quote;
@@ -653,6 +696,10 @@ async function resume(pending: PendingExternal) {
   context = null;
   const payload = JSON.parse(pending.fingerprint)[1] as Record<string, unknown>;
   open({ summary: pending.summary, kind: pending.kind, payload, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
+  waitForResumedChoice();
+  await query();
+}
+function waitForResumedChoice() {
   // No active purchase callback after reload. A delivered intent returns to the original order.
   void waitForChoice().then(result => {
     if (result?.method !== 'EXTERNAL' || !result.receipt || typeof result.receipt !== 'object') return;
@@ -660,7 +707,6 @@ async function resume(pending: PendingExternal) {
     const orderNo = (result.receipt as { orderNo?: unknown }).orderNo;
     if (typeof orderNo === 'string' && orderNo) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
   });
-  await query();
 }
 function onOrderPage(orderNo: string) {
   const pages = getCurrentPages(), top = pages[pages.length - 1] as { route?: string; options?: Record<string, string> } | undefined;
@@ -673,7 +719,7 @@ export function usePurchasePayment() {
     openCashier: () => { if (state.intent?.paymentUrl && purchasePaymentTiming(state.intent, Date.now(), state.deadlineAt).canPay) state.cashier = true; },
     closeCashier: () => { state.cashier = false; paused = false; if (!state.busy) void query(); },
     pause: () => { paused = true; clearTimeout(pollTimer); pollTimer = undefined; },
-    wake: () => { paused = false; if (state.open && state.pending && !state.busy && !settled(state.intent) && !state.concluded) void readPendingPayment(); },
+    wake: () => { paused = false; if (state.open && (state.pending || originalRecovery) && !state.busy && !settled(state.intent) && !state.concluded) void readPendingPayment(); },
     topup: (shortfall: number) => {
       const { orderNo, amount, deadlineAt, summary } = state;
       const query = `amount=${Number(amount)}&shortfall=${shortfall.toFixed(6)}&name=${encodeURIComponent(summary)}`

@@ -37,6 +37,7 @@ interface ApiErrorOptions {
   retryable?: boolean;
   retryAfterMs?: number;
   providerReason?: string;
+  purchaseIntentNo?: string;
   sessionEndedReason?: string;
 }
 
@@ -55,6 +56,7 @@ export class ApiError extends Error {
   /** Valid HTTP Retry-After delay at response processing time; zero is meaningful. */
   readonly retryAfterMs?: number;
   readonly providerReason?: string;
+  readonly purchaseIntentNo?: string;
   readonly sessionEndedReason?: string;
 
   constructor(options: ApiErrorOptions) {
@@ -66,6 +68,7 @@ export class ApiError extends Error {
     this.retryable = options.retryable ?? false;
     this.retryAfterMs = validRetryAfterMs(options.retryAfterMs) ? options.retryAfterMs : undefined;
     this.providerReason = readProviderReason(options.providerReason);
+    this.purchaseIntentNo = options.purchaseIntentNo;
     this.sessionEndedReason = options.sessionEndedReason;
   }
 }
