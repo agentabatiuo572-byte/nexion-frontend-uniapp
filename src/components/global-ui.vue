@@ -43,8 +43,7 @@
           <text class="nx-btn__label nx-btn__label--ghost">{{ topConfirm.cancelLabel || t.ui.cancel }}</text>
         </view>
         <view
-          class="nx-btn active:opacity-85"
-          :class="topConfirm.danger ? 'nx-btn--danger' : 'nx-btn--primary'"
+          class="nx-btn nx-btn--primary active:opacity-85"
           role="button"
           tabindex="0"
           @click="ui.resolveConfirm(topConfirm.id, true)"
@@ -176,8 +175,9 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   padding: 10px 14px;
   border-radius: var(--v5-radius-full);
 }
+/* The confirm's main action is always the solid primary type (03 §3.1, §3.5); a destructive confirm says so in its
+   title and copy, not with a red fill outside the four button types. `danger` stays in the confirm API for callers. */
 .nx-btn--primary { background: var(--v5-brand); }
-.nx-btn--danger { background: var(--v5-danger); }
 .nx-btn--ghost { min-height: 44px; background: transparent; }
 /* Detail confirm (P-45): the same centred dialog with a badge and recessed rows. */
 .nx-modal--detail { padding: 24px 20px 12px; }
@@ -204,7 +204,6 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   overflow-wrap: break-word;
   color: var(--v5-on-brand);
 }
-.nx-btn--danger .nx-btn__label { color: #fff; }
 /* The secondary exit is a text button under the primary: brand text, no container (03 §3.1, §3.5 居中确认框). */
 .nx-btn__label--ghost { color: var(--v5-brand); }
 </style>
