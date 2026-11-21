@@ -108,7 +108,11 @@ function trackFocus(): void {
       if (top?.el) {
         if (!top.el.hasAttribute("tabindex")) top.el.setAttribute("tabindex", "-1");
         top.el.focus();
-      } else if (!top && Date.now() - restoredAt < 5_000) relocate(null, null)?.focus();
+      } else if (!top && Date.now() - restoredAt < 5_000) {
+        const landing = relocate(null, null);
+        landing?.focus();
+        if (landing) settleOnLanding(landing);
+      }
     }, 0);
   }, true);
 }
@@ -168,6 +172,19 @@ function focusInside(el: HTMLElement): void {
   if (target === el && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
   target.focus();
 }
+const MAIN_REGION = '[role="main"], main, uni-page-body';
+/** Focus that fell back to the page's main region moves on to its heading or bottom-bar action once the page draws one
+ *  (a result page renders its head just after the payment dialog closes), unless the user has moved on. */
+function settleOnLanding(landing: Element): void {
+  if (!landing.matches(MAIN_REGION)) return;
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    if (document.activeElement !== landing || tries > 10) { clearInterval(timer); return; }
+    const better = relocate(null, null);
+    if (better && better !== landing) { clearInterval(timer); better.focus(); }
+  }, 150);
+}
 const accessibleName = (el: Element) => (el.getAttribute("aria-label") || el.textContent || "").trim();
 
 /** The trigger's replacement: same test id, else same role, name and first class; else the page's bottom-bar action; else the visible heading. */
@@ -194,7 +211,7 @@ function relocate(trace: { testid: string | null; role: string | null; name: str
   if (action) return action;
   // Last: the visible page heading, else the page's main region. Never <body>.
   const [heading] = Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2')).filter((x) => shown(x) && !x.closest("[inert]"));
-  const landing = heading ?? Array.from(document.querySelectorAll<HTMLElement>('[role="main"], main, uni-page-body')).find((x) => shown(x) && !x.closest("[inert]"));
+  const landing = heading ?? Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION)).find((x) => shown(x) && !x.closest("[inert]"));
   if (!landing) return null;
   // Neither is in the Tab order; tabindex -1 lets it take focus without adding a Tab stop.
   if (!landing.hasAttribute("tabindex")) landing.setAttribute("tabindex", "-1");
@@ -316,6 +333,7 @@ export function useDialogA11y(
       : settled ? null : relocate(previousTrace, scope);
     back?.focus();
     restoredAt = Date.now();
+    if (back) settleOnLanding(back);
     previousFocus = null;
     previousTrace = null;
   }
