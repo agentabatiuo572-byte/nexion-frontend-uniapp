@@ -2381,6 +2381,8 @@ export const fil: Messages = {
     coOpenOriginalOrder: "Tingnan ang orihinal na order",
     coPendingCreateTitle: "Hindi pa kumpirmado ang resulta ng huling order",
     coPendingCreateHint: "I-tap ang I-sync ulit para makumpirma ang resulta. Huwag munang mag-order ulit hangga't hindi ito kumpirmado.",
+    coResubmitOrder: "Resubmit order",
+    coResubmitOrderHint: "We couldn't confirm your last order. Resubmitting uses the original request and won't create a duplicate.",
     coPendingCreateChecking: "Kinukumpirma ang resulta ng huling order. Huwag munang mag-order ulit hangga't hindi ito kumpirmado.",
     coPendingCreateFound: "Nagawa na ang huling order. Buksan ito para magpatuloy; hindi na kailangang mag-order ulit.",
     coPendingCreateNotFound: "Hindi nakita ang huling order. Maaari kang mag-order ulit.",

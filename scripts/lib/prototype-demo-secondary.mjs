@@ -1,5 +1,6 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
+import { demoAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 import { createHash } from 'node:crypto';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
@@ -173,9 +174,9 @@ export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUs
 }
 
 export function demoWithdrawalUser(state, headers) {
-  if (headers && (state.sessionState === 'signed-out' || state.authState === 'signed-out'
-    || !['Bearer local-demo-token', 'Bearer formal-probe-access-token'].includes(headers.authorization))) return null;
-  return state.authUser?.userId ?? 900001;
+  if (!headers) return state.authUser?.userId ?? Number(demoAccountId);
+  const accountId = previewAccountId(state, headers);
+  return accountId === null ? null : Number(accountId);
 }
 
 // One rule for every withdrawal read (EarningsReleaseService.withdrawableAmount, AppWithdrawalService.maximumWithdrawable

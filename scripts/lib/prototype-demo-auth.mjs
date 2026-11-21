@@ -1,5 +1,6 @@
 // Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
+import { issuePreviewAccessToken } from './prototype-demo-identity.mjs';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
 const recoverPath = /^\/auth\/users\/login\/attempts\/([^/]+)\/recover$/;
@@ -10,10 +11,10 @@ const registrationReceipt = {
 };
 const success = data => ({ status: 200, body: { code: 0, message: 'OK', data } });
 const failure = (status, message) => ({ status, body: { code: status, message, data: null } });
-const session = user => ({ accessToken: 'local-demo-token', refreshToken: null, tokenType: 'Bearer', user });
 
 export function createAuthDemo(state) {
   let saved = null;
+  const session = user => ({ accessToken: issuePreviewAccessToken(state, user.userId), refreshToken: null, tokenType: 'Bearer', user });
 
   function issue(data) {
     state.sessionState = 'signed-in';

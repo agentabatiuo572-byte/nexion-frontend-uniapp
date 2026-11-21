@@ -17,6 +17,7 @@ import { stakingDemo } from './prototype-demo-staking.mjs';
 import { demoNotifications } from './prototype-demo-notifications.mjs';
 import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs';
 import { savedAttemptOptions } from './prototype-demo-auth.mjs';
+import { previewAccountId } from './prototype-demo-identity.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { contentOptions, demoHasLongBillRefs } from './prototype-demo-long-content.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
@@ -566,7 +567,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const alreadyActive=device.activatedAt!==null;
     if(!alreadyActive){
       if(clientMaxDevices>fleet.slotCap||fleet.slotsUsed>=fleet.slotCap)refuse('DEVICE_SLOT_CAP_EXCEEDED');
-      (state.deviceActivations??={})[deviceId]={status:'ACTIVE',activatedAt:now,rowVersion:expectedVersion+1,runtimeStatus:'ONLINE'};
+      (state.deviceActivations??={})[deviceId]={status:'ACTIVE',activatedAt:now,deactivatedAt:null,rowVersion:expectedVersion+1,runtimeStatus:'ONLINE'};
     }
     const receipt={deviceId,instanceNo:device.instanceNo,status:alreadyActive?device.status:'ACTIVE',
       activeCount:fleet.slotsUsed-fleet.reservedSlotCount-fleet.trialSlotCount+Number(!alreadyActive),
@@ -574,14 +575,58 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     (state.deviceActivationReceipts??={})[command]={identity,receipt};
     return receipt;
   }
+  const deactivate = pathname.match(/^\/api\/device\/(\d+)\/deactivate$/);
+  if (deactivate && request.method() === 'POST') {
+    const fail = (status, message) => { throw Object.assign(new Error(message), {status}); };
+    const owner = previewAccountId(state, request.headers?.());
+    if (!owner) fail(403, 'USER_SUBJECT_REQUIRED');
+    const deviceId = Number(deactivate[1]);
+    const {expectedVersion} = request.postDataJSON();
+    if (!Number.isSafeInteger(deviceId) || deviceId <= 0) fail(422, 'DEVICE_ID_REQUIRED');
+    if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) fail(422, 'DEVICE_VERSION_REQUIRED');
+    const key = request.headers?.()['idempotency-key']?.trim();
+    if (!key) fail(422, 'IDEMPOTENCY_KEY_REQUIRED');
+    if (key.length > 128) fail(422, 'IDEMPOTENCY_KEY_INVALID');
+    const command = `deactivate:${owner}:${key}`;
+    const identity = JSON.stringify([deviceId, expectedVersion]);
+    const prior = state.deviceActivationReceipts?.[command];
+    if (prior) {
+      if (prior.identity !== identity) fail(409, 'IDEMPOTENCY_KEY_CONFLICT');
+      return prior.receipt;
+    }
+    const device = demoFleetFacts(url, locale, state).devices.find(row => row.id === deviceId);
+    if (!device) fail(404, 'DEVICE_NOT_FOUND');
+    if ((device.ownershipStatus ?? 'OWNED') !== 'OWNED') fail(403, 'DEVICE_FORBIDDEN');
+    const alreadyDeactivated = device.status === 'DEACTIVATED';
+    if (!alreadyDeactivated) {
+      if (device.activatedAt == null) fail(409, 'DEVICE_STATE_CONFLICT');
+      if (device.rowVersion !== expectedVersion) fail(409, 'DEVICE_VERSION_CONFLICT');
+      const source = demoReplacementSourceCheck(device, state, true, path =>
+        demoFixture(new URL(path, url.origin), locale, state, {...request, method: () => 'GET'}, now));
+      if (source.refusal) fail(409, source.refusal);
+      (state.deviceActivations ??= {})[deviceId] = {status:'DEACTIVATED', activatedAt:null, deactivatedAt:now,
+        pendingDeactivate:false, runtimeStatus:'OFFLINE', rowVersion:expectedVersion + 1};
+    }
+    const receipt = {deviceId, instanceNo:device.instanceNo, status:'DEACTIVATED',
+      rowVersion:device.rowVersion + Number(!alreadyDeactivated), alreadyDeactivated};
+    (state.deviceActivationReceipts ??= {})[command] = {identity, receipt};
+    return receipt;
+  }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
+  const orderCreateIndex = key => JSON.stringify([previewAccountId(state, request.headers?.()), key]);
+  const commandIndex = pathname === '/api/orders' && request.method() === 'POST' ? orderCreateIndex(commandKey) : commandKey;
   const remember=(operation,targetId,response,order)=>{
-    if(commandKey){state.commands??={};state.commands[commandKey]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(order),response:structuredClone(response)};}
+    if(commandKey){state.commands??={};state.commands[commandIndex]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(order),response:structuredClone(response)};}
     return response;
   };
-  if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
-  if(!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  if (pathname.startsWith('/api/promotion-commands/')) {
+    const key = decodeURIComponent(pathname.split('/').pop());
+    const operation = url.searchParams.get('operation');
+    const index = operation === 'createOrder' ? orderCreateIndex(key) : key;
+    return state.commands?.[index] ?? {idempotencyKey:key, operation, targetId:url.searchParams.get('targetId'), status:'NOT_FOUND', order:null};
+  }
+  if(!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandIndex])return structuredClone(state.commands[commandIndex].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.interfaceLanguages=previewInterfaceLanguages(state.interfaceLanguagesState);
@@ -994,7 +1039,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const sample=base('/api/promotions').items[0];
     const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
     const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
-    const authenticated=['Bearer local-demo-token','Bearer formal-probe-access-token'].includes(request?.headers?.().authorization);
+    const authenticated=previewAccountId(state,request?.headers?.())!==null;
     const exact=state.repurchaseState==='boundary'||state.repurchaseState==='outside';
     const repurchaseWindow=exact?{minDays:30,maxDays:30}:{minDays:state.repurchaseState==='inside'?7:0,maxDays:90};
     const readsPurchaseHistory=authenticated&&!empty&&state.eventState!=='empty';

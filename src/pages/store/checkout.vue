@@ -246,7 +246,7 @@
         <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
       </view>
       <view v-if="!promotionRoute && (originalOrderNavigationFailed || (pendingCreateUnresolved && createLookupUnavailable)) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
-        <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.catalogRetry" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
+        <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <text v-if="checkoutCapacityBlocked" class="nx-tray-note w-full">{{ checkoutCapacityMessage }}</text>
@@ -382,7 +382,7 @@ const pendingCreateUnresolved = computed(() => !!pendingCheckoutCreate.value && 
   && pendingCheckoutCreate.value.request.idempotencyKey !== confirmedMissingCreateKey.value);
 const pendingCreateDescription = computed(() => originalOrderNavigationFailed.value
   ? (pendingCreateFound.value ? t.value.store.coPendingCreateFound : t.value.store.coOriginalOrderOpenHint)
-  : (createLookupUnavailable.value ? t.value.store.coPendingCreateHint : t.value.store.coPendingCreateChecking));
+  : (createLookupUnavailable.value ? t.value.store.coResubmitOrderHint : t.value.store.coPendingCreateChecking));
 // A definitive server refusal of this payment: shown with its reason and a cancel-order exit.
 const paymentBlocked = ref('');
 const hasOriginalCheckout = computed(() => !!createdCheckoutOrder.value || !!pendingCheckoutCreate.value);
@@ -1862,7 +1862,7 @@ async function retryOriginalCheckout() {
     return;
   }
   const pendingCreate = pendingCheckoutCreate.value;
-  if (!pendingCreate || !createLookupUnavailable.value) return;
+  if (!pendingCreate || !pendingCreateUnresolved.value || !createLookupUnavailable.value) return;
   const scope = captureCheckoutRoute();
   const attempt = ++checkoutLeaveAttempt;
   checkoutLeaving.value = true;
@@ -1876,7 +1876,7 @@ async function retryOriginalCheckout() {
     pendingCheckoutCreate.value = null;
     await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`, scope);
   } catch {
-    if (isCurrentCheckoutRoute(scope)) toast.warn(t.value.store.coPendingCreateHint);
+    if (isCurrentCheckoutRoute(scope)) toast.warn(t.value.store.coPendingCreateTitle);
   } finally {
     if (attempt === checkoutLeaveAttempt) checkoutLeaving.value = false;
   }

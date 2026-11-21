@@ -2381,6 +2381,8 @@ export const uz: Messages = {
     coOpenOriginalOrder: "Asl buyurtmani koʻrish",
     coPendingCreateTitle: "Oldingi buyurtma natijasi hali tasdiqlanmagan",
     coPendingCreateHint: "Natijani tasdiqlash uchun «Qayta yuklash» tugmasini bosing. Natija tasdiqlanmaguncha yangi buyurtma bermang.",
+    coResubmitOrder: "Resubmit order",
+    coResubmitOrderHint: "We couldn't confirm your last order. Resubmitting uses the original request and won't create a duplicate.",
     coPendingCreateChecking: "Oldingi buyurtma natijasi tasdiqlanmoqda. Natija tasdiqlanmaguncha yangi buyurtma bermang.",
     coPendingCreateFound: "Oldingi buyurtma yaratilgan. Davom etish uchun uni oching, qayta buyurtma berish shart emas.",
     coPendingCreateNotFound: "Oldingi buyurtma topilmadi. Buyurtmani qayta berishingiz mumkin.",
