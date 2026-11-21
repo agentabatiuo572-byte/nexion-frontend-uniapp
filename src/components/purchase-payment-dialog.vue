@@ -181,7 +181,7 @@
       </view>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30). -->
-    <view v-if="!received && (isBank || s.canResubmit) && !conclusion" class="pp-bar nx-glass-bar">
+    <view v-if="!received && (s.canResubmit || (isBank && cashierUrl)) && !conclusion" class="pp-bar nx-glass-bar">
       <NxButton v-if="s.canResubmit" class="pp-reopen" :label="copy.retryPay" variant="primary" :busy="s.busy" :disabled="s.reading" @click="payment.retryOriginal" />
       <NxButton v-else class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
     </view>
