@@ -14,7 +14,7 @@
     <view v-else-if="remoteApiEnabled" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/wallet-exchange" />
       <!-- A failed capability read leaves the guide with nothing to show: the shared whole-page result, as on every other guide. -->
-      <EmptyState v-if="!exchangeLoading && exchangeAvailable === null" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="loadExchangeCaps" />
+      <EmptyState v-if="capsFailed && exchangeAvailable === null" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="loadExchangeCaps" />
       <view v-else class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px; color: var(--v5-ink-2)">
         <text class="block" style="font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight)">{{ exchangeAvailable === false ? w.pausedTitle : t.howPublished.loading }}</text>
         <text v-if="exchangeAvailable === false" class="block" style="margin-top: 8px; font-size: var(--ui-type-list-subtitle); line-height: 1.6">{{ w.pausedBody }}</text>
@@ -46,6 +46,8 @@ const t = useT();
 const w = computed(() => t.value.exchangeHowItWorks);
 const exchangeAvailable = ref<boolean | null>(null);
 const exchangeLoading = ref(remoteApiEnabled);
+// View only: once the read has failed, the result stays on screen while a re-read runs.
+const capsFailed = ref(false);
 let capsRequest = 0;
 
 async function loadExchangeCaps() {
@@ -55,9 +57,10 @@ async function loadExchangeCaps() {
   exchangeLoading.value = true;
   try {
     const caps = await exchangeApi.fetchCaps();
-    if (request === capsRequest) exchangeAvailable.value = caps.swapEnabled;
+    if (request === capsRequest) { exchangeAvailable.value = caps.swapEnabled; capsFailed.value = false; }
   } catch {
     // Unknown is not open: the guide must not claim swaps can be submitted.
+    if (request === capsRequest) capsFailed.value = true;
   } finally {
     if (request === capsRequest) exchangeLoading.value = false;
   }

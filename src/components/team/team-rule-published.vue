@@ -1,7 +1,7 @@
 <template>
   <view class="team-rule-published">
     <SubPageHeader :back="back" :title="heading" />
-    <view v-if="loading && !content" class="team-rule-published__notice" role="status"><text>{{ t.howPublished.loading }}</text></view>
+    <view v-if="loading && !content && !failureShown" class="team-rule-published__notice" role="status"><text>{{ t.howPublished.loading }}</text></view>
     <template v-if="content">
       <view v-if="languageFallback" class="team-rule-published__notice" role="status" aria-live="polite">
         <text>{{ t.howPublished.languageFallback }}</text>
@@ -9,7 +9,7 @@
       <TeamRuleHero :kind="kind" :title="copy.overview" :sections="directory" :nav-label="copy.contents" />
       <TeamRuleDocument :blocks="content.blocks" />
     </template>
-    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
+    <EmptyState v-if="failureShown && !content" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
     <view class="mx-4 mt-6"><view class="reward-cta reward-cta--wide" role="button" tabindex="0" @click="navBack(back)" @keydown.enter.prevent="navBack(back)" @keydown.space.prevent="navBack(back)"><text>{{ backLabel }}</text></view></view>
   </view>
 </template>
@@ -38,6 +38,8 @@ const copy = computed(() => teamRuleGuideCopy(locale.code));
 const content = ref<HowContentDocument | null>(null);
 const loading = ref(true), error = ref(false);
 const requestFence = new PublishedContentRequestFence();
+// View only: a shown failure stays put while an automatic re-read runs (no swap to the loading line).
+const failureShown = ref(false);
 // Directory chips only when the publication is short enough to scan (design system 04.7).
 const directory = computed(() => {
   const sections = (content.value?.blocks ?? []).filter(block => block.kind !== "callout").map(block => ({ id: block.id, title: block.title }));
@@ -57,16 +59,18 @@ async function load() {
     if (props.contentKey === 'team-unilevel-how' && (!next.blocks.some(block => block.id === 'direct-referral-scope')
       || (next.schemaVersion === 2 && (next.templateId !== 'unilevel-v2' || !next.blocks.some(block => block.id === 'seven-layer-scope'))))) throw new Error('TEAM_PUBLICATION_REQUIRED');
     content.value = next;
+    failureShown.value = false;
   } catch (failure) {
     if (!requestFence.isCurrent(generation)) return;
     if (!(failure instanceof ApiError && failure.kind === 'network')) content.value = null;
     error.value = true;
+    failureShown.value = true;
   } finally {
     if (requestFence.isCurrent(generation)) { loading.value = false; requestFence.settle(generation); }
   }
 }
 watch(() => [props.contentKey, locale.code], () => {
-  requestFence.invalidate(); content.value = null; error.value = false;
+  requestFence.invalidate(); content.value = null; error.value = false; failureShown.value = false;
   if (remoteApiEnabled) void load();
   else loading.value = false;
 }, { immediate: true, flush: 'sync' });
