@@ -35,7 +35,7 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :payment-confirmed="walletPaymentConfirmed || commerceOrderHasPayment(resultOrder)" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
+        <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -218,7 +218,7 @@ import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import { asApiError } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { paidOrderReceipt } from "@/api/order-api";
+import { paidOrderReceipt, type PaidOrderReceipt } from "@/api/order-api";
 import { readPaymentCommand } from '@/api/payment-command-api';
 import { beginOrderAction,readOrderAction,markOrderActionPaid,clearOrderAction,type PendingOrderAction } from '@/lib/order-command-fence';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
@@ -389,8 +389,9 @@ const orderPresentation = ref<Order | null>(null);
 const orderEnvironmentInvalidated = ref(false);
 watch(() => apiRuntimeConfig?.environment, () => { orderEnvironmentInvalidated.value = true; orderPresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, locale.code], () => { orderPresentation.value = null; }, { flush: 'sync' });
-watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value], () => {
+watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, apiRuntimeConfig?.environment], () => {
   paymentResultOrder.value = null; paymentResultVisible.value = false;
+  paymentResultReceipt.value = null;
   paymentSheetOpen.value = false; paymentNotice.value = '';
   pendingPaymentChecking.value = false;
 }, { flush: 'sync' });
@@ -418,10 +419,10 @@ const remoteOrderBinding = computed(() => {
 const remoteOrderBoundAccount = computed(() => remoteOrderBinding.value.accountKey);
 const showRemoteOrderLoading = computed(() => remoteApiEnabled
   && hasOrderId.value
-  && !order.value
+  && !resultOrder.value
   && !remoteOrderError.value
   && (!remoteOrderBoundAccount.value || !remoteOrderAttempted.value || remoteOrderRefreshing.value));
-const showOrderNotFound = computed(() => !order.value && (!remoteApiEnabled
+const showOrderNotFound = computed(() => !resultOrder.value && (!remoteApiEnabled
   || !hasOrderId.value
   || (remoteOrderBoundAccount.value && remoteOrderAttempted.value
     && !remoteOrderRefreshing.value && !remoteOrderError.value)));
@@ -482,7 +483,17 @@ const cancelBlocked = ref(false);
 const paymentNoticeReason = ref('');
 const noticeCancelFailed = ref(false);
 const paymentResultOrder = ref<Order|null>(null);
+const paymentResultReceipt = ref<PaidOrderReceipt|null>(null);
 const resultOrder = computed(() => order.value ?? paymentResultOrder.value);
+const paymentResultAmount = computed<{ value: Order['total']; currency: 'USD' | 'USDT' } | undefined>(() => {
+  const receipt = paymentResultReceipt.value;
+  if (receipt) return {
+    value: receipt.paidTotalUsdt ?? receipt.amountUsdt,
+    currency: receipt.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT',
+  };
+  const current = resultOrder.value;
+  if (current && commerceOrderHasPayment(current)) return commerceOrderAmount(current);
+});
 // Same branch as the template's result view: the header drops back and retitles only while that view is on screen.
 const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value && (showTrialResult.value || paymentResultVisible.value));
 
@@ -962,6 +973,7 @@ async function handleWalletPayment() {
   }
   if (typeof liveOrder.value.total !== 'number') return; // Promoted orders resume through their original-command checkout above.
   const scope = captureDetailScope();
+  const originalOrder = liveOrder.value;
   const requestOrderNo = liveOrder.value.id;
   const requestAmountUsdt = liveOrder.value.total;
   const requestItems = liveOrder.value.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
@@ -1014,7 +1026,8 @@ async function handleWalletPayment() {
       throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");
     }
     paymentConfirmed = true;
-    paymentResultOrder.value = liveOrder.value ?? null;
+    paymentResultOrder.value = originalOrder;
+    paymentResultReceipt.value = receipt;
     paymentResultVisible.value = true;
     markOrderActionPaid(scope.accountScope.accountKey,requestOrderNo);
     orderAction.value=readOrderAction(scope.accountScope.accountKey,requestOrderNo);
@@ -1024,11 +1037,9 @@ async function handleWalletPayment() {
           || !app.adoptCommerceWallet(receipt.walletBalanceAfterUsdt, receiptScope))) {
       throw new Error("WALLET_PAYMENT_RECEIPT_ACCOUNT_MISMATCH");
     }
-    await orders.ensureRemoteOrder(requestOrderNo);
+    await refreshOrder();
     if (!isCurrentDetailScope(scope)) return;
-    if (liveOrder.value?.status !== "activated") {
-      throw new Error("WALLET_PAYMENT_ORDER_READBACK_MISMATCH");
-    }
+    if (remoteOrderError.value || !liveOrder.value || !['activated', 'inventory'].includes(liveOrder.value.status)) return;
     if(orderAction.value)clearOrderAction(scope.accountScope.accountKey,requestOrderNo,orderAction.value.key);orderAction.value=null;
     void app.refreshRemoteFleet(receiptScope);
   } catch (error) {
