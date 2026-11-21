@@ -66,7 +66,7 @@
           <view class="pp-tabs" role="radiogroup" :aria-label="copy.networkLabel" @keydown.right.prevent="moveFocus($event, 1, true)" @keydown.down.prevent="moveFocus($event, 1, true)" @keydown.left.prevent="moveFocus($event, -1, true)" @keydown.up.prevent="moveFocus($event, -1, true)">
             <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id }" role="radio" :tabindex="!s.originalRecovery && s.method === tab.id ? 0 : -1"
               :aria-disabled="!!s.originalRecovery" :aria-checked="s.method === tab.id" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
-              <text class="pp-tab__a">{{ tab.title }}</text><text class="pp-tab__b">{{ tab.chain }}</text>
+              <view class="pp-opt__tx"><text class="pp-tab__a">{{ tab.title }}</text><text class="pp-tab__b">{{ tab.chain }}</text></view><view class="pp-radio" aria-hidden="true" />
             </view>
           </view>
         </template>
@@ -107,11 +107,7 @@
     </view>
 
     <view v-if="received" class="pp-scroll pp-done">
-      <view class="pp-done__hero" role="status">
-        <view class="pp-done__badge" aria-hidden="true"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></view>
-        <text class="pp-done__title">{{ copy.received }}</text>
-        <text class="pp-done__desc">{{ copy.provisioning }}</text>
-      </view>
+      <NxResultHead tone="success" :title="copy.received" :description="copy.provisioning" />
       <view class="pp-track" role="list" :aria-label="copy.provisionTrack">
         <view class="pp-step" role="listitem"><view class="pp-seg is-done" /><view class="pp-dot is-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></view><text class="pp-step__l">{{ copy.trackPaid }}</text></view>
         <view class="pp-step" role="listitem"><view class="pp-seg" /><view class="pp-dot is-current" /><text class="pp-step__l">{{ copy.trackProvision }}</text></view>
@@ -123,10 +119,6 @@
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.paidMethod }}</text><text class="pp-kv__v">{{ methodName }}</text></view>
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.product }}</text><text class="pp-kv__v">{{ s.summary }}</text></view>
         <view v-if="s.orderNo" class="pp-kv"><text class="pp-kv__k">{{ copy.orderNo }}</text><text class="pp-kv__v pp-mono">{{ s.orderNo }}</text></view>
-      </view>
-      <view class="pp-done__foot">
-        <text class="pp-note">{{ copy.leaveOk }}</text>
-        <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
       </view>
     </view>
 
@@ -150,18 +142,19 @@
       <view class="pp-card">
         <view class="pp-wait" :class="{ 'is-alone': isBank || conclusion, 'is-concluded': conclusion, 'is-paused': networkPaused }" role="status" :style="{ '--pp-st': waitTone }">
           <view class="pp-wait__head">
-            <view v-if="!conclusion" class="pp-wait__spin" aria-hidden="true" />
+            <!-- Nothing runs while the page waits for the user to resend, so the spinner stays only for live checks (07 §7.1). -->
+            <view v-if="!conclusion && !s.canResubmit" class="pp-wait__spin" aria-hidden="true" />
             <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
           </view>
           <text v-if="conclusion" class="pp-wait__s">{{ conclusion.body }}</text>
           <text v-else-if="ready && !s.error" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
         </view>
         <template v-if="!isBank && ready">
-          <view class="pp-card__top"><text class="pp-card__t">{{ copy.address }}</text><text class="pp-tag">{{ networkName }}</text></view>
+          <view class="pp-card__top"><text class="pp-card__t">{{ copy.address }}</text><NxTag tone="brand" :label="networkName" /></view>
           <view v-if="qrImage" class="pp-qr"><image class="pp-qr__img" :src="qrImage" mode="aspectFit" :aria-label="copy.addressQr" /></view>
           <text v-if="ready" class="pp-cap">{{ copy.scan }}</text>
           <view v-if="s.intent?.address" class="pp-addr">
-            <text class="pp-addr__t" selectable>{{ s.intent.address }}</text>
+            <NxCodeValue class="pp-addr__t" :value="s.intent.address" :label="copy.address" full :copyable="false" />
             <view class="pp-copy nx-frosted-button" role="button" tabindex="0" :aria-label="copy.copyAddress" @click="copyAddress" @keydown.enter.prevent="copyAddress">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
             </view>
@@ -174,7 +167,7 @@
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.channelFee }}</text><text class="pp-kv__v">{{ amount(fees.channelFeeUsdt) }}</text></view>
         <view v-if="!isBank" class="pp-kv"><text class="pp-kv__k">{{ copy.networkFee }}</text><text class="pp-kv__v">{{ amount(fees.networkConfirmFeeUsdt) }}</text></view>
         <view class="pp-div" />
-        <view class="pp-kv"><text class="pp-kv__k">{{ copy.total }}</text><text class="pp-kv__v">{{ isBank ? `$${amount(fees.totalUsdt)}` : `${amount(fees.totalUsdt)} USDT` }}</text></view>
+        <view class="pp-kv"><text class="pp-kv__k">{{ copy.total }}</text><text class="pp-kv__v">{{ isBank ? `$${amount(fees.totalUsdt)}` : `${amount(fees.totalUsdt)}\u00A0USDT` }}</text></view>
       </view>
 
       <view v-if="!conclusion" class="pp-warn">
@@ -186,6 +179,10 @@
     <view v-if="!received && (isBank || s.canResubmit) && !conclusion" class="pp-bar nx-glass-bar">
       <NxButton v-if="s.canResubmit" class="pp-reopen" :label="copy.retryPay" variant="primary" :busy="s.busy" :disabled="s.reading" @click="payment.retryOriginal" />
       <NxButton v-else class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
+    </view>
+    <view v-if="received" class="pp-bar pp-bar--done nx-glass-bar">
+      <text class="nx-tray-note">{{ copy.leaveOk }}</text>
+      <NxButton :label="copy.viewOrder" variant="primary" @click="payment.openOrder" />
     </view>
     <view v-if="networkPaused && s.orderNo" class="pp-bar nx-glass-bar">
       <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
@@ -231,6 +228,9 @@ import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-l
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxNoticeDialog from '@/components/ui/nx-notice-dialog.vue';
+import NxResultHead from '@/components/ui/nx-result-head.vue';
+import NxTag from '@/components/ui/nx-tag.vue';
+import NxCodeValue from '@/components/ui/nx-code-value.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
 import { usePurchasePayment, purchaseConclusion, type PurchaseNotice } from '@/store/purchase-payment';
@@ -350,7 +350,7 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
       ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
     case 'quoteChanged': return { icon: 'info', tone: 'warning', title: c.changedTitle,
-      body: s.quote ? `${c.changed} ${c.total}: ${s.method === 'HDPAY_BANK' ? '$' : ''}${amount(s.quote.totalUsdt)}${s.method === 'HDPAY_BANK' ? '' : ' USDT'}` : c.changed,
+      body: s.quote ? `${c.changed} ${c.total}: ${s.method === 'HDPAY_BANK' ? '$' : ''}${amount(s.quote.totalUsdt)}${s.method === 'HDPAY_BANK' ? '' : '\u00A0USDT'}` : c.changed,
       primary: c.ok, onPrimary: dismiss, onSecondary: dismiss };
     case 'changed': return { icon: 'info', tone: 'warning', title: c.changedTitle, body: c.changed, primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close, ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
     case 'rejectTradeinBusy':
@@ -480,14 +480,16 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-head__text { flex: 1; min-width: 0; }
 .pp-title { display: block; font: 600 var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
 .pp-steps { flex: none; display: block; margin-top: 6px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.pp-circ { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
-.pp-cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-1); color: var(--v5-warning); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.pp-circ { position: relative; flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+/* 36px glass circle, 44px hit area (03 §3.1). */
+.pp-circ::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; }
+.pp-cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-1); color: var(--v5-warning-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-cd.is-urgent { color: var(--v5-danger); font-weight: 500; }
 .pp-body { min-height: 0; overflow-y: auto; }
 .pp-prod { display: flex; align-items: center; gap: var(--v5-space-3); margin-top: var(--v5-space-4); padding: var(--v5-space-3); border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
 .pp-prod__img { flex: none; width: 44px; height: 44px; }
 .pp-prod__text { flex: 1; min-width: 0; }
-.pp-prod__name { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: anywhere; }
+.pp-prod__name { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .pp-prod__meta { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-prod .pp-prod__amt { flex: none; font-size: 17px; line-height: 24px; font-variant-numeric: normal; }
 .pp-prod__amt :deep(.checkout-amount__symbol) { margin-right: 1px; }
@@ -495,30 +497,33 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-label { display: block; margin-top: var(--v5-space-5); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-opts { display: grid; gap: 10px; margin-top: var(--v5-space-2); }
 .pp-opt { min-height: 68px; box-sizing: border-box; padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-l); background: var(--v5-surface-2); box-shadow: inset 0 0 0 1px var(--v5-border); display: flex; flex-direction: column; justify-content: center; }
-.pp-opt.on { background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
+.pp-opt.on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface-2)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
 .pp-opt__row { display: flex; align-items: center; gap: var(--v5-space-3); }
 .pp-opt__ic { flex: none; width: 40px; height: 40px; border-radius: var(--v5-radius-s); display: grid; place-items: center; background: var(--v5-surface-3); color: var(--v5-ink-2); }
 .pp-opt.on .pp-opt__ic { background: var(--v5-brand-soft); color: var(--v5-brand); }
 .pp-opt__tx { flex: 1; min-width: 0; }
 .pp-opt__t { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .pp-opt__h { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
-.pp-radio { flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); }
-.pp-opt.on .pp-radio, .pp-tab.on .pp-radio { box-shadow: inset 0 0 0 6px var(--v5-brand); }
+/* Picker radio (design-rules Controls): 22px, hollow 1.5px ring; selected = 2px brand ring + 12px brand dot. */
+.pp-radio { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); }
+.pp-opt.on .pp-radio, .pp-tab.on .pp-radio { box-shadow: inset 0 0 0 2px var(--v5-brand); }
+.pp-opt.on .pp-radio::after, .pp-tab.on .pp-radio::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--v5-brand); }
 .pp-short { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--v5-border); }
 /* The 32px pill keeps its 44px hit area without adding visible space. */
 .pp-short :deep(.nx-button) { margin: -6px 0; flex-shrink: 0; white-space: nowrap; }
-.pp-short__t { min-width: 0; color: var(--v5-warning); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
-.pp-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: var(--v5-space-2); }
-.pp-tab { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; box-sizing: border-box; padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); box-shadow: inset 0 0 0 1px var(--v5-border); }
-.pp-tab.on { background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
-.pp-tab__a { font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
-.pp-tab__b { font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.pp-short__t { min-width: 0; color: var(--v5-warning-ink); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+/* Network picker: stacked radio rows like the method rows (design-rules Controls), name left, radio right. */
+.pp-tabs { display: grid; gap: 10px; margin-top: var(--v5-space-2); }
+.pp-tab { display: flex; align-items: center; gap: var(--v5-space-3); min-height: 64px; box-sizing: border-box; padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-l); background: var(--v5-surface-2); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.pp-tab.on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface-2)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
+.pp-tab__a { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
+.pp-tab__b { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .pp-fees { margin-top: var(--v5-space-5); padding: var(--v5-space-1) var(--v5-space-4); border-radius: var(--v5-radius-l); background: var(--v5-surface-2); }
 .pp-fees .pp-kv { min-height: 36px; }
 .pp-fees .pp-kv + .pp-kv { border-top: 1px solid var(--v5-border); }
 .pp-kv { display: flex; justify-content: space-between; align-items: center; gap: var(--v5-space-3); min-height: 32px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .pp-kv__k { color: var(--v5-ink-3); }
-.pp-kv__v { min-width: 0; font-weight: 500; color: var(--v5-ink); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.pp-kv__v { min-width: 0; font-weight: 500; color: var(--v5-ink); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: break-word; }
 .pp-foot { flex: none; }
 .pp-total { display: flex; align-items: baseline; justify-content: space-between; margin-top: var(--v5-space-4); }
 .pp-total.is-ruled { margin-top: var(--v5-space-5); padding-top: var(--v5-space-4); border-top: 1px solid var(--v5-border); }
@@ -545,7 +550,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-hero__amt { min-width: 0; font: 500 32px/40px var(--font-amount); letter-spacing: -.02em; white-space: nowrap; color: var(--v5-ink); }
 .pp-hero .pp-cd { margin-top: 10px; }
 .pp-hero__meta { display: block; margin-top: var(--v5-space-3); padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
-.pp-copy { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+.pp-copy { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
 /* Inside the tinted amount card the copy control is a bare icon with a 44px target (P-67). */
 .pp-copy--plain { width: 44px; height: 44px; margin-right: -10px; cursor: pointer; }
 .pp-copy--plain:active { opacity: .6; }
@@ -560,12 +565,12 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-wait__s { margin-left: auto; text-align: right; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-2); }
 .pp-card__t { display: block; font: 600 var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
-.pp-tag { height: 24px; padding: 0 var(--v5-space-2); border-radius: var(--v5-radius-full); display: inline-flex; align-items: center; background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
 .pp-qr { width: 200px; height: 200px; margin: var(--v5-space-4) auto 0; padding: var(--v5-space-3); box-sizing: border-box; border-radius: var(--v5-radius-m); background: #fff; box-shadow: inset 0 0 0 1px var(--v5-border); }
 .pp-qr__img { display: block; width: 176px; height: 176px; }
 .pp-cap { display: block; margin-top: var(--v5-space-2); text-align: center; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .pp-addr { display: flex; align-items: center; gap: var(--v5-space-2); margin-top: var(--v5-space-3); padding: 6px 6px 6px 14px; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
-.pp-addr__t { flex: 1; min-width: 0; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-jet-mono); color: var(--v5-ink); overflow-wrap: anywhere; }
+/* The full address wraps evenly in mono (NxCodeValue full, 03 §3.6.1); the copy control beside it copies the whole address. */
+.pp-addr__t { flex: 1; }
 .pp-wait.is-alone { margin: 0; padding: 0 2px; border: 0; }
 /* While the address is still being prepared nothing follows the status, so it keeps no divider. */
 .pp-wait:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
@@ -578,14 +583,12 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 /* A lone bar action spans the bar like the bank page's reopen button. */
 .pp-bar > .nx-button { flex: 1; }
 .pp-div { height: 1px; margin: 6px 0; background: var(--v5-border); }
-.pp-warn { display: flex; gap: var(--v5-space-2); padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: color-mix(in srgb, var(--v5-warning-soft) 60%, transparent); color: var(--v5-warning); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
+.pp-warn { display: flex; gap: var(--v5-space-2); padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: color-mix(in srgb, var(--v5-warning-soft) 60%, transparent); color: var(--v5-warning-ink); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .pp-warn > :first-child { flex: none; margin-top: 2px; }
 
-.pp-done { display: flex; flex-direction: column; padding: 48px var(--v5-space-4) var(--v5-space-8); }
-.pp-done__hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 var(--v5-space-2); }
-.pp-done__badge { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-brand); background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--v5-brand) 26%, transparent), color-mix(in srgb, var(--v5-brand) 10%, transparent) 70%); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 6%, transparent), 0 0 60px color-mix(in srgb, var(--v5-brand) 22%, transparent); }
-.pp-done__title { display: block; margin-top: var(--v5-space-6); font: 600 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); }
-.pp-done__desc { display: block; margin-top: var(--v5-space-2); color: var(--v5-ink-2); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
+/* Bottom clearance for the note + button tray (04 §4.0: tray height + 38). */
+.pp-done { display: flex; flex-direction: column; padding: 48px var(--v5-space-4) 136px; }
+.pp-bar--done { flex-direction: column; align-items: stretch; }
 .pp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 36px; }
 .pp-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); text-align: center; }
 .pp-seg { position: absolute; top: 11px; left: calc(50% + 16px); width: calc(100% - 32px); height: 2px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); }
@@ -597,14 +600,13 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-step__l { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink); }
 .pp-receipt { margin-top: 36px; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
 .pp-receipt .pp-receipt__amt { font-size: 20px; line-height: 28px; font-variant-numeric: normal; }
-.pp-done__foot { margin-top: auto; padding-top: var(--v5-space-6); display: flex; flex-direction: column; align-items: stretch; gap: var(--v5-space-2); text-align: center; }
 
 .pp-cashier { position: fixed; inset: 0; z-index: 955; display: flex; flex-direction: column; background: var(--v5-bg); color: var(--v5-ink); }
 .pp-cashier__bar { flex: none; background: var(--v5-surface); box-shadow: 0 1px 0 var(--v5-border); }
 .pp-cashier__row { position: relative; z-index: 120; height: 56px; padding: 0 var(--v5-space-4); display: flex; align-items: center; gap: var(--v5-space-3); }
 .pp-cashier__mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .pp-cashier__t { font: 600 var(--ui-type-nav-title)/var(--ui-type-nav-title-lh) var(--font-v5); }
-.pp-cashier__cd { display: inline-flex; align-items: center; gap: var(--v5-space-1); color: var(--v5-warning); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.pp-cashier__cd { display: inline-flex; align-items: center; gap: var(--v5-space-1); color: var(--v5-warning-ink); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-cashier__cd.is-urgent { color: var(--v5-danger); }
 .pp-cashier__lock { position: relative; z-index: 120; height: 26px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-1); color: var(--v5-ink-3); font: 400 11px/14px var(--font-v5); }
 .pp-cashier__frame { flex: 1; min-height: 0; background: #fff; }

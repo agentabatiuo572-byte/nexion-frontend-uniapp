@@ -51,6 +51,7 @@ const end = computed(() => props.value.slice(cut.value));
 .nx-code__tail { flex: none; }
 .nx-code__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .nx-code--full { align-items: flex-start; width: 100%; min-width: 0; }
-.nx-code__full { flex: 1; min-width: 0; word-break: break-all; }
+/* Even wrap (03 §3.6.1 均匀折行): the lines share the characters instead of a full line and a short tail. */
+.nx-code__full { flex: 1; min-width: 0; word-break: break-all; text-wrap: balance; }
 .nx-code--full :deep(.copy-code-button) { margin-top: -4px; }
 </style>
