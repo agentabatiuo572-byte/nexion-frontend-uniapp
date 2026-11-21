@@ -91,8 +91,7 @@
             </text>
             <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
             <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
-            <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
-            <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
+            <text v-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.purchaseEligibilityIneligible) }}</text>
           </view>
           <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: (p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-surface-2)">
@@ -123,8 +122,7 @@
               <text class="block" :style="itemMetaStyle">
                 <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
               </text>
-              <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
-              <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.gateBlockedToast }}</text>
+              <text v-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.gateBlockedToast) }}</text>
               <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             </view>
             <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
@@ -340,11 +338,34 @@ const suggestions = computed(() =>
     ).slice(0, 3)
     : [],
 );
-watch([() => products.value.map((p) => p.id).join("|"),
-  () => suggestions.value.map((p) => p.id).join("|"), () => app.accountKey], () => {
-  if (remoteApiEnabled) void Promise.all([...products.value, ...suggestions.value]
-    .map((p) => purchaseEligibilityStore.ensure(p.id, true)));
+const eligibilityProductIds = computed(() => [...products.value, ...suggestions.value].map((p) => p.id));
+watch([eligibilityProductIds, () => app.accountKey], ([ids, account], [previousIds, previousAccount]) => {
+  if (!remoteApiEnabled) return;
+  for (const id of ids) {
+    if (account !== previousAccount || !previousIds?.includes(id)) void purchaseEligibilityStore.ensure(id, true);
+  }
 }, { immediate: true });
+
+function eligibilityUnavailable(productNo: string): boolean {
+  return purchaseEligibilityStore.state(productNo).status === "unavailable";
+}
+
+const failedEligibilityIds = computed(() => remoteApiEnabled
+  ? eligibilityProductIds.value.filter((id) => purchaseEligibilityStore.state(id).status === "error")
+  : []);
+useAutoRecovery({
+  failed: () => failedEligibilityIds.value.length > 0,
+  retry: () => Promise.all(failedEligibilityIds.value.map((id) => purchaseEligibilityStore.ensure(id, true))),
+});
+
+function eligibilityLabel(productNo: string, ineligible: string): string {
+  switch (purchaseEligibilityStore.state(productNo).status) {
+    case "unavailable": return t.value.store.temporarilyOutOfStock;
+    case "error": return t.value.store.purchaseEligibilityError;
+    case "ready": return ineligible;
+    default: return t.value.store.purchaseEligibilityLoading;
+  }
+}
 
 async function retryCatalog() {
   await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
@@ -416,6 +437,7 @@ const checkoutHint = computed(() => {
   if (products.value.length < 2) return t.value.bundle.checkoutUnavailableHint;
   if (!remoteApiEnabled) return "";
   const entries = products.value.map((p) => purchaseEligibilityStore.state(p.id));
+  if (entries.some((entry) => entry.status === "unavailable")) return t.value.store.temporarilyOutOfStock;
   if (entries.some((entry) => entry.status === "error")) return t.value.store.purchaseEligibilityError;
   if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
   return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
@@ -473,15 +495,19 @@ function clear() {
 }
 async function onAddSuggestion(p: Product) {
   if (remoteApiEnabled) {
-    if (purchaseEligibilityStore.state(p.id).status === "ready" && !purchaseEligibilityStore.state(p.id).eligible) {
+    const entry = purchaseEligibilityStore.state(p.id);
+    if (entry.status === "unavailable") return;
+    if (entry.status === "ready" && !entry.eligible) {
       navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
       return;
     }
     const scope = captureAccountScope();
-    const eligible = await purchaseEligibilityStore.ensure(p.id, true);
+    const eligible = await purchaseEligibilityStore.ensure(p.id, entry.status !== "loading");
     if (!isCurrentAccountScope(scope)) return;
     if (!eligible) {
-      if (purchaseEligibilityStore.state(p.id).status === "error") toast.warn(t.value.store.purchaseEligibilityError);
+      const status = purchaseEligibilityStore.state(p.id).status;
+      if (status === "unavailable") return;
+      if (status === "error") toast.warn(t.value.store.purchaseEligibilityError);
       else navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
       return;
     }
@@ -572,6 +598,7 @@ async function openBundleReview(list:Product[]):Promise<boolean> {
       original=!!record?.pending||record?.order?.paymentStatus==='PENDING'
         ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
     }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
+    if (!original && list.some((p) => eligibilityUnavailable(p.id))) return true;
     // Every device and Cloud Share takes one slot; the server refuses a bundle
     // larger than the free slots, so say so before the review page.
     const used=app.remoteSlotsUsed;
@@ -597,6 +624,7 @@ async function onCheckout() {
   if (list.length < 2 || submitting.value || walletRefreshing.value) return;
   if (remoteApiEnabled) {
     if(await openBundleReview(list))return;
+    if (list.some((p) => eligibilityUnavailable(p.id))) return;
     const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();
     const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)
@@ -613,7 +641,9 @@ async function onCheckout() {
       if (!scopeIsCurrent()) return;
       const firstBlocked = decisions.findIndex((eligible) => !eligible);
       if (firstBlocked >= 0) {
-        toast.warn(purchaseEligibilityStore.state(list[firstBlocked].id).status === "error"
+        const status = purchaseEligibilityStore.state(list[firstBlocked].id).status;
+        if (status === "unavailable") return;
+        toast.warn(status === "error"
           ? t.value.store.purchaseEligibilityError : t.value.store.gateBlockedToast);
         return;
       }
