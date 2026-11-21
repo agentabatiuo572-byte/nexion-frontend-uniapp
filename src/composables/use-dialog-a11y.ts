@@ -404,11 +404,11 @@ export function useDialogA11y(
       return;
     }
     syncInert();
-    scheduleRestore(openedAt, restore, forget);
+    if (wasOpen) scheduleRestore(openedAt, restore, forget);
   // immediate:有些弹层不是靠自身的 v-if 开关,而是**整个组件被父级 v-if 挂载**
   // (captcha-slider 就是这样)。它们的 open 恒为 true,不给 immediate 的话 watch
   // 永远不触发,焦点管理一次都不会生效。对 open 初值为 false 的弹层,immediate 只会
-  // 走一次"关闭"分支,而那时 previousFocus 是 null,无副作用。
+  // 走一次"关闭"分支,不参与真正关闭的焦点归还队列。
   }, { immediate: true });
 
   // A dialog removed by its parent's v-if while still open (open stays true) is closing too: return focus the same way.

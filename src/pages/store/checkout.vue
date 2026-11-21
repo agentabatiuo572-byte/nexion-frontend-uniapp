@@ -493,6 +493,7 @@ const originalOrderNavigationFailed = ref(false);
 const checkoutPurchaseChecking = computed(() => remoteApiEnabled && !createdCheckoutOrder.value
   && (serverOrderRecovery.value !== null || (!ordinaryCheckoutInitialized.value && !originalOrderNavigationFailed.value)));
 type PurchaseEligibilityResult = "eligible" | "ineligible" | "outOfStock" | "productUnavailable" | "unavailable" | "stale";
+type CheckoutLoadMode = "entry" | "read-only";
 const checkoutStockRefused = ref(false);
 const eligibilityCatalogUnconfirmed = ref(false);
 const recoveredCreateRefusal = ref(false);
@@ -697,7 +698,7 @@ onLoad(async (options) => {
   await initializeCheckout(routeScope);
 });
 
-async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void> {
+async function initializeCheckout(routeScope: CheckoutRouteScope, mode: CheckoutLoadMode = "entry"): Promise<void> {
   let catalogReady = false;
   activeCheckoutLoad = routeScope;
   quantityReady.value = false;
@@ -705,7 +706,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     // A durable server order is a recovery route, never a fresh purchase. It has
     // priority over catalog/eligibility gates so a newly denied purchase cannot
     // hide an already committed original order.
-    if (remoteApiEnabled && await resumeServerOrder(routeScope)) return;
+    if (mode === "entry" && remoteApiEnabled && await resumeServerOrder(routeScope)) return;
     if (!isCurrentCheckoutRoute(routeScope)) return;
 
     const read = refreshProductCatalog(true);
@@ -2154,9 +2155,9 @@ function rejectRemoteTradein(accountKey: string, recovery: CheckoutTradeinRecove
 }
 
 async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissionScope: CheckoutRouteScope, options: {
-  newSubmission?: boolean; retainRecovery?: boolean; current?: () => boolean;
+  newSubmission?: boolean; retainRecovery?: boolean; readOnly?: boolean; current?: () => boolean;
 } = {}): Promise<CanonicalTradeinResult> {
-  const { newSubmission = false, retainRecovery = false } = options;
+  const { newSubmission = false, retainRecovery = false, readOnly = false } = options;
   const scopeIsCurrent = options.current ?? (() => isCurrentCheckoutRoute(submissionScope));
   const reviewedQuote = { ...recovery.tradeinQuote };
   const authorizationIsCurrent = () => {
@@ -2187,7 +2188,8 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
       rejectRemoteTradein(submissionScope.accountKey, recovery, key, result.message);
     }
     if (result.status === 'SUCCEEDED') recoveredResult = parseCanonicalTradeinResult(result.receipt);
-    else if (result.status === 'NOT_SEEN' && result.canResumeSameKey
+    // A passive read may confirm a prior command, but only an entry or user action can resume it.
+    else if (!readOnly && result.status === 'NOT_SEEN' && result.canResumeSameKey
         && recovery.tradeinCommandSubmitted === false && !hasTradeinPurchaseIntent(submissionScope.accountKey, key)) {
       remoteTradeinRecoveryError.value = false;
     }
@@ -2305,8 +2307,8 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
       });
 }
 
-async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = false, foregroundOnly = false): Promise<boolean> {
-  const current = () => isCurrentCheckoutRoute(scope) && (!foregroundOnly || foregroundReadAllowed());
+async function resumePendingRemoteTradein(scope: CheckoutRouteScope, { navigate = false, readOnly = false } = {}): Promise<boolean> {
+  const current = () => isCurrentCheckoutRoute(scope) && (!readOnly || foregroundReadAllowed());
   if (!remoteApiEnabled || !current()) return false;
   let recovery: CheckoutTradeinRecovery | null;
   try { recovery = readCheckoutTradein(scope.accountKey, scope.productNo); }
@@ -2329,7 +2331,7 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
   if (remoteTradeinRecoveryBusy.value) return true;
   remoteTradeinRecoveryBusy.value = true;
   try {
-    const tracking = prepareTradeinPaymentRecovery(scope.accountKey, key, recovery.tradeinCommandSubmitted === false);
+    const tracking = readOnly ? null : prepareTradeinPaymentRecovery(scope.accountKey, key, recovery.tradeinCommandSubmitted === false);
     if (tracking) {
       await tracking;
       if (!current()) return true;
@@ -2338,7 +2340,7 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
       if (stored.commandKey !== recovery.commandKey) return true;
       recovery = stored;
     }
-    const result = await completeRemoteTradein(recovery, scope, { retainRecovery: navigate, current });
+    const result = await completeRemoteTradein(recovery, scope, { retainRecovery: navigate, readOnly, current });
     if (navigate && current()) {
       const navigated = await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(result.orderNo)}`);
       if (navigated && isCurrentAccountScope({ accountKey: scope.accountKey, epoch: scope.accountEpoch })) {
@@ -2357,9 +2359,9 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
         step.value = 'select-payment';
         if (!ordinaryCheckoutInitialized.value) {
           if (activeCheckoutLoad) return false;
-          // A new scope lets initialization run the original-order check without joining this recovery.
+          // Release this recovery before reloading the ordinary checkout.
           remoteTradeinRecoveryBusy.value = false;
-          await initializeCheckout(beginCheckoutRoute());
+          await initializeCheckout(beginCheckoutRoute(), readOnly ? "read-only" : "entry");
           return true;
         }
         await retryCheckoutCapacity();
@@ -2392,12 +2394,13 @@ async function readPendingCheckoutCreate() {
     confirmedMissingCreateKey.value = pending.request.idempotencyKey;
     step.value = 'select-payment';
     toast.info(t.value.store.coPendingCreateNotFound);
-    if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute());
+    if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute(), "read-only");
   } else if (result.status === 'FAILED') {
     // The active key can be released while the original request still owns the B60 readback.
     retireRemoteOrderKey(pending.intent, scope.accountKey, pending.request.idempotencyKey);
     if (!completeFailedCheckoutCreate(scope.accountKey, pending, result)) {
-      await initializeCheckout(beginCheckoutRoute());
+      pendingCheckoutCreate.value = readCheckoutCreate(scope.accountKey, scope.productNo);
+      if (!pendingCreateUnresolved.value) await initializeCheckout(beginCheckoutRoute(), "read-only");
       return;
     }
     pendingCheckoutCreate.value = null;
@@ -2417,7 +2420,7 @@ async function readPendingCheckoutCreate() {
           ? t.value.store.coCapacityProductUnavailable
           : orderPaymentRejection(failure, locale.code) ?? t.value.tradein.errPurchaseFailed;
     toast.warn(reason);
-    if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute());
+    if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute(), "read-only");
   } else if (result.status === 'SUCCEEDED') {
     rememberCheckoutOrder(scope.accountKey, { productNo: scope.productNo, orderNo: result.orderNo,
       intent: pending.intent, commandKey: pending.request.idempotencyKey });
@@ -2435,7 +2438,7 @@ function resumeServerOrder(routeScope = captureCheckoutRoute()): Promise<boolean
   const key = JSON.stringify([routeScope.accountKey, routeScope.accountEpoch, routeScope.productNo, routeScope.generation]);
   if (serverOrderRecovery.value?.key === key) return serverOrderRecovery.value.promise;
   const promise = (async () => {
-    if (await resumePendingRemoteTradein(routeScope, true)) return true;
+    if (await resumePendingRemoteTradein(routeScope, { navigate: true })) return true;
     const result = await recoverCheckoutOrder(routeScope.accountKey, routeScope.productNo, {
       list: orderApi.list,
       isCurrent: () => isCurrentCheckoutRoute(routeScope),
@@ -2717,13 +2720,13 @@ const stopCheckoutCapacityRelease = onPurchaseRecordReleased((accountKey, comman
     if (!isCurrentCheckoutRoute(scope) || scope.productNo !== recovery.target) return;
     const sheet = tradein.state;
     if (sheet.kind === "keep-recovery" && sheet.targetKind === recovery.target) tradein.hide();
-    refreshVisibleCheckout();
+    refreshVisibleCheckout(false, "read-only");
   });
 });
 useAutoRecovery({
   failed: () => eligibilityCatalogUnconfirmed.value && !hasOriginalCheckout.value
     && !promotionRoute.value && !checkoutLeaving.value && isTopCheckoutPage(),
-  retry: async () => { if (!activeCheckoutLoad) await initializeCheckout(beginCheckoutRoute()); },
+  retry: async () => { if (!activeCheckoutLoad) await initializeCheckout(beginCheckoutRoute(), "read-only"); },
   repeatMs: 30_000,
 });
 useAutoRecovery({
@@ -2742,7 +2745,7 @@ useAutoRecovery({
   failed: () => remoteApiEnabled && pageAlive && pageVisible && auth.isAuthenticated
     && !promotionRoute.value && remoteTradeinRecoveryError.value && !remoteTradeinRecoveryBusy.value
     && !serverOrderRecovery.value && !purchasePayment.state.open && !checkoutLeaving.value,
-  retry: () => resumePendingRemoteTradein(captureCheckoutRoute(), true, true),
+  retry: () => resumePendingRemoteTradein(captureCheckoutRoute(), { navigate: true, readOnly: true }),
   repeatMs: 15_000,
 });
 useAutoRecovery({
@@ -2780,15 +2783,15 @@ function reassertTradeinContext() {
   else tradein.clearApplied(tradeinOwner);
 }
 
-async function resumeReadyCheckout(scope: CheckoutRouteScope, catalogRead: Promise<boolean>) {
-  if (await resumeServerOrder(scope)) return;
+async function resumeReadyCheckout(scope: CheckoutRouteScope, catalogRead: Promise<boolean>, mode: CheckoutLoadMode) {
+  if (mode === "entry" && await resumeServerOrder(scope)) return;
   if (await catalogRead && isCurrentCheckoutRoute(scope) && ordinaryCheckoutInitialized.value
     && !activeSession.value && checkoutCapacityRequired.value) {
     await fireTradeinIntercept();
   }
 }
 
-function refreshVisibleCheckout(retryCatalog = false) {
+function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "entry") {
   if (activeCheckoutLoad) {
     // An explicit catalog retry may replace the read the initialization owns.
     if (retryCatalog) void refreshProductCatalog(true);
@@ -2800,8 +2803,8 @@ function refreshVisibleCheckout(retryCatalog = false) {
   }
   // An original payment can finish before the ordinary checkout reaches eligibility.
   if (!quantityReady.value || (!ordinaryCheckoutInitialized.value && !activeSession.value)) {
-    void initializeCheckout(beginCheckoutRoute());
-  } else void resumeReadyCheckout(captureCheckoutRoute(), settleProductCatalogRefresh(refreshProductCatalog(true)));
+    void initializeCheckout(beginCheckoutRoute(), mode);
+  } else void resumeReadyCheckout(captureCheckoutRoute(), settleProductCatalogRefresh(refreshProductCatalog(true)), mode);
 }
 
 function showCheckout() {
