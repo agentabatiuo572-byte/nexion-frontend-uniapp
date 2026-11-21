@@ -137,6 +137,7 @@ const server=http.createServer(async(req,res)=>{
         let raw='';for await(const chunk of req)raw+=chunk;const update=JSON.parse(raw||'{}');
         if(update.resetPin){checkoutFlow.pin.state.password=null;checkoutFlow.pin.state.version=0;checkoutFlow.pin.state.attempts=5;checkoutFlow.pin.state.lockedUntil=null;}
         if(typeof update.dropNextPayment==='boolean')checkoutFlow.pin.state.dropNextPayment=update.dropNextPayment;
+        if(update.observePayments===true)checkoutFlow.observePayments();
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }
@@ -325,4 +326,13 @@ const server=http.createServer(async(req,res)=>{
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
+// QA can pause the provider clock and use POST /__checkout/state to observe on demand.
+if(checkoutFlow&&process.env.DEMO_PAYMENT_AUTO_OBSERVE!=='0'){
+  const observer=setInterval(()=>{
+    try { checkoutFlow.observePayments(); }
+    catch(error) { console.error('Preview payment observation failed:',error.message); }
+  },1000);
+  observer.unref();
+  server.once('close',()=>clearInterval(observer));
+}
 server.listen(port,'127.0.0.1',()=>console.log('UVEL simulation: http://127.0.0.1:'+server.address().port+'/preview'));
