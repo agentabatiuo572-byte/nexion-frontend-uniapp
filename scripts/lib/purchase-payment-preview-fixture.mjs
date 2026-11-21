@@ -44,7 +44,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const assignmentPath = v2 ? '/api/tasks/v2/assignments' : '/api/tasks/assignments';
     const assignments = source.activatedAt == null ? null
       : demoFixture(new URL(assignmentPath, url.origin), locale(), state, {...request, method: () => 'GET'});
-    const task = assignments?.devices.find(device => device.deviceId === sourceId)?.currentTask;
+    const row = assignments?.devices.find(device => device.deviceId === sourceId), task = row?.currentTask;
+    // Compute V2 (ComputeV2DeviceLifecycleService.requireDrainedForReplacement): an unresolved earlier result refuses;
+    // a generation is drained only if it failed before starting, or started and has exited (a terminal status here).
+    if (v2 && row?.recoveryPending) return refused(409, 'COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED');
+    const drained = !task || (task.startedAt == null ? task.status === 'FAILED' : ['COMPLETED', 'FAILED', 'CANCELLED'].includes(task.status));
+    if (v2 && !drained) return refused(409, 'COMPUTE_V2_DEVICE_BUSY');
     return [source.status, source.runtimeStatus, task?.status].some(busy)
       ? refused(409, v2 ? 'COMPUTE_V2_DEVICE_BUSY' : 'SIMULATED_DEVICE_BUSY') : null;
   }
