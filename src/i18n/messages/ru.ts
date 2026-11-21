@@ -2177,6 +2177,7 @@ export const ru: Messages = {
     inventoryPendingDeactivateChip: "Отключится после задачи",
     inventoryRowActivate: "Включить",
     inventoryRowDeactivate: "Отключить",
+    inventoryMoreActions: "Другие действия",
     inventoryEarnedLabel: "Доход:",
     inventoryTodayLabel: "Сегодня",
     inventoryRowSlotsFull: "Слоты заняты",
