@@ -60,36 +60,49 @@ export function verifiedResource(origin: string, platform: string, p: ResourcePo
 export async function installResource(origin: string, platform: string, p: ResourcePolicy, device: Device) {
   if (!verifiedResource(origin, platform, p, device) || !device.resourceBuild || device.resourceBuild >= p.latestBuild) throw Error("untrusted resource");
   // The downloader writes an app-private file with the extension expected by runtime.install.
-  const target = `_doc/uvel-test-updates/${p.sha256}-${Date.now()}.wgt`;
+  let target = `_doc/uvel-test-updates/${p.sha256}-${Date.now()}.wgt`;
   let entry: PlusIoFileEntry | undefined;
+  let stage = "download";
   try {
-    await new Promise<void>((resolve, reject) => {
-      const download = plus.downloader.createDownload(p.downloadUrl, { filename: target, timeout: 30, retry: 0 }, (_, status) => {
-        if (status === 200) resolve(); else reject(Error("resource download"));
+    target = await new Promise<string>((resolve, reject) => {
+      const download = plus.downloader.createDownload(p.downloadUrl, { filename: target, timeout: 30, retry: 0 }, (task, status) => {
+        if (status === 200 && task.filename) resolve(task.filename); else reject(Error(`download status ${status}`));
       });
       download.addEventListener("statechanged", task => {
         if (Number(task.downloadedSize) > p.sizeBytes!) { download.abort(); reject(Error("resource too large")); }
       });
       download.start();
     });
+    stage = "open";
     entry = await new Promise<PlusIoFileEntry>((resolve, reject) => plus.io.resolveLocalFileSystemURL(target, file => resolve(file as unknown as PlusIoFileEntry), reject));
     const file = await new Promise<PlusIoFile>((resolve, reject) => entry!.file(resolve, reject));
-    if (file.size !== p.sizeBytes) throw Error("resource size");
+    if (!file.size || file.size !== p.sizeBytes) throw Error("resource size");
+    stage = "read";
     const hash = sha256.create();
     const chunkSize = 256 * 1024;
-    for (let offset = 0; offset < file.size!; offset += chunkSize) {
+    for (let offset = 0; offset < file.size; offset += chunkSize) {
+      const length = Math.min(chunkSize, file.size - offset);
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new plus.io.FileReader();
         reader.onload = () => resolve(String(reader.result));
-        reader.onerror = reject;
-        reader.readAsDataURL(file.slice(offset, Math.min(file.size!, offset + chunkSize)));
+        reader.onerror = () => reject(reader.error);
+        // HTML5+ File.slice includes its end byte (unlike the Web Blob API).
+        reader.readAsDataURL(file.slice(offset, offset + length - 1));
       });
       const comma = dataUrl.indexOf(",");
       if (comma < 0 || !dataUrl.slice(0, comma).endsWith(";base64")) throw Error("resource read");
-      hash.update(new Uint8Array(uni.base64ToArrayBuffer(dataUrl.slice(comma + 1))));
+      const bytes = new Uint8Array(uni.base64ToArrayBuffer(dataUrl.slice(comma + 1)));
+      if (bytes.length !== length) throw Error("resource chunk size");
+      hash.update(bytes);
     }
+    stage = "digest";
     if (bytesToHex(hash.digest()) !== p.sha256) throw Error("resource digest");
+    stage = "install";
     await new Promise<void>((resolve, reject) => plus.runtime.install(target, { force: false }, () => resolve(), reject));
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : (error as {code?: number})?.code;
+    console.warn("[app-update] resource failure", stage, detail);
+    throw error;
   } finally {
     if (entry) entry.remove();
     else plus.io.resolveLocalFileSystemURL(target, partial => partial.remove(), () => {});
