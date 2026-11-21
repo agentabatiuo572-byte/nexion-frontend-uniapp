@@ -324,7 +324,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError, isApiRefusal, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -2529,9 +2529,8 @@ useAutoRecovery({
     && !purchasePayment.state.open && purchasePayment.unsettledCheckoutPayments(!remoteTradeinRecoveryRequired.value).length > 0,
   retry: () => {
     const scope = captureCheckoutRoute();
-    return refreshExpiredCheckoutPayments(scope.accountKey,
-      () => isCurrentCheckoutRoute(scope) && foregroundReadAllowed(),
-      !remoteTradeinRecoveryRequired.value);
+    // The same read the payment bar runs: expiry, review and delivery all apply, once for both.
+    return refreshPendingPayments(scope.accountKey, () => isCurrentCheckoutRoute(scope) && foregroundReadAllowed());
   },
   repeatMs: 15_000,
 });

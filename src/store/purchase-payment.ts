@@ -174,23 +174,14 @@ function unsettledCheckoutPayments(includeTradein: boolean) {
 /** The progress bar can outlive both a closed payment layer and a released checkout pointer. */
 // Checkout and the floating bar read the same unfinished payments: one read at a time, at most every 10 seconds, shared by both.
 let passiveRead: Promise<unknown> | null = null, passiveReadAt = 0;
-function sharedPassiveRead(run: () => Promise<unknown>) {
-  if (passiveRead || Date.now() - passiveReadAt < 10_000) return passiveRead;
+function sharedPassiveRead(run: () => Promise<unknown>): Promise<unknown> {
+  if (passiveRead || Date.now() - passiveReadAt < 10_000) return passiveRead ?? Promise.resolve();
   passiveRead = run().finally(() => { passiveRead = null; passiveReadAt = Date.now(); });
   return passiveRead;
 }
-export async function refreshExpiredCheckoutPayments(accountKey: string, current: () => boolean, includeTradein: boolean) {
-  if (!current() || account() !== accountKey || state.open) return;
-  await sharedPassiveRead(() => Promise.allSettled(unsettledCheckoutPayments(includeTradein).map(async pending => {
-    const result = await readIntent(pending);
-    if (!current() || account() !== accountKey || state.open || result?.status !== 'EXPIRED') return;
-    matches(result, pending);
-    saveExpiry(accountKey, pending.commandKey, pending.kind);
-  })));
-}
 /** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
-export function refreshPendingPayments(accountKey: string, current: () => boolean) {
-  if (!current() || account() !== accountKey || state.open) return passiveRead;
+export function refreshPendingPayments(accountKey: string, current: () => boolean): Promise<unknown> {
+  if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(pendingPayments().map(async pending => {
     const intent = await readIntent(pending);
     if (!intent || intent.status === pending.lastStatus || !current() || account() !== accountKey || state.open) return;
@@ -305,9 +296,8 @@ function readPendingPayment() {
 /** A purchase page whose payment ends on its order is finished: the order page takes its place, so back skips it.
  *  When that order's page is right below (a purchase continued from it), going back to it avoids a second copy. */
 export function replaceWithOrder(href: string): Promise<boolean> {
-  const pages = getCurrentPages() as { route?: string; options?: Record<string, string> }[];
-  const below = pages[pages.length - 2], id = /[?&]id=([^&]+)/.exec(href)?.[1];
-  if (below?.route === 'pages/store/order-detail' && id && below.options?.id === decodeURIComponent(id)) { navBack(href); return Promise.resolve(true); }
+  const pages = getCurrentPages(), below = pages[pages.length - 2] as { route?: string } | undefined, id = /[?&]id=([^&]+)/.exec(href)?.[1];
+  if (below?.route === 'pages/store/order-detail' && id && pageQuery(below)?.id === decodeURIComponent(id)) { navBack(href); return Promise.resolve(true); }
   return navReplace(href);
 }
 // A purchase page whose payment ends on its order is finished: replace sends the order page in its place, so back skips it.
@@ -695,9 +685,14 @@ async function resume(pending: PendingExternal) {
   });
   await query();
 }
+// The App runtime keeps a page's query on $page.options; H5 also sets options.
+function pageQuery(page: unknown) {
+  const value = page as { options?: Record<string, string>; $page?: { options?: Record<string, string> } } | undefined;
+  return value?.options ?? value?.$page?.options;
+}
 function onOrderPage(orderNo: string) {
-  const pages = getCurrentPages(), top = pages[pages.length - 1] as { route?: string; options?: Record<string, string> } | undefined;
-  return top?.route === 'pages/store/order-detail' && top.options?.id === orderNo;
+  const pages = getCurrentPages(), top = pages[pages.length - 1] as { route?: string } | undefined;
+  return top?.route === 'pages/store/order-detail' && pageQuery(top)?.id === orderNo;
 }
 export function usePurchasePayment() {
   return { state, select, choose, proceed, confirm, query, submitOriginal, restart, loadPolicy, close: () => finish(null),
