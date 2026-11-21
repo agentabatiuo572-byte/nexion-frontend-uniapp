@@ -20,7 +20,7 @@ const zh = {
   rejectCapacity: '设备位已满，请先在设备仓库处理设备后再支付。', rejectUnavailable: '该商品暂停销售，本单暂时无法支付。',
   rejectQuota: '本月购买名额已满，本单暂时无法支付。', rejectRequirements: '暂未满足该商品的购买条件。',
   rejectPaused: '支付服务维护中，请稍后再试。',
-  rejectTradeinBusy: '旧设备现在不能置换，本次未扣款，也未发起付款。请稍后再试。', rejectTradeinOwner: '旧设备已不在当前账号下，本次未扣款，也未发起付款。请重新选择要置换的设备。',
+  rejectTradeinBusy: '旧设备现在不能置换，本次未扣款，也未发起付款。请稍后再试。', rejectTradeinOwner: '旧设备已不在当前账号下，本次未扣款，也未发起付款。请重新选择要置换的设备。', rejectCapacitySourceChanged: '要让出的设备已变化，本次未扣款，也未发起付款。请重新确认要让出的设备。',
 };
 type CheckoutFlowCopy = typeof zh;
 const en: CheckoutFlowCopy = {
@@ -43,7 +43,7 @@ const en: CheckoutFlowCopy = {
   rejectCapacity: 'Your device slots are full. Free a slot in device inventory, then pay.', rejectUnavailable: 'This product is not on sale right now, so this order cannot be paid.',
   rejectQuota: 'This month\'s purchase quota is used up, so this order cannot be paid.', rejectRequirements: 'You do not meet the purchase requirements for this product yet.',
   rejectPaused: 'Payments are under maintenance. Please try again later.',
-  rejectTradeinBusy: 'Your old device can\'t be traded in right now. Nothing was charged and no payment was made. Try again later.', rejectTradeinOwner: 'Your old device is no longer on this account. Nothing was charged and no payment was made. Choose another device to trade in.',
+  rejectTradeinBusy: 'Your old device can\'t be traded in right now. Nothing was charged and no payment was made. Try again later.', rejectTradeinOwner: 'Your old device is no longer on this account. Nothing was charged and no payment was made. Choose another device to trade in.', rejectCapacitySourceChanged: 'The device to step down has changed. Nothing was charged and no payment was made. Check the device again.',
 };
 const vi: CheckoutFlowCopy = {
   paymentMethod: 'Phương thức thanh toán', paymentTotal: 'Tổng tiền thanh toán', wallet: 'Ví', walletBalance: 'Số dư USDT',
@@ -65,7 +65,7 @@ const vi: CheckoutFlowCopy = {
   rejectCapacity: 'Đã hết vị trí thiết bị. Hãy xử lý thiết bị trong kho rồi thanh toán.', rejectUnavailable: 'Sản phẩm đang tạm ngừng bán nên chưa thể thanh toán đơn này.',
   rejectQuota: 'Đã hết lượt mua trong tháng nên chưa thể thanh toán đơn này.', rejectRequirements: 'Bạn chưa đáp ứng điều kiện mua sản phẩm này.',
   rejectPaused: 'Hệ thống thanh toán đang bảo trì. Vui lòng thử lại sau.',
-  rejectTradeinBusy: 'Thiết bị cũ hiện chưa thể đem đổi. Chưa trừ tiền và chưa phát sinh thanh toán. Vui lòng thử lại sau.', rejectTradeinOwner: 'Thiết bị cũ không còn thuộc tài khoản này. Chưa trừ tiền và chưa phát sinh thanh toán. Hãy chọn thiết bị khác để đem đổi.',
+  rejectTradeinBusy: 'Thiết bị cũ hiện chưa thể đem đổi. Chưa trừ tiền và chưa phát sinh thanh toán. Vui lòng thử lại sau.', rejectTradeinOwner: 'Thiết bị cũ không còn thuộc tài khoản này. Chưa trừ tiền và chưa phát sinh thanh toán. Hãy chọn thiết bị khác để đem đổi.', rejectCapacitySourceChanged: 'Thiết bị cần nhường chỗ đã thay đổi. Chưa trừ tiền và chưa phát sinh thanh toán. Hãy xác nhận lại thiết bị nhường chỗ.',
 };
 const id: CheckoutFlowCopy = {
   paymentMethod: 'Metode pembayaran', paymentTotal: 'Total pembayaran', wallet: 'Dompet', walletBalance: 'Saldo USDT',
@@ -87,7 +87,7 @@ const id: CheckoutFlowCopy = {
   rejectCapacity: 'Slot perangkat Anda penuh. Kosongkan slot di Inventaris perangkat, lalu bayar.', rejectUnavailable: 'Produk ini sedang tidak dijual, jadi pesanan ini belum bisa dibayar.',
   rejectQuota: 'Kuota pembelian bulan ini sudah habis, jadi pesanan ini belum bisa dibayar.', rejectRequirements: 'Anda belum memenuhi syarat pembelian produk ini.',
   rejectPaused: 'Layanan pembayaran sedang dalam pemeliharaan. Coba lagi nanti.',
-  rejectTradeinBusy: 'Perangkat lama belum bisa ditukar tambah saat ini. Dana tidak dipotong dan tidak ada pembayaran yang dibuat. Coba lagi nanti.', rejectTradeinOwner: 'Perangkat lama sudah tidak ada di akun ini. Dana tidak dipotong dan tidak ada pembayaran yang dibuat. Pilih perangkat lain untuk ditukar tambah.',
+  rejectTradeinBusy: 'Perangkat lama belum bisa ditukar tambah saat ini. Dana tidak dipotong dan tidak ada pembayaran yang dibuat. Coba lagi nanti.', rejectTradeinOwner: 'Perangkat lama sudah tidak ada di akun ini. Dana tidak dipotong dan tidak ada pembayaran yang dibuat. Pilih perangkat lain untuk ditukar tambah.', rejectCapacitySourceChanged: 'Perangkat yang akan dinonaktifkan telah berubah. Dana tidak dipotong dan tidak ada pembayaran yang dibuat. Periksa kembali perangkatnya.',
 };
 const ms: CheckoutFlowCopy = {
   paymentMethod: 'Kaedah pembayaran', paymentTotal: 'Jumlah bayaran', wallet: 'Dompet', walletBalance: 'Baki USDT',
@@ -109,7 +109,7 @@ const ms: CheckoutFlowCopy = {
   rejectCapacity: 'Slot peranti anda penuh. Kosongkan satu slot di inventori peranti, kemudian bayar.', rejectUnavailable: 'Produk ini tidak dijual buat masa ini, jadi pesanan ini tidak boleh dibayar.',
   rejectQuota: 'Kuota pembelian bulan ini telah habis, jadi pesanan ini tidak boleh dibayar.', rejectRequirements: 'Anda belum memenuhi syarat pembelian untuk produk ini.',
   rejectPaused: 'Perkhidmatan pembayaran sedang diselenggara. Sila cuba lagi nanti.',
-  rejectTradeinBusy: 'Peranti lama tidak boleh ditukar beli buat masa ini. Tiada dana ditolak dan tiada bayaran dibuat. Sila cuba lagi nanti.', rejectTradeinOwner: 'Peranti lama tiada lagi dalam akaun ini. Tiada dana ditolak dan tiada bayaran dibuat. Pilih peranti lain untuk ditukar beli.',
+  rejectTradeinBusy: 'Peranti lama tidak boleh ditukar beli buat masa ini. Tiada dana ditolak dan tiada bayaran dibuat. Sila cuba lagi nanti.', rejectTradeinOwner: 'Peranti lama tiada lagi dalam akaun ini. Tiada dana ditolak dan tiada bayaran dibuat. Pilih peranti lain untuk ditukar beli.', rejectCapacitySourceChanged: 'Peranti yang perlu dinyahaktifkan telah berubah. Tiada dana ditolak dan tiada bayaran dibuat. Semak semula peranti tersebut.',
 };
 const fil: CheckoutFlowCopy = {
   paymentMethod: 'Paraan ng pagbabayad', paymentTotal: 'Kabuuang bayad', wallet: 'Wallet', walletBalance: 'Balanseng USDT',
@@ -131,7 +131,7 @@ const fil: CheckoutFlowCopy = {
   rejectCapacity: 'Puno ang device slot mo. Magbakante ng slot sa device inventory, saka magbayad.', rejectUnavailable: 'Hindi ibinebenta ngayon ang produktong ito, kaya hindi mababayaran ang order na ito.',
   rejectQuota: 'Ubos na ang purchase quota ngayong buwan, kaya hindi mababayaran ang order na ito.', rejectRequirements: 'Hindi ka pa pasok sa requirement sa pagbili ng produktong ito.',
   rejectPaused: 'May maintenance ang payment. Subukan ulit mamaya.',
-  rejectTradeinBusy: 'Hindi pa mai-trade in ngayon ang lumang device mo. Walang nabawas na pondo at walang naisagawang bayad. Subukan ulit mamaya.', rejectTradeinOwner: 'Wala na sa account na ito ang lumang device mo. Walang nabawas na pondo at walang naisagawang bayad. Pumili ng ibang device na ite-trade in.',
+  rejectTradeinBusy: 'Hindi pa mai-trade in ngayon ang lumang device mo. Walang nabawas na pondo at walang naisagawang bayad. Subukan ulit mamaya.', rejectTradeinOwner: 'Wala na sa account na ito ang lumang device mo. Walang nabawas na pondo at walang naisagawang bayad. Pumili ng ibang device na ite-trade in.', rejectCapacitySourceChanged: 'Nagbago ang device na aalis. Walang nabawas na pondo at walang naisagawang bayad. Suriin ulit ang device.',
 };
 const ru: CheckoutFlowCopy = {
   paymentMethod: 'Способ оплаты', paymentTotal: 'Итого к оплате', wallet: 'Кошелёк', walletBalance: 'Баланс USDT',
@@ -153,7 +153,7 @@ const ru: CheckoutFlowCopy = {
   rejectCapacity: 'Слоты устройств заняты. Освободите слот на складе устройств, затем оплатите.', rejectUnavailable: 'Этот товар сейчас не продаётся, поэтому заказ оплатить нельзя.',
   rejectQuota: 'Квота покупок на месяц исчерпана, поэтому заказ оплатить нельзя.', rejectRequirements: 'Условия покупки этого товара пока не выполнены.',
   rejectPaused: 'Платёжный сервис на обслуживании. Повторите попытку позже.',
-  rejectTradeinBusy: 'Старое устройство сейчас нельзя сдать в трейд-ин. Деньги не списаны, оплата не проводилась. Повторите попытку позже.', rejectTradeinOwner: 'Старое устройство больше не привязано к этому аккаунту. Деньги не списаны, оплата не проводилась. Выберите для трейд-ина другое устройство.',
+  rejectTradeinBusy: 'Старое устройство сейчас нельзя сдать в трейд-ин. Деньги не списаны, оплата не проводилась. Повторите попытку позже.', rejectTradeinOwner: 'Старое устройство больше не привязано к этому аккаунту. Деньги не списаны, оплата не проводилась. Выберите для трейд-ина другое устройство.', rejectCapacitySourceChanged: 'Устройство для отключения изменилось. Деньги не списаны, оплата не проводилась. Проверьте устройство ещё раз.',
 };
 const kk: CheckoutFlowCopy = {
   paymentMethod: 'Төлем әдісі', paymentTotal: 'Жалпы төлем', wallet: 'Әмиян', walletBalance: 'USDT балансы',
@@ -175,7 +175,7 @@ const kk: CheckoutFlowCopy = {
   rejectCapacity: 'Құрылғы орындары толы. Құрылғы қоймасында бір орын босатып, сосын төлеңіз.', rejectUnavailable: 'Бұл тауар қазір сатылмайды, сондықтан бұл тапсырысты төлеу мүмкін емес.',
   rejectQuota: 'Осы айдағы сатып алу квотасы бітті, сондықтан бұл тапсырысты төлеу мүмкін емес.', rejectRequirements: 'Бұл тауарды сатып алу талаптарына әлі сай емессіз.',
   rejectPaused: 'Төлемдерде техникалық жұмыстар жүріп жатыр. Кейінірек қайталап көріңіз.',
-  rejectTradeinBusy: 'Ескі құрылғыны қазір Trade-in арқылы өткізу мүмкін емес. Ақша алынған жоқ, төлем жасалмады. Кейінірек қайталап көріңіз.', rejectTradeinOwner: 'Ескі құрылғы енді бұл аккаунтта емес. Ақша алынған жоқ, төлем жасалмады. Trade-in үшін басқа құрылғыны таңдаңыз.',
+  rejectTradeinBusy: 'Ескі құрылғыны қазір Trade-in арқылы өткізу мүмкін емес. Ақша алынған жоқ, төлем жасалмады. Кейінірек қайталап көріңіз.', rejectTradeinOwner: 'Ескі құрылғы енді бұл аккаунтта емес. Ақша алынған жоқ, төлем жасалмады. Trade-in үшін басқа құрылғыны таңдаңыз.', rejectCapacitySourceChanged: 'Орнын босататын құрылғы өзгерді. Ақша алынған жоқ, төлем жасалмады. Құрылғыны қайта тексеріңіз.',
 };
 const uz: CheckoutFlowCopy = {
   paymentMethod: 'Toʻlov usuli', paymentTotal: 'Toʻlov summasi', wallet: 'Hamyon', walletBalance: 'USDT balansi',
@@ -197,7 +197,7 @@ const uz: CheckoutFlowCopy = {
   rejectCapacity: 'Qurilma slotlari toʻla. Qurilmalar omborida slot boʻshating, soʻng toʻlang.', rejectUnavailable: 'Bu mahsulot hozir sotuvda emas, shuning uchun buyurtmani toʻlab boʻlmaydi.',
   rejectQuota: 'Bu oylik xarid kvotasi tugadi, shuning uchun buyurtmani toʻlab boʻlmaydi.', rejectRequirements: 'Bu mahsulotni xarid qilish shartlariga hali mos emassiz.',
   rejectPaused: 'Toʻlovlarda texnik ishlar olib borilmoqda. Keyinroq qayta urinib koʻring.',
-  rejectTradeinBusy: 'Eski qurilmani hozir almashtirib boʻlmaydi. Mablagʻ yechilmadi, toʻlov amalga oshirilmadi. Keyinroq qayta urinib koʻring.', rejectTradeinOwner: 'Eski qurilma endi bu akkauntda emas. Mablagʻ yechilmadi, toʻlov amalga oshirilmadi. Almashtirish uchun boshqa qurilmani tanlang.',
+  rejectTradeinBusy: 'Eski qurilmani hozir almashtirib boʻlmaydi. Mablagʻ yechilmadi, toʻlov amalga oshirilmadi. Keyinroq qayta urinib koʻring.', rejectTradeinOwner: 'Eski qurilma endi bu akkauntda emas. Mablagʻ yechilmadi, toʻlov amalga oshirilmadi. Almashtirish uchun boshqa qurilmani tanlang.', rejectCapacitySourceChanged: 'Oʻrnini boʻshatadigan qurilma oʻzgardi. Mablagʻ yechilmadi, toʻlov amalga oshirilmadi. Qurilmani qayta tekshiring.',
 };
 
 const copy: Record<UiLocale, CheckoutFlowCopy> = { zh, en, vi, id, ms, fil, ru, kk, uz };
