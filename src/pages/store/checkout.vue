@@ -1,7 +1,7 @@
 <!-- Checkout review presentation. Transaction quotes, confirmation and recovery remain server-authoritative. -->
 <template>
   <AppChassis active="store">
-    <template #pageTop><SubPageHeader class="checkout-header" design :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
+    <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
     <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
@@ -325,7 +325,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError, isApiRefusal, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -411,7 +411,8 @@ const keepCheckoutTarget = ref<string | null>(null), keepCheckoutReadError = ref
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
-onBackPress(options => { if (options.from === 'navigateBack') return false; requestCheckoutBack(); return true; });
+// An open payment layer registers its own back handler on this page; checkout leaves that press to it.
+onBackPress(options => { if (options.from === 'navigateBack') return false; if (!purchasePayment.state.open) requestCheckoutBack(); return true; });
 const auth = useAuth();
 const orders = useOrders();
 const voucher = useVoucher();
@@ -1884,6 +1885,9 @@ async function cancelCheckout() {
     const created = original;
     if (!created) return;
     const action = readOrderAction(scope.accountKey, created.orderNo);
+    // A bank or USDT payment already started cannot be cancelled (ORDER_EXTERNAL_PAYMENT_IN_PROGRESS): back leaves the
+    // order as it is, the payment bar keeps it in reach, and an unpaid one closes at its deadline.
+    if (action?.kind === 'pay' && action.paymentMethod === 'EXTERNAL') { navBack(checkoutBackHref.value); return; }
     let unseenPaymentKey: string | null = null;
     if (action?.kind === 'pay') {
       const outcome = await readPaymentCommand(apiClient, 'order-pay', action.key);
@@ -2513,9 +2517,8 @@ useAutoRecovery({
     && !purchasePayment.state.open && purchasePayment.unsettledCheckoutPayments(!remoteTradeinRecoveryRequired.value).length > 0,
   retry: () => {
     const scope = captureCheckoutRoute();
-    return refreshExpiredCheckoutPayments(scope.accountKey,
-      () => isCurrentCheckoutRoute(scope) && foregroundReadAllowed(),
-      !remoteTradeinRecoveryRequired.value);
+    // The same read the payment bar runs: expiry, review and delivery all apply, once for both.
+    return refreshPendingPayments(scope.accountKey, () => isCurrentCheckoutRoute(scope) && foregroundReadAllowed());
   },
   repeatMs: 15_000,
 });

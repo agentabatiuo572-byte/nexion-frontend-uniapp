@@ -160,7 +160,7 @@ import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display
 import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
 import { litePromotion } from '@/lib/promotion-landing';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { onPurchaseRecordReleased, refusedPurchasePayment } from '@/store/purchase-payment';
+import { onPurchaseRecordReleased, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
@@ -512,7 +512,7 @@ async function confirmPayment(){
     &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&JSON.stringify(order.value?.items)===lines&&order.value?.payBy===payBy
     &&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&!session.unknown;
   paymentConfirming.value=true;paymentSheetOpen.value=false;
-  let rejection='',paymentDestination='';
+  let rejection='',paymentDestination='',paymentReplace=false;paymentLeaveApproved=false;
   try{
     await run(async()=>{
       await executeSelectedPurchase({amount:amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,
@@ -531,7 +531,7 @@ async function confirmPayment(){
           }
         },
         paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
-          navigate:href=>{paymentDestination=href;},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);},
+          navigate:(href,replace)=>{paymentDestination=href;paymentReplace=!!replace;paymentLeaveApproved=routeLeavesPurchase(href);},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);paymentReplace=false;},
           commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}});
     });
     if(!readCurrent(generation)||paymentDestination)return;
@@ -548,7 +548,8 @@ async function confirmPayment(){
     }
   }finally{
     paymentConfirming.value=false;
-    if(paymentDestination&&readCurrent(generation))await navTo(paymentDestination);
+    // The order page replaces a finished checkout, so back does not return to it.
+    if(paymentDestination&&readCurrent(generation))await (paymentReplace?replaceWithOrder:navTo)(paymentDestination);
   }
 }
 let recoveryReadGeneration=-1;
@@ -660,8 +661,13 @@ function viewDevices(){if(current()&&visible.value&&order.value?.paymentStatus==
 function openWalletTopup(){paymentSheetOpen.value=false;void navTo('/pages/me/wallet-topup');}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref(selection.value,props.activityId,props)));}
 let disposeGuard:(()=>void)|null=null;
+// A leave the user confirmed inside the payment flow keeps the order for later; it is not a checkout cancel.
+let paymentLeaveApproved=false;
 async function requestLeave():Promise<boolean>{
-  if(nativeBackApproved)return true;
+  if(nativeBackApproved||paymentLeaveApproved)return true;
+  // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
+  const pending=session.record.pending;
+  if(pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)return !busy.value&&!paymentConfirming.value;
   if(!current()||!visible.value||busy.value||paymentConfirming.value||leaving.value)return false;
   if(!session.record.order&&!session.record.pending)return true;
   leaving.value=true;paymentSheetOpen.value=false;
@@ -706,7 +712,7 @@ function hide(){
   disposeGuard?.();disposeGuard=null;
 }
 function show(){
-  visible.value=true;nativeBackApproved=false;if(!current())return;
+  visible.value=true;nativeBackApproved=false;paymentLeaveApproved=false;if(!current())return;
   startWalletTimer();
   if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(allowAuxiliaryNavigation);
   if(busy.value){refreshOnIdle=true;return;}
