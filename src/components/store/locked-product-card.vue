@@ -45,7 +45,7 @@
       <view v-if="detailsOpen" class="mt-3 flex items-center" style="gap: 10px">
         <view class="flex-1 inline-flex items-center justify-center nx-frosted-button locked-card__notify" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path :d="serverSubscribed ? 'm5 12 4 4L19 6' : 'M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'" /><path v-if="!serverSubscribed" d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          <text>{{ notifyBusy || notificationStatus === 'loading' ? t.store.coLoading : notificationStatus === 'error' ? t.ui.retry : t.store.lockedNotifyMe }}</text>
+          <text>{{ notifyBusy ? t.store.coLoading : t.store.lockedNotifyMe }}</text>
         </view>
       </view>
     </view>
@@ -64,6 +64,7 @@ import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { productCopy, specText } from "@/lib/product-copy";
 
@@ -131,25 +132,28 @@ async function reloadNotificationState(): Promise<void> {
       notificationStatus.value = "error";
     }
   } catch {
-    // Status is a best-effort hydration. The CTA remains available and only
-    // a confirmed mutation can move it to the subscribed state.
     if (requestIsCurrent(scope, epoch, accountKey, runScope, productNo)) notificationStatus.value = "error";
   }
 }
 
+useAutoRecovery({
+  active: () => cardInView.value || detailsOpen.value,
+  failed: () => notificationStatus.value === "error",
+  retry: reloadNotificationState,
+  repeatMs: 30_000,
+  quiet: false,
+});
+
 async function handleNotify() {
   if (notifyBusy.value || notificationStatus.value === "loading") return;
+  if (notificationStatus.value !== "ready") {
+    toast.error(t.value.authOtp.errorServiceUnavailable);
+    return;
+  }
   const scope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   const accountKey = scope.accountKey;
   const productNo = props.product.id;
-  if (notificationStatus.value !== "ready") {
-    const reading = reloadNotificationState();
-    const epoch = notificationEpoch;
-    await reading;
-    if (requestIsCurrent(scope, epoch, accountKey, runScope, productNo) && notificationStatus.value === "error") toast.error(t.value.authOtp.errorServiceUnavailable);
-    return;
-  }
   // A mutation also advances the local request epoch so an older GET (or a
   // previous mutation) cannot overwrite its confirmed state for this account.
   const epoch = ++notificationEpoch;
