@@ -9,8 +9,8 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalOrderNavigationFailed || (pendingCheckoutCreate && !createdCheckoutOrder)) && !paymentFlowBusy" class="checkout-original-open nx-step-in" role="status">
-        <view class="checkout-original-open-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h4" /></svg></view><text class="checkout-original-open-title">{{ originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle }}</text><text class="checkout-original-open-body">{{ originalOrderNavigationFailed ? t.store.coOriginalOrderOpenHint : t.store.coPendingCreateHint }}</text>
+      <view v-if="(originalOrderNavigationFailed || (pendingCheckoutCreate && !createdCheckoutOrder)) && !paymentFlowBusy" class="checkout-original-open nx-step-in">
+        <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle" :description="originalOrderNavigationFailed ? t.store.coOriginalOrderOpenHint : t.store.coPendingCreateHint" />
       </view>
       <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : purchaseRecoveryCopy(locale.code).original }}</text>
@@ -24,11 +24,9 @@
       </view>
 
       <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: var(--v5-space-5)">
-        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogErrorTitle }}</text>
+        <text class="checkout-page-state">{{ t.store.catalogErrorTitle }}</text>
         <view class="mb-3"><NxButton :label="t.store.catalogRetry" @click="refreshVisibleCheckout(true)" /></view>
-        <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
-          <text>{{ t.store.coBackToStore }}</text>
-        </view>
+        <NxButton variant="text" size="small" :label="t.store.coBackToStore" @click="goStore" />
       </view>
 
       <view v-else-if="trialQuoteScreenUnavailable" class="text-center" role="status" style="padding: var(--v5-space-6) var(--v5-space-4)">
@@ -38,10 +36,8 @@
 
       <!-- Product not found -->
       <view v-else-if="!product" class="text-center" style="padding: var(--v5-space-5)">
-        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.coProductNotFound }}</text>
-        <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
-          <text>{{ t.store.coBackToStore }}</text>
-        </view>
+        <text class="checkout-page-state">{{ t.store.coProductNotFound }}</text>
+        <NxButton :label="t.store.coBackToStore" @click="goStore" />
       </view>
 
       <template v-else>
@@ -68,12 +64,10 @@
              不许盖住本页正在展示的活票(地址 / 金额 / 倒计时 / 取消都在被它压掉的那一支里):
              恢复行是持久行,resume 进来的票会被它整页遮蔽而全站失联(审计 R5 P0)—— 有活票先付票,
              票结清 / 作废后这张卡再露出来。 -->
-        <view v-if="receiptWriteFailure && !activeSession" class="nx-glass-card mx-4 rounded-2xl text-center nx-step-in" :style="receiptFailureCardStyle">
-          <text class="block" :style="centerTitleStyle">{{ t.errors.billMissingTitle }}</text>
-          <text class="block" style="margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.errors.billMissingMsg }}</text>
-          <view class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: var(--v5-space-4)" :aria-disabled="receiptRetrying" @click.stop="retryReceiptWrite">
-            <text>{{ receiptRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
-          </view>
+        <view v-if="receiptWriteFailure && !activeSession" class="checkout-group checkout-receipt-failure nx-step-in" role="status">
+          <text class="checkout-receipt-failure__title">{{ t.errors.billMissingTitle }}</text>
+          <text class="checkout-receipt-failure__body">{{ t.errors.billMissingMsg }}</text>
+          <view class="checkout-receipt-failure__actions"><NxButton variant="text" size="small" :label="receiptRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry" :busy="receiptRetrying" @click="retryReceiptWrite" /></view>
         </view>
 
         <!-- Review uses the existing quote, redemption and explicit confirmation flow. -->
@@ -91,7 +85,7 @@
                 <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher">
                   <view v-for="choice in [{ automatic: true, label: reviewCopy.automaticVoucher }, { automatic: false, label: t.promotion.noVoucher }]" :key="String(choice.automatic)" class="checkout-voucher-choice" role="radio" :aria-checked="voucherAutomatic === choice.automatic" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(choice.automatic)">
                     <text class="checkout-voucher-choice__label">{{ choice.label }}</text>
-                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === choice.automatic }" aria-hidden="true"><svg v-if="voucherAutomatic === choice.automatic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7" /></svg></view>
+                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === choice.automatic }" aria-hidden="true" />
                   </view>
                 </view>
                 <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
@@ -104,7 +98,7 @@
                 <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h13m1 12 4-4-4-4M21 16H8" /></svg></view>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-row-description">{{ tradeinChipText }}</text></view>
                 <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
-                <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" icon="chevron-right" @click="reAddTradein" />
+                <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" @click="reAddTradein" />
               </view>
             </view>
           </view>
@@ -274,6 +268,7 @@ import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/am
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { ref, reactive, shallowRef, nextTick, computed, watch, onMounted, onUnmounted, getCurrentInstance, type CSSProperties } from "vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
@@ -3026,16 +3021,6 @@ onUnload(() => cleanup());
 onUnmounted(() => cleanup());
 
 // ─── styles ───
-const notFoundBtnStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 20px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-ink)",
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 600,
-};
 function stepFillStyle(i: number): CSSProperties {
   const w = i < stepDisplay.value ? "100%" : i === stepDisplay.value ? "100%" : "0%";
   return { width: w, background: "linear-gradient(90deg, var(--v5-brand-deep), var(--ui-lime-soft))", boxShadow: i <= stepDisplay.value ? "0 0 10px var(--v5-brand-border)" : "none", transition: "width 0.5s" };
@@ -3136,10 +3121,6 @@ const doneBtnStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
   fontSize: "13px",
 };
-const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
-  padding: "var(--v5-space-6) var(--v5-space-5)",
-  background: "var(--nx-glass-fill)",
-};
 
 
 </script>
@@ -3208,14 +3189,14 @@ button.checkout-quantity-button::after {border:0;}
   .checkout-quantity { grid-column:2;justify-self:start;text-align:left; }
 }
 .checkout-section { margin:var(--v5-space-5) var(--v5-space-4) 0; }
-.checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); letter-spacing:-.012em; }
+.checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); letter-spacing:-.012em; }
 .checkout-option { display:flex; align-items:center; gap:var(--v5-space-3); min-height:64px; padding:10px 16px; border-bottom:1px solid var(--v5-border); }
 .checkout-option:last-child { border-bottom:0; }
 .checkout-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; color:var(--v5-ink-2); background:var(--ui-content-surface-2); }
 .checkout-option-copy { flex:1; min-width:0; }
 .checkout-row-title { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); }
-.checkout-row-description { display:block; margin-top:2px; font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
-.checkout-discount { flex:none; color:var(--v5-brand); font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
+.checkout-row-description { display:block; margin-top:2px; font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
+.checkout-discount { flex:none; color:var(--v5-brand); font:500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); font-variant-numeric:tabular-nums; }
 .checkout-chevron { flex:none; width:16px; height:16px; color:var(--v5-ink-4); transition:transform 180ms ease; }
 .checkout-chevron--open { transform:rotate(90deg); }
 .checkout-voucher { cursor:pointer; }
@@ -3223,7 +3204,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
 .checkout-voucher-match { padding:var(--v5-space-2) var(--v5-space-4) 0 64px; }
 .checkout-voucher-choices { padding:var(--v5-space-1) var(--v5-space-4) var(--v5-space-1) 64px; }
-.checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; min-height:44px; padding:6px 0 6px 8px; color:var(--v5-brand); font-size:13px; }
+.checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; min-height:44px; padding:6px 0 6px 8px; }
 /* Long trade-in labels (ru, kk) would squeeze the title into 3 lines: the action drops below, right-aligned. */
 .checkout-tradein { flex-wrap:wrap; }
 .checkout-tradein .checkout-option-copy { flex:1 1 8em; }
@@ -3241,7 +3222,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-fee--total { margin-top:var(--v5-space-1); padding-block:12px; min-height:55px; box-sizing:border-box; border-top:1px solid var(--v5-border); }
 .checkout-fee--total > text,.checkout-fee--total > uni-text { font-weight:600; }
 .checkout-fee--total :deep(.tabular-nums) { font-size:18px !important; }
-.checkout-note { display:block; margin:var(--v5-space-3) 2px 0; font:400 12.5px/1.6 var(--font-v5); color:var(--v5-ink-3); }
+.checkout-note { display:block; margin:var(--v5-space-3) 2px 0; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); }
 .checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-3); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle); line-height:var(--ui-type-list-subtitle-lh); font-weight:600; color:var(--v5-ink-2); }
 .checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .checkout-note--warning { padding:10px 12px; border-radius:12px; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
@@ -3263,16 +3244,20 @@ button.checkout-policy-link::after { border:0; }
 .checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
 .checkout-sticky { position:absolute; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; }
 .checkout-sticky-copy { min-width:0; }
-.checkout-total { display:block; font:600 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
+.checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }
 .checkout-sticky--single :deep(.nx-button) { flex:1 1 auto; }
 .checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }
 .checkout-summary-total :deep(.checkout-amount) { font-size:var(--ui-type-section); }
 .checkout-exit-error { display:grid; gap:var(--v5-space-5); color:var(--v5-ink-2); line-height:1.6; }
 .checkout-original-open { display:grid; gap:var(--v5-space-2); padding:calc(var(--v5-space-8) * 2) var(--v5-space-4) var(--v5-space-6); text-align:center; }
-.checkout-original-open-icon { justify-self:center; display:grid; place-items:center; width:56px; height:56px; margin-bottom:var(--v5-space-2); border-radius:50%; background:color-mix(in srgb, var(--v5-ink) 6%, transparent); color:var(--v5-ink-2); }
-.checkout-original-open-title { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color:var(--v5-ink); text-wrap:balance; }
-.checkout-original-open-body { font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); text-wrap:pretty; }
+/* Page states (catalog failed, product missing): one centred result line, short-body role (DS 03 §3.4, 10.1). */
+.checkout-page-state { display:block; margin-bottom:var(--v5-space-4); color:var(--v5-ink-2); font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); text-wrap:pretty; }
+/* Receipt write failure is a solid content card: title, one caption line, in-place retry bottom-right (DS 01 §1.1.2, 03 §3.1). */
+.checkout-receipt-failure { margin:var(--ui-space-card-gap) var(--v5-space-4) 0; padding:var(--ui-space-inset); }
+.checkout-receipt-failure__title { display:block; color:var(--v5-ink); font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.checkout-receipt-failure__body { display:block; margin-top:var(--v5-space-1); color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.checkout-receipt-failure__actions { display:flex; justify-content:flex-end; margin:var(--v5-space-1) -8px -8px 0; }
 .checkout-promotion { padding:var(--v5-space-2) var(--v5-space-4) 120px; color:var(--v5-ink); }
 .checkout-promotion--result { padding: 0; }
 .checkout-promotion :deep(.promotion-flat) { border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); padding:var(--v5-space-4); }
@@ -3291,8 +3276,10 @@ button.checkout-policy-link::after { border:0; }
 .checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink-2); font:400 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
 .checkout-voucher-choice[aria-checked="true"] .checkout-voucher-choice__label { color:var(--v5-ink); font-weight:var(--ui-type-subheading-weight); }
 .checkout-voucher-choice[aria-disabled="true"] { opacity:.45; pointer-events:none; }
+/* Radio per design rules: hollow 1.5px ring; selected = 2px brand ring + 12px brand dot, no checkmark. */
 .checkout-voucher-radio { width:22px; height:22px; flex:none; box-sizing:border-box; display:grid; place-items:center; border-radius:999px; border:1.5px solid var(--v5-ink-4); }
-.checkout-voucher-radio--on { border:0; background:var(--v5-brand); color:var(--v5-on-brand); }
+.checkout-voucher-radio--on { border:2px solid var(--v5-brand); }
+.checkout-voucher-radio--on::after { content:""; width:12px; height:12px; border-radius:999px; background:var(--v5-brand); }
 .checkout-voucher-link { min-height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px 0 64px; border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:500 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); cursor:pointer; }
 .checkout-voucher-choice:focus-visible,.checkout-voucher-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
 </style>
