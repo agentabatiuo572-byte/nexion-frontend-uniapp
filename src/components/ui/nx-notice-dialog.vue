@@ -15,7 +15,7 @@
       <slot />
       <view class="nx-notice__actions">
         <NxButton :label="primary" variant="primary" :busy="busy" @click="$emit('primary')" />
-        <NxButton v-if="secondary" :label="secondary" variant="link" :disabled="busy" @click="$emit('secondary')" />
+        <NxButton v-if="secondary" :label="secondary" variant="text" :disabled="busy" @click="$emit('secondary')" />
       </view>
     </view>
   </view>
@@ -24,7 +24,8 @@
 import { computed, getCurrentInstance } from 'vue';
 import NxButton from './nx-button.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
-// Centered notice (payment design 07): icon, title, one short explanation, a primary action and an optional quiet one.
+// Centered notice (DS 03 §3.5 居中确认框, the same anatomy as the global confirm()): icon, title, one short explanation,
+// a solid primary and an optional secondary exit below it as a brand text button.
 const props = withDefaults(defineProps<{ open: boolean; title: string; body?: string; primary: string; secondary?: string;
   icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean }>(), { icon: 'alert', tone: 'warning' });
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();
@@ -38,12 +39,9 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary 
 .nx-notice__icon { flex: none; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--nx-notice-fill) var(--nx-notice-fill-amount), transparent); color: var(--nx-notice-tone); }
 /* Icon tone: brand = go ahead (pre-payment check), warning = attention, danger = failed, neutral = closed. */
 .nx-notice--warning { --nx-notice-tone: var(--v5-warning); --nx-notice-fill: var(--v5-warning); --nx-notice-fill-amount: 14%; }
-.nx-notice--brand { --nx-notice-tone: var(--v5-brand); --nx-notice-fill: var(--v5-brand); --nx-notice-fill-amount: 16%; }
-.nx-notice--danger { --nx-notice-tone: var(--v5-danger); --nx-notice-fill: var(--v5-danger); --nx-notice-fill-amount: 16%; }
+.nx-notice--brand { --nx-notice-tone: var(--v5-brand); --nx-notice-fill: var(--v5-brand); --nx-notice-fill-amount: 14%; }
+.nx-notice--danger { --nx-notice-tone: var(--v5-danger); --nx-notice-fill: var(--v5-danger); --nx-notice-fill-amount: 14%; }
 .nx-notice--neutral { --nx-notice-tone: var(--v5-ink-2); --nx-notice-fill: var(--v5-ink-3); --nx-notice-fill-amount: 18%; }
-.nx-notice__title { display: block; margin-top: 16px; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); }
+.nx-notice__title { display: block; margin-top: 16px; font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); color: var(--v5-ink); text-wrap: balance; }
 .nx-notice__body { display: block; margin-top: 8px; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); }
-.nx-notice__actions { align-self: stretch; display: grid; gap: 4px; margin-top: 24px; }
-/* The quiet action reads at button size, in the muted color. */
-.nx-notice__actions :deep(.nx-button--link) { font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
-</style>
+.nx-notice__actions { align-self: stretch; display: grid; gap: 4px; margin-top: 24px; }</style>

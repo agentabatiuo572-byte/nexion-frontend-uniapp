@@ -70,7 +70,7 @@ onHide(() => { shown.value = false; });
 .nx-toast__title {
   display: block;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   font: 500 15px/22px var(--font-v5);
   color: var(--v5-toast-ink);
 }
@@ -78,7 +78,7 @@ onHide(() => { shown.value = false; });
   display: block;
   max-width: 100%;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   font: 400 13px/18px var(--font-v5);
   color: var(--v5-toast-ink-2);
 }
