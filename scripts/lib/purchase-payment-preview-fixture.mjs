@@ -34,14 +34,19 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (kind !== 'TRADE_IN' && kind !== 'CAPACITY_REPLACE') return null;
     const fleet = demoFleetFacts(url, locale(), state), id = payload.sourceDeviceId;
     const sourceId = typeof id === 'string' && /^\+?\d+$/.test(id.trim()) ? Number(id) : id;
-    if (kind === 'CAPACITY_REPLACE' && (!Number.isSafeInteger(sourceId) || demoCapacityReplacementSource(fleet)?.id !== sourceId))
+    if (kind === 'CAPACITY_REPLACE' && (!Number.isSafeInteger(sourceId)
+      || demoCapacityReplacementSource(fleet, demoProducts(state, url.origin))?.id !== sourceId))
       return refused(409, 'CAPACITY_REPLACEMENT_SOURCE_CHANGED');
     const source = fleet.devices.find(device => device.id === sourceId);
     if (!source) return null;
     const busy = status => ['RUNNING', 'BUSY'].includes(status);
-    const assignments = demoFixture(new URL('/api/tasks/assignments', url.origin), locale(), state, {...request, method: () => 'GET'});
-    const task = assignments.devices.find(device => device.deviceId === sourceId)?.currentTask;
-    return [source.status, source.runtimeStatus, task?.status].some(busy) ? refused(409, 'SIMULATED_DEVICE_BUSY') : null;
+    const v2 = !['app', 'cycles'].includes(state.computeState ?? 'app');
+    const assignmentPath = v2 ? '/api/tasks/v2/assignments' : '/api/tasks/assignments';
+    const assignments = source.activatedAt == null ? null
+      : demoFixture(new URL(assignmentPath, url.origin), locale(), state, {...request, method: () => 'GET'});
+    const task = assignments?.devices.find(device => device.deviceId === sourceId)?.currentTask;
+    return [source.status, source.runtimeStatus, task?.status].some(busy)
+      ? refused(409, v2 ? 'COMPUTE_V2_DEVICE_BUSY' : 'SIMULATED_DEVICE_BUSY') : null;
   }
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   // The account's one order list.

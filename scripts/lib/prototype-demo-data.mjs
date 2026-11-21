@@ -470,8 +470,14 @@ export function demoFleetFacts(url,locale,state) {
   return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
 }
 
-export function demoCapacityReplacementSource(fleet) {
-  return fleet.slotsUsed >= fleet.slotCap ? fleet.devices.find(device => device.activatedAt !== null) : undefined;
+export function demoCapacityReplacementSource(fleet, products) {
+  if (fleet.slotsUsed < fleet.slotCap) return undefined;
+  const shareSkus = new Set(products.filter(product => product.productType === 'SHARE').map(product => product.id.toUpperCase()));
+  return fleet.devices.filter(device => device.activatedAt != null && device.deactivatedAt == null
+    && ['ACTIVE', 'ONLINE'].includes(device.status) && (device.ownershipStatus ?? 'OWNED') === 'OWNED'
+    && !device.pendingDeactivate && device.sourceChannel !== 'PROMOTION_GIFT'
+    && !['SHARE', 'CLOUD', 'PHONE', 'MOBILE'].includes(device.deviceType) && !shareSkus.has(device.productCode))
+    .sort((a, b) => (a.dailyUsdt ?? 0) - (b.dailyUsdt ?? 0) || a.id - b.id)[0];
 }
 
 // Apply a selected preview preset once. Reads and saved-state imports never issue a gift.
@@ -879,7 +885,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(state.checkoutState==='capacity-error')throw Object.assign(new Error('CAPACITY_UNAVAILABLE'),{status:503});
     if(state.checkoutState==='setup-required')throw Object.assign(new Error('USER_ONBOARDING_REQUIRED'),{status:428});
     const fleet=demoFleetFacts(url,locale,state),active=fleet.devices.filter(device=>device.activatedAt!==null),full=fleet.slotsUsed>=fleet.slotCap;
-    const source=demoCapacityReplacementSource(fleet);
+    const source=demoCapacityReplacementSource(fleet,products);
     Object.assign(data,{decision:full?(source?'REPLACE_REQUIRED':'NO_ACTIVE_DEVICE'):'CAPACITY_AVAILABLE',activeDevices:active.length,maxActiveDevices:fleet.slotCap,
       sourceDeviceId:source?.id??null,sourceDeviceName:source?.name??null,
       payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
