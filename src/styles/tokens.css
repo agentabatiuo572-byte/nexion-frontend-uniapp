@@ -1208,6 +1208,27 @@ uni-input .uni-input-placeholder {
   .nx-header__r, .message-nav, .cp-head { --ui-header-glass-inset: 3px; --ui-header-icon-size: 18px; }
 }
 
+/* Whole-page result (03 §3.5.2): the page container fills the screen between its header and bottom
+   padding, every wrapper on the way down passes the free height on, and the result takes it and
+   centres itself. Content above it (tabs, a search field) stays where it is. */
+.nx-page-enter:has(.nx-empty--page),
+.nx-standalone-page:has(.nx-empty--page) {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+:is(.nx-page-enter, .nx-standalone-page) :has(.nx-empty--page) {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+.nx-empty--page { flex-grow: 1; }
+/* 17–23px titles track -0.01em; Chinese keeps 0 (01.2). */
+.nx-empty__title { letter-spacing: -0.01em; }
+.nx-empty__title:lang(zh) { letter-spacing: 0; }
+
 /* Card read recovery is a text button (design system 03 §3.1, 10 §10.2): brand text 13/18
    at 500, no fill. Its box is the label line; the 44px target is a layer that takes no layout.
    The combined selector also wins over the later inline-recovery stylesheet. */

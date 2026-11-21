@@ -10,7 +10,7 @@
   表单字段校验错误也不用(规范 §4:inline 就地提示,不升整页缺省页)。
 -->
 <template>
-  <view class="nx-empty" :style="rootStyle">
+  <view class="nx-empty" :class="{ 'nx-empty--page': page }" :style="rootStyle">
     <image class="nx-empty__art" :src="artSrc" mode="aspectFit" :style="artStyle" />
     <text class="nx-empty__title" :style="titleStyle">{{ title }}</text>
     <text v-if="desc" class="nx-empty__desc" :style="descStyle">{{ desc }}</text>
@@ -59,8 +59,10 @@ const props = withDefaults(
     emphasis?: boolean;
     /** 嵌在卡片/小容器里时收窄纵向留白 */
     compact?: boolean;
+    /** The page has nothing else to show: the result sits in the middle of the page body below the header (03 §3.5.2). */
+    page?: boolean;
   }>(),
-  { emphasis: false, compact: false, ctaDisabled: false, ctaBusy: false },
+  { emphasis: false, compact: false, ctaDisabled: false, ctaBusy: false, page: false },
 );
 
 const emit = defineEmits<{ (e: "cta"): void }>();
@@ -90,13 +92,13 @@ const artStyle = computed<CSSProperties>(() => ({
   width: props.compact ? "112px" : "144px",
   height: props.compact ? "112px" : "144px",
 }));
+// Overview-title role (10.1), so 360 gets its own step; tracking lives in the class below.
 const titleStyle: CSSProperties = {
   marginTop: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "20px",
-  lineHeight: "28px",
-  fontWeight: 600,
-  letterSpacing: "-0.014em",
+  fontSize: "var(--ui-type-hero-title)",
+  lineHeight: "var(--ui-type-hero-title-lh)",
+  fontWeight: "var(--ui-type-hero-title-weight)" as CSSProperties["fontWeight"],
   color: "var(--v5-ink)",
   // A two-line title splits evenly instead of leaving one word alone (06 §6.3).
   textWrap: "balance",
@@ -130,3 +132,4 @@ const ctaTextStyle = computed<CSSProperties>(() => isReadRetry.value ? {} : ({
   color: props.emphasis ? "var(--v5-on-brand)" : "var(--v5-ink-2)",
 }));
 </script>
+

@@ -40,7 +40,7 @@
 
       <!-- A receipt lookup is the whole page: one 重新加载. The ordinary list keeps its overview and shows the
            unknown placeholder while it recovers on its own (03 §3.5.2). -->
-      <EmptyState v-if="initialError && ledgerBizNo" kind="recoverable-error" :title="t.walletV3.submitReasonServiceUnavailable" :cta-label="t.ui.reload" @cta="refreshLedger" />
+      <EmptyState v-if="initialError && ledgerBizNo" kind="recoverable-error" page :title="t.wallet.lookupUnavailable" :cta-label="t.ui.reload" @cta="refreshLedger" />
       <view v-else-if="initialError" :style="loadingStyle"><text>—</text></view>
 
       <!-- Empty -->

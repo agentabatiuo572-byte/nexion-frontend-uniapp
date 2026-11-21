@@ -12,7 +12,7 @@
       <view v-if="narrative.state === 'loading'" class="mx-4" :style="stateCardStyle">
         <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeLoading }}</text>
       </view>
-      <EmptyState v-else-if="narrative.state === 'error'" kind="recoverable-error" :title="t.trust.nexNarrativeError" :cta-label="t.ui.reload" @cta="loadNarrative(true)" />
+      <EmptyState v-else-if="narrative.state === 'error'" kind="recoverable-error" page :title="t.trust.nexNarrativeError" :cta-label="t.ui.reload" @cta="loadNarrative(true)" />
       <EmptyState v-else-if="narrative.state === 'unpublished'" kind="empty-list" :title="t.trust.nexNarrativeUnavailable" :cta-label="w.ctaBack" @cta="goBack()" />
 
       <template v-if="narrative.state !== 'error' && narrative.state !== 'unpublished'">

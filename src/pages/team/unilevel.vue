@@ -4,7 +4,7 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.directReferral.title" :action-label="t.unilevel.howItWorksEntry" :action="openRules" plain />
       <view class="px-4" style="display: flex; flex-direction: column; gap: 16px">
-        <EmptyState v-if="remoteState === 'error'" kind="recoverable-error" :title="updateRequired ? t.directReferral.updateRequired : t.network.projectionErrorTitle" :desc="updateRequired ? t.directReferral.updateHint : t.network.projectionErrorDesc" :cta-label="updateRequired ? t.network.retry : t.ui.reload" @cta="retryRemote" />
+        <EmptyState v-if="remoteState === 'error'" kind="recoverable-error" page :title="updateRequired ? t.directReferral.updateRequired : t.network.projectionErrorTitle" :desc="updateRequired ? t.directReferral.updateHint : t.network.projectionErrorDesc" :cta-label="updateRequired ? t.network.retry : t.ui.reload" @cta="retryRemote" />
         <template v-else>
         <view v-if="remoteState !== 'ready' && !remoteSnapshot" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
         <template v-else-if="remoteSnapshot">

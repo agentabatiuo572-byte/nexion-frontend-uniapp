@@ -3,7 +3,7 @@
     <SubPageHeader :back="returnTo" :back-action="goBack" :title="t.privacy.title" plain design />
     <view class="privacy-page">
       <text v-if="loading" class="privacy-copy">{{ t.terms.loading }}</text>
-      <EmptyState v-else-if="failed" kind="recoverable-error" :title="t.privacy.unavailable" :cta-label="t.ui.reload" @cta="load" />
+      <EmptyState v-else-if="failed" kind="recoverable-error" page :title="t.privacy.unavailable" :cta-label="t.ui.reload" @cta="load" />
       <view v-else-if="policy">
         <text class="privacy-copy">{{ t.privacy.version }} {{ policy.version }} · {{ policy.locale }}</text>
         <text class="privacy-copy">{{ platformDisplayText(policy.hero) }}</text>

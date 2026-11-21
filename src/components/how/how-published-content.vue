@@ -29,7 +29,7 @@
       </template>
       </template>
     </view>
-    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
+    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
   </view>
 </template>
 

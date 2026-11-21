@@ -9,9 +9,8 @@
           v-if="remoteApiEnabled && !ledger"
           :kind="commission.eventsStatus === 'error' ? 'recoverable-error' : 'empty-list'"
           :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionLoadingTitle"
-          :desc="commission.eventsStatus === 'error' ? t.network.projectionErrorDesc : undefined"
-          :cta-label="commission.eventsStatus === 'error' ? t.network.retry : undefined"
-          compact
+          :cta-label="commission.eventsStatus === 'error' ? t.ui.reload : undefined"
+          page
           @cta="commission.refreshCanonicalEvents()"
         />
         <template v-if="!remoteApiEnabled || ledger !== null">

@@ -2190,6 +2190,7 @@ rankBenefits: "View rank benefits",
 },
   wallet: {
     loadingTransactions: "Loading transaction history…",
+    lookupUnavailable: "This transaction can't be loaded right now",
     title: "Wallet",
     usdtBalance: "USDT balance",
     nexBalance: "UVT Balance",
@@ -5579,9 +5580,9 @@ openSeaErrorPool: {
     // The server sends `duration` as "<n> min"; the page renders it through
     // `courseDurationText` so the unit follows the interface language.
     durationMinutes: "{n} min",
-    centerOffline: "The learning center needs a trusted network connection; please connect and retry.",
-    centerGeoUnresolved: "We can't confirm which courses are available in your region right now. Check your connection and retry.",
-    centerUnavailable: "The learning center is unavailable right now; please retry shortly.",
+    centerOffline: "Connect to a trusted network to view courses",
+    centerGeoUnresolved: "Courses for your region can't be confirmed right now",
+    centerUnavailable: "Courses can't be loaded right now",
     courseLoading: "Loading the course…",
     courseVersionMeta: "Version {version} · {nex}\u00A0UVT reward",
     courseIdMissing: "The course link is incomplete. Return to the learning center and reopen it.",

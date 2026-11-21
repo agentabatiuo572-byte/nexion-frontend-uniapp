@@ -25,7 +25,7 @@
       <EmptyState
         v-else-if="fleetFailed"
         class="nx-device-detail__error mx-4"
-        kind="recoverable-error"
+        kind="recoverable-error" page
         :title="t.empty.errorTitle"
         :desc="t.empty.errorDesc"
         :cta-label="t.ui.reload"
@@ -37,7 +37,7 @@
       <EmptyState
         v-else-if="showNotFound"
         class="nx-device-detail__empty mx-4"
-        kind="recoverable-error"
+        kind="recoverable-error" page
         :title="t.earn.deviceNotFound"
         :desc="t.empty.errorDesc"
       />
