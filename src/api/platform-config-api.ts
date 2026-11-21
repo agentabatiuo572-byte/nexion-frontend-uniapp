@@ -3,6 +3,7 @@ import type {
   OnlineBonus,
   PlatformVerifiedAggregate,
   PlatformVerifiedStats,
+  PlatformConfig,
   PublicStatsConfig,
   RewardsConfig,
   ShareChannelDef,
@@ -13,14 +14,18 @@ import type {
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
+import { parseGlobeDisplay } from "@/lib/globe-simulation";
+import { uiLocale, type UiLocale } from "@/i18n";
 
 export interface PlatformComputeConfigSnapshot {
   featureFlags: {
     computeShareEnabled: boolean;
     homeNewcomerTasksEnabled: boolean;
     homeWeeklyPromoEnabled: boolean;
+    stakingVisible: boolean;
   };
   publicStats: PublicStatsConfig;
+  networkPulse: PlatformConfig["networkPulse"];
   publicStatsAuthority: PlatformPublicStatsAuthority;
   /**
    * 服务端可核验聚合。对外「在线设备 / 账号数」这类事实必须读它,不得再由
@@ -40,6 +45,8 @@ export interface PlatformComputeConfigSnapshot {
   };
   rewards: RewardsConfig;
   share: ShareConfig;
+  /** Interface languages the platform switches on; null when the field is missing or invalid (not configured). */
+  interfaceLanguages: UiLocale[] | null;
   updatedAt: string;
   sources: string[];
 }
@@ -220,7 +227,8 @@ export function parsePlatformExperienceConfig(value: unknown): {
   const root = record(value);
   const featureFlags = record(root.featureFlags);
   if (typeof featureFlags.homeNewcomerTasksEnabled !== "boolean"
-      || typeof featureFlags.homeWeeklyPromoEnabled !== "boolean") {
+      || typeof featureFlags.homeWeeklyPromoEnabled !== "boolean"
+      || (featureFlags.stakingVisible !== undefined && typeof featureFlags.stakingVisible !== "boolean")) {
     return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   }
   return {
@@ -228,6 +236,8 @@ export function parsePlatformExperienceConfig(value: unknown): {
       computeShareEnabled: typeof featureFlags.computeShareEnabled === "boolean" ? featureFlags.computeShareEnabled : false,
       homeNewcomerTasksEnabled: featureFlags.homeNewcomerTasksEnabled,
       homeWeeklyPromoEnabled: featureFlags.homeWeeklyPromoEnabled,
+      // Staking is withdrawn: H5 Lite hides it whatever the server flag says.
+      stakingVisible: false,
     },
     share: parsePlatformShareConfig(root.share),
   };
@@ -340,22 +350,38 @@ function parseVerifiedStats(value: unknown): PlatformVerifiedStats | null {
   };
 }
 
+function optionalEstimateNumber(row: Record<string, unknown>, key: string): number | undefined {
+  if (!(key in row)) return undefined;
+  const value = row[key];
+  return typeof value === "number" ? value : Number.NaN;
+}
+
 function parsePublicStats(value: unknown): PublicStatsConfig {
   const projection = record(value);
+  const estimateValues = projection.values && typeof projection.values === "object" && !Array.isArray(projection.values) ? projection.values as Record<string,unknown> : projection;
   const realUserCount = finiteNumber(projection.realUserCount);
   if (!Number.isInteger(realUserCount) || realUserCount < 0 || realUserCount > 100_000_000) {
     return invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
   }
-  // Legacy servers may still send operator-configured values. Never install them
-  // into the public store: old surfaces could render them as measured facts.
-  // Invalid sentinels keep every H9-derived public display unavailable.
+  // Optional estimate parameters are rendered only with an explicit estimate label.
+  // Invalid or missing values are hidden by publicStatsHealth; they never replace realUserCount.
   return {
+    globeDisplay: parseGlobeDisplay(projection.globeDisplay),
     fleetDevices: 0,
     onlineRatePct: 0,
     onlineJitter: -1,
-    registeredUsersBase: 0,
+    registeredUsersEstimateProvided: ["registeredUsersBase", "registeredUsersAnchorAt", "registeredUsersTickIntervalSec",
+      "registeredUsersTickStepMin", "registeredUsersTickStepMax", "registeredUsersTickStep"].some(key => key in estimateValues),
+    registeredUsersBase: optionalEstimateNumber(estimateValues, "registeredUsersBase") ?? -1,
     registeredUsersMonthlyGrowthPct: -1,
-    registeredUsersAnchorAt: 0,
+    registeredUsersAnchorAt: optionalEstimateNumber(estimateValues, "registeredUsersAnchorAt") ?? -1,
+    registeredUsersTickIntervalSec: optionalEstimateNumber(estimateValues, "registeredUsersTickIntervalSec"),
+    // A server from the first cadence release sends one fixed step; read it as min = max.
+    registeredUsersTickStepMin: optionalEstimateNumber(estimateValues, "registeredUsersTickStepMin" in estimateValues ? "registeredUsersTickStepMin" : "registeredUsersTickStep"),
+    registeredUsersTickStepMax: optionalEstimateNumber(estimateValues, "registeredUsersTickStepMax" in estimateValues ? "registeredUsersTickStepMax" : "registeredUsersTickStep"),
+    // H9 starting value for the published active-jobs series. Outside B21's 0..100,000,000 integers means unpublished.
+    activeJobsBase: Number.isSafeInteger(estimateValues.activeJobsBase) && (estimateValues.activeJobsBase as number) >= 0
+      && (estimateValues.activeJobsBase as number) <= 100_000_000 ? estimateValues.activeJobsBase as number : null,
     realUserCount,
     virtualUserCount: -1,
     hashratePercentileTable: [],
@@ -364,6 +390,7 @@ function parsePublicStats(value: unknown): PublicStatsConfig {
 
 export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = "prod"): {
   config: PublicStatsConfig;
+  networkPulse: PlatformConfig["networkPulse"];
   authority: PlatformPublicStatsAuthority;
 } {
   const projection = record(value);
@@ -380,6 +407,7 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = 
   }
   return {
     config: parsePublicStats(projection),
+    networkPulse: parseNetworkPulse(projection.networkPulse),
     authority: {
       source: source as PlatformPublicStatsAuthority["source"],
       sourceEnvironment: sourceEnvironment as PlatformPublicStatsAuthority["sourceEnvironment"],
@@ -387,6 +415,25 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = 
       version,
     },
   };
+}
+
+// Missing/malformed values provide no new language authority; keep the last confirmed list.
+export function parseInterfaceLanguages(value: unknown): UiLocale[] | null {
+  if (!Array.isArray(value) || !value.every((code) => typeof code === "string" && uiLocale(code) === code)) return null;
+  const codes = value as UiLocale[];
+  return new Set(codes).size === codes.length && codes.includes("en") ? codes : null;
+}
+
+function parseNetworkPulse(value: unknown): PlatformConfig["networkPulse"] {
+  if (value === null || value === undefined) return null;
+  const row = record(value);
+  const count = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    const parsed = finiteNumber(value);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) return invalid("H9_NETWORK_PULSE_INVALID");
+    return parsed;
+  };
+  return { registeredUsers: count(row.registeredUsers), onlineDevices: count(row.onlineDevices) };
 }
 
 export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment = "prod"): PlatformComputeConfigSnapshot {
@@ -400,6 +447,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
   if (typeof featureFlags.computeShareEnabled !== "boolean"
       || typeof featureFlags.homeNewcomerTasksEnabled !== "boolean"
       || typeof featureFlags.homeWeeklyPromoEnabled !== "boolean"
+      || (featureFlags.stakingVisible !== undefined && typeof featureFlags.stakingVisible !== "boolean")
       || compute.domain !== "E6") return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
   const experience = parsePlatformExperienceConfig(value);
   const h5BaseFactor = nonNegativeNumber(onlineBonus.h5BaseFactor);
@@ -412,12 +460,13 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
   const flags = compute.flags.map(record);
   const coefficients = compute.coefficients.map(record);
   const yields = compute.yieldEstimate.map(record);
-  exactKeySet(flags, FLAG_KEYS);
+  if (flags.length) exactKeySet(flags, FLAG_KEYS);
   exactKeySet(coefficients, COEFFICIENT_KEYS);
   exactKeySet(yields, YIELD_KEYS);
 
   const flag = flags[0];
-  if (typeof flag.enabled !== "boolean" || flag.enabled !== featureFlags.computeShareEnabled) return invalid();
+  if (flag ? typeof flag.enabled !== "boolean" || flag.enabled !== featureFlags.computeShareEnabled
+    : featureFlags.computeShareEnabled !== false) return invalid();
   const coefficientValues = Object.fromEntries(
     coefficients.map((row) => {
       const key = nonEmptyString(row.key);
@@ -437,8 +486,9 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
   const sources = Array.isArray(compute.sources) ? compute.sources.map(nonEmptyString) : invalid();
 
   return {
-    featureFlags: experience.featureFlags,
+    featureFlags: { ...experience.featureFlags, computeShareEnabled: false },
     publicStats: publicStatsProjection.config,
+    networkPulse: publicStatsProjection.networkPulse,
     publicStatsAuthority: publicStatsProjection.authority,
     verifiedStats: parseVerifiedStats(root.publicStats && typeof root.publicStats === "object"
       ? (root.publicStats as Record<string, unknown>).verified : null),
@@ -451,7 +501,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
         enTitle: string(download.enTitle),
         enGuide: string(download.enGuide),
       },
-      gpuTiers: parseGpuTiers(compute.gpuTiers),
+      gpuTiers: Array.isArray(compute.gpuTiers) && compute.gpuTiers.length === 0 ? [] : parseGpuTiers(compute.gpuTiers),
     },
     // H8 is fetched from its own bounded context and merged by createPlatformConfigApi.
     rewards: {
@@ -461,6 +511,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
       inviterReward: { nexAmount: 0 },
     },
     share: experience.share,
+    interfaceLanguages: parseInterfaceLanguages(root.interfaceLanguages),
     updatedAt: nonEmptyString(root.updatedAt),
     sources,
   };

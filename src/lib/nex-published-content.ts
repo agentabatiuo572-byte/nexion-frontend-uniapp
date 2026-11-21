@@ -1,3 +1,4 @@
+import { platformDisplayText } from "./brand-copy";
 import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
 import { localizedTrustFieldValue } from "./trust-fields";
 
@@ -16,18 +17,20 @@ export type PublishedNexNarrative =
 export function resolvePublishedNexNarrative(
   sections: readonly PublishedTrustSection[],
   status: PublishedTrustStatus,
+  hasSnapshot: boolean,
   locale: TrustLocale,
 ): PublishedNexNarrative {
-  if (status === "idle" || status === "loading") return { state: "loading" };
-  if (status !== "ready") return { state: "error" };
+  if (!hasSnapshot && (status === "idle" || status === "loading")) return { state: "loading" };
+  if (status === "error" && !hasSnapshot) return { state: "error" };
   const section = sections.find((item) => item.sectionKey === "nexNarrative");
   if (!section) return { state: "unpublished" };
   const hero = localizedTrustFieldValue(section.fields, "hero", locale);
   if (!hero) return { state: "unpublished" };
+  const subhero = localizedTrustFieldValue(section.fields, "subhero", locale);
   return {
     state: "ready",
     version: section.version,
-    hero,
-    subhero: localizedTrustFieldValue(section.fields, "subhero", locale),
+    hero: platformDisplayText(hero),
+    subhero: subhero === null ? null : platformDisplayText(subhero),
   };
 }

@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { serverLanguage } from "@/i18n";
 import type { ApiEnvironment } from "./runtime-config";
 import { normalizeQuestActionRoute } from "@/lib/quest-presentation";
 
@@ -29,6 +30,7 @@ export interface CanonicalPromoBanner {
   countdownDays: number;
   countdownHours: number;
   targetDevice: string;
+  productType?: "DEVICE" | "SHARE";
   targetDaily: number | null;
   status: "active" | "paused";
 }
@@ -145,7 +147,12 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
   const countdownDays = number(row.countdownDays, 0, 365);
   const countdownHours = number(row.countdownHours, 0, 23);
   const targetDevice = text(row.targetDevice);
-  const productType = text(row.productType)?.toUpperCase();
+  const rawProductType = text(row.productType)?.toUpperCase();
+  const productType = rawProductType === "SERVER" ? "DEVICE" : rawProductType;
+  if ((productType !== undefined && productType !== "DEVICE" && productType !== "SHARE")
+      || (row.productType != null && productType === undefined)) {
+    return invalid("QUEST_PROMO_RESPONSE_INVALID");
+  }
   const shareTarget = productType === "SHARE"
     || (productType == null && /cloud[\s_-]*share|\u4e91\u5171\u4eab|\u96f2\u5171\u4eab/i.test(targetDevice ?? ""));
   const targetDaily = shareTarget ? null : number(row.targetDaily, 0, 1_000_000);
@@ -163,6 +170,7 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
     countdownDays,
     countdownHours,
     targetDevice,
+    productType,
     targetDaily,
     status,
   };
@@ -258,7 +266,7 @@ export function createQuestApi(client: ApiClient, mode: ApiEnvironment = "prod")
   return {
     state: async (locale = "en") => parseQuestSnapshot(await client.request({
       method: "GET",
-      path: `/api/quests/state?locale=${encodeURIComponent(["en", "zh", "vi"].includes(locale) ? locale : "en")}`,
+      path: `/api/quests/state?locale=${encodeURIComponent(serverLanguage(locale))}`,
     }), mode),
     claim: async (questCode, idempotencyKey, instanceKey) => parseQuestClaim(await client.request({
       method: "POST",

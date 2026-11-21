@@ -72,7 +72,7 @@
       <!-- Confirm + cancel -->
       <view style="padding: 8px 16px 16px">
         <view class="w-full inline-flex items-center justify-center active:opacity-90 active:scale-[0.98]" :style="confirmBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCompletedPayment" @click.stop="emitComplete">
-          <text>{{ t.store.coCompletedPayment }}</text>
+          <text class="nx-after-arrow">{{ t.store.coCompletedPayment }}</text>
         </view>
         <view class="w-full grid place-items-center active:opacity-70" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.pendingCancelConfirm" @click.stop="emitCancel">
           <text>{{ t.store.pendingCancelConfirm }}</text>
@@ -229,8 +229,8 @@ const expiredIconStyle: CSSProperties = {
 const expiredTitleStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 

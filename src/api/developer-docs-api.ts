@@ -2,6 +2,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { matchesRuntimeProvenance } from "./runtime-provenance";
+import { serverLanguage } from "@/i18n";
 
 export interface DeveloperDocsEndpoint { method: string; path: string; description?: string }
 export interface DeveloperDocs { version: string; locale: string; example: { request: string; response: string }; endpoints: DeveloperDocsEndpoint[]; events: string[]; source: "server"; sourceEnvironment: "SANDBOX" | "PRODUCTION"; runId: string }
@@ -17,4 +18,4 @@ function parse(value: unknown, mode: ApiEnvironment): DeveloperDocs {
   if (!endpoints.length || !row.events.every((event) => typeof event === "string")) return invalid();
   return { version: row.version, locale: row.locale, example: { request: example.request, response: example.response }, endpoints, events: row.events as string[], source: "server", sourceEnvironment: row.sourceEnvironment as "SANDBOX" | "PRODUCTION", runId: row.runId };
 }
-export function createDeveloperDocsApi(client: ApiClient, mode: ApiEnvironment = "prod") { return { published: async (locale: string) => parse(await client.request<unknown>({ method: "GET", path: `/api/developer/docs?locale=${encodeURIComponent(locale)}`, authenticated: false }), mode) }; }
+export function createDeveloperDocsApi(client: ApiClient, mode: ApiEnvironment = "prod") { return { published: async (locale: string) => parse(await client.request<unknown>({ method: "GET", path: `/api/developer/docs?locale=${encodeURIComponent(serverLanguage(locale))}`, authenticated: false }), mode) }; }

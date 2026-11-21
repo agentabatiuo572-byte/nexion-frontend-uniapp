@@ -1,0 +1,23 @@
+/* Rule guides (design system 04.7) use the shared 2.0 type roles; UI-OPT-027's guide-only
+   scale is retired. Only the guide art size stays local. */
+.team-rule-hero,
+.team-rule-section,
+.team-rule-item,
+.team-rule-note,
+.team-rule-faq,
+.team-rule-fold,
+.team-rule-document,
+.team-rule-published,
+.rank-how-page {
+  --team-guide-art-size: 56px;
+  font-family: var(--font-v5);
+  font-size: var(--ui-type-guide-body);
+  line-height: var(--ui-type-guide-body-lh);
+}
+
+@media (max-width: 374px) {
+  .team-rule-hero, .team-rule-section, .team-rule-item, .team-rule-note, .team-rule-faq, .team-rule-fold,
+  .team-rule-document, .team-rule-published, .rank-how-page {
+    --team-guide-art-size: 48px;
+  }
+}

@@ -28,9 +28,9 @@
         </view>
       </view>
 
-      <view v-if="navigationError" class="mx-4 mt-3" :style="navigationErrorStyle" role="alert">
-        <text class="block" :style="navigationErrorTextStyle">{{ t.search.navigationFailed }}</text>
-        <view class="active:opacity-70" :style="navigationRetryStyle" role="button" tabindex="0"
+      <view v-if="navigationError" class="mx-4 mt-3 nx-inline-recovery" :style="navigationErrorStyle" role="alert">
+        <text class="nx-inline-recovery__copy" :style="navigationErrorTextStyle">{{ t.search.navigationFailed }}</text>
+        <view class="active:opacity-70 nx-inline-recovery__action" :style="navigationRetryStyle" role="button" tabindex="0"
           @click="retryNavigation" @keydown.enter.prevent="retryNavigation" @keydown.space.prevent="retryNavigation">
           <text>{{ t.search.retryNavigation }}</text>
         </view>
@@ -39,7 +39,7 @@
       <!-- Empty state -->
       <view v-if="!q.trim()" class="nx-empty mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-        <text class="block" style="font-size: 13px; color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
         <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
         <view class="nx-search-help active:opacity-75" role="button" tabindex="0"
           @click="openHelp" @keydown.enter.prevent="openHelp" @keydown.space.prevent="openHelp">
@@ -48,14 +48,15 @@
       </view>
 
       <view v-else-if="searchResultState.body === 'loading'" class="nx-empty mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.home.networkStatUpdating }}</text>
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ t.home.networkStatUpdating }}</text>
       </view>
 
       <EmptyState
         v-else-if="searchResultState.body === 'recoverable-error'"
-        kind="recoverable-error"
-        :title="t.authOtp.errorServiceUnavailable"
-        :cta-label="t.ui.retry"
+        kind="recoverable-error" page
+        :title="recoveryCopy.unavailable"
+        :desc="recoveryCopy.retryHint"
+        :cta-label="t.ui.reload"
         @cta="retrySearchSources"
       />
 
@@ -69,15 +70,7 @@
         @cta="openHelp"
       />
 
-      <EmptyState
-        v-if="searchResultState.showSourceError"
-        class="mx-4 mt-4"
-        kind="recoverable-error"
-        :title="t.authOtp.errorServiceUnavailable"
-        :cta-label="t.ui.retry"
-        compact
-        @cta="retrySearchSources"
-      />
+
 
       <!-- Results -->
       <view v-if="searchResultState.body === 'results'" class="mx-4 mt-3 space-y-3">
@@ -107,6 +100,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { navTo } from "@/lib/route";
 import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
@@ -119,19 +114,22 @@ import { useApp } from "@/store/app";
 import { useNetwork } from "@/store/network";
 import { useLocaleStore } from "@/store/locale";
 import { useStaking } from "@/store/staking";
+import { useConfig } from "@/store/config";
 import { PRODUCTS } from "@/mock/products";
 import type { Product } from "@/mock/products";
-import { productCopy, specRow } from "@/lib/product-copy";
+import { productCopy, specRow, specText } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
-import { remoteApiEnabled, supportApi } from "@/api/runtime";
+import { remoteApiEnabled } from "@/api/runtime";
 import type { SupportFaq } from "@/domain/support";
-import { readPublishedFaqPages } from "@/lib/published-faq-pages";
+import { readPublishedFaqs } from "@/store/published-content";
 import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { searchStakingRateSummary } from "@/lib/search-staking-rate";
 import { resolveSearchResultState, type SearchRemoteStatus } from "@/lib/search-source-state";
 import { beginNavigationAttempt, completeNavigationAttempt } from "@/lib/navigation-attempt";
 import { fmt } from "@/i18n/format";
+import { searchCopyFor } from "./search-copy";
+import { serverLanguage } from "@/i18n";
 
 type Group = "route" | "device" | "product" | "member" | "faq" | "help";
 interface Hit {
@@ -145,16 +143,21 @@ const t = useT();
 const app = useApp();
 const network = useNetwork();
 const locale = useLocaleStore();
+const recoveryCopy = computed(() => searchCopyFor(locale.code));
 const staking = useStaking();
+const config = useConfig();
+onShow(() => { void config.load(); });
 
 const q = ref("");
 
 let searchSourceReadEpoch = 0;
 const publishedFaqs = ref<SupportFaq[]>([]);
 const publishedFaqStatus = ref<SearchRemoteStatus>("idle");
+const searchReading = ref(false);
+useAutoRecovery({ failed: () => remoteApiEnabled && !searchReading.value && [productCatalogState.status, network.remoteStatus, app.remoteFleetStatus, publishedFaqStatus.value].includes("error"), retry: retrySearchSources });
 let publishedFaqReadEpoch = 0;
 
-async function refreshPublishedFaqs(): Promise<void> {
+async function refreshPublishedFaqs(force = false): Promise<void> {
   const readEpoch = ++publishedFaqReadEpoch;
   const accountKey = app.accountKey;
   const accountEpoch = app.accountBindingEpoch;
@@ -164,7 +167,7 @@ async function refreshPublishedFaqs(): Promise<void> {
   publishedFaqs.value = [];
   publishedFaqStatus.value = "loading";
   try {
-    const items = await readPublishedFaqPages(supportApi, language, isCurrent);
+    const items = await readPublishedFaqs(serverLanguage(language), isCurrent, force);
     if (!isCurrent()) return;
     publishedFaqs.value = items;
     publishedFaqStatus.value = "ready";
@@ -173,21 +176,24 @@ async function refreshPublishedFaqs(): Promise<void> {
   }
 }
 
-async function refreshSearchSources(force = false): Promise<void> {
+async function refreshSearchSources(force = false, forceFaqs = false): Promise<void> {
   if (!remoteApiEnabled) return;
-  void refreshPublishedFaqs();
   const readEpoch = ++searchSourceReadEpoch;
-  const accountKey = app.accountKey;
-  const accountEpoch = app.accountBindingEpoch;
-  // A successful catalogue read advances the runtime revision. Do not start
-  // E3 fleet work under the revision it is about to invalidate.
-  await refreshProductCatalog(force);
-  if (readEpoch !== searchSourceReadEpoch
-    || accountKey !== app.accountKey
-    || accountEpoch !== app.accountBindingEpoch) return;
-  void network.refreshCanonicalNetwork();
-  void app.refreshRemoteFleet(undefined, { coalesce: !force });
-  void staking.syncRemote();
+  searchReading.value = true;
+  try {
+    const accountKey = app.accountKey;
+    const accountEpoch = app.accountBindingEpoch;
+    // A successful catalogue read advances the runtime revision. Do not start
+    // E3 fleet work under the revision it is about to invalidate.
+    await refreshProductCatalog(force);
+    if (readEpoch !== searchSourceReadEpoch
+      || accountKey !== app.accountKey
+      || accountEpoch !== app.accountBindingEpoch) return;
+    await Promise.allSettled([
+      refreshPublishedFaqs(forceFaqs), network.refreshCanonicalNetwork(),
+      force ? app.refreshRemoteFleet() : app.ensureRemoteFleet(), staking.syncRemote(),
+    ]);
+  } finally { if (readEpoch === searchSourceReadEpoch) searchReading.value = false; }
 }
 
 const searchVisibility = createPageVisibilityRefresh((reason) => refreshSearchSources(reason === "return"));
@@ -200,7 +206,7 @@ bindPageVisibilityRefresh(searchVisibility, {
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale.code], () => refreshSearchSources(true));
 
 function retrySearchSources() {
-  refreshSearchSources(true);
+  return refreshSearchSources(true, true);
 }
 
 const devices = computed(() => !remoteApiEnabled
@@ -214,7 +220,9 @@ const searchableProducts = computed(() => !remoteApiEnabled ? PRODUCTS
 
 function productSearchDetail(p: Product): string {
   if (!remoteApiEnabled) return productCopy(t.value, p).tagline;
-  return [specRow(t.value.store.specGpu, p.gpu)?.v, specRow(t.value.store.specVram, p.vram)?.v]
+  const gpu = specRow(t.value.store.specGpu, p.gpu);
+  const vram = specRow(t.value.store.specVram, p.vram);
+  return [gpu && specText(t.value, gpu.v), vram && specText(t.value, vram.v, undefined, "vram")]
     .filter(Boolean).join(" · ");
 }
 
@@ -232,7 +240,7 @@ const ROUTES: ReadonlyArray<{ key: RouteKey; href: string }> = [
   { key: "team", href: "/pages/team/team" },
   { key: "royalty", href: "/pages/team/unilevel" },
   { key: "networkMap", href: "/pages/team/network" },
-  { key: "wallet", href: "/pages/me/wallet" },
+  { key: "wallet", href: "/pages/me/me" },
   { key: "bankCards", href: "/pages/me/wallet-cards" },
   { key: "walletBills", href: "/pages/me/wallet-bills" },
   { key: "withdraw", href: "/pages/me/wallet-withdraw-method" },
@@ -247,8 +255,6 @@ const ROUTES: ReadonlyArray<{ key: RouteKey; href: string }> = [
   { key: "preferences", href: "/pages/me/preferences" },
   { key: "language", href: "/pages/me/language" },
   { key: "help", href: "/pages/me/help" },
-  { key: "supportTickets", href: "/pages/me/support-tickets" },
-  { key: "risk", href: "/pages/me/risk-disclosure" },
   { key: "trust", href: "/pages/trust/trust" },
   { key: "developer", href: "/pages/developer/developer" },
   { key: "globe", href: "/pages/globe/globe" },
@@ -262,7 +268,7 @@ const FAQ: ReadonlyArray<{ key: FaqKey; href: string }> = [
   { key: "royalty", href: "/pages/team/unilevel" },
   { key: "staking", href: "/pages/staking/staking" },
   { key: "genesis", href: "/pages/genesis/genesis" },
-  { key: "nex", href: "/pages/me/wallet" },
+  { key: "nex", href: "/pages/me/wallet-nex" },
 ];
 
 const results = computed<Hit[]>(() => {
@@ -273,6 +279,7 @@ const results = computed<Hit[]>(() => {
   const routeCopy = t.value.search.routes;
   const faqCopy = t.value.search.faqEntries;
   for (const r of ROUTES) {
+    if (r.key === "staking" && !config.isEnabled("stakingVisible")) continue;
     const c = routeCopy[r.key];
     const sublabel = r.key === "staking"
       ? searchStakingRateSummary({
@@ -374,14 +381,8 @@ const pendingNavigationUrl = computed(() => navigationState.value.pendingUrl);
 function navigateWithFeedback(url: string) {
   const started = beginNavigationAttempt(navigationState.value, url);
   navigationState.value = started;
-  uni.navigateTo({
-    url,
-    success: () => {
-      navigationState.value = completeNavigationAttempt(navigationState.value, started.attempt, "success");
-    },
-    fail: () => {
-      navigationState.value = completeNavigationAttempt(navigationState.value, started.attempt, "failure");
-    },
+  void navTo(url).then(ok => {
+    navigationState.value = completeNavigationAttempt(navigationState.value, started.attempt, ok ? "success" : "failure");
   });
 }
 
@@ -409,7 +410,8 @@ const inputWrapStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   flex: "1",
   background: "transparent",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-input)",
+  lineHeight: "var(--ui-type-input-lh)",
   color: "var(--v5-ink)",
   height: "100%",
 };
@@ -431,7 +433,7 @@ const navigationErrorStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
 };
 const navigationErrorTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
-const navigationRetryStyle: CSSProperties = { display: "inline-flex", minHeight: "44px", alignItems: "center", color: "var(--v5-brand)", fontSize: "12px", fontWeight: 600 };
+const navigationRetryStyle: CSSProperties = { color: "var(--v5-brand)" };
 const groupLabelStyle: CSSProperties = {
   marginBottom: "6px",
   paddingLeft: "2px",
@@ -455,6 +457,22 @@ function rowStyle(isLast: boolean): CSSProperties {
 </script>
 
 <style scoped>
+.nx-search-source-note {
+  color: var(--v5-ink-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.nx-search-source-note > text { flex: 1; min-width: 0; }
+.nx-search-source-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  flex-shrink: 0;
+  color: var(--v5-brand);
+  font-weight: 600;
+}
 .nx-search-ph {
   color: var(--v5-ink-4);
 }

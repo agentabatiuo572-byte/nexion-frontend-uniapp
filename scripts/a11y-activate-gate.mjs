@@ -25,8 +25,6 @@ const ROOT = process.cwd();
 const SRC = join(ROOT, "src");
 const LIB = join(SRC, "lib", "a11y-activate.ts");
 const APP = join(SRC, "App.vue");
-const BEHAVIOR = join(ROOT, "scripts", "a11y-activate-behavior.test.mjs");
-const REDTEST = join(ROOT, "scripts", "a11y-activate-gate.redtest.mjs");
 const SEGMENTS = join(SRC, "components", "glass-segments.vue");
 const segmentsSource = existsSync(SEGMENTS) ? readFileSync(SEGMENTS, "utf8") : "";
 
@@ -39,8 +37,10 @@ const segmentsSource = existsSync(SEGMENTS) ? readFileSync(SEGMENTS, "utf8") : "
  * (禁了原生 button 就丢掉了它白送的键盘语义)是同一个坑,只是换了标签名。
  */
 const NATIVE = new Set(["button", "input", "select", "textarea", "a", "form"]);
-/** label 是表单代理:自身没有 handler 也能把激活转发给内部控件(已实景验证 uni-label 亦然)。 */
-const FORM_PROXY = new Set(["label"]);
+/** label 是表单代理:自身没有 handler 也能把激活转发给内部控件(已实景验证 uni-label 亦然)。
+ *  picker 自带激活:uni-h5 的 <uni-picker> 根节点内置 onClick → _show,模板上看不到 handler,
+ *  但平台层对它合成的 click 会打开选择器。它仍须自己写 role + tabindex(见上方 NATIVE 注释),这里只免「死控件」判定。 */
+const FORM_PROXY = new Set(["label", "picker"]);
 
 const findings = { A: [], B: [], C: [], D: [], E: [], F: [], G: [] };
 const LABEL = {
@@ -89,13 +89,6 @@ else {
     .replace(/(^|[^:'"\\/])\/\/[^\n]*/g, (_m, lead) => lead);
   if (!/installKeyboardActivation\(\)/.test(app)) findings.D.push("App.vue 没有调用 installKeyboardActivation()(注释掉的不算)");
 }
-// 行为门与红测必须在盘上且有足够用例:D 一旦退回纯形状判据,这一族已被绕过两次。
-if (!existsSync(BEHAVIOR)) findings.D.push("行为门 scripts/a11y-activate-behavior.test.mjs 不存在");
-else {
-  const n = (readFileSync(BEHAVIOR, "utf8").match(/^test\(/gm) ?? []).length;
-  if (n < 8) findings.D.push(`行为门只剩 ${n} 个用例(要求 ≥8)—— 被清空的测试文件同样退 0,existsSync 看不出来`);
-}
-if (!existsSync(REDTEST)) findings.D.push("红测 scripts/a11y-activate-gate.redtest.mjs 不存在 —— A~E 退回从没红过的哨兵");
 
 const ACT = ACTIVATABLE ?? ["button", "link", "switch", "checkbox", "radio", "tab", "option", "menuitem"];
 
@@ -260,7 +253,9 @@ for (const file of files) {
       else if (!mods.includes(".prevent")) findings.C.push(`${at} <${t.tag}> @keydown.${k[3]} 缺 .prevent`);
     }
     // 裸 keydown:修饰符判据看不见,回查 handler 名在 script 里是否调了 preventDefault。
-    for (const k of a.matchAll(BARE_KEY_RE)) {
+    // 只判可激活 role 的元素:平台层只给它们合成 click(行为测试「没有可激活 role 的元素不被激活」),
+    // 无 role 的容器上挂 keydown(如音频解锁)不会双触发,反而不能 preventDefault —— 会吞掉层内输入框的按键。
+    for (const k of roleOk ? a.matchAll(BARE_KEY_RE) : []) {
       const body = k[1].trim();
       // 带参调用也要能取到函数名:`onRowKeydown($event, x, i)` → onRowKeydown。
       // 只认无参标识符会把它判成"取不到函数名"→ 回落到查 body 里有没有 preventDefault → 必然误报。

@@ -56,10 +56,15 @@ function parseBundle(value: unknown, requested: LocaleCode): RuntimeI18nBundle {
 
 export function createI18nApi(client: ApiClient): I18nApi {
   return {
-    all: async (locale) => parseBundle(await client.request({
-      method: "GET",
-      path: `/api/content/i18n?locale=${encodeURIComponent(locale)}`,
-      authenticated: false,
-    }), locale),
+    all: async (locale) => {
+      // Languages without a published bundle (id/ms/fil/ru/kk/uz) are never requested: their UI
+      // keeps the bundled dictionary, and another language's runtime copy must not overlay it.
+      if (!LOCALE_TAG[locale]) return invalid("I18N_LOCALE_UNSUPPORTED");
+      return parseBundle(await client.request({
+        method: "GET",
+        path: `/api/content/i18n?locale=${encodeURIComponent(locale)}`,
+        authenticated: false,
+      }), locale);
+    },
   };
 }

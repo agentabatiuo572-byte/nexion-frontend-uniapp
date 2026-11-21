@@ -37,8 +37,8 @@ const TABLE_KEY = "nexgrid-withdraw-attempt-accounts-v1"; // { [accountKey]: Wit
 const NETWORKS: ReadonlyArray<CryptoNetwork> = ["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"];
 
 /** 读未收口的尝试。形状不完整一律当没有 —— 宁可多铸一个新键,也不拿半个 body 去重放。 */
-export function readWithdrawAttempt(accountKey: string): WithdrawAttempt | null {
-  const row = readAccountRow<Partial<WithdrawAttempt>>(TABLE_KEY, accountKey);
+export function readWithdrawAttempt(accountKey: string, throwOnReadError = false): WithdrawAttempt | null {
+  const row = readAccountRow<Partial<WithdrawAttempt>>(TABLE_KEY, accountKey, throwOnReadError);
   if (!row) return null;
   const { key, amount, network, address, policyVersion, offset } = row;
   if (typeof key !== "string" || !key) return null;
@@ -59,9 +59,10 @@ export function rememberWithdrawAttempt(accountKey: string, attempt: WithdrawAtt
   return writeAccountRow<WithdrawAttempt>(TABLE_KEY, accountKey, attempt);
 }
 
-/** 退役。只在结果**定局**时调用:成功、服务端明确拒绝、或 409(键已被服务端占用)。 */
-export function forgetWithdrawAttempt(accountKey: string): void {
-  writeAccountRow<Record<string, never>>(TABLE_KEY, accountKey, {});
+/** 只退役本回执所属的尝试;另一标签页留下的新键必须保留。仅在结果定局时调用。 */
+export function forgetWithdrawAttempt(accountKey: string, receiptKey: string): boolean {
+  return readAccountRow<Pick<WithdrawAttempt, "key">>(TABLE_KEY, accountKey)?.key === receiptKey
+    && writeAccountRow<Record<string, never>>(TABLE_KEY, accountKey, {});
 }
 
 /** 新键。带随机熵 —— 纯时间戳 + 计数器在两个标签页的首笔上会撞出同一个字符串。 */

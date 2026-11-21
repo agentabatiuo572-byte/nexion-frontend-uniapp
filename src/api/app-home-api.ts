@@ -24,7 +24,6 @@ export interface AppHomeDeviceRanking {
   rank: number;
   name: string | null;
   kind: DeviceKind | null;
-  bestFor: string | null;
   dailyUsdt: number | null;
 }
 
@@ -38,7 +37,7 @@ export interface AppHomeOnGridClient {
 
 export interface AppHomeDoTheMath {
   basis: "OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT";
-  base: { kind: DeviceKind; name: string; dailyUsdt: number };
+  base: { kind: DeviceKind; productNo?: string; name: string; dailyUsdt: number };
   target: { productNo: string; kind: DeviceKind; name: string; dailyUsdt: number; priceUsdt: number };
   multiplier: number;
   paybackDays: number;
@@ -61,6 +60,8 @@ export interface AppHomeOverview {
   earnings: {
     today: AppHomePeriod;
     todayVsYesterdayPct: number | null;
+    /** Today's settled USDT minus yesterday's same-period amount; null when either amount is unknown. */
+    todayVsYesterdayUsdt: number | null;
     week: AppHomePeriod;
     month: AppHomePeriod;
     all: AppHomePeriod;
@@ -76,13 +77,14 @@ export interface AppHomeOverview {
     endAt: string | null;
     product: { kind: string | null; name: string | null; dailyUsdt: number | null; priceUsdt: number | null };
   } | null;
-  onboarding: { cumulativePaidUsdt: number | null; activeDevices: number | null };
+  onboarding: { cumulativePaidUsdt: number | null; activeDevices: number | null;
+    slotsUsed?: number | null; slotCap?: number | null; reservedSlotCount?: number | null; trialSlotCount?: number | null };
   onGrid: { clients: AppHomeOnGridClient[]; activeDevices: number | null; activeJobs: number | null; perSecUsdt: number | null };
   source: string;
 }
 
 type Row = Record<string, unknown>;
-const APP_HOME_SOURCE = "server:nx_compute_receipt,nx_compute_task,nx_user_device,nx_compute_datacenter,nx_product,nx_growth_promo_banner";
+const APP_HOME_SOURCE = "server:nx_compute_receipt,nx_compute_task,nx_user_device.dc_location,nx_product,nx_growth_promo_banner";
 const APP_HOME_ACCOUNT_SCOPE = "authenticated-account";
 const TASKS = new Set<TaskCategory>(["IG", "VG", "LL", "FT", "EM", "SP"]);
 const DEVICE_KINDS = new Set<DeviceKind>(["phone", "cloud-share", "pc-gpu", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"]);
@@ -131,7 +133,7 @@ function ranking(v: unknown): AppHomeDeviceRanking {
   const kind = v.kind == null ? null : (typeof v.kind === "string" && DEVICE_KINDS.has(v.kind as DeviceKind) ? v.kind as DeviceKind : null);
   const dailyUsdt = v.dailyUsdt == null ? null : nonNegative(v.dailyUsdt);
   if (rank === null || rank < 1 || (v.kind != null && kind === null) || (v.dailyUsdt != null && dailyUsdt === null)) return invalid();
-  return { rank, name: text(v.name), kind, bestFor: text(v.bestFor), dailyUsdt };
+  return { rank, name: text(v.name), kind, dailyUsdt };
 }
 function client(v: unknown): AppHomeOnGridClient {
   if (!isRow(v)) return invalid();
@@ -160,7 +162,7 @@ function doTheMath(v: unknown): AppHomeDoTheMath | null {
       || paybackDays !== Math.round(priceUsdt / targetDaily)) return invalid();
   return {
     basis: v.basis,
-    base: { kind: baseKind, name: baseName, dailyUsdt: baseDaily },
+    base: { kind: baseKind, productNo: text(v.base.productNo) ?? undefined, name: baseName, dailyUsdt: baseDaily },
     target: { productNo, kind: targetKind, name: targetName, dailyUsdt: targetDaily, priceUsdt },
     multiplier, paybackDays,
   };
@@ -193,12 +195,14 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
   const todayVsYesterdayPct = e?.todayVsYesterdayPct === null
     ? null
     : finiteNumber(e?.todayVsYesterdayPct);
+  const todayVsYesterdayUsdt = e?.todayVsYesterdayUsdt == null ? null : finiteNumber(e.todayVsYesterdayUsdt);
   if (!generatedAt || !production
       || accountScope !== APP_HOME_ACCOUNT_SCOPE
       || row.serverCanonical !== true || !e || !market || !onboarding || !grid
       || ledgerMode !== "SETTLED"
       || !isRow(e.today) || !isRow(e.week) || !isRow(e.month) || !isRow(e.all)
       || (e.todayVsYesterdayPct !== null && todayVsYesterdayPct === null)
+      || (e.todayVsYesterdayUsdt != null && todayVsYesterdayUsdt === null)
       || !Array.isArray(row.earningsLedger) || row.earningsLedger.length > 20
       || !Array.isArray(market.workloads) || !Array.isArray(market.deviceRankings) || !Array.isArray(grid.clients)) return invalid();
   const promoRow = row.weeklyPromo;
@@ -216,6 +220,13 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
   }
   const onboardingPaid = onboarding.cumulativePaidUsdt == null ? null : nonNegative(onboarding.cumulativePaidUsdt);
   const onboardingDevices = onboarding.activeDevices == null ? null : integer(onboarding.activeDevices);
+  const onboardingCapacity: Record<string, number | null> = { slotsUsed: null, slotCap: null, reservedSlotCount: null, trialSlotCount: null };
+  for (const key of ["slotsUsed", "slotCap", "reservedSlotCount", "trialSlotCount"]) {
+    if (onboarding[key] === undefined) continue;
+    const count = integer(onboarding[key]);
+    if (count === null || (key === "slotCap" && count < 1)) return invalid();
+    onboardingCapacity[key] = count;
+  }
   const activeDevices = grid.activeDevices == null ? null : integer(grid.activeDevices);
   const activeJobs = grid.activeJobs == null ? null : integer(grid.activeJobs);
   const perSecUsdt = grid.perSecUsdt == null ? null : nonNegative(grid.perSecUsdt);
@@ -227,13 +238,13 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
     sourceEnvironment: row.sourceEnvironment as AppHomeOverview["sourceEnvironment"],
     runId: row.runId as string, generatedAt, accountScope,
     earnings: {
-      today: period(e.today), todayVsYesterdayPct,
+      today: period(e.today), todayVsYesterdayPct, todayVsYesterdayUsdt,
       week: period(e.week), month: period(e.month), all: period(e.all),
     },
     earningsLedgerMode: ledgerMode as AppHomeOverview["earningsLedgerMode"], earningsLedger,
     marketBoard: { workloads: market.workloads.map(workload), deviceRankings: market.deviceRankings.map(ranking) },
     doTheMath: calculator,
-    weeklyPromo, onboarding: { cumulativePaidUsdt: onboardingPaid, activeDevices: onboardingDevices },
+    weeklyPromo, onboarding: { cumulativePaidUsdt: onboardingPaid, activeDevices: onboardingDevices, ...onboardingCapacity },
     onGrid: { clients: grid.clients.map(client), activeDevices, activeJobs, perSecUsdt }, source,
   };
 }

@@ -1,3 +1,6 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
+import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
 import { market24hSummary } from "@/lib/market-24h-summary";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
@@ -77,20 +80,24 @@ export const useMarket = defineStore("market", () => {
   // 权威不可达是常态输入,不 reject(resilience 门同族;z6 审计 P0:
   // wallet-nex 的 setInterval 裸发 tickPrice → 原 throw 每 3s 一个 unhandledRejection)。
   function syncRemote(): Promise<boolean> {
+    invalidateBeforePassiveTabRead("market");
     if (!remoteApiEnabled) return Promise.resolve(true);
     if (syncInFlight) return syncInFlight;
     if (remoteReady.value && Date.now() - lastRemoteFetchAt < 30_000) return Promise.resolve(true);
     lastRemoteFetchAt = Date.now();
     const generation = ++nexGeneration;
+    const snapshotWrite = captureTabSnapshotWrite();
     const operation = (async () => {
       try {
         const snapshot = await marketApi.fetch();
         if (generation !== nexGeneration) return false;
         marketRunId.value = snapshot.runId;
         commitNex(snapshot);
+        saveTabSnapshot(snapshotWrite, "market", { price: snapshot.currentPrice }, null);
         return true;
-      } catch {
+      } catch (cause) {
         if (generation !== nexGeneration) return false;
+        if (!isTransientReadFailure(cause)) invalidateTabSnapshots(["market"], snapshotWrite);
         marketRunId.value = null;
         clearRemoteState();
         remoteError.value = "G3_REMOTE_AUTHORITY_UNAVAILABLE";

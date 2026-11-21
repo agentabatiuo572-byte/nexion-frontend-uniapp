@@ -6,7 +6,7 @@
          同理 `e.target.closest()` 也不存在。改用全站既有写法(country-code-sheet /
          slot-action-sheet / purchase-sheet):遮罩单独一层,点卡片根本到不了它。 -->
     <view class="cs-mask" @click="onCancel" />
-    <view class="cs-card">
+    <view class="nx-glass-sheet cs-card">
       <view class="cs-head">
         <view class="cs-head__txt">
           <text class="cs-title">{{ t.authOtp.captchaTitle }}</text>
@@ -58,7 +58,7 @@
           @keydown="onHandleKeydown"
         >
           <view v-if="busy" class="cs-spin" />
-          <text v-else class="cs-handle__t">{{ verified ? "✓" : "→" }}</text>
+          <view v-else class="cs-handle__t" aria-hidden="true"><NxIcon :name="verified ? 'check' : 'arrow-right'" /></view>
         </view>
       </view>
 
@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { ref, computed, onMounted, onUnmounted, getCurrentInstance, nextTick, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -168,31 +169,26 @@ onUnmounted(()=>{closed=true;generation++;clearSkeleton();if(finishTimer)clearTi
    为什么不排到最顶(< 10050):10050 是模拟硬件 chrome(顶部状态条 + Home Indicator,
    后者 pointer-events:none),它模拟的是手机自身的系统层,且与垂直居中的滑块卡片零几何
    重叠,压在滑块上不影响任何操作。 */
-.cs-layer { position: fixed; inset: 0; z-index: 9500; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.cs-layer { position: fixed; inset: 0; z-index: 9500; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: max(16px, var(--nx-overlay-top)) 16px var(--nx-overlay-bottom); }
 .cs-mask { position: absolute; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(4px); }
-.cs-card { position: relative; width: 100%; max-width: 340px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 20px; padding: 18px; }
+.cs-card { position: relative; width: 100%; max-width: 340px; max-height: 100%; box-sizing: border-box; overflow-y: auto; background: var(--nx-glass-fill); border: none; border-radius: var(--nx-glass-radius); box-shadow: var(--nx-glass-edge); padding: 18px; }
 .cs-head { display: flex; align-items: flex-start; justify-content: space-between; }
 .cs-head__txt { display: flex; flex-direction: column; gap: 3px; }
-.cs-title { font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); }
-.cs-sub { font-size: 13px; color: var(--v5-ink-3); text-wrap: pretty; }
+.cs-title { font-family: var(--font-v5); font-size: var(--ui-type-hero-title); font-weight: var(--ui-type-hero-title-weight); color: var(--v5-ink); }
+.cs-sub { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); text-wrap: pretty; }
 .cs-x { width: 44px; height: 44px; margin: -12px -12px 0 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
 .cs-x:active { opacity: 0.7; }
 
-.cs-puzzle { position: relative; margin-top: 12px; height: 150px; border-radius: 14px; overflow: hidden; background:
-    radial-gradient(120px 80px at 20% 30%, color-mix(in srgb, var(--v5-brand) 22%, transparent), transparent 70%),
-    radial-gradient(140px 90px at 75% 65%, color-mix(in srgb, var(--v5-brand-2) 16%, transparent), transparent 70%),
-    radial-gradient(90px 70px at 55% 20%, color-mix(in srgb, var(--v5-tech-cyan) 14%, transparent), transparent 70%),
-    var(--v5-surface-2);
-}
+.cs-puzzle { position: relative; margin-top: 12px; height: 150px; border-radius: 14px; overflow: hidden; background: var(--v5-surface-2); }
 .cs-puzzle--skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent); animation: cs-shimmer 1.2s infinite; }
 @keyframes cs-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .cs-slot { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; border: 2px dashed rgba(255, 255, 255, 0.5); background: rgba(0, 0, 0, 0.35); box-sizing: border-box; }
-.cs-piece { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--v5-brand) 90%, transparent), color-mix(in srgb, var(--v5-brand) 65%, transparent)); border: 1px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
+.cs-piece { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 80%, transparent); border: 1px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
 .cs-refresh { position: absolute; right: 4px; top: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .cs-refresh:active { opacity: 0.7; }
 /* ⑤ 网络失败态:soft tint 重试 pill(零 border,tap ≥44,rest 态自带 affordance) */
 .cs-fail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
-.cs-fail__t { font-size: 13px; color: var(--v5-ink-2); text-align: center; text-wrap: pretty; }
+.cs-fail__t { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); text-align: center; text-wrap: pretty; }
 .cs-fail__btn { min-height: 44px; padding: 0 24px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
 .cs-fail__btn:active { opacity: 0.8; transform: scale(0.98); }
 .cs-fail__btn-t { font-size: 13px; font-weight: 600; color: var(--v5-brand); }
@@ -203,10 +199,10 @@ onUnmounted(()=>{closed=true;generation++;clearSkeleton();if(finishTimer)clearTi
 .cs-track { position: relative; margin-top: 12px; height: 48px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-surface-2) 55%, transparent); border: 1px solid var(--v5-surface-2); overflow: hidden; }
 .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--v5-brand) 18%, transparent); }
 .cs-hintwrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.cs-hint { font-size: 13px; color: var(--v5-ink-4); }
+.cs-hint { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-4); }
 .cs-handle { position: absolute; top: 2px; width: 44px; height: 44px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; touch-action: none; }
 .cs-handle:active { transform: scale(0.98); }
-.cs-handle__t { font-size: 15px; font-weight: 600; color: var(--v5-on-brand); }
+.cs-handle__t { font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); color: var(--v5-on-brand); }
 .cs-track--err { border-color: color-mix(in srgb, var(--v5-brand-2) 55%, transparent); animation: cs-shake 0.35s; }
 .cs-track--err .cs-handle { background: var(--v5-brand-2); }
 .cs-track--ok { border-color: color-mix(in srgb, var(--v5-brand) 60%, transparent); }

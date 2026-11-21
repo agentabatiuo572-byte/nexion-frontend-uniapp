@@ -3,7 +3,7 @@
 .nx-glass-sheet,
 .nx-glass-action {
   --nx-glass-radius: 24px;
-  --nx-glass-fill: linear-gradient(145deg, color-mix(in srgb, var(--v5-ink) 4%, transparent), transparent 65%), color-mix(in srgb, var(--v5-surface) 94%, transparent);
+  --nx-glass-fill: color-mix(in srgb, var(--v5-surface) 94%, transparent);
   --nx-glass-edge: inset 0 0 0 1px color-mix(in srgb, var(--v5-liquid-rim) 45%, transparent), inset 0 1px 1px color-mix(in srgb, var(--v5-liquid-highlight) 45%, transparent), inset 0 -1px 1px var(--v5-liquid-bottom);
 }
 /* Keep the existing content class as a compatibility hook, but make it flat. */
@@ -23,9 +23,15 @@
   background: var(--nx-glass-fill);
   box-shadow: var(--nx-glass-edge);
 }
+/* Sheets and dialogs float over content: the shared floating material — a uniform near-opaque fill so text behind
+   never shows, blur, and one 1px highlight along the top edge only; the sides and bottom carry no rim or inner
+   shadow (04 §4.0, P42 sheet boards). The highlight is the shared button rim, so light takes its light value. */
 .nx-glass-sheet {
   --nx-glass-radius: 28px;
-  --nx-glass-fill: linear-gradient(155deg, color-mix(in srgb, var(--v5-ink) 4%, transparent), transparent 55%), color-mix(in srgb, var(--v5-surface) 98%, transparent);
+  --nx-glass-fill: color-mix(in srgb, var(--v5-surface) 98%, transparent);
+  --nx-glass-edge: inset 0 1px 0 var(--ui-button-rim);
+  backdrop-filter: blur(12px) saturate(125%);
+  -webkit-backdrop-filter: blur(12px) saturate(125%);
 }
 /* Only the decorative layer springs; text, focus and hit targets stay still. */
 .nx-glass-action { position: relative; isolation: isolate; border-radius: var(--nx-glass-radius); }
@@ -41,11 +47,35 @@
   .nx-glass-action:active::before { transform: none; }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .nx-glass-card, .nx-glass-sheet, .nx-glass-action, .nx-home-glass-panel { --nx-glass-fill: var(--v5-surface); }
+  .nx-glass-card, .nx-glass-action, .nx-home-glass-panel { --nx-glass-fill: var(--v5-surface); }
+  .nx-glass-sheet { --nx-glass-fill: var(--v5-surface-2); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 @media (forced-colors: active) {
   .nx-glass-card, .nx-glass-sheet, .nx-glass-action { border: 1px solid CanvasText; }
+  .nx-glass-sheet { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 /* Explicit content bands share their parent glass; never apply to all descendants. */
 .nx-glass-inset { background: transparent; }
+
+/* Tinted solid (01 §1.1.2): a card whose colour used to come from corner glows or a wash keeps that hue as one light,
+   uniform base over the surface instead of going black — a hint of colour, never a heavy fill. Set --nx-tint to the card's own hue token; text keeps its roles. */
+.nx-tint { background: color-mix(in srgb, var(--nx-tint, var(--v5-brand)) 7%, var(--v5-surface)); box-shadow: var(--ui-glass-edge-shadow); }
+[data-theme="light"] .nx-tint { background: color-mix(in srgb, var(--nx-tint, var(--v5-brand)) 5%, var(--v5-surface)); box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+@media (forced-colors: active) { .nx-tint { background: Canvas; box-shadow: none; outline: 1px solid CanvasText; outline-offset: -1px; } }
+/* Actions inside a tinted or soft-glass card carry no surface of their own (design system 03 §3.1):
+   a footer row under a hairline, the action as brand text with an arrow, an optional note on the left. */
+.nx-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: var(--ui-space-inset); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.nx-card-footer__note { min-width: 0; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); overflow-wrap: break-word; }
+.nx-card-action { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-left: auto; color: var(--v5-brand); font: 500 15px/20px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nx-card-action > text { min-width: 0; overflow-wrap: break-word; }
+.nx-card-action > svg { flex: none; }
+.nx-card-action--muted { color: var(--v5-ink-3); }
+.nx-card-action:active { opacity: .6; }
+.nx-card-action[aria-disabled="true"] { opacity: .5; cursor: default; }
+.nx-card-link { position: relative; display: inline-flex; align-items: center; gap: 2px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nx-card-link__chevron, .nx-card-action--muted > .nx-card-link__chevron { color: var(--v5-ink-3); }
+.nx-card-link:active { opacity: .6; }
+/* The box is the text line, so the footer's spacing is what shows; the 44px target is a layer that takes no layout. */
+.nx-card-action::after, .nx-card-link::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-8px, calc(50% - 22px)); right: min(-8px, calc(50% - 22px)); }
+.nx-card-action:focus-visible, .nx-card-link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 8px; }

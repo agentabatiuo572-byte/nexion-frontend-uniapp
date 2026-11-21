@@ -38,12 +38,10 @@ const ROUTE_TITLE_KEY: Record<string, HeaderTitleKey> = {
   "pages/me/wallet-exchange": "meWalletExchange",
   "pages/me/wallet-bills": "meWalletBills",
   "pages/me/wallet-nex": "meWalletNex",
-  "pages/me/wallet-repurchase": "meWalletRepurchase",
   "pages/me/profile": "meProfile",
   "pages/me/security": "meSecurity",
   "pages/me/help": "meHelp",
   "pages/me/support": "meSupport",
-  "pages/me/support-tickets": "meSupportTickets",
   "pages/me/notifications": "meNotifications",
   "pages/me/receipts": "meReceipts",
   "pages/me/preferences": "mePreferences",
@@ -63,11 +61,15 @@ const ROUTE_TITLE_KEY: Record<string, HeaderTitleKey> = {
   "pages/team/leaderboard": "teamLeaderboard",
   "pages/team/quota": "teamQuota",
   "pages/team/agent": "teamAgent",
+  "pages/team/agent-applications": "teamAgentApplications",
+  "pages/team/agent-application": "teamAgentApplication",
   // Genesis subtree
   "pages/genesis/marketplace": "genesisMarketplace",
   "pages/genesis/holder": "genesisHolder",
   // Trust subtree
   "pages/trust/nex": "trustNex",
+  "pages/trust/whitepaper": "trustWhitepaper",
+  "pages/trust/document": "trustDocument",
 };
 
 // How-it-works pages append headerTitles.howItWorksSuffix to the PARENT title.
@@ -84,7 +86,6 @@ const HOW_IT_WORKS_PARENT: Record<string, string> = {
   "pages/team/commissions-how": "pages/team/commissions",
   "pages/team/leadership-pool-how": "pages/team/leadership-pool",
   "pages/me/wallet-exchange-how": "pages/me/wallet-exchange",
-  "pages/me/wallet-repurchase-how": "pages/me/wallet-repurchase",
 };
 
 export interface ResolvedTitle {

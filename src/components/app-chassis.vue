@@ -11,48 +11,49 @@
   `active` prop is an optional fallback for the very first frame.
 -->
 <template>
-  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
-    <view class="nx-top-chrome" :style="{ height: statusBarHeight + 'px' }" />
-
+  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" :lang="contentLang" :data-tab-key="tabHost ? tabLocationKey : undefined" :data-tab-revision="tabHost ? tabRevision : undefined" :data-page-visit="pageVisit" :data-page-visible="pageVisible && hostVisible ? 'true' : 'false'" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
     <!-- Status bar safe area (real on device, ~0 on desktop H5) -->
     <DeviceStatusBar />
 
     <!-- Header brand row — TAB routes only (sub-pages carry their own back row) -->
     <view v-if="isTabRoute" class="nx-header" :style="{ top: statusBarHeight + 'px' }">
       <view class="nx-header__l">
-        <BrandLockup :height="40" aria-hidden="true" />
+        <BrandLockup :height="50" style="width:100%;height:100%" />
       </view>
       <view class="nx-header__center" />
       <view class="nx-header__r">
-        <LiquidGlass :radius="24" tone="control" backdrop=".nx-page-enter" />
-        <view class="nx-icon-btn" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch"  @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+        <view v-if="activeTab !== 'me'" class="nx-icon-btn nx-design-glass" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch"  @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
+          <LiquidGlass :radius="22" tone="control" backdrop=".nx-page-enter" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         </view>
-	        <view class="nx-icon-btn nx-bell" role="button" tabindex="0" :aria-label="unread > 0 ? t.notifs.drawerTitle + ' · ' + unreadLabel : t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          <view v-if="unread > 0" class="nx-badge"><text class="nx-badge__t">{{ unreadLabel }}</text></view>
+	        <view class="nx-icon-btn nx-bell nx-design-glass" role="button" tabindex="0" :aria-label="unread !== null && unread > 0 ? t.notifs.drawerTitle + ' · ' + unreadLabel : unread === null ? t.notifs.drawerTitle + ' · ' + t.notifs.unreadUnavailable : t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
+          <LiquidGlass :radius="22" tone="control" backdrop=".nx-page-enter" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          <view v-if="unread !== null && unread > 0" class="nx-badge"><text class="nx-badge__t">{{ unreadLabel }}</text></view>
         </view>
       </view>
     </view>
 
     <!-- Registered sub-page header: round glass controls stay available while
          the bare title hides as content scrolls into the reserved header gap. -->
-    <view v-if="!isTabRoute && navHeader" class="nx-navheader" :style="{ top: statusBarHeight + 'px', height: navHeaderH + 'px' }">
-      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack"  @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
+    <view v-if="!isTabRoute && navHeader" class="nx-navheader" :class="{ 'nx-navheader--capsule': navCapsule }" :style="{ top: statusBarHeight + 'px', height: navHeaderH + 'px' }">
+      <LiquidGlass v-if="navCapsule" :radius="navHeaderH / 2" tone="navigation" backdrop=".nx-page-enter" />
+      <view v-if="navHeader.noBack" class="nx-nav-side" aria-hidden="true" />
+      <view v-else class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack"  @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
         <view class="nx-nav-glass">
-          <LiquidGlass :radius="18" tone="navigation" backdrop=".nx-page-enter" />
+          <LiquidGlass v-if="!navCapsule" :radius="18" tone="navigation" backdrop=".nx-page-enter" />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
       </view>
-      <view class="nx-nav-titlewrap">
+      <view class="nx-nav-titlewrap" :data-persistent="navCapsule ? 'true' : undefined">
         <text class="nx-nav-title">{{ navHeader.title }}</text>
         <text v-if="navHeader.subtitle" class="nx-nav-sub">{{ navHeader.subtitle }}</text>
       </view>
-	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="unread > 0 ? t.notifs.drawerTitle + ' · ' + unreadLabel : t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
+	      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="unread !== null && unread > 0 ? t.notifs.drawerTitle + ' · ' + unreadLabel : unread === null ? t.notifs.drawerTitle + ' · ' + t.notifs.unreadUnavailable : t.notifs.drawerTitle" @click="goNotifications"  @keydown.enter.prevent="onKeyboardActivate($event, goNotifications)" @keydown.space.prevent="onKeyboardActivate($event, goNotifications)">
         <view class="nx-nav-glass">
-          <LiquidGlass :radius="18" tone="navigation" backdrop=".nx-page-enter" />
+          <LiquidGlass v-if="!navCapsule" :radius="18" tone="navigation" backdrop=".nx-page-enter" />
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          <view v-if="unread > 0" class="nx-nav-belldot" />
+          <view v-if="unread !== null && unread > 0" class="nx-nav-belldot" />
         </view>
       </view>
     </view>
@@ -67,18 +68,15 @@
     <view
       ref="scrollEl"
       class="nx-content nx-scroll"
-      @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
-      @touchcancel="onTouchEnd"
+      :class="{ 'nx-content--locked': scrollLocks > 0 }"
     >
       <!-- themed pull-to-refresh indicator — anchored just below the header,
            centered in the pull gap. -->
       <view
         class="nx-refresher"
-        :style="{ top: contentTop + 'px', transform: `translate(-50%, ${indicatorY / 2 - 18}px)`, opacity: refresherVisible ? 1 : 0, transition: pulling ? 'opacity .15s' : 'transform .28s cubic-bezier(.16,1,.3,1), opacity .2s' }"
+        :style="{ top: (contentTop + pendingBarInset) + 'px' }" style="transform: translate(-50%, -18px); opacity: 0; transition: transform .28s cubic-bezier(.16,1,.3,1), opacity .2s"
       >
-        <view class="nx-refresher-icon" :class="{ 'nx-spinning': refreshing }" :style="{ transform: refreshing ? '' : `rotate(${Math.min(1, pullY / 70) * 270}deg)` }">
+        <view class="nx-refresher-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" /><path d="M21 3v6h-6" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </view>
       </view>
@@ -88,7 +86,7 @@
            backdrop-filter cannot sample → the frosted glass shows nothing (looks
            opaque). Mirrors the prototype PullableContent ("transform must be
            ABSENT, not translateY(0), when idle"). (P-041) -->
-      <view :style="pullActive ? { transform: `translateY(${indicatorY}px)`, transition: pulling ? 'none' : 'transform .28s cubic-bezier(.16,1,.3,1)', willChange: 'transform' } : {}">
+      <view>
         <!-- Padded so content sits BELOW the header / ABOVE the tabbar, while the
              scroll container (.nx-content) spans the FULL chassis (top:0/bottom:0).
              This is the crux: content then scrolls BEHIND the frosted chrome and
@@ -96,36 +94,37 @@
              clipped everything above the header so there was nothing behind the
              chrome to frost → it read as solid black. (P-041) `backwards` fill on
              the entrance so no transform lingers. -->
-        <view class="nx-page-enter" :style="{ paddingTop: (contentTop + pendingBarInset) + 'px', paddingBottom: contentBottom + 'px' }">
+        <view class="nx-page-enter" :class="{ 'nx-page-enter--tab': isTabRoute }" :style="{ paddingTop: (contentTop + pendingBarInset) + 'px', paddingBottom: contentBottom }">
           <slot name="pageTop" />
           <!-- Voucher fallback banner — chassis-injected at content top so the
                5 protected tab pages stay untouched (ALIGNMENT red-line). Self-
                hides unless a claimable voucher targets the current surface. -->
-          <VoucherBanner v-if="bannerSurface" :surface="bannerSurface" />
           <slot />
         </view>
       </view>
     </view>
 
     <slot name="pageFixed" :top="contentTop + pendingBarInset" />
+    <ReceiptModal v-if="active === 'earn'" :receipt="taskCenterReceipt" @close="taskCenterReceipt = null" />
 
     <!-- Bottom chrome: floating pill TabBar (tab routes) + home indicator (always) -->
     <view class="nx-tabbar-wrap">
-      <GlassSegments v-if="isTabRoute" class="nx-tabbar-pill" variant="navigation" :options="navigationOptions" :model-value="activeTab" :from-value="navigationFrom" @select="selectNavigation">
+      <!-- Anchor to the actual navigation height, including its safe area. -->
+      <SupportBubble v-if="showFloatingSupport" :dimmed="scrolling" />
+      <GlassSegments v-if="isTabRoute" :key="navigationReset" class="nx-tabbar-pill" variant="navigation" selection="flat" :options="navigationOptions" :model-value="activeTab" :from-value="navigationReset ? undefined : navigationFrom" :navigation-on-arrival="tabHost ? false : undefined" @select="selectNavigation">
         <template #option="{ option: tab, selected }">
-          <svg class="nx-tab__icon" width="22" height="22" viewBox="0 0 24 24" fill="none"
-            :stroke="selected ? 'var(--v5-brand)' : 'var(--v5-ink-2)'"
-            :stroke-width="selected ? 2.3 : 1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path :d="tab.icon" />
-            <template v-if="tab.icon2"><path :d="tab.icon2" /></template>
-          </svg>
-          <text class="nx-tab__label" :style="{ color: selected ? 'var(--v5-brand)' : 'var(--v5-ink-2)' }">{{ tab.label }}</text>
+          <view class="nx-tab__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+              :stroke="selected ? 'var(--v5-brand)' : 'var(--v5-ink-2)'"
+              :stroke-width="selected ? 2.3 : 1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path :d="tab.icon" />
+              <template v-if="tab.icon2"><path :d="tab.icon2" /></template>
+            </svg>
+          </view>
         </template>
       </GlassSegments>
       <DeviceHomeIndicator />
     </view>
-
-    <NovaBubble v-if="isTabRoute" :dimmed="scrolling" />
 
     <!-- Chassis-level overlays (each self-gates on its own store's open state,
          mirroring the prototype IOSFrame). Ported P-043. -->
@@ -133,7 +132,7 @@
       <TrialClaimSheet />
       <VoucherClaimSheet />
       <SlotActionSheet />
-      <TradeinSheets />
+      <TradeinSheets :active="pageVisible && hostVisible" />
       <LuckySpinSheet />
       <StickyCtaBar />
       <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
@@ -148,10 +147,13 @@
 
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties, getCurrentInstance } from "vue";
-import GlobalUi from "@/components/global-ui.vue";
+import { ref, computed, watch, onMounted, onUnmounted, provide, getCurrentInstance } from "vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
-import NovaBubble from "@/components/nova/nova-bubble.vue";
+import GlobalUi from "@/components/global-ui.vue";
+import ReceiptModal from "@/components/me/receipt-modal.vue";
+import { taskCenterReceiptKey, type OpenTaskReceipt } from "@/store/receipts";
+import SupportBubble from "@/components/support/support-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
 import SlotActionSheet from "@/components/slot-action-sheet.vue";
 import StickyCtaBar from "@/components/sticky-cta-bar.vue";
@@ -159,14 +161,15 @@ import PendingCheckoutBar from "@/components/pending-checkout-bar.vue";
 import TradeinSheets from "@/components/tradein-sheets.vue";
 import LuckySpinSheet from "@/components/lucky-spin-sheet.vue";
 import VoucherClaimSheet from "@/components/voucher-claim-sheet.vue";
-import VoucherBanner from "@/components/voucher-banner.vue";
 import DeviceHomeIndicator from "@/components/device/device-home-indicator.vue";
 import DeviceStatusBar from "@/components/device/device-status-bar.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useRefresh } from "@/store/refresh";
+import { DIALOG_SCROLL_LOCK } from "@/composables/use-dialog-a11y";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { usePageHeader } from "@/store/page-header";
 import { useFreeTrial } from "@/store/free-trial";
@@ -175,11 +178,11 @@ import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
-import { usePopupArbiter, runPriorityRound, type AutoPushCandidate, type PopupId } from "@/store/popup-arbiter";
+import { usePopupArbiter, type PopupId } from "@/store/popup-arbiter";
 import { navBack as navBackTo, navTo } from "@/lib/route";
+import { isCurrentNativeTab } from "@/lib/native-tab-navigation";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
-import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
 import { resolveChassisScrollElement, scrollCurrentTabToTop, scrollNativeCurrentTabToTop } from "@/lib/chassis-scroll";
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -189,12 +192,29 @@ import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, o
 
 // Uni forwards query parameters such as product `id` through the page root.
 // Bind fallthrough attrs explicitly so they cannot replace the view adapter's ID.
-defineOptions({ inheritAttrs: false });
-const props = defineProps<{
-  active?: "home" | "earn" | "store" | "team" | "me";
-}>();
+defineOptions({ inheritAttrs: false, methods: {
+  // App-Plus callMethod resolves vm.proxy, which does not expose script-setup bindings.
+  onChassisScrolling(this: { $: { exposed: { receiveChassisScrolling(value: boolean): void } | null } }, value: boolean) { this.$.exposed?.receiveChassisScrolling(value); },
+  onChassisRefresh(this: { $: { exposed: { receiveChassisRefresh(visit: string): void } | null } }, visit: string) { this.$.exposed?.receiveChassisRefresh(visit); },
+  onNativeScrollLoadMore(this: { $: { exposed: { receiveNativeScrollLoadMore(key: string): void } | null } }, key: string) { this.$.exposed?.receiveNativeScrollLoadMore(key); },
+} });
+const taskCenterReceipt = ref<OpenTaskReceipt>(null);
+provide(taskCenterReceiptKey, taskCenterReceipt);
 
+const props = withDefaults(defineProps<{
+  active?: "home" | "earn" | "store" | "team" | "me";
+  logicalRoute?: string;
+  tabLocationKey?: string;
+  tabHost?: boolean;
+  hostVisible?: boolean;
+  navCapsule?: boolean;
+  scrollLoadKey?: string;
+}>(), { hostVisible: true });
+
+const emit = defineEmits<{ (event: "scroll-load-more"): void }>();
 const t = useT();
+// The App build has no document in the logic layer; the shell root carries the language for :lang() rules.
+const contentLang = computed(() => useLocaleStore().code);
 const notifications = useNotifications();
 const messageDrawer = useMessageDrawer();
 const refresh = useRefresh();
@@ -222,7 +242,7 @@ function isCurrentVoucherPopupScope(scope: VoucherPopupRequestScope): boolean {
 
 let autoPushMounted = false;
 const voucherPopupScheduler = createVoucherPopupScheduler<VoucherPopupRequestScope>({
-  isHome: () => autoPushMounted && readRoute() === "pages/index/index",
+  isHome: () => false, // Marketing is user-initiated from the single home benefit slot.
   isObservationModalOpen: isAcceptanceObservationModalOpen,
   isBlockingSheetOpen: () => popupArbiter.current !== null || popupArbiter.visitClaimed,
   sessionShownCount: () => voucherClaimSheet.sessionShownCount,
@@ -264,61 +284,8 @@ function bindVoucherClaimSheetScope(): void {
 // 逐个问「你现在够条件吗」,第一个够的拿走令牌。
 // 🔴 B1「一次进首页只弹一个」由「只评出一个赢家、评出即停表」自然成立 —— 不另设闩:
 //    赢家关掉之后不会再有第二个候选被评,因为表已经停了。
-const SETTLE_RETRY_MS = 300;
-// 资格复算窗口:只在安顿点评一次会重演缺陷 ②(异步目录还没到货)。
-// 有界重试 205 × 300ms ≈ 61.5s；H7 的长冷却不靠这里轮询，而由权威 nextEligibleAt 调度。
-const SETTLE_MAX_TICKS = 205;
-let settleTimer: ReturnType<typeof setTimeout> | null = null;
-let settleRetry: ReturnType<typeof setInterval> | null = null;
-let settleTicks = 0;
-
-// 顺序**不在这里定**(按 POPUP_PRIORITY 排),这里只声明每个 id 的资格与推送方式。
-const autoPushCandidates: AutoPushCandidate[] = [
-  {
-    id: "trial-claim",
-    // 先等 H7 目录到货；若当前有到点的首页券，由独立权威调度器先拿本次首页名额。
-    eligible: () => voucher.catalogReady && !voucher.autoPopupDueNow
-      && trialConfig.config.autoPushEnabled && freeTrial.canStart(),
-    ready: () => voucher.catalogReady,
-    push: () =>
-      trialClaimSheet.tryAutoPush({
-        cooldownHours: trialConfig.config.autoPushCooldownHours,
-        maxPerSession: trialConfig.config.autoPushMaxPerSession,
-      }),
-  },
-];
-
-// 延迟回归本职「让首屏先安顿」,不再兼任优先级。取各候选配置延迟的较大值,
-// 保证每个候选都过了它自己那份 autoPushDelayMs 才被评。
-function settleDelayMs(): number {
-  return Math.max(trialConfig.config.autoPushDelayMs, voucher.autoPopupCadence?.delayMs ?? 0);
-}
-
-/** 按优先级评一轮。返回 true = 该停表(有人弹出来了,或已离开首页)。 */
-// 评选逻辑本体在 store/popup-arbiter.ts 的 runPriorityRound —— 放在 store 层是为了让
-// 机器门能测**正主**;埋在组件里时门只能用正则猜写法,而正则对改名 / 挪位 / 装饰性
-// 保留一概判绿(独立审计实测:两条旧定时器改个变量名搬回来,门 57/57 全绿)。
-function runAutoPushRound(): boolean {
-  if (readRoute() !== "pages/index/index") return true;
-  return runPriorityRound({
-    currentHolder: () => popupArbiter.current,
-    acquire: (id) => popupArbiter.acquire(id),
-    release: (id) => popupArbiter.release(id),
-    candidates: autoPushCandidates,
-    waitForReady: settleTicks < SETTLE_MAX_TICKS,
-  });
-}
-
-function stopAutoPush() {
-  if (settleTimer) {
-    clearTimeout(settleTimer);
-    settleTimer = null;
-  }
-  if (settleRetry) {
-    clearInterval(settleRetry);
-    settleRetry = null;
-  }
-}
+// Marketing sheets open only after an explicit user action.
+function stopAutoPush() { voucherPopupScheduler.cancel(); }
 
 // 令牌跟着弹层的真实开合走 —— 从 banner 手动打开的也算占屏,庆祝浮层同样要让路。
 // 写成 watch 而不是散在各个关闭路径上:关闭出口有好几个(hide / closeTransient /
@@ -336,126 +303,20 @@ watch(
   { immediate: true },
 );
 
-// ── Pull-to-refresh — touch gesture ported from the prototype's PullToRefresh
-// (lib/store/refresh + ui/pull-to-refresh.tsx). The plain overflow:auto view
-// (see template) needs its own gesture since we dropped <scroll-view>. Only
-// fires when scrolled to top + not already refreshing. Brand-themed spinner.
-const TRIGGER_PX = 70; // pull distance (damped) needed to fire
-const MAX_PX = 110; // visual ceiling
-const HOLD_PX = 56; // parked spinner position while loading
-const DAMP = 0.5; // iOS-like resistance
-const pullY = ref(0);
-const pulling = ref(false);
-// pullActive gates whether the content wrapper carries a transform at all. It
-// stays true during the pull + ~340ms after release (so the spring-back still
-// animates) then drops to false → transform removed → chrome backdrop-filter
-// can frost the content again. (P-041)
-const pullActive = ref(false);
-let deactivateTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleDeactivate() {
-  if (deactivateTimer) clearTimeout(deactivateTimer);
-  deactivateTimer = setTimeout(() => {
-    if (pullY.value === 0 && !refresh.isRefreshing) pullActive.value = false;
-  }, 340);
-}
+// Real DOM scrolling, position memory and pull gestures belong to renderjs on
+// both App and H5. Only scrolling edges and an explicit refresh intent cross back.
 const scrollEl = ref<unknown>(null);
-let startY: number | null = null;
-
-const refreshing = computed(() => refresh.isRefreshing);
-const indicatorY = computed(() => (refreshing.value ? HOLD_PX : pullY.value));
-const refresherVisible = computed(() => refreshing.value || pullY.value > 6);
-
-// H5's uni <view> ref exposes the DOM element via $el. APP-PLUS page logic has
-// no document; its ref still serves scroll-memory reads, while writes use evalJS.
-function chassisScrollDom(): HTMLElement | null {
-  const raw = scrollEl.value as { $el?: HTMLElement } | HTMLElement | null;
-  // #ifdef APP-PLUS
-  return (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
-  // #endif
-  return resolveChassisScrollElement(raw, () => null);
-}
-function currentScrollTop(): number {
-  return chassisScrollDom()?.scrollTop ?? 0;
-}
-
-// ── scroll-position restore on back-navigation — uni hides stacked pages with
-// display:none (zeroing this inner container's scrollTop) and only auto-restores
-// PAGE-level scroll, so every navigateBack used to land the parent page at the
-// top. Record continuously, restore on keep-alive re-activation; a fresh mount
-// (forward navigation / reLaunch) intentionally starts clean at the top. ──
-let scrollMemKey = "";
-function pageScrollKey(): string {
-  try {
-    const ps = getCurrentPages();
-    const top = ps.length ? (ps[ps.length - 1] as { $page?: { fullPath?: string }; route?: string }) : undefined;
-    return top?.$page?.fullPath ?? top?.route ?? route.value;
-  } catch {
-    return route.value;
-  }
-}
-// ── Nova 浮标让路 —— 滚动中淡出,停下再淡回 ──
-// 浮标 fixed 在右下角,而内容区一直延伸到它下面(内容底部只留 TABBAR_INSET=104px,
-// 浮标含浮动动画顶到 152px)→ 它永远横在正在读的内容上。滚动 = 用户在看内容,
-// 此刻让它隐身;停下 SCROLL_IDLE_MS 后淡回(主人 2026-08-17 拍板)。
-// 复位靠 debounce 而非 scrollend:后者 Safari / uni webview 都还没有。
-const SCROLL_IDLE_MS = 200;
 const scrolling = ref(false);
-let scrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
-function markScrolling() {
-  scrolling.value = true;
-  if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
-  scrollIdleTimer = setTimeout(() => {
-    scrolling.value = false;
-    scrollIdleTimer = null;
-  }, SCROLL_IDLE_MS);
-}
-function onChassisScroll() {
-  markScrolling();
-  const el = chassisScrollDom();
-  if (el) saveScrollPos(scrollMemKey, el.scrollTop);
-}
-function restoreChassisScroll() {
-  const saved = getScrollPos(scrollMemKey);
-  if (saved === undefined || saved <= 0) return;
-  void nextTick(() => {
-    const el = chassisScrollDom();
-    if (el) el.scrollTop = saved;
-  });
-}
-onActivated(() => {
-  scrollMemKey = pageScrollKey();
-  restoreChassisScroll();
+const scrollLocks = ref(0);
+provide(DIALOG_SCROLL_LOCK, () => {
+  scrollLocks.value += 1;
+  let held = true;
+  return () => { if (held) { held = false; scrollLocks.value -= 1; } };
 });
-function touchY(e: TouchEvent): number | null {
-  const tp = e.touches?.[0] ?? e.changedTouches?.[0];
-  return tp ? tp.clientY : null;
-}
-function onTouchStart(e: TouchEvent) {
-  if (refreshing.value || currentScrollTop() > 0) { startY = null; return; }
-  startY = touchY(e);
-}
-function onTouchMove(e: TouchEvent) {
-  if (startY === null || refreshing.value) return;
-  const y = touchY(e);
-  if (y === null) return;
-  const dy = y - startY;
-  if (dy <= 0) { pullY.value = 0; pulling.value = false; return; }
-  pulling.value = true;
-  pullActive.value = true; // arm the transform layer only now (idle stays clean)
-  if (deactivateTimer) { clearTimeout(deactivateTimer); deactivateTimer = null; }
-  pullY.value = Math.min(MAX_PX, dy * DAMP);
-}
-async function onTouchEnd() {
-  if (startY === null) return;
-  const pulled = pullY.value;
-  startY = null;
-  pulling.value = false;
-  if (pulled >= TRIGGER_PX && !refreshing.value) {
-    pullY.value = HOLD_PX;
-    await refresh.refresh();
-  }
-  pullY.value = 0;
-  scheduleDeactivate(); // drop the transform after the spring-back finishes
+
+// H5-only DOM access for the existing same-tab return-to-top action.
+function chassisScrollDom(): HTMLElement | null {
+  return resolveChassisScrollElement(scrollEl.value, () => null);
 }
 
 // ── route self-detection (mirrors the prototype root layout) ──
@@ -467,6 +328,7 @@ const TAB_ROUTE_KEY: Record<string, "home" | "earn" | "store" | "team" | "me"> =
   "pages/me/me": "me",
 };
 function readRoute(): string {
+  if (props.logicalRoute) return props.logicalRoute;
   try {
     const ps = getCurrentPages();
     const route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
@@ -493,15 +355,6 @@ onMounted(() => {
     if (readRoute() === "pages/index/index") voucherPopupScheduler.schedule();
   });
   route.value = readRoute();
-  // Fresh mount = fresh landing: start at top and wipe stale memory; only a
-  // keep-alive re-activation (back-navigation) restores. H5-only listener —
-  // App-side pages live in their own webview, which keeps scroll natively.
-  scrollMemKey = pageScrollKey();
-  dropScrollPos(scrollMemKey);
-  const scrollDom = chassisScrollDom();
-  if (scrollDom && typeof scrollDom.addEventListener === "function") {
-    scrollDom.addEventListener("scroll", onChassisScroll, { passive: true });
-  }
   const closeTransient = (trialClaimSheet as { closeTransient?: () => void }).closeTransient;
   if (typeof closeTransient === "function") closeTransient();
   else trialClaimSheet.open = false;
@@ -511,8 +364,15 @@ onMounted(() => {
   // 挂载即排一条安顿定时器;到点评一轮,评不出赢家就有界重试(等异步目录到货),
   // 直到有人弹出 / 离开首页 / 超时。isHome 守卫让受保护的 index.vue 不必被编辑
   // (ALIGNMENT 红线);路由在**触发时**复检,绝不弹到延迟期间跳过去的别的页上。
-  if (isHome.value) {
-    popupArbiter.beginHomeVisit();
+  beginHomeAutoPush(true);
+});
+function beginHomeAutoPush(newVisit: boolean) {
+  stopAutoPush();
+  voucherPopupScheduler.cancel();
+  stopObservationOpened?.(); stopObservationOpened = null;
+  stopObservationClosed?.(); stopObservationClosed = null;
+  if (props.hostVisible && isHome.value) {
+    if (newVisit) popupArbiter.beginHomeVisit();
     voucherPopupScheduler.schedule();
     stopObservationOpened = onAcceptanceObservationModalOpened(() => {
       voucherPopupScheduler.onObservationModalOpened(captureVoucherPopupScope());
@@ -520,15 +380,16 @@ onMounted(() => {
     stopObservationClosed = onAcceptanceObservationModalClosed(({ token }) => {
       voucherPopupScheduler.onObservationModalClosed(token);
     });
-    settleTicks = 0;
-    settleTimer = setTimeout(() => {
-      if (runAutoPushRound()) return;
-      settleRetry = setInterval(() => {
-        settleTicks += 1;
-        if (runAutoPushRound() || settleTicks >= SETTLE_MAX_TICKS) stopAutoPush();
-      }, SETTLE_RETRY_MS);
-    }, settleDelayMs());
+
   }
+}
+watch(() => [props.logicalRoute, props.tabLocationKey], () => {
+  if (!props.tabHost) return;
+  route.value = readRoute();
+  // The view controller restores each tab after its retained content is visible.
+});
+watch(() => [route.value, props.hostVisible], ([current], [previous]) => {
+  if (autoPushMounted && props.tabHost) beginHomeAutoPush(current !== previous);
 });
 onUnmounted(() => {
   autoPushMounted = false;
@@ -539,11 +400,6 @@ onUnmounted(() => {
   stopObservationOpened = null;
   stopObservationClosed?.();
   stopObservationClosed = null;
-  const scrollDom = chassisScrollDom();
-  if (scrollDom && typeof scrollDom.removeEventListener === "function") {
-    scrollDom.removeEventListener("scroll", onChassisScroll);
-  }
-  if (scrollIdleTimer) { clearTimeout(scrollIdleTimer); scrollIdleTimer = null; }
   stopAutoPush();
 });
 
@@ -565,17 +421,6 @@ const isTabRoute = computed(() => routeTab.value !== undefined || (route.value =
 const activeTab = computed(() => routeTab.value ?? props.active ?? "home");
 const isHome = computed(() => activeTab.value === "home");
 
-// Voucher fallback banner surface = current tab route (home/store/me/earn). team
-// is not a configured claim surface. The VoucherBanner self-hides unless a
-// claimable voucher targets the surface, so this only maps the route → surface.
-const bannerSurface = computed<"home" | "store" | "me" | "earn" | null>(() => {
-  // Tab pages only — sub-pages (checkout/detail/…) pass active="store" etc. but
-  // must NOT carry the banner (it's scoped to the 4 first-level surfaces).
-  if (!isTabRoute.value) return null;
-  const tab = activeTab.value;
-  return tab === "home" || tab === "store" || tab === "me" || tab === "earn" ? tab : null;
-});
-
 // Sub-page nav header (registered via useSetPageHeader). Null on tab routes → brand
 // row. navHeaderH drives both the row height and the content-top inset, so only
 // converted sub-pages get the inset (un-converted ones keep contentTop+0, unchanged).
@@ -592,7 +437,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   action();
 }
 
-const unread = computed(() => messageDrawer.totalUnread);
+const unread = computed(() => messageDrawer.actionableUnread);
 const unreadLabel = computed(() => formatUnreadBadge(unread.value));
 
 // ── layout insets ──
@@ -603,13 +448,16 @@ const statusBarHeight = computed(() => {
     return h5DevicePreviewStatusBarHeight();
   }
 });
-const HEADER_H = 52;
-// Floor breathing (owner 2026-07-09: 加大底部呼吸). Both give ~18px clear space
-// below the last element so it isn't jammed against the tabbar / screen edge.
-const TABBAR_INSET = 104; // floating pill (64) + home indicator (22) + 18 breathing (was 92)
+const HEADER_H = 56;
+// Preserve the existing floor clearance while the navigation rail changes height.
+const TABBAR_CLEARANCE = 36; // HomeIndicator (22) + 14px gap, in addition to the responsive rail height.
 const SUB_BOTTOM = 40; //  home indicator (~22) + 18 breathing (was 26)
 const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HEADER_H : navHeaderH.value));
-const contentBottom = computed(() => (isTabRoute.value ? TABBAR_INSET : SUB_BOTTOM));
+const showFloatingSupport = computed(() => isTabRoute.value && ['home', 'earn', 'team'].includes(activeTab.value));
+// Let the last page action scroll fully above the floating support shortcut.
+const contentBottom = computed(() => isTabRoute.value
+  ? `calc(var(--nx-tabbar-height, 56px) + ${TABBAR_CLEARANCE + (showFloatingSupport.value ? 60 : 0)}px)`
+  : `${SUB_BOTTOM}px`);
 // ── 待支付浮动条的落位 ──
 // 浮动条永远占 chrome 之下自己的一条带(top = contentTop + 8),页面内容整体下让 PENDING_BAR_INSET,
 // 任何页都不被盖住:tab 页 / useSetPageHeader 子页的 chassis 头在带之上;用 sub-page-header(内容内
@@ -632,18 +480,22 @@ const tabs = computed(() => [
   { key: "me", route: "/pages/me/me", label: t.value.tabs.me, icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", icon2: "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" },
 ]);
 
-// Liquid-Glass active-tab gradient pill (faithful to prototype tab-bar.tsx).
-const activeTabStyle: CSSProperties = {
-  color: "var(--v5-brand)",
-  background:
-    "linear-gradient(180deg, color-mix(in srgb, var(--v5-brand) 22%, transparent) 0%, color-mix(in srgb, var(--v5-brand) 8%, transparent) 100%)",
-  boxShadow:
-    "inset 0 1px 0 rgba(255,255,255,0.22)," +
-    "inset 0 0 16px color-mix(in srgb, var(--v5-brand) 14%, transparent)," +
-    "0 0 0 0.5px color-mix(in srgb, var(--v5-brand) 28%, transparent)",
-};
-
-function go(tab: { key: string; route: string }) {
+function go(tab: { key: string; route: string }, reason = "activation") {
+  if (props.tabHost) {
+    const attempt = ++navigationAttempt;
+    // Props can still describe A while the service has already selected B.
+    // Decide same-tab taps from the host's synchronous route, including B→A.
+    if (isCurrentNativeTab(tab.route)) {
+      const pages = getCurrentPages();
+      scrollNativeCurrentTabToTop(pages[pages.length - 1]);
+    } else {
+      void navTo(tab.route).then(ok => { if (!ok && attempt === navigationAttempt) navigationReset.value++; });
+    }
+    return;
+  }
+  // #ifdef APP-PLUS
+  if (navigationPending) return;
+  // #endif
   // 再点当前 tab = 回到顶部(《05》§5.3);原实现直接 return,实测 scrollTop
   // 900→900 零位移,是全站唯一「点了没反应」的控件。
   // behavior 显式跟随系统「减少动态」偏好——CSS 的 scroll-behavior 兜底管不到
@@ -662,8 +514,25 @@ function go(tab: { key: string; route: string }) {
     // #endif
     return;
   }
-  rememberGlassNavigation(activeTab.value, tab.key);
-  navTo(tab.route);
+  let from: string = activeTab.value;
+  // A native drag already moved the lens under the finger in the outgoing view.
+  // #ifdef APP-PLUS
+  if (reason === "drag") from = tab.key;
+  // #endif
+  rememberGlassNavigation(from, tab.key);
+  // #ifdef APP-PLUS
+  navigationPending = true;
+  void navTo(tab.route).then(ok => {
+    navigationPending = false;
+    if (!ok) {
+      rememberGlassNavigation(activeTab.value, activeTab.value);
+      navigationReset.value++;
+    }
+  });
+  // #endif
+  // #ifndef APP-PLUS
+  void navTo(tab.route);
+  // #endif
 }
 function goSearch() {
   navTo("/pages/search/search");
@@ -677,13 +546,42 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 import GlassSegments from "@/components/glass-segments.vue";
 
 const chassisHostId = `nx-chassis-host-${getCurrentInstance()!.uid}`;
-const chromeConfiguration = { hostId: chassisHostId };
-declare const chromeView: { update(value: { hostId: string }): void };
+const pageVisible = ref(true);
+const scrollVisit = ref(0);
+const pageVisit = ref(0);
+watch(() => props.scrollLoadKey, () => { scrollVisit.value++; }, { flush: "sync" });
+const tabRevision = ref(0);
+watch(() => props.tabLocationKey, () => { tabRevision.value += 1; }, { flush: "sync" });
+onShow(() => { scrollVisit.value++; pageVisit.value++; pageVisible.value = true; });
+onHide(() => { scrollVisit.value++; pageVisible.value = false; });
+let scrollDiagnostics = false;
+let nativeScrollBridge = false;
+// #ifdef APP-PLUS
+scrollDiagnostics = import.meta.env.VITE_UVEL_SCROLL_DEBUG === "true";
+nativeScrollBridge = true;
+// #endif
+const chromeConfiguration = computed(() => ({ hostId: chassisHostId, tabKey: props.tabHost ? props.tabLocationKey : undefined, tabRevision: props.tabHost ? tabRevision.value : undefined, visible: pageVisible.value && props.hostVisible, pageVisit: pageVisit.value, memoryKey: !props.tabHost && isTabRoute.value ? route.value || props.active : undefined, visit: `${scrollVisit.value}:${tabRevision.value}`, isRefreshing: refresh.isRefreshing, scrollLocks: scrollLocks.value, pullInset: contentTop.value + pendingBarInset.value, debug: scrollDiagnostics, scrollKey: nativeScrollBridge && props.scrollLoadKey !== undefined ? `${scrollVisit.value}:${props.scrollLoadKey}` : undefined }));
+// renderjs owns the real WebView scroller; only this visible list may consume its receipt.
+function receiveNativeScrollLoadMore(key: string) {
+  if (nativeScrollBridge && pageVisible.value && props.hostVisible && key === chromeConfiguration.value.scrollKey) emit("scroll-load-more");
+}
+function receiveChassisScrolling(value: boolean) {
+  scrolling.value = value;
+}
+function receiveChassisRefresh(visit: string) {
+  if (pageVisible.value && props.hostVisible && visit === chromeConfiguration.value.visit
+    && scrollLocks.value === 0 && !refresh.isRefreshing) void refresh.refresh();
+}
+defineExpose({ receiveNativeScrollLoadMore, receiveChassisScrolling, receiveChassisRefresh });
+declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void };
 const navigationOptions = computed(() => tabs.value.map(tab => ({ ...tab, value: tab.key })));
 const navigationFrom = consumeGlassNavigation(activeTab.value);
-function selectNavigation(value: string) {
+let navigationPending = false;
+let navigationAttempt = 0;
+const navigationReset = ref(0);
+function selectNavigation(value: string, reason: string) {
   const tab = tabs.value.find(item => item.key === value);
-  if (tab) go(tab);
+  if (tab) go(tab, reason);
 }
 </script>
 
@@ -695,22 +593,17 @@ export default chassisView;
 
 <style scoped>
 .nx-chassis {
+  --nx-tabbar-height: 56px;
   position: fixed;
   inset: 0;
   overflow: hidden;
 }
-.nx-top-chrome {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 90;
-  background: var(--v5-chrome-bg);
-  backdrop-filter: saturate(180%) blur(24px);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
-  pointer-events: none;
-}
+@media (min-width: 360px) { .nx-chassis { --nx-tabbar-height: 60px; } }
+@media (min-width: 375px) { .nx-chassis { --nx-tabbar-height: 62px; } }
+@media (min-width: 390px) { .nx-chassis { --nx-tabbar-height: 64px; } }
+@media (min-width: 414px) { .nx-chassis { --nx-tabbar-height: 68px; } }
 .nx-header {
+  isolation: isolate;
   position: absolute;
   left: 0;
   right: 0;
@@ -731,9 +624,11 @@ export default chassisView;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 2px;
+  /* No extra inset: the 44px hit areas start at 12px, so each 36px glass circle sits on the 16px page margin like the tab header. */
+  padding: 0;
   border-radius: 28px;
 }
+.nx-navheader--capsule { box-shadow: 0 0 0 1px var(--v5-liquid-rim); }
 .nx-nav-side {
   position: relative;
   z-index: 1;
@@ -798,7 +693,7 @@ export default chassisView;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--v5-brand-2);
+  background: var(--ui-unread-badge);
 }
 .nx-header__l {
   position: relative;
@@ -806,10 +701,8 @@ export default chassisView;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  /* 品牌包给横版定的最小渲染宽度是 120px(低于它 8 个节点糊成一团),槽宽跟着它走。
-     原值 104px 是旧字标 logo 的宽度,装不下新标会溢出到中间区。 */
-  width: 132px;
-  height: 44px;
+  width: 146px;
+  height: 50px;
   justify-content: center;
   flex-shrink: 0;
   transition: transform 200ms cubic-bezier(.23,1,.32,1), opacity 200ms, visibility 0s;
@@ -901,6 +794,15 @@ export default chassisView;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
 }
+/* An open dialog keeps the page under its mask still. iOS WebKit stacks a fixed dialog mounted
+   inside this scroller with the scroller itself, below the header (100) and the tab bar (30)
+   whatever its own z-index; raising the scroller puts every in-page dialog's mask over the chrome.
+   785 also keeps in-page dialogs above the milestone celebration (780), as on other engines, while
+   chassis sheets (790+) and the global overlay host stay above them. */
+.nx-content--locked {
+  z-index: 785;
+  overflow-y: hidden;
+}
 /* hide scrollbar (match the prototype's no-scrollbar utility) */
 .nx-content::-webkit-scrollbar {
   display: none;
@@ -941,6 +843,11 @@ export default chassisView;
 .nx-page-enter {
   animation: nx-page-in 0.36s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
+/* Native tab roots replace the webview; another content translation makes that
+   replacement look like a second transition underneath the moving lens. */
+/* #ifdef APP-PLUS */
+.nx-page-enter--tab { animation: none; }
+/* #endif */
 @keyframes nx-page-in {
   from {
     opacity: 0;
@@ -962,4 +869,27 @@ export default chassisView;
 .nx-tabbar-pill {
   margin: 0 12px;
 }
+/* APP's view thread supplies this state when the logic thread has no DOM. */
+.nx-chassis[data-scrolling="true"] :deep(.nx-support-bubble) { opacity: 0; pointer-events: none; }
+.nx-chassis[data-scrolling="true"] :deep(.nx-support-motion),
+.nx-chassis[data-scrolling="true"] :deep(.nx-support-beat) { animation-play-state: paused; }
 </style>
+
+<style scoped>
+.nx-header { height:56px;padding-inline:16px; }
+.nx-header__r { gap:8px;padding:0; }
+.nx-icon-btn { isolation:isolate;border-radius:50%; }
+.nx-icon-btn > svg { position:relative;z-index:1; }
+@media (max-width:374px) {
+  .nx-header__l { width:124px; height:43px; }
+}
+@media (max-width:350px) {
+  .nx-header__l { width:112px; height:39px; }
+}
+</style>
+
+<style scoped>
+.nx-badge {right:4px;background:var(--ui-unread-badge);z-index:2;} .nx-badge__t {font-size:10.5px;color:var(--ui-unread-badge-ink);}
+</style>
+
+<style scoped>.nx-header__l {justify-content:flex-start;}</style>

@@ -197,6 +197,7 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
     pendingLogin: () => false,
     pendingLoginContext: () => null,
     cancelLoginChallenge() {},
+    async completeProviderLogin() { throw new ApiError({ kind: "configuration", message: "OAUTH_PROVIDER_REQUIRES_SERVER" }); },
     async retryLogin() { throw new ApiError({ kind: "configuration", message: "LOGIN_RECOVERY_REQUIRES_SERVER" }); },
     async recoverLogin() { throw new ApiError({ kind: "configuration", message: "LOGIN_RECOVERY_REQUIRES_SERVER" }); },
     async login(request) {

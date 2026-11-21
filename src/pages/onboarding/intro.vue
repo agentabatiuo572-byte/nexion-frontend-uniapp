@@ -57,12 +57,12 @@
             <g v-for="(s, i) in satellites" :key="`sat-${i}`">
               <circle :cx="s.x" :cy="s.y" r="6" fill="var(--v5-brand)" opacity="0.12" filter="url(#orb-soft)" />
               <circle :cx="s.x" :cy="s.y" r="2.4" fill="var(--v5-brand)" opacity="0.75">
-                <animate attributeName="opacity" values="0.75;0.3;0.75" :dur="`${2.2 + i * 0.4}s`" repeatCount="indefinite" />
+                <animate v-if="motionAllowed" attributeName="opacity" values="0.75;0.3;0.75" :dur="`${2.2 + i * 0.4}s`" repeatCount="indefinite" />
               </circle>
             </g>
 
             <!-- Active orbiting node + comet halo -->
-            <g>
+            <g v-if="motionAllowed">
               <circle r="7" fill="var(--v5-brand)" opacity="0.25">
                 <animateMotion dur="9s" repeatCount="indefinite" :path="orbitPath" rotate="auto" />
               </circle>
@@ -70,15 +70,19 @@
                 <animateMotion dur="9s" repeatCount="indefinite" :path="orbitPath" rotate="auto" />
               </circle>
             </g>
+            <g v-else transform="translate(120 12)">
+              <circle r="7" fill="var(--v5-brand)" opacity="0.25" />
+              <circle r="3.4" fill="var(--v5-brand)" />
+            </g>
 
             <!-- Expanding pulse rings (2× staggered) -->
             <circle cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4">
-              <animate attributeName="r" from="36" to="92" dur="2.6s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="r" from="36" to="92" dur="2.6s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" repeatCount="indefinite" />
             </circle>
             <circle cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4">
-              <animate attributeName="r" from="36" to="92" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="r" from="36" to="92" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
             </circle>
 
             <!-- Middle thin ring —— 此前写死一个深灰色号,浅色档就是那圈扎眼的黑环。
@@ -102,18 +106,7 @@
         <text class="intro-title">{{ t.intro.title1 }}</text>
         <text class="intro-sub">{{ t.intro.subtitleLine1 }}</text>
 
-        <view class="intro-stats anim-stats">
-          <view class="stat-item">
-            <view class="stat-dot" />
-            <text class="stat-num">{{ fmtNum(visibleDevices) }}</text>
-            <text class="stat-label">{{ t.intro.statsDevices }}</text>
-          </view>
-          <view v-if="visiblePaid !== null" class="stat-sep" />
-          <view v-if="visiblePaid !== null" class="stat-item">
-            <text class="stat-num stat-num--brand">{{ visiblePaid === null ? t.intro.publicStatsUnavailable : `$${formatAmount(visiblePaid)}` }}</text>
-            <text class="stat-label">{{ t.intro.statsPaidTotal }}</text>
-          </view>
-        </view>
+        <HomeDisplayStats :active="statsActive" />
       </view>
 
       <view class="intro-cta anim-cta">
@@ -143,7 +136,7 @@
       <text class="intro-lang-sheet__title">{{ t.language.pageTitle }}</text>
       <scroll-view scroll-y :show-scrollbar="false" class="intro-lang-list">
         <view
-          v-for="l in LOCALES"
+          v-for="l in platformConfig.offeredLocales"
           :key="l.code"
           class="intro-lang-row active:opacity-80"
           role="button"
@@ -166,25 +159,29 @@
       </scroll-view>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import ToastHost from "@/components/toast-host.vue";
+import HomeDisplayStats from "@/components/home/home-display-stats.vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import { navReset, navTo } from "@/lib/route";
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
-import { LOCALES, type LocaleCode } from "@/i18n";
+import type { LocaleCode } from "@/i18n";
+import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { paidCumulativeNow } from "@/lib/platform-stats";
-import { useConfig } from "@/store/config";
-import { remoteApiEnabled } from "@/api/runtime";
+import { useIntroMotion } from "@/composables/use-intro-motion";
 
 const t = useT();
+const motionAllowed = useIntroMotion();
 const locale = useLocaleStore();
+const platformConfig = useConfig();
 const langOpen = ref(false);
 function closeLang() {
   langOpen.value = false;
@@ -194,34 +191,9 @@ function pick(code: LocaleCode) {
   langOpen.value = false;
 }
 useDialogA11y(computed(() => langOpen.value), ".intro-lang-root", closeLang);
-const cfg = useConfig();
-const fleetNow = () => {
-  return cfg.syncFailed ? null : cfg.config.verifiedStats?.onlineDevices.value ?? null;
-};
-// 🔴 累计支付**不跟配置走**(第二次结构反思·族B,R2 审计 C5):它是时间积分,背着历史 ——
-//   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
-//   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。
-//   速率类($/sec、日产、月付)跟配置走是对的 —— 它们是「现在」,不背历史。
-// No public payout projection exists. Private purchase totals are not payouts;
-// omit this unsupported metric rather than expose an account-dependent amount.
-// 🔴 远程模式下的「累计已发放」只能是可核验的提现完成额(zentao #59):
-//   此前这里是 `null`(直接隐藏),服务端也没有对应聚合。现在读 verified 聚合;
-//   沙箱/旧后端没有该聚合 → 继续不显示,绝不用配置值编造一个财务事实。
-const paidNow = () => {
-  if (!remoteApiEnabled) return paidCumulativeNow();
-  const v = cfg.syncFailed ? null : cfg.config.verifiedStats;
-  return v ? v.completedPayoutUsdt.value : null;
-};
-const paid = ref(paidNow());
-const visiblePaid = computed(() => remoteApiEnabled ? paidNow() : paid.value);
-// Intro is public and often shown before a user session exists. Its public
-// device count comes from the verified server aggregate.
-const devices = ref(fleetNow());
-const visibleDevices = computed(() => remoteApiEnabled ? fleetNow() : devices.value);
-
-function fmtNum(n: number | null): string {
-  return n === null ? "—" : n.toLocaleString("en-US");
-}
+const statsActive = ref(true);
+onShow(() => { statsActive.value = true; });
+onHide(() => { statsActive.value = false; });
 
 // Deterministic PRNG (SSR-safe in the prototype; here just keeps positions stable).
 function mulberry32(seed: number) {
@@ -252,22 +224,6 @@ const satellites = [
 ];
 const orbitPath = "M 120 12 A 108 108 0 1 1 119.999 12 Z";
 
-let timer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  timer = setInterval(() => {
-    // Recompute from the time anchor (~$14/1.8s) instead of accumulating random
-    // steps, so a reload can never show a smaller total than a longer session.
-    paid.value = paidNow();
-    // BUG #59: the published fleet figure is an operator-owned aggregate, not a
-    // live measurement. It must not drift while the page is open — a wobbling
-    // number reads as a real-time feed. Display the configured value verbatim.
-    devices.value = fleetNow();
-  }, 1800);
-});
-onUnmounted(() => {
-  if (timer) clearInterval(timer);
-});
-
 function goRegister() {
   navReset({ url: "/pages/register/register", fail: () => {} });
 }
@@ -295,7 +251,7 @@ function goPrivacy() {
 /* 🔴 本页三层背景此前全是**为纯黑底调的写死值**(遗留品牌绿 + 纯黑渐变),浅色主题下
    分别表现为:顶部一条突兀的黑色渐变、柠檬绿雾霭糊在米色上。主人 2026-08-18 拍板
    本页浅色不再豁免,故三层一律改走 token,由主题决定色。暗色侧取值与原写死值等价
-   (--v5-bg 就是 #000),观感不变。 */
+   (当时 --v5-bg 为 #000),观感不变。 */
 .intro-glow {
   position: absolute;
   inset: 0;
@@ -381,7 +337,10 @@ function goPrivacy() {
   z-index: 800;
   background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge);
 
-  padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 38px);
+  padding: 10px 16px var(--nx-overlay-bottom);
+  box-sizing: border-box;
+  max-height: calc(100% - var(--nx-overlay-top));
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -393,7 +352,7 @@ function goPrivacy() {
   margin: 2px auto 10px;
 }
 .intro-lang-sheet__title {
-  font-size: 15px;
+  font-size: var(--ui-type-hero-title);
   font-weight: 600;
   color: var(--v5-ink);
   padding: 0 4px 10px;
@@ -418,7 +377,7 @@ function goPrivacy() {
   flex-direction: column;
 }
 .intro-lang-row__native {
-  font-size: 15px;
+  font-size: var(--ui-type-list-title);
   font-weight: 550;
   color: var(--v5-ink);
 }
@@ -444,6 +403,7 @@ function goPrivacy() {
 .intro-content {
   position: relative;
   min-height: 100%;
+  box-sizing: border-box;
   padding: 0 24px;
   display: flex;
   flex-direction: column;
@@ -457,8 +417,8 @@ function goPrivacy() {
 }
 .intro-orb {
   position: relative;
-  width: 240px;
-  height: 240px;
+  width: clamp(104px, calc(100vh - 510px), 240px);
+  height: clamp(104px, calc(100vh - 510px), 240px);
 }
 .orb-glow {
   position: absolute;
@@ -495,7 +455,7 @@ function goPrivacy() {
 .intro-sub {
   display: block;
   margin-top: 12px;
-  font-size: 15px;
+  font-size: var(--ui-type-body);
   line-height: 1.625;
   color: var(--v5-ink-3);
   padding: 0 16px;
@@ -572,7 +532,7 @@ function goPrivacy() {
   transition: transform 0.15s ease;
 }
 .cta-primary__t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 500;
   color: var(--v5-on-brand);
 }
@@ -587,22 +547,66 @@ function goPrivacy() {
   transition: transform 0.15s ease;
 }
 .cta-secondary__t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-ink);
 }
 .intro-terms {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 6px;
   text-align: center;
-  padding-top: 8px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--v5-ink-4);
 }
+.terms-left {
+  width: 100%;
+}
 .terms-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   color: var(--v5-ink-3);
   text-decoration: underline;
   text-underline-offset: 2px;
-  /* inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 只扩热区不撑行高(原 34×17) */
-  padding: 14px 0;
+}
+
+/* Reserve the shell's status/home areas; compact the illustration and spacing,
+   not the content. Larger text settings can still scroll naturally. */
+@media (max-width: 374px), (max-height: 740px) {
+  .intro-content { padding-inline: 20px; }
+  .intro-orb-area { padding-top: 44px; }
+  .intro-orb {
+    width: clamp(104px, calc(100vh - 530px), 196px);
+    height: clamp(104px, calc(100vh - 530px), 196px);
+  }
+  .intro-hero { padding-bottom: 0; }
+  .intro-title { font-size: 26px; line-height: 1.2; }
+  .intro-sub { margin-top: 8px; padding-inline: 0; font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
+  .intro-hero :deep(.home-display-stats) {
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-top: 12px;
+    padding: 7px 10px;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .intro-hero :deep(.home-display-item) { gap: 4px; }
+  .intro-cta { padding-top: 20px; gap: 8px; }
+  .cta-primary, .cta-secondary { height: 44px; flex-shrink: 0; }
+  .intro-terms { font-size: 11px; }
+}
+@media (max-height: 620px) {
+  .intro-orb-area { padding-top: 44px; }
+  .intro-title { font-size: 24px; }
+  .intro-sub { margin-top: 6px; }
+  .intro-hero :deep(.home-display-stats) { margin-top: 8px; }
+  .intro-cta { padding-top: 12px; gap: 6px; }
 }
 
 /* framer-motion → CSS entrance animations */
@@ -633,5 +637,8 @@ function goPrivacy() {
 @keyframes intro-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-root :deep(*) { animation: none !important; transition: none !important; }
 }
 </style>

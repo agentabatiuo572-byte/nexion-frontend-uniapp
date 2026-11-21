@@ -7,7 +7,7 @@
   + writes a bill. Decomposed into src/components/events/* (FeaturedHero /
   Card) — each carries its own scroll-grow bar.
 
-  Wrapped in <AppChassis active="home"> (reached from Home). SetPageHeader
+  Wrapped in <NxPageContent :embedded="embedded" active="home"> (reached from Home). SetPageHeader
   backHref="/" → SubPageHeader back="/pages/index/index". SegmentedControl →
   inline pill tabs. The source's live evaluateEventProgress() is replaced by
   the mock's `trackable`/`done` flags (self-contained, backend-replaceable).
@@ -17,12 +17,13 @@
   Achievements unlock on claim is omitted (no achievements store ported).
 -->
 <template>
-  <AppChassis active="home">
+  <NxPageContent :embedded="embedded" active="home">
     <CardStagger class="pb-8" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/index/index" />
+      <SubPageHeader v-if="!embedded" back="/pages/index/index" />
 
       <view class="px-4 space-y-3">
         <GlassSegments :label="t.promotion.events" v-model="eventSource" :options="sourceOptions" />
+        <view class="nx-glass-card" style="padding:14px;border-radius:var(--nx-glass-radius)" role="link" tabindex="0" @click="navTo('/pages/events/genesis-raffle')" @keydown.enter.prevent="navTo('/pages/events/genesis-raffle')"><text class="block nx-after-chevron" style="font-size:14px;font-weight:600;color:var(--v5-brand)">{{ raffleCopy.title }}</text><text class="block" style="margin-top:4px;font-size:12px;color:var(--v5-ink-3)">{{ raffleCopy.intro }}</text></view>
         <PromotionEntry v-if="eventSource==='promotions'" mode="events" />
         <view v-else-if="!signedIn" class="promotion-flat"><view class="promotion-action" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent('/pages/events/events'))"><text>{{ t.promotion.signIn }}</text></view></view>
         <template v-else>
@@ -43,16 +44,14 @@
         <GlassSegments :label="t.events.categoryGroupLabel" v-model="tab" :options="tabOptions" layout="scroll"  />
 
         <!-- Event list -->
-        <EmptyState
-          v-if="remoteEventsError"
-          kind="recoverable-error"
-          :title="t.events.loadErrorTitle"
-          :desc="t.events.loadErrorBody"
-          :cta-label="t.events.retry"
-          :cta-disabled="remoteEventsLoading"
-          :cta-busy="remoteEventsLoading"
-          @cta="retryRemoteEvents"
-        />
+        <!-- A failed first read keeps the same still placeholder cards and recovers on its own (03 §3.5.2). -->
+        <view v-if="!remoteEvents && (remoteEventsLoading || remoteEventsError)" class="space-y-2.5" :aria-busy="remoteEventsLoading ? 'true' : undefined" :role="remoteEventsLoading ? 'status' : undefined" :aria-label="remoteEventsLoading ? loadingLabel : undefined" :aria-hidden="remoteEventsLoading ? undefined : 'true'">
+          <view v-for="row in 3" :key="row" class="nx-glass-card" style="height: 132px; padding: 18px">
+            <view style="width: 58%; height: 18px; border-radius: 6px; background: var(--v5-surface-3)" />
+            <view style="width: 86%; height: 12px; margin-top: 16px; border-radius: 4px; background: var(--v5-surface-2)" />
+            <view style="width: 35%; height: 12px; margin-top: 10px; border-radius: 4px; background: var(--v5-surface-2)" />
+          </view>
+        </view>
         <EmptyState v-else-if="filtered.length === 0 && emptyKey" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
         <view v-else class="space-y-2.5">
           <EventsCard
@@ -72,14 +71,16 @@
         </template>
       </view>
     </CardStagger>
-  </AppChassis>
+  </NxPageContent>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+const { embedded = false } = defineProps<{ embedded?: boolean }>();
 import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
-import { onHide, onShow } from "@dcloudio/uni-app";
-import AppChassis from "@/components/app-chassis.vue";
+import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
+import NxPageContent from "@/components/ui/nx-page-content.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -87,13 +88,15 @@ import EventsFeaturedHero from "@/components/events/events-featured-hero.vue";
 import EventsCard from "@/components/events/events-card.vue";
 import PromotionEntry from "@/components/promotion/promotion-entry.vue";
 import { useT } from "@/i18n/use-t";
-import { navTo } from '@/lib/route';
+import { isStakingVisibilityRoute, navTo, takeNavigationQuery } from '@/lib/route';
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { eventsApi, remoteApiEnabled,sessionVault } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useEventQuest } from "@/store/event-quest";
 import { useApp } from "@/store/app";
+import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
@@ -105,6 +108,8 @@ import { EVENTS, type EventStatus, type NexEvent } from "@/mock/events";
 import { remoteEventView, type EventActionLabels } from "./remote-event-view";
 import { runRemoteEventAction } from "./remote-event-action";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { subscribeRuntimeRevision } from "@/api/order-api";
+import { genesisRaffleCopy } from "@/i18n/genesis-raffle";
 
 type TabId = "all" | EventStatus | "joined";
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
@@ -113,6 +118,10 @@ const TABS: TabId[] = ["all", "ongoing", "upcoming", "joined", "ended"];
 
 const t = useT();
 const eventSource=ref('promotions');
+onLoad(options => {
+  const query = new URLSearchParams(takeNavigationQuery("/pages/events/events"));
+  if ((options?.source ?? query.get("source")) === "legacy") eventSource.value = "legacy";
+});
 const signedIn=computed(()=>{void app.accountKey;void app.accountBindingEpoch;return !!sessionVault.read();});
 const sourceOptions=computed(()=>[
   {value:'promotions',label:t.value.promotion.promotionList},
@@ -121,11 +130,14 @@ const sourceOptions=computed(()=>[
 const eventQuest = useEventQuest();
 const luckySpin = useLuckySpin();
 const app = useApp();
+const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const language = computed(() => locale.code);
+const raffleCopy = computed(() => genesisRaffleCopy[uiLocale(locale.code)]);
+const loadingLabel = computed(() => ({ zh: "加载中", en: "Loading", vi: "Đang tải", id: "Memuat", ms: "Memuatkan", fil: "Naglo-load", ru: "Загрузка", kk: "Жүктелуде", uz: "Yuklanmoqda" })[uiLocale(locale.code)]);
 
 const tab = ref<TabId>("ongoing");
-const remoteEvents = ref<CanonicalEvent[]>([]);
+const remoteEvents = ref<CanonicalEvent[] | null>(null);
 const remoteEventsError = ref(false);
 const remoteEventsLoading = ref(remoteApiEnabled);
 const commandBusy = ref<string | null>(null);
@@ -136,7 +148,7 @@ const remoteCommandFence = createRemotePageCommandFence(remoteAccountEpoch, () =
 let releaseActiveRefresh = () => {};
 function activatePageRefresh() {
   releaseActiveRefresh();
-  releaseActiveRefresh = registerActivePageRefresh(loadRemoteEvents);
+  releaseActiveRefresh = registerActivePageRefresh(() => remoteEventsError.value ? undefined : loadRemoteEvents());
 }
 
 const eventActionLabels = computed<EventActionLabels>(() => ({
@@ -159,24 +171,25 @@ async function loadRemoteEvents() {
     if (!remoteRequestFence.isCurrent(scope)) return;
     remoteEvents.value = snapshot.events;
     remoteEventsError.value = false;
-  } catch {
+  } catch (cause) {
     if (remoteRequestFence.isCurrent(scope)) {
-      remoteEvents.value = [];
+      if (!isTransientReadFailure(cause)) remoteEvents.value = null;
       remoteEventsError.value = true;
     }
   } finally {
     if (remoteRequestFence.isCurrent(scope)) remoteEventsLoading.value = false;
   }
 }
-function retryRemoteEvents() {
-  void loadRemoteEvents();
-}
+const stopRuntimeRefresh = subscribeRuntimeRevision(() => {
+  if (mounted) void loadRemoteEvents();
+});
+onUnmounted(stopRuntimeRefresh);
 
 const eventVisibility = createPageVisibilityRefresh((reason) => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(app.accountKey);
   if (reason === "initial") {
-    remoteEvents.value = [];
+    remoteEvents.value = null;
     remoteEventsError.value = false;
     remoteEventsLoading.value = true;
   }
@@ -207,12 +220,15 @@ onUnmounted(() => {
   remoteRequestFence.invalidate();
   remoteCommandFence.invalidate();
 });
+watch(() => luckySpin.open, (open, wasOpen) => {
+  if (remoteApiEnabled && mounted && wasOpen && !open) void loadRemoteEvents();
+});
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => language.value], ([accountKey]) => {
   remoteCommandFence.invalidate();
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(accountKey);
   remoteRequestFence.invalidate();
-  remoteEvents.value = [];
+  remoteEvents.value = null;
   remoteEventsError.value = false;
   remoteEventsLoading.value = true;
   void loadRemoteEvents();
@@ -221,12 +237,13 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => langua
 // Enrich each event with live join/claim state from the store.
 const enrichedEvents = computed<EnrichedEvent[]>(() =>
   (remoteApiEnabled
-    ? remoteEvents.value.map((event) => remoteEventView(event, eventActionLabels.value))
+    ? (remoteEvents.value ?? []).map((event) => remoteEventView(event, eventActionLabels.value))
     : EVENTS.map((event) => ({ ...event, runtimeSource: "mock" as const }))
-  ).map((ev) => {
+  ).filter((ev) => stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(ev.href ?? ""))
+    .map((ev) => {
     const trackable = ev.trackable === true;
     const remoteStatus = remoteApiEnabled
-      ? remoteEvents.value.find((event) => event.eventCode === ev.id)?.userStatus
+      ? remoteEvents.value?.find((event) => event.eventCode === ev.id)?.userStatus
       : undefined;
     const joinedFromStore = eventQuest.isJoined(ev.id);
     const claimedFromStore = eventQuest.isClaimed(ev.id);
@@ -330,7 +347,7 @@ async function handleClaim(ev: EnrichedEvent) {
     const paid = reward > 0
     ? postMoneyBillsOnce([{
       type: "achievement",
-      symbol: "NEX",
+      symbol: "UVT",
       amount: reward,
       status: "posted",
       memo: `Event reward · ${ev.id}`,
@@ -399,7 +416,7 @@ function pillLabelStyle(id: TabId): CSSProperties {
   const on = tab.value === id;
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -411,5 +428,7 @@ const emptyStyle: CSSProperties = {
 };
 
 import GlassSegments from "@/components/glass-segments.vue";
+import { uiLocale } from "@/i18n";
 const tabOptions = computed(() => TABS.map(value => ({ value, label: t.value.events.tabs[value] })));
+useAutoRecovery({ failed: () => remoteApiEnabled && remoteEventsError.value && !remoteEventsLoading.value, retry: loadRemoteEvents });
 </script>

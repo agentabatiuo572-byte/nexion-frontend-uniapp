@@ -17,6 +17,8 @@ export interface PageHeaderPayload {
   subtitle?: string;
   /** Logical/route href for the back button, mapped via navTo (P-046). */
   backHref: string;
+  /** A status page in a payment flow shows no back control; the page offers its own way on (user 2026-11-22). */
+  noBack?: boolean;
 }
 
 export const usePageHeader = defineStore("pageHeader", () => {

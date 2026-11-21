@@ -31,7 +31,7 @@ export interface GenesisEligibility {
   halted?: boolean;
   holderStatus: "READY" | "NOT_ELIGIBLE" | "CONFIG_UNAVAILABLE" | "NOT_EFFECTIVE";
   reservedAllocation: number | null;
-  reservedAllocationUnit: "NEX";
+  reservedAllocationUnit: "UVT";
   priorityRank: number | null;
   priorityTier: "TOP_1" | "TOP_3" | "TOP_5" | "STANDARD" | "NONE";
   qualificationReasonCodes: string[];
@@ -262,7 +262,7 @@ function parseEligibility(value: unknown, mode: ApiEnvironment): GenesisEligibil
       || asOf === null || serverTime === null || !provenance
       || text(provenance.source) === null
       || provenance.environment !== row.sourceEnvironment || provenance.runId !== row.runId
-      || row.reservedAllocationUnit !== "NEX"
+      || row.reservedAllocationUnit !== "UVT"
       || !Array.isArray(row.qualificationReasonCodes)
       || !row.qualificationReasonCodes.every((reason) => typeof reason === "string" && reason.trim())) return invalid();
   return {
@@ -278,7 +278,7 @@ function parseEligibility(value: unknown, mode: ApiEnvironment): GenesisEligibil
     halted: typeof row.halted === "boolean" ? row.halted : undefined,
     holderStatus: holderStatus as GenesisEligibility["holderStatus"],
     reservedAllocation,
-    reservedAllocationUnit: "NEX",
+    reservedAllocationUnit: "UVT",
     priorityRank,
     priorityTier: priorityTier as GenesisEligibility["priorityTier"],
     qualificationReasonCodes: row.qualificationReasonCodes.map((reason) => String(reason).trim()),
@@ -444,7 +444,7 @@ export function parseGenesisAccountState(
   const noSeries = row?.series === null && row.sale === null && row.eligibility === null;
   const series = noSeries ? null : parseSeries(row?.series);
   const sale = noSeries ? null : parseSale(row?.sale);
-  const walletBalanceUsdt = number(row?.walletBalanceUsdt);
+  const walletBalanceUsdt = number(row?.walletBalanceUsdt, -Infinity);
   const orders = row?.orders;
   if (!row || !validAuthority(row, mode) || (noSeries && row.marketEnabled !== false)
       || typeof row.marketEnabled !== "boolean"
@@ -472,6 +472,12 @@ export function parseGenesisAccountState(
 }
 
 export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod") {
+  const stateSummary = async () => parseGenesisPublicState(await client.request({
+    method: "GET", path: "/api/genesis/state", authenticated: false,
+  }), mode);
+  const accountSummary = async () => parseGenesisAccountState(await client.request({
+    method: "GET", path: "/api/genesis/account", authenticated: true,
+  }), mode);
   async function accountHistoryPage<T>(kind: "orders" | "emissions", parser: (v: unknown) => T, cursor?: string) {
     if (cursor !== undefined && !/^[1-9][0-9]{0,18}$/.test(cursor)) return invalid();
     const row = record(await client.request({ method: "GET", authenticated: true,
@@ -503,22 +509,21 @@ export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod
     });
   }
   return {
+    stateSummary,
+    accountSummary,
     transactionPage,
     orderPage: (cursor?: string) => accountHistoryPage("orders", parseTransaction, cursor),
     emissionPage: (cursor?: string) => accountHistoryPage("emissions", parseEmission, cursor),
-    state: async () => {
-      const state = parseGenesisPublicState(await client.request({
-      method: "GET", path: "/api/genesis/state", authenticated: false,
-      }), mode);
-      const [listings, transactions] = await Promise.all([history("listings", parseListing), transactionPage()]);
+    state: async (readSummary = stateSummary) => {
+      const [state, listings, transactions] = await Promise.all([
+        readSummary(), history("listings", parseListing), transactionPage(),
+      ]);
       return { ...state, listings, transactions: transactions.items, transactionsNextCursor: transactions.nextCursor };
     },
-    account: async () => {
-      const state = parseGenesisAccountState(await client.request({
-      method: "GET", path: "/api/genesis/account", authenticated: true,
-      }), mode);
-      const [orders, emissions] = await Promise.all([
-        accountHistoryPage("orders", parseTransaction), accountHistoryPage("emissions", parseEmission)]);
+    account: async (readSummary = accountSummary) => {
+      const [state, orders, emissions] = await Promise.all([
+        readSummary(), accountHistoryPage("orders", parseTransaction), accountHistoryPage("emissions", parseEmission),
+      ]);
       return { ...state, orders: orders.items, emissions: emissions.items,
         ordersNextCursor: orders.nextCursor, emissionsNextCursor: emissions.nextCursor };
     },

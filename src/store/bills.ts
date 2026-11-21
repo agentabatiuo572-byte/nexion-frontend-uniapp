@@ -13,7 +13,7 @@ import { createWalletLedgerPager, type LedgerLoadStatus, type WalletLedgerPager 
 // rows; totals always come from the independent server summary, never this page.
 export type BillType =
   | "earn" | "refer" | "bonus" | "topup" | "withdraw"
-  | "purchase" | "refund" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "other";
+  | "purchase" | "refund" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "clawback" | "other";
 export type BillStatus = "posted" | "pending" | "failed";
 
 export interface Bill {
@@ -21,7 +21,7 @@ export interface Bill {
   type: BillType;
   amount: number; // signed: +credit, -debit
   amountExact?: string; // signed exact server decimal, retained for display
-  symbol: "USDT" | "NEX";
+  symbol: "USDT" | "UVT";
   status: BillStatus;
   ts: number; // epoch ms
   /**
@@ -141,8 +141,8 @@ function seedBills(): Bill[] {
     });
   }
   list.push({ ts: now - 29 * DAY, type: "bonus", symbol: "USDT", amount: 5.0, status: "posted", memo: "Welcome bonus credited on activation", memoKey: "welcomeBonus" });
-  list.push({ ts: now - 29 * DAY + 60 * 1000, type: "bonus", symbol: "NEX", amount: 10, status: "posted", memo: "Achievement · First Contribution", memoKey: "achFirstContribution" });
-  list.push({ ts: now - 14 * DAY + 5 * 3600 * 1000, type: "achievement", symbol: "NEX", amount: 20, status: "posted", memo: "Achievement · First Dollar", memoKey: "achFirstDollar" });
+  list.push({ ts: now - 29 * DAY + 60 * 1000, type: "bonus", symbol: "UVT", amount: 10, status: "posted", memo: "Achievement · First Contribution", memoKey: "achFirstContribution" });
+  list.push({ ts: now - 14 * DAY + 5 * 3600 * 1000, type: "achievement", symbol: "UVT", amount: 20, status: "posted", memo: "Achievement · First Dollar", memoKey: "achFirstDollar" });
   list.push({ ts: now - 12 * DAY, type: "topup", symbol: "USDT", amount: 50.0, status: "posted", memo: "Top-up · USDT-TRC20", memoKey: "topupTrc20", ref: "TX-20260503-7621" });
   // 🔴 种子不造 withdraw 行:提现账单行与提现单据(app.withdrawals)必须同源成对 ——
   // 只造账单行的话,追踪页按单号深链必「查无此单」(每个新账号都命中),
@@ -192,7 +192,7 @@ export const useBills = defineStore("bills", () => {
     let pager = ledgers.get(key);
     if (!pager) {
       const stableFilters = { ...filters };
-      pager = createWalletLedgerPager((page, cursor) => walletBillsApi.list(page, 50, { ...stableFilters, cursor }), productionBill);
+      pager = createWalletLedgerPager((page, cursor) => walletBillsApi.list(page, 20, { ...stableFilters, cursor }), productionBill);
       ledgers.set(key, pager);
     }
     return pager;
@@ -313,6 +313,7 @@ export const useBills = defineStore("bills", () => {
     withdrawFeeOffsetRefund: "withdrawFeeOffsetRefund",
     purchase: "purchase",
     orderRefund: "orderRefund",
+    rewardClawback: "rewardClawback",
     swap: "swap",
     verification: "verification",
     stake: "stake",
@@ -322,7 +323,7 @@ export const useBills = defineStore("bills", () => {
   };
   const CATEGORY_MEMO_KEYS: Record<BillType, string> = {
     earn: "earn", refer: "refer", bonus: "bonus", topup: "topup", withdraw: "withdraw", purchase: "purchase", refund: "orderRefund",
-    swap: "swap", verification: "verification", stake: "stake", unstake: "unstake", achievement: "achievement", other: "other",
+    swap: "swap", verification: "verification", stake: "stake", unstake: "unstake", achievement: "achievement", clawback: "rewardClawback", other: "other",
   };
   function legacyPresentation(bizType: string, bizNo: string): LegacyPresentation | undefined {
     const value = bizType.trim().toUpperCase();

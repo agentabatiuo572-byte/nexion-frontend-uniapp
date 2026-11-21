@@ -1,0 +1,203 @@
+import { demoWalletUsdt, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+// Loopback-only demo state. No SMS, bank transfer or outbound request is made.
+// Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
+import { randomBytes } from 'node:crypto';
+import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, updateDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
+import { demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
+import { demoHasLongContent, demoLongBankStrongReview, longBankOrderNo } from './prototype-demo-long-content.mjs';
+
+const DAY = 86400000;
+const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
+const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
+const snapshot = value => structuredClone(value);
+const bankConfigUrl = new URL('http://127.0.0.1/api/withdrawals/bank/config');
+
+function bankConfig(state, now) {
+  const base = secondaryDemo(bankConfigUrl, state);
+  const beneficiary = state.bankDemo?.beneficiary ?? base.beneficiary;
+  return { ...base, beneficiary, unresolvedIntent: demoBankWithdrawalIntent(state, now) };
+}
+
+function canQuote({ beneficiary, policy, capacity }, amountUsdt) {
+  return beneficiary?.canWithdraw && Number.isFinite(amountUsdt)
+    && amountUsdt >= policy.minAmountUsd && amountUsdt <= policy.maxAmountUsd
+    && amountUsdt <= capacity.maxWithdrawableUsdt;
+}
+
+function saveQuote(demo, bank, amountUsdt, now, quoteNo = 'BQ-' + randomBytes(16).toString('hex')) {
+  const feeUsdt = Math.round(Math.max(1, Math.min(100, amountUsdt * .01)) * 1e6) / 1e6;
+  const netUsdt = Math.round((amountUsdt - feeUsdt) * 1e6) / 1e6;
+  const quote = { quoteNo, amountUsdt, feeUsdt, netUsdt,
+    rateVnd: 25000, amountVnd: Math.round(netUsdt * 25000), bankCode: bank.bankCode, bankName: bank.bankName,
+    bankRoutingVerified: true, maskedAccount: bank.maskedAccount, expiresAt: new Date(now + 300000).toISOString() };
+  return demo.quotes[quote.quoteNo] = { quote };
+}
+
+function reserveBankOrder(state, demo, row, beneficiaryNo, withdrawalNo, now) {
+  const reserve = { asset: 'USDT', direction: 'OUT', at: now, category: 'withdraw' };
+  postDemoWalletEntries(state,
+    { ...reserve, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', amount: row.quote.netUsdt },
+    { ...reserve, bizNo: withdrawalNo + ':USDT:BANK_FEE', bizType: 'WITHDRAW_BANK_FEE', amount: row.quote.feeUsdt });
+  row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo,
+    withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'REVIEW_PASSED' },
+    providerState: 'READY', bank: snapshot(row.quote) };
+  if (demoLongBankStrongReview(row.order)) {
+    row.order.withdrawal.status = 'REVIEW_PENDING';
+    row.order.withdrawal.reviewStatus = 'REVIEW_PENDING';
+  }
+  demo.orders[withdrawalNo] = row.order;
+  updateDemoBankWithdrawals(state, now);
+  return row.order;
+}
+
+export function seedLongBankOrder(state, now, quoteNo) {
+  if (!demoHasLongContent(state) || state.bankDemo?.orders?.[longBankOrderNo]) return;
+  const config = bankConfig(state, now), amountUsdt = 5000;
+  if (config.unresolvedIntent || !config.capacity.dailyRemainingCount || !canQuote(config, amountUsdt)) return;
+  const demo = state.bankDemo ??= { quotes: {}, orders: {}, commands: {} };
+  const row = saveQuote(demo, config.beneficiary, amountUsdt, now, quoteNo);
+  reserveBankOrder(state, demo, row, config.beneficiary.beneficiaryNo, longBankOrderNo, now);
+}
+
+// The local layout-audit snapshot could post a refund without ever reserving the funds.
+// Remove only this sample's old postings and let the current scenario reserve it again.
+export function removeUnreservedLongBankOrder(state) {
+  const demo = state.bankDemo, order = demo?.orders?.[longBankOrderNo];
+  if (!order) return;
+  const principal = longBankOrderNo + ':USDT:PRINCIPAL', fee = longBankOrderNo + ':USDT:BANK_FEE';
+  const movements = state.walletMovements ?? [];
+  const reserved = (bizNo, bizType, amount) => movements.some(row => row.bizNo === bizNo && row.bizType === bizType
+    && row.asset === 'USDT' && row.direction === 'OUT' && row.status === 'SUCCESS' && row.amount === amount);
+  if (reserved(principal, 'WITHDRAW_NET_PRINCIPAL', order.bank?.netUsdt)
+    && reserved(fee, 'WITHDRAW_BANK_FEE', order.bank?.feeUsdt)) return;
+  const refs = new Set([principal, fee, longBankOrderNo + ':PAYOUT:USDT:REFUND', 'D2-REFUND-' + longBankOrderNo]);
+  const money = value => Number(value.toFixed(6));
+  let removed = 0;
+  if (state.walletMovements) {
+    state.walletMovements = movements.filter(row => {
+      if (row.asset !== 'USDT') return true;
+      if (refs.has(row.bizNo)) {
+        removed += row.direction === 'IN' ? row.amount : -row.amount;
+        return false;
+      }
+      if (removed && Number.isFinite(row.balanceAfter)) {
+        row.balanceAfter = money(row.balanceAfter - removed);
+        if (row.balanceAfterExact != null) row.balanceAfterExact = row.balanceAfter.toFixed(6);
+      }
+      return true;
+    });
+  }
+  if (removed) state.walletBalance = money(demoWalletUsdt(state) - removed);
+  const quoteNo = order.bank?.quoteNo;
+  delete demo.orders[longBankOrderNo];
+  if (quoteNo) delete demo.quotes?.[quoteNo];
+  return quoteNo;
+}
+
+export function bankDemo(url, state, request) {
+  const path = url.pathname, method = request.method(), now = Date.now();
+  if (!path.startsWith('/api/withdrawals/bank/') && !path.startsWith('/api/payout-addresses')) return undefined;
+  const input = () => request.postDataJSON() || {};
+  const key = request.headers?.()['idempotency-key'] || request.headers?.()['Idempotency-Key'];
+  state.bankDemo ??= { quotes: {}, orders: {}, commands: {} };
+  const demo = state.bankDemo;
+  const command = (name, action) => {
+    if (!key) fail('IDEMPOTENCY_KEY_REQUIRED', 400);
+    const id = name + ':' + key, body = JSON.stringify(input());
+    if (demo.commands[id]) {
+      if (demo.commands[id].body !== body) fail('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
+      return snapshot(demo.commands[id].result);
+    }
+    const result = action();
+    demo.commands[id] = { body, result: snapshot(result) };
+    return result;
+  };
+  const challenge = type => {
+    if(state.authUser&&!state.authUser.phone)fail(type==='address'?'PAYOUT_ADDRESS_PHONE_INVALID':'USER_PHONE_REQUIRED',422);
+    const challengeNo = type === 'bank' ? 'PAYOUT-BANK-' + randomBytes(16).toString('hex') : 'PAYOUT-' + randomBytes(16).toString('hex').toUpperCase();
+    demo[type + 'Otp'] = { challengeNo, expiresAt: now + 300000 };
+    return { ...proof, challengeNo, expiresInSeconds: 300, retryAfterSeconds: 60 };
+  };
+  const validateOtp = type => {
+    const challenge = demo[type + 'Otp'];
+    if (!challenge || challenge.expiresAt <= now || input().challengeNo !== challenge.challengeNo || input().code !== '123456') fail(type === 'address' ? 'PAYOUT_ADDRESS_OTP_INVALID' : 'OTP_INVALID', type === 'address' ? 422 : 400);
+  };
+  const config = () => bankConfig(state, now);
+  const orderView = row => snapshot({ ...row, settlementEvidence: row.settlementEvidence ?? {
+    status: row.providerState === 'MANUAL_REVIEW' ? 'review_required' : 'unconfirmed',
+    evidenceRef: null, providerOrderId: null, providerStatus: null, checkedAt: null, amountUsdt: null,
+  } });
+  if (path === '/api/withdrawals/bank/config' && method === 'GET') return config();
+  if (path === '/api/withdrawals/bank/beneficiary/otp' && method === 'POST') return challenge('bank');
+  if (path === '/api/withdrawals/bank/beneficiary' && method === 'POST') return command('bind', () => {
+    const body = input();
+    if (config().beneficiary) validateOtp('bank');
+    if (!/^\d{6,32}$/.test(body.account) || !String(body.holder || '').trim() || body.bankCode !== '' || body.accountRoutingConfirmed !== true) fail('BANK_DETAILS_INVALID', 400);
+    demo.beneficiary = { bankCode: '', bankName: 'ACCOUNT_ROUTED', bankRoutingVerified: true, maskedAccount: '••••' + body.account.slice(-4), effectiveAt: new Date(now).toISOString(), nextChangeAt: new Date(now).toISOString(), beneficiaryNo: 'DEMO-BANK-2', canWithdraw: true };
+    delete demo.bankOtp;
+    return { beneficiary: snapshot(demo.beneficiary) };
+  });
+  if (path === '/api/withdrawals/bank/quotes' && method === 'POST') {
+    if (demoBankWithdrawalIntent(state, now)) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
+    const current = config(), amountUsdt = Number(input().amountUsdt);
+    if (!canQuote(current, amountUsdt)) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
+    return snapshot(saveQuote(demo, current.beneficiary, amountUsdt, now).quote);
+  }
+  const quoteMatch = path.match(/^\/api\/withdrawals\/bank\/quotes\/(BQ-[a-f0-9]{32})(\/abandon)?$/);
+  if (quoteMatch) {
+    const row = demo.quotes[quoteMatch[1]];
+    if (!row) fail('BANK_QUOTE_NOT_FOUND', 404);
+    if (row.order) return orderView(demo.orders[row.order.withdrawalNo]);
+    if (!row.abandoned && Date.parse(row.quote.expiresAt) <= now) return { state: 'EXPIRED' };
+    if (quoteMatch[2] && method === 'POST') row.abandoned = true;
+    if (row.abandoned) return { state: 'ABANDONED' };
+    return { state: 'NOT_SUBMITTED', quote: snapshot(row.quote) };
+  }
+  if (path === '/api/withdrawals/bank/orders' && method === 'POST') {
+    const quoteNo = input().quoteNo;
+    if (typeof quoteNo !== 'string' || !/^BQ-[a-f0-9]{32}$/.test(quoteNo)) fail('BANK_QUOTE_INVALID', 422);
+    const receipt = command('withdraw', () => {
+      const row = demo.quotes[quoteNo];
+      if (!row) fail('BANK_QUOTE_NOT_FOUND', 404);
+      if (row.order) return orderView(demo.orders[row.order.withdrawalNo]);
+      if (row.abandoned) fail('BANK_QUOTE_ABANDONED');
+      if (Date.parse(row.quote.expiresAt) <= now) fail('BANK_QUOTE_EXPIRED');
+      const intent = demoBankWithdrawalIntent(state, now);
+      if (intent?.state !== 'NOT_SUBMITTED' || intent.quoteNo !== quoteNo) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
+      // AppWithdrawalService.reserveBank: one daily count with USDT withdrawals, and the funds leave the wallet here.
+      const facts = demoWithdrawalFacts(state, now);
+      if (facts.dailyRemainingCount === 0) fail('WITHDRAWAL_DAILY_LIMIT_EXCEEDED');
+      if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
+      // Real form: WD- plus 32 upper-case hex (35 characters), so result layouts see the true length.
+      const withdrawalNo = 'WD-' + randomBytes(16).toString('hex').toUpperCase();
+      return orderView(reserveBankOrder(state, demo, row, config().beneficiary.beneficiaryNo, withdrawalNo, now));
+    });
+    return orderView(demo.orders[receipt.withdrawalNo]);
+  }
+  if (path.startsWith('/api/withdrawals/bank/orders/') && method === 'GET') {
+    const row = demo.orders[path.split('/').pop()];
+    if (!row) fail('BANK_ORDER_NOT_FOUND', 404);
+    return orderView(row);
+  }
+  if (path === '/api/payout-addresses/otp/send' && method === 'POST') return challenge('address');
+  if (path === '/api/payout-addresses' && method === 'PUT') return command('address', () => {
+    const body = input();
+    const network = String(body.network ?? '').trim().toUpperCase(), address = String(body.address ?? '').trim();
+    if (!['USDT-TRC20', 'USDT-BEP20', 'USDT-ERC20'].includes(network)) fail('PAYOUT_ADDRESS_NETWORK_INVALID', 422);
+    const addressValid = network === 'USDT-TRC20' ? /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address) : /^0x[0-9a-fA-F]{40}$/.test(address);
+    if (!addressValid) fail('PAYOUT_ADDRESS_FORMAT_INVALID', 422);
+    if (!demoWithdrawalNetworks(state).includes(network)) fail('WITHDRAWAL_NETWORK_DISABLED');
+    validateOtp('address');
+    // verifyAndConsume commits in REQUIRES_NEW: later in-flight/cooldown refusals still burn this code.
+    delete demo.addressOtp;
+    // Keep the backend's exact terminal set: REFUNDED is settled; REVIEW_REJECTED alone still blocks changes.
+    const terminal = ['COMPLETED', 'CONFIRMED', 'SUCCESS', 'REFUNDED', 'REJECTED', 'CANCELLED', 'FAILED'];
+    if (demoWithdrawals(state, now).some(row => !terminal.includes(row.status.toUpperCase()))) fail('PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL');
+    const current = demoPayoutAddresses(state, now).find(row => row.network === network);
+    if (current && Date.parse(current.nextChangeAllowedAt) > now) fail('PAYOUT_ADDRESS_CHANGE_COOLDOWN');
+    if (current && (network === 'USDT-TRC20' ? address === current.address : address.toLowerCase() === current.address.toLowerCase())) return snapshot(current);
+    demo.addresses ??= {};
+    demo.addresses[network] = { ...proof, network, address, status: 'ACTIVE', effectiveAt: new Date(now + DAY).toISOString(), createdAt: current?.createdAt ?? new Date(now).toISOString(), nextChangeAllowedAt: new Date(now + 7 * DAY).toISOString(), changePending: true };
+    return snapshot(demo.addresses[network]);
+  });
+}

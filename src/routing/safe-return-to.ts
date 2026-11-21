@@ -10,6 +10,8 @@
  * server-side allowlist of return destinations per user role.
  */
 
+import { isLiteNativeRoute } from "@/lib/lite-scope";
+
 export function safeReturnTo(raw: string | null | undefined, fallback: string): string {
   if (!raw) return fallback;
   // Uni H5 may retain one additional query-encoding layer. Decode only the
@@ -31,5 +33,6 @@ export function safeReturnTo(raw: string | null | undefined, fallback: string): 
   if (/^[a-z]+:/i.test(raw)) return fallback;
   // Must be a relative path starting with `/`
   if (!raw.startsWith("/")) return fallback;
-  return raw;
+  // A page Lite removed can never be reached, so its return address goes home instead of leaving the user in place.
+  return isLiteNativeRoute(raw) ? "/pages/index/index" : raw;
 }

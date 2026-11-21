@@ -6,31 +6,30 @@
 -->
 <template>
   <view ref="cardRef" class="nx-glass-card relative overflow-hidden" :style="rootStyle">
-    <!-- aurora drift bg -->
-    <view aria-hidden :style="auroraStyle" />
+    <!-- aurora drift bg (paused off screen or while the page is hidden) -->
+    <view ref="auroraRef" aria-hidden class="locked-card__aurora" :class="{ 'is-paused': !auroraLoop.running.value }" />
     <!-- 24px grid overlay -->
-    <view aria-hidden :style="gridStyle" />
+    <view aria-hidden class="locked-card__grid" />
 
     <view class="relative" style="padding: 16px">
       <!-- Top row — Lock badge + identity + ETA chip -->
       <view class="flex items-start" style="gap: 12px">
         <view class="shrink-0 grid place-items-center relative" :style="lockBoxStyle">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-          <view aria-hidden :style="lockDotStyle" />
+          <view aria-hidden class="locked-card__dot" :class="{ 'is-paused': !auroraLoop.running.value }" :style="lockDotStyle" />
         </view>
         <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" :aria-expanded="detailsOpen" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
-              <text class="font-mono-tabular tabular-nums" :style="stageChipStyle">{{ t.store.comingSoonHeading }}</text>
               <view class="grid place-items-center" :style="toggleStyle">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
               </view>
             </view>
           </view>
-          <text class="block mt-1" :style="titleStyle">{{ nexGridBrandText(product.name) }}</text>
+          <text class="block mt-1" :style="titleStyle">{{ (product.name) }}</text>
           <view v-if="detailsOpen">
-            <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
+            <text class="block mt-1 line-clamp-2" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
             <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
               <text style="color: var(--v5-ink-2)">{{ gpuText }}</text>
               <text style="color: var(--v5-ink-4)">·</text>
@@ -62,9 +61,9 @@ import { productNotificationApi, remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { productCopy, specText } from "@/lib/product-copy";
-import { nexGridBrandText } from "@/lib/brand-copy";
 
 const props = defineProps<{ product: Product }>();
 const app = useApp();
@@ -72,7 +71,7 @@ const t = useT();
 const locale = useLocaleStore();
 const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
 const gpuText = computed(() => specText(t.value, props.product.gpu, "-"));
-const vramText = computed(() => specText(t.value, props.product.vram, "-"));
+const vramText = computed(() => specText(t.value, props.product.vram, "-", "vram"));
 
 const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: number }> = {
   P3: { current: 1, total: 3, pct: 33 },
@@ -99,7 +98,9 @@ const queue = computed(() =>
 );
 const queueText = computed(() => (queue.value ?? 0).toLocaleString());
 
-const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
+const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false, nativeSelector: ".nx-glass-card" });
+const auroraLoop = useLoopsInView(".locked-card__aurora");
+const auroraRef = auroraLoop.elRef;
 
 function requestIsCurrent(scope: ReturnType<typeof captureAccountScope>, epoch: number, accountKey: string, runScope: RuntimeRevisionScope, productNo: string): boolean {
   return notificationMounted
@@ -159,7 +160,7 @@ async function handleNotify() {
     if (!requestIsCurrent(scope, epoch, accountKey, runScope, productNo)) return;
     if (result.serverCanonical && result.productNo === productNo && result.subscribed === nextSubscribed) {
       serverSubscribed.value = nextSubscribed;
-      if (nextSubscribed) toast.success(fmt(t.value.store.notifyToast, { name: nexGridBrandText(props.product.name) }));
+      if (nextSubscribed) toast.success(fmt(t.value.store.notifyToast, { name: (props.product.name) }));
     } else {
       toast.error(t.value.authOtp.errorServiceUnavailable);
     }
@@ -205,29 +206,6 @@ const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   borderRadius: "var(--nx-glass-radius)",
 };
 
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 85% 15%, var(--v5-brand-2-soft) 0%, transparent 60%)," +
-    "radial-gradient(35% 45% at 15% 85%, var(--v5-tech-cyan-soft) 0%, transparent 60%)",
-  filter: "blur(10px)",
-  pointerEvents: "none",
-  opacity: 0.7,
-  animation: "v5-aurora-drift 14s ease-in-out infinite",
-};
-
-const gridStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  backgroundImage:
-    // 网格线跟随 ink:写死的深色网格在暗主题下落在近黑卡面上 = 纹理消失(卡底是 var(--v5-surface),跟主题)
-    "linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px)," +
-    "linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px)",
-  backgroundSize: "24px 24px",
-  pointerEvents: "none",
-};
-
 const lockBoxStyle: CSSProperties = {
   width: "44px",
   height: "44px",
@@ -245,7 +223,6 @@ const lockDotStyle: CSSProperties = {
   borderRadius: "50%",
   background: "var(--v5-tech-cyan)",
   border: "2px solid var(--v5-surface)",
-  animation: "v5-hb-pulse 2.4s ease-in-out infinite",
 };
 
 const stageChipStyle: CSSProperties = {
@@ -301,3 +278,27 @@ const notifyBtnStyle: CSSProperties = {
 
 
 </script>
+<style scoped>
+.locked-card__aurora {
+  position: absolute; inset: -20%; pointer-events: none; opacity: .7; filter: blur(10px);
+  background:
+    radial-gradient(40% 50% at 85% 15%, var(--v5-brand-2-soft) 0%, transparent 60%),
+    radial-gradient(35% 45% at 15% 85%, var(--v5-tech-cyan-soft) 0%, transparent 60%);
+  animation: v5-aurora-drift 14s ease-in-out infinite;
+}
+.locked-card__aurora.is-paused, .nx-chassis[data-scrolling="true"] .locked-card__aurora { animation-play-state: paused; }
+/* Lock-dot heartbeat: a pre-drawn halo animated by transform/opacity only retraces the former 0→8px box-shadow
+   pulse (50% → 0 cyan by 70%); a copy of the dot drawn above it keeps the halo outside the dot, as a shadow was. */
+.locked-card__dot::before { content: ""; position: absolute; inset: -10px; border-radius: 50%; background: rgb(12, 196, 214); opacity: 0; transform: scale(.3333); animation: locked-card-dot-pulse 2.4s ease-in-out infinite; }
+.locked-card__dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--v5-tech-cyan); border: 2px solid var(--v5-surface); }
+.locked-card__dot.is-paused::before, .nx-chassis[data-scrolling="true"] .locked-card__dot::before { animation-play-state: paused; }
+@keyframes locked-card-dot-pulse { 0% { opacity: .5; transform: scale(.3333); } 70%, 100% { opacity: 0; transform: none; } }
+/* Grid lines follow ink so the texture shows on the themed card surface in both themes. */
+.locked-card__grid {
+  position: absolute; inset: 0; pointer-events: none; background-size: 24px 24px;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px);
+}
+@media (prefers-reduced-motion: reduce) { .locked-card__aurora, .locked-card__dot::before { animation: none; } }
+</style>

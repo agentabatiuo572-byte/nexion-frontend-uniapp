@@ -1,67 +1,78 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { DEFAULT_LOCALE, LOCALES, type LocaleCode } from "@/i18n";
+import { useConfig } from "@/store/config";
 
-// Ported from Nexion-prototype/lib/store/locale.ts (zustand → Pinia).
-// Persistence uses uni.* storage so it works on both H5 (localStorage) and App.
 const STORAGE_KEY = "nexgrid-locale-v1";
 
-interface Persisted {
-  code: LocaleCode;
-  userSet: boolean;
-}
-
-function hydrate(): Persisted & { restored: boolean } {
+function restoreExplicitChoice(): LocaleCode | null {
   try {
-    const saved = uni.getStorageSync(STORAGE_KEY) as Persisted | "";
-    if (saved && saved.userSet && saved.code && LOCALES.some((locale) => locale.code === saved.code)) {
-      return { code: saved.code, userSet: !!saved.userSet, restored: true };
-    }
+    const saved: unknown = uni.getStorageSync(STORAGE_KEY);
+    if (!saved || typeof saved !== "object") return null;
+    const row = saved as Record<string, unknown>;
+    // Legacy automatic/server values are not deliberate device preferences.
+    const choice = "explicitChoice" in row ? row.explicitChoice : row.userSet === true ? row.code : null;
+    return LOCALES.find((locale) => locale.code === choice)?.code ?? null;
   } catch {
-    // ignore — first run
+    return null;
   }
-  return { code: DEFAULT_LOCALE, userSet: false, restored: false };
 }
 
 export const useLocaleStore = defineStore("locale", () => {
-  const init = hydrate();
-  const code = ref<LocaleCode>(init.code);
-  const userSet = ref<boolean>(init.userSet);
-  let localeResolved = init.restored;
-  // This changes only for a deliberate picker/onboarding selection. Server
-  // hydration and device detection must never be mistaken for an account
-  // preference that should be written back.
+  const platformConfig = useConfig();
+  const explicitChoice = ref<LocaleCode | null>(restoreExplicitChoice());
+  const accountLanguage = ref<LocaleCode | null>(null);
+  const accountKey = ref("default");
+  const systemLanguages = ref<LocaleCode[]>([]);
+  const userSet = computed(() => explicitChoice.value !== null);
+  // Automatic resolution never increments this or persists the effective language.
   const explicitRevision = ref(0);
-
-  function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { code: code.value, userSet: userSet.value });
-    } catch {
-      // ignore — storage unavailable
+  const code = computed<LocaleCode>(() => {
+    for (const candidate of [explicitChoice.value, accountLanguage.value, ...systemLanguages.value]) {
+      if (candidate && platformConfig.offeredLocales.some((entry) => entry.code === candidate)) return candidate;
     }
-  }
+    return DEFAULT_LOCALE;
+  });
 
   function setLocale(next: LocaleCode) {
-    code.value = LOCALES.some((locale) => locale.code === next) ? next : DEFAULT_LOCALE;
-    userSet.value = true;
+    if (!platformConfig.offeredLocales.some((entry) => entry.code === next)) return;
+    explicitChoice.value = next;
+    try {
+      uni.setStorageSync(STORAGE_KEY, { explicitChoice: next });
+    } catch {
+      // The deliberate selection remains usable for this process without storage.
+    }
     explicitRevision.value += 1;
-    persist();
   }
 
-  function applyServerLocale(next: LocaleCode) {
-    localeResolved = true;
-    code.value = LOCALES.some((locale) => locale.code === next) ? next : DEFAULT_LOCALE;
-    persist();
+  function setAccountScope(next: string) {
+    if (accountKey.value === next) return;
+    accountKey.value = next;
+    accountLanguage.value = null;
   }
 
-  // Keep the first screen in Chinese unless an explicit or account preference exists.
-  // The legacy method name is retained for existing startup callers.
+  function applyAccountLocale(next: LocaleCode, owner: string) {
+    if (owner === accountKey.value) accountLanguage.value = next;
+  }
+
   function ensureSystemDetected() {
-    if (userSet.value || localeResolved) return;
-    localeResolved = true;
-    persist();
+    const languages = typeof navigator === "undefined" ? [] : [...navigator.languages, navigator.language];
+    const detected: LocaleCode[] = [];
+    for (const language of languages) {
+      const base = language.trim().toLowerCase().split(/[-_]/)[0];
+      const normalized = base === "in" ? "id" : base === "tl" ? "fil" : base;
+      const candidate = LOCALES.find((locale) => locale.code === normalized)?.code;
+      if (candidate) detected.push(candidate);
+    }
+    systemLanguages.value = detected;
   }
 
   ensureSystemDetected();
-  return { code, userSet, explicitRevision, setLocale, applyServerLocale, ensureSystemDetected };
+  // #ifdef H5
+  const root = typeof document === "undefined" ? undefined : document.documentElement;
+  if (root) watch(code, (value) => { root.lang = value; }, { immediate: true, flush: "sync" });
+  if (typeof window !== "undefined") window.addEventListener("languagechange", ensureSystemDetected);
+  // #endif
+  return { code, explicitChoice, accountLanguage, systemLanguages, userSet, explicitRevision,
+    setLocale, setAccountScope, applyAccountLocale, ensureSystemDetected };
 });

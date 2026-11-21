@@ -1,211 +1,155 @@
-<!--
-  Agent — ported from Nexion-prototype/app/(main)/team/agent/page.tsx.
-  Regional Ambassador dashboard (V5+ gated), de-carded: floor hero →
-  eligibility tint banner (eligible / locked + path CTA) → 4 reimbursable
-  buckets (transparent hairline rows) → application form on the floor
-  (recessed fields, gated submit) → approved-case rows. Sub-page →
-  <AppChassis active="team"> with in-page back row. Reuses v-rank store +
-  v-badge. lucide → inline SVG; <input>→uni input; toast via store/ui.
--->
 <template>
   <AppChassis active="team">
-    <view class="pb-6" style="color: var(--v5-ink)">
+    <view class="agent-page nx-viz-motion">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamAgent" />
 
-      <view v-if="remoteApiEnabled && pageReadState !== 'ready'" class="px-4 text-center" style="padding-top: 32px" role="status" aria-live="polite" :aria-busy="pageReadState === 'loading'">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-2)">{{ pageReadState === 'loading' ? t.agent.loading : t.agent.loadError }}</text>
-        <view v-if="pageReadState === 'error'" role="button" tabindex="0" style="padding: 14px; color: var(--v5-brand)" @click="retryAgentPage" @keydown.enter.prevent="retryAgentPage" @keydown.space.prevent="retryAgentPage"><text>{{ t.agent.retry }}</text></view>
-      </view>
-      <view v-else class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
-        <!-- hero — de-carded: sits on the page floor (radial glow deleted outright) -->
-        <view :style="heroStyle">
-          <view class="flex items-center" style="gap: 10px">
-            <view class="rounded-xl grid place-items-center" :style="heroIconStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg>
-            </view>
-            <view class="flex-1">
-              <text class="block font-mono-tabular" :style="heroCapStyle">{{ t.agent.heroLabel }}</text>
-              <text class="block font-display" :style="heroHeadlineStyle">{{ t.agent.heroHeadline }}</text>
-            </view>
+      <EmptyState v-if="pageReadState === 'error' && !policy" kind="recoverable-error" page :title="t.agent.loadError" :cta-label="t.ui.reload" @cta="retryAgentPage" />
+      <view v-else-if="pageReadState === 'loading' && !policy" class="agent-loading" role="status" aria-busy="true"><text>{{ t.agent.loading }}</text></view>
+      <CardStagger v-if="policy" class="agent-content">
+        <!-- The page focus: headline, the V1→V5 track and eligibility share one soft-glass card. -->
+        <view class="agent-hero nx-soft-glass">
+          <view>
+            <text class="agent-headline">{{ t.agent.heroHeadline }}</text>
+            <text class="agent-intro">{{ fmt(t.agent.heroBody, { rank: requiredRankLabel }) }}</text>
           </view>
-          <text class="block" :style="heroBodyStyle">{{ fmt(t.agent.heroBody, { rank: requiredRankLabel }) }}</text>
-        </view>
-
-        <!-- eligibility -->
-        <view v-if="unlocked" class="rounded-2xl" :style="eligibleStyle">
-          <view class="flex items-center" style="gap: 12px">
-            <view class="rounded-xl grid place-items-center" :style="eligibleIconStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-            </view>
-            <view class="flex-1">
-              <view class="flex items-center" style="gap: 6px">
-                <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.eligible }}</text>
-                <VBadge :v="myRank" size="sm" :show-title="false" />
+          <view v-if="displayRank !== null && !visibility.hidden" ref="agentTrackRef" class="agent-track" role="img" :aria-label="`${t.rank.currentRank}: V${displayRank}`">
+            <template v-for="n in AGENT_TRACK" :key="n">
+              <view v-if="n > 1" class="agent-track__line"><view :style="{ width: agentTrackInView === false ? '0%' : n <= trackRank ? '100%' : '0%', transition: agentTrackInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: agentTrackInView === false ? '0ms' : vizStagger(n - 2, 120) }" /></view>
+              <view class="agent-track__stop" :class="{ 'agent-track__stop--current': n === trackRank, 'agent-track__stop--goal': n === AGENT_TRACK }">
+                <view class="agent-track__node" :class="{ 'agent-track__node--done': n <= trackRank, 'agent-track__node--current': n === trackRank, 'agent-track__node--goal': n === AGENT_TRACK }"><text>V{{ n }}</text></view>
+                <text class="agent-track__label">{{ n === trackRank ? trackCurrentLabel : n === AGENT_TRACK ? t.agent.applicationOpens : '' }}</text>
               </view>
-              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.agent.budgetReviewHint }}</text>
-            </view>
+            </template>
           </view>
-        </view>
-        <view v-else class="rounded-2xl" :style="lockedStyle">
-          <view class="flex items-center" style="gap: 12px">
-            <view class="rounded-xl grid place-items-center" :style="lockedIconStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            </view>
-            <view class="flex-1">
-              <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ fmt(t.agent.lockedReq, { rank: requiredRankLabel }) }}</text>
-              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ lockedSubText }}</text>
-            </view>
-            <view class="shrink-0 rounded-full flex items-center active:scale-95" :style="pathCtaStyle" role="button" tabindex="0" @click="go('/pages/team/rank')">
-              <text>{{ t.agent.pathCta }}</text>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+          <view class="agent-eligibility">
+            <svg v-if="unlocked" class="agent-eligibility__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="m8 12 3 3 5-6" /></svg>
+            <text class="agent-eligibility__text">{{ unlocked ? t.agent.eligible : rankReady ? fmt(t.agent.levelsRemaining, { n: visibility.mask(levelsRemaining) }) : t.profile.rankUnavailable }}</text>
+            <view v-if="!unlocked" class="agent-path" role="button" tabindex="0" :aria-label="t.agent.pathCta" @click="go('/pages/team/rank')" @keydown.enter.prevent="go('/pages/team/rank')" @keydown.space.prevent="go('/pages/team/rank')">
+              <view class="agent-opening-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ fmt(t.agent.openFrom, { rank: requiredRankLabel }) }}</text></view>
             </view>
           </view>
         </view>
 
-        <!-- buckets — transparent hairline rows -->
-        <view :style="bucketsGroupStyle">
-          <!-- 反馈用 scale 不用 opacity:bucketRowStyle 在 inline style 里写了 opacity(锁定态 0.7),
-               inline 优先级压过 class 生成的 .active\:opacity-70:active,写 opacity 反馈两种状态下都失效。 -->
-          <view
-            v-for="(b, i) in BUCKETS"
-            :key="b.id"
-            class="flex items-start active:scale-[0.98] transition-transform"
-            :style="bucketRowStyle(i === BUCKETS.length - 1)"
-            role="button"
-            tabindex="0"
-            :aria-label="b.title"
-            @click.capture="selectBucket(b)"
-          >
-            <view class="rounded-xl grid place-items-center shrink-0" :style="bucketIconStyle(b.tint)">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="b.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in b.paths" :key="pi" :d="p" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <view class="flex items-center justify-between">
-                <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ b.title }}</text>
-                <text class="font-display tabular-nums" :style="{ fontSize: '13px', fontWeight: 600, color: b.tint }">{{ b.range }}</text>
-              </view>
-              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px', lineHeight: 1.375 }">{{ b.rule }}</text> <!-- SKILL: leading-snug=1.375 (was 1.4) -->
-            </view>
+        <view v-if="pendingApplication" class="agent-section">
+          <view class="agent-section__head">
+            <text class="agent-section__title">{{ c.currentApplication }}</text>
+            <view class="agent-link" role="link" tabindex="0" @click="go(AMBASSADOR_ROUTES.records)" @keydown.enter.prevent="go(AMBASSADOR_ROUTES.records)"><text>{{ c.allRecords }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
           </view>
+          <AmbassadorApplicationCard :application="pendingApplication" />
         </view>
-        <text v-if="selectedBucketTitle" class="block text-center" :style="selectedBucketStyle">{{ selectedBucketTitle }} · {{ t.agent.newApplication }}</text>
-
-        <!-- application form — transparent block, recessed fields -->
-        <view :style="formBlockStyle">
-          <text class="block font-mono-tabular" :style="formCapStyle">{{ t.agent.newApplication }}</text>
-          <view style="display: flex; flex-direction: column; gap: 8px">
-            <view :style="fieldStyle">
-              <view class="flex items-center" style="gap: 6px; margin-bottom: 4px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                <text class="font-mono-tabular" :style="fieldLabelStyle">{{ t.agent.fieldEventDate }}</text>
-              </view>
-              <input
-                v-model="date"
-                :aria-label="t.agent.fieldEventDate"
-                type="text"
-                :disabled="!unlocked"
-                placeholder="YYYY-MM-DD"
-                :style="inputStyle"
-                placeholder-style="color: var(--v5-ink-2)"
-              />
-            </view>
-            <view :style="fieldStyle">
-              <view class="flex items-center" style="gap: 6px; margin-bottom: 4px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
-                <text class="font-mono-tabular" :style="fieldLabelStyle">{{ t.agent.fieldCity }}</text>
-              </view>
-              <input
-                v-model="city"
-                :aria-label="t.agent.fieldCity"
-                type="text"
-                :disabled="!unlocked"
-                :placeholder="t.agent.cityPlaceholder"
-                :style="inputStyle"
-                placeholder-style="color: var(--v5-ink-2)"
-              />
-            </view>
-            <view :style="fieldStyle">
-              <view class="flex items-center" style="gap: 6px; margin-bottom: 4px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg>
-                <text class="font-mono-tabular" :style="fieldLabelStyle">{{ t.agent.fieldBudget }}</text>
-              </view>
-              <view class="flex items-center">
-                <text class="font-display" :style="{ fontSize: '13px', color: 'var(--v5-ink-3)', marginRight: '4px' }">$</text>
-                <input
-                  v-model="budgetText"
-                  :aria-label="t.agent.fieldBudget"
-                  type="text"
-                  inputmode="decimal"
-                  :disabled="!unlocked"
-                  :style="budgetInputStyle"
-                />
-              </view>
-            </view>
+        <view v-else-if="latestRecord" class="agent-section">
+          <view class="agent-section__head">
+            <text class="agent-section__title">{{ c.myApplications }}</text>
+            <view class="agent-link" role="link" tabindex="0" @click="go(AMBASSADOR_ROUTES.records)" @keydown.enter.prevent="go(AMBASSADOR_ROUTES.records)"><text>{{ c.allRecords }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
           </view>
-
-          <view class="rounded-full flex items-center justify-center active:scale-[0.98]" :style="submitStyle" role="button" tabindex="0" :aria-disabled="unlocked ? 'false' : 'true'" @click="submit">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="unlocked ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
-            <text>{{ unlocked ? t.agent.submitForReview : t.agent.lockedV5 }}</text>
-          </view>
-
-          <text v-if="!unlocked" class="block text-center" :style="previewOnlyStyle">{{ fmt(t.agent.previewOnly, { rank: requiredRankLabel }) }}</text>
+          <view class="agent-latest"><AmbassadorApplicationRow :application="latestRecord" /></view>
         </view>
 
-        <!-- approved cases — transparent hairline rows -->
-        <view v-if="remoteApiEnabled && applications.length > 0" :style="casesBlockStyle">
-          <text class="block font-mono-tabular" :style="approvedCapStyle">{{ t.agent.serverApplication }}</text>
-          <view :style="casesGroupStyle">
-            <view v-for="(application, index) in applications" :key="application.applicationId ?? index" :style="caseRowStyle(index === applications.length - 1)">
-              <view class="flex items-start justify-between">
-                <view>
-                  <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ application.city }} · {{ application.eventDate }}</text>
-                </view>
-                <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ applicationStatusText(application) }}</text>
-              </view>
+        <view class="agent-section">
+          <view class="agent-section__head">
+            <text class="agent-section__title">{{ t.agent.supportTypes }}</text>
+            <text v-if="formOffered" class="agent-section__sub">{{ c.chooseOne }}</text>
+          </view>
+          <view v-if="formOffered" class="agent-tiles" role="radiogroup" :aria-label="t.agent.supportTypes" @keydown.right.prevent="moveBucketFocus($event, 1)" @keydown.down.prevent="moveBucketFocus($event, 1)" @keydown.left.prevent="moveBucketFocus($event, -1)" @keydown.up.prevent="moveBucketFocus($event, -1)">
+            <view v-for="(b, i) in BUCKETS" :key="b.id" class="agent-tile" :class="{ 'agent-tile--selected': selectedBucketId === b.id }" :style="{ '--tint-ink': b.ink }"
+              role="radio" :tabindex="bucketTabStop(b.id, i) ? 0 : -1" :aria-checked="selectedBucketId === b.id" :aria-label="b.title" :aria-disabled="selectionLocked"
+              @click="selectBucket(b)" @keydown.enter.prevent="selectBucket(b)" @keydown.space.prevent="selectBucket(b)">
+              <AmbassadorBucketIcon :bucket="b.id" />
+              <svg v-if="selectedBucketId === b.id" class="agent-tile__check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+              <view><text class="agent-tile__title">{{ b.title }}</text><text class="agent-tile__rule">{{ b.rule }}</text><text class="agent-tile__range">{{ b.range }}</text></view>
             </view>
           </view>
+          <view v-else class="agent-tiles">
+            <view v-for="b in BUCKETS" :key="b.id" class="agent-tile" :style="{ '--tint-ink': b.ink }">
+              <AmbassadorBucketIcon :bucket="b.id" />
+              <view><text class="agent-tile__title">{{ b.title }}</text><text class="agent-tile__rule">{{ b.rule }}</text><text class="agent-tile__range">{{ b.range }}</text></view>
+            </view>
+          </view>
+          <view v-if="pendingApplication" class="agent-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg><text>{{ c.pendingHint }}</text></view>
         </view>
 
-        <view v-if="!remoteApiEnabled" :style="casesBlockStyle">
-          <text class="block font-mono-tabular" :style="approvedCapStyle">{{ t.agent.recentlyApproved }}</text>
-          <view :style="casesGroupStyle">
-            <view v-for="(c, i) in APPROVED_CASES" :key="i" :style="caseRowStyle(i === APPROVED_CASES.length - 1)">
-              <view class="flex items-start justify-between">
-                <view>
-                  <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ c.name }}</text>
-                  <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ hostedByText(c) }}</text>
-                </view>
-                <text class="font-display tabular-nums" :style="{ fontSize: '15px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ formatAmount(c.amount) }}</text>
+        <view v-if="formOffered && !unlocked" class="agent-preview nx-frosted-button" role="button" tabindex="0" aria-controls="agent-application-form" :aria-expanded="previewForm" @click="togglePreview" @keydown.enter.prevent="togglePreview" @keydown.space.prevent="togglePreview"><text>{{ previewForm ? t.agent.closePreview : t.agent.previewForm }}</text></view>
+        <!-- Collapsing the preview leaves the account-owned draft intact. -->
+        <view v-if="formOffered" v-show="unlocked || previewForm" id="agent-application-form" class="agent-section">
+          <view class="agent-section__head">
+            <text class="agent-section__title">{{ t.agent.newApplication }}</text>
+            <text v-if="selectedBucketTitle" class="agent-section__sub">{{ selectedBucketTitle }}</text>
+          </view>
+          <view class="agent-form">
+            <view class="agent-field">
+              <view class="agent-field__label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg><text>{{ t.agent.fieldEventDate }}</text></view>
+              <picker class="agent-date-picker" mode="date" :value="date" role="button" :tabindex="formReady && !submitting ? 0 : -1" :aria-label="t.agent.fieldEventDate" :aria-disabled="!formReady || submitting" :disabled="!formReady || submitting" @change="date = $event.detail.value">
+                <view class="agent-control"><text class="agent-control__value" :class="{ 'agent-control__placeholder': !date }">{{ date || t.agent.chooseEventDate }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></view>
+              </picker>
+            </view>
+            <view class="agent-field">
+              <view class="agent-field__label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg><text>{{ t.agent.fieldCity }}</text></view>
+              <view class="agent-control"><input v-model="city" class="agent-control__value agent-control__input" :aria-label="t.agent.fieldCity" type="text" :disabled="!formReady || submitting" :placeholder="t.agent.cityPlaceholder" placeholder-class="agent-control__placeholder" /></view>
+            </view>
+            <view class="agent-field">
+              <view class="agent-field__label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg><text>{{ c.budgetLabel }}</text></view>
+              <view class="agent-control">
+                <text class="agent-control__prefix">USDT</text>
+                <text v-if="visibility.hidden" class="agent-control__value" :aria-label="c.budgetLabel">{{ visibility.mask(budgetText) }}</text>
+                <input v-else v-model="budgetText" class="agent-control__value agent-control__input" :aria-label="c.budgetLabel" type="text" inputmode="decimal" :disabled="!formReady || submitting" />
               </view>
+              <text v-if="selectedBucket" class="agent-field__help">{{ fmt(c.bucketRange, { bucket: selectedBucket.title, range: selectedBucket.range }) }}</text>
             </view>
           </view>
+          <view v-if="draft.touched" class="agent-discard"><NxButton variant="text" :label="logicCopy.discardDraft" :disabled="submitting || pageReadState !== 'ready'" @click="discardDraft" /></view>
+          <view class="agent-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg><text>{{ c.applyHint }}</text></view>
         </view>
-      </view>
+        <view class="agent-bar-space" />
+      </CardStagger>
     </view>
+    <template #pageFixed>
+      <AmbassadorActionBar v-if="policy && pendingApplication">
+        <NxButton variant="primary" icon="arrow-right" @click="go(AMBASSADOR_ROUTES.detail(pendingApplication.applicationId ?? 0))"><text>{{ pendingAction }}</text></NxButton>
+      </AmbassadorActionBar>
+      <AmbassadorActionBar v-else-if="policy && formOffered && (unlocked || previewForm)">
+        <text v-if="!unlocked" class="amb-bar__why nx-tray-note">{{ rankReady ? fmt(t.agent.previewOnly, { rank: requiredRankLabel }) : t.profile.rankUnavailable }}</text>
+        <NxButton variant="primary" :label="t.agent.submitForReview" :disabled="!formReady" :busy="submitting" @click="submit" />
+      </AmbassadorActionBar>
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useDataVisibility } from "@/store/data-visibility";
+import { teamLogicCopy } from "@/i18n/team-logic-copy";
+import { ambassadorDraftCache, clearAmbassadorDraft, beginAmbassadorDraftSubmit, endAmbassadorDraftSubmit, type AmbassadorDraftForm } from "@/lib/ambassador-draft-session";
 import { navTo } from "@/lib/route";
-import { ref, computed, watch, type CSSProperties } from "vue";
+import { ref, shallowRef, computed, watch } from "vue";
 import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import VBadge from "@/components/team/v-badge.vue";
+import CardStagger from "@/components/card-stagger.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import AmbassadorActionBar from "@/components/team/ambassador-action-bar.vue";
+import AmbassadorApplicationCard from "@/components/team/ambassador-application-card.vue";
+import AmbassadorApplicationRow from "@/components/team/ambassador-application-row.vue";
+import AmbassadorBucketIcon from "@/components/team/ambassador-bucket-icon.vue";
 import { useVRank } from "@/store/v-rank";
-import { rankTitle, rankLabel } from "@/lib/v-rank-copy";
+import { rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
+import { ambassadorCopy } from "@/i18n/ambassador";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
+import { useAuth } from '@/store/auth';
 import { useApp } from "@/store/app";
-import { ambassadorApplicationApi, remoteApiEnabled } from "@/api/runtime";
-import type { AmbassadorApplication, AmbassadorApplicationInput, AmbassadorPolicy,
-  AmbassadorPolicyBucket } from "@/api/ambassador-application-api";
+import { ambassadorApplicationApi, apiRuntimeConfig } from "@/api/runtime";
+import { subscribeRuntimeRevision } from "@/api/order-api";
+import type { AmbassadorApplication, AmbassadorApplicationInput, AmbassadorPolicy, AmbassadorPolicyBucket } from "@/api/ambassador-application-api";
 import { isAmbassadorApplicationPending } from "@/api/ambassador-application-api";
 import { isSettledRejection } from "@/api/errors";
 import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/ambassador-command-key";
+import { AMBASSADOR_BUCKET_VISUALS, AMBASSADOR_ROUTES, ambassadorAmountText, ambassadorPresentation } from "@/lib/ambassador-display";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import {
   isCurrentTeamP31718Request,
   ambassadorSubmitErrorRecovery,
@@ -216,31 +160,57 @@ import {
 } from "@/lib/team-p3-17-18-request-scope";
 
 const t = useT();
+const visibility = useDataVisibility();
 const vrank = useVRank();
 const locale = useLocaleStore();
+const logicCopy = computed(() => teamLogicCopy(locale.code));
+const c = computed(() => ambassadorCopy(locale.code));
 const app = useApp();
+const auth = useAuth();
+const readEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
+let environmentInvalidated = false;
+watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
+const environmentCurrent = () => !environmentInvalidated && readEnvironment[0] === apiRuntimeConfig.environment && readEnvironment[1] === apiRuntimeConfig.baseUrl;
 
 const myRank = computed(() => vrank.myRank);
 const rankReady = computed(() => vrank.remoteReady);
-const requiredRankLabel = computed(() => rankLabel(5, locale.code, vrank.ladder));
-const unlocked = computed(() => rankReady.value && vrank.myRank >= 5);
+// A normal rank reread retains its confirmed facts. Keep that account's track mounted,
+// while authorization still requires remoteReady. Revoked facts must never animate as V0.
+const rankPresentation = ref<{ rank: number; accountKey: string; accountEpoch: number } | null>(null);
+watch([() => vrank.remoteReady, () => vrank.myRank, () => vrank.remoteError, () => vrank.ladder.length], () => {
+  if (vrank.remoteError || (!vrank.remoteReady && vrank.ladder.length === 0)) {
+    rankPresentation.value = null;
+  } else if (vrank.remoteReady && auth.isAuthenticated && environmentCurrent()) {
+    rankPresentation.value = { rank: vrank.myRank, accountKey: app.accountKey, accountEpoch: app.accountBindingEpoch };
+  }
+}, { immediate: true });
+const displayRank = computed(() => {
+  const value = rankPresentation.value;
+  return value && auth.isAuthenticated && environmentCurrent()
+    && value.accountKey === app.accountKey && value.accountEpoch === app.accountBindingEpoch ? value.rank : null;
+});
+const stopRankPresentationRuntime = subscribeRuntimeRevision(() => { rankPresentation.value = null; });
+// The existing application contract opens at V5; use one value for qualification and its display.
+const AGENT_TRACK = 5;
+// V6–V8 have reached the whole V1→V5 track; the V5 node carries their actual rank.
+const trackRank = computed(() => Math.min(displayRank.value ?? 0, AGENT_TRACK));
+const trackCurrentLabel = computed(() => (displayRank.value ?? 0) > AGENT_TRACK ? `${t.value.agent.trackCurrent} V${displayRank.value}` : t.value.agent.trackCurrent);
+const requiredRankLabel = computed(() => rankLabel(AGENT_TRACK, locale.code, vrank.ladder));
+const unlocked = computed(() => rankReady.value && vrank.myRank >= AGENT_TRACK);
+const levelsRemaining = computed(() => Math.max(0, AGENT_TRACK - myRank.value));
+const previewForm = ref(false);
+const { elRef: agentTrackRef, inView: agentTrackInView } = useScrollGrowProgress();
+const formReady = computed(() => pageReadState.value === 'ready' && unlocked.value);
 
 interface Bucket {
   id: AmbassadorPolicyBucket["id"];
   title: string;
   range: string;
   rule: string;
-  tint: string;
-  paths: string[];
+  ink: string;
 }
-const BUCKET_VISUALS: Record<AmbassadorPolicyBucket["id"], Pick<Bucket, "tint" | "paths">> = {
-  venue: { tint: "var(--v5-brand)", paths: ["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z", "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2", "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2", "M10 6h4M10 10h4M10 14h4M10 18h4"] },
-  kol: { tint: "var(--v5-tech-cyan)", paths: ["m3 11 18-5v12L3 14v-3z", "M11.6 16.8a3 3 0 1 1-5.8-1.6"] },
-  print: { tint: "var(--v5-warning)", paths: ["M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2", "M6 9V2h12v7", "M6 14h12v8H6z"] },
-  dev: { tint: "var(--v5-tech-cyan)", paths: ["m16 18 6-6-6-6", "m8 6-6 6 6 6"] },
-};
 const policy = ref<AmbassadorPolicy | null>(null);
-const pageReadState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
+const pageReadState = ref<"loading" | "ready" | "error">("loading");
 // Bucket ids are a closed server enum (venue/kol/print/dev) but the policy rows
 // carry only the operator's English title/rule. Resolve the visible name and
 // rule from the locale dictionary; the server copy stays the fallback for any
@@ -248,35 +218,41 @@ const pageReadState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loa
 const BUCKETS = computed<Bucket[]>(() => (policy.value?.buckets ?? []).map((bucket) => {
   const copy = t.value.agent.buckets[bucket.id];
   return {
-    id: bucket.id, title: copy?.title || bucket.title, range: bucket.range, rule: copy?.rule || bucket.rule,
-    ...BUCKET_VISUALS[bucket.id],
+    id: bucket.id, title: copy?.title || bucket.title,
+    range: `${formatFinanceAmount(bucket.minBudgetUsdt).replace(/\.00$/, '')}–${formatFinanceAmount(bucket.maxBudgetUsdt).replace(/\.00$/, '')} USDT`,
+    rule: copy?.rule || bucket.rule,
+    ink: AMBASSADOR_BUCKET_VISUALS[bucket.id].ink,
   };
 }));
 
-interface ApprovedCase {
-  name: string;
-  host: string;
-  amount: number;
-  attendees: number;
+const draft = shallowRef(ambassadorDraftCache.forAccount({ accountKey: app.accountKey, accountEpoch: app.accountBindingEpoch }));
+function draftField<K extends keyof AmbassadorDraftForm>(key: K) {
+  return computed({ get: () => draft.value.form[key], set: (value: AmbassadorDraftForm[K]) => {
+    if (draft.value.pending || !agentMounted || pageReadState.value !== "ready") return;
+    draft.value.form[key] = value;
+    draft.value.touched = true;
+  } });
 }
-const APPROVED_CASES: ApprovedCase[] = [
-  { name: "Tokyo Web3 Summit", host: "Sarah K.", amount: 8500, attendees: 247 },
-  { name: "Berlin DePIN Meetup", host: "Marina K.", amount: 3200, attendees: 142 },
-  { name: "São Paulo AI Devcon", host: "Diego P.", amount: 6700, attendees: 198 },
-];
-
-const date = ref("");
-const city = ref("");
-const budgetText = ref("3000");
-const selectedBucketTitle = ref("");
-const selectedBucketId = ref<AmbassadorApplicationInput["bucket"] | "">("");
-const submitting = ref(false);
-const latestApplication = ref<AmbassadorApplication>({ applicationId: null, status: "NONE", city: null,
-  eventDate: null, budgetUsdt: null, bucket: null, submittedAt: null, source: "server",
-  sourceEnvironment: "PRODUCTION", runId: "" });
+const date = draftField('date');
+const city = draftField('city');
+const budgetText = draftField('budgetText');
+const selectedBucketTitle = draftField('bucketTitle');
+const selectedBucketId = draftField('bucketId');
+const selectedBucket = computed(() => BUCKETS.value.find(bucket => bucket.id === selectedBucketId.value) ?? null);
+const submitting = computed(() => draft.value.pending !== null);
+const selectionLocked = computed(() => submitting.value || pageReadState.value !== 'ready');
+const latestApplication = ref<AmbassadorApplication>(emptyApplication());
 const applications = ref<AmbassadorApplication[]>([]);
-
-const applicationStatusText = (application: AmbassadorApplication) => t.value.agent.applicationStatuses[application.status];
+// Only one application can be pending. While it is, the new-application form is
+// not offered; the server would refuse it (409) anyway.
+const pendingApplication = computed(() => applications.value.find(row => row.status === "PENDING")
+  ?? (latestApplication.value.status === "PENDING" ? latestApplication.value : null));
+const latestRecord = computed(() => applications.value[0] ?? (latestApplication.value.status !== "NONE" ? latestApplication.value : null));
+const formOffered = computed(() => !pendingApplication.value);
+const pendingAction = computed(() => {
+  const status = pendingApplication.value ? ambassadorPresentation(pendingApplication.value).status : "review";
+  return status === "draft" || status === "bucket" ? c.value.uploadMaterials : status === "more" ? c.value.supplementMaterials : c.value.viewProgress;
+});
 
 let agentMounted = true;
 let agentRequestGeneration = 0;
@@ -292,7 +268,7 @@ function captureAgentRequest(): TeamP31718Request {
   };
 }
 function requestIsCurrent(request: TeamP31718Request): boolean {
-  return isCurrentTeamP31718Request(request, {
+  return auth.isAuthenticated && environmentCurrent() && isCurrentTeamP31718Request(request, {
     mounted: agentMounted,
     accountKey: app.accountKey,
     accountEpoch: app.accountBindingEpoch,
@@ -303,35 +279,38 @@ function invalidateAgentRequests(): void {
   agentRequestGeneration += 1;
 }
 function clearAgentFormState(form: AmbassadorAgentFormState = {
-  date: "", city: "", budgetText: "3000", bucketId: "", bucketTitle: "",
+  date: "", city: "", budgetText: String(policy.value?.defaultBudgetUsdt ?? 3000), bucketId: "", bucketTitle: "",
 }): void {
-  date.value = form.date;
-  city.value = form.city;
-  budgetText.value = form.budgetText;
-  selectedBucketId.value = form.bucketId;
-  selectedBucketTitle.value = form.bucketTitle;
+  clearAmbassadorDraft(draft.value);
+  Object.assign(draft.value.form, form);
 }
 function resetAgentPageState(): void {
   invalidateAgentRequests();
-  pageReadState.value = remoteApiEnabled ? "loading" : "ready";
-  clearAgentFormState();
+  pageReadState.value = "loading";
   latestApplication.value = emptyApplication();
   applications.value = [];
   policy.value = null;
-  submitting.value = false;
 }
-
-const lockedSubText = computed(() =>
-  fmt(t.value.agent.lockedSub, { n: rankReady.value ? vrank.myRank : "—", title: rankReady.value ? rankTitle(vrank.myRank, locale.code, vrank.ladder) : "—" }),
-);
-function hostedByText(c: ApprovedCase): string {
-  return fmt(t.value.agent.hostedBy, { name: c.host, attendees: c.attendees });
+function discardDraft(): void {
+  if (submitting.value || !agentMounted || pageReadState.value !== "ready") return;
+  clearAmbassadorDraft(draft.value, String(policy.value?.defaultBudgetUsdt ?? 3000));
 }
 
 function selectBucket(b: Bucket) {
+  if (selectionLocked.value || !agentMounted) return;
   selectedBucketTitle.value = b.title;
   selectedBucketId.value = b.id as AmbassadorApplicationInput["bucket"];
 }
+// Arrow keys move through the categories and select, like any radio group.
+function moveBucketFocus(event: KeyboardEvent, delta: number) {
+  const items = Array.from((event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]:not([aria-disabled="true"])'));
+  const next = items[(items.indexOf(document.activeElement as HTMLElement) + delta + items.length) % items.length];
+  next?.focus();
+  next?.click();
+}
+/** Roving tab stop: the selected category, or the first one before anything is chosen. */
+function bucketTabStop(id: string, index: number) { return !selectionLocked.value && (selectedBucketId.value ? selectedBucketId.value === id : index === 0); }
+function togglePreview() { previewForm.value = !previewForm.value; }
 
 function payloadIdentity(input: AmbassadorApplicationInput): string {
   return JSON.stringify([input.eventDate, input.city, input.budgetUsdt, input.bucket]);
@@ -350,6 +329,7 @@ async function refreshHistory(requestScope = captureAgentRequest()): Promise<Amb
 }
 
 async function submit() {
+  if (submitting.value || !agentMounted || pageReadState.value !== "ready" || pendingApplication.value) return;
   if (!unlocked.value) {
     toast.error(t.value.agent.toastV5Required, fmt(t.value.agent.toastV5RequiredSub, { rank: requiredRankLabel.value }));
     return;
@@ -372,63 +352,67 @@ async function submit() {
     return;
   }
   const activeBucket = policy.value?.buckets.find((bucket) => bucket.id === input.bucket);
-  if (remoteApiEnabled && (!activeBucket || input.budgetUsdt < activeBucket.minBudgetUsdt
-      || input.budgetUsdt > activeBucket.maxBudgetUsdt)) {
+  if (!activeBucket || input.budgetUsdt < activeBucket.minBudgetUsdt || input.budgetUsdt > activeBucket.maxBudgetUsdt) {
     toast.error(t.value.agent.invalidFormTitle, t.value.agent.invalidFormBody);
     return;
   }
-  if (remoteApiEnabled) {
-    if (submitting.value) return;
-    const identity = payloadIdentity(input);
-    // A page-load read may still be in flight. It must not replace this POST's
-    // authoritative receipt when it settles later.
-    invalidateAgentRequests();
-    const requestScope = captureAgentRequest();
-    let key: string;
-    try {
-      key = acquireAmbassadorCommandKey(requestScope.accountKey, identity);
-    } catch {
-      toast.error(t.value.agent.toastRemoteFailed, t.value.agent.submitUnconfirmedBody);
-      return;
-    }
-    submitting.value = true;
-    try {
-      const result = await ambassadorApplicationApi.submit(input, key);
-      if (!requestIsCurrent(requestScope)) return;
-      latestApplication.value = result;
-      finishAmbassadorCommand(requestScope.accountKey, identity);
-      void refreshHistory(requestScope).catch(() => undefined);
-    } catch (error) {
-      if (!requestIsCurrent(requestScope)) return;
-      const pending = isAmbassadorApplicationPending(error);
-      const recovery = ambassadorSubmitErrorRecovery(pending || isSettledRejection(error));
-      try {
-        if (pending) await refreshHistory(requestScope);
-        else if (recovery.refreshLatestForDisplay) await refreshLatest(requestScope);
-        if (!requestIsCurrent(requestScope)) return;
-      } catch {
-        if (!requestIsCurrent(requestScope)) return;
-      }
-      if (!requestIsCurrent(requestScope)) return;
-      if (recovery.finishCommand) finishAmbassadorCommand(requestScope.accountKey, identity);
-      toast.error(pending ? t.value.agent.pendingApplicationTitle : t.value.agent.toastRemoteFailed,
-        pending ? t.value.agent.pendingApplicationBody : t.value.agent.submitUnconfirmedBody);
-      return;
-    } finally {
-      if (requestIsCurrent(requestScope)) submitting.value = false;
-    }
+  const identity = payloadIdentity(input);
+  // A page-load read may still be in flight. It must not replace this POST's
+  // authoritative receipt when it settles later.
+  invalidateAgentRequests();
+  const requestScope = captureAgentRequest();
+  let key: string;
+  try {
+    key = acquireAmbassadorCommandKey(requestScope.accountKey, identity);
+  } catch {
+    toast.error(t.value.agent.toastRemoteFailed, t.value.agent.submitUnconfirmedBody);
+    return;
   }
-  toast.success(
-    t.value.agent.toastSubmitted,
-    fmt(t.value.agent.toastSubmittedSub, { city: input.city, budget: formatAmount(input.budgetUsdt) }),
-  );
-  const settled = successfulAmbassadorApplicationState(latestApplication.value);
+  const submittedDraft = draft.value;
+  const submitToken = beginAmbassadorDraftSubmit(submittedDraft);
+  if (!submitToken) return;
+  try {
+    const result = await ambassadorApplicationApi.submit(input, key);
+    // A successful command can settle the same account's cached draft while
+    // hidden/unloaded. Page reads/receipts still require the full request fence.
+    if (requestScope.accountKey !== app.accountKey || requestScope.accountEpoch !== app.accountBindingEpoch) return;
+    finishAmbassadorCommand(requestScope.accountKey, identity);
+    endAmbassadorDraftSubmit(submittedDraft, submitToken, true);
+    if (!requestIsCurrent(requestScope)) {
+      if (agentMounted) { invalidateAgentRequests(); refreshAgentPage(); }
+      return;
+    }
+    latestApplication.value = result;
+    void refreshHistory(requestScope).catch(() => undefined);
+  } catch (error) {
+    if (!requestIsCurrent(requestScope)) return;
+    const pending = isAmbassadorApplicationPending(error);
+    const recovery = ambassadorSubmitErrorRecovery(pending || isSettledRejection(error));
+    try {
+      if (pending) await refreshHistory(requestScope);
+      else if (recovery.refreshLatestForDisplay) await refreshLatest(requestScope);
+      if (!requestIsCurrent(requestScope)) return;
+    } catch {
+      if (!requestIsCurrent(requestScope)) return;
+    }
+    if (!requestIsCurrent(requestScope)) return;
+    if (recovery.finishCommand) finishAmbassadorCommand(requestScope.accountKey, identity);
+    toast.error(pending ? t.value.agent.pendingApplicationTitle : t.value.agent.toastRemoteFailed,
+      pending ? t.value.agent.pendingApplicationBody : t.value.agent.submitUnconfirmedBody);
+    return;
+  } finally {
+    endAmbassadorDraftSubmit(submittedDraft, submitToken);
+  }
+  toast.success(t.value.agent.toastSubmitted, fmt(t.value.agent.toastSubmittedSub, { city: input.city, budget: visibility.mask(ambassadorAmountText(input.budgetUsdt)) }));
+  const settled = successfulAmbassadorApplicationState(latestApplication.value, policy.value?.defaultBudgetUsdt ?? 3000);
   latestApplication.value = settled.receipt;
   clearAgentFormState(settled.form);
 }
 
-function refreshAgentPage(): void {
-  if (!remoteApiEnabled) return;
+/** Resolves false only when this read failed; a superseded read leaves the outcome to its successor. */
+function refreshAgentPage(): Promise<boolean> {
+  if (!agentMounted || !auth.isAuthenticated || !environmentCurrent()) return Promise.resolve(true);
+  invalidateAgentRequests();
   const requestScope = captureAgentRequest();
   pageReadState.value = "loading";
   // 🔴 本页的契约是三条大使读取(policy / latest / history),**不是**等级阶梯(zentao #204)。
@@ -437,13 +421,17 @@ function refreshAgentPage(): void {
   // 预算规则、活动类型、申请记录全都读到了也照样不显示,而且重试永远复现,因为重试跑的是同一组读。
   // 现在:三条大使读取成功即就绪;等级失败只降级「资格横幅」(unlocked 仍要求 rankReady,
   // rankReady=false 时渲染未知态),不再吃掉整页。
-  void Promise.all([
+  return Promise.all([
     refreshLatest(requestScope),
     refreshHistory(requestScope),
     ambassadorApplicationApi.policy().then((value) => {
       if (!requestIsCurrent(requestScope)) return;
       policy.value = value;
-      budgetText.value = String(value.defaultBudgetUsdt);
+      if (!draft.value.touched && !submitting.value) draft.value.form.budgetText = String(value.defaultBudgetUsdt);
+      // Preserve an edited/removed selection for validation against the new
+      // policy; never silently replace a user's budget or selected category.
+      const bucket = value.buckets.find(row => row.id === selectedBucketId.value);
+      if (bucket) draft.value.form.bucketTitle = t.value.agent.buckets[bucket.id]?.title || bucket.title;
     }),
     // 等级读单独吞掉自己的失败:它只喂资格横幅(rankReady/unlocked),失败由 store 记进
     // remoteError、由横幅渲染未知态。挂在这里是为了让「等级不是本页的就绪前提」成为本页
@@ -451,34 +439,49 @@ function refreshAgentPage(): void {
     vrank.refreshCanonicalVRank().catch(() => undefined),
   ]).then(() => {
     if (requestIsCurrent(requestScope)) pageReadState.value = policy.value ? "ready" : "error";
+    return pageReadState.value !== "error";
   }).catch(() => {
-    if (requestIsCurrent(requestScope)) pageReadState.value = "error";
+    if (!requestIsCurrent(requestScope)) return true;
+    invalidateAgentRequests();
+    policy.value = null; applications.value = []; latestApplication.value = emptyApplication(); pageReadState.value = "error";
+    return false;
   });
 }
 
-function retryAgentPage(): void {
+function retryAgentPage(): Promise<boolean> {
   resetAgentPageState();
-  refreshAgentPage();
+  return refreshAgentPage();
 }
 
-watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
+watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.isAuthenticated, () => locale.code, () => apiRuntimeConfig.environment, () => apiRuntimeConfig.baseUrl], () => {
+  if (displayRank.value === null) rankPresentation.value = null;
+  draft.value = ambassadorDraftCache.forAccount({ accountKey: app.accountKey, accountEpoch: app.accountBindingEpoch });
   resetAgentPageState();
-  if (agentMounted) refreshAgentPage();
-});
+  if (agentMounted) void refreshAgentPage();
+}, { flush: "sync" });
 
+let releaseActiveRefresh = () => {};
 onShow(() => {
+  draft.value = ambassadorDraftCache.forAccount({ accountKey: app.accountKey, accountEpoch: app.accountBindingEpoch });
   agentMounted = true;
-  resetAgentPageState();
-  refreshAgentPage();
+  invalidateAgentRequests();
+  void refreshAgentPage();
+  releaseActiveRefresh();
+  // Pull-down rereads the page; a failed read rejects so the shared refresh reports it once.
+  releaseActiveRefresh = registerActivePageRefresh(() => refreshAgentPage().then((ok) => { if (!ok) throw new Error("AMBASSADOR_PAGE_REFRESH_FAILED"); }), "pages/team/agent");
 });
 
 onHide(() => {
   agentMounted = false;
-  resetAgentPageState();
+  invalidateAgentRequests();
+  pageReadState.value = "loading";
+  releaseActiveRefresh();
 });
 
 onUnload(() => {
   agentMounted = false;
+  stopRankPresentationRuntime();
+  releaseActiveRefresh();
   resetAgentPageState();
 });
 
@@ -486,135 +489,70 @@ function go(url: string) {
   navTo(url);
 }
 
-// ─── styles ───
-// De-carded hero on the page floor — the old radial glow card was a page-floor
-// aura → deleted outright (owner call 2026-07-08), not re-tuned.
-const heroStyle: CSSProperties = { padding: "6px 2px 0" };
-const heroIconStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
-};
-const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--v5-warning)" };
-const heroHeadlineStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, lineHeight: 1.25, marginTop: "2px" }; // SKILL: leading-tight=1.25 (was 1.2)
-// Paragraph tier: 13.5 / 1.65 / ink-2 (body copy must not sit in ink-3).
-const heroBodyStyle: CSSProperties = { marginTop: "10px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
-
-// Status banners — tint fill only, border chrome dropped (single difference).
-const eligibleStyle: CSSProperties = {
-  padding: "16px",
-  background: "color-mix(in srgb, var(--v5-brand) 8%, transparent)",
-};
-const eligibleIconStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)",
-};
-const lockedStyle: CSSProperties = {
-  padding: "16px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-};
-const lockedIconStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
-};
-const pathCtaStyle: CSSProperties = {
-  padding: "0 12px",
-  height: "44px",
-  gap: "4px",
-  background: "var(--v5-brand-2)",
-  color: "var(--v5-on-brand-2)", // bright brand-2 fill → on-brand-2 text (incl. svg stroke)
-  fontSize: "12px",
-  fontWeight: 600,
-};
-
-// Transparent hairline rows — border-top opens the group, +12px top margin for
-// 24px section rhythm. SKILL: opacity still gates on unlocked (1 / 0.7).
-const bucketsGroupStyle: CSSProperties = { marginTop: "12px", padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
-function bucketRowStyle(isLast: boolean): CSSProperties {
-  return {
-    padding: "13px 0",
-    gap: "12px",
-    opacity: unlocked.value ? 1 : 0.7,
-    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
-  };
-}
-const selectedBucketStyle: CSSProperties = {
-  marginTop: "-4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-brand-2)",
-};
-function bucketIconStyle(tint: string): CSSProperties {
-  return {
-    width: "40px",
-    height: "40px",
-    // SKILL: prototype `${tint}18` is 8-digit hex alpha 0x18=24/255≈9% (was mis-ported as 18%)
-    background: `color-mix(in srgb, ${tint} 9%, transparent)`,
-  };
-}
-
-// Transparent form block — 2px optical inset, +12px top margin (24px rhythm).
-const formBlockStyle: CSSProperties = { marginTop: "12px", padding: "0 2px" };
-const formCapStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: "var(--v5-ink-3)",
-  marginBottom: "12px",
-};
-// 输入框零描边。外层 formBlockStyle 只有 margin/padding 无底色 → 字段贴页面底;
-// 原 surface-3 亮色下对页面底仅 ΔE 2.7(分不出),改 L1。
-const fieldStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderRadius: "12px",
-  padding: "10px 12px",
-};
-const fieldLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.05em", color: "var(--v5-ink-3)" };
-const inputStyle: CSSProperties = {
-  width: "100%",
-  background: "transparent",
-  fontSize: "15px",
-  color: "var(--v5-ink)",
-};
-const budgetInputStyle: CSSProperties = {
-  flex: "1",
-  background: "transparent",
-  fontSize: "15px",
-  color: "var(--v5-ink)",
-  fontFamily: "var(--font-v5)",
-};
-const submitStyle = computed<CSSProperties>(() => ({
-  marginTop: "12px",
-  height: "48px",
-  gap: "6px",
-  fontSize: "15px",
-  fontWeight: 600,
-  background: unlocked.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: unlocked.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-}));
-const previewOnlyStyle: CSSProperties = {
-  marginTop: "8px",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-
-// Transparent hairline rows — cap label outside, border-top opens the group.
-const casesBlockStyle: CSSProperties = { marginTop: "12px" };
-const approvedCapStyle: CSSProperties = {
-  padding: "0 2px",
-  marginBottom: "8px",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: "var(--v5-ink-3)",
-};
-const casesGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
-function caseRowStyle(isLast: boolean): CSSProperties {
-  return {
-    padding: "12px 0",
-    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
-  };
-}
+useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAgentPage });
 </script>
+
+<style scoped>
+.agent-page { color: var(--v5-ink); }
+.agent-loading { padding: var(--v5-space-8) var(--v5-space-4) 0; text-align: center; color: var(--v5-ink-3); }
+.agent-content { display: flex; flex-direction: column; padding-top: var(--v5-space-4); }
+/* Focus card: the shared soft glass (design system 01 §1.1.2); layout only here. */
+.agent-hero { display: flex; flex-direction: column; gap: var(--v5-space-4); margin: 0 var(--v5-space-4); padding: var(--ui-space-inset-hero); border-radius: var(--v5-radius-2xl); }
+.agent-headline { display: block; font: var(--ui-type-page-title-weight, 600) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); color: var(--v5-ink); white-space: pre-line; text-wrap: balance; overflow-wrap: anywhere; }
+.agent-intro { display: block; margin-top: var(--v5-space-1); font: var(--ui-type-description-weight, 400) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); }
+.agent-track { display: flex; align-items: center; }
+.agent-track__line { flex: 1; height: 3px; margin: 0 var(--v5-space-1) 26px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); overflow: hidden; }
+.agent-track__line > view { height: 100%; border-radius: var(--v5-radius-full); background: var(--v5-brand); }
+.agent-track__stop { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: none; width: 44px; min-height: 62px; gap: var(--v5-space-1); }
+.agent-track__node { display: grid; place-items: center; flex: none; width: 36px; height: 40px; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); background: var(--v5-border); font: 600 11px/1 var(--font-metric); color: var(--v5-ink-3); }
+.agent-track__node > text { display: grid; place-items: center; width: calc(100% - 2px); height: calc(100% - 2px); clip-path: inherit; background: var(--v5-surface-2); }
+.agent-track__node--done { color: var(--v5-brand); }
+.agent-track__node--current { background: var(--v5-ink-3); color: var(--v5-brand); }
+.agent-track__node--goal { width: 40px; height: 44px; color: var(--v5-brand-2-ink); }
+.agent-track__label { display: block; min-height: 20px; max-width: 64px; font: 500 11px/14px var(--font-v5); text-align: center; color: var(--v5-ink-3); }
+.agent-track__stop--current .agent-track__label { color: var(--v5-brand); }
+.agent-track__stop--goal .agent-track__label { color: var(--v5-brand-2-ink); }
+.agent-eligibility { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; box-sizing: border-box; padding-top: var(--ui-space-inline); border-top: 1px solid var(--v5-border); }
+.agent-eligibility__icon { flex: none; color: var(--v5-success-ink); }
+.agent-eligibility__text { flex: 1; min-width: 0; font: var(--ui-type-list-title-weight, 500) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.agent-path { display: flex; align-items: center; justify-content: center; flex: none; min-height: 44px; cursor: pointer; }
+.agent-opening-badge { display: flex; align-items: center; gap: var(--v5-space-1); padding: var(--v5-space-1) var(--ui-space-row-y); border-radius: var(--v5-radius-full); background: var(--v5-surface-3); color: var(--v5-ink-3); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
+.agent-section { margin-top: var(--ui-space-section-gap); }
+.agent-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); margin: 0 var(--v5-space-4) var(--ui-space-inline); }
+.agent-section__title { font: var(--ui-type-section-weight, 600) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
+.agent-section__sub { min-width: 0; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); text-align: end; overflow-wrap: anywhere; }
+.agent-link { display: inline-flex; align-items: center; gap: 2px; flex: none; padding: calc((44px - 18px) / 2) 0; margin: calc((18px - 44px) / 2) 0; font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3); cursor: pointer; }
+.agent-section > :deep(.amb-card) { margin: 0 var(--v5-space-4); }
+.agent-latest { margin: 0 var(--v5-space-4); border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
+.agent-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-card-gap); margin: 0 var(--v5-space-4); }
+.agent-tile { position: relative; display: flex; flex-direction: column; gap: var(--v5-space-2); min-height: 132px; box-sizing: border-box; padding: 14px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+.agent-tile[role="radio"] { cursor: pointer; }
+.agent-tile[aria-disabled="true"] { cursor: default; }
+.agent-tile--selected { box-shadow: inset 0 0 0 1.5px var(--v5-brand), var(--v5-glass-shadow); }
+.agent-tile > :deep(.amb-icon) { margin-bottom: auto; }
+.agent-tile__check { position: absolute; top: 14px; right: 14px; color: var(--v5-brand); }
+.agent-tile__title { display: block; font: var(--ui-type-subheading-weight, 500) 14px/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.agent-tile__rule { display: block; margin-top: var(--v5-space-1); font: 400 11px/16px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.agent-tile__range { display: block; font: 500 11px/16px var(--font-metric); color: var(--tint-ink); overflow-wrap: anywhere; }
+.agent-tile:focus-visible, .agent-path:focus-visible, .agent-link:focus-visible, .agent-preview:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.agent-hint { display: flex; gap: var(--v5-space-2); margin: var(--ui-space-inline) var(--v5-space-4) 0; font: var(--ui-type-note-weight, 400) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
+.agent-hint > svg { flex: none; margin-top: var(--v5-space-1); }
+.agent-section > .agent-hint { margin-top: var(--v5-space-4); }
+.agent-preview { display: flex; align-items: center; justify-content: center; min-height: 48px; margin: var(--ui-space-section-gap) var(--v5-space-4) 0; padding: 0 var(--v5-space-5); border-radius: var(--v5-radius-full); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; }
+.agent-form { margin: 0 var(--v5-space-4); padding: var(--v5-space-1) var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.agent-field { padding: 14px 0; border-bottom: 1px solid var(--v5-border); }
+.agent-field:last-child { border-bottom: 0; }
+.agent-field__label { display: flex; align-items: center; gap: var(--v5-space-2); margin-bottom: var(--v5-space-2); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.agent-control { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-2); width: 100%; min-height: 44px; box-sizing: border-box; padding: 0 var(--ui-space-inline); border-radius: var(--v5-radius-s); background: var(--v5-surface-3); font: var(--ui-type-input-weight, 400) var(--ui-type-input)/var(--ui-type-input-lh) var(--font-v5); color: var(--v5-ink); }
+.agent-control__value { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.agent-control__input { min-height: 44px; background: transparent; color: var(--v5-ink); font: inherit; }
+.agent-control__placeholder { color: var(--v5-ink-3); }
+.agent-control__prefix { flex: none; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-ink-3); }
+.agent-control > svg { flex: none; color: var(--v5-ink-3); }
+.agent-control:focus-within, .agent-date-picker:focus-visible .agent-control { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.agent-field__help { display: block; margin-top: var(--v5-space-2); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* 12px under the form so the text button's 44px target stays off the last field. */
+.agent-discard { display: flex; justify-content: center; margin: var(--v5-space-3) var(--v5-space-4) 0; }
+.agent-bar-space { height: calc(120px + env(safe-area-inset-bottom)); }
+@media (max-width: 374px) { .agent-track__stop { width: 36px; } .agent-track__line { margin-inline: 2px; } .agent-opening-badge { padding-inline: 7px; } }
+</style>

@@ -21,7 +21,7 @@ interface Persisted {
  * existing auth record. It never restores authority: server mode still needs
  * an in-memory sessionVault before protected UI may render.
  */
-export function hasPersistedServerAuthenticatedAccountTrace(): boolean {
+export function readPersistedServerAuthenticatedAccountId(): string | null {
   try {
     let record = uni.getStorageSync(STORAGE_KEY) as unknown;
     // Uni H5 may expose its typed-storage envelope as an object or one/more
@@ -32,7 +32,7 @@ export function hasPersistedServerAuthenticatedAccountTrace(): boolean {
         try {
           record = JSON.parse(record) as unknown;
         } catch {
-          return false;
+          return null;
         }
       }
       if (record && typeof record === "object" && "data" in record) {
@@ -45,17 +45,19 @@ export function hasPersistedServerAuthenticatedAccountTrace(): boolean {
       try {
         record = JSON.parse(record) as unknown;
       } catch {
-        return false;
+        return null;
       }
     }
-    return !!record
-      && typeof record === "object"
-      && (record as Partial<Persisted>).isAuthenticated === true
-      && typeof (record as Partial<Persisted>).accountId === "string"
-      && (record as Partial<Persisted>).accountId!.startsWith("user:");
+    if (!record || typeof record !== "object" || (record as Partial<Persisted>).isAuthenticated !== true) return null;
+    const accountId = (record as Partial<Persisted>).accountId;
+    return typeof accountId === "string" && accountId.startsWith("user:") ? accountId : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function hasPersistedServerAuthenticatedAccountTrace(): boolean {
+  return readPersistedServerAuthenticatedAccountId() !== null;
 }
 
 function hydrate(): Persisted {

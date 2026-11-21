@@ -1,4 +1,5 @@
-import { formatAmount } from "./amount-display";
+import { teamLogicCopy } from "@/i18n/team-logic-copy";
+import { computePointsCopy, formatComputePoints } from "@/i18n/compute-points";
 // V 级晋升缺口的本地化文案。
 //
 // 为什么要这一层(2026-08-17,英文文案哨兵配套):`nextRankProgress` 原来直接返回**英文句子**
@@ -10,49 +11,88 @@ import { formatAmount } from "./amount-display";
 // 缺口结构定义在 store(`@/store/v-rank` 的 `RankGap`),措辞在这里 —— 与 product-copy.ts /
 // device-copy.ts 同一分层约定。
 import type { Messages } from "@/i18n/messages/en";
-import type { LocaleCode } from "@/i18n";
-import { publishedRankTitle } from "@/i18n/rank-titles";
+import { uiLocale, type LocaleCode } from "@/i18n";
 import type { RankGap, VRankDef } from "@/store/v-rank";
 import { fmt } from "@/i18n/format";
-import { HAN_SCRIPT_RE } from "@/lib/native-unicode-regex";
 import { formatHowNumber } from "./rank-how-content";
 
+const CULTIVATION_COPY = {
+  zh: {
+    title: "好友升级奖励",
+    trigger: "好友升到 V{n} 时，你可获得 {amount}。",
+    recipient: "奖励发给邀请这位好友的人。",
+  },
+  en: {
+    title: "Friend rank-up reward",
+    trigger: "When a friend reaches V{n}, you can earn {amount}.",
+    recipient: "The reward goes to the person who invited that friend.",
+  },
+  vi: {
+    title: "Thưởng khi bạn bè lên hạng",
+    trigger: "Khi bạn bè đạt V{n}, bạn có thể nhận {amount}.",
+    recipient: "Phần thưởng dành cho người đã mời người bạn đó.",
+  },
+  id: {
+    title: "Hadiah naik peringkat teman",
+    trigger: "Saat teman mencapai V{n}, Anda bisa mendapat {amount}.",
+    recipient: "Hadiah diberikan kepada orang yang mengundang teman tersebut.",
+  },
+  ms: {
+    title: "Ganjaran naik pangkat rakan",
+    trigger: "Apabila rakan mencapai V{n}, anda boleh memperoleh {amount}.",
+    recipient: "Ganjaran diberikan kepada orang yang menjemput rakan itu.",
+  },
+  fil: {
+    title: "Reward sa rank-up ng kaibigan",
+    trigger: "Kapag umabot sa V{n} ang kaibigan, puwede kang makakuha ng {amount}.",
+    recipient: "Mapupunta ang reward sa taong nag-imbita sa kaibigang iyon.",
+  },
+  ru: {
+    title: "Награда за повышение ранга друга",
+    trigger: "Когда друг достигает V{n}, вы можете получить {amount}.",
+    recipient: "Награда достаётся тому, кто пригласил этого друга.",
+  },
+  kk: {
+    title: "Дос дәрежесі өскендегі сыйақы",
+    trigger: "Дос V{n} дәрежесіне жеткенде, {amount} ала аласыз.",
+    recipient: "Сыйақы сол досты шақырған адамға беріледі.",
+  },
+  uz: {
+    title: "Doʻst darajasi oshishi mukofoti",
+    trigger: "Doʻstingiz V{n} darajasiga yetganda {amount} olishingiz mumkin.",
+    recipient: "Mukofot shu doʻstni taklif qilgan kishiga beriladi.",
+  },
+};
+
+export function rankCultivationCopy(locale: string) {
+  return CULTIVATION_COPY[uiLocale(locale.split("-")[0])];
+}
+
 /**
- * F1 正式公开等级名称。服务端目前把同一中文配置写入 title/cnTitle，
- * 英文、越文显示时只按完全匹配的正式中文名翻译；动态自定义名不猜测。
- *
- * 🔴 **档位表必须由调用方传进来**,不许在这里直读 `V_RANKS` —— 那张表源码明写 `⚠️ MOCK-ONLY`,
- * 而 store 的 `ladder` 在 remote 档是**空数组**(权威档位由服务端给)。直读 mock 表的后果是
- * 「接上真后端后页面照旧显示 mock 头衔」,本地永远看不出来(独立验收 2026-08-17 抓到)。
- * 取不到档位就只给 `V{n}`,由调用方决定要不要显示更明确的未知态。
+ * 2026-10-29 文案审查 D6:App 只显示 V 级(V0–V8),不显示后台配置的头衔。
+ * 头衔字段(title / cnTitle)留给运营内部使用;这里统一返回空串,调用方按空串隐藏头衔。
  */
-export function rankName(def: Pick<VRankDef, "title" | "cnTitle">, locale: LocaleCode): string {
-  if (locale === "zh") return def.cnTitle || def.title;
-  if (locale === "vi") {
-    const vietnamese = publishedRankTitle(def.cnTitle, locale) || publishedRankTitle(def.title, locale);
-    if (vietnamese) return vietnamese;
-  }
-  if (!HAN_SCRIPT_RE.test(def.title)) return def.title;
-  return publishedRankTitle(def.title, locale) || publishedRankTitle(def.cnTitle, locale);
+export function rankName(_def: Pick<VRankDef, "title" | "cnTitle">, _locale: LocaleCode): string {
+  return "";
 }
 
-export function rankTitle(v: number, locale: LocaleCode, ladder: readonly VRankDef[]): string {
-  const def = ladder[v];
-  if (!def) return "";
-  return rankName(def, locale);
+export function rankTitle(_v: number, _locale: LocaleCode, _ladder: readonly VRankDef[]): string {
+  return "";
 }
 
-/** `V3 一星大使` / `V3 One-Star Ambassador` —— 档位未知时只给 `V3`。 */
-export function rankLabel(v: number, locale: LocaleCode, ladder: readonly VRankDef[]): string {
-  const title = rankTitle(v, locale, ladder);
-  return title ? `V${v} ${title}` : `V${v}`;
+/** 等级标签只给 `V3`。 */
+export function rankLabel(v: number, _locale: LocaleCode, _ladder: readonly VRankDef[]): string {
+  return `V${v}`;
 }
 
 /** 一条晋升缺口 → 当前语言的一句话。 */
 export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladder: readonly VRankDef[]): string {
   switch (gap.kind) {
-    case "selfBuy":
-      return fmt(t.rank.needSelfBuy, { n: formatAmount(gap.amount) });
+    case "selfComputePoints":
+    case "teamComputePoints":
+      if (gap.amount === undefined) return computePointsCopy(locale).conditionsPending;
+      return (gap.kind === "selfComputePoints" ? computePointsCopy(locale).needSelf : computePointsCopy(locale).needTeam)
+        .replace("{n}", formatComputePoints(gap.amount, locale));
     case "directRefs":
       // 🔴 英文单复数:改成读词典时我漏了旧码的 `invite${n === 1 ? "" : "s"}`,n=1 渲染成
       //    「1 more direct invites」(独立验收抓到,我先前「en 逐字未变」那句话对 n=1 是错的)。
@@ -62,8 +102,6 @@ export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladde
       //    (词法判据才抗变异),该改的是我的写法。
       if (gap.n === 1) return fmt(t.rank.needRefsOne, { n: formatHowNumber(gap.n, locale) });
       return fmt(t.rank.needRefs, { n: formatHowNumber(gap.n, locale) });
-    case "teamVolume":
-      return fmt(t.rank.needTeam, { n: formatAmount(gap.amount) });
     case "vDownlines":
       return fmt(t.rank.needV, { n: formatHowNumber(gap.n, locale), title: rankTitle(gap.vLevel, locale, ladder), v: gap.vLevel });
   }
@@ -71,17 +109,18 @@ export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladde
 
 /** 一阶 V 级的达成条件 → 当前语言的一句话(条件之间用 ` + ` 连,无条件时给「注册即得」)。 */
 export function rankConditionsText(t: Messages, conds: {
-  selfBuyUSD?: number;
+  selfComputePoints?: number;
+  teamComputePoints?: number;
   directRefs?: number;
-  teamVolumeUSD?: number;
   vDownlines?: Record<string, number>;
 }, locale: LocaleCode = "en"): string {
   const parts: string[] = [];
-  if (conds.selfBuyUSD) parts.push(fmt(t.rank.cond.selfBuy, { n: formatAmount(conds.selfBuyUSD) }));
+  const pointsCopy = computePointsCopy(locale);
+  if (conds.selfComputePoints !== undefined) parts.push(`${pointsCopy.self} ≥ ${formatComputePoints(conds.selfComputePoints, locale)}`);
   if (conds.directRefs) parts.push(fmt(t.rank.cond.directRefs, { n: formatHowNumber(conds.directRefs, locale) }));
-  if (conds.teamVolumeUSD) parts.push(fmt(t.rank.cond.teamVol, { n: formatAmount(conds.teamVolumeUSD) }));
+  if (conds.teamComputePoints !== undefined) parts.push(`${pointsCopy.team} ≥ ${formatComputePoints(conds.teamComputePoints, locale)}`);
   if (conds.vDownlines) {
-    for (const [v, n] of Object.entries(conds.vDownlines)) parts.push(fmt(t.rank.cond.vDownlines, { n: formatHowNumber(n, locale), v }));
+    for (const [v, n] of Object.entries(conds.vDownlines)) if (n > 0) parts.push(fmt(t.rank.cond.vDownlines, { n: formatHowNumber(n, locale), v }));
   }
   return parts.length ? parts.join(" + ") : t.rank.cond.register;
 }

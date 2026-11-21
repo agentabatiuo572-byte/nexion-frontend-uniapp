@@ -57,6 +57,15 @@ export interface OAuthExchangeRequest {
   provider: OAuthProvider;
   displayName?: string;
 }
+export interface OAuthProviderLoginRequest {
+  provider: Exclude<OAuthProvider, "PASSKEY">;
+  flowId: string;
+  flowKey: string;
+  receipt: string;
+  challengeNo?: string;
+  code?: string;
+  captchaTicket?: string;
+}
 
 export interface PasswordResetOtpVerifyResult {
   status: "PASSWORD_RESET_OTP_VERIFIED";
@@ -76,7 +85,7 @@ export interface AuthApi {
   pendingLogin(): boolean;
   pendingLoginContext(): { authMethod: string; context: Record<string, string | null>; pending: boolean } | null;
   cancelLoginChallenge(): void;
-  recoverLogin(): Promise<LoginResult>;
+  recoverLogin(): Promise<Extract<LoginResult, { kind: "authenticated" }>>;
   retryLogin(credentials: { password?: string; code?: string; captchaTicket?: string }): Promise<LoginResult>;
   login(request: PasswordLoginRequest): Promise<LoginResult>;
   sendLoginOtp(request: RegistrationOtpRequest): Promise<LoginOtpResult>;
@@ -99,6 +108,7 @@ export interface AuthApi {
   }): Promise<{ status: "REGISTRATION_OTP_VERIFIED" }>;
   register(request: RegistrationRequest): Promise<LoginResult>;
   oauthExchange(request: OAuthExchangeRequest): Promise<OAuthExchangeResult>;
+  completeProviderLogin(request: OAuthProviderLoginRequest, expectedRevision: number): Promise<LoginResult>;
   restore(): Promise<SessionSnapshot | null>;
   /** Consume only the exact vault epoch issued by a failed sign-in completion. */
   discardSessionIfCurrent(expectedRevision: number): void;
@@ -143,6 +153,7 @@ function passwordResetOtpFromResponse(value: unknown): PasswordResetOtpResult {
 const SETTLED_REGISTRATION_CONFLICTS = new Set([
   "USER_REGISTRATION_ACCOUNT_EXISTS",
   "USER_REGISTRATION_K1_IP_LIMIT",
+  "USER_REGISTRATION_DEVICE_LIMIT",
   "USER_REGISTRATION_SPONSOR_AMBIGUOUS",
   "USER_REGISTRATION_SPONSOR_STATE_CHANGED",
   "USER_REGISTRATION_SPONSOR_ENVIRONMENT_MISMATCH",
@@ -201,7 +212,7 @@ function sessionFromResponse(data: AuthSessionResponse, refreshCredentialMode: R
   };
 }
 
-function consumeLoginResponse(
+export function consumeLoginResponse(
   data: AuthSessionResponse,
   vault: SessionVault,
   expectedRevision: number,
@@ -304,24 +315,51 @@ function oauthDevelopmentChallengeFromResponse(value: unknown): string {
 export function createAuthApi(
   client: ApiClient,
   vault: SessionVault,
-  options: { refreshCredentialMode?: RefreshCredentialMode; clientSurface?: "APP";
-    installationId?: () => string; executionSupported?: () => boolean; attemptStorage?: KeyValueStorage } = {},
+  options: { refreshCredentialMode?: RefreshCredentialMode; clientSurface?: "APP" | "H5";
+    installationId?: () => string; executionSupported?: () => boolean; attemptStorage?: KeyValueStorage;
+    beforeSessionEnd?: (snapshot: SessionSnapshot) => Promise<void>;
+    sessionEndCancelled?: (snapshot: SessionSnapshot) => void } = {},
 ): AuthApi {
   const refreshCredentialMode = options.refreshCredentialMode ?? "token";
   let restoreInFlight: Promise<SessionSnapshot | null> | null = null;
   const cookieHeaders = refreshCredentialMode === "cookie"
     ? { "X-Nexion-Refresh-Mode": "cookie" }
     : undefined;
-  const sessionIssuanceHeaders = options.clientSurface === "APP"
-    ? { ...cookieHeaders, "X-NexGrid-Client-Surface": "APP" }
+  const sessionIssuanceHeaders = options.clientSurface
+    ? { ...cookieHeaders, "X-NexGrid-Client-Surface": options.clientSurface }
     : cookieHeaders;
-  const attempts = createLoginAttempt({ storage: options.attemptStorage,
+  const otpHeaders = () => options.clientSurface === "H5" ? {
+    ...sessionIssuanceHeaders,
+    "X-NexGrid-Installation-Id": (options.installationId?.() ?? ""),
+    "X-NexGrid-Execution-Supported": "false",
+  } : sessionIssuanceHeaders;
+  const attempts = createLoginAttempt({ clientSurface: options.clientSurface, storage: options.attemptStorage,
     installationId: options.installationId ?? (() => ""), executionSupported: options.executionSupported ?? (() => false) });
   const contextHeaders = (attempt: LoginAttempt) => ({ ...sessionIssuanceHeaders,
     "X-NexGrid-Installation-Id": attempt.installationId,
     "X-NexGrid-Execution-Supported": String(attempt.executionSupported),
     "X-NexGrid-Login-Attempt-Id": attempt.loginAttemptId,
     "X-NexGrid-Login-Recovery-Key": attempt.recoveryProof });
+  async function recoverAttempt(attempt: LoginAttempt, revision: number): Promise<Extract<LoginResult, { kind: "authenticated" }>> {
+    if (vault.revision() !== revision)
+      throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
+    const data = await client.request<AuthSessionResponse>({ method: "POST",
+      path: `/auth/users/login/attempts/${encodeURIComponent(attempt.loginAttemptId)}/recover`, authenticated: false,
+      headers: contextHeaders(attempt), body: { installationId: attempt.installationId,
+        executionSupported: attempt.executionSupported, recoveryProof: attempt.recoveryProof,
+        authMethod: attempt.authMethod, authReference: attempt.authReference } });
+    // A newer page may have recovered this session while this request was in flight.
+    if (vault.revision() !== revision)
+      throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
+    // A missing/in-progress result never authorizes a fresh attempt.
+    if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
+    const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
+    // Recovery only reads issued sessions. A challenge here cannot prove the
+    // original login was unissued, so preserve the unresolved attempt.
+    if (result.kind !== "authenticated") throw new ApiError({ kind: "protocol", message: "LOGIN_RECOVERY_RESPONSE_INVALID" });
+    attempts.complete(attempt);
+    return result;
+  }
   async function issue(method: string, reference: string, request: Parameters<ApiClient["request"]>[0], oauth = false, replay = false): Promise<LoginResult | OAuthExchangeResult> {
     const body = request.body as Record<string, unknown>;
     const context: Record<string, string | null> = {};
@@ -331,15 +369,38 @@ export function createAuthApi(
     }
     const attempt = attempts.begin(method, reference, context, replay);
     const revision = vault.revision();
+    const previous = vault.read();
     try {
+      if (previous?.accessToken && options.beforeSessionEnd) {
+        await options.beforeSessionEnd(previous);
+        if (vault.revision() !== revision) throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
+      }
       const data = await client.request<AuthSessionResponse>({ ...request, headers: contextHeaders(attempt) });
       if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
       const result = oauth ? oauthExchangeFromResponse(data, vault, revision, refreshCredentialMode)
         : consumeLoginResponse(data, vault, revision, refreshCredentialMode);
-      if ("kind" in result && result.kind === "challenge") attempts.challenge(attempt, result.challengeNo);
+      if ("kind" in result && result.kind === "challenge") {
+        attempts.challenge(attempt, result.challengeNo);
+        if (previous?.accessToken && vault.revision() === revision) options.sessionEndCancelled?.(previous);
+      }
       else attempts.complete(attempt);
       return result;
     } catch (cause) {
+      if (previous?.accessToken && vault.revision() === revision) options.sessionEndCancelled?.(previous);
+      if (method === "OAUTH" && body?.flowId && cause instanceof ApiError
+          && cause.message === "OAUTH_FLOW_EXPIRED") {
+        // An expired flow can still have issued a session. Query the original proof
+        // after the server's expiry reply before allowing any new login attempt.
+        try { return await recoverAttempt(attempt, revision); }
+        catch (recoveryError) {
+          if (vault.revision() !== revision)
+            throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
+          if (!(recoveryError instanceof ApiError) || recoveryError.message !== "LOGIN_ATTEMPT_RECOVERY_INVALID"
+              || (recoveryError.status !== 401 && recoveryError.code !== 401)) throw recoveryError;
+          attempts.complete(attempt);
+          throw new ApiError({ kind: "auth", message: "OAUTH_LOGIN_EXPIRED" });
+        }
+      }
       if (!replay) {
         // A CAPTCHA rejects issuance, but the provider identity/context still belongs
         // to this attempt. Preserve its frozen installation for the challenge retry.
@@ -348,7 +409,7 @@ export function createAuthApi(
           attempts.challenge(attempt);
         else if (method === "OAUTH" && body?.flowId && cause instanceof ApiError
             && cause.message === "OAUTH_ACCOUNT_LINK_REQUIRED") attempts.complete(attempt);
-        else if (method === "REGISTRATION" && isSettledRegistrationConflict(cause)) attempts.complete(attempt);
+        else if ((method === "REGISTRATION" || method === "OAUTH") && isSettledRegistrationConflict(cause)) attempts.complete(attempt);
         else attempts.failed(attempt, cause);
       }
       throw cause;
@@ -375,6 +436,7 @@ export function createAuthApi(
     if (vault.revision() !== expectedRevision) return;
     const snapshot = vault.read();
     if (!snapshot) return;
+    void options.beforeSessionEnd?.(snapshot);
     // Clear synchronously before the network request so a rejected completion
     // cannot leave a hidden Bearer token available to background requests.
     if (!vault.clearIfUnchanged(expectedRevision)) return;
@@ -400,33 +462,33 @@ export function createAuthApi(
         throw new ApiError({ kind: "configuration", message: "LOGIN_ATTEMPT_REQUIRED" });
       const paths: Record<string, string> = { PASSWORD: "/auth/users/login", OTP: "/auth/users/login/otp/verify",
         TWO_FACTOR: "/auth/users/login/2fa", REGISTRATION: "/auth/users/register", OAUTH: "/auth/users/oauth/exchange" };
+      const providerLogin = attempt.authMethod === "OAUTH" && !!attempt.context.flowId;
       const method = !attempt.pending && attempt.authMethod === "PASSWORD" && attempt.context.challengeNo
         ? "TWO_FACTOR" : attempt.authMethod;
       const reference = method === "TWO_FACTOR" ? attempt.context.challengeNo! : attempt.authReference;
-      const path = paths[method];
+      const path = providerLogin ? "/auth/users/oauth/provider/complete" : paths[method];
       if (!path) throw new ApiError({ kind: "configuration", message: "LOGIN_ATTEMPT_REQUIRED" });
       // Only newly entered secrets may vary. Identity, provider/challenge, and
       // registration choices remain those of the original durable attempt.
       const result = await issue(method, reference, { path, method: "POST", authenticated: false,
         body: { ...attempt.context, password: credentials.password, code: credentials.code, captchaTicket: credentials.captchaTicket },
-        ...(attempt.authMethod === "PASSWORD" ? { acceptedResponses: [{ status: 428, code: 428, message: "USER_TWO_FACTOR_VERIFICATION_REQUIRED" }] } : {}),
-      }, attempt.authMethod === "OAUTH", attempt.pending);
+        ...(attempt.authMethod === "PASSWORD" || providerLogin ? { acceptedResponses: [{ status: 428, code: 428, message: "USER_TWO_FACTOR_VERIFICATION_REQUIRED" }] } : {}),
+      }, attempt.authMethod === "OAUTH" && !providerLogin, attempt.pending);
       return "kind" in result ? result : { kind: "authenticated", user: result.user, vaultRevision: result.vaultRevision };
     },
     async recoverLogin() {
       const attempt = attempts.read();
       if (!attempt?.pending) throw new ApiError({ kind: "configuration", message: "LOGIN_ATTEMPT_REQUIRED" });
-      const revision = vault.revision();
-      const data = await client.request<AuthSessionResponse>({ method: "POST",
-        path: `/auth/users/login/attempts/${encodeURIComponent(attempt.loginAttemptId)}/recover`, authenticated: false,
-        headers: contextHeaders(attempt), body: { installationId: attempt.installationId,
-          executionSupported: attempt.executionSupported, recoveryProof: attempt.recoveryProof,
-          authMethod: attempt.authMethod, authReference: attempt.authReference } });
-      // A missing/in-progress result never authorizes a fresh attempt.
-      if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
-      const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
-      if (result.kind === "authenticated") attempts.complete(attempt);
-      return result;
+      return recoverAttempt(attempt, vault.revision());
+    },
+    async completeProviderLogin(request, expectedRevision) {
+      if (restoreInFlight) await restoreInFlight;
+      if (vault.revision() !== expectedRevision)
+        throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
+      return issue("OAUTH", `${request.provider}:${request.flowId}`, {
+        path: "/auth/users/oauth/provider/complete", method: "POST", authenticated: false, body: request,
+        acceptedResponses: [{ status: 428, code: 428, message: "USER_TWO_FACTOR_VERIFICATION_REQUIRED" }],
+      }) as Promise<LoginResult>;
     },
     async login(request) {
       // Set-Cookie from a bootstrap restore must settle before a new login.
@@ -452,6 +514,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
+        headers: otpHeaders(),
       }));
     },
     async completeOtpLogin(request) {
@@ -473,6 +536,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
+        headers: otpHeaders(),
       }));
     },
     async verifyPasswordResetOtp(request) {
@@ -516,6 +580,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
+        headers: otpHeaders(),
       });
       return registrationOtpFromResponse(data);
     },
@@ -601,8 +666,10 @@ export function createAuthApi(
     },
     async logout() {
       const revision = vault.revision();
-      const refreshToken = vault.read()?.refreshToken;
+      const snapshot = vault.read();
+      const refreshToken = snapshot?.refreshToken;
       try {
+        if (snapshot?.accessToken) await options.beforeSessionEnd?.(snapshot);
         if (refreshCredentialMode === "cookie" || refreshToken) {
           await client.request({
             path: "/auth/users/logout",

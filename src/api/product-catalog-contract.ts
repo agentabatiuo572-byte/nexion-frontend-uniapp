@@ -1,4 +1,5 @@
-import type { Product, PurchaseGate } from "@/mock/products";
+import { isLiteProduct } from "@/lib/lite-scope";
+import type { Product, ProductTaskLevel, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
 
 export type CatalogProduct = Product;
@@ -26,6 +27,7 @@ const GATE_MODES = new Set<PurchaseGate["mode"]>(["all", "either"]);
 const GATE_PERIODS = new Set<NonNullable<PurchaseGate["quotaPeriod"]>>(["month", "lifetime"]);
 const PRODUCT_TYPES = new Set<NonNullable<Product["productType"]>>(["DEVICE", "SHARE"]);
 const INVENTORY_MODES = new Set<NonNullable<Product["inventoryMode"]>>(["FINITE", "UNLIMITED"]);
+const TASK_LEVELS: readonly ProductTaskLevel[] = [1, 2, 3, 4];
 
 function invalid(): never {
   throw new ProductCatalogContractError();
@@ -61,6 +63,11 @@ function finiteNumber(value: unknown, minimum = 0): number {
 function optionalNumber(value: unknown, minimum = 0): number | undefined {
   if (value === null || value === undefined) return undefined;
   return finiteNumber(value, minimum);
+}
+
+function optionalEstimate(value: unknown): number | undefined {
+  const parsed = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+  return optionalNumber(parsed);
 }
 
 function integer(value: unknown, minimum = 0): number {
@@ -129,26 +136,14 @@ function purchaseGate(value: unknown): PurchaseGate | undefined {
   const quotaPeriod = optionalString(gate.quotaPeriod);
   if (quotaPeriod && !GATE_PERIODS.has(quotaPeriod as NonNullable<PurchaseGate["quotaPeriod"]>)) return invalid();
   return {
-    rankMin: optionalInteger(gate.rankMin),
-    activeDirectMin: optionalInteger(gate.activeDirectMin),
-    teamVolumeMin: optionalNumber(gate.teamVolumeMin),
+    rankMin: optionalInteger(gate.rankMin) ?? 0,
+    activeDirectMin: optionalInteger(gate.activeDirectMin) ?? 0,
+    teamComputePointsMin: optionalNumber(gate.teamComputePointsMin) ?? 0,
     mode: gate.mode as PurchaseGate["mode"],
     quotaCap: optionalInteger(gate.quotaCap),
     quotaSold: optionalInteger(gate.quotaSold),
     quotaPeriod: quotaPeriod as PurchaseGate["quotaPeriod"],
     enforce: gate.enforce,
-  };
-}
-
-function ai(value: unknown): Product["ai"] {
-  if (value === null || value === undefined) return undefined;
-  const source = record(value);
-  return {
-    imageGenPerMin: optionalNumber(source.imageGenPerMin),
-    llmTokensPerSec: optionalNumber(source.llmTokensPerSec),
-    videoMinPerHour: optionalNumber(source.videoMinPerHour),
-    fineTuneMins: optionalNumber(source.fineTuneMins),
-    unlocks: optionalString(source.unlocks),
   };
 }
 
@@ -182,6 +177,7 @@ function product(value: unknown): CatalogProduct {
   const shareYieldMax = optionalNumber(source.shareYieldMax);
   if (productType === "SHARE" && ((shareYieldMin === undefined) !== (shareYieldMax === undefined)
     || (shareYieldMin !== undefined && (shareYieldMin <= 0 || shareYieldMax! < shareYieldMin)))) return invalid();
+  const taskLevels: unknown[] = Array.isArray(source.taskLevels) ? source.taskLevels : [];
 
   return {
     id: nonEmptyString(source.id),
@@ -193,14 +189,21 @@ function product(value: unknown): CatalogProduct {
     vram: displayString(source.vram),
     hashRate: optionalString(source.hashRate),
     power: displayString(source.power),
+    uptime: displayString(source.uptime),
+    specDocumentTitle: optionalString(source.specDocumentTitle),
+    specDocumentUrl: optionalString(source.specDocumentUrl),
     datacenter: displayString(source.datacenter),
     // 质保直接消费 nx_admin_device_sku.warranty 的服务端原文；它可能是月数、年数或
     // 限定条款，客户端不得改造成并不存在的 warrantyMonths 再猜单位。
     warranty: displayString(source.warranty),
     dailyEarn: finiteNumber(source.dailyEarn),
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
+    monthlyEstimateUsdt: optionalEstimate(source.monthlyEstimateUsdt),
+    dailyEstimateLowUsdt: optionalEstimate(source.dailyEstimateLowUsdt),
+    dailyEstimateHighUsdt: optionalEstimate(source.dailyEstimateHighUsdt),
     shareYieldMin,
     shareYieldMax,
+    computePoints: optionalInteger(source.computePoints),
     price: finiteNumber(source.price, Number.EPSILON),
     sold: integer(source.sold),
     imageUrl: productMediaUrl(source.imageUrl),
@@ -209,7 +212,7 @@ function product(value: unknown): CatalogProduct {
     inventoryMode,
     stock: optionalInteger(source.stock),
     features: [...source.features],
-    ai: ai(source.ai),
+    taskLevels: TASK_LEVELS.filter((level) => taskLevels.includes(level)),
     status: lifecycle as Product["status"],
     available: booleanValue(source.available),
     releaseState: optionalString(source.releaseState),
@@ -236,6 +239,6 @@ export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnap
     sourceEnvironment: "PRODUCTION",
     runId: "",
     revision: source.revision as string | null,
-    products: source.products.map(product),
+    products: source.products.map(product).filter(isLiteProduct),
   };
 }

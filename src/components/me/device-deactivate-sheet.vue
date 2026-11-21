@@ -27,7 +27,7 @@
       <view v-if="task" :style="taskCardStyle">
         <view class="flex items-center justify-between" style="gap: 8px">
           <view class="min-w-0 flex-1">
-            <text class="block truncate" :style="taskModelStyle">{{ task.model }}</text>
+            <text class="block truncate" :style="taskModelStyle">{{ task.type }}</text>
             <text class="block truncate" :style="taskRewardStyle">{{ taskRewardLine }}</text>
           </view>
           <view class="text-right shrink-0">
@@ -48,7 +48,7 @@
         </view>
         <view class="w-full flex items-center justify-center transition active:bg-[color-mix(in_srgb,var(--v5-brand-2)_25%,transparent)]" :style="forceBtnStyle" role="button" tabindex="0" @click="emit('force')"  @keydown.enter.prevent="emit('force')" @keydown.space.prevent="emit('force')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
-          <text :style="forceLabelStyle">{{ t.deactivateSheet.forceCta }}</text>
+          <text :style="forceLabelStyle">{{ task?.executionMode === 'SIMULATED' ? computeCopy.stopNow : t.deactivateSheet.forceCta }}</text>
         </view>
         <view class="w-full flex items-center justify-center transition active:bg-[var(--v5-surface-3)]" :style="backBtnStyle" role="button" tabindex="0" @click="emit('dismiss')"  @keydown.enter.prevent="emit('dismiss')" @keydown.space.prevent="emit('dismiss')">
           <text :style="backLabelStyle">{{ t.deactivateSheet.backCta }}</text>
@@ -60,10 +60,15 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
-import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { formatTaskReward } from "@/lib/task-reward-display";
+import { taskProgressPercent } from "@/lib/task-progress";
+import { projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { computed, ref, type CSSProperties } from "vue";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import type { Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 
@@ -71,34 +76,34 @@ const props = defineProps<{ device: Device | null }>();
 const emit = defineEmits<{ (e: "wait"): void; (e: "force"): void; (e: "dismiss"): void }>();
 
 const t = useT();
+const computeCopy = useComputeV2Copy();
 useDialogA11y(computed(() => props.device !== null), ".nx-device-deactivate-root", () => emit("dismiss"));
 
-// Local epoch-ms clock so the task progress bar / ETA tick once a second while
-// the sheet is open. Component lifecycle (not page) → onMounted/onUnmounted (P-021).
+// Re-read both clocks whenever this visible sheet opens; never accumulate hidden ticks.
 const nowMs = ref(Date.now());
-let clock: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  clock = setInterval(() => {
-    nowMs.value = Date.now();
-  }, 1000);
-});
-onUnmounted(() => {
-  if (clock) clearInterval(clock);
-});
+const monotonicNow = ref(readMonotonicNowMs());
+useVisibleInterval(() => {
+  nowMs.value = Date.now();
+  monotonicNow.value = readMonotonicNowMs();
+}, 1000, () => props.device !== null);
 
 const task = computed(() => props.device?.currentTask ?? null);
+const taskNow = computed(() => props.device?.taskServerNow != null && props.device.taskServerNowReceivedAt != null
+  ? projectServerNow(props.device.taskServerNow, props.device.taskServerNowReceivedAt, monotonicNow.value) : nowMs.value);
 const descLine = computed(() =>
-  props.device ? fmt(t.value.deactivateSheet.desc, { name: deviceName(t.value, props.device) }) : "",
+  props.device ? fmt(task.value?.executionMode === "SIMULATED" ? computeCopy.value.stopDescription : t.value.deactivateSheet.desc,
+    { name: deviceName(t.value, props.device) }) : "",
 );
 const progressPct = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return Math.round(Math.min(100, ((nowMs.value - tk.startedAt) / 1000 / tk.totalSec) * 100));
+  return taskProgressPercent(tk, taskNow.value, props.device?.interruptedAt,
+    props.device?.kind === "phone" ? props.device.phoneValidUntil : null) ?? 0;
 });
 const etaSec = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return Math.max(0, Math.round(tk.totalSec - (nowMs.value - tk.startedAt) / 1000));
+  return tk.startedAt === null || tk.status === "QUEUED" ? tk.totalSec : Math.max(0, Math.round(tk.totalSec - (taskNow.value - tk.startedAt) / 1000));
 });
 const etaLabel = computed(() =>
   etaSec.value >= 60 ? `~${Math.ceil(etaSec.value / 60)}m` : `~${etaSec.value}s`,
@@ -107,9 +112,10 @@ const etaLine = computed(() => fmt(t.value.deactivateSheet.etaRemaining, { eta: 
 const taskRewardLine = computed(() => {
   const tk = task.value;
   if (!tk) return "";
+  if (tk.executionMode === "SIMULATED") return formatTaskReward(tk, true);
   return fmt(t.value.deactivateSheet.taskRewardLine, {
     client: tk.client,
-    amount: formatAmount(tk.reward),
+    amount: formatAmount(tk.reward, 6),
   });
 });
 
@@ -124,22 +130,24 @@ const scrimStyle: CSSProperties = {
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
-const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0", boxShadow: "var(--nx-glass-edge)",
   position: "fixed",
   left: 0,
   right: 0,
   bottom: 0,
   zIndex: 800,
-  borderTopLeftRadius: "var(--nx-glass-radius)",
-  borderTopRightRadius: "var(--nx-glass-radius)",
   background: "var(--nx-glass-fill)",
   borderTop: "none",
-  padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
+  boxSizing: "border-box",
+  maxHeight: "calc(100vh - var(--nx-overlay-top))",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  padding: "18px 16px var(--nx-overlay-bottom)",
 };
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-hero-title)",
+  fontWeight: "var(--ui-type-hero-title-weight)",
   color: "var(--v5-ink)",
 };
 const descStyle: CSSProperties = {
@@ -150,10 +158,13 @@ const descStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 const closeBtnStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
+  width: "44px",
+  height: "44px",
+  boxSizing: "border-box",
+  padding: "4px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
+  backgroundClip: "content-box",
 };
 const taskCardStyle: CSSProperties = {
   marginTop: "12px",
@@ -217,7 +228,7 @@ const forceBtnStyle: CSSProperties = {
 };
 const forceLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
@@ -229,7 +240,7 @@ const backBtnStyle: CSSProperties = {
 };
 const backLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-2)",
 };
 

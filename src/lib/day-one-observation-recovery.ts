@@ -22,7 +22,8 @@ export function observationRejectionReason(error: unknown): DayOneObservationRea
   return "unconfirmed";
 }
 export function observationRecoveryRoute(reason: DayOneObservationReason, web: boolean, taskRoute: string): string {
-  if (reason === "onboarding") return web ? "/pages/register/success?setup=1" : "/pages/onboarding/estimator";
+  // Lite has no setup step: a server setup refusal can only be resolved by support.
+  if (reason === "onboarding") return "/pages/support/messages";
   if (reason === "terms") return buildLegalTermsRoute(taskRoute);
   return taskRoute;
 }

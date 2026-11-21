@@ -1,23 +1,36 @@
+import { invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./config-types";
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
-import { platformConfigApi, remoteApiEnabled } from "@/api/runtime";
-import type { PlatformPublicStatsAuthority } from "@/api/platform-config-api";
+import { apiRuntimeConfig, apiRuntimeClientOrigin, platformConfigApi, remoteApiEnabled } from "@/api/runtime";
+import { parseInterfaceLanguages, type PlatformPublicStatsAuthority } from "@/api/platform-config-api";
+import { ApiError } from "@/api/errors";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
+import { LOCALES, type UiLocale } from "@/i18n";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 const CONFIG_REFRESH_MS = 30 * 60_000;
 const CONFIG_INVALIDATION_MS = 90_000;
 const CONFIG_RETRY_MS = 60_000;
+function restoreInterfaceLanguages(cacheKey: string): UiLocale[] | null {
+  try {
+    return parseInterfaceLanguages(uni.getStorageSync(cacheKey));
+  } catch {
+    return null;
+  }
+}
 
 // Platform config / feature-flag store. Single source for client-side feature
 // flags + tunable platform config across all carriers (signed APP / H5 /
 // janus-loaded real-disc).
-// Remote builds use the public platform snapshot. Local demo builds use the mock seed.
+//
+// Remote builds read a versioned platform snapshot; demo builds retain their seed.
 export const useConfig = defineStore("config", () => {
+  const interfaceLanguagesCacheKey = `nexgrid-interface-languages-v1:${JSON.stringify([apiRuntimeClientOrigin.environment, apiRuntimeClientOrigin.baseUrl])}`;
   const mockConfig = completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG);
   // Remote mode never exposes plausible server-owned seed values while the
   // authority request is pending or failed. The full structural shape keeps
@@ -28,6 +41,7 @@ export const useConfig = defineStore("config", () => {
       computeShareEnabled: false,
       homeNewcomerTasksEnabled: false,
       homeWeeklyPromoEnabled: false,
+      stakingVisible: false,
     },
     publicStats: {
       // 🔴 三个 -1 是**故意的非法值**,不是随手写的 0(2026-08-12 合并收口;
@@ -42,6 +56,7 @@ export const useConfig = defineStore("config", () => {
       registeredUsersBase: 0,
       registeredUsersMonthlyGrowthPct: -1,
       registeredUsersAnchorAt: 0,
+      activeJobsBase: null,
       realUserCount: 0,
       virtualUserCount: -1,
       hashratePercentileTable: [],
@@ -122,7 +137,15 @@ export const useConfig = defineStore("config", () => {
   };
   const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
   const publicStatsAuthority = ref<PlatformPublicStatsAuthority | null>(null);
+  const transientFailure = ref(false);
   const configStatus = ref<"idle" | "loading" | "ready" | "failed">(remoteApiEnabled ? "idle" : "ready");
+  // Language eligibility alone is cached, without restoring platform readiness, version or timers.
+  const interfaceLanguages = ref<readonly UiLocale[] | null>(restoreInterfaceLanguages(interfaceLanguagesCacheKey));
+  /** Until this source has a confirmed list, only the mandatory English language is offered. */
+  const offeredLocales = computed(() => {
+    const switchedOn = interfaceLanguages.value;
+    return LOCALES.filter((locale) => (switchedOn ?? ["en"]).some((code) => code === locale.code));
+  });
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
   // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
@@ -162,13 +185,18 @@ export const useConfig = defineStore("config", () => {
    */
   const loading = ref(false);
   let currentLoad: Promise<void> | null = null;
+  let currentLoadStartedAt = 0;
   let snapshotVersion: string | null = null;
   let invalidation = 0;
   let nextCheckAt = 0;
   let retryAt = 0;
+  let retryAfterAt = 0;
   const guestSlot = Math.floor(Math.random() * CONFIG_REFRESH_MS);
   let refreshSlot = guestSlot;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  const originKey = () => JSON.stringify([apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl]);
+  const clientOrigin = JSON.stringify([apiRuntimeClientOrigin.environment, apiRuntimeClientOrigin.baseUrl]);
+  let environmentInvalidated = false;
 
   function clearRemotePlatformAuthority() {
     if (!remoteApiEnabled) return;
@@ -177,6 +205,7 @@ export const useConfig = defineStore("config", () => {
       ...config.value,
       publicStats: { ...unavailableServerConfig.publicStats },
       verifiedStats: null,
+      networkPulse: null,
       rewards: {
         enabled: false,
         effectiveAt: null,
@@ -188,13 +217,32 @@ export const useConfig = defineStore("config", () => {
     syncFailed.value = true;
   }
 
+  function invalidateEnvironment(): void {
+    environmentInvalidated = true;
+    currentLoad = null;
+    invalidation += 1;
+    snapshotVersion = null;
+    clearTimeout(refreshTimer);
+    invalidatePassiveTabRead("config");
+    loading.value = false;
+    clearRemotePlatformAuthority();
+    interfaceLanguages.value = null;
+    configStatus.value = "failed";
+    transientFailure.value = false;
+  }
+  function currentClient(): boolean {
+    if (originKey() !== clientOrigin && !environmentInvalidated) invalidateEnvironment();
+    return !environmentInvalidated;
+  }
+  watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], invalidateEnvironment, { flush: "sync" });
+
   function nextSlot(now: number): number {
     return (Math.floor((now - refreshSlot) / CONFIG_REFRESH_MS) + 1) * CONFIG_REFRESH_MS + refreshSlot;
   }
 
   function scheduleRefresh(): void {
     clearTimeout(refreshTimer);
-    if (!remoteApiEnabled || !foregroundReadAllowed() || currentLoad) return;
+    if (!remoteApiEnabled || !currentClient() || !foregroundReadAllowed() || currentLoad) return;
     const delay = Math.max(nextCheckAt, retryAt) - Date.now();
     if (delay <= 0) void load();
     else refreshTimer = setTimeout(scheduleRefresh, delay);
@@ -218,21 +266,25 @@ export const useConfig = defineStore("config", () => {
     scheduleRefresh();
   }
 
-  function load(force = false): Promise<void> {
+  function load(force = false, recovering = false): Promise<void> {
+    if (!currentClient()) return Promise.resolve();
     if (currentLoad) return currentLoad;
     const now = Date.now();
-    if (remoteApiEnabled && (!foregroundReadAllowed() || (!force && (now < retryAt || now < nextCheckAt)))) {
+    if (remoteApiEnabled && (!foregroundReadAllowed() || now < retryAfterAt
+      || (!force && (now < nextCheckAt || (!recovering && now < retryAt))))) {
       return Promise.resolve();
     }
+    invalidateBeforePassiveTabRead("config");
     const previousStatus = configStatus.value;
     loading.value = true;
     configStatus.value = "loading";
+    const startedAt = Date.now();
     const startedInvalidation = invalidation;
     let flight!: Promise<void>;
     // Start in a microtask so even a synchronous API mock/adapter throw cannot
     // run finally before currentLoad has received this flight.
     flight = Promise.resolve().then(async () => {
-      const current = () => currentLoad === flight && invalidation === startedInvalidation;
+      const current = () => currentClient() && currentLoad === flight && invalidation === startedInvalidation;
       try {
         if (!current() || (remoteApiEnabled && !foregroundReadAllowed())) return;
         const { version, snapshot: remote } = await platformConfigApi.platformConfig(snapshotVersion);
@@ -259,6 +311,7 @@ export const useConfig = defineStore("config", () => {
             //   解析器返回的每个属于 PlatformConfig 的字段都必须在这里落地,漏一个即红。
             publicStats: remote.publicStats,
             verifiedStats: remote.verifiedStats,
+            networkPulse: remote.networkPulse,
             onlineBonus: remote.onlineBonus,
             rewards: remote.rewards,
             computeShare: remote.computeShare,
@@ -266,19 +319,33 @@ export const useConfig = defineStore("config", () => {
           };
           if (!current()) return;
           publicStatsAuthority.value = remote.publicStatsAuthority;
+          if (remote.interfaceLanguages) {
+            interfaceLanguages.value = remote.interfaceLanguages;
+            try {
+              uni.setStorageSync(interfaceLanguagesCacheKey, remote.interfaceLanguages);
+            } catch {
+              // A storage failure must not invalidate the successful in-memory platform read.
+            }
+          }
         }
         if (!current()) return;
         snapshotVersion = version;
         nextCheckAt = nextSlot(Date.now());
         retryAt = 0;
+        retryAfterAt = 0;
+        transientFailure.value = false;
         syncFailed.value = false;
         if (!current()) return;
         configStatus.value = "ready";
-      } catch {
+      } catch (error) {
         if (!current()) return;
         snapshotVersion = null;
         nextCheckAt = 0;
-        retryAt = Date.now() + CONFIG_RETRY_MS;
+        const failedAt = Date.now();
+        const retryAfterMs = error instanceof ApiError ? error.retryAfterMs ?? 0 : 0;
+        retryAfterAt = failedAt + retryAfterMs;
+        retryAt = failedAt + Math.max(CONFIG_RETRY_MS, retryAfterMs);
+        transientFailure.value = isTransientReadFailure(error);
         clearRemotePlatformAuthority();
         if (!current()) return;
         configStatus.value = "failed";
@@ -292,7 +359,23 @@ export const useConfig = defineStore("config", () => {
       }
     });
     currentLoad = flight;
+    currentLoadStartedAt = startedAt;
+    rememberPassiveTabRead("config", flight, undefined, startedAt, () => configStatus.value === "ready");
     return flight;
+  }
+
+  /** Passive visitors join startup work without requesting a queued manual reload. */
+  function revalidate(): Promise<void> {
+    if (!currentClient()) return Promise.resolve();
+    if (currentLoad) return rememberPassiveTabRead("config", currentLoad, undefined, currentLoadStartedAt, () => configStatus.value === "ready");
+    return runPassiveTabRead("config", () => load(), undefined, () => configStatus.value === "ready");
+  }
+
+  /** Join startup work without turning a page's wait into an extra reload. */
+  function ensureLoaded(): Promise<void> {
+    if (!currentClient()) return Promise.resolve();
+    if (currentLoad) return currentLoad;
+    return load();
   }
 
   // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。
@@ -324,8 +407,10 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, publicStatsAuthority, configStatus, syncFailed, loading,
-    load, refresh: () => load(true), ensureLoaded: load, startRefresh, invalidate, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
+  return { config, publicStatsAuthority, configStatus, transientFailure, interfaceLanguages, offeredLocales, syncFailed, loading,
+    load, refresh: () => load(true), recover: () => load(false, true), recoveryNotBefore: () => retryAfterAt,
+    revalidate, ensureLoaded, startRefresh, invalidate,
+    feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 
 // currentNetworkConfirmFeeUsd(权威网络费跨 store 纯函数)已随 c37e642 的 D5 policy

@@ -1,3 +1,4 @@
+import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
 /**
  * Ported from Nexion-prototype/lib/store/orders.ts
  * (zustand persist → Pinia + uni storage).
@@ -19,8 +20,10 @@ import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { createAccountRowCommit } from "./account-scoped-storage";
+import { beginOrderAction,clearOrderAction,readOrderAction } from '@/lib/order-command-fence';
+import { asApiError,isSettledRejection } from '@/api/errors';
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
-import type { CanonicalOrder, CanonicalOrderStatus } from "@/api/order-api";
+import type { CanonicalOrder, CanonicalOrderStatus, OrderCloseReasonCode, OrderRefundReasonCode } from "@/api/order-api";
 import type { OrderLineItem } from "@/lib/order-line-items";
 import {
   captureRuntimeRevision,
@@ -58,7 +61,13 @@ export interface Order {
   promoDiscountUSD?: number;
   /** FEAT-TRIAL02 试用抵扣金(USDT)——仅结算抵减;服务端在同一订单事务里复算并 convert。 */
   trialOffsetUSD?: number;
+  /** FEAT-TRIAL05 早购立减(USDT)。 */
+  earlyDiscountUSD?: number;
+  /** 试用转购购后到账的 USDT / UVT 奖励;fullTerm 订单退款时随退款收回。 */
+  trialReward?: { usdt: number; nex: number; reversedOnRefund: boolean };
   total: number | string;   // Promoted history preserves the server's exact decimal string.
+  /** Server-reported amount actually paid incl. channel and network fees. */
+  paidTotal?: string;
   promotionQuoteId?: string;
   paymentMethod: string;    // "usdt-trc20" etc
   status: OrderStatus;
@@ -70,6 +79,8 @@ export interface Order {
   refundAmountUsdt?: number;
   refundChannel?: string;
   refundBillNo?: string;
+  refundReasonCode?: OrderRefundReasonCode;
+  closeReasonCode?: OrderCloseReasonCode;
   timeline: OrderTimelineEvent[];
   deviceId?: string;        // the spawned device id once activated
   /** Canonical server data-center; null means the location is not known. */
@@ -222,9 +233,16 @@ export const useOrders = defineStore("orders", () => {
       ...(row.lineItems != null && { lineItems: row.lineItems }),
       subtotal: row.subtotalUsdt,
       unitPrice: row.unitPriceUsdt,
-      discount: row.tradeinNo ? 0 : row.discountUsdt,
+      discount: row.tradeinNo || row.trialSettlement ? 0 : row.discountUsdt,
+      ...(row.trialSettlement && {
+        ...(row.trialSettlement.promoDiscountUsdt > 0 && { promoDiscountUSD: row.trialSettlement.promoDiscountUsdt }),
+        ...(row.trialSettlement.offsetUsdt > 0 && { trialOffsetUSD: row.trialSettlement.offsetUsdt }),
+        ...(row.trialSettlement.earlyDiscountUsdt > 0 && { earlyDiscountUSD: row.trialSettlement.earlyDiscountUsdt }),
+        trialReward: { usdt: row.trialSettlement.rewardUsdt, nex: row.trialSettlement.rewardNex, reversedOnRefund: row.trialSettlement.fullTerm },
+      }),
       ...(row.tradeinNo && { tradeInCredit: row.discountUsdt, tradeInDeviceId: String(row.sourceDeviceId) }),
       total: row.amountUsdt,
+      ...(row.paidTotalUsdt !== undefined && { paidTotal: row.paidTotalUsdt }),
       ...(row.promotionQuoteId && { promotionQuoteId: row.promotionQuoteId }),
       paymentMethod: row.paymentMethod ?? "wallet",
       status,
@@ -236,6 +254,8 @@ export const useOrders = defineStore("orders", () => {
       ...(row.refundAmountUsdt != null && { refundAmountUsdt: row.refundAmountUsdt }),
       ...(row.refundChannel != null && { refundChannel: row.refundChannel }),
       ...(row.refundBillNo != null && { refundBillNo: row.refundBillNo }),
+      ...(row.refundReasonCode != null && { refundReasonCode: row.refundReasonCode }),
+      ...(row.closeReasonCode != null && { closeReasonCode: row.closeReasonCode }),
       ...(row.targetDeviceId != null && { deviceId: String(row.targetDeviceId) }),
       timeline,
       dataCenter: row.dataCenter,
@@ -243,6 +263,7 @@ export const useOrders = defineStore("orders", () => {
   }
 
   async function refreshRemote(): Promise<void> {
+    invalidateBeforePassiveTabRead("orders");
     if (!remoteApiEnabled) return;
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
@@ -253,7 +274,7 @@ export const useOrders = defineStore("orders", () => {
       && requestGeneration === refreshGeneration
       && isCurrentRuntimeRevision(requestRunScope);
     try {
-      const canonical = await orderApi.list(null, 50);
+      const canonical = await orderApi.list(null, 20);
       if (!isCurrent()) return;
       orders.value = canonical.orders.map(fromCanonical);
       nextCursor.value = canonical.nextCursor ?? null;
@@ -275,7 +296,7 @@ export const useOrders = defineStore("orders", () => {
       && isCurrentRuntimeRevision(requestRunScope);
     loadingMore.value = true;
     try {
-      const canonical = await orderApi.list(cursor, 50);
+      const canonical = await orderApi.list(cursor, 20);
       if (!isCurrent()) return;
       if (canonical.nextCursor === cursor) {
         nextCursor.value = null;
@@ -319,18 +340,26 @@ export const useOrders = defineStore("orders", () => {
     const requestRunScope = captureRuntimeRevision();
     const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
       && isCurrentRuntimeRevision(requestRunScope);
+    const prior=readOrderAction(requestBoundKey,id);
+    if (prior?.kind==='pay') return false;
     try {
-      await orderApi.cancel(id, `order-cancel:${id}`);
+      const action=beginOrderAction(requestBoundKey,'cancel',id,null);
+      await orderApi.cancel(id, action.key);
       if (!isCurrent()) return false;
       await ensureRemoteOrder(id);
       if (!isCurrent()) return false;
+      if (orders.value.some(item=>item.id===id&&item.status!=='placed')) clearOrderAction(requestBoundKey,id,action.key);
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
-    } catch {
+    } catch (error) {
       if (!isCurrent()) return false;
       // The command may have committed before the response was lost. Read-back is
       // the only safe result for the UI; never project a local cancellation.
       try { await ensureRemoteOrder(id); } catch { return false; }
       if (!isCurrent()) return false;
+      const latest=orders.value.find(item=>item.id===id),failure=asApiError(error);
+      if (latest && (latest.status!=='placed' || (isSettledRejection(error)
+          && !failure.message.startsWith('IDEMPOTENCY_') && (failure.status??0)<500)))
+        clearOrderAction(requestBoundKey,id,`order-cancel:${id}`);
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
     }
   }

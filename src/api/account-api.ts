@@ -3,6 +3,8 @@ import type { SecurityMutation, SecurityState } from "./contracts";
 import { ApiError } from "./errors";
 
 export interface AccountApi {
+  sendPhoneBindingChallenge(countryCode: string, phone: string, captchaTicket?: string): Promise<{ challengeNo: string; resendAfterSec: number; deliveryHint: string }>;
+  bindPhone(countryCode: string, phone: string, challengeNo: string, code: string): Promise<void>;
   securityOverview(cursor?: string): Promise<SecurityState>;
   passwordCommandReceipt(key: string): Promise<SecurityMutation | null>;
   changePassword(currentPassword: string, newPassword: string, idempotencyKey: string): Promise<SecurityMutation>;
@@ -11,8 +13,26 @@ export interface AccountApi {
   revokeSession(sessionId: string): Promise<SecurityMutation>;
   revokeOtherSessions(): Promise<SecurityMutation>;
   accountDeletionStatus(): Promise<AccountDeletionStatus>;
-  requestAccountDeletion(currentPassword: string, idempotencyKey: string): Promise<AccountDeletionRequest>;
+  requestAccountDeletion(currentPassword: string, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
   cancelAccountDeletion(expectedVersion: number, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
+  phoneNumberPolicy(): Promise<PhoneNumberChangePolicy>;
+  startPhoneNumberChange(currentPassword: string, countryCode: string, phone: string): Promise<PhoneNumberChangeChallenge>;
+  confirmPhoneNumberChange(changeNo: string, oldCode: string, newCode: string): Promise<void>;
+}
+
+export interface PhoneNumberChangePolicy {
+  windowDays: number;
+  maxChanges: number;
+  usedChanges: number;
+  remainingChanges: number;
+  nextAvailableAt: string;
+}
+
+export interface PhoneNumberChangeChallenge {
+  changeNo: string;
+  expiresInSeconds: number;
+  oldPhoneMasked: string;
+  newPhoneMasked: string;
 }
 
 export interface TwoFactorChallenge {
@@ -30,10 +50,25 @@ export interface AccountDeletionRequest {
   completedAt: string | null;
   reason: string | null;
   blockReason: string | null;
+  originalReason: string | null;
   cancelledAt: string | null;
 }
 
 export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
+
+export const ACCOUNT_DELETION_REASON_MAX_LENGTH = 255;
+export type AccountDeletionReasonValidation =
+  | { ok: true }
+  | { ok: false; code: "ACCOUNT_DELETION_REASON_INVALID" };
+
+export function validateAccountDeletionReason(reason: string): AccountDeletionReasonValidation {
+  // Match Java StringUtils.hasText and String.trim, which use different whitespace sets.
+  const hasText = /[^\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]/.test(reason);
+  const trimmed = hasText ? reason.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "") : "";
+  return trimmed.length <= ACCOUNT_DELETION_REASON_MAX_LENGTH
+    ? { ok: true }
+    : { ok: false, code: "ACCOUNT_DELETION_REASON_INVALID" };
+}
 
 let idempotencySequence = 0;
 
@@ -124,6 +159,27 @@ function parseTwoFactorChallenge(value: unknown): TwoFactorChallenge {
   return source as unknown as TwoFactorChallenge;
 }
 
+function parsePhoneNumberChangePolicy(value: unknown): PhoneNumberChangePolicy {
+  const source = record(value);
+  if (!source || ![source.windowDays, source.maxChanges, source.usedChanges, source.remainingChanges]
+    .every((item) => typeof item === "number" && Number.isSafeInteger(item) && item >= 0)
+    || typeof source.nextAvailableAt !== "string"
+    || (source.nextAvailableAt !== "" && !validDate(source.nextAvailableAt))) {
+    throw new ApiError({ kind: "protocol", message: "PHONE_CHANGE_POLICY_INVALID" });
+  }
+  return source as unknown as PhoneNumberChangePolicy;
+}
+
+function parsePhoneNumberChangeChallenge(value: unknown): PhoneNumberChangeChallenge {
+  const source = record(value);
+  if (!source || typeof source.changeNo !== "string" || !/^PHONE-[a-f0-9]{32}$/.test(source.changeNo)
+    || typeof source.expiresInSeconds !== "number" || source.expiresInSeconds <= 0
+    || typeof source.oldPhoneMasked !== "string" || typeof source.newPhoneMasked !== "string") {
+    throw new ApiError({ kind: "protocol", message: "PHONE_CHANGE_CHALLENGE_INVALID" });
+  }
+  return source as unknown as PhoneNumberChangeChallenge;
+}
+
 function parseAccountDeletion(value: unknown): AccountDeletionRequest {
   const raw = record(value);
   const source: Record<string, unknown> | null = raw && {
@@ -132,6 +188,7 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
     cancelledAt: null,
     reason: null,
     blockReason: null,
+    originalReason: null,
     ...raw,
   };
   const allowed = ["REQUESTED", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"];
@@ -144,12 +201,21 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
       || (source.cancelledAt !== null && !validDate(source.cancelledAt))
       || (source.reason !== null && typeof source.reason !== "string")
       || (source.blockReason !== null && typeof source.blockReason !== "string")
-      || Object.keys(source).some((key) => ![
-        "requestNo", "status", "version", "requestedAt", "reviewedAt", "completedAt", "reason", "blockReason", "cancelledAt",
-      ].includes(key))) {
+      || (source.originalReason !== null && typeof source.originalReason !== "string")) {
     throw new ApiError({ kind: "protocol", message: "ACCOUNT_DELETION_RESPONSE_INVALID" });
   }
-  return source as unknown as AccountDeletionRequest;
+  return {
+    requestNo: source.requestNo,
+    status: source.status as AccountDeletionRequest["status"],
+    requestedAt: source.requestedAt,
+    version: source.version,
+    reviewedAt: source.reviewedAt,
+    completedAt: source.completedAt,
+    cancelledAt: source.cancelledAt,
+    reason: source.reason,
+    blockReason: source.blockReason,
+    originalReason: source.originalReason,
+  };
 }
 
 function parseAccountDeletionStatus(value: unknown): AccountDeletionStatus {
@@ -165,14 +231,30 @@ function parseAccountDeletionStatus(value: unknown): AccountDeletionStatus {
 
 export function createAccountApi(client: ApiClient): AccountApi {
   return {
+    sendPhoneBindingChallenge: async (countryCode, phone, captchaTicket) => {
+      const result = record(await client.request({ method: "POST", path: "/api/app/security/phone/challenge",
+        body: { countryCode, phone, ...(captchaTicket ? { captchaTicket } : {}) } }));
+      if (!result || typeof result.challengeNo !== "string" || !/^REG-[a-f0-9]{32}$/.test(result.challengeNo)
+          || !Number.isSafeInteger(result.resendAfterSec) || typeof result.deliveryHint !== "string")
+        throw new ApiError({ kind: "protocol", message: "PHONE_BINDING_CHALLENGE_INVALID" });
+      return result as { challengeNo: string; resendAfterSec: number; deliveryHint: string };
+    },
+    bindPhone: async (countryCode, phone, challengeNo, code) => {
+      const result = record(await client.request({ method: "POST", path: "/api/app/security/phone",
+        body: { countryCode, phone, challengeNo, code } }));
+      if (result?.status !== "PHONE_BOUND") throw new ApiError({ kind: "protocol", message: "PHONE_BINDING_RESPONSE_INVALID" });
+    },
     passwordCommandReceipt: async (key) => {
       const result = await client.request({ method: "GET", path: `/api/app/security/password/commands/${encodeURIComponent(key)}` });
       return result === null ? null : parseMutation(result);
     },
-    securityOverview: async (cursor) => parseSecurityState(await client.request({
+    securityOverview: async (cursor) => {
+      invalidateBeforePassiveTabRead("security-overview");
+      return parseSecurityState(await client.request({
       method: "GET",
       path: cursor ? `/api/app/security?cursor=${encodeURIComponent(cursor)}` : "/api/app/security",
-    })),
+      }));
+    },
     changePassword: async (currentPassword, newPassword, idempotencyKey) => parseMutation(await client.request({
       method: "POST",
       path: "/api/app/security/password",
@@ -205,17 +287,39 @@ export function createAccountApi(client: ApiClient): AccountApi {
       method: "GET",
       path: "/api/app/security/account-deletion",
     })),
-    requestAccountDeletion: async (currentPassword, idempotencyKey) => parseAccountDeletion(await client.request({
-      method: "POST",
-      path: "/api/app/security/account-deletion",
-      body: { currentPassword, confirmation: "DELETE" },
-      idempotencyKey,
-    })),
+    requestAccountDeletion: async (currentPassword, idempotencyKey, reason) => {
+      const validation = validateAccountDeletionReason(reason ?? "");
+      if (!validation.ok) throw new ApiError({ kind: "business", message: validation.code, code: 422 });
+      return parseAccountDeletion(await client.request({
+        method: "POST",
+        path: "/api/app/security/account-deletion",
+        body: { currentPassword, confirmation: "DELETE", reason },
+        idempotencyKey,
+      }));
+    },
     cancelAccountDeletion: async (expectedVersion, idempotencyKey, reason = "USER_REQUESTED_CANCEL") => parseAccountDeletion(await client.request({
       method: "POST",
       path: "/api/app/security/account-deletion/cancel",
       body: { expectedVersion, reason },
       idempotencyKey,
     })),
+    phoneNumberPolicy: async () => parsePhoneNumberChangePolicy(await client.request({
+      method: "GET", path: "/api/app/security/phone-number",
+    })),
+    startPhoneNumberChange: async (currentPassword, countryCode, phone) =>
+      parsePhoneNumberChangeChallenge(await client.request({
+        method: "POST", path: "/api/app/security/phone-number/challenge",
+        body: { currentPassword, countryCode, phone },
+        idempotencyKey: mutationKey("phone-number-challenge"),
+      })),
+    confirmPhoneNumberChange: async (changeNo, oldCode, newCode) => {
+      const result = record(await client.request({
+        method: "POST", path: "/api/app/security/phone-number/confirm",
+        body: { changeNo, oldCode, newCode },
+        idempotencyKey: changeNo,
+      }));
+      if (result?.changed !== true) throw new ApiError({ kind: "protocol", message: "PHONE_CHANGE_RESULT_INVALID" });
+    },
   };
 }
+import { invalidateBeforePassiveTabRead } from "@/lib/passive-read-window";

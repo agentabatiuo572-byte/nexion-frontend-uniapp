@@ -37,6 +37,8 @@ export interface AmbassadorApplication {
   budgetUsdt: number | null;
   bucket: "venue" | "kol" | "print" | "dev" | null;
   submittedAt: string | null;
+  materialRevision?: number;
+  materialState?: AmbassadorMaterials["materialState"];
   source: "server";
   sourceEnvironment: "PRODUCTION";
   runId: string;
@@ -49,11 +51,61 @@ export interface AmbassadorApplicationInput {
   bucket: "venue" | "kol" | "print" | "dev";
 }
 
+export interface AmbassadorMaterialAttachment {
+  fileId: string;
+  kind: string;
+  name: string;
+  contentType: "image/png" | "image/jpeg" | "application/pdf";
+  sizeBytes: number;
+}
+
+export interface AmbassadorMaterialReview {
+  status: "PENDING" | "NEEDS_MORE" | "PASSED";
+  reviewerLabel: string | null;
+  reviewedAt: string | null;
+  reason: string | null;
+  verifiedAttendees?: number | null;
+  recognizedBudgetUsdt?: number | null;
+}
+
+export interface AmbassadorMaterialRequirement { kind: string; label: string; required: boolean }
+
+export interface AmbassadorMaterials {
+  applicationId: number;
+  bucket: AmbassadorApplicationInput["bucket"] | null;
+  eventDate: string;
+  budgetUsdt: number;
+  materialRevision: number;
+  materialState: "NOT_SUBMITTED" | "PENDING" | "NEEDS_MORE" | "PASSED";
+  requirements: AmbassadorMaterialRequirement[];
+  requirementsByBucket?: Record<AmbassadorApplicationInput["bucket"], AmbassadorMaterialRequirement[]>;
+  attachments: AmbassadorMaterialAttachment[];
+  businessReview: AmbassadorMaterialReview;
+  financeReview: AmbassadorMaterialReview;
+  missingKinds: string[];
+  statement: string;
+  canSubmit: boolean;
+  legacyApproved: boolean;
+  approvalBlockers: string[];
+}
+
+export interface AmbassadorMaterialsInput {
+  expectedMaterialRevision: number;
+  attachments: Pick<AmbassadorMaterialAttachment, "fileId" | "kind">[];
+  statement: string;
+  budgetUsdt?: number;
+  bucket?: AmbassadorApplicationInput["bucket"];
+}
+
 export interface AmbassadorApplicationApi {
   policy(): Promise<AmbassadorPolicy>;
   latest(): Promise<AmbassadorApplication>;
   history(): Promise<AmbassadorApplication[]>;
   submit(input: AmbassadorApplicationInput, idempotencyKey: string): Promise<AmbassadorApplication>;
+  materials(applicationId: number): Promise<AmbassadorMaterials>;
+  submitMaterials(applicationId: number, input: AmbassadorMaterialsInput, idempotencyKey: string): Promise<AmbassadorMaterials>;
+  uploadMaterialFile(applicationId: number, filePath: string, kind: string, idempotencyKey: string, signal?: AbortSignal): Promise<AmbassadorMaterialAttachment>;
+  materialFile(applicationId: number, fileId: string, signal?: AbortSignal): Promise<string>;
 }
 
 function invalid(): never {
@@ -111,14 +163,70 @@ function parse(value: unknown, expectedEnvironment?: AmbassadorEnvironment): Amb
   const budgetUsdt = row.budgetUsdt;
   const bucket = row.bucket;
   const submittedAt = row.submittedAt;
+  if ((row.materialRevision !== undefined && (typeof row.materialRevision !== "number" || !Number.isSafeInteger(row.materialRevision) || row.materialRevision < 0))
+    || (row.materialState !== undefined && !["NOT_SUBMITTED", "PENDING", "NEEDS_MORE", "PASSED"].includes(row.materialState as string))) return invalid();
   if (typeof applicationId !== "number" || !Number.isSafeInteger(applicationId) || applicationId <= 0
     || typeof city !== "string" || !city.trim()
     || typeof eventDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)
     || typeof budgetUsdt !== "number" || !Number.isFinite(budgetUsdt) || budgetUsdt < 0
-    || (bucket !== "venue" && bucket !== "kol" && bucket !== "print" && bucket !== "dev")
+    || (bucket !== null && bucket !== "venue" && bucket !== "kol" && bucket !== "print" && bucket !== "dev")
     || typeof submittedAt !== "string" || !Number.isFinite(Date.parse(submittedAt))) return invalid();
   return { applicationId, status, city: city.trim(), eventDate, budgetUsdt, bucket,
-    submittedAt, source: "server", ...proof };
+    submittedAt, source: "server", ...proof,
+    ...(row.materialRevision !== undefined ? { materialRevision: row.materialRevision as number } : {}),
+    ...(row.materialState !== undefined ? { materialState: row.materialState as AmbassadorMaterials["materialState"] } : {}) };
+}
+
+function materialAttachment(value: unknown): AmbassadorMaterialAttachment {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
+  const row = value as Record<string, unknown>;
+  if (typeof row.fileId !== "string" || !row.fileId.trim()
+    || typeof row.kind !== "string" || !row.kind.trim() || typeof row.name !== "string" || !row.name.trim()
+    || !["image/png", "image/jpeg", "application/pdf"].includes(row.contentType as string)
+    || typeof row.sizeBytes !== "number" || !Number.isSafeInteger(row.sizeBytes) || row.sizeBytes <= 0 || row.sizeBytes > 10 * 1024 * 1024) return invalid();
+  return row as unknown as AmbassadorMaterialAttachment;
+}
+
+function materialReview(value: unknown): AmbassadorMaterialReview {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
+  const row = value as Record<string, unknown>;
+  if (!["PENDING", "NEEDS_MORE", "PASSED"].includes(row.status as string)
+    || (row.reviewerLabel != null && typeof row.reviewerLabel !== "string")
+    || (row.reason != null && typeof row.reason !== "string")
+    || (row.reviewedAt != null && (typeof row.reviewedAt !== "string" || !Number.isFinite(Date.parse(row.reviewedAt))))
+    || (row.verifiedAttendees != null && (typeof row.verifiedAttendees !== "number" || !Number.isSafeInteger(row.verifiedAttendees) || row.verifiedAttendees < 0))
+    || (row.recognizedBudgetUsdt != null && (typeof row.recognizedBudgetUsdt !== "number" || !Number.isFinite(row.recognizedBudgetUsdt) || row.recognizedBudgetUsdt < 0))) return invalid();
+  return { ...row, reviewerLabel: row.reviewerLabel ?? null, reviewedAt: row.reviewedAt ?? null, reason: row.reason ?? null } as unknown as AmbassadorMaterialReview;
+}
+
+function materialRequirements(value: unknown): AmbassadorMaterialRequirement[] {
+  if (!Array.isArray(value) || !value.every(item => item && typeof item.kind === "string" && !!item.kind.trim()
+    && typeof item.label === "string" && typeof item.required === "boolean")) return invalid();
+  return value as AmbassadorMaterialRequirement[];
+}
+
+function materialPackage(value: unknown, applicationId: number): AmbassadorMaterials {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
+  const row = value as Record<string, unknown>;
+  if (row.applicationId !== applicationId
+    || (row.bucket !== null && !["venue", "kol", "print", "dev"].includes(row.bucket as string))
+    || typeof row.eventDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.eventDate)
+    || typeof row.budgetUsdt !== "number" || !Number.isFinite(row.budgetUsdt) || row.budgetUsdt < 0
+    || typeof row.materialRevision !== "number" || !Number.isSafeInteger(row.materialRevision) || row.materialRevision < 0
+    || !["NOT_SUBMITTED", "PENDING", "NEEDS_MORE", "PASSED"].includes(row.materialState as string)
+    || !Array.isArray(row.attachments) || row.attachments.length > 12
+    || !Array.isArray(row.missingKinds) || !row.missingKinds.every(item => typeof item === "string")
+    || !Array.isArray(row.approvalBlockers) || !row.approvalBlockers.every(item => typeof item === "string")
+    || typeof row.statement !== "string" || typeof row.canSubmit !== "boolean" || typeof row.legacyApproved !== "boolean") return invalid();
+  let requirementsByBucket: AmbassadorMaterials["requirementsByBucket"];
+  if (row.requirementsByBucket !== undefined) {
+    if (!row.requirementsByBucket || typeof row.requirementsByBucket !== "object" || Array.isArray(row.requirementsByBucket)) return invalid();
+    const requirements = row.requirementsByBucket as Record<string, unknown>;
+    requirementsByBucket = Object.fromEntries(["venue", "kol", "print", "dev"].map(bucket => [bucket, materialRequirements(requirements[bucket])])) as AmbassadorMaterials["requirementsByBucket"];
+  }
+  return { ...row, requirements: materialRequirements(row.requirements), requirementsByBucket,
+    attachments: row.attachments.map(materialAttachment), businessReview: materialReview(row.businessReview),
+    financeReview: materialReview(row.financeReview) } as unknown as AmbassadorMaterials;
 }
 
 export function parseAmbassadorApplicationPage(value: unknown, expectedEnvironment?: AmbassadorEnvironment): {
@@ -173,6 +281,20 @@ export function createAmbassadorApplicationApi(client: ApiClient, environment: A
     },
     async submit(input, idempotencyKey) {
       return parse(await client.request<unknown>({ path, method: "POST", body: input, idempotencyKey }), environment);
+    },
+    async materials(applicationId) {
+      return materialPackage(await client.request({ path: `${path}/${applicationId}/materials` }), applicationId);
+    },
+    async submitMaterials(applicationId, input, idempotencyKey) {
+      return materialPackage(await client.request({ path: `${path}/${applicationId}/materials`, method: "POST", body: input, idempotencyKey }), applicationId);
+    },
+    async uploadMaterialFile(applicationId, filePath, kind, idempotencyKey, signal) {
+      return materialAttachment(await client.upload({ path: `${path}/${applicationId}/materials/files`, filePath,
+        name: "file", formData: { kind }, idempotencyKey, signal }));
+    },
+    async materialFile(applicationId, fileId, signal) {
+      if (!client.download) return invalid();
+      return client.download({ path: `${path}/${applicationId}/materials/files/${encodeURIComponent(fileId)}`, signal });
     },
   };
 }

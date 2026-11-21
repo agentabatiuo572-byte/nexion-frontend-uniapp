@@ -12,6 +12,7 @@ const RUNTIME_PUBLIC_STATS_DEFAULT: PlatformConfig["publicStats"] = {
   registeredUsersBase: 0,
   registeredUsersMonthlyGrowthPct: -1,
   registeredUsersAnchorAt: 0,
+  activeJobsBase: null,
   realUserCount: 0,
   virtualUserCount: -1,
   hashratePercentileTable: [],
@@ -71,6 +72,7 @@ export function completePlatformConfigSeed(seed: PlatformConfigSeed): PlatformCo
       hashratePercentileTable: publicStats.hashratePercentileTable.map((bucket) => ({ ...bucket })),
     },
     verifiedStats,
+    networkPulse: null,
     onlineBonus: { ...seed.onlineBonus },
     riskCluster: { ...seed.riskCluster },
     withdrawRules: {

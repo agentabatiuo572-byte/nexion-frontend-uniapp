@@ -6,8 +6,8 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="padding-bottom: 16px">
-      <SubPageHeader :back="'/pages/me/wallet'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
+    <view class="tr-page" style="padding-bottom: 16px">
+      <SubPageHeader :back="'/pages/me/me'" :title="t.wallet.withdrawalStatusSubtitle" />
 
       <!-- Exact deep-link reads wait for the authenticated account before presenting any absence. -->
       <view v-if="trackingReadPending && !wd" class="px-5" style="padding-top: 4px">
@@ -15,12 +15,7 @@
         <view :style="skelStyle('66%', '34px', '8px')" />
         <view :style="skelStyle('88%', '14px', '12px')" />
       </view>
-      <view v-else-if="trackingReadError" class="px-5 text-center">
-        <text class="block" :style="emptyTextStyle">{{ t.empty.errorDesc }}</text>
-        <view class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" @click.stop="retryTrackedWithdrawal">
-          <text :style="emptyLinkStyle">{{ t.empty.errorCta }}</text>
-        </view>
-      </view>
+      <EmptyState v-else-if="trackingReadError && !wd" kind="recoverable-error" page :title="t.empty.errorDesc" :cta-label="t.ui.reload" @cta="retryTrackedWithdrawal" />
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
       <view v-else-if="!wd" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ deepLinkMiss ? t.wallet.withdrawalNotFound : t.wallet.noActiveWithdrawal }}</text>
@@ -28,7 +23,7 @@
         <!-- 日限用尽时置灰 + 给原因(与「再提一笔」同判据同文案)。深链 miss 让本空态在
              「有单据+额度已满」时也可达,不加这道就是外观可点、点了没反应的死链接(审计双镜头 P1)。 -->
         <view :class="againDisabled ? '' : 'active:opacity-70'" :style="againDisabled ? 'opacity:0.4' : ''" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="againDisabled ? 'true' : 'false'" :aria-describedby="againDisabled ? 'wd-again-reason-empty' : undefined" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
-          <text :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
+          <text class="nx-after-arrow" :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
         </view>
         <text v-if="againDisabled" id="wd-again-reason-empty" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
       </view>
@@ -36,43 +31,37 @@
       <template v-else>
         <!-- Single-theme continuous flow: page-floor blocks separated by 12px,
              hairlines open the stepper + ETA groups (de-carded). -->
-        <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-          <!-- Amount hero — de-carded to the page floor (no surface/border; the
-               floor glow + dot-grid are deleted, not re-tuned). -->
-          <view :style="heroStyle">
-            <text class="block" :style="amountLabelStyle">{{ t.wallet.trackAmountLabel }}</text>
-            <text class="block" :style="amountStyle">${{ formatAmount(wd.amount) }}</text>
-            <text class="block" :style="viaStyle">{{ viaLine }}</text>
-            <text class="block" :style="addrStyle">{{ wd.address }}</text>
-          </view>
-
-          <!-- Status stepper — outer card dropped, stepper structure kept;
-               hairline opens the group. -->
-          <!-- 失败终态不渲染步进条:五步全灰、连「已提交」都不打勾,而下方卡片说转账失败(对抗证伪坐实) -->
-          <view v-if="!isFailedEnd" :style="stepperStyle">
-            <text class="block" :style="progressLabelStyle">{{ t.wallet.trackProgressLabel }}</text>
-            <view class="relative">
-              <view v-for="(step, i) in steps" :key="step.key" class="flex relative" :style="stepLiStyle(i === steps.length - 1)">
-                <!-- connector -->
-                <view v-if="i < steps.length - 1" :style="connectorStyle(i < doneUpTo)" />
-                <!-- icon -->
-                <view class="grid place-items-center shrink-0" style="width: 24px; height: 24px">
-                  <view v-if="i < doneUpTo" class="grid place-items-center" :style="doneIconStyle">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+        <view class="tr">
+          <!-- P-45 tracking ticket: amount + status, tear line, timeline (only reached steps carry labels — DS-30). -->
+          <view class="tr-ticket">
+            <view class="tr-tk">
+              <view class="tr-row1"><text class="tr-k">{{ t.wallet.trackAmountLabel }}</text><text class="tr-tag" :class="`tr-tag--${statusTone}`">{{ statusTag }}</text></view>
+              <text class="tr-amt"><text class="tr-cur">$</text>{{ amountParts[0] }}<text class="tr-dec">{{ amountParts[1] }}</text></text>
+              <text class="tr-note">{{ viaLine }}</text>
+              <NxCodeValue class="tr-addr" :value="wd.address" :label="t.wallet.withdrawAddressLabel" />
+              <view class="tr-id"><text class="tr-k">{{ t.bankWithdrawal.orderNumber }}</text><NxCodeValue class="tr-id__v" :value="wd.id" :label="t.bankWithdrawal.orderNumber" fill /></view>
+            </view>
+            <!-- 失败终态不渲染步进条:五步全灰、连「已提交」都不打勾,而下方卡片说转账失败(对抗证伪坐实) -->
+            <template v-if="!isFailedEnd">
+              <view class="tr-tear" aria-hidden="true" />
+              <view class="tr-tl" role="list" :aria-label="t.wallet.trackProgressLabel">
+                <view
+                  v-for="(step, i) in steps" :key="step.key" class="tr-st" role="listitem"
+                  :class="i < doneUpTo ? 'tr-st--done' : i === currentIdx ? 'tr-st--cur' : 'tr-st--todo'"
+                  :aria-current="i === currentIdx && i >= doneUpTo ? 'step' : undefined"
+                  :aria-hidden="i > currentIdx && i >= doneUpTo ? 'true' : undefined"
+                >
+                  <view class="tr-nd" :class="{ 'tr-nd--live': i === currentIdx && i >= doneUpTo && showSpinner }">
+                    <svg v-if="i < doneUpTo" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                    <view v-else class="tr-nd__dot" />
                   </view>
-                  <view v-else-if="i === currentIdx && showSpinner" class="grid place-items-center glow-green" :style="currentIconStyle">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                  <view v-if="i < doneUpTo || i === currentIdx" class="tr-st__body">
+                    <text class="tr-st__t">{{ step.label }}</text>
+                    <text class="tr-st__d">{{ stepTimeText(i) ? `${step.hint} · ${stepTimeText(i)}` : step.hint }}</text>
                   </view>
-                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2"><circle cx="12" cy="12" r="9" /></svg>
-                </view>
-                <!-- text -->
-                <view style="flex: 1; padding-top: 2px">
-                  <text class="block" :style="stepLabelStyle(i >= doneUpTo && i !== currentIdx)">{{ step.label }}</text>
-                  <text class="block" :style="stepHintStyle">{{ step.hint }}</text>
-                  <text v-if="stepTimeText(i)" class="block" :style="stepTimeStyle">{{ stepTimeText(i) }}</text>
                 </view>
               </view>
-            </view>
+            </template>
           </view>
 
           <!-- Estimated completion / SPEC-7 风控持有态(manual/delay=审核中,freeze=冻结)
@@ -88,7 +77,7 @@
               <!-- 人工审核 / 冻结态给客服出口:告诉用户「不会自动放款」却不给人问,
                    等于把人钉在原地(业务链必须有下一步)。 -->
               <view v-if="needsSupport" class="active:opacity-70" :style="supportLinkStyle" role="button" tabindex="0" :aria-label="t.wallet.trackContactSupport" @click.stop="goSupport">
-                <text :style="supportLinkTextStyle">{{ t.wallet.trackContactSupport }} →</text>
+                <text class="nx-after-arrow" :style="supportLinkTextStyle">{{ t.wallet.trackContactSupport }}</text>
               </view>
             </view>
           </view>
@@ -111,30 +100,38 @@
             <text v-if="againDisabled" id="wd-again-reason" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
           </view>
 
-          <!-- Back to wallet -->
-          <view class="flex items-center justify-center active:opacity-80" :style="backBtnStyle" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @click.stop="goWallet">
-            <text>{{ t.wallet.trackBackToWallet }}</text>
-          </view>
         </view>
+        <view class="tr-bar-space" />
       </template>
     </view>
+    <!-- Back to wallet is the page's main action, in the fixed bottom bar (DS-30). -->
+    <template #pageFixed>
+      <view v-if="wd && !trackingReadPending && !trackingReadError" class="tr-bar nx-glass-bar">
+        <view class="tr-bar__btn" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @click.stop="goWallet" @keydown.enter.prevent="goWallet" @keydown.space.prevent="goWallet">
+          <text>{{ t.wallet.trackBackToWallet }}</text>
+        </view>
+      </view>
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { formatDisplayDateTime } from "@/lib/display-date";
+import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
-import { remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
-import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { apiRuntimeConfig, remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
 import { toCanonicalWithdrawal, type WithdrawalDetailSnapshot, type WithdrawalPolicy } from "@/api/withdrawal-api";
 import { mockServerNow } from "@/store/server-time";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import { occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
@@ -183,7 +180,7 @@ function trackingReadScope(): WithdrawalTrackingReadScope | null {
     accountKey: app.accountKey,
     accountBindingEpoch: app.accountBindingEpoch,
     sessionRevision: sessionVault.revision(),
-    runtimeEpoch: captureRuntimeRevision().epoch,
+    apiOrigin: { ...apiRuntimeConfig },
     pageEpoch: trackingPageEpoch,
   };
 }
@@ -194,7 +191,7 @@ function applyTrackedWithdrawal(detail: WithdrawalDetailSnapshot): void {
   trackedWithdrawal.value = {
     ...canonical,
     status: detail.status,
-    ...(detail.confirmedAt !== null ? { confirmedAt: detail.confirmedAt } : {}),
+    confirmedAt: detail.confirmedAt,
     ...(detail.terminalReason !== null ? { terminalReason: detail.terminalReason } : {}),
     ...(detail.retriable !== null ? { retriable: detail.retriable } : {}),
     ...(detail.nexRefunded !== null
@@ -241,17 +238,21 @@ function openBankTracking() {
 }
 watch(() => wd.value, openBankTracking);
 
-function refreshTrackedWithdrawal(quiet = false, refreshPrimary = false): void {
+async function refreshTrackedWithdrawal(quiet = false, refreshPrimary = false): Promise<void> {
   if (!trackingPageVisible.value || !foregroundReadAllowed() || !auth.isAuthenticated) return;
-  if (trackedId.value) void trackedWithdrawalRead.refresh(quiet);
-  // Entry and manual retry refresh the primary selection when no order was specified.
+  const account = app.accountKey, epoch = app.accountBindingEpoch;
+  if (trackedId.value) await trackedWithdrawalRead.refresh(quiet);
+  if (!trackingPageVisible.value || !foregroundReadAllowed() || !auth.isAuthenticated
+      || account !== app.accountKey || epoch !== app.accountBindingEpoch) return;
+  // The default view resolves its primary selection on entry and manual retry.
   if (remoteApiEnabled && (!app.remoteWithdrawalListHasSnapshot || (refreshPrimary && !deepLinkId.value))
-      && app.remoteWithdrawalListStatus !== "loading") void app.refreshRemoteWithdrawalList();
+      && app.remoteWithdrawalListStatus !== "loading") await app.refreshRemoteWithdrawalList();
 }
 
-function retryTrackedWithdrawal(): void {
-  refreshTrackedWithdrawal(false, true);
+function retryTrackedWithdrawal(): Promise<void> {
+  return refreshTrackedWithdrawal(false, true);
 }
+useAutoRecovery({ failed: () => trackingReadError.value && trackingReadStatus.value !== "loading" && app.remoteWithdrawalListStatus !== "loading", retry: retryTrackedWithdrawal });
 
 function canPollTrackedWithdrawal(): boolean {
   return remoteApiEnabled && trackingPageVisible.value && auth.isAuthenticated && foregroundReadAllowed()
@@ -273,31 +274,23 @@ watch([trackingPageVisible, foregroundReadAllowed, () => auth.isAuthenticated], 
     return;
   }
   if (!wasVisible || !deepLinkId.value || canPollTrackedWithdrawal() || (!wd.value && trackingReadStatus.value !== "not-found")) {
-    refreshTrackedWithdrawal(wasVisible && !!wd.value, true);
+    void refreshTrackedWithdrawal(wasVisible && !!wd.value, true);
     if (!wasVisible || !withdrawalPolicy.value) void loadWithdrawalPolicy();
   }
 });
 
 watch(
-  () => [trackedId.value, app.accountKey, app.accountBindingEpoch] as const,
+  () => [trackedId.value, app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const,
   ([, account, epoch], [, previousAccount, previousEpoch]) => {
     trackedWithdrawal.value = null;
     storeRowAtTrackedRead.value = null;
     trackedWithdrawalRead.invalidate();
-    if (!trackingPageVisible.value) return;
-    refreshTrackedWithdrawal();
+    if (!trackingPageVisible.value || !foregroundReadAllowed()) return;
+    void refreshTrackedWithdrawal();
     if (account !== previousAccount || epoch !== previousEpoch) void loadWithdrawalPolicy();
   },
+  { flush: "sync" },
 );
-
-const stopTrackingRuntimeWatch = subscribeRuntimeRevision(() => {
-  if (!trackingPageVisible.value) return;
-  trackingPageEpoch += 1;
-  trackedWithdrawal.value = null;
-  storeRowAtTrackedRead.value = null;
-  trackedWithdrawalRead.invalidate();
-  refreshTrackedWithdrawal();
-});
 
 const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>(() => [
   { key: "submitted", label: t.value.wallet.submitted, hint: t.value.wallet.trackSubmittedHint },
@@ -324,7 +317,14 @@ const failedTitle = computed(() => {
 // 🔴 拦截/异常态一律要有客服出口。原判据只看 riskRoute,而 frozen 也可能由后台对一张
 // pass 路由的在途单事后冻结(types.ts 明写「K3 route freeze 或 D2 处置」)——
 // 那种单文案叫用户联系客服,页面上却没有客服入口。
-const routeHeld = computed(() => !isTerminalDone.value && !!wd.value?.riskRoute && wd.value.riskRoute !== "pass");
+const routeHeld = computed(() => !!wd.value
+  && (wd.value.status === "review-pending" || wd.value.status === "frozen"
+    || (wd.value.status === "submitted" && !!wd.value.riskRoute && wd.value.riskRoute !== "pass")));
+// Original flags are historical evidence; only a future USDT server deadline is a current review window.
+const reviewWindowHeld = computed(() => !!wd.value && wd.value.network !== "BANK-VND"
+  && typeof wd.value.reviewHoldUntil === "number" && Number.isFinite(wd.value.reviewHoldUntil)
+  && wd.value.reviewHoldUntil > Math.ceil(Math.max(nowTick.value, mockServerNow()) / 1000) * 1000
+  && ["submitted", "review-pending", "review-passed"].includes(wd.value.status));
 const needsSupport = computed(() => routeHeld.value || isFrozenHold.value || isFailedEnd.value);
 // 终态:5 步全部走满,最后一步不能还转圈 —— 转圈代表「进行中」,
 // 钱都到账了还转,用户会以为卡住了。
@@ -358,6 +358,7 @@ async function loadWithdrawalPolicy(): Promise<void> {
   // 🔴 在途守卫:抄提现页那份 loader 时我漏抄了它。onShow 与 onMounted 首次进入会各触发一次,
   // App 端每次回前台再叠一次 —— 没有守卫就会重复发请求,且**后到的响应覆盖先到的**。
   if (withdrawalPolicyLoading.value) return;
+  // After an H5 reload the session is restored after the page shows; the account watch above reads it then.
   if (remoteApiEnabled && (!foregroundReadAllowed() || !sessionVault.read())) return;
   withdrawalPolicyLoading.value = true;
   try {
@@ -403,7 +404,6 @@ onUnmounted(() => {
   trackingPageEpoch += 1;
   trackedWithdrawalRead.invalidate();
   stopDayTimer();
-  stopTrackingRuntimeWatch();
 }); // 兜底:onHide 不触发的场景(直接销毁)仍要清
 
 // app.withdrawals 本身是响应源,提交完回到本页会自动重算 —— 不再需要 `void wd.value` 那种手动挂依赖。
@@ -430,13 +430,11 @@ const retryBlockedLine = computed(() =>
   (isFailedEnd.value && wd.value?.retriable === false ? t.value.wallet.trackRetryBlocked : null));
 const againDisabled = computed(() => dailyLimit.value.reached);
 const againReasonText = computed(() => {
-  const at = new Date(dailyLimit.value.resetAt);
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  const stamp = `${p2(at.getMonth() + 1)}-${p2(at.getDate())} ${p2(at.getHours())}:${p2(at.getMinutes())}`;
+  const stamp = formatDisplayDateTime(dailyLimit.value.resetAt, dateLocale());
   return fmt(t.value.walletV3.dailyLimitReached, { time: stamp });
 });
 // SPEC-7: freeze 路由/冻结状态用独立危险态文案;manual/delay 用审核中文案。
-const isFrozenHold = computed(() => !isTerminalDone.value && (wd.value?.riskRoute === "freeze" || wd.value?.status === "frozen"));
+const isFrozenHold = computed(() => wd.value?.status === "frozen");
 // 命中原因 → 业务话术(工程 reason code 不直出;R5: 展示存单快照的服务端结论)。
 const heldReasonLines = computed(() => {
   if (!routeHeld.value) return [] as string[];
@@ -464,6 +462,14 @@ const reasonLines = computed(() => [...new Set([
   ...(retryBlockedLine.value ? [retryBlockedLine.value] : []),
 ])]);
 // FEAT-WD02:fee 是结构化快照,展示只读 actualFeeUsd(旧单读盘时已归一,禁重算)。
+// Ticket header: amount anatomy and a status tag that names where the withdrawal stands.
+const amountParts = computed<[string, string]>(() => {
+  const text = wd.value ? formatAmount(wd.value.amount) : "", at = text.lastIndexOf(".");
+  return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
+});
+const statusTag = computed(() => isTerminalDone.value ? steps.value[steps.value.length - 1]!.label
+  : isFailedEnd.value ? failedTitle.value : isFrozenHold.value ? etaTitle.value : steps.value[currentIdx.value]?.label ?? "");
+const statusTone = computed(() => isTerminalDone.value ? "ok" : isFailedEnd.value ? "bad" : isFrozenHold.value ? "warn" : "brand");
 const viaLine = computed(() =>
   wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: formatAmount(wd.value.fee.actualFeeUsd) }) : "",
 );
@@ -474,6 +480,8 @@ const etaTitle = computed(() =>
       ? failedTitle.value
       : isFrozenHold.value
       ? t.value.wallet.routeHeldFrozenTitle
+      : reviewWindowHeld.value
+        ? t.value.walletV3.complianceHoldTitle
       : routeHeld.value
         ? t.value.wallet.withdrawRouteHeldTitle
         // 🔴 标题必须用**不带插值**的 key。这里原来直接取 trackEtaPending,而那条
@@ -486,21 +494,30 @@ const etaSub = computed(() => {
   // 失败终态不给「预计到账」——钱没走成,给的是原因 + 客服出口(见 needsSupport)。
   if (isFailedEnd.value) return t.value.wallet.trackFailedBody;
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
-  if (routeHeld.value) return t.value.wallet.withdrawRouteHeldSub;
+  if (reviewWindowHeld.value) {
+    const current = wd.value!;
+    return fmt(current.complianceReviewRequired && current.status !== "review-passed"
+      ? t.value.walletV3.complianceHoldUntilBody : t.value.walletV3.reviewWindowUntilBody,
+    { time: absTime(current.reviewHoldUntil!) });
+  }
+  if (routeHeld.value) {
+    const current = wd.value!;
+    if (current.complianceReviewRequired) return t.value.walletV3.complianceReviewRequired;
+    return t.value.wallet.withdrawRouteHeldSub;
+  }
   // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
   if (isTerminalDone.value && wd.value) {
-    const at = wd.value.confirmedAt ?? wd.value.estimatedCompletion;
-    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.trackReviewNote;
+    const at = wd.value.confirmedAt;
+    return typeof at === "number" && Number.isFinite(at)
+      ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.confirmed;
   }
   const at = wd.value?.estimatedCompletion;
   return Number.isFinite(at) ? fmt(t.value.wallet.trackExpectedAt, { time: absTime(at as number) }) : t.value.wallet.trackReviewNote;
 });
 
-/** 「MM-DD HH:mm」本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */
+/** 按界面语言显示包含年份的本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */
 function absTime(ts: number): string {
-  const d = new Date(ts);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return formatDisplayDateTime(ts, dateLocale());
 }
 
 /**
@@ -511,8 +528,9 @@ function stepTimeText(i: number): string {
   const w = wd.value;
   if (!w) return "";
   if (isTerminalDone.value && i === steps.value.length - 1) {
-    const at = w.confirmedAt ?? w.estimatedCompletion;
-    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : "";
+    const at = w.confirmedAt;
+    return typeof at === "number" && Number.isFinite(at)
+      ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : "";
   }
   // 🔴 只给单据里**真有**的时刻:提交(第 1 步)与实际到账(末步)。
   // 中间三步没有任何时间戳,原先用 3.5 秒假阶梯现编 —— 跨整点时会渲染成
@@ -536,7 +554,7 @@ function goWithdraw() {
   navTo("/pages/me/wallet-withdraw-method");
 }
 function goWallet() {
-  navTo("/me/wallet");
+  navTo("/pages/me/me");
 }
 function goSupport() {
   navTo("/pages/me/support");
@@ -547,39 +565,12 @@ function skelStyle(w: string, h: string, mt = "0", radius = "6px"): CSSPropertie
   return { width: w, height: h, marginTop: mt, borderRadius: radius, background: "var(--v5-surface-2)", opacity: 0.6 };
 }
 
-const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyTextStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)" };
 const emptyLinkStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-brand)" };
 // De-carded amount hero — left-aligned on the page floor (2px optical inset);
 // no surface/border, and the floor glow + dot-grid element are deleted outright.
-const heroStyle: CSSProperties = { padding: "0 2px" };
-const amountLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
-const amountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "34px", fontWeight: 600, color: "var(--v5-ink)", marginTop: "4px", fontVariantNumeric: "tabular-nums" };
-const viaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
-const addrStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", wordBreak: "break-all" };
 // De-carded — the stepper structure is kept; a hairline opens the group and
 // content sits at the 2px optical inset (no surface/border).
-const stepperStyle: CSSProperties = { padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
-const progressLabelStyle: CSSProperties = { marginBottom: "14px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
-function stepLiStyle(last: boolean): CSSProperties {
-  return { gap: "12px", paddingBottom: last ? "0" : "20px" };
-}
-function connectorStyle(done: boolean): CSSProperties {
-  return {
-    position: "absolute",
-    left: "11px",
-    top: "28px",
-    bottom: "4px",
-    width: "1px",
-    background: done ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  };
-}
-const doneIconStyle: CSSProperties = { width: "24px", height: "24px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
-const currentIconStyle: CSSProperties = { width: "24px", height: "24px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
-function stepLabelStyle(pending: boolean): CSSProperties {
-  return { fontSize: "13px", fontWeight: 500, color: pending ? "var(--v5-ink-4)" : "var(--v5-ink)" };
-}
-const stepHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
-const stepTimeStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px", fontVariantNumeric: "tabular-nums" };
 // Normal ETA — floor note; a hairline opens it (no surface/border).
 const etaCardStyle: CSSProperties = { gap: "12px", padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
 // Frozen/held ETA — danger accent callout (tint + border: the whitelisted
@@ -591,7 +582,7 @@ const etaFrozenCardStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
   border: "1px solid color-mix(in srgb, var(--v5-danger) 30%, transparent)",
 };
-const etaTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
+const etaTitleStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", fontWeight: 500, color: "var(--v5-ink)" };
 const etaSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const reasonLineStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 // 客服出口 —— 独占一行的行动链接,撑到 44px 热区(《07》tap≥44,不吃 inline 豁免)。
@@ -599,26 +590,67 @@ const supportLinkStyle: CSSProperties = { display: "inline-flex", alignItems: "c
 const supportLinkTextStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)" };
 // 「再提一笔」= 主行动,但在追踪页不抢主 CTA 的位置(用描边而非实心品牌色);
 // 置灰态压低对比并去掉 active 反馈,视觉上就说明「现在按不了」。
+// "再提一笔" is secondary here (返回钱包 is the page's single primary in the bar): quiet ink text on a 44px row.
 const againBtnStyle = computed<CSSProperties>(() => ({
   width: "100%",
   height: "44px",
   borderRadius: "999px",
-  background: againDisabled.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
-  color: againDisabled.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
+  background: "transparent",
+  color: againDisabled.value ? "var(--v5-ink-4)" : "var(--v5-ink-2)",
   fontSize: "13px",
-  fontWeight: 600,
+  fontWeight: 500,
   opacity: againDisabled.value ? 0.6 : 1,
   transition: "opacity 150ms ease",
 }));
 const againReasonStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
-const backBtnStyle: CSSProperties = {
-  width: "100%",
-  height: "44px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  fontSize: "13px",
-  fontWeight: 500,
-  color: "var(--v5-ink)",
-  transition: "opacity 150ms ease",
-};
 </script>
+
+<style scoped>
+/* P-45 withdrawal tracking: ticket with amount + status, tear line, timeline; back to wallet in the fixed bar. */
+.tr { display: flex; flex-direction: column; gap: 12px; padding: 0 16px; }
+.tr-ticket { position: relative; margin-top: 3px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.tr-tk { padding: 18px 20px 16px; }
+.tr-row1 { display: flex; align-items: center; justify-content: space-between; }
+.tr-k { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.tr-tag { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); font: 500 12px/16px var(--font-v5); white-space: nowrap; }
+.tr-tag--brand { background: var(--v5-brand-soft); color: var(--v5-brand); }
+.tr-tag--ok { background: var(--v5-success-soft); color: var(--v5-success-ink); }
+.tr-tag--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
+.tr-tag--bad { background: var(--v5-danger-soft); color: var(--v5-danger); }
+.tr-amt { display: block; margin-top: 6px; color: var(--v5-ink); font: 500 36px/44px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tr-cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
+.tr-dec { color: var(--v5-ink-3); }
+.tr-note { display: block; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+/* Address and withdrawal number are long codes: one line, middle ellipsis, copy gives the whole code (NxCodeValue). */
+.tr-addr { margin-top: 6px; color: var(--v5-ink-3); font-size: 12px; line-height: 18px; }
+.tr-id { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; }
+.tr-id > .tr-k { flex: 0 1 auto; min-width: 0; }
+.tr-id__v { color: var(--v5-ink-2); font-size: 12px; line-height: 18px; }
+.tr-tear { position: relative; height: 0; margin: 0 18px; border-top: 1.5px dashed var(--v5-border-strong); }
+.tr-tear::before, .tr-tear::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-bg); }
+.tr-tear::before { left: -28px; } .tr-tear::after { right: -28px; }
+.tr-tl { padding: 18px 20px 20px; }
+.tr-st { position: relative; display: flex; gap: 14px; padding-bottom: 20px; }
+.tr-st:last-child { padding-bottom: 0; }
+.tr-st::before { content: ""; position: absolute; left: 11px; top: 26px; bottom: 2px; width: 2px; border-radius: 2px; background: var(--v5-surface-3); }
+.tr-st--done::before { background: var(--v5-brand); }
+.tr-st:last-child::before { display: none; }
+.tr-st--todo { min-height: 4px; }
+.tr-nd { position: relative; display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; }
+.tr-st--done .tr-nd { background: var(--v5-brand); color: var(--v5-on-brand); }
+.tr-st--cur .tr-nd { background: var(--v5-brand-soft); box-shadow: inset 0 0 0 2px var(--v5-brand); }
+.tr-nd__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--v5-ink-4); }
+.tr-st--cur .tr-nd__dot { background: var(--v5-brand); }
+/* Live state only: the current step breathes while the withdrawal is still moving. */
+.tr-nd--live::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--v5-brand); opacity: 0; animation: tr-pulse 1.8s ease-out infinite; }
+@keyframes tr-pulse { 0% { transform: scale(.8); opacity: .7; } 100% { transform: scale(1.3); opacity: 0; } }
+.tr-st__t { display: block; color: var(--v5-ink); font: 500 15px/22px var(--font-v5); }
+.tr-st--cur .tr-st__t { color: var(--v5-brand); }
+.tr-st__d { display: block; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.tr-bar-space { height: 110px; }
+.tr-bar { position: absolute; z-index: 36; }
+.tr-bar__btn { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: pointer; }
+.tr-bar__btn:active { transform: scale(.98); }
+.tr-bar__btn:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .tr-nd--live::after { animation: none; } .tr-bar__btn:active { transform: none; } }
+</style>

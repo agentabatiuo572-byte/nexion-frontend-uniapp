@@ -13,10 +13,11 @@ export interface UserSession {
 }
 
 export interface RegistrationReceipt {
-  sponsorCode: string;
-  sponsorDisplayName: string;
+  // Both null when the account has no inviter (no code, or a support-advisor code).
+  sponsorCode: string | null;
+  sponsorDisplayName: string | null;
   sourceEnvironment: "PRODUCTION";
-  giftStatus: "PENDING_REVIEW" | "POSTED" | "UNAVAILABLE";
+  giftStatus: "PENDING_REVIEW" | "FROZEN" | "POSTED" | "UNAVAILABLE";
   giftUsdt: number | null;
   giftNex: number | null;
 }
@@ -39,11 +40,12 @@ export function isRegistrationReceipt(value: unknown): value is RegistrationRece
   const receipt = value as Partial<RegistrationReceipt> & Record<string, unknown>;
   const amount = (candidate: unknown) => candidate === null
     || (typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 0);
+  const noSponsor = receipt.sponsorCode === null && receipt.sponsorDisplayName === null;
   return exactKeys(receipt, ["sponsorCode", "sponsorDisplayName", "sourceEnvironment", "giftStatus", "giftUsdt", "giftNex"])
-    && typeof receipt.sponsorCode === "string" && /^[A-Z0-9]{4,32}$/.test(receipt.sponsorCode)
-    && maskedSponsorDisplayName(receipt.sponsorDisplayName)
+    && (noSponsor || (typeof receipt.sponsorCode === "string" && /^[A-Z0-9]{4,32}$/.test(receipt.sponsorCode)
+      && maskedSponsorDisplayName(receipt.sponsorDisplayName)))
     && receipt.sourceEnvironment === "PRODUCTION"
-    && (receipt.giftStatus === "PENDING_REVIEW" || receipt.giftStatus === "POSTED" || receipt.giftStatus === "UNAVAILABLE")
+    && (receipt.giftStatus === "PENDING_REVIEW" || receipt.giftStatus === "FROZEN" || receipt.giftStatus === "POSTED" || receipt.giftStatus === "UNAVAILABLE")
     && amount(receipt.giftUsdt) && amount(receipt.giftNex)
     && (receipt.giftStatus === "UNAVAILABLE" || (typeof receipt.giftUsdt === "number" && typeof receipt.giftNex === "number"));
 }
@@ -57,9 +59,9 @@ export function isUserSession(value: unknown): value is UserSession {
     && Number.isSafeInteger(user.userId)
     && user.userId > 0
     && typeof user.countryCode === "string"
-    && ["+84", "+86"].includes(user.countryCode)
+    && (["+84", "+86"].includes(user.countryCode) || user.countryCode === "" && user.phone === "")
     && typeof user.phone === "string"
-    && user.phone.length > 0
+    && (user.phone.length > 0 || user.countryCode === "")
     && typeof user.nickname === "string"
     && typeof user.onboardingComplete === "boolean"
   );

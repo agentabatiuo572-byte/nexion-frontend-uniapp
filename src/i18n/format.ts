@@ -1,6 +1,6 @@
 import { useLocaleStore } from "@/store/locale";
 import { DICTS } from "./use-t";
-import type { LocaleCode } from "./index";
+import { uiLocale, type LocaleCode } from "./index";
 
 /**
  * Tiny string interpolator for i18n keys with placeholders.
@@ -22,6 +22,29 @@ export function fmt(
 
 export function openSlotsTemplate(s: string, open: number): string {
   return open === 1 ? s.replace("slots open", "slot open") : s;
+}
+
+/** Display-only formatting. Unknown values never become a zero balance. */
+export function fmtMoney(value: number | null | undefined, detail = false): string {
+  if (value == null || !Number.isFinite(value)) return "-";
+  if (!detail && value !== 0 && Math.abs(value) < 0.01) return value < 0 ? "−<$0.01" : "<$0.01";
+  return `${value < 0 ? "−" : ""}$${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: detail ? 4 : 2 })}`;
+}
+
+const RATE_UNIT = { zh: "天", en: "day", vi: "ngày", id: "hari", ms: "hari", fil: "araw", ru: "день", kk: "күн", uz: "kun" };
+const JUST_NOW = { zh: "刚刚", en: "Just now", vi: "Vừa xong", id: "Baru saja", ms: "Baru sahaja", fil: "Ngayon lang", ru: "Только что", kk: "Жаңа ғана", uz: "Hozirgina" };
+
+export function fmtRate(value: number | null | undefined, locale: string = "en"): string {
+  return `${fmtMoney(value)}/${RATE_UNIT[uiLocale(locale)]}`;
+}
+
+export function fmtRelTime(timestamp: number, locale = "en", now = Date.now()): string {
+  if (!Number.isFinite(timestamp)) return "-";
+  const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+  if (!minutes) return JUST_NOW[uiLocale(locale)];
+  const unit = minutes < 60 ? "minute" : minutes < 1440 ? "hour" : "day";
+  const count = unit === "minute" ? minutes : unit === "hour" ? Math.floor(minutes / 60) : Math.floor(minutes / 1440);
+  return new Intl.RelativeTimeFormat(locale, { numeric: "always" }).format(-count, unit);
 }
 
 /**
@@ -47,6 +70,11 @@ const DATE_LOCALE_TAGS: Record<LocaleCode, string> = {
   ar: "ar-SA",
   de: "de-DE",
   fr: "fr-FR",
+  kk: "kk-KZ",
+  uz: "uz-Latn-UZ",
+  id: "id-ID",
+  ms: "ms-MY",
+  fil: "fil-PH",
 };
 
 export function dateLocale(): string {

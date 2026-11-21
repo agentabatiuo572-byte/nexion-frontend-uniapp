@@ -1,15 +1,11 @@
 <!--
-  [FEAT-SHARE5] 注册成功页 — 礼包确认 + H5 官网下载引导。
-  规格: PRD/specs/FEAT-SHARE01-invite-chain.md [FEAT-SHARE5]。
-  仅 H5 注册链路到达(register.vue finish 的 #ifdef H5 分支);APP 壳内注册直进
-  onboarding。bare 全屏页(无 chassis)→ 自带 GlobalUi 宿主(PORT-PITFALLS P-062)。
-  H5 统一落地页读取 officialUrl，iOS/Android 按钮分别读取 iosUrl/androidUrl；空值
-  显示不可用占位,不制造死链接。App 编译不渲染下载提醒。返回键视同
-  「继续」:H5 进首页,App 进 onboarding(禁回注册流)。
+  Lite registration shows its account-bound receipt and the iOS / Android /
+  official-site download links before continuing to Home. download=1 is the
+  public App-download entry; neither mode performs phone initialization.
 -->
 <template>
   <StandalonePageShell class="rs-root" :reserve-bottom="false">
-    <view v-if="successVisible" class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none', 'rs-wrap--web-setup': webSetupAvailable, 'rs-wrap--web-download': showH5Downloads }">
+    <view v-if="successVisible" class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none' }">
       <view class="rs-main">
         <view class="rs-content">
           <view class="rs-badge">
@@ -18,8 +14,8 @@
             </view>
           </view>
           <!-- #ifdef H5 -->
-          <text class="rs-title" role="heading" aria-level="1" tabindex="-1">{{ downloadOnly ? t.register.doneOfficialDownloadLink : setupOnly ? t.register.webSetupTitle : t.register.doneTitle }}</text>
-          <text class="rs-sub">{{ downloadOnly ? t.myDevices.phoneActivationAppOnlyBody : subLine }}</text>
+          <text class="rs-title" role="heading" aria-level="1" tabindex="-1">{{ downloadOnly ? t.register.doneOfficialDownloadLink : t.register.doneTitle }}</text>
+          <text class="rs-sub">{{ downloadOnly ? t.phonePolicy.webNotice : subLine }}</text>
           <!-- #endif -->
           <!-- #ifndef H5 -->
           <text class="rs-title" role="heading" aria-level="1" tabindex="-1">{{ t.register.doneTitle }}</text>
@@ -31,7 +27,7 @@
             <text class="rs-gift__cap">{{ t.share.posterGiftCap }}</text>
             <view class="rs-gift__amt">
               <text class="rs-gift__usd">${{ formatAmount(giftUsdt) }}</text>
-              <text class="rs-gift__nex">+ {{ formatAmount(giftNex) }} NEX</text>
+              <text class="rs-gift__nex">+ {{ formatAmount(giftNex) }} UVT</text>
             </view>
             <view v-if="giftState === 'posted'" class="rs-chip rs-chip--ok">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5" /></svg>
@@ -66,14 +62,6 @@
               <text class="rs-why__t">{{ t.register.doneWhyApp3 }}</text>
             </view>
           </view>
-          <view v-if="webSetupAvailable" class="rs-web-setup">
-            <text class="rs-web-setup__note">{{ t.register.webSetupNote }}</text>
-            <text v-if="setupError" class="rs-web-setup__error" role="alert">{{ setupError }}</text>
-            <view class="rs-cta rs-web-defer active-press" role="button" :tabindex="setupBusy ? -1 : 0" :aria-disabled="setupBusy" :aria-busy="setupBusy"
-              @click="deferForWeb" @keydown.enter.prevent="deferForWeb" @keydown.space.prevent="deferForWeb">
-              <text class="rs-cta__t">{{ setupBusy ? t.register.webSetupSaving : t.register.webSetupDefer }}</text>
-            </view>
-          </view>
           <!-- #endif -->
         </view>
       </view>
@@ -84,7 +72,7 @@
           <view v-for="item in platformDownloads" :key="item.platform" class="rs-platform-download">
             <view v-if="item.url" class="rs-h5-download__action active-press" role="link" tabindex="0"
               @click="openDownload(item.url)">
-              <text class="rs-h5-download__action-text">{{ item.label }} ↗</text>
+              <text class="rs-h5-download__action-text nx-after-external">{{ item.label }}</text>
             </view>
             <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
               <text class="rs-h5-download__pending">{{ item.label }}</text>
@@ -99,15 +87,13 @@
           role="link"
           tabindex="0"
           @click="openOfficialDownload"
+          @keydown.enter.prevent="openOfficialDownload"
         >
           <text class="rs-h5-download__action-text">{{ t.register.doneOfficialDownloadLink }}</text>
-          <text class="rs-h5-download__arrow">↗</text>
+          <view class="rs-h5-download__arrow" aria-hidden="true"><NxIcon name="arrow-up-right" /></view>
         </view>
         <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
           <text class="rs-h5-download__pending">{{ t.register.doneOfficialDownloadPending }}</text>
-        </view>
-        <view v-if="!officialDownloadUrl" class="rs-retry active-press" role="button" :tabindex="cfg.loading ? -1 : 0" :aria-disabled="cfg.loading" @click="retryDownloadConfig">
-          <text>{{ t.ui.retry }}</text>
         </view>
       </view>
       <!-- #endif -->
@@ -123,7 +109,7 @@
           @keydown.space.prevent="continueWeb"
         >
           <!-- #ifdef H5 -->
-          <text class="rs-cta__t">{{ webSetupAvailable ? t.register.webSetupBrowse : t.register.doneContinue }}</text>
+          <text class="rs-cta__t">{{ t.register.doneContinue }}</text>
           <!-- #endif -->
           <!-- #ifndef H5 -->
           <text class="rs-cta__t">{{ t.register.doneContinue }}</text>
@@ -137,10 +123,12 @@
 </template>
 
 <script setup lang="ts">
+import NxIcon from "@/components/ui/nx-icon.vue";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
-import { navBack, navReset } from "@/lib/route";
+import { navReset } from "@/lib/route";
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
-import { onBackPress, onHide, onLoad } from "@dcloudio/uni-app";
+import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import { useT } from "@/i18n/use-t";
@@ -154,11 +142,6 @@ import { consumeRemoteRegistrationReceipt } from "@/auth/remote-registration-rec
 import { canRenderRegistrationSuccess } from "@/lib/registration-success-session";
 import type { RegistrationReceipt } from "@/api/contracts";
 // #ifdef H5
-import { confirmInitialWebPhoneDeferral } from "@/lib/defer-phone-activation";
-import { remoteAccountScope } from "@/lib/remote-account-epoch";
-import { getDeviceId } from "@/lib/device-id";
-import { requireCryptoUuid } from "@/lib/secure-command-id";
-import { calibrationBelongsTo } from "@/lib/phone-calibration-flow";
 import { appDownloadUrl } from "@/lib/app-download-url";
 // #endif
 
@@ -167,17 +150,13 @@ type GiftState = "posted" | "pending" | "none";
 const t = useT();
 const cfg = useConfig();
 const auth = useAuth();
-let showH5Downloads = false;
 // #ifdef H5
-showH5Downloads = true;
 const downloadOnly = ref(false);
-const setupOnly = ref(false);
 // #endif
 const remoteReceipt = ref<RegistrationReceipt | null>(null);
 onLoad((options) => {
   // #ifdef H5
   downloadOnly.value = options?.download === "1";
-  setupOnly.value = options?.setup === "1";
   if (downloadOnly.value) return;
   // #endif
   remoteReceipt.value = consumeRemoteRegistrationReceipt(auth.accountId);
@@ -263,59 +242,9 @@ onMounted(() => {
 });
 onUnmounted(() => {
   if (sessionGateTimer) clearTimeout(sessionGateTimer);
-  // #ifdef H5
-  setupGeneration += 1;
-  // #endif
 });
 
-const webSetupAvailable = computed(() => {
-  // #ifdef H5
-  return remoteApiEnabled && !downloadOnly.value && auth.isAuthenticated && successVisible.value;
-  // #endif
-  // #ifndef H5
-  return false;
-  // #endif
-});
 // #ifdef H5
-const setupBusy = ref(false);
-const setupError = ref("");
-let setupGeneration = 0;
-let setupCommand: { accountKey: string; epoch: number; deviceId: string; idempotencyKey: string } | null = null;
-onHide(() => { setupGeneration += 1; setupBusy.value = false; });
-async function deferForWeb() {
-  if (!webSetupAvailable.value || setupBusy.value) return;
-  const scope = remoteAccountScope.snapshot();
-  const deviceId = getDeviceId();
-  const generation = ++setupGeneration;
-  const isCurrent = () => generation === setupGeneration && webSetupAvailable.value
-    && remoteAccountScope.isCurrent(scope) && auth.accountId === scope.accountKey
-    && sessionVault.read()?.user.userId === Number(scope.accountKey.slice(5)) && getDeviceId() === deviceId;
-  if (!isCurrent()) return;
-  setupBusy.value = true;
-  setupError.value = "";
-  try {
-    await confirmInitialWebPhoneDeferral({ deviceId, isCurrent,
-      accept: result => isCurrent() && calibrationBelongsTo(result, scope.accountKey, deviceId),
-      command: revision => {
-        if (!setupCommand || setupCommand.accountKey !== scope.accountKey || setupCommand.epoch !== scope.epoch
-            || setupCommand.deviceId !== deviceId) {
-          setupCommand = { ...scope, deviceId, idempotencyKey: `web-initial-defer:${requireCryptoUuid()}` };
-        }
-        return { revision, idempotencyKey: setupCommand.idempotencyKey };
-      },
-    });
-    if (!isCurrent()) return;
-    if (!auth.completeOnboarding()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
-    if (!isCurrent()) return;
-    if (setupOnly.value) navBack("/pages/me/wallet-topup");
-    else navReset({ url: "/pages/index/index", fail: () => {} });
-  } catch (cause) {
-    if (isCurrent()) setupError.value = cause instanceof Error && cause.message === "PHONE_WEB_SETUP_READ_ONLY"
-      ? t.value.register.webSetupReadOnly : t.value.register.webSetupFailed;
-  } finally {
-    if (generation === setupGeneration) setupBusy.value = false;
-  }
-}
 const officialDownloadUrl = computed(() => appDownloadUrl(
   cfg.config.share.appDownload.officialUrl,
 ));
@@ -331,17 +260,12 @@ function openDownload(url: string) {
   if (!url) return;
   window.location.assign(url);
 }
-function retryDownloadConfig() {
-  if (!cfg.loading) void cfg.load();
-}
+useAutoRecovery({ failed: () => cfg.configStatus === "failed" && !cfg.loading, retry: () => cfg.load() });
 // #endif
 
 function continueWeb() {
   // #ifdef H5
   navReset({ url: "/pages/index/index", fail: () => {} });
-  // #endif
-  // #ifndef H5
-  navReset({ url: "/pages/onboarding/estimator", fail: () => {} });
   // #endif
 }
 // 禁回注册流:返回键视同「继续」(App 端;H5 hash 回退由浏览器承担)。
@@ -354,8 +278,8 @@ onBackPress(() => {
 <style scoped>
 .rs-root { position: fixed; inset: 0; background: var(--v5-bg); overflow-y: auto; }
 .rs-pending { min-height: 100%; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-3); }
-.rs-wrap { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 100%; padding: 0 24px; box-sizing: border-box; text-align: center; }
-.rs-main { position: absolute; inset: 0 24px; display: flex; align-items: center; justify-content: center; padding: 24px 0; box-sizing: border-box; }
+.rs-wrap { position: relative; display: flex; flex-direction: column; min-height: 100%; padding: 0 24px calc(env(safe-area-inset-bottom, 0px) + 114px); box-sizing: border-box; text-align: center; }
+.rs-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 0 20px; box-sizing: border-box; }
 .rs-content { width: 100%; }
 .rs-badge { width: 74px; height: 74px; border-radius: 9999px; margin: 0 auto; background: color-mix(in srgb, var(--v5-brand) 16%, transparent); display: flex; align-items: center; justify-content: center; }
 .rs-badge__in { width: 52px; height: 52px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; }
@@ -365,7 +289,7 @@ onBackPress(() => {
 .rs-gift { margin-top: 18px; border-radius: 16px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); padding: 16px 14px; }
 .rs-gift__cap { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; color: var(--v5-brand); }
 .rs-gift__amt { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin-top: 8px; }
-.rs-gift__usd { font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-ink); }
+.rs-gift__usd { font-family: var(--font-amount); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-ink); }
 .rs-gift__nex { font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-nex); }
 .rs-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; border-radius: 9999px; padding: 4px 10px; }
 .rs-chip--ok { background: color-mix(in srgb, var(--v5-success) 12%, transparent); }
@@ -378,32 +302,21 @@ onBackPress(() => {
 .rs-why__r:last-child { border-bottom: none; }
 .rs-why__ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .rs-why__t { flex: 1; font-size: 12px; color: var(--v5-ink-2); line-height: 1.5; text-wrap: pretty; }
-.rs-h5-download { position: absolute; right: 24px; bottom: calc(env(safe-area-inset-bottom, 0px) + 102px); left: 24px; }
-.rs-retry { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--v5-surface); color: var(--v5-brand); font-size: 12px; }
+.rs-h5-download { flex-shrink: 0; margin-bottom: 16px; }
+.rs-retry { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--v5-surface); color: var(--v5-brand); font: 600 13px/20px var(--font-v5); }
 .rs-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .rs-h5-download__hint { display: block; font-size: 12px; color: var(--v5-ink-2); line-height: 1.5; text-wrap: pretty; }
 .rs-h5-download__action { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 9999px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 10%, transparent); }
 .rs-h5-download__action--disabled { color: var(--v5-ink-3); background: var(--v5-surface); }
 .rs-h5-download__action-text, .rs-h5-download__pending { font-size: 12px; font-weight: 500; }
-.rs-h5-download__arrow { font-size: 13px; line-height: 1; }
+.rs-h5-download__arrow { font-size: var(--ui-type-list-subtitle); line-height: 1; }
+.rs-footer { position: fixed; z-index: 3; right: 24px; bottom: 0; left: 24px; padding-top: 12px; padding-bottom: var(--nx-overlay-safe-bottom); background: var(--v5-bg); }
+.rs-cta { min-height: 52px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 0 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
+.rs-cta__t { font-size: var(--ui-type-button); font-weight: 500; color: var(--v5-on-brand); }
+.active-press:active { transform: scale(0.985); opacity: 0.9; }
 .rs-platform-downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
 .rs-platform-download__pending { display: block; margin-top: 5px; font-size: 12px; color: var(--v5-ink-3); }
 .rs-h5-download__action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.rs-footer { position: fixed; z-index: 3; right: 24px; bottom: 0; left: 24px; padding-top: 12px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 38px); background: linear-gradient(to bottom, transparent, var(--v5-bg) 12px); }
-.rs-cta { min-height: 52px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 0 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
-.rs-cta__t { font-size: 15px; font-weight: 500; color: var(--v5-on-brand); }
-.active-press:active { transform: scale(0.985); opacity: 0.9; }
-.rs-wrap--web-setup { height: auto; min-height: 100%; padding-top: 24px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 114px); }
-.rs-wrap--web-setup .rs-main { position: static; flex: 1; padding: 0 0 20px; }
-.rs-wrap--web-setup .rs-h5-download { position: static; margin-bottom: 16px; }
-.rs-web-setup { margin-top: 20px; }
-.rs-web-setup__note, .rs-web-setup__error { display: block; margin-bottom: 12px; font-size: 12px; line-height: 1.6; color: var(--v5-ink-2); }
-.rs-web-setup__error { color: var(--v5-danger); }
-.rs-web-setup .rs-cta { padding: 12px 16px; }
-.rs-wrap--web-setup .rs-continue { background: var(--v5-surface); box-shadow: none; }
-.rs-wrap--web-setup .rs-continue .rs-cta__t { color: var(--v5-ink-2); }
-.rs-web-defer[aria-disabled="true"] { opacity: 0.6; }
-.rs-web-defer:focus-visible { outline: 2px solid var(--v5-ink); outline-offset: 2px; }
 
 @media (max-height: 720px) {
   .rs-badge { width: 56px; height: 56px; }
@@ -417,13 +330,8 @@ onBackPress(() => {
   .rs-gift__note { margin-top: 5px; }
   .rs-why { margin-top: 6px; }
   .rs-why__r { padding: 4px 12px; }
-  .rs-h5-download__hint { display: none; }
   .rs-wrap--gift { height: auto; min-height: 100%; padding-top: 18px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 114px); }
   .rs-wrap--gift .rs-main { position: static; flex: 1; min-height: 0; padding: 0 0 12px; }
-  .rs-wrap--gift .rs-h5-download { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 102px); z-index: 2; margin-bottom: 12px; background: var(--v5-bg); }
-  .rs-wrap--web-setup.rs-wrap--gift .rs-h5-download { position: static; }
+  .rs-wrap--gift .rs-h5-download { margin-bottom: 12px; }
 }
-.rs-wrap--web-download { height: auto; min-height: 100%; padding-top: 32px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 114px); }
-.rs-wrap--web-download .rs-main { position: static; flex: 1; padding: 0 0 24px; }
-.rs-wrap--web-download .rs-h5-download { position: static; margin-bottom: 16px; }
 </style>

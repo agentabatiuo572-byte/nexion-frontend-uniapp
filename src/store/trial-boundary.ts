@@ -60,8 +60,8 @@ export function accruedShadow(
   const windowMs = Math.max(0, row.expiresAt - row.startedAt);
   const elapsedMs = Math.min(windowMs, Math.max(0, now - row.startedAt));
   return {
-    usd: +(cfg.shadowDailyUSD * (elapsedMs / ONE_DAY_MS)).toFixed(2),
-    nex: +(cfg.shadowDailyNEX * (elapsedMs / ONE_DAY_MS)).toFixed(0),
+    usd: +((cfg.shadowDailyUSD ?? 0) * (elapsedMs / ONE_DAY_MS)).toFixed(2),
+    nex: +((cfg.shadowDailyNEX ?? 0) * (elapsedMs / ONE_DAY_MS)).toFixed(0),
   };
 }
 

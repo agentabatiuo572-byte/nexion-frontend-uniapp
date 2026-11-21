@@ -1,31 +1,19 @@
 <!--
   Preferences (ported from Nexion-prototype/app/(main)/me/preferences/page.tsx).
-  Two toggle blocks: sound + haptics, and per-kind notification mute filters.
+  Two toggle blocks: interface sound, and per-kind notification mute filters.
   State persists via the preferences store. Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
     <view class="message-family" style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/me" />
-      <view v-if="prefs.error" class="mx-4" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
-        <text>{{ preferenceError }}</text>
-        <view class="family-control preferences-retry" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
-          <LiquidGlass :radius="24" /><text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
-
-      <!-- Sound + haptics -->
+      <SubPageHeader back="/pages/me/me" plain />
+      <!-- Sound -->
       <view class="mx-4">
-        <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
+        <text class="block pref-heading" :style="headingStyle">{{ w.feedbackHeading }}</text>
         <view class="nx-glass-card" :style="cardStyle">
-          <ToggleRow :label="w.soundLabel" :hint="w.soundHint" :value="prefs.soundEnabled" @toggle="prefs.toggleSound">
+          <ToggleRow :label="w.soundLabel" :hint="w.soundHint" :value="prefs.soundEnabled" last @toggle="prefs.toggleSound">
             <template #icon>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg>
-            </template>
-          </ToggleRow>
-          <ToggleRow :label="w.hapticsLabel" :hint="w.hapticsHint" :value="prefs.hapticsEnabled" last @toggle="prefs.toggleHaptics">
-            <template #icon>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 8 2 2-2 2 2 2-2 2" /><path d="m22 8-2 2 2 2-2 2 2 2" /><rect width="8" height="14" x="8" y="5" rx="1" /></svg>
             </template>
           </ToggleRow>
         </view>
@@ -33,24 +21,24 @@
 
       <!-- Notification kinds -->
       <view class="mx-4" style="margin-top: 20px">
-        <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
-        <text v-if="!prefs.remoteReady && !prefs.error" class="block" role="status" aria-live="polite">{{ w.loading }}</text>
-        <view v-if="prefs.remoteReady" class="nx-glass-card" :style="cardStyle">
+        <text class="block pref-heading" :style="headingStyle">{{ w.notifHeading }}</text>
+        <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
             :key="k"
             :label="w.notifKinds[k]"
-            :value="prefs.notifPrefs[k]"
+            :value="prefs.remoteReady ? prefs.notifPrefs[k] : null"
+            :unknown-label="w.notifUnknown"
             :last="i === notifKinds.length - 1"
-            :locked="isMandatoryNotifKind(k)"
-            :hint="isMandatoryNotifKind(k) ? w.notifMandatoryHint : undefined"
-            @toggle="prefs.toggleNotifKind(k)"
+            @toggle="saveNotificationPreference(k)"
           >
             <template #icon>
               <view :style="dotStyle(k)" />
             </template>
           </ToggleRow>
         </view>
+        <!-- Until the server answers, the switches show "—"; one line under the card says why, so the card itself never moves (03 §3.4). -->
+        <text v-if="!prefs.remoteReady" class="block mx-1 pref-notif-status" role="status" aria-live="polite">{{ prefs.readFailedWithoutData ? w.notifUnavailable : w.loading }}</text>
         <text class="block mx-1" :style="footerStyle">{{ w.notifFooter }}</text>
       </view>
     </view>
@@ -58,23 +46,58 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onUnmounted, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import LiquidGlass from "@/components/liquid-glass.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
+import { toast } from "@/store/ui";
 
 const t = useT();
 const w = computed(() => t.value.preferences);
 const prefs = usePreferences();
-const preferenceError = computed(() => {
-  const labels = t.value.preferences as typeof t.value.preferences & Record<"updateFailed" | "unavailable", string>;
-  return prefs.error === "updateFailed" ? labels.updateFailed : labels.unavailable;
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!prefs.readError,
+  retry: () => prefs.refreshRemote(),
 });
+function refreshHealthyPreferences() {
+  if (remoteApiEnabled && !prefs.readError && !prefs.loading) return prefs.refreshRemote();
+}
+let pageVisit = 0;
+let pageVisible = false;
+let releaseActiveRefresh = () => {};
+onShow(() => {
+  pageVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshHealthyPreferences, "pages/me/preferences");
+  void refreshHealthyPreferences();
+});
+function leavePreferences() {
+  pageVisible = false;
+  pageVisit++;
+  releaseActiveRefresh();
+}
+onHide(leavePreferences);
+onUnmounted(leavePreferences);
 
-const notifKinds: NotifKind[] = ["commission", "team", "staking", "market", "genesis", "system"];
+async function saveNotificationPreference(kind: NotifKind) {
+  if (!pageVisible || !prefs.remoteReady) return;
+  const visit = pageVisit;
+  const account = remoteAccountScope.snapshot();
+  const result = await prefs.toggleNotifKind(kind);
+  if (result === "failed" && pageVisible && visit === pageVisit && remoteAccountScope.isCurrent(account)) {
+    toast.error(t.value.preferences.updateFailed);
+  }
+}
+
+// Mandatory kinds cannot be switched off, so they are not listed.
+const notifKinds = (["commission", "team", "market", "genesis", "system"] as NotifKind[]).filter(k => !isMandatoryNotifKind(k));
 const NOTIF_COLOR: Record<NotifKind, string> = {
   commission: "var(--v5-brand)",
   team: "var(--v5-tech-cyan)",
@@ -91,9 +114,8 @@ function dotStyle(k: NotifKind): CSSProperties {
 // Section label (de-card spec): 15/600/ink, sentence-case, sits above the group.
 const headingStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-section)",
   fontWeight: 600,
-  letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
   marginBottom: "12px",
   paddingLeft: "2px",
@@ -105,18 +127,22 @@ const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
   overflow: "hidden",
 };
+// Footer note: 注释 role in ink-3; ink-4 carries no information (01 §1.1.1, 10 §10.1).
 const footerStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-  lineHeight: 1.625,
+  fontSize: "var(--ui-type-note)",
+  color: "var(--v5-ink-3)",
+  lineHeight: "var(--ui-type-note-lh)",
 };
 
 
 </script>
 
-<style scoped>
-.preferences-retry { margin-top: 8px; }
-</style>
-
 <style src="@/styles/message-family.css"></style>
+
+<style scoped>
+/* Section titles: -0.01em for 17px Latin titles, none for Chinese (01 §1.2); a class, since an inline style cannot follow :lang. */
+.pref-heading { letter-spacing: -0.01em; }
+.pref-heading:lang(zh) { letter-spacing: 0; }
+.pref-notif-status { margin-top: var(--v5-space-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+</style>

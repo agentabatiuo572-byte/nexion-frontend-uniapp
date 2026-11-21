@@ -40,10 +40,10 @@
         </view>
         <EmptyState
           v-if="showRemoteReceiptInitialError"
-          kind="recoverable-error"
+          kind="recoverable-error" page
           :title="t.empty.errorTitle"
           :desc="t.empty.errorDesc"
-          :cta-label="t.empty.errorCta"
+          :cta-label="t.ui.reload"
           emphasis
           @cta="retryRemoteReceipts"
         />
@@ -62,12 +62,12 @@
               @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
-                <text class="block truncate" :style="rowSubStyle">{{ t.receipt.computeTitle }} · {{ r.model }}</text>
+                <text class="block truncate font-mono-code" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
+                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
               </view>
-              <view class="text-right shrink-0" style="margin-left: 8px">
-                <text class="block tabular-nums" :style="remoteAmountStyle">+${{ formatAmount(r.rewardUsdt) }}</text>
-                <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
+              <view class="text-right shrink-0 min-w-0" style="margin-left: 8px; max-width: 42%">
+                <text class="block truncate tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 'full')} UVT` : `+$${formatAmount(r.rewardUsdt, 'full')}` }}</text>
+                <text class="block truncate" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
           </template>
@@ -79,26 +79,13 @@
               </view>
               <view class="text-right shrink-0" style="margin-left: 8px">
                 <text class="block tabular-nums" :style="remoteReceiptAmountStyle(r)">{{ remoteReceiptAmount(r) }}</text>
-                <text class="block" :style="rowDateStyle">{{ shortDate(Date.parse(r.createdAt)) }}</text>
+                <text class="block" :style="rowDateStyle">{{ shortDate(r.createdAt) }}</text>
               </view>
             </view>
           </template>
         </view>
         <view
-          v-if="showRemoteReceiptInlineError"
-          class="flex items-center justify-center active:opacity-70"
-          style="min-height: 44px; margin: 8px 0"
-          role="button"
-          tabindex="0"
-          :aria-label="t.empty.errorCta"
-          @click="retryRemoteReceipts"
-
-          @keydown.enter.stop.prevent="retryRemoteReceipts" @keydown.space.stop.prevent="retryRemoteReceipts"
-        >
-          <text :style="rowSubStyle">{{ t.empty.errorDesc }} · {{ t.empty.errorCta }}</text>
-        </view>
-        <view
-          v-if="remoteReceiptHasMore"
+          v-if="remoteReceiptHasMore && !showRemoteReceiptInitialError"
           class="grid place-items-center active:opacity-70"
           style="min-height: 44px; margin: 8px 0 16px"
           role="button"
@@ -154,7 +141,7 @@
             </view>
           </view>
           <view class="text-right shrink-0" style="margin-left: 8px">
-            <text class="block tabular-nums" :style="rowAmountStyle(r)">{{ rowAmount(r) }}</text>
+            <text class="block tabular-nums" :class="{ 'nx-before-check': r.category === 'KY' }" :style="rowAmountStyle(r)">{{ rowAmount(r) }}</text>
             <text class="block" :style="rowDateStyle">{{ shortDate(r.settledAt) }}</text>
           </view>
         </view>
@@ -164,14 +151,18 @@
            first mount rather than missing it if this tab starts with 0 items. -->
       <view v-if="!remoteReceiptsMode" ref="loadMoreSentinel" style="height: 1px" />
 
-      <text v-if="!remoteReceiptsMode" class="block" :style="footerStyle">{{ t.receipt.footerNote }}</text>
 
-      <ReceiptModal :receipt="open" @close="open = null" />
     </view>
+    <template #pageFixed>
+      <ReceiptModal :receipt="open" @close="open = null" />
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { displayTimestamp, formatDisplayDate, formatDisplayTime } from "@/lib/display-date";
+import { receiptLine } from "@/lib/receipt-line";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
@@ -181,14 +172,16 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import ReceiptCatIcon from "@/components/me/receipt-cat-icon.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { workloadLabel } from "@/lib/workload-label";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
+import { shortenHex } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
-import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
 import { useApp } from "@/store/app";
 
@@ -204,6 +197,7 @@ const REMOTE_RECEIPT_KINDS: RemoteReceiptKind[] = ["compute", "deposit"];
 const PAGE_SIZE = 10;
 
 const t = useT();
+const computeCopy = useComputeV2Copy();
 const app = useApp();
 const depositsStore = useDeposits();
 const receiptsPageFence = createReceiptsPageRequestFence(
@@ -248,13 +242,13 @@ const remoteReceiptHasMore = computed(() => remoteReceiptKind.value === "compute
 const showRemoteReceiptInitialError = computed(() => remoteReceiptInitialStatus.value === "error" && remoteReceiptItems.value.length === 0);
 const showRemoteReceiptInlineError = computed(() => remoteReceiptMoreStatus.value === "error" && remoteReceiptItems.value.length > 0);
 const remoteReceiptTitle = computed(() => remoteReceiptKind.value === "compute"
-  ? t.value.receipt.computeTitle
+  ? computeCopy.value.taskReceipt
   : t.value.receipt.depositTitle);
 const remoteReceiptEmptyTitle = computed(() => remoteReceiptKind.value === "compute"
-  ? t.value.receipt.computeEmptyTitle
+  ? computeCopy.value.emptyReceipts
   : t.value.receipt.depositEmptyTitle);
 const remoteReceiptEmptyHint = computed(() => remoteReceiptKind.value === "compute"
-  ? t.value.receipt.computeEmptyHint
+  ? computeCopy.value.receiptsHint
   : t.value.receipt.depositEmptyHint);
 const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
@@ -281,7 +275,7 @@ function remoteReceiptAmountStyle(receipt: ServerReceiptListItem): CSSProperties
   const presentation = presentVietQrReceipt(receipt.status, receipt.creditedUsdt);
   return {
     ...remoteAmountStyle,
-    color: presentation.credited ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
+    color: presentation.credited ? "var(--v5-brand)" : "var(--v5-ink-3)",
   };
 }
 
@@ -322,7 +316,7 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor
       && expectedBindingEpoch === app.accountBindingEpoch) {
       failedComputeReceiptRequest.value = { offset, cursor, append };
       remoteComputeReceiptStatus.value = "error";
-      toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
+      if (append) toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
     }
   } finally {
     if (requestEpoch === receiptPageRequestEpoch
@@ -361,29 +355,38 @@ async function loadSelectedMoreRemoteReceipts(): Promise<void> {
   remoteDepositMoreLoading.value = true;
   try {
     await depositsStore.loadMoreRemoteVietQrReceipts();
+    if (depositsStore.remoteReceiptMoreStatus === "error") toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
   } finally {
     if (receiptsPageFence.isCurrent(requestScope)) remoteDepositMoreLoading.value = false;
   }
 }
 
-function retryRemoteReceipts(): void {
+async function retryRemoteReceipts(): Promise<void> {
   if (remoteReceiptKind.value === "compute" && remoteComputeReceiptStatus.value === "error") {
     const failed = failedComputeReceiptRequest.value ?? { offset: 0, cursor: null, append: false };
-    if (failed.append) void loadSelectedMoreRemoteReceipts();
-    else void loadRemoteComputeReceipts(failed.offset, false, failed.cursor);
+    if (failed.append) await loadSelectedMoreRemoteReceipts();
+    else await loadRemoteComputeReceipts(failed.offset, false, failed.cursor);
     return;
   }
   if (remoteReceiptKind.value === "deposit" && depositsStore.remoteReceiptInitialStatus === "error") {
-    void depositsStore.refreshRemoteVietQrDeposits();
+    await depositsStore.refreshRemoteVietQrDeposits();
     return;
   }
   if (remoteReceiptKind.value === "deposit" && depositsStore.remoteReceiptMoreStatus === "error") {
-    void loadSelectedMoreRemoteReceipts();
+    await loadSelectedMoreRemoteReceipts();
   }
 }
 
+useAutoRecovery({
+  failed: () => remoteReceiptsMode && !remoteReceiptLoading.value && !remoteMoreLoading.value
+    && remoteReceiptInitialStatus.value === "error"
+    && (remoteReceiptKind.value !== "compute" || !failedComputeReceiptRequest.value?.append),
+  retry: retryRemoteReceipts,
+});
+
 function loadSelectedRemoteReceipts(): void {
-  if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
+  // After an H5 reload the session is restored after the page shows; the account watch reads once it is bound.
+  if (!remoteReceiptsMode || !receiptsPageFence.isVisible() || !sessionVault.read()) return;
   if (remoteReceiptKind.value === "compute") {
     void loadRemoteComputeReceipts(0, false);
     return;
@@ -541,7 +544,7 @@ function tabLabel(c: Tab): string {
 }
 
 function remoteReceiptKindLabel(kind: RemoteReceiptKind): string {
-  return kind === "compute" ? t.value.receipt.computeTab : t.value.receipt.depositTab;
+  return kind === "compute" ? computeCopy.value.taskReceipt : t.value.receipt.depositTab;
 }
 
 async function handleClearAll() {
@@ -570,16 +573,13 @@ function copySig(r: Receipt) {
 }
 
 function rowAmount(r: Receipt): string {
-  return r.category === "KY" ? `✓ ${formatAmount(r.netPaid)}` : `+${formatAmount(r.netPaid)}`;
+  return r.category === "KY" ? formatAmount(r.netPaid) : `+${formatAmount(r.netPaid)}`;
 }
-function shortDate(ts: number): string {
-  const d = new Date(ts);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  if (sameDay) {
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+function shortDate(ts: number | string): string {
+  const timestamp = displayTimestamp(ts);
+  if (timestamp === null) return "—";
+  const sameDay = new Date(timestamp).toDateString() === new Date().toDateString();
+  return sameDay ? formatDisplayTime(timestamp) : formatDisplayDate(timestamp, dateLocale());
 }
 
 // ── styles ──
@@ -595,7 +595,7 @@ function remoteTabStyle(kind: RemoteReceiptKind): CSSProperties {
 }
 function remoteTabLabelStyle(kind: RemoteReceiptKind): CSSProperties {
   return {
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: 500,
     color: remoteReceiptKind.value === kind ? "var(--v5-brand)" : "var(--v5-ink-3)",
   };
@@ -628,7 +628,7 @@ const emptyStyle: CSSProperties = {
   padding: "32px",
   textAlign: "center",
 };
-const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)" };
 const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 // De-carded: transparent hairline group (earnings-ledger idiom). The surface +
@@ -658,7 +658,7 @@ function rowIconStyle(r: Receipt): CSSProperties {
   };
 }
 const rowTitleStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
@@ -668,7 +668,7 @@ function rowAmountStyle(r: Receipt): CSSProperties {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "13px",
     fontWeight: 600,
-    color: r.category === "KY" ? "var(--v5-brand-2)" : "var(--v5-brand)",
+    color: "var(--v5-brand)",
   };
 }
 const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
@@ -676,14 +676,7 @@ const remoteAmountStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "13px",
   fontWeight: 600,
-  color: "var(--v5-brand-2)",
-};
-const footerStyle: CSSProperties = {
-  margin: "16px 24px 24px",
-  textAlign: "center",
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-  lineHeight: 1.625,
+  color: "var(--v5-brand)",
 };
 
 import GlassSegments from "@/components/glass-segments.vue";

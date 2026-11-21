@@ -8,6 +8,7 @@ export const ORDER_STATUSES = [
   "paid",
   "provisioning",
   "activated",
+  "inventory",
   "payment_failed",
   "expired",
   "provisioning_failed",
@@ -17,6 +18,41 @@ export const ORDER_STATUSES = [
 ] as const;
 
 export type CanonicalOrderStatus = typeof ORDER_STATUSES[number];
+
+/** Backend OrderRefundReason (E4); the operator's free-text note is never sent to the App. */
+export const ORDER_REFUND_REASON_CODES = [
+  "USER_REQUEST",
+  "DUPLICATE_PAYMENT",
+  "DELIVERY_UNAVAILABLE",
+  "ORDER_EXCEPTION",
+  "OTHER",
+] as const;
+
+export type OrderRefundReasonCode = typeof ORDER_REFUND_REASON_CODES[number];
+
+/** Backend OrderCloseReason (E4): why an order closed as cancelled, expired, failed or charged back. */
+export const ORDER_CLOSE_REASON_CODES = [
+  "USER_CANCELLED",
+  "PAYMENT_TIMEOUT",
+  "PAYMENT_NOT_RECEIVED",
+  "PAYMENT_AMOUNT_MISMATCH",
+  "PAYMENT_DISPUTED",
+  "DELIVERY_UNAVAILABLE",
+  "ORDER_EXCEPTION",
+  "OTHER",
+] as const;
+
+export type OrderCloseReasonCode = typeof ORDER_CLOSE_REASON_CODES[number];
+
+export interface OrderTrialSettlement {
+  /** FULL_TERM_ON_CONVERSION takes its rewards back on refund; older rules keep them. */
+  fullTerm: boolean;
+  promoDiscountUsdt: number;
+  offsetUsdt: number;
+  earlyDiscountUsdt: number;
+  rewardUsdt: number;
+  rewardNex: number;
+}
 
 export interface CanonicalOrder {
   orderNo: string;
@@ -30,6 +66,8 @@ export interface CanonicalOrder {
   amountUsdt: number | string;
   promotionQuoteId?: string;
   paymentMethod: string | null;
+  /** What the user actually paid incl. channel and network fees (2-place decimal); absent until the server sends it. */
+  paidTotalUsdt?: string;
   paymentStatus: string;
   orderStatus: string;
   activationStatus: string;
@@ -43,6 +81,11 @@ export interface CanonicalOrder {
   refundAmountUsdt: number | null;
   refundChannel: string | null;
   refundBillNo: string | null;
+  /** User-visible refund reason; unknown codes are dropped rather than shown raw. */
+  refundReasonCode?: OrderRefundReasonCode | null;
+  closeReasonCode?: OrderCloseReasonCode | null;
+  /** Trial-conversion orders only: checkout discounts and the trial rewards credited. */
+  trialSettlement?: OrderTrialSettlement | null;
   dataCenter: string | null;
   tradeinNo: string | null;
   sourceDeviceId: number | null;
@@ -95,7 +138,8 @@ export interface PaidOrderReceipt {
   activationStatus: "ACTIVATED";
   canonicalStatus: "activated";
   amountUsdt: number;
-  paymentMethod: "WALLET" | "VOUCHER";
+  paymentMethod: "WALLET" | "VOUCHER" | "HDPAY_BANK" | "CREGIS_USDT_BSC" | "CREGIS_USDT_ERC20" | "CREGIS_USDT_TRC20";
+  paidTotalUsdt?: string;
   walletBalanceAfterUsdt: number | null;
   idempotent: boolean;
   serverCanonical: true;
@@ -115,12 +159,13 @@ export interface OrderApi {
   list(beforeOrderNo?: string | null, pageSize?: number): Promise<CanonicalOrderList>;
   create(request: CreateOrderRequest): Promise<CreatedOrder>;
   cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
-  pay(orderNo: string, idempotencyKey: string): Promise<PaidOrderReceipt>;
+  pay(orderNo: string, idempotencyKey: string, authorization?: import('./payment-password-api').PaymentPasswordAuthorization): Promise<PaidOrderReceipt>;
 }
 
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
 let currentRuntimeRevision = 0;
-const runtimeRevisionListeners = new Set<(scope: RuntimeRevisionScope) => void>();
+export type RuntimeRevisionReason = "authority" | "catalog";
+const runtimeRevisionListeners = new Set<(scope: RuntimeRevisionScope, reason: RuntimeRevisionReason) => void>();
 
 export interface RuntimeRevisionScope {
   runId: null;
@@ -128,15 +173,17 @@ export interface RuntimeRevisionScope {
 }
 
 /** Invalidate responses captured before a catalogue or account refresh. */
-export function advanceRuntimeRevision(_reason?: unknown): void {
+export function advanceRuntimeRevision(reason: RuntimeRevisionReason | null = null, beforeNotify?: (scope: RuntimeRevisionScope) => void): void {
   currentRuntimeRevision += 1;
   const scope = captureRuntimeRevision();
-  runtimeRevisionListeners.forEach((listener) => listener(scope));
+  // Stamp derived display context after the epoch moves, before observers run.
+  beforeNotify?.(scope);
+  runtimeRevisionListeners.forEach((listener) => listener(scope, reason ?? "authority"));
 }
 
 /** Notify account-scoped stores after a canonical runtime revision changes. */
 export function subscribeRuntimeRevision(
-  listener: (scope: RuntimeRevisionScope) => void,
+  listener: (scope: RuntimeRevisionScope, reason: RuntimeRevisionReason) => void,
 ): () => void {
   runtimeRevisionListeners.add(listener);
   return () => runtimeRevisionListeners.delete(listener);
@@ -166,6 +213,29 @@ function nonEmptyString(value: unknown): string {
   return value.trim();
 }
 
+function trialSettlement(value: unknown): OrderTrialSettlement | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  return {
+    fullTerm: row.settlementPolicy === "FULL_TERM_ON_CONVERSION",
+    promoDiscountUsdt: finiteNumber(row.promoDiscountUsdt ?? 0),
+    offsetUsdt: finiteNumber(row.offsetUsdt ?? 0),
+    earlyDiscountUsdt: finiteNumber(row.earlyDiscountUsdt ?? 0),
+    rewardUsdt: finiteNumber(row.rewardUsdt ?? 0),
+    rewardNex: finiteNumber(row.rewardNex ?? 0),
+  };
+}
+
+function refundReasonCode(value: unknown): OrderRefundReasonCode | null {
+  return typeof value === "string" && (ORDER_REFUND_REASON_CODES as readonly string[]).includes(value)
+    ? value as OrderRefundReasonCode : null;
+}
+
+function closeReasonCode(value: unknown): OrderCloseReasonCode | null {
+  return typeof value === "string" && (ORDER_CLOSE_REASON_CODES as readonly string[]).includes(value)
+    ? value as OrderCloseReasonCode : null;
+}
+
 function nullableString(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
   return nonEmptyString(value);
@@ -178,11 +248,28 @@ function finiteNumber(value: unknown, minimum = 0): number {
 
 function historyAmount(source: Record<string, unknown>): number | string {
   if (typeof source.promotionQuoteId === 'string' && source.promotionQuoteId.trim()) {
-    const value=source.amountUsdt;
-    if(typeof value!=='string'||!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(value))return invalid();
-    return value;
+    return promotionDecimal(source.amountUsdt);
   }
   return finiteNumber(source.amountUsdt);
+}
+
+function promotionDecimal(value: unknown): string {
+  if(typeof value!=='string'||!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(value))return invalid();
+  return value;
+}
+
+/** Optional fee-inclusive paid total: a decimal string with at most two places. */
+function paidTotalUsdt(value: unknown): { paidTotalUsdt?: string } {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "string" || !/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(value)) return invalid();
+  return { paidTotalUsdt: value };
+}
+
+function historyNumber(source: Record<string, unknown>, field: "subtotalUsdt" | "discountUsdt"): number {
+  const value=source[field];
+  // Promotion overlays encode every total as a decimal string; the settled amount stays exact above.
+  return typeof value==='string' && typeof source.promotionQuoteId==='string' && source.promotionQuoteId.trim()
+    ? Number(promotionDecimal(value)) : finiteNumber(value);
 }
 
 function integer(value: unknown, minimum = 0): number {
@@ -220,12 +307,13 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     productNo: nonEmptyString(source.productNo),
     productName: nonEmptyString(source.productName),
     quantity: integer(source.quantity, 1),
-    subtotalUsdt: finiteNumber(source.subtotalUsdt),
+    subtotalUsdt: historyNumber(source,"subtotalUsdt"),
     unitPriceUsdt: finiteNumber(source.unitPriceUsdt),
-    discountUsdt: finiteNumber(source.discountUsdt),
+    discountUsdt: historyNumber(source,"discountUsdt"),
     amountUsdt: historyAmount(source),
     ...(source.promotionQuoteId ? { promotionQuoteId: nonEmptyString(source.promotionQuoteId) } : {}),
     paymentMethod: nullableString(source.paymentMethod),
+    ...paidTotalUsdt(source.paidTotalUsdt),
     paymentStatus: nonEmptyString(source.paymentStatus),
     orderStatus: nonEmptyString(source.orderStatus),
     activationStatus: nonEmptyString(source.activationStatus),
@@ -240,6 +328,9 @@ function canonicalOrder(value: unknown): CanonicalOrder {
       ? null : finiteNumber(source.refundAmountUsdt),
     refundChannel: nullableString(source.refundChannel),
     refundBillNo: nullableString(source.refundBillNo),
+    refundReasonCode: refundReasonCode(source.refundReasonCode),
+    closeReasonCode: closeReasonCode(source.closeReasonCode),
+    trialSettlement: trialSettlement(source.trialSettlement),
     dataCenter: nullableString(source.dataCenter),
     tradeinNo: nullableString(source.tradeinNo),
     sourceDeviceId: nullableInteger(source.sourceDeviceId),
@@ -275,7 +366,12 @@ function canonicalOrder(value: unknown): CanonicalOrder {
           && parsed.activatedAt === null;
       case "activated":
         return paymentStatus === "PAID" && orderStatus === "COMPLETED"
-          && activationStatus === "ACTIVATED" && parsed.paidAt !== null && parsed.activatedAt !== null;
+          && activationStatus === "ACTIVATED" && parsed.paidAt !== null;
+      case "inventory":
+        return parsed.orderType.toUpperCase() === "TRADE_IN" && parsed.tradeinNo !== null
+          && parsed.sourceDeviceId !== null && parsed.targetDeviceId !== null
+          && paymentStatus === "PAID" && orderStatus === "COMPLETED"
+          && activationStatus === "INVENTORY" && parsed.paidAt !== null && parsed.activatedAt === null;
       case "payment_failed":
         return paymentStatus === "FAILED" && orderStatus === "PAYMENT_FAILED"
           && activationStatus === "WAITING_PAYMENT";
@@ -347,19 +443,24 @@ function cancelledOrder(value: unknown): CancelledOrder {
     idempotent: source.idempotent };
 }
 
-function paidOrderReceipt(value: unknown): PaidOrderReceipt {
-  const source = record(value);
+export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
+  const source = { ...record(value) };
+  if ((source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC' || source.paymentMethod === 'CREGIS_USDT_ERC20' || source.paymentMethod === 'CREGIS_USDT_TRC20') && typeof source.amountUsdt === 'string') {
+    if (!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(source.amountUsdt)) return invalid();
+    source.amountUsdt = Number(source.amountUsdt);
+  }
   if (source.paymentStatus !== "PAID" || source.orderStatus !== "COMPLETED"
       || source.activationStatus !== "ACTIVATED" || source.canonicalStatus !== "activated"
       || source.serverCanonical !== true || source.source !== "server"
       || source.sourceEnvironment !== "PRODUCTION" || source.runId !== "") return invalid();
   const amountUsdt = finiteNumber(source.amountUsdt);
   if (amountUsdt < 0) return invalid();
-  const paymentMethod = source.paymentMethod === "NEXGRID_WALLET" || source.paymentMethod === "WALLET"
-    ? "WALLET" : source.paymentMethod === "VOUCHER" ? "VOUCHER" : invalid();
+  const paymentMethod = source.paymentMethod === "UVEL_WALLET" || source.paymentMethod === "WALLET"
+    ? "WALLET" : source.paymentMethod === "VOUCHER" ? "VOUCHER"
+      : source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC' || source.paymentMethod === 'CREGIS_USDT_ERC20' || source.paymentMethod === 'CREGIS_USDT_TRC20' ? source.paymentMethod : invalid();
   if ((paymentMethod === "VOUCHER") !== (amountUsdt === 0)) return invalid();
   const walletBalanceAfterUsdt = paymentMethod === "WALLET"
-    ? finiteNumber(source.walletBalanceAfterUsdt)
+    ? finiteNumber(source.walletBalanceAfterUsdt, -Infinity)
     : source.walletBalanceAfterUsdt === null ? null : invalid();
   return {
     orderNo: nonEmptyString(source.orderNo),
@@ -370,6 +471,7 @@ function paidOrderReceipt(value: unknown): PaidOrderReceipt {
     canonicalStatus: "activated",
     amountUsdt,
     paymentMethod,
+    ...paidTotalUsdt(source.paidTotalUsdt),
     walletBalanceAfterUsdt,
     idempotent: typeof source.idempotent === "boolean" ? source.idempotent : invalid(),
     serverCanonical: true,
@@ -381,7 +483,7 @@ function paidOrderReceipt(value: unknown): PaidOrderReceipt {
 
 export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod"): OrderApi {
   return {
-    async list(beforeOrderNo = null, pageSize = 50): Promise<CanonicalOrderList> {
+    async list(beforeOrderNo = null, pageSize = 20): Promise<CanonicalOrderList> {
       const cursor = beforeOrderNo?.trim() || null;
       if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) return invalid();
       const query = cursor
@@ -438,13 +540,15 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
       }));
     },
 
-    async pay(orderNo, idempotencyKey): Promise<PaidOrderReceipt> {
+    async pay(orderNo, idempotencyKey, authorization): Promise<PaidOrderReceipt> {
       const normalized = orderNo.trim();
       if (!normalized || !idempotencyKey.trim()) return invalid();
       const parsed = paidOrderReceipt(await client.request<unknown>({
         method: "POST",
         path: `/api/orders/${encodeURIComponent(normalized)}/pay`,
         idempotencyKey,
+        body: authorization,
+        retryAfterAuth: false,
       }));
       if (parsed.orderNo !== normalized) return invalid();
       return parsed;

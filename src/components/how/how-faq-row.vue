@@ -1,6 +1,6 @@
 <!-- FaqRow — surface-2 fill Q/A pair (ported from how-it-works/parts.tsx FaqRow). -->
 <template>
-  <view :style="boxStyle">
+  <view :style="open ? openStyle : boxStyle">
     <text class="block" :style="qStyle">{{ q }}</text>
     <text class="block" :style="aStyle">{{ a }}</text>
   </view>
@@ -9,7 +9,12 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 
-defineProps<{ q: string; a: string }>();
+defineProps<{ q: string; a: string; open?: boolean }>();
+
+const openStyle: CSSProperties = {
+  paddingBlock: "var(--ui-space-inline)",
+  borderBottom: "1px solid var(--v5-border)",
+};
 
 const boxStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
@@ -27,8 +32,8 @@ const qStyle: CSSProperties = {
 };
 const aStyle: CSSProperties = {
   marginTop: "5px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-long-form)",
   color: "var(--v5-ink-2)",
-  lineHeight: 1.62,
+  lineHeight: "var(--ui-type-long-form-lh)",
 };
 </script>
