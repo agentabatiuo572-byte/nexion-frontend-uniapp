@@ -243,6 +243,11 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       });
     }
     if ((response.status < 200 || response.status >= 300) && !explicitlyAccepted) {
+      const purchaseConflict = request.method === "POST" && response.status === 409 && envelope?.code === 409
+        && envelope.message === "PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED"
+        && [`${baseUrl}/api/app/purchase-payment-quotes`, `${baseUrl}/api/app/purchase-payment-intents`].includes(request.url)
+        && envelope.data && typeof envelope.data === "object"
+        ? envelope.data as { intentNo?: unknown; commandKey?: unknown } : undefined;
       const providerDenial = request.method === "POST" && request.url === `${baseUrl}/api/app/deposits/vietqr/intents`
         && response.status === 422 && envelope?.code === 422 && envelope.message === "HDPAY_ORDER_CREATE_REJECTED"
         && envelope.data && typeof envelope.data === "object" && !Array.isArray(envelope.data)
@@ -255,6 +260,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         retryable: response.status >= 500,
         retryAfterMs,
         providerReason: typeof providerDenial?.providerReason === "string" ? providerDenial.providerReason : undefined,
+        purchaseIntentNo: typeof purchaseConflict?.intentNo === "string" && purchaseConflict.intentNo.trim() ? purchaseConflict.intentNo : undefined,
+        purchaseIntentCommandKey: typeof purchaseConflict?.commandKey === "string" && purchaseConflict.commandKey.trim() ? purchaseConflict.commandKey : undefined,
       });
       if (key && response.status === 429) readCooldowns.set(key, { until: Date.now() + (retryAfterMs ?? 30_000), error: failure });
       throw failure;

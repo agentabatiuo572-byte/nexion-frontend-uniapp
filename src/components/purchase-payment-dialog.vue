@@ -7,7 +7,7 @@
   <view v-if="sheetOpen" class="pp-mask nx-sheet-fade-in" @click.self="payment.close">
     <view id="pp-sheet" class="pp-sheet nx-glass-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="sheetTitle">
       <view class="pp-head">
-        <view v-if="s.step !== 'methods'" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
+        <view v-if="s.step !== 'methods' && !s.originalRecovery" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
         </view>
         <view class="pp-head__text">
@@ -64,8 +64,8 @@
         <template v-else-if="s.step === 'network'">
           <text class="pp-label">{{ copy.networkLabel }}</text>
           <view class="pp-tabs" role="radiogroup" :aria-label="copy.networkLabel" @keydown.right.prevent="moveFocus($event, 1, true)" @keydown.down.prevent="moveFocus($event, 1, true)" @keydown.left.prevent="moveFocus($event, -1, true)" @keydown.up.prevent="moveFocus($event, -1, true)">
-            <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id }" role="radio" :tabindex="s.method === tab.id ? 0 : -1"
-              :aria-checked="s.method === tab.id" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
+            <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id }" role="radio" :tabindex="!s.originalRecovery && s.method === tab.id ? 0 : -1"
+              :aria-disabled="!!s.originalRecovery" :aria-checked="s.method === tab.id" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
               <text class="pp-tab__a">{{ tab.title }}</text><text class="pp-tab__b">{{ tab.chain }}</text>
             </view>
           </view>
@@ -88,9 +88,9 @@
         </view>
         <template v-if="s.step !== 'methods'">
           <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_TRC20' ? copy.gasTrc20 : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
-          <view v-if="s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying }" aria-hidden="true" /><text>{{ retryMessage || (s.retrying ? copy.retrying : s.quote && quoteLeft !== null ? fill(copy.quoteValid, { t: clock(quoteLeft) }) : copy.loadingFees) }}</text></view>
+          <view v-if="s.originalRecovery || s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying && !s.originalRecovery }" aria-hidden="true" /><text>{{ quoteStatus }}</text></view>
         </template>
-        <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="s.step === 'methods' ? !walletEnough : !s.quote || s.loading" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
+        <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="!!s.originalRecovery || (s.step === 'methods' ? !walletEnough : !s.quote || s.loading)" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
       </view>
     </view>
   </view>
@@ -130,12 +130,12 @@
       </view>
     </view>
 
-    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': isBank && !conclusion || networkPaused && s.orderNo }">
+    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': (isBank || s.canResubmit) && !conclusion || networkPaused && s.orderNo }">
       <view class="pp-card pp-hero nx-tint">
         <text class="pp-hero__lab">{{ conclusion ? copy.total : copy.payable }}</text>
         <view class="pp-hero__row">
           <CheckoutAmount class="pp-hero__amt" :value="fees?.totalUsdt ?? null" :currency="isBank ? 'USD' : 'USDT'" />
-          <view v-if="!isBank && !conclusion" class="pp-copy pp-copy--plain" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
+          <view v-if="!isBank && !conclusion && fees" class="pp-copy pp-copy--plain" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
         </view>
@@ -181,8 +181,9 @@
       </view>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30). -->
-    <view v-if="!received && isBank && !conclusion" class="pp-bar nx-glass-bar">
-      <NxButton class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
+    <view v-if="!received && (isBank || s.canResubmit) && !conclusion" class="pp-bar nx-glass-bar">
+      <NxButton v-if="s.canResubmit" class="pp-reopen" :label="copy.retryPay" variant="primary" :busy="s.busy" :disabled="s.reading" @click="payment.retryOriginal" />
+      <NxButton v-else class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
     </view>
     <view v-if="networkPaused && s.orderNo" class="pp-bar nx-glass-bar">
       <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
@@ -297,7 +298,23 @@ const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
 const waitTone = computed(() => s.error || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
-const waitTitle = computed(() => retryMessage.value || (s.error ? copy.value.offline : confirming.value ? copy.value.confirming : ready.value ? copy.value.waiting : copy.value.creating));
+const quoteStatus = computed(() => {
+  const c = copy.value;
+  if (s.originalRecovery) return c.checkingOriginalPayment;
+  if (retryMessage.value) return retryMessage.value;
+  if (s.retrying) return c.retrying;
+  return s.quote && quoteLeft.value !== null ? fill(c.quoteValid, { t: clock(quoteLeft.value) }) : c.loadingFees;
+});
+const waitTitle = computed(() => {
+  const c = copy.value;
+  if (s.originalRecovery) return c.checkingOriginalPayment;
+  if (s.canResubmit) return c.originalPaymentNotFoundRetry;
+  if (s.busy && !s.intent) return c.creating;
+  if (retryMessage.value) return retryMessage.value;
+  if (s.error) return c.offline;
+  if (confirming.value) return c.confirming;
+  return ready.value ? c.waiting : c.checkingOriginalPayment;
+});
 watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment.closeCashier(); });
 
 type Notice = { title: string; body: string; primary: string; secondary?: string; icon: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone: 'warning' | 'danger' | 'brand' | 'neutral'; onPrimary: () => void; onSecondary: () => void };
@@ -365,6 +382,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'existing': return order
       ? { icon: 'info', tone: 'warning', title: c.existingTitle, body: c.existing, primary: c.viewOrder, secondary: c.support, onPrimary: payment.openOrder, onSecondary: payment.support }
       : { icon: 'info', tone: 'warning', title: c.existingTitle, body: c.existing, primary: c.ok, secondary: c.support, onPrimary: payment.close, onSecondary: payment.support };
+    case 'originalUnavailable': return { icon: 'info', tone: 'neutral', title: c.originalPaymentUnavailableTitle,
+      body: c.originalPaymentUnavailableBody, primary: c.close, secondary: c.support, onPrimary: payment.close, onSecondary: payment.support };
     case 'gone': return order
       ? { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
       : { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };

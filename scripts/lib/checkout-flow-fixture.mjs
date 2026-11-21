@@ -25,6 +25,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
     if (paymentCommand) {
+      if (!external.ownsPreviewPayments(request)) return {status:404,message:'PURCHASE_PAYMENT_INTENT_NOT_FOUND',data:null};
       const [,kind,encodedKey] = paymentCommand, commandKey = decodeURIComponent(encodedKey);
       if (state.paymentState === 'read-error' && pin.commands.has(kind+':'+commandKey)) return pin.handle(url, request);
       const result = external.paymentCommand(kind, commandKey);
