@@ -35,7 +35,7 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
+        <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices" @support="contactOrderSupport" v-slot="{ done }">
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -45,7 +45,8 @@
         <view v-if="showTrialResult && orderSaved > 0" class="trial-result-summary">
           <view class="trial-result-line"><text>{{ purchaseCopy.resultSaved }}</text><text class="trial-result-saved">{{ resultSavings }}</text></view>
         </view>
-        <view class="trial-result-actions">
+        <!-- The exit keeps its place but stays hidden and untouchable until the result animation has finished. -->
+        <view class="trial-result-actions" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">
           <view class="trial-result-secondary active:opacity-85" role="button" tabindex="0" :aria-label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false"><text>{{ purchaseCopy.resultOrder }}</text></view>
         </view>
         </CheckoutResult>
@@ -513,7 +514,8 @@ useSetPageHeader(() => ({
 }));
 
 const pendingCopy = computed(() => checkoutFlowCopy(locale.code));
-const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'>(() => remoteOrderError.value ? 'error' : resultOrder.value?.status === 'activated'
+// A confirmed provisioning failure stays the result through a later transient read error; only unconfirmed results fall back to the clock.
+const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'|'failed'>(() => resultOrder.value?.status === 'provisioning_failed' ? 'failed' : remoteOrderError.value ? 'error' : resultOrder.value?.status === 'activated'
   ? 'activated' : resultOrder.value?.status === 'inventory' ? 'inventory' : walletPaymentConfirmed.value || resultOrder.value?.status === 'paid' || resultOrder.value?.status === 'provisioning' ? 'processing' : 'error');
 const payingFromWallet = ref(false);
 const cancellingOrder = ref(false);
@@ -883,7 +885,7 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
       if (!liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
       original = liveOrder.value;
     }
-    if (original.status === 'activated' || original.status === 'inventory' || original.status === 'paid' || original.status === 'provisioning') {
+    if (original.status === 'activated' || original.status === 'inventory' || original.status === 'paid' || original.status === 'provisioning' || original.status === 'provisioning_failed') {
       paymentResultVisible.value = true;
       return;
     }

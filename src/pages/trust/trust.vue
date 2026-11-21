@@ -434,6 +434,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && status.value === "error", re
 .trust-category + .trust-category { border-top: 1px solid var(--v5-border); }
 .trust-category-toggle { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 60px; padding: var(--v5-space-3) var(--v5-space-4); cursor: pointer; }
 .trust-category-body { padding: 0 var(--v5-space-4) var(--v5-space-4); font: 400 13px/1.6 var(--font-v5); color: var(--v5-ink-2); }
+/* Frozen approved page (10.2): its text buttons keep their original 48px box until the user approves a change. */
+.trust-category-body :deep(.nx-button.nx-button--text.nx-button--large) { min-height: 48px; }
+.trust-category-body :deep(.nx-button.nx-button--text.nx-button--large > .nx-button__surface) { min-height: 48px; padding: 10px 8px; }
 .trust-document { padding: var(--v5-space-3) 0; border-bottom: 1px solid var(--v5-border); }
 .trust-document:last-child { border-bottom: 0; }
 .trust-document[aria-disabled="false"] { cursor: pointer; }

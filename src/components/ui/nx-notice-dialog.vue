@@ -15,7 +15,7 @@
       <slot />
       <view class="nx-notice__actions">
         <NxButton :label="primary" variant="primary" :busy="busy" @click="$emit('primary')" />
-        <NxButton v-if="secondary" :label="secondary" variant="link" :disabled="busy" @click="$emit('secondary')" />
+        <NxButton v-if="secondary" :label="secondary" variant="text" :disabled="busy" @click="$emit('secondary')" />
       </view>
     </view>
   </view>
@@ -43,7 +43,6 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary 
 .nx-notice--neutral { --nx-notice-tone: var(--v5-ink-2); --nx-notice-fill: var(--v5-ink-3); --nx-notice-fill-amount: 18%; }
 .nx-notice__title { display: block; margin-top: 16px; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); }
 .nx-notice__body { display: block; margin-top: 8px; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); }
-.nx-notice__actions { align-self: stretch; display: grid; gap: 4px; margin-top: 24px; }
-/* The quiet action reads at button size, in the muted color. */
-.nx-notice__actions :deep(.nx-button--link) { font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
+/* The secondary exit is a text button (03 §3.5): 12px below the primary, so its 44px target stays off the primary's. */
+.nx-notice__actions { align-self: stretch; display: grid; gap: 12px; margin-top: 24px; }
 </style>

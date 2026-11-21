@@ -394,7 +394,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-content .quota-carousel :deep(.quota-product__image) { align-self: center; width: 100%; height: 120px; }
 .quota-content .quota-carousel :deep(.quota-product__arrow) { display: none; }
 .quota-content .quota-carousel :deep(.quota-product__name) { font: 600 var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
-.quota-content .quota-carousel :deep(.quota-conditions) { padding-top: var(--ui-space-inline); }
+/* Same space above and below the conditions divider (22px margin above, 20px inset below; 01 §1.3). */
+.quota-content .quota-carousel :deep(.quota-conditions) { padding-top: 20px; }
 @media (max-width: 374px) { .quota-carousel { margin-inline: -16px; padding-inline: var(--v5-space-4); } .quota-content .quota-carousel :deep(.quota-tier) { width: 248px; } }
 /* A lone tier does not sit in a narrow swipe card: it takes the full content width (layout audit L12). */
 .quota-content .quota-carousel--single :deep(.quota-tier) { flex: 1 1 auto; width: auto; }

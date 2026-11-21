@@ -172,7 +172,7 @@
           </view>
         </view>
 
-        <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay" payment-confirmed :state="checkoutResultState" :product-name="product.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? netPrice" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" />
+        <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay" payment-confirmed :state="checkoutResultState" :product-name="product.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? netPrice" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @support="contactResultSupport" />
 
         <!-- === confirmed === -->
         <view v-else-if="step === 'confirmed'" class="nx-glass-card mx-4 rounded-2xl text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
@@ -271,6 +271,8 @@ import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
+import { advisorChatRoute } from '@/lib/advisor-chat-route';
+import { useConversations } from '@/store/conversations';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
@@ -1256,7 +1258,14 @@ function presentSettledPurchase(firstHardwareOrder: boolean, onResultShown: (() 
   void nextTick(() => { if (pageAlive && settledResultReplay.value) { forgetSettledOrder?.(); forgetSettledOrder = null; } });
 }
 const checkoutResultState = computed(() => completedOrder.value?.status === 'activated' ? 'activated'
-  : completedOrder.value?.status === 'inventory' ? 'inventory' : 'processing');
+  : completedOrder.value?.status === 'inventory' ? 'inventory' : completedOrder.value?.status === 'provisioning_failed' ? 'failed' : 'processing');
+// The failed result's exit, as on the order detail: copy the order number, then open support.
+const conversations = useConversations();
+function contactResultSupport() {
+  const orderNo = completedOrder.value?.id;
+  if (!orderNo) return;
+  uni.setClipboardData({ data: orderNo, success: async () => { if (!pageAlive) return; const route = await advisorChatRoute(conversations); if (pageAlive) void navTo(route); } });
+}
 const checkoutResultReading = ref(false);
 async function refreshCheckoutResult() {
   if (!orderId.value || !pageAlive || !pageVisible || checkoutResultReading.value) return;
@@ -2438,7 +2447,8 @@ async function submitRemoteOrder(): Promise<void> {
     await orders.refreshRemote();
     if (!scopeIsCurrent()) return;
     const settled = orders.orders.find((order) => order.id === created.orderNo);
-    if (!settled || settled.status !== "activated") {
+    // A server-confirmed provisioning failure is a settled result shown as such, not a read-back mismatch (03 §3.5.2).
+    if (!settled || (settled.status !== "activated" && settled.status !== "provisioning_failed")) {
       throw new Error("WALLET_PAYMENT_ORDER_READBACK_MISMATCH");
     }
     if (paymentKey) clearOrderAction(submissionScope.accountKey,created.orderNo,paymentKey);
@@ -3232,7 +3242,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
 .checkout-voucher-match { padding:var(--v5-space-2) var(--v5-space-4) 0 64px; }
 .checkout-voucher-choices { padding:var(--v5-space-1) var(--v5-space-4) var(--v5-space-1) 64px; }
-.checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; min-height:44px; padding:6px 0 6px 8px; color:var(--v5-brand); font-size:13px; }
+.checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; color:var(--v5-brand); font-size:13px; }
 .checkout-payment { cursor:pointer; transition:background 180ms ease; }
 .checkout-payment--active { background:color-mix(in srgb,var(--v5-brand) 7%,transparent); box-shadow:inset 3px 0 0 var(--v5-brand); }
 .checkout-payment--active .checkout-icon { color:var(--v5-brand); }
@@ -3250,7 +3260,8 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-3); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle); line-height:var(--ui-type-list-subtitle-lh); font-weight:600; color:var(--v5-ink-2); }
 .checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .checkout-note--warning { padding:10px 12px; border-radius:12px; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
-.checkout-capacity-actions { display:flex; flex-wrap:wrap; gap:var(--v5-space-1) var(--v5-space-3); margin-top:6px; }
+/* Text buttons are their label line; the gaps keep each 44px target clear of its neighbour's. */
+.checkout-capacity-actions { display:flex; flex-wrap:wrap; gap:26px var(--v5-space-4); margin-top:var(--v5-space-2); }
 .checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 12.5px/20px var(--font-v5); color:var(--v5-ink-3); text-align:center; }
 .checkout-legal-link { display:inline; color:var(--v5-brand); cursor:pointer; }
 .checkout-legal-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:2px; }

@@ -551,7 +551,8 @@ useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAge
 .agent-control > svg { flex: none; color: var(--v5-ink-3); }
 .agent-control:focus-within, .agent-date-picker:focus-visible .agent-control { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .agent-field__help { display: block; margin-top: var(--v5-space-2); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.agent-discard { display: flex; justify-content: center; margin: var(--v5-space-1) var(--v5-space-4) 0; }
+/* 12px under the form so the text button's 44px target stays off the last field. */
+.agent-discard { display: flex; justify-content: center; margin: var(--v5-space-3) var(--v5-space-4) 0; }
 .agent-bar-space { height: calc(120px + env(safe-area-inset-bottom)); }
 @media (max-width: 374px) { .agent-track__stop { width: 36px; } .agent-track__line { margin-inline: 2px; } .agent-opening-badge { padding-inline: 7px; } }
 </style>

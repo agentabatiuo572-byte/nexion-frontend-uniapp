@@ -4,7 +4,7 @@
   notice icon), the result as title, one short line for what happens next.
   Tone follows the status map (DS 03 §3.8): success = 已到账/已完成, warning = 等待/处理中/核对中,
   neutral = 已退回/已关闭, danger = 失败, brand = 下一步可继续. The icon defaults per tone.
-  The title is the live status: it carries role=status and aria-live so a polled change is read out;
+  The title is the page's level-1 heading inside the live status region, so a polled change is read out;
   title-testid puts an e2e hook on it. Pass :live="false" for a state the page already announces
   another way (e.g. a toast with the same words), so one change is read out once. The icon pops once when it mounts or changes; static under
   reduced motion. Extra content (amount, note) goes in the default slot, centred under the line.
@@ -21,8 +21,10 @@
         <template v-else><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></template>
       </svg>
     </view>
-    <text class="nx-result-head__title" :role="speaks ? 'status' : undefined" :aria-live="speaks ? 'polite' : undefined" :aria-atomic="speaks ? 'true' : undefined" :data-testid="titleTestid">{{ title }}</text>
-    <text v-if="description" class="nx-result-head__desc">{{ description }}</text>
+    <view class="nx-result-head__live" :role="speaks ? 'status' : undefined" :aria-live="speaks ? 'polite' : undefined" :aria-atomic="speaks ? 'true' : undefined">
+      <text class="nx-result-head__title" role="heading" aria-level="1" :data-testid="titleTestid">{{ title }}</text>
+      <text v-if="description" class="nx-result-head__desc">{{ description }}</text>
+    </view>
     <slot />
   </view>
 </template>
@@ -50,6 +52,7 @@ const speaks = computed(() => props.live && armed.value);
 .nx-result-head--brand { --nx-result-tone: var(--v5-brand); }
 .nx-result-head--neutral { --nx-result-tone: var(--v5-ink-2); }
 .nx-result-head--neutral .nx-result-head__icon { background: color-mix(in srgb, var(--v5-ink-3) 18%, transparent); }
+.nx-result-head__live { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
 .nx-result-head__title { display: block; max-width: 100%; margin-top: var(--v5-space-4); font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); text-wrap: balance; }
 .nx-result-head__desc { display: block; max-width: 320px; margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap: pretty; }
 </style>

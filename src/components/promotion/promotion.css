@@ -17,6 +17,9 @@
 .promotion-action:focus-visible,.promotion-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:3px; }
 .promotion-link { display:flex; align-items:center; min-height:44px; color:var(--v5-brand); font-size:13px; }
 .promotion-link:active { opacity:.65; }
+/* A lone next-level link that ends its card is the shared text link (.nx-card-link: 13/18, 500, muted, chevron, 44px
+   target that takes no layout), as far from the text above (15px plus that line's half-leading) as from the card bottom (18px). */
+.nx-card-link.promotion-link--end { display:flex; width:fit-content; margin-top:15px; }
 .promotion-actions { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
 .promotion-notice { border-left:2px solid var(--v5-brand); padding:4px 0 4px 12px; font-size:var(--ui-type-list-subtitle); line-height:1.7; }
 .promotion-badge { display:inline-flex; margin-top:8px; padding:4px 8px; border-radius:8px; color:var(--v5-brand); background:color-mix(in srgb,var(--v5-brand) 10%,var(--v5-surface)); font-size:12px; }

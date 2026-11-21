@@ -65,15 +65,17 @@
 @media (forced-colors: active) { .nx-tint { background: Canvas; box-shadow: none; outline: 1px solid CanvasText; outline-offset: -1px; } }
 /* Actions inside a tinted or soft-glass card carry no surface of their own (design system 03 §3.1):
    a footer row under a hairline, the action as brand text with an arrow, an optional note on the left. */
-.nx-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
-.nx-card-footer__note { min-width: 0; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); overflow-wrap: anywhere; }
-.nx-card-action { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; max-width: 100%; margin-left: auto; color: var(--v5-brand); font: 500 15px/20px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.nx-card-action > text { min-width: 0; overflow-wrap: anywhere; }
+.nx-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: var(--ui-space-inset); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.nx-card-footer__note { min-width: 0; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); overflow-wrap: break-word; }
+.nx-card-action { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-left: auto; color: var(--v5-brand); font: 500 15px/20px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nx-card-action > text { min-width: 0; overflow-wrap: break-word; }
 .nx-card-action > svg { flex: none; }
-.nx-card-action--muted { color: var(--v5-ink-2); }
+.nx-card-action--muted { color: var(--v5-ink-3); }
 .nx-card-action:active { opacity: .6; }
 .nx-card-action[aria-disabled="true"] { opacity: .5; cursor: default; }
-.nx-card-link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; color: var(--v5-ink-2); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nx-card-link { position: relative; display: inline-flex; align-items: center; gap: 2px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .nx-card-link__chevron, .nx-card-action--muted > .nx-card-link__chevron { color: var(--v5-ink-3); }
 .nx-card-link:active { opacity: .6; }
+/* The box is the text line, so the footer's spacing is what shows; the 44px target is a layer that takes no layout. */
+.nx-card-action::after, .nx-card-link::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-8px, calc(50% - 22px)); right: min(-8px, calc(50% - 22px)); }
 .nx-card-action:focus-visible, .nx-card-link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 8px; }

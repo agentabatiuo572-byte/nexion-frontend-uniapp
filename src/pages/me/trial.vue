@@ -633,9 +633,11 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-bar--pair { flex-direction:row;flex-wrap:wrap; }
 .trial-bar__note { margin:0;padding-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;text-wrap:pretty; }
 .trial-bar__retry { display:flex;justify-content:center;margin:-8px 0 -4px; }
+/* Tray text buttons are 48 tall at any size, in neutral ink (03 §3.1 tray rule). */
+.trial-bar__retry :deep(.nx-button) { min-height:48px; color:var(--v5-ink); }
 /* In-flow twin of the bar: 12 top + 48 button + 30 bottom (+ safe area) + a 20px gap, less the 40px the chassis already pads. */
 .trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 16px calc(70px + env(safe-area-inset-bottom)); }
-.trial-bar-space__retry { height:44px; }
+.trial-bar-space__retry { height:48px; }
 .trial-bar__main { display:flex;width:100%; }
 .trial-bar__side { flex:1 1 0;min-width:fit-content; }
 .trial-bar__wide { flex:2 1 0;min-width:fit-content; }
