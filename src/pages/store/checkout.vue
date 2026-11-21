@@ -9,8 +9,9 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalOrderNavigationFailed || (pendingCheckoutCreate && !createdCheckoutOrder)) && !paymentFlowBusy" class="checkout-exit-error" role="status">
-        <text>{{ t.store.coRecoverOriginalOrder }}</text><NxButton :label="t.store.catalogRetry" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
+      <view v-if="(originalOrderNavigationFailed || (pendingCheckoutCreate && !createdCheckoutOrder)) && !paymentFlowBusy" :class="originalOrderNavigationFailed ? 'checkout-original-open nx-step-in' : 'checkout-exit-error'" role="status">
+        <template v-if="originalOrderNavigationFailed"><view class="checkout-original-open-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h4" /></svg></view><text class="checkout-original-open-title">{{ t.store.coOriginalOrderOpenFailed }}</text><text class="checkout-original-open-body">{{ t.store.coOriginalOrderOpenHint }}</text></template>
+        <template v-else><text>{{ t.store.coRecoverOriginalOrder }}</text><NxButton :label="t.store.catalogRetry" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" /></template>
       </view>
       <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : purchaseRecoveryCopy(locale.code).original }}</text>
@@ -246,6 +247,9 @@
       <view v-if="promotionRoute && promotionCheckout?.footer" class="checkout-sticky nx-glass-bar">
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
+      </view>
+      <view v-if="!promotionRoute && originalOrderNavigationFailed && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
+        <NxButton variant="primary" :label="t.store.coOpenOriginalOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
@@ -1168,7 +1172,10 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'capacity' 
       }
       const rejection = tradeinPaymentRejection(failure);
       if (rejection) toast.warn(flowCopy.value.cannotPay, flowCopy.value[rejection]);
-      else toast.warn(checkoutOnboardingRequired.value ? t.value.store.coSetupRequired : t.value.store.coCapacityUnavailable);
+      else toast.warn(checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
+        : checkoutCapacityRefusal.value === "product-unavailable" ? t.value.store.coCapacityProductUnavailable
+        : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
+        : t.value.store.coCapacityUnavailable);
     });
     return checkoutCapacityRead;
   }
@@ -1326,6 +1333,8 @@ const checkoutCapacityRequired = computed(() => remoteApiEnabled && !trialConver
   && KNOWN_KINDS.includes(productId.value as DeviceKind));
 const checkoutCapacityMessage = computed(() => remoteCapacityGate.pending || !quantityReady.value ? t.value.store.coCapacityChecking
   : checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
+  : checkoutCapacityRefusal.value === "product-unavailable" ? t.value.store.coCapacityProductUnavailable
+  : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
   : remoteCapacityGate.decision === "REPLACE_REQUIRED" ? slotsFullText.value
   : remoteCapacityGate.decision === "NO_ACTIVE_DEVICE" ? t.value.tradein.errNoActiveDevice
   : t.value.store.coCapacityUnavailable);
@@ -3285,9 +3294,14 @@ button.checkout-policy-link::after { border:0; }
 .checkout-sticky-copy { min-width:0; }
 .checkout-total { display:block; font:600 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }
+.checkout-sticky--single :deep(.nx-button) { flex:1 1 auto; }
 .checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }
 .checkout-summary-total :deep(.checkout-amount) { font-size:var(--ui-type-section); }
 .checkout-exit-error { display:grid; gap:var(--v5-space-5); color:var(--v5-ink-2); line-height:1.6; }
+.checkout-original-open { display:grid; gap:var(--v5-space-2); padding:64px var(--v5-space-4) var(--v5-space-6); text-align:center; }
+.checkout-original-open-icon { justify-self:center; display:grid; place-items:center; width:56px; height:56px; margin-bottom:var(--v5-space-2); border-radius:50%; background:color-mix(in srgb, var(--v5-ink) 6%, transparent); color:var(--v5-ink-2); }
+.checkout-original-open-title { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color:var(--v5-ink); text-wrap:balance; }
+.checkout-original-open-body { font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); text-wrap:pretty; }
 .checkout-promotion { padding:var(--v5-space-2) var(--v5-space-4) 120px; color:var(--v5-ink); }
 .checkout-promotion--result { padding: 0; }
 .checkout-promotion :deep(.promotion-flat) { border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); padding:var(--v5-space-4); }
