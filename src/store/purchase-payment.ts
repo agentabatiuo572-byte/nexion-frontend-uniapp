@@ -42,6 +42,7 @@ function quotaNotice(cause: ApiError, kind: PurchaseKind): QuotaRefusal | Eligib
       case 'ORDER_MONTHLY_QUOTA_PAUSED': return 'rejectQuotaPaused';
       case 'ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET': return 'rejectConditionsUnmet';
       case 'ORDER_MONTHLY_QUOTA_EXHAUSTED': return 'rejectQuotaMonthFull';
+      case 'PURCHASE_GATE_BLOCKED': return kind === 'ORDER_PAY' ? 'rejectConditionsUnmet' : undefined;
       case 'PURCHASE_GATE_SOLD_OUT': return kind === 'ORDER_PAY' ? 'rejectQuotaSoldOut' : undefined;
     }
   }
