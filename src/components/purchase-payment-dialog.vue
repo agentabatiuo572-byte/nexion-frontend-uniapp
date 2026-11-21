@@ -1,9 +1,11 @@
 <template>
-  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" :class="{ 'has-close': !showHistory }" role="status">
+  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" :class="{ 'has-close': !showHistory }" :style="barBottom === null ? undefined : { bottom: barBottom + 'px' }" role="status">
     <view v-if="!showHistory" class="purchase-payment-resume__close nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="payment.dismissResume(pending)" @keydown.enter.prevent="payment.dismissResume(pending)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
     </view>
-    <view v-for="row in showHistory ? records : pending" :key="row.commandKey" class="purchase-payment__row"><text>{{ row.summary }} · {{ row.lastStatus === 'MANUAL_REVIEW' ? copy.review : row.lastStatus === 'EXPIRED' ? copy.ended : row.businessDelivered ? copy.delivered : copy.resume }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
+    <!-- Outside Orders the bar is one line with the count (user 2026-11-22); Orders lists each payment to pick from. -->
+    <view v-if="!showHistory" class="purchase-payment__row"><text>{{ fill(copy.resumeCount, { n: pending.length }) }}</text><NxButton :label="copy.viewProgress" variant="link" icon="chevron-right" @click="openPending" /></view>
+    <view v-for="row in showHistory ? records : []" :key="row.commandKey" class="purchase-payment__row"><text>{{ row.summary }} · {{ row.lastStatus === 'MANUAL_REVIEW' ? copy.review : row.lastStatus === 'EXPIRED' ? copy.ended : row.businessDelivered ? copy.delivered : copy.resume }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
   </view>
 
   <!-- Step sheet: method → network / bank confirmation. -->
@@ -245,6 +247,7 @@ import { formatGroupedAmount } from '@/lib/amount-display';
 import { hostedPaymentUrlPattern, validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import { toast } from '@/store/ui';
+import { navTo } from '@/lib/route';
 import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
 import qrcode from 'qrcode-generator';
 const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale = useLocaleStore();
@@ -256,7 +259,10 @@ const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
-const pending = computed(() => unsettled.value.filter(row => !payment.resumeDismissed(row)));
+// The bar counts payments still under way; a delivered one is finished and is found on its order.
+const pending = computed(() => unsettled.value.filter(row => !row.businessDelivered && !payment.resumeDismissed(row)));
+// One payment opens directly; several are listed on Orders.
+function openPending() { if (pending.value.length === 1) void payment.resume(pending.value[0]); else void navTo('/pages/store/orders'); }
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
 const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
 // Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
@@ -264,6 +270,18 @@ const records = computed(() => { app.accountKey; s.revision; return payment.reco
 const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.length > 0);
 function readResumeRows() { const accountKey = app.accountKey; void refreshPendingPayments(accountKey, () => resumeWatched.value && app.accountKey === accountKey && foregroundReadAllowed()); }
 useVisibleInterval(readResumeRows, 15000, () => resumeWatched.value);
+// The bar floats 12px above what sits at the bottom of the page, the tab bar, the floating support button or the
+// page's action tray, so it never covers or touches them (02: nothing covers the support button); their heights differ by page and state, so they are measured while the bar shows.
+const barShown = computed(() => props.showResume && active.value && !s.open && (pending.value.length > 0 || props.showHistory && records.value.length > 0));
+const barBottom = ref<number | null>(null);
+function placeBar() {
+  uni.createSelectorQuery().selectAll('.nx-tabbar-pill, .nx-glass-bar, .nx-support-bubble').boundingClientRect(found => {
+    const tops = (Array.isArray(found) ? found : [found]).filter(rect => rect && (rect.height ?? 0) > 0).map(rect => rect.top as number);
+    barBottom.value = tops.length ? Math.max(0, uni.getSystemInfoSync().windowHeight - Math.min(...tops) + 12) : null;
+  }).exec();
+}
+watch(() => barShown.value && s.revision, shown => { if (shown !== false) setTimeout(placeBar, 50); }, { immediate: true });
+useVisibleInterval(placeBar, 2000, () => barShown.value);
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().safeAreaInsets?.bottom ?? 0, 30); } catch { return 30; } })();
 
@@ -604,5 +622,5 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .purchase-payment-resume.has-close { padding-right: 56px; }
 .purchase-payment-resume__close { position: absolute; top: 14px; right: var(--v5-space-3); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
 .purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
-.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 64px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
+.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
 </style>
