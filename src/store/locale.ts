@@ -71,7 +71,12 @@ export const useLocaleStore = defineStore("locale", () => {
   ensureSystemDetected();
   // #ifdef H5
   const root = typeof document === "undefined" ? undefined : document.documentElement;
-  if (root) watch(code, (value) => { root.lang = value; }, { immediate: true, flush: "sync" });
+  if (root) watch(code, (value) => {
+    root.lang = value;
+    // Inter's Vietnamese subset otherwise loads only once Vietnamese letters are laid out, so the first screen briefly
+    // mixes in the system font (BUG-551). Only a Vietnamese interface requests it early.
+    if (value === "vi") void document.fonts?.load('400 16px "Inter"', "ệ").catch(() => undefined);
+  }, { immediate: true, flush: "sync" });
   if (typeof window !== "undefined") window.addEventListener("languagechange", ensureSystemDetected);
   // #endif
   return { code, explicitChoice, accountLanguage, systemLanguage, userSet, explicitRevision,

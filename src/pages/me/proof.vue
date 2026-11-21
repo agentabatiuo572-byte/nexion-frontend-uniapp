@@ -216,6 +216,7 @@ import { proofStreakFacts } from "@/lib/proof-streak";
 import { proofPosterText } from "@/lib/proof-poster-values";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { canvasFontStack, canvasFontsReady } from "@/lib/canvas-font";
 
 type Variant = "earnings" | "streak" | "network";
 const VARIANTS: Variant[] = ["earnings", "streak", "network"];
@@ -483,9 +484,12 @@ async function drawProofPoster(): Promise<void> {
     success: image => image.path ? resolve(image.path) : reject(new Error("PROOF_LOGO_EMPTY")),
     fail: reject,
   }));
+  await canvasFontsReady(`${JSON.stringify(t.value.proof)} ${profileName.value} ${memberSinceText.value} 0123456789`);
   return new Promise((resolve, reject) => {
     try {
       const ctx = uni.createCanvasContext("proofPosterCanvas");
+      // The family stays for the whole poster; each line below only changes the size.
+      ctx.font = `normal 400 24px ${canvasFontStack()}`;
       ctx.setFillStyle("#0b0b0b");
       ctx.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
       ctx.drawImage(logoPath, 72, 40, 356, 123);
