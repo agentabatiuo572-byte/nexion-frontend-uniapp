@@ -69,11 +69,6 @@
           </template>
         </view>
       </view>
-      <view v-if="retryShown" class="hb-retry" :class="{ 'hb-retry--busy': retryBusy }" role="button" :tabindex="retryBusy ? -1 : 0" :aria-disabled="retryBusy ? 'true' : undefined" :aria-label="retryBusy ? t.trial.entryChecking : `${copy.benefitTrialLoadFailedAria} · ${copy.benefitRetry}`" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility">
-        <svg class="hb-retry__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5h.01" /></svg>
-        <text class="hb-retry__msg">{{ retryBusy ? t.trial.entryChecking : copy.benefitTrialLoadFailed }}</text>
-        <text class="hb-retry__act">{{ copy.benefitRetry }}</text>
-      </view>
     </view>
   </NxSection>
 </template>
@@ -162,7 +157,7 @@ const trialRechecking = computed(() => trial.authorityStatus === 'loading' && !t
   && (trialPill.value[2] === copy.value.benefitTrialClaim || trialPill.value[2] === copy.value.benefitTrialAgain));
 // Only a background re-read from a ready card waits before dimming (CSS delay), so a quick read never flashes.
 // Pills that were already muted (out of stock, unavailable, or a retry after a failed read) stay muted.
-const trialPillWait = computed(() => trialRechecking.value && !retryShown.value);
+const trialPillWait = computed(() => trialRechecking.value && !trialReadFailed.value);
 const trialOfferLabel = computed(() => showCapacityManagement.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
   : trial.status === "none" && (eligibility.value.ok || offerState.value === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
@@ -207,12 +202,8 @@ function openTrialOffer() {
   trialSheet.show();
 }
 function openTrialDetails() { navTo('/pages/me/trial'); }
-// Preserve the retry row while the next read runs, including after a tab remount.
-const retryShown = computed(() => trial.lastReadFailed || trial.authorityStatus === 'error');
-const retryBusy = computed(() => retryShown.value && trial.authorityStatus === 'loading');
-function retryEligibility() {
-  if (retryShown.value && !retryBusy.value) void trialView.refresh();
-}
+// A failed read recovers on its own (03 §3.5.2); it also holds across the next read and a tab remount.
+const trialReadFailed = computed(() => trial.lastReadFailed || trial.authorityStatus === 'error');
 </script>
 <style scoped>
 .hb-stack { display:flex;flex-direction:column;gap:12px; }
@@ -326,14 +317,6 @@ function retryEligibility() {
 .hb-val { flex:none;text-align:right;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 .hb-val__amount { display:block;margin-top:2px;font:500 15px/20px var(--font-v5);color:var(--v5-ink); }
 .hb-chev { flex:none;width:16px;height:16px;color:var(--v5-ink-4); }
-/* Retry sits on the page floor: icon + state in ink-3, short action on the right that never wraps. */
-.hb-retry { display:flex;align-items:center;gap:6px;min-height:44px;padding:0 2px;font:400 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer;-webkit-tap-highlight-color:transparent; }
-.hb-retry__icon { flex:none;width:16px;height:16px;color:var(--v5-warning-ink); }
-.hb-retry__msg { flex:1;min-width:0;overflow-wrap:anywhere; }
-.hb-retry__act { flex:none;padding-left:8px;font-weight:500;color:var(--v5-brand);white-space:nowrap; }
-.hb-retry--busy { cursor:default; }
-.hb-retry--busy .hb-retry__act { opacity:.5; }
-.hb-retry:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px;border-radius:4px; }
 
 /* Motion: one entrance with a short stagger, one pop when an offer becomes a pending card. */
 .hb-stack--enter .hb-card { animation:hb-rise 420ms cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--hb-i, 0) * 70ms); }

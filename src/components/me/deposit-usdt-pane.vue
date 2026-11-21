@@ -111,18 +111,9 @@
         <text class="nx-dep-sec">{{ t.topupChrome.recentDeposits }}</text>
 
         <view v-if="bankHistoryStatus === 'idle' || bankHistoryStatus === 'loading'" class="nx-dep-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
-        <view v-else-if="bankHistoryStatus === 'error'" style="margin-top: 8px">
-          <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
-          <view class="nx-dep-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refreshBankHistory">
-            <text>{{ t.ui.retry }}</text>
-          </view>
-        </view>
-
-        <view v-if="fundsServerEnabled && chainHistoryFailed" style="margin-top: 8px">
-          <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
-          <view class="nx-dep-chain-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refresh()"><text>{{ t.ui.retry }}</text></view>
-        </view>
-        <view v-else-if="fundsServerEnabled && !chainHistoryLoaded" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
+        <view v-if="fundsServerEnabled && !chainHistoryLoaded && !chainHistoryFailed" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
+        <!-- A failed history read is unknown, not empty: a still placeholder that recovers on its own (03 §3.5.2). -->
+        <text v-if="historyUnknown" class="block" :style="historyUnknownStyle">—</text>
 
         <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || (chainHistoryLoaded && !chainHistoryFailed && !addressRefreshFailed))" class="flex flex-col items-center" style="padding: 26px 0 18px">
           <view class="grid place-items-center" :style="stateIconBoxStyle">
@@ -488,6 +479,11 @@ const sortedRecords = computed(() => {
     ? bankRecords.filter(row => row.channel === "bank-vietqr") : [])]
     .sort((a, b) => b.createdAt - a.createdAt);
 });
+// No row to show, nothing still loading, and a history read failed: the list is unknown, not empty.
+const historyUnknown = computed(() => sortedRecords.value.length === 0
+  && bankHistoryStatus.value !== "idle" && bankHistoryStatus.value !== "loading"
+  && (!fundsServerEnabled || chainHistoryLoaded.value || chainHistoryFailed.value)
+  && (bankHistoryStatus.value === "error" || (fundsServerEnabled && chainHistoryFailed.value)));
 /** 法币轨(VietQR / 银行卡)入账后与链上记录同列此区,标题按通道分流。
  *  全键 Record 而非三元表达式:新增通道时 TS 强制补齐,不会静默落进 USDT 文案 ——
  *  卡轨接入本列表时正是先踩了这个(旧写法「非银行轨即 USDT」会把卡入金标成 USDT 充值)。 */
@@ -609,6 +605,7 @@ function progFillStyle(r: PaneDepositRecord): CSSProperties {
     transition: "width 0.4s ease",
   };
 }
+const historyUnknownStyle: CSSProperties = { marginTop: "8px", padding: "18px 0", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
 const noteStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",

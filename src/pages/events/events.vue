@@ -44,23 +44,14 @@
         <GlassSegments :label="t.events.categoryGroupLabel" v-model="tab" :options="tabOptions" layout="scroll"  />
 
         <!-- Event list -->
-        <view v-if="remoteEventsLoading && filtered.length === 0" class="space-y-2.5" aria-busy="true" role="status" :aria-label="loadingLabel">
+        <!-- A failed first read keeps the same still placeholder cards and recovers on its own (03 §3.5.2). -->
+        <view v-if="(remoteEventsLoading && filtered.length === 0) || (remoteEventsError && !remoteEvents.length)" class="space-y-2.5" :aria-busy="remoteEventsLoading ? 'true' : undefined" :role="remoteEventsLoading ? 'status' : undefined" :aria-label="remoteEventsLoading ? loadingLabel : undefined" :aria-hidden="remoteEventsLoading ? undefined : 'true'">
           <view v-for="row in 3" :key="row" class="nx-glass-card" style="height: 132px; padding: 18px">
             <view style="width: 58%; height: 18px; border-radius: 6px; background: var(--v5-surface-3)" />
             <view style="width: 86%; height: 12px; margin-top: 16px; border-radius: 4px; background: var(--v5-surface-2)" />
             <view style="width: 35%; height: 12px; margin-top: 10px; border-radius: 4px; background: var(--v5-surface-2)" />
           </view>
         </view>
-        <EmptyState
-          v-else-if="remoteEventsError && !remoteEvents.length"
-          kind="recoverable-error"
-          :title="t.events.loadErrorTitle"
-          :desc="t.events.loadErrorBody"
-          :cta-label="t.events.retry"
-          :cta-disabled="remoteEventsLoading"
-          :cta-busy="remoteEventsLoading"
-          @cta="retryRemoteEvents"
-        />
         <EmptyState v-else-if="filtered.length === 0 && emptyKey" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
         <view v-else class="space-y-2.5">
           <EventsCard
@@ -188,9 +179,6 @@ async function loadRemoteEvents() {
   } finally {
     if (remoteRequestFence.isCurrent(scope)) remoteEventsLoading.value = false;
   }
-}
-function retryRemoteEvents() {
-  void loadRemoteEvents();
 }
 const stopRuntimeRefresh = subscribeRuntimeRevision(() => {
   if (mounted) void loadRemoteEvents();

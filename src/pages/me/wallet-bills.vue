@@ -38,7 +38,10 @@
         </view>
       </template>
 
-      <EmptyState v-if="initialError" kind="recoverable-error" :title="t.walletV3.submitReasonServiceUnavailable" :cta-label="t.store.catalogRetry" @cta="refreshLedger" />
+      <!-- A receipt lookup is the whole page: one 重新加载. The ordinary list keeps its overview and shows the
+           unknown placeholder while it recovers on its own (03 §3.5.2). -->
+      <EmptyState v-if="initialError && ledgerBizNo" kind="recoverable-error" :title="t.walletV3.submitReasonServiceUnavailable" :cta-label="t.ui.reload" @cta="refreshLedger" />
+      <view v-else-if="initialError" :style="loadingStyle"><text>—</text></view>
 
       <!-- Empty -->
       <view v-else-if="initialLoading" :style="loadingStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>

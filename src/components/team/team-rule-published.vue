@@ -5,12 +5,11 @@
     <template v-if="content">
       <view v-if="languageFallback" class="team-rule-published__notice" role="status" aria-live="polite">
         <text>{{ t.howPublished.languageFallback }}</text>
-        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.ui.retry }}</text></view>
       </view>
       <TeamRuleHero :kind="kind" :title="copy.overview" :sections="directory" :nav-label="copy.contents" />
       <TeamRuleDocument :blocks="content.blocks" />
     </template>
-    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :desc="t.howPublished.unavailableBody" :cta-label="t.ui.retry" @cta="load" />
+    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
     <view class="mx-4 mt-6"><view class="reward-cta reward-cta--wide" role="button" tabindex="0" @click="navBack(back)" @keydown.enter.prevent="navBack(back)" @keydown.space.prevent="navBack(back)"><text>{{ backLabel }}</text></view></view>
   </view>
 </template>

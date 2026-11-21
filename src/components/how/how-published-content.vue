@@ -5,9 +5,6 @@
     <view v-if="content" class="pb-8">
       <view v-if="languageFallback" class="mx-4" style="margin: 16px; padding: 14px; border-radius: 12px; background: var(--v5-surface-2);" role="status" aria-live="polite">
         <text class="block" :style="bodyStyle">{{ t.howPublished.languageFallback }}</text>
-        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
-          <text>{{ t.ui.retry }}</text>
-        </view>
       </view>
       <!-- A page may render the accepted publication itself (scoped slot); loading, fallback and
            failure stay here so every guide keeps the same acceptance and refresh boundary. -->
@@ -32,7 +29,7 @@
       </template>
       </template>
     </view>
-    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :desc="t.howPublished.unavailableBody" :cta-label="t.ui.retry" @cta="load" />
+    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
   </view>
 </template>
 

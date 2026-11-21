@@ -17,6 +17,7 @@
     <view
       v-if="ctaLabel"
       class="nx-empty__cta active:opacity-90 transition-opacity"
+      :class="{ 'nx-card-recovery-action': isReadRetry }"
       :style="ctaStyle"
       role="button"
       :tabindex="ctaDisabled || ctaBusy ? -1 : 0"
@@ -69,6 +70,9 @@ function activateCta(event?: KeyboardEvent) {
   emit("cta");
 }
 
+// The one 重新加载 of a page whose read failed is a text button: brand 13/18 at 500 from the shared
+// recovery action (03 §3.1 table, 10.2), centred under the title. Other kinds keep their pill.
+const isReadRetry = computed(() => props.kind === "recoverable-error");
 const theme = useTheme();
 const artSrc = computed(() => `/static/img/empty/${theme.resolved}/${props.kind}.png`);
 
@@ -105,7 +109,7 @@ const descStyle: CSSProperties = {
   textWrap: "pretty",
 };
 // CTA 是 pill button 不是文字链;转化型不弱化(《06》§3)
-const ctaStyle = computed<CSSProperties>(() => ({
+const ctaStyle = computed<CSSProperties>(() => isReadRetry.value ? { margin: "12px auto 0", alignSelf: "center" } : ({
   marginTop: "16px",
   minHeight: "44px",
   padding: "0 20px",
@@ -116,7 +120,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
   // 缺省页坐在页面底上,弱 CTA 原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface。
   background: props.emphasis ? "var(--v5-brand)" : "var(--v5-surface)",
 }));
-const ctaTextStyle = computed<CSSProperties>(() => ({
+const ctaTextStyle = computed<CSSProperties>(() => isReadRetry.value ? {} : ({
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
   fontWeight: 600,
