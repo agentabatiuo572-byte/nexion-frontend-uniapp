@@ -6,10 +6,37 @@ import { getDeviceId } from "@/lib/device-id";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { hasCheckoutLeaveGuard } from "@/lib/promotion-leave-guard";
 import { navTo } from "@/lib/route";
+import { jpushPrivacyCopy } from "@/i18n/native-push";
+import { useLocaleStore } from "@/store/locale";
 import { createNativePushController, validNativePushToken, type NativePushToken, type PushPermission } from "./native-push-controller";
 // #ifdef APP-PLUS
 import { initializeNativePush, getNativePushToken, addNativePushListener, getInitialNotification,
-  shutdownNativePush, requestNativePushPermission as requestSystemPushPermission } from "@/uni_modules/uvel-native-push";
+  getNativePushPermission, shutdownNativePush, requestNativePushPermission as requestSystemPushPermission,
+  type NativePushResult } from "@/uni_modules/uvel-native-push";
+
+type IOSPushPermission = NonNullable<NativePushResult["permission"]>;
+let iosPermissionRequest: Promise<IOSPushPermission> | undefined;
+
+async function readIOSPushPermission(request = false): Promise<IOSPushPermission> {
+  const operation = request ? requestSystemPushPermission : getNativePushPermission;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await new Promise<IOSPushPermission>(resolve => {
+      // The permission prompt itself can stay open while the user decides.
+      if (!request) timeout = setTimeout(() => resolve("unknown"), 3000);
+      operation(result => resolve(result.permission ?? "unknown"));
+    });
+  } catch { return "unknown"; }
+  finally { clearTimeout(timeout); }
+}
+
+function requestIOSPushPermission() {
+  return iosPermissionRequest ??= readIOSPushPermission(true).finally(() => { iosPermissionRequest = undefined; });
+}
+
+function displayIOSPushPermission(permission: IOSPushPermission): PushPermission {
+  return permission === "prompt" ? "unknown" : permission;
+}
 // #endif
 
 export const nativePushPermission = ref<PushPermission>("unknown");
@@ -17,6 +44,44 @@ export const nativePushRegistrationUnavailable = ref(false);
 let controller: ReturnType<typeof createNativePushController> | undefined;
 let readInitialNotification: (() => void) | undefined;
 let stopNativePush: (() => void) | undefined;
+let applyJPushConsentToBridge: (() => void) | undefined;
+const jpushConsentKey = "uvel:jpush:privacy:v1";
+let jpushPromptOpen = false;
+
+function hasJPushBuild(): boolean {
+  // #ifdef APP-PLUS
+  return import.meta.env.VITE_UVEL_JPUSH_ENABLED === "true" && plus.os.name === "iOS";
+  // #endif
+  // #ifndef APP-PLUS
+  return false;
+  // #endif
+}
+
+export function chooseJPushPrivacy(accepted: boolean) {
+  if (!hasJPushBuild() || uni.getStorageSync(jpushConsentKey)) return;
+  uni.setStorageSync(jpushConsentKey, accepted ? "accepted" : "declined");
+  if (accepted) applyJPushConsentToBridge?.();
+  void controller?.sync(true);
+}
+
+export function showJPushPrivacyPrompt() {
+  if (!hasJPushBuild() || jpushPromptOpen || uni.getStorageSync(jpushConsentKey)) return;
+  const locale = useLocaleStore().code;
+  const copy = locale === "zh" || locale === "vi" ? jpushPrivacyCopy[locale] : jpushPrivacyCopy.en;
+  jpushPromptOpen = true;
+  uni.showActionSheet({
+    title: copy.disclosure,
+    itemList: [copy.policy, copy.accept, copy.decline],
+    success({ tapIndex }) {
+      if (tapIndex === 0) void navTo("/pages/onboarding/privacy?source=jpush");
+      else chooseJPushPrivacy(tapIndex === 1);
+    },
+    fail(error) {
+      if (error.errMsg?.endsWith("cancel")) chooseJPushPrivacy(false);
+    },
+    complete() { jpushPromptOpen = false; },
+  });
+}
 
 // Native imports and invocations are excluded from H5; importing the module is inert.
 export function installNativePush(options: { client: ApiClient; vault: SessionVault; canNavigate(): boolean; received(): void }) {
@@ -24,17 +89,24 @@ export function installNativePush(options: { client: ApiClient; vault: SessionVa
   if (controller || typeof plus === "undefined" || !["Android", "iOS"].includes(plus.os.name ?? "")) return;
   const platform = plus.os.name === "Android" ? "android" : "ios";
   const proofKey = `uvel-push-proof-v1:${getDeviceId()}`;
-  let initialized = false, nativeEpoch = 0;
+  let initialized = false, initializedWithJPush = false, nativeEpoch = 0;
   stopNativePush = () => {
     nativeEpoch += 1;
     initialized = false;
+    initializedWithJPush = false;
     try { shutdownNativePush(); } catch { /* Old native bases may not include this plugin. */ }
     nativePushPermission.value = "unknown";
     nativePushRegistrationUnavailable.value = false;
   };
   const initialize = () => {
-    if (!initialized) { initializeNativePush({}); initialized = true; }
+    const jpushPrivacyAccepted = platform === "ios" && hasJPushBuild() && uni.getStorageSync(jpushConsentKey) === "accepted";
+    if (!initialized || jpushPrivacyAccepted !== initializedWithJPush) {
+      initializeNativePush({ jpushPrivacyAccepted });
+      initialized = true;
+      initializedWithJPush = jpushPrivacyAccepted;
+    }
   };
+  applyJPushConsentToBridge = () => { if (initialized) initialize(); };
   const token = () => new Promise<NativePushToken>((resolve, reject) => {
     const captured = nativeEpoch;
     try {
@@ -55,11 +127,12 @@ export function installNativePush(options: { client: ApiClient; vault: SessionVa
     let state: PushPermission = "unknown";
     try {
       if (platform === "ios") {
-        if (request && uni.getAppAuthorizeSetting().notificationAuthorized === "not determined") {
-          await new Promise<void>(resolve => requestSystemPushPermission(() => resolve()));
+        let permission = await readIOSPushPermission();
+        if (captured !== nativeEpoch) return "unknown";
+        if (permission === "prompt" && request && (!hasJPushBuild() || uni.getStorageSync(jpushConsentKey))) {
+          permission = await requestIOSPushPermission();
         }
-        const value = uni.getAppAuthorizeSetting().notificationAuthorized;
-        state = value === "authorized" ? "granted" : value === "denied" ? "denied" : "unknown";
+        state = displayIOSPushPermission(permission);
       } else {
         const android = plus.android;
         const version = android.importClass("android.os.Build$VERSION") as unknown as { SDK_INT: number };
@@ -123,6 +196,14 @@ export function installNativePush(options: { client: ApiClient; vault: SessionVa
 export function refreshNativePush() {
   // #ifdef APP-PLUS
   readInitialNotification?.();
+  if (typeof plus !== "undefined" && plus.os.name === "iOS") {
+    void readIOSPushPermission().then(permission => {
+      const state = displayIOSPushPermission(permission);
+      if (state === nativePushPermission.value) return;
+      nativePushPermission.value = state;
+      if (state !== "unknown") controller?.permissionChanged();
+    });
+  }
   controller?.foreground();
   // #endif
 }
@@ -143,7 +224,7 @@ export function resumeNativePush(snapshot: SessionSnapshot) {
   controller?.sessionChanged(null, snapshot, false);
   // #endif
 }
-export function openNativePushSettings(onFailure: () => void = () => {}) {
+function openNativePushSettings(onFailure: () => void) {
   // #ifdef APP-PLUS
   try {
     if (plus.os.name === "iOS") plus.runtime.openURL("app-settings:", onFailure);
@@ -151,8 +232,24 @@ export function openNativePushSettings(onFailure: () => void = () => {}) {
   } catch { onFailure(); }
   // #endif
 }
-export async function requestNativePushPermission() {
+export async function manageNativePushPermission(onFailure: () => void) {
   // #ifdef APP-PLUS
-  await controller?.sync(true);
+  if (typeof plus === "undefined") { onFailure(); return; }
+  if (plus.os.name === "iOS") {
+    const permission = await readIOSPushPermission();
+    nativePushPermission.value = displayIOSPushPermission(permission);
+    if (permission === "prompt") {
+      const result = await requestIOSPushPermission();
+      nativePushPermission.value = displayIOSPushPermission(result);
+      if (result === "unknown" || result === "prompt") openNativePushSettings(onFailure);
+      else controller?.permissionChanged();
+    } else {
+      openNativePushSettings(onFailure);
+    }
+  } else if (nativePushPermission.value === "unknown") {
+    await controller?.sync(true);
+  } else {
+    openNativePushSettings(onFailure);
+  }
   // #endif
 }

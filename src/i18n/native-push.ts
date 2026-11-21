@@ -9,3 +9,21 @@ export const nativePushCopy = {
   kk: { title: "Жүйелік хабарландырулар", granted: "Қосулы", denied: "Өшірулі. Хабарлар кіріс жәшігінде қолжетімді.", unknown: "Әлі қосылмаған", enable: "Хабарландыруларды қосу", settings: "Хабарландыру баптаулары", settingsFailed: "Баптаулар ашылмады. Хабарландыруларды қосу үшін телефон баптауларынан UVEL-ді табыңыз.", connectionUnavailable: "Push байланысы қолжетімсіз. Хабарлар кіріс жәшігінде қолжетімді." },
   uz: { title: "Tizim bildirishnomalari", granted: "Yoqilgan", denied: "Oʻchirilgan. Xabarlar ilova ichida koʻrinadi.", unknown: "Hali yoqilmagan", enable: "Bildirishnomalarni yoqish", settings: "Bildirishnoma sozlamalari", settingsFailed: "Sozlamalarni ochib boʻlmadi. Telefon sozlamalarida UVELni topib, bildirishnomalarni yoqing.", connectionUnavailable: "Push-bildirishnomalar hozircha ishlamayapti. Xabarlarni ilova ichida koʻrish mumkin." },
 };
+
+export const jpushPrivacyCopy = {
+  zh: {
+    disclosure: "极光推送会处理设备标识和通知令牌，用于向这台设备发送通知。你可以查看隐私政策后再选择。",
+    policy: "查看隐私政策", accept: "同意并启用", decline: "暂不启用",
+    sdkPolicy: "极光隐私政策", details: "UVEL 使用深圳市和讯华谷信息技术有限公司的极光推送 SDK。它通过网络接收设备与系统信息、网络信息、设备标识、通知令牌和推送日志，用于注册设备、发送通知和排查投递。",
+  },
+  en: {
+    disclosure: "JPush uses a device identifier and notification token to deliver notifications to this device. You can review the Privacy Policy before choosing.",
+    policy: "View Privacy Policy", accept: "Agree and enable", decline: "Not now",
+    sdkPolicy: "JPush Privacy Policy", details: "UVEL uses the JPush SDK from Shenzhen Hexun Huagu Information Technology Co., Ltd. It receives device, operating system and network information, device identifiers, notification tokens and delivery logs over the network to register devices, deliver notifications and troubleshoot delivery.",
+  },
+  vi: {
+    disclosure: "JPush dùng mã thiết bị và mã thông báo để gửi thông báo đến thiết bị này. Bạn có thể đọc Chính sách quyền riêng tư trước khi chọn.",
+    policy: "Xem chính sách quyền riêng tư", accept: "Đồng ý và bật", decline: "Để sau",
+    sdkPolicy: "Chính sách quyền riêng tư của JPush", details: "UVEL sử dụng SDK JPush của Shenzhen Hexun Huagu Information Technology Co., Ltd. SDK nhận thông tin thiết bị, hệ điều hành, mạng, mã thiết bị, mã thông báo và nhật ký gửi qua mạng để đăng ký thiết bị, gửi thông báo và xử lý lỗi gửi.",
+  },
+};

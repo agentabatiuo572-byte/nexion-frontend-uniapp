@@ -1,1 +1,25 @@
-{ "deploymentTarget": "13.0" }
+{
+  "deploymentTarget": "13.0",
+  "dependencies-pods": [
+    {
+      "name": "JCore",
+      "version": "5.6.0-noidfa",
+      "source": "https://cdn.cocoapods.org/"
+    }
+  ],
+  "frameworks": [
+    "UIKit.framework",
+    "CFNetwork.framework",
+    "CoreFoundation.framework",
+    "CoreTelephony.framework",
+    "SystemConfiguration.framework",
+    "CoreGraphics.framework",
+    "Foundation.framework",
+    "Security.framework",
+    "WebKit.framework",
+    "UserNotifications.framework",
+    "StoreKit.framework",
+    "libz.tbd",
+    "libresolv.tbd"
+  ]
+}

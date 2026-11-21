@@ -68,6 +68,7 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
   const opened = new Set<string>();
   let registered = "", retryAllowed = true;
   let tokenRevision = 0;
+  let permissionRevision = 0;
   const current = (snapshot: SessionSnapshot, captured: number) => !blocked && epoch === captured
     && vault.read()?.user.userId === snapshot.user.userId
     && vault.read()?.sessionChainId === snapshot.sessionChainId;
@@ -128,6 +129,7 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
     const id = installation(snapshot);
     if (!id) return;
     syncing = true;
+    const capturedPermissionRevision = permissionRevision;
     try {
       const permission = await port.permission(requestPermission);
       if (!current(snapshot, captured)) return;
@@ -160,7 +162,7 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
       syncing = false;
       // A new login may arrive while the old native token callback is pending.
       if (epoch !== captured && !blocked && vault.read()?.accessToken) void sync(true);
-      else if (tokenRevision !== capturedTokenRevision && !blocked) void sync();
+      else if (!blocked && (tokenRevision !== capturedTokenRevision || permissionRevision !== capturedPermissionRevision)) void sync();
     }
   }
   async function revoke(snapshot: SessionSnapshot) {
@@ -182,6 +184,7 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
   }
   return {
     revoke, sessionChanged, flush, sync,
+    permissionChanged() { permissionRevision += 1; void sync(); },
     foreground() { retryAllowed = true; void sync(); void flush(); },
     start() {
       if (started) return;

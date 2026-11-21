@@ -1,12 +1,15 @@
 import Foundation
 import UIKit
 import UserNotifications
+import UvelJPushSDK
 
 public final class NativePushBridge: NSObject, UNUserNotificationCenterDelegate {
     private static let shared = NativePushBridge()
     private var previous: UNUserNotificationCenterDelegate?
     private var callback: ((String) -> Void)?
     private var enabled = false
+    private var jpushStarted = false
+    private var pendingJPushClick: [AnyHashable: Any]?
     private var token: String?
     private var waiters: [UUID: (String) -> Void] = [:]
     private var generation = 0
@@ -36,10 +39,24 @@ public final class NativePushBridge: NSObject, UNUserNotificationCenterDelegate 
         }
     }
     public static func launchId(_ id: String) { shared.click(["notificationId": id]) }
-    public static func startRegistration() {
+    public static func startRegistration(_ jpushPrivacyAccepted: Bool) {
         DispatchQueue.main.async {
             install()
             if !shared.enabled { shared.generation += 1 }
+            if jpushPrivacyAccepted,
+               let appKey = Bundle.main.object(forInfoDictionaryKey: "UvelJPushAppKey") as? String,
+               !appKey.isEmpty {
+                if !shared.jpushStarted {
+                    JPUSHService.setup(withOption: nil, appKey: appKey, channel: "App Store",
+                                       apsForProduction: true, advertisingIdentifier: nil)
+                    shared.jpushStarted = true
+                }
+                JPUSHService.turnOnPush()
+                if let info = shared.pendingJPushClick {
+                    JPUSHService.handleRemoteNotification(info)
+                    shared.pendingJPushClick = nil
+                }
+            }
             shared.enabled = true
             let epoch = shared.generation
             UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -103,6 +120,7 @@ public final class NativePushBridge: NSObject, UNUserNotificationCenterDelegate 
     public static func registered(_ data: Data) {
         DispatchQueue.main.async {
             guard shared.enabled else { return }
+            if shared.jpushStarted { JPUSHService.registerDeviceToken(data) }
             let token = data.map { String(format: "%02x", $0) }.joined()
             let changed = shared.token != token
             shared.token = token
@@ -136,6 +154,7 @@ public final class NativePushBridge: NSObject, UNUserNotificationCenterDelegate 
     }
     public static func shutdown() {
         DispatchQueue.main.async {
+            if shared.enabled, shared.jpushStarted { JPUSHService.turnOffPush(nil) }
             shared.enabled = false
             shared.generation += 1
             shared.token = nil
@@ -157,7 +176,14 @@ public final class NativePushBridge: NSObject, UNUserNotificationCenterDelegate 
     }
     public func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        guard let id = Self.id(notification.request.content.userInfo) else {
+        let info = notification.request.content.userInfo
+        let isJPushNotification = notification.request.trigger is UNPushNotificationTrigger && info["_j_msgid"] != nil
+        if enabled, jpushStarted, isJPushNotification { JPUSHService.handleRemoteNotification(info) }
+        guard let id = Self.id(info) else {
+            if enabled, jpushStarted, isJPushNotification {
+                completionHandler([.alert, .sound])
+                return
+            }
             if let previous = previous, previous.responds(to: #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:willPresent:withCompletionHandler:))) {
                 previous.userNotificationCenter?(center, willPresent: notification, withCompletionHandler: completionHandler)
             } else { completionHandler([]) }
@@ -172,7 +198,14 @@ public final class NativePushBridge: NSObject, UNUserNotificationCenterDelegate 
     }
     public func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                        withCompletionHandler completionHandler: @escaping () -> Void) {
-        if response.actionIdentifier != UNNotificationDismissActionIdentifier { click(response.notification.request.content.userInfo) }
+        let info = response.notification.request.content.userInfo
+        if response.actionIdentifier != UNNotificationDismissActionIdentifier {
+            if response.notification.request.trigger is UNPushNotificationTrigger, info["_j_msgid"] != nil {
+                if enabled, jpushStarted { JPUSHService.handleRemoteNotification(info) }
+                else { pendingJPushClick = info }
+            }
+            click(info)
+        }
         if let previous = previous, previous.responds(to: #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:))) {
             previous.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
         } else { completionHandler() }

@@ -91,7 +91,7 @@ import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { toast } from "@/store/ui";
 // #ifdef APP-PLUS
-import { nativePushPermission, nativePushRegistrationUnavailable, openNativePushSettings, requestNativePushPermission, refreshNativePush } from "@/services/native-push";
+import { nativePushPermission, nativePushRegistrationUnavailable, manageNativePushPermission, refreshNativePush } from "@/services/native-push";
 import { nativePushCopy } from "@/i18n/native-push";
 import { useLocaleStore } from "@/store/locale";
 import { uiLocale } from "@/i18n";
@@ -103,8 +103,7 @@ const pushSettingsFailed = ref(false);
 const pushCopy = computed(() => nativePushCopy[uiLocale(pushLocale.code)]);
 function managePushPermission() {
   pushSettingsFailed.value = false;
-  if (nativePushPermission.value === 'unknown') void requestNativePushPermission();
-  else openNativePushSettings(() => { pushSettingsFailed.value = true; });
+  void manageNativePushPermission(() => { pushSettingsFailed.value = true; });
 }
 // #endif
 
