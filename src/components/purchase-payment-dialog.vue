@@ -588,11 +588,14 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__foot { flex: none; padding-top: var(--v5-space-3); min-height: 20px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); background: var(--v5-surface); box-shadow: 0 -1px 0 var(--v5-border); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 0 5px color-mix(in srgb, var(--v5-brand) 20%, transparent); }
 
-.purchase-payment__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.purchase-payment__row > text { flex: 1; min-width: 0; }
-.purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; }
-.purchase-payment-resume.has-close { padding-right: 44px; }
-.purchase-payment-resume__close { position: absolute; top: var(--v5-space-2); right: var(--v5-space-2); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+/* One line sits in a 56px row with equal space above and below; the 48px text action keeps its touch height inside it. */
+.purchase-payment__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 56px; box-sizing: border-box; padding: 4px 0; color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.purchase-payment__row + .purchase-payment__row { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); }
+.purchase-payment__row > text { flex: 1; min-width: 0; padding-block: 6px; }
+/* The text action's own 8px inline padding sits in the bar padding, so its label keeps the same 16px inset as the row text. */
+.purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; margin-right: -8px; }
+.purchase-payment-resume.has-close { padding-right: 48px; }
+.purchase-payment-resume__close { position: absolute; top: 14px; right: var(--v5-space-3); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
 .purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
-.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 64px); display: grid; gap: var(--v5-space-2); max-height: 160px; overflow: auto; padding: var(--v5-space-2) var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
+.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 64px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
 </style>
