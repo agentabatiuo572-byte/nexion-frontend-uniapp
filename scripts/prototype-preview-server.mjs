@@ -160,8 +160,9 @@ const server=http.createServer(async(req,res)=>{
         updatePreviewHomeDisplay(state,update,Date.now());
         // A live trial conversion policy change keeps existing quotes and payment intents.
         if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
-        // API-only preview controls for the last quota spot and pre-hold compatibility.
+        // API-only preview controls for live quota changes and pre-hold compatibility.
         if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
+        if(typeof update.quotaPaused==='boolean')state.quotaPaused=update.quotaPaused;
         if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
         if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
