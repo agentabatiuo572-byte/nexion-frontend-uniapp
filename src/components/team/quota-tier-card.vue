@@ -124,7 +124,7 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 .quota-stat-line { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-1) var(--v5-space-3); font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .quota-condition__values { margin-left:auto; font:500 13px/18px var(--font-metric); color:var(--v5-ink); font-variant-numeric:tabular-nums; text-align:right; }
 /* Progress (design-rules Progress): thin ink-8% track, brand fill fading in toward a small solid head. */
-.quota-condition :deep(.quota-progress) { height:4px; margin-top:var(--v5-space-2); background:color-mix(in srgb,var(--v5-ink) 8%,transparent); overflow:visible; }
+.quota-condition :deep(.quota-progress) { height:4px; margin:var(--v5-space-2) 3px 0; background:color-mix(in srgb,var(--v5-ink) 8%,transparent); overflow:visible; }
 .quota-condition :deep(.quota-progress > view) { position:relative; background:linear-gradient(90deg,color-mix(in srgb,var(--v5-brand) 12%,transparent),color-mix(in srgb,var(--v5-brand) 70%,transparent)); }
 .quota-condition :deep(.quota-progress > view::after) { content:""; position:absolute; top:50%; right:-3px; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:var(--v5-brand); }
 .quota-meta { display:flex; flex-direction:column; gap:var(--v5-space-1); margin-top:var(--ui-space-inset); padding-top:var(--v5-space-3); border-top:1px solid color-mix(in srgb,var(--v5-ink) 8%,transparent); font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
