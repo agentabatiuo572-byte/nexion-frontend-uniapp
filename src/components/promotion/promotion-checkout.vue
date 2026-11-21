@@ -191,7 +191,7 @@ async function refreshWallet(coalesce=false,background=false){
 const visible=ref(true);
 const account=app.accountKey,epoch=app.accountBindingEpoch;let alive=true,readGeneration=0,refreshOnIdle=false;const current=()=>alive&&app.accountKey===account&&app.accountBindingEpoch===epoch;
 const readCurrent=(generation:number)=>current()&&visible.value&&generation===readGeneration;
-const recoveryReading=ref(false);
+const recoveryRead=shallowRef<Promise<boolean>|null>(null);
 const recoveryReadFailed=ref(false);
 let recoveryGeneration:number|null=null;
 const TABLE=PROMOTION_CHECKOUT_TABLE;
@@ -326,7 +326,7 @@ async function loadOrderClock(){
 }
 const catalogReadFailed=computed(()=>freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&productCatalogState.status==='error');
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
-const canPay=computed(()=>!busy.value&&!recoveryReading.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
+const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
 async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';activityConflict.value=false;try{await action();}catch(cause){if(current()){
@@ -510,8 +510,9 @@ async function confirmPayment(){
     if(!readCurrent(generation)||paymentDestination)return;
     if(order.value?.paymentStatus==='PAID')await readActivation();
     else{
-      await refreshWallet();
+      const walletRefresh=refreshWallet();
       if(!rejection)return;
+      await walletRefresh;
       const reason=error.value;
       const recovered=await recover();
       if(!recovered||!readCurrent(generation)||unknown.value||!canCancel.value)return;
@@ -523,10 +524,17 @@ async function confirmPayment(){
     if(paymentDestination&&readCurrent(generation))await navTo(paymentDestination);
   }
 }
-async function recover():Promise<boolean>{
-  if(!current()||!visible.value||busy.value||session.busy||recoveryReading.value)return false;
+function recover():Promise<boolean>{
+  if(!current()||!visible.value||busy.value)return Promise.resolve(false);
+  // Back can arrive while the foreground read is checking this same order.
+  if(recoveryRead.value)return recoveryRead.value;
+  if(session.busy)return Promise.resolve(false);
+  recoveryRead.value=readCheckout().finally(()=>{recoveryRead.value=null;});
+  return recoveryRead.value;
+}
+async function readCheckout():Promise<boolean>{
   const generation=readGeneration;
-  recoveryGeneration=generation;recoveryReading.value=true;
+  recoveryGeneration=generation;
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
     &&!session.record.pending&&!unknown.value&&!recoveryReadFailed.value;
   try{
@@ -558,7 +566,7 @@ async function recover():Promise<boolean>{
     else if(!clockOnly)await refreshWallet(true,true);
     return readCurrent(generation)&&!unknown.value;
   }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
-  finally{recoveryGeneration=null;recoveryReading.value=false;}
+  finally{recoveryGeneration=null;}
 }
 async function readActivation(){
   if(!current()||!visible.value||resultReading.value||order.value?.paymentStatus!=='PAID')return;
@@ -579,7 +587,7 @@ async function readActivation(){
   }catch{if(valid()){resultState.value='error';resultError.value=t.value.orders.walletPaymentConfirmedRefreshPending;if(walletState.value==='loading')walletState.value='error';}}
   finally{if(generation===resultGeneration)resultReading.value=false;}
 }
-const purchaseReadBusy=()=>loading.value||busy.value||session.busy||recoveryReading.value||resultReading.value
+const purchaseReadBusy=()=>loading.value||busy.value||session.busy||!!recoveryRead.value||resultReading.value
   ||walletState.value==='loading'||paymentConfirming.value||paymentEntryChecking.value||paymentSheetOpen.value||leaving.value||voucherLoading.value;
 useAutoRecovery({
   failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!session.retryOriginal
