@@ -1155,7 +1155,9 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'capacity' 
       const failure = asApiError(error);
       checkoutOnboardingRequired.value = failure.kind === "http" && failure.status === 428
         && failure.code === 428 && failure.message === "USER_ONBOARDING_REQUIRED";
-      toast.warn(checkoutOnboardingRequired.value ? t.value.store.coSetupRequired : t.value.store.coCapacityUnavailable);
+      const rejection = tradeinPaymentRejection(failure);
+      if (rejection) toast.warn(flowCopy.value.cannotPay, flowCopy.value[rejection]);
+      else toast.warn(checkoutOnboardingRequired.value ? t.value.store.coSetupRequired : t.value.store.coCapacityUnavailable);
     });
     return checkoutCapacityRead;
   }
