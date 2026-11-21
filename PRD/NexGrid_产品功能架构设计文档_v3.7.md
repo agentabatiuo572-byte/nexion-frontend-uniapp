@@ -1404,7 +1404,7 @@ APP 普通登录及冷启动会话恢复直接进入首页或既有合法返回�
 
 **上架节奏门**(`Product.unlocksAtPhase`,控市场投放节奏):
 
-| 产品 | unlocksAtPhase | 时点(参 §13.4 phase 月段)|
+| 产品 | unlocksAtPhase | 时点 |
 |---|---|---|
 | NexGridBox Pro v2 | `P3` | 月 ≥ 4 |
 | NexGridRack P2 | `P5` | 月 ≥ 8 |
@@ -2028,14 +2028,14 @@ flowchart LR
 
 #### 8.1.1.1 phase-driven 邀请奖励 promo(Sprint 3 第三阶段)
 
-接 `useProductPhase().inviteBonusMultiplier`(§13.4),根据用户当前 phase 自动派发奖励倍数:
+接 `useProductPhase().inviteBonusMultiplier`,根据用户当前 phase 自动派发奖励倍数:
 
 | Phase 派发 multiplier | 派发表现 |
 |---|---|
 | `> 1.0`(P1=2.0,P2=1.5) | 顶部加 Flame chip `Limited time · {N}× bonus this week`(真实庞氏话术);左侧 hero 大字显示派发后金额(`$400` / `$300`)+ 原价 `$200`;Share CTA 跟随派发数额;NEX 显示 `400` / `300` |
 | `= 1.0`(P3+) | 无 promo chip,显示基础 `$200 + 200 NEX`(无变化) |
 
-**⚠️ 铁律(参 §13.4 + [[feedback-no-meta-in-product]])**:**永远不在 UI 暴露 phase id / phase name**。promo chip 用"Limited time · N× bonus this week"真实电商促销话术,等同 Coinbase / Binance 的限时活动文案。
+**⚠️ 铁律(参 [[feedback-no-meta-in-product]])**:**永远不在 UI 暴露 phase id / phase name**。promo chip 用"Limited time · N× bonus this week"真实电商促销话术,等同 Coinbase / Binance 的限时活动文案。
 
 `Math.round(BASE × multiplier)` 计算 → 整数显示;multiplier toFixed 仅在小数时显示一位(避免 `1.5×` → `2×` 取整后变成 `2x` 误导)。
 
@@ -2752,64 +2752,20 @@ flowchart TD
 
 - 未 KYC 用户先进入 KYC-Express,完成后回到提现页继续提交。
 - 提现提交必须生成 tracking record 与 USDT 提现单;烧了 NEX 抵扣手续费时另写一条 NEX 抵扣单。
-- 提交为原子操作:若 nexBurned > 0 先扣减用户 NEX 余额(`debitNex(nexBurned)`),再提交提现单;提现单失败则回滚已扣的 NEX,保证不出现"扣了 NEX 却没提现"或"提现了却没扣 NEX"。nexBurned = 0(用户无 NEX)时不扣 NEX,直接按全额惩罚费提交。
+- 提交为原子操作:若 nexBurned > 0 先扣减用户 NEX 余额(`debitNex(nexBurned)`),再提交提现单;提现单失败则回滚已扣的 NEX,保证不出现"扣了 NEX 却没提现"或"提现了却没扣 NEX"。
 - USDT 提现单记录 `fee = actualFee`(见 9.3.2 计算),账单金额 = 提现金额(全额出金,手续费为其中差额);NEX 抵扣单记录烧掉的 NEX 数与抵扣的手续费。提现追踪页与账单显示的手续费均为 `actualFee`(三处口径一致)。
 - `/me/wallet/withdraw/tracking` 必须展示 pending / review / paid / rejected 等状态轨迹,并允许从 bill hash 反查。
 
-#### 9.3.2 NEX 优惠抵扣提现手续费(关键业务规则)
+#### 9.3.2 USDT 提现网络确认费与 UVT 抵扣
 
-**模型**:提现按惩罚费率收取手续费;用户可烧 NEX 按优惠率抵扣该费(NEX 取代旧贡献积分门槛)。**不再硬拦截**——没有 NEX 也能提现,只是手续费高;NEX 越多手续费越低,烧够则全免。这是 NEX 的两大功能之一(另一为兑换 USDT,见 §9.4)。
+每笔 USDT 提现按所选网络收取固定确认费。网络费和 UVT 抵扣率取自服务端提现政策，抵扣率默认每枚 UVT 抵 0.40 USDT。
 
-**参数**(后台可调,随 phase 派发,见 §13.3):
-- `withdrawPenaltyFeeRate`:无 NEX 抵扣时按提现金额收取的费率(默认 20%;P5 → 25%,P6 → 30%,锁定期摩擦上升)。
-- `nexFeeOffsetRate`:每烧 1 枚 NEX 可抵扣的手续费(默认 $0.40 / NEX)。该值**远高于 NEX 兑换市价**(~$0.027),即用 NEX 抵手续费比兑现更划算,引导持有与抵扣。
-
-**计算**(提现金额 A):
-
-```
-grossFee   = A × withdrawPenaltyFeeRate          // 无 NEX 抵扣时的费
-requiredNex = grossFee / nexFeeOffsetRate         // 全额免费所需 NEX(A=$100/20%/$0.40 → 50)
-nexBurned  = min(用户 NEX 余额, requiredNex)       // 部分抵扣
-feeWaived  = min(grossFee, nexBurned × nexFeeOffsetRate)
-actualFee  = grossFee − feeWaived                 // 烧够 → $0
-到账        = A − actualFee
-```
-
-**三档结果**(以 A=$100、20% / $0.40 为例):
-
-| 用户 NEX | 烧 NEX | 抵扣 | 实付手续费 | 到账 |
-|---|---|---|---|---|
-| 0 | 0 | $0 | $20 | $80 |
-| 25 | 25 | $10 | $10 | $90 |
-| ≥ 50 | 50 | $20 | $0 | $100 |
-
-**业务流程**:
-
-```mermaid
-flowchart TD
-  A[提现金额 A] --> B[grossFee = A × penaltyRate]
-  B --> C[requiredNex = grossFee / offsetRate]
-  C --> D{用户 NEX 余额}
-  D -- ≥ requiredNex --> E[烧 requiredNex · 全额抵扣 · 手续费 $0 · 到账 A]
-  D -- 0 < NEX < requiredNex --> F[烧全部 NEX · 部分抵扣 · 余额付 actualFee]
-  D -- 0 --> G[不烧 · 全额惩罚费 grossFee · 到账 A − grossFee]
-  E --> H[提交:扣 USDT A + 烧 nexBurned + 写账单 + tracking]
-  F --> H
-  G --> H
-```
+UVT 抵扣默认关闭。余额为零时无法开启。开启后，页面显示消耗的 UVT、抵扣金额和实付网络费。余额不足时可抵扣一部分，足额时实付为零。到账金额等于提现金额减去实付网络费。
 
 **NEX 来源**:
 - 主产出:设备挖矿(NEX 即时滴灌入钱包持仓)
 - 每日签到水龙头(基础 +2 NEX / 天,连续 7 天额外 +5 NEX)
 - 团队佣金部分以 NEX 计
-
-**NEX 抵扣面板 UI**(金额 > 0 时显示):
-- 进度条:当前 NEX 余额 / requiredNex(全额抵扣所需)。
-- 全额抵扣:`✓ 已烧 N NEX · 提现手续费全免($0)`。
-- 不足时:`按惩罚费率收 $X · 攒 NEX 可降低甚至免除`,并双 CTA 引导补 NEX:
-  - `Daily check-in`(签到攒 NEX,跳 `/daily`)
-  - `Mine more NEX`(去挖矿赚 NEX,跳设备 / 商城)
-- 规则说明:`每 1 NEX 抵 ${offsetRate} 手续费(远高于兑换价值)· 烧够 {requiredNex} NEX 即全免;不足按比例抵扣,余额以 USDT 支付。`
 
 #### 9.3.3 KYC-Express 门槛
 
@@ -3338,7 +3294,7 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 | Genesis 二级市场 stats(floor / vol_24h / sales_24h / listed / owners) | `app/(main)/genesis/marketplace/page.tsx:48-52` | SSE `/api/genesis/marketplace/stats` | 实时市场数据 |
 | NEX 市场参数 + 拉盘曲线(price / pump 概率 / 幅度) | `lib/v3/market.ts:50-76` | WebSocket `/api/market/nex` | server canonical |
 | Exchange 三阈值(USER_DAILY_CAP / PLATFORM_DAILY_CAP / KYC_LIFETIME) | `lib/v3/exchange.ts:20-22` | `GET /api/config/exchange/caps` | 合规调阈值 |
-| Phase engine 全表(每 phase 多个时变 dial × 6 phases,含 `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`)| `lib/store/product-phase.ts` | `GET /api/admin/platform/phase-config` | 12 月节奏 dial 调优 |
+| Phase engine 全表(每 phase 多个时变 dial × 6 phases)| `lib/store/product-phase.ts` | `GET /api/admin/platform/phase-config` | 12 月节奏 dial 调优 |
 | Task pricing 表(6 类 min/maxReward + QUEUE_SATURATION)| `lib/mock/tasks.ts:31-193` | `GET /api/config/task-pricing` | 每周市场行情 |
 | Device specs(baseRate / baseRateNEX / price 全表) | `lib/store/index.ts:33-86` | `GET /api/products/specs` | 产品上下架 / 定价 |
 | 任务产能节奏(3 段月界+递减幅度 + 产能下限 + 豁免 SKU + 新机补贴天数) | `src/store/device-lifecycle.ts`(TASK_CAPACITY_BANDS 等) | `GET /api/config/task-capacity`(TBD) | 产能节奏决定终身收益;运营可调段界/幅度/补贴 |
@@ -3423,7 +3379,7 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 | 试用购机结果 | 正式 `POST /api/trial/convert` | 由真实钱包余额、订单事务及幂等结果决定，客户端不模拟扣款成功率 |
 | Unilevel rates promotion 周 multiplier | `lib/v3/commission.ts:56-62` | server feature flag(server-side 计算佣金时按 user bucket 应用 multiplier)|
 | Sign-in lucky multiplier(5% 2x / 15% 1.5x,作用于签到 NEX 发放)| `lib/store/nex-faucet.ts` | `POST /api/faucet/sign-in` 返 multiplier |
-| PHASES 全表(每 phase 多个时变 dials,含 `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`)| `lib/store/product-phase.ts` | `GET /api/admin/platform/phase-config` + user bucket-aware override |
+| PHASES 全表(每 phase 多个时变 dials)| `lib/store/product-phase.ts` | `GET /api/admin/platform/phase-config` + user bucket-aware override |
 | NEX 拉盘曲线(isPump=0.08 / ±3%)| `lib/v3/market.ts:73-76` | server-driven price feed |
 
 ### 9.11e 跨 store mutation 原子性(transaction boundary)
@@ -3936,7 +3892,7 @@ flowchart LR
    - 🎁 签到 + 注册礼包(每日签到水龙头 + 20 NEX 注册礼)
 5. §3 NEX 5 种用法 IconRow:
    - 💱 Convert to USDT 提现(经 `/me/wallet/exchange`)
-   - 🔥 提现网络结算费(每 $100 提现燃烧 N NEX,见 §9.3.2)
+   - 🔥 抵扣提现网络确认费（见 §9.3.2）
    - 🛒 支付升级 / 复投
    - 🔒 质押锁定 NEX 收益
    - 🚀 持有看涨
@@ -4963,10 +4919,10 @@ Conversation:
 FaucetEvent = { ts: number, delta: number, reason: string }   // delta = 本次发放 NEX
 ```
 
-**纯函数**(独立于 store,提现页与 phase 系统共用):
+**提现页费用计算**（见 §9.3.2）
 
 ```
-computeWithdrawFee(amount, userNex, penaltyFeeRate, nexFeeOffsetRate): WithdrawFee  // 提现费 + NEX 优惠抵扣(grossFee/requiredNex/nexBurned/feeWaived/actualFee/netReceive),见 §9.3.2
+computeWithdrawFee(amountUSDT, userNex, offsetWithNex, nexFeeOffsetRate, networkConfirmFeeUsd): WithdrawFee
 ```
 
 ### 12.13 Weekly Quest(useWeeklyQuest,persist key `nexgrid-weekly-quest-v1`)
@@ -5395,7 +5351,7 @@ progressPct = avg(checks);
 | 任务锁定月度阈值 | P1-P2 $40 / P3-P4 $140 / P5-P6 $450 | `MONTHLY_LOCKED_TASK_USD` 常量,§6.7 TaskLockCumulativeBanner 主数字基准,日历月 partial accrual + 累计 |
 | Nova task-lock 推送节奏 | P1-P2 30 d / P3-P4 7 d / P5-P6 3.5 d | `monthly-task-lock` cooldownKey,30 min tick / phase-keyed cadence(§11.0A.2a),与 §6.7 banner 形成"屏内 + 召回"双层 funnel |
 | Nova tradein 推送节奏 | 60 min cooldown | `tradein-nudge` cooldownKey;触发条件 = 车队平均产能 < 65% 且持有可置换设备;文案钩子 = 产能/月损 + CTA 跳设备仓库置换入口(§11.0A.2a)|
-| 提现惩罚费率 / NEX 抵扣率 | 费率 P1-P4 20% · P5 25% · P6 30%;抵扣率 $0.40 / NEX(恒定) | `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`,`computeWithdrawFee()`,phase 派发(§9.3.2 / §13.4.1)|
+| USDT 提现网络确认费 / UVT 抵扣率 | 按网络每笔固定 / 每枚 UVT 可抵扣的金额 | 取服务端提现政策 `networkConfirmFeeUsd` 和 `nexFeeOffsetRate`（§9.3.2） |
 | Nova ambient 总频率 | 30-60 min cooldown(per channel,§11.0A.1 / §11.0A.2a 表)| v3 收敛后 30 分钟主动浏览 1-3 次,事件触发类(quest / weekly refresh / wrapped)按日历滚动不入此口径 |
 | 新手任务期限 | 服务端下发 | 每项任务的 `eligibleUntil`(`GET /api/quests/state`),由后台配置,不固定为注册当天;前端无固定窗口常量 |
 | 新手任务奖励 | 服务端下发 | 组奖励 `dayOneRewardNex`、单项 `rewardNex`、需完成数 `dayOneRequiredTaskCount`;全部完成后在新手任务卡领取 |
@@ -5611,7 +5567,7 @@ app/
 
 **系统 store**(`lib/store/`):
 - index.ts (useApp:user + devices + earnings + global + tick)
-- auth / profile / security / wallet-pairing / bills / orders / staking / achievements / receipts / stella / ui / refresh / locale / exchange / **nex-faucet**(§12.12 签到水龙头 + 提现销毁闸纯函数)/ **milestones**(§11.3a)/ **risk-disclosure**(§11.4a)/ product-phase + product-phase-override(§13.4)/ **cart**(套餐 cart)/ **goals**(目标设置)/ **preferences**(P8 + P9 偏好)/ **weekly-quest**(§11.13)/ **monthly-challenge**(§11.14)/ **event-quest**(§11.10.6)/ **daily-powerup**(§9.8.6)
+- auth / profile / security / wallet-pairing / bills / orders / staking / achievements / receipts / stella / ui / refresh / locale / exchange / **nex-faucet**(§12.12 签到水龙头 + 提现费用计算)/ **milestones**(§11.3a)/ **risk-disclosure**(§11.4a)/ product-phase + product-phase-override / **cart**(套餐 cart)/ **goals**(目标设置)/ **preferences**(P8 + P9 偏好)/ **weekly-quest**(§11.13)/ **monthly-challenge**(§11.14)/ **event-quest**(§11.10.6)/ **daily-powerup**(§9.8.6)
 
 **通用 utility**(`lib/store/` 和 `lib/hooks/`,无独立 store 状态):
 - `device-lifecycle.ts` — Device 任务产能引擎(§6.8 / §13.3 产能节奏参数)
