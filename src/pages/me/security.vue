@@ -716,9 +716,10 @@ async function readBackConfirmedSecurityCommand(
 ) {
   const { pending, read, restartBackoff } = securityReadbacks[section];
   pending.value = confirmation;
+  if (confirmation.tone === "warn") toast.warn(confirmation.message());
+  else toast.success(confirmation.message());
   if (!(await read()) && pending.value === confirmation && securityPageVisible) {
     restartBackoff();
-    toast.info(confirmation.message(), t.value.wallet.syncFailedTitle);
   }
 }
 
@@ -727,8 +728,6 @@ function settleSecurityReadback(pending: ShallowRef<ConfirmedSecurityReadback | 
   if (!confirmation) return;
   pending.value = null;
   confirmation.releaseReceipt?.();
-  if (confirmation.tone === "warn") toast.warn(confirmation.message());
-  else toast.success(confirmation.message());
 }
 
 async function loadRemoteSecurity(): Promise<boolean> {
