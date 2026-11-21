@@ -157,7 +157,7 @@
           <view v-if="!conclusion" class="pp-wait__spin" aria-hidden="true" />
           <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
           <text v-if="conclusion" class="pp-wait__s">{{ conclusion.body }}</text>
-          <text v-else-if="ready && !s.error" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
+          <text v-else-if="ready && !appDeviceOffline" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
         </view>
         <template v-if="!isBank && ready">
           <view class="pp-card__top"><text class="pp-card__t">{{ copy.address }}</text><text class="pp-tag">{{ networkName }}</text></view>
@@ -236,7 +236,7 @@ import NxNoticeDialog from '@/components/ui/nx-notice-dialog.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
 import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, type PurchaseNotice } from '@/store/purchase-payment';
-import { foregroundReadAllowed } from '@/lib/foreground-read';
+import { appDeviceOffline, appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
@@ -259,12 +259,11 @@ const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
-// The bar counts payments still under way; a delivered one is finished and is found on its order.
-const pending = computed(() => unsettled.value.filter(row => !row.businessDelivered && !payment.resumeDismissed(row)));
+// Orders lists every unfinished payment; dismissal applies only to the floating count.
+const records = computed(() => unsettled.value.filter(row => !row.validated && !row.businessDelivered && row.lastStatus !== 'DELIVERED'));
+const pending = computed(() => records.value.filter(row => !payment.resumeDismissed(row)));
 // One payment opens directly; several are listed on Orders.
 function openPending() { if (pending.value.length === 1) void payment.resume(pending.value[0]); else void navTo('/pages/store/orders'); }
-// A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
-const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
 // Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
 // payment leaves the bar, and a closed one returns when its status changes.
 const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.length > 0);
@@ -322,8 +321,13 @@ const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
-const waitTone = computed(() => s.error || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
-const waitTitle = computed(() => retryMessage.value || (s.error ? copy.value.offline : confirming.value ? copy.value.confirming : ready.value ? copy.value.waiting : copy.value.creating));
+const waitTone = computed(() => appDeviceOffline.value || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
+const waitTitle = computed(() => {
+  if (retryMessage.value) return retryMessage.value;
+  if (appDeviceOffline.value) return copy.value.offline;
+  if (confirming.value || (!s.intent && s.error)) return copy.value.confirming;
+  return ready.value ? copy.value.waiting : copy.value.creating;
+});
 watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment.closeCashier(); });
 
 type Notice = { title: string; body: string; primary: string; secondary?: string; icon: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone: 'warning' | 'danger' | 'brand' | 'neutral'; onPrimary: () => void; onSecondary: () => void };
@@ -470,6 +474,9 @@ const appHide = () => { appHidden = true; payment.pause(); };
 const appShow = () => { appHidden = false; if (active.value && s.open) payment.wake(); };
 function visibility() { if (typeof document === 'undefined' || !s.open) return; if (document.hidden) payment.pause(); else if (active.value) payment.wake(); }
 watch(() => app.accountKey, () => payment.close());
+watch(appReadOnline, online => {
+  if (online && active.value && s.open && foregroundReadAllowed()) void payment.query();
+});
 // Channel availability is read when the method sheet opens.
 watch(() => active.value && s.open && !s.concluded && !s.pending && s.policy === null, load => { if (load) void payment.loadPolicy(); }, { immediate: true });
 onShow(() => { active.value = true; if (s.open) payment.wake(); });

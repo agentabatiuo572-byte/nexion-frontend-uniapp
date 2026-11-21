@@ -325,7 +325,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError, isApiRefusal, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -407,7 +407,9 @@ const legalCopy = computed(() => ({
 })[uiLocale(locale.code)]);
 const app = useApp();
 const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string}&VoucherEntryContext)|null>(null);
-const keepCheckoutTarget = ref<string | null>(null), keepCheckoutReadError = ref(false);
+const keepCheckoutRecovery = shallowRef<{ target: string; accountKey: string; commandKey: string | null } | null>(null);
+const keepCheckoutTarget = computed(() => keepCheckoutRecovery.value?.target ?? null);
+const keepCheckoutReadError = computed(() => keepCheckoutRecovery.value?.commandKey === null);
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
@@ -581,21 +583,24 @@ function purchaseEligibilityFailureCopy(): string {
 let refusedCapacityTarget: string | null = null;
 function recoverCapacityBeforePurchase(targets: string[], explicit = false): boolean {
   refusedCapacityTarget = null;
-  keepCheckoutTarget.value = null; keepCheckoutReadError.value = false;
+  keepCheckoutRecovery.value = null;
   if (!remoteApiEnabled) return false;
+  const accountKey = app.accountKey;
   for (const target of targets) {
+    let commandKey: string | null = null;
     try {
-      const pending = readCapacityPending(app.accountKey, target);
+      const pending = readCapacityPending(accountKey, target);
       if (!pending) continue;
-      if (refusedPurchasePayment(app.accountKey, pending.key)) {
+      if (refusedPurchasePayment(accountKey, pending.key)) {
         refusedCapacityTarget = target;
         if (!explicit || !pending.quote) continue;
         tradein.showCanonicalReplace(target as DeviceKind, pending.quote.payableUsdt, pending.quote);
         return true;
       }
+      commandKey = pending.key;
     }
-    catch { keepCheckoutReadError.value = true; }
-    keepCheckoutTarget.value = target;
+    catch { /* A failed read still blocks a new purchase. */ }
+    keepCheckoutRecovery.value = { target, accountKey, commandKey };
     productId.value = target;
     tradein.showKeepRecovery(target as DeviceKind);
     return true;
@@ -1086,7 +1091,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   receiptRetrying.value = false;
   restoreReceiptRecovery();
   remoteTradeinRecoveryRequired.value = false;
-  keepCheckoutTarget.value = null; keepCheckoutReadError.value = false;
+  keepCheckoutRecovery.value = null;
   remoteTradeinRecoveryError.value = false;
   remoteTradeinRecoveryBusy.value = false;
   remoteOrderCommandKey.clear();
@@ -2505,6 +2510,20 @@ async function submitRemoteOrder(): Promise<void> {
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
 const purchasePayment = usePurchasePayment();
+const stopCheckoutCapacityRelease = onPurchaseRecordReleased((accountKey, commandKey) => {
+  const recovery = keepCheckoutRecovery.value;
+  if (recovery?.accountKey !== accountKey || recovery.commandKey !== commandKey) return;
+  const scope = captureCheckoutRoute();
+  // Some releases notify in the same turn as they remove the saved payment.
+  void nextTick(() => {
+    if (!pageAlive || app.accountKey !== accountKey || keepCheckoutRecovery.value !== recovery) return;
+    keepCheckoutRecovery.value = null;
+    if (!isCurrentCheckoutRoute(scope) || scope.productNo !== recovery.target) return;
+    const sheet = tradein.state;
+    if (sheet.kind === "keep-recovery" && sheet.targetKind === recovery.target) tradein.hide();
+    refreshVisibleCheckout();
+  });
+});
 useAutoRecovery({
   failed: () => remoteApiEnabled && pageAlive && pageVisible && auth.isAuthenticated
     && !promotionRoute.value && remoteTradeinRecoveryError.value && !remoteTradeinRecoveryBusy.value
@@ -2995,6 +3014,7 @@ function goTrack() {
 // 任何全局层都是在动别人的东西。
 function cleanup() {
   if (!pageAlive) return;
+  stopCheckoutCapacityRelease();
   closePaymentSheet();
   clearAdvance();
   pageVisible = false;

@@ -6,6 +6,8 @@ import {demoAccountOrders,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoP
 import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
+export const previewPurchaseCashier = new URL('/__demo/purchase-cashier/', 'https://api.hdpayadmin.com');
+
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
 const money = value => (value / 100).toFixed(2);
@@ -93,6 +95,16 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     quotes.clear();
     intents.clear();
   }
+  // Simulate environment cleanup of unpaid intent rows and their reservations.
+  function removeUnpaidIntents() {
+    sync();
+    for (const [intentNo, intent] of intents) {
+      if (intent.status !== 'AWAITING_PAYMENT') continue;
+      intents.delete(intentNo);
+      removeDemoPaymentQuotaHold(state, intent.quotaHold);
+      if (intent.orderNo && state.intentOrders) delete state.intentOrders[intent.orderNo];
+    }
+  }
   // A state sample is adopted into the account's writable orders first, so its payment and delivery facts are kept
   // as delivered (paid total with fees, channel, payment number, times) instead of being regenerated on the next read.
   function settle(orderNo, status, intent, hardwareQuotaUsedAt=null) {
@@ -152,11 +164,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       paymentRail: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
     }});
   }
-  const noProviderSuccess = ['waiting', 'urgent', 'late', 'remote-in-progress', 'expired', 'mismatch'];
+  const waitingModes = ['waiting', 'urgent', 'late', 'remote-in-progress', 'intent-missing'];
+  const noProviderSuccess = [...waitingModes, 'expired', 'mismatch'];
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
     const now = Date.now(), age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
-    if (scenario === 'intent-missing') return intent;
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED') {
       if (intent.reason === 'PAYMENT_FAILED' && graceOver) closeUnpaidOrder(intent);
@@ -167,7 +179,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;
     if (intent.status === 'AWAITING_PAYMENT') {
-      if (['waiting', 'urgent', 'late', 'remote-in-progress'].includes(scenario)) {
+      if (waitingModes.includes(scenario)) {
         if (!graceOver) return intent;
         closeUnpaidOrder(intent);
         expire(intent, 'PAYMENT_TIMEOUT');
@@ -336,7 +348,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const intentNo = `PPI-PREVIEW-${++sequence}`;
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
-        paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
+        paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? new URL(intentNo, previewPurchaseCashier).href : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
         createdAt: Date.now(), orderNo: subject.orderNo, identity: subject.identity, targetProductNo: subject.targetProductNo, payload: source.payload, pricingAt: source.pricingAt, deadline, origin: url.origin, quotaHold};
       intents.set(intentNo, intent);
@@ -363,5 +375,5 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return handle(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}));
   }
-  return {handles, handle, paymentCommand, sweep, sync, openOrderPayment, seedRemoteOrderPayment};
+  return {handles, handle, paymentCommand, sweep, sync, openOrderPayment, seedRemoteOrderPayment, removeUnpaidIntents};
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
-import { appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
+import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { refreshActivePage } from "@/lib/active-page-refresh";
 import { useNotifications } from "@/store/notifications";
@@ -422,12 +422,12 @@ function runScheduledReads(route: string, reconnected = false) {
 
 function installForegroundReadSignals() {
   // #ifdef H5
-  let outage = false;
   const syncOnline = () => {
     const online = navigator.onLine;
+    const disconnected = !online && !appDeviceOffline.value;
+    appDeviceOffline.value = !online;
     appReadOnline.value = online;
-    if (!online && !outage) toast.warn(useT().value.ui.networkDisconnected);
-    outage = !online;
+    if (disconnected) toast.warn(useT().value.ui.networkDisconnected);
   };
   const syncDocument = () => { documentReadVisible.value = !document.hidden; };
   document.addEventListener("visibilitychange", syncDocument);

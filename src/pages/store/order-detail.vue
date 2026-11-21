@@ -189,7 +189,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { discoverOrderPayment, pendingOrderPayment, refusedPurchasePayment, usePurchasePayment, onPurchaseRecordReleased } from "@/store/purchase-payment";
+import { discoverOrderPayment, pendingOrderPayment, refusedPurchasePayment, usePurchasePayment, onPurchaseRecordReleased, type PurchaseContextCheck } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue";
@@ -966,14 +966,22 @@ async function handleWalletPayment() {
   const requestAmountUsdt = liveOrder.value.total;
   const requestItems = liveOrder.value.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
     ?? [{ productNo: liveOrder.value.productId, quantity: liveOrder.value.quantity }];
-  function paymentOrderCurrent(): boolean {
+  const paymentOrderScopeCurrent = () => isCurrentDetailScope(scope) && !orderEnvironmentInvalidated.value;
+  function paymentOrderMatches(): boolean {
     const current = liveOrder.value;
-    if (!isCurrentDetailScope(scope) || !current || current.id !== requestOrderNo || current.total !== requestAmountUsdt
-        || current.status !== 'placed' || current.expiresAt == null || current.expiresAt <= Date.now()
-        || remoteOrderRefreshing.value || remoteOrderError.value || orderEnvironmentInvalidated.value) return false;
+    if (!current || current.id !== requestOrderNo || current.total !== requestAmountUsdt
+        || current.status !== 'placed' || current.expiresAt == null || current.expiresAt <= Date.now()) return false;
     const items = current.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
       ?? [{ productNo: current.productId, quantity: current.quantity }];
     return items.length === requestItems.length && items.every((item, index) => item.productNo === requestItems[index].productNo && item.quantity === requestItems[index].quantity);
+  }
+  function paymentOrderCurrent(): boolean {
+    return paymentOrderScopeCurrent() && !remoteOrderRefreshing.value && !remoteOrderError.value && paymentOrderMatches();
+  }
+  async function checkPaymentOrder(): Promise<PurchaseContextCheck> {
+    while (paymentOrderScopeCurrent() && remoteOrderRead) await remoteOrderRead;
+    if (!paymentOrderScopeCurrent() || remoteOrderError.value) return 'abandoned';
+    return paymentOrderMatches() ? 'current' : 'changed';
   }
   const receiptScope = app.captureRemoteAccountRequest();
   payingFromWallet.value = true;
@@ -997,7 +1005,7 @@ async function handleWalletPayment() {
             throw error;
           }
         },
-        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
+        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},scopeCurrent:paymentOrderScopeCurrent,checkCurrent:checkPaymentOrder,commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
           orderNo:requestOrderNo,deadlineAt:liveOrder.value.expiresAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')});
       // A refused payment means this page's order is out of date.
       if (!receipt) { if (isCurrentDetailScope(scope)) void refreshOrder(); return; }
