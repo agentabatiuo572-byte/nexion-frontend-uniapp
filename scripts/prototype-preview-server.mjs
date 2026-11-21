@@ -4,7 +4,7 @@ import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
-import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
+import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
@@ -53,7 +53,7 @@ let scenarioEpoch=state.scenarioEpoch??0;
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
 const fixtureFor=(url,request)=>{
   if(['/api/app/team/quota','/api/store/purchase-eligibility'].includes(url.pathname))checkoutFlow?.observePayments();
-  return demoFixture(url,locale,state,request);
+  return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,request),state);
 };
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
@@ -271,7 +271,8 @@ const server=http.createServer(async(req,res)=>{
         if(staleWrite())return refuseStale();
         const response=checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         if(response.drop){res.destroy();return;}
-        return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
+        const data=response.status===200?demoPromotionResponse(url,req.method,response.data,state):response.data;
+        return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data},response.status);
       }
       if(req.method==='POST'&&authDemo.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
