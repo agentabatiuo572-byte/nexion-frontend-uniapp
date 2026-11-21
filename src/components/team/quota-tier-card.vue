@@ -7,7 +7,8 @@
       </view>
     </view>
     <view class="quota-product" role="link" tabindex="0" :aria-label="displayName" @click="openProduct" @keydown.enter.prevent="openProduct">
-      <image v-if="tier.imageUrl" :src="tier.imageUrl" mode="aspectFit" class="quota-product__image" :alt="displayName" />
+      <!-- Shared SKU art: the response image only; missing or broken shows the neutral placeholder, never built-in art. -->
+      <CatalogMachineImage class="quota-product__image" :sku="tier.productId" :image-url="tier.imageUrl" :scope-key="'quota:' + tier.productId" />
       <view class="quota-product__copy"><text class="quota-product__name">{{ displayName }}</text><view class="quota-product__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ priceParts[0] }}</text><text v-if="priceParts[1]" class="quota-price-fraction">.{{ priceParts[1] }}</text></view></view>
       <svg class="quota-product__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
     </view>
@@ -38,6 +39,7 @@ import { useLocaleStore } from '@/store/locale';
 import { networkReauditCopy } from '@/i18n/network-reaudit';
 import QuotaConditionBar from './quota-condition-bar.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
+import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { useT } from '@/i18n/use-t';
 import { fmt } from '@/i18n/format';
 import { useScrollGrowProgress, VIZ_RING_TRANSITION } from '@/composables/use-scroll-grow-progress';
@@ -110,7 +112,9 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 /* P-41 tinted tier card: the shared tinted solid in brand (it used to be a top glow). */
 .quota-tier { --nx-tint:var(--v5-brand);padding:var(--ui-space-section) 18px 22px;margin-bottom:18px;border:1px solid var(--v5-border);border-radius:24px;color:var(--v5-ink); }
 .quota-product { display:flex;align-items:center;gap:14px;min-height:80px;cursor:pointer; }
-.quota-product__image { width:76px;height:80px;flex:none; }.quota-product__copy { min-width:0;flex:1; }
+.quota-product__image { width:76px;height:80px;flex:none; }
+/* Missing or broken art: the shared neutral placeholder as a centred square, like the order cards and home, not a slab across a wide image box. */
+.quota-product__image :deep(.catalog-machine-image__placeholder) { inset:12% auto; left:50%; aspect-ratio:1; transform:translateX(-50%); }.quota-product__copy { min-width:0;flex:1; }
 .quota-product__name { display:block;font:600 17px/1.4 var(--font-v5);overflow-wrap:break-word; }.quota-product__price { display:block;margin-top:var(--v5-space-1);font:500 14px/1.5 var(--font-v5);color:var(--v5-ink-2); }
 .quota-qualification__check { flex:none;margin-right:var(--v5-space-1); }.quota-product__arrow { flex:none;color:var(--v5-ink-3); }
 .quota-stock { margin-top:18px; }.quota-stat-line { display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 14px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }

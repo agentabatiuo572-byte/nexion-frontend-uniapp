@@ -24,6 +24,7 @@
     </view>
     <view class="checkout-result__actions">
       <NxButton v-if="(state === 'inventory' || state === 'activated') && phase === 'complete'" :label="copy.devices" variant="primary" @click="emit('devices')" />
+      <NxButton v-else-if="state === 'failed'" :label="t.orders.copyAndSupport" variant="primary" @click="emit('support')" />
       <template v-else-if="(state === 'error' || state === 'processing') && phase === 'complete'">
         <NxButton :label="copy.deviceInventory" variant="text" @click="emit('devices')" />
       </template>
@@ -38,11 +39,15 @@ import { useLocaleStore } from '@/store/locale';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxResultHead from '@/components/ui/nx-result-head.vue';
+import { useT } from '@/i18n/use-t';
+import { purchasePaymentCopy } from '@/lib/purchase-payment-copy';
 import CheckoutAmount from './CheckoutAmount.vue';
-const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
-const emit = defineEmits<{ (event: 'devices'): void }>();
+// 'failed' is a server-confirmed provisioning failure (order PAID + PROVISIONING_FAILED); 'error' is only a read-back that has not succeeded yet.
+const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
+const emit = defineEmits<{ (event: 'devices'): void; (event: 'support'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));
+const t = useT();
 const showPaidAmount = computed(() => props.paymentConfirmed && props.amount !== undefined);
 const phase = ref<'confirmed' | 'activating' | 'complete'>('complete');
 // Confetti for the purchase itself; a check pop and halo when activation completes.
@@ -60,14 +65,16 @@ const presentable = computed(() => props.state === 'activated' || props.state ==
 
 const title = computed(() => phase.value === 'confirmed' ? copy.value.paid
   : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activating : copy.value.activated
-  : props.state === 'inventory' ? copy.value.inventory : props.state === 'processing' ? copy.value.processing : copy.value.resultError);
+  : props.state === 'inventory' ? copy.value.inventory : props.state === 'processing' ? copy.value.processing
+  : props.state === 'failed' ? t.value.orders.statusProvisioningFailed : copy.value.resultError);
 const description = computed(() => phase.value === 'confirmed' ? props.state === 'activated' ? copy.value.paidHint : copy.value.paidInventoryHint
   : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activatingHint : copy.value.activatedHint
-  : props.state === 'inventory' ? copy.value.inventoryHint : props.state === 'processing' ? copy.value.processingHint : props.error || copy.value.resultErrorHint);
+  : props.state === 'inventory' ? copy.value.inventoryHint : props.state === 'processing' ? copy.value.processingHint
+  : props.state === 'failed' ? purchasePaymentCopy(locale.code).delivery : props.error || copy.value.resultErrorHint);
 // Head tone follows the status map (03 §3.8): paid and done are success; activating, processing and a paid order whose
-// read-back failed and is being re-read are in progress. 'error' here is never a confirmed delivery failure (03 §3.5.2:
-// no failure before the server confirms one), so it does not use danger.
-const headTone = computed(() => phase.value === 'confirmed' ? 'success'
+// read-back has not succeeded yet are in progress (03 §3.5.2: no failure before the server confirms one); only the
+// server-confirmed provisioning failure is danger.
+const headTone = computed(() => props.state === 'failed' ? 'danger' : phase.value === 'confirmed' ? 'success'
   : props.state === 'processing' || props.state === 'error' || phase.value === 'activating' ? 'warning' : 'success');
 const sparks = Array.from({ length: 36 }, (_, index) => ({ index, style: {
   '--x': `${12 + (index * 17) % 77}%`, '--dx': `${(index * 73) % 241 - 120}px`,
