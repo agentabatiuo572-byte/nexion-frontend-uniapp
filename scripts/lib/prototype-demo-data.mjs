@@ -167,8 +167,7 @@ function demoHardwareQuota(product,state,points,now){
   const monthlyStock=state.quotaMonthlyStock??60,month=demoTeamBusinessDate(now).slice(0,7);
   const sameMonth=at=>at<=now&&demoTeamBusinessDate(at).slice(0,7)===month;
   const sampleAt=state.previewFactsAt??demoStartedAt;
-  const soldOut=state.catalogState==='soldout'&&product.id===approvedQuotaSku;
-  const seeded=sameMonth(sampleAt)?(soldOut?monthlyStock:7):0;
+  const seeded=sameMonth(sampleAt)?(state.quotaSalesSample==='sold-out'?60:7):0;
   const sold=(state.createdOrders??[]).filter(order=>demoPaidPurchase(order)
     &&order.hardwareQuotaUsedAt!=null&&sameMonth(order.hardwareQuotaUsedAt))
     .flatMap(order=>order.lineItems).filter(line=>line.sku===product.id).reduce((sum,line)=>sum+line.quantity,0);
@@ -182,7 +181,7 @@ function demoHardwareQuota(product,state,points,now){
     // The legacy open preset keeps its original orders and uses a quota without a points requirement.
     conditions:state.walletLegacySeed&&state.catalogState==='available'?[]:
       [{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:points}],
-    perks:[],available:product.available&&remaining>0};
+    perks:[],available:product.available&&product.stock!==0&&remaining>0};
 }
 
 function demoE1PurchaseRule(product) {
@@ -612,7 +611,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
-  if(!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  if(!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&!request.verifiedPayment&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.interfaceLanguages=previewInterfaceLanguages(state.interfaceLanguagesState);
@@ -831,14 +830,14 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const reason=tradeinSourceReason(device,product);
     if(reason!=='OK')refuse('TRADEIN_'+reason);
     // External pricing has already checked the target and checks monthly quota separately.
-    if(!request.externalPurchasePricing)requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
+    if(!request.externalPurchasePricing&&!request.verifiedPayment)requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
     return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
   };
-  const checkWalletSource=sourceDeviceId=>{
+  const checkReplacementSource=(sourceDeviceId,external)=>{
     const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===sourceDeviceId);
-    const {assignment,refusal}=demoReplacementSourceCheck(source,state,false,
+    const {assignment,refusal}=demoReplacementSourceCheck(source,state,external,
       path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>({})},now));
     if(refusal)refuse(refusal);
     return assignment;
@@ -847,44 +846,55 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const input=request.postDataJSON();
     return tradeinQuote(input.sourceDeviceId,input.targetProductNo);
   }
-  if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'){
+  const paid=request.verifiedPayment;
+  const keepingCapacity=paid?.kind==='CAPACITY_KEEP'&&pathname==='/api/app/trade-in/capacity-keep';
+  if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'||keepingCapacity){
     const replacingCapacity=pathname.endsWith('/capacity-replace');
     const input=request.postDataJSON();
     let quote;
-    if(replacingCapacity){
+    if(replacingCapacity||keepingCapacity){
       const capacity=capacityQuote();
-      if(capacity.sourceDeviceId===null||input.sourceDeviceId!==capacity.sourceDeviceId)refuse('CAPACITY_REPLACEMENT_SOURCE_CHANGED');
-      if(typeof input.expectedPayableUsdt!=='number'||Math.abs(input.expectedPayableUsdt-capacity.payableUsdt)>0.000001)refuse('CAPACITY_REPLACEMENT_QUOTE_CHANGED');
-      quote={...capacity,discountUsdt:0,targetDeviceStatus:'ACTIVE'};
+      if(keepingCapacity&&capacity.decision!=='CAPACITY_AVAILABLE')refuse('DEVICE_SLOT_CAP_EXCEEDED');
+      if(replacingCapacity&&(capacity.decision!=='REPLACE_REQUIRED'||input.sourceDeviceId!==capacity.sourceDeviceId))refuse('CAPACITY_REPLACEMENT_SOURCE_CHANGED');
+      if(typeof input.expectedPayableUsdt!=='number'||Math.abs(input.expectedPayableUsdt-capacity.payableUsdt)>0.000001){
+        refuse(keepingCapacity?'CAPACITY_KEEP_QUOTE_CHANGED':'CAPACITY_REPLACEMENT_QUOTE_CHANGED');
+      }
+      quote={...capacity,sourceDeviceId:keepingCapacity?null:capacity.sourceDeviceId,discountUsdt:0,targetDeviceStatus:'ACTIVE'};
     }else{
-      quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo);
-      if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
+      quote=tradeinQuote(input.sourceDeviceId,paid?.targetProductNo??input.targetProductNo);
+      if(input.expectedSourceVersion!==quote.sourceRowVersion)refuse('TRADEIN_SOURCE_VERSION_CONFLICT');
+      if(!Number.isFinite(input.expectedPayableUsdt)||!Number.isFinite(input.expectedDiscountUsdt)
+        ||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)refuse('TRADEIN_QUOTE_CHANGED');
     }
-    const sourceAssignment=checkWalletSource(quote.sourceDeviceId);
+    const sourceAssignment=keepingCapacity?null:checkReplacementSource(quote.sourceDeviceId,Boolean(paid));
     const currentTask=sourceAssignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
-    const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true);
-    if(!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
+    if(paid&&Number(quote.payableUsdt).toFixed(6)!==paid.businessAmountUsdt)refuse('PURCHASE_PAYMENT_PRICING_CHANGED');
+    const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true,paid?.quotaHold);
+    if(!paid&&!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
     if(replacingCapacity){
       const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===quote.sourceDeviceId);
       (state.deviceActivations??={})[source.id]={status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',rowVersion:source.rowVersion+1};
-    }else (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
+    }else if(!keepingCapacity) (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
-    postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
+    if(!paid)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
       amount:quote.payableUsdt,at:now,category:'purchase',remark:'E3 trade-in upgrade wallet payment'});
     const targetDeviceInstanceNo=demoOrderDeviceInstance(orderNo);
     const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;
     (state.deviceIds??={})[targetDeviceInstanceNo]=targetDeviceId;
     const canonicalStatus=active?'activated':'inventory';
-    const order={...demoOrders(products,state,now)[0],orderNo,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:'WALLET',orderType:'TRADE_IN',itemCount:1,
-      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
-      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null};
+    const order={...demoOrders(products,state,now)[0],orderNo,productId:quote.targetProductId,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:paid?.paymentMethod??'WALLET',orderType:keepingCapacity?'CAPACITY_KEEP':'TRADE_IN',itemCount:1,
+      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:keepingCapacity?null:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
+      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:paid?.paidAt??now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null,
+      ...(paid&&{paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt})};
     (state.createdOrders||=[]).unshift(order);
     if(currentTask?.status==='RUNNING'){
       recordDemoTaskCancellation(state,sourceAssignment,currentTask);
     }
-    const receipt={tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance};
-    return replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);
+    const paymentReceipt={orderNo,targetDeviceId,orderStatus:'COMPLETED',walletDebitUsdt:paid?0:quote.payableUsdt,walletBalanceAfterUsdt:demoWalletUsdt(state)};
+    if(keepingCapacity)return {...paymentReceipt,operationNo:'DEMO-CPK-'+sequence,deviceStatus:'ACTIVE'};
+    const receipt={...paymentReceipt,tradeinNo:order.tradeinNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',discountUsdt:quote.discountUsdt};
+    return replacingCapacity||paid?receipt:remember('tradeinSubmit',orderNo,receipt,order);
   }
   function capacityQuote(){
     const {targetProductNo}=request.postDataJSON();
@@ -892,7 +902,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
     const reason=tradeinTargetReason(product);
     if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
-    if(!request.externalPurchasePricing){
+    if(!request.externalPurchasePricing&&!request.verifiedPayment){
       const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
       const purchase=demoSkuPurchaseRules(state,product,points,now);
       if(!purchase.eligible){

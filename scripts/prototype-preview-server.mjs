@@ -163,6 +163,7 @@ const server=http.createServer(async(req,res)=>{
         // API-only preview controls for the last quota spot and pre-hold compatibility.
         if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
         if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
+        if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(update.reset||update.savedAttemptState)authDemo.reset();
@@ -192,7 +193,10 @@ const server=http.createServer(async(req,res)=>{
           state.withdrawRecoveryState = recoverySelection?.[0] ?? 'off';
           withdrawalRecoverySeed = seedWithdrawalRecovery(state, state.withdrawRecoveryState);
         }
-        if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
+        if(update.reset||scenarioChange){
+          state.scenarioEpoch=++scenarioEpoch;
+          checkoutFlow?.syncScenario();
+        }
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.

@@ -98,7 +98,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return order;
   }
   // An open payment belongs to the same business even when a new request changes the reviewed price.
-  const openIntent = (subject, excluding) => [...intents.values()].find(row => row !== excluding && row.kind === subject.kind
+  const openIntent = (subject, excluding) => [...intents.values()].findLast(row => row !== excluding && row.kind === subject.kind
     && !row.receipt && !['DELIVERED', 'EXPIRED'].includes(row.status)
     && (row.kind === 'ORDER_PAY' ? !!subject.orderNo && row.orderNo === subject.orderNo
       : subject.identity != null && row.identity === subject.identity));
@@ -116,16 +116,33 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   function lateArrival(intent, now) {
     return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_LATE_REVIEW', paidAt: now});
   }
-  // TRIAL_CONVERT settles through the trial lifecycle at the quote's pricing time, as VerifiedPurchasePayment does. A
-  // refusal keeps the funds for support under its own code.
-  function deliverTrial(intent) {
+  const deliveryPaths = {
+    TRIAL_CONVERT: '/api/trial/convert',
+    TRADE_IN: '/api/app/trade-in/submit',
+    CAPACITY_REPLACE: '/api/app/trade-in/capacity-replace',
+    CAPACITY_KEEP: '/api/app/trade-in/capacity-keep',
+  };
+  // Settle through the same business fixture as the wallet path, with the intent's verified payment and quota.
+  function deliverPurchase(intent) {
     let receipt;
-    try { receipt = demoFixture(new URL('/api/trial/convert', intent.origin), locale(), state, {method: () => 'POST', headers: () => ({'idempotency-key': intent.commandKey}), postDataJSON: () => intent.payload, verifiedPayment: intent}); }
-    catch (error) { return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: error.message}); }
+    const url = new URL(deliveryPaths[intent.kind], intent.origin);
+    try {
+      receipt = demoFixture(url, locale(), state, {
+        method: () => 'POST', headers: () => ({'idempotency-key': intent.commandKey}),
+        postDataJSON: () => intent.payload, verifiedPayment: intent,
+      });
+    } catch (error) {
+      if (!error.status) throw error;
+      return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: error.message});
+    }
     removeDemoPaymentQuotaHold(state, intent.quotaHold);
-    return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {...receipt, paymentNo: intent.intentNo, amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt,
-      roundingAdjustmentUsdt: intent.roundingAdjustmentUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paymentRail: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt}});
+    return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
+      ...receipt, paymentNo: intent.intentNo, amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt,
+      roundingAdjustmentUsdt: intent.roundingAdjustmentUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod,
+      paymentRail: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
+    }});
   }
+  const noProviderSuccess = ['waiting', 'urgent', 'late', 'remote-in-progress', 'expired', 'mismatch'];
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
     const now = Date.now(), age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
@@ -157,19 +174,17 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (scenario === 'bank-failed' && bank) return expire(intent, 'PAYMENT_FAILED');
       if (scenario === 'mismatch') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_AMOUNT_MISMATCH'});
     }
-    // PurchasePaymentService.arrivalReason: funds paid before the deadline deliver normally, also when delivery itself
-    // lands after it, and the order waits for them. Funds paid at or after it go to review, which delivery skips.
-    intent.paidAt ??= intent.createdAt + ARRIVE_AFTER;
-    if (intent.paidAt >= intent.deadline) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_LATE_REVIEW'});
-    // Observation continues during closure; deliver()/cregisGate records the refusal for manual review.
-    // Reopening alone does not revalidate a MANUAL_REVIEW intent or erase its observed arrival.
+    // Confirmation is durable. The current provider response must independently verify that payment before delivery.
+    if (noProviderSuccess.includes(scenario) || (bank && scenario === 'bank-failed')) return intent;
+    if (intent.status === 'AWAITING_PAYMENT') {
+      intent.paidAt = intent.createdAt + ARRIVE_AFTER;
+      if (intent.paidAt >= intent.deadline) return lateArrival(intent, intent.paidAt);
+      intent.status = 'FUNDS_CONFIRMED';
+    }
     if (!networkOpen(intent.paymentMethod)) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CREGIS_DIRECT_PAYMENT_PAUSED', reconciliationStatus: 'REVIEW'});
-    if (age < DELIVER_AFTER) return Object.assign(intent, {status: 'FUNDS_CONFIRMED'});
+    if (age < DELIVER_AFTER) return intent;
     if (scenario === 'delivery-failed') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
-    if (intent.kind === 'TRIAL_CONVERT') return deliverTrial(intent);
-    // Trade-in and capacity fixtures cover open, unknown and rejected commands. Their
-    // business delivery/fleet mutation is not simulated here.
-    if (intent.kind !== 'ORDER_PAY') throw Object.assign(new Error('PURCHASE_PAYMENT_DELIVERY_NOT_MODELED'), {status:503});
+    if (intent.kind !== 'ORDER_PAY') return deliverPurchase(intent);
     const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
     // Delivery needs the order; funds for an order that cannot be found never become a success.
     if (!order) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
@@ -196,7 +211,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, identity, pricingAt, paidAt, quotaHold, ...row} = advance(intent), open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, pricingAt, paidAt, quotaHold, ...row} = advance(intent), open = Date.now() < deadline;
     const networkEnabled = networkOpen(row.paymentMethod);
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
@@ -218,21 +233,15 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return {...original, status: intent.status === 'DELIVERED' ? 'INDETERMINATE' : 'PROCESSING',
       message: intent.reason || 'PURCHASE_PAYMENT_PROCESSING'};
   }
-  // The server's own observation of open order payments, so an order read follows them without the App polling.
+  // The server's own observation of payments, independent of whether the App is polling.
   function sweep() {
     sync();
-    for (const intent of intents.values()) if (['ORDER_PAY', 'TRIAL_CONVERT'].includes(intent.kind)) advance(intent);
+    for (const intent of intents.values()) advance(intent);
   }
   // AppOrderCommandService refuses a wallet pay or a cancel while an order's external payment is open.
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
   function readIntent(intent) {
     if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE');
-    if (state.paymentState === 'intent-missing' && intent?.status === 'AWAITING_PAYMENT') {
-      removeDemoPaymentQuotaHold(state, intent.quotaHold);
-      intents.delete(intent.intentNo);
-      if (intent.orderNo && state.intentOrders) delete state.intentOrders[intent.orderNo];
-      intent = undefined;
-    }
     return intent ? {status: 200, message: 'OK', data: view(intent)} : refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
   }
   function handle(url, request) {
@@ -317,7 +326,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
         paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
-        createdAt: Date.now(), orderNo: subject.orderNo, identity: subject.identity, payload: source.payload, pricingAt: source.pricingAt, deadline, origin: url.origin, quotaHold};
+        createdAt: Date.now(), orderNo: subject.orderNo, identity: subject.identity, targetProductNo: subject.targetProductNo, payload: source.payload, pricingAt: source.pricingAt, deadline, origin: url.origin, quotaHold};
       intents.set(intentNo, intent);
       // The deadline task leaves an order with a payment intent to the payment's own outcome.
       if (subject.orderNo) (state.intentOrders ??= {})[subject.orderNo] = true;
@@ -342,5 +351,5 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return handle(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}));
   }
-  return {handles, handle, paymentCommand, sweep, openOrderPayment, seedRemoteOrderPayment};
+  return {handles, handle, paymentCommand, sweep, sync, openOrderPayment, seedRemoteOrderPayment};
 }
