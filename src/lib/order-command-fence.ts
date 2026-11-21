@@ -1,9 +1,16 @@
-import {readAccountRow,writeAccountRow} from '@/store/account-scoped-storage';
+import {readAccountRow,readAccountStorageEventRow,writeAccountRow} from '@/store/account-scoped-storage';
 import {requireCryptoUuid} from '@/lib/secure-command-id';
 
 const TABLE='nexgrid-order-action-accounts-v1';
 export type PendingOrderAction={kind:'pay'|'cancel';orderNo:string;key:string;amount:number|null;phase:'pending'|'paid';paymentMethod?:'WALLET'|'EXTERNAL'};
 type ActionRow={actions:Record<string,PendingOrderAction>;paymentKeys?:Record<string,string>};
+
+export function isOrderPaidStorageChange(event: StorageEvent, accountKey: string, orderNo: string): boolean {
+  if (event.key !== TABLE) return false;
+  const before = readAccountStorageEventRow<ActionRow>(event.oldValue, accountKey)?.actions?.[orderNo];
+  const after = readAccountStorageEventRow<ActionRow>(event.newValue, accountKey)?.actions?.[orderNo];
+  return before?.phase !== 'paid' && after?.kind === 'pay' && after.phase === 'paid';
+}
 
 export function readOrderAction(accountKey:string,orderNo:string):PendingOrderAction|null {
   const row=readAccountRow<ActionRow>(TABLE,accountKey,true);

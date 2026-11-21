@@ -5,7 +5,7 @@ import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
 import { useApp } from './app';
 import { useOrders } from './orders';
-import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
+import { readAccountRow, readAccountStorageEventRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
 import { clearOrderAction, readOrderAction } from '@/lib/order-command-fence';
 import { navTo, navReplace, navBack } from '@/lib/route';
 import { formatAmount } from '@/lib/amount-display';
@@ -34,6 +34,18 @@ type DefinitePaymentNotice = 'rejectQuotaPaused' | 'rejectQuotaMonthFull' | 'rej
 type EligibilityRetry = 'rejectEligibilityUnavailable';
 export type PurchaseNotice = '' | 'keepOrder' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'originalUnavailable' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | DefinitePaymentNotice;
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
+
+export function isOrderDeliveredStorageChange(event: StorageEvent, accountKey: string, orderNo: string): boolean {
+  if (event.key !== TABLE) return false;
+  const before = readAccountStorageEventRow<PendingRow>(event.oldValue, accountKey)?.records;
+  const after = readAccountStorageEventRow<PendingRow>(event.newValue, accountKey)?.records;
+  return Object.entries(after ?? {}).some(([key, row]) => {
+    if (row?.kind !== 'ORDER_PAY' || !row.businessDelivered || before?.[key]?.businessDelivered) return false;
+    try { return JSON.parse(row.fingerprint)[1]?.orderNo === orderNo; }
+    catch { return false; }
+  });
+}
+
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
 // Another payment for this purchase is still open, perhaps from another device: say so rather than asking to review the order.
