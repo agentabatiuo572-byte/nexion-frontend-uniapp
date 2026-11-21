@@ -475,7 +475,8 @@ async function load() {
     const lite = litePromotion(item);
     if (!lite) { void navReplace('/pages/events/events'); return; }
     activity.value = lite; readAt.value = Date.now(); now.value = readAt.value; status.value = 'ready';
-    if (item.template === 'REPURCHASE' && item.state === 'ACTIVE' && item.eligibility === 'INELIGIBLE') void readFirstOffer(ticket, identity, signedIn).catch(() => { /* Without the offer list the store stays the next step. */ });
+    if (item.template === 'REPURCHASE' && item.state === 'ACTIVE' && item.eligibility === 'INELIGIBLE'
+      && repurchaseInterval.value === null) void readFirstOffer(ticket, identity, signedIn).catch(() => { /* Without the offer list the store stays the next step. */ });
   } catch (cause) {
     if (!fence.current(ticket) || identity !== readIdentity()) return;
     // A refused session drops the old account's view; any other failure keeps a shown offer as it was.

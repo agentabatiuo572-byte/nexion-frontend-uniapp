@@ -165,7 +165,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (intent.status === 'EXPIRED') return {...original, status: 'REJECTED', message: 'PURCHASE_PAYMENT_EXPIRED'};
     return {...original, status: intent.status === 'DELIVERED' ? 'INDETERMINATE' : 'PROCESSING',
-      message: intent.reason || 'PURCHASE_PAYMENT_PROCESSING'};
+      message: intent.reason ?? 'PURCHASE_PAYMENT_PROCESSING'};
   }
   // The server's own observation of open order payments, so an order read follows them without the App polling.
   function sweep() {
