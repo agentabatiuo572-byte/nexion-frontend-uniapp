@@ -265,7 +265,8 @@ export const useConfig = defineStore("config", () => {
     if (!currentClient()) return Promise.resolve();
     if (currentLoad) return currentLoad;
     const now = Date.now();
-    if (remoteApiEnabled && (!foregroundReadAllowed() || (!force && (now < (recovering ? retryAfterAt : retryAt) || now < nextCheckAt)))) {
+    if (remoteApiEnabled && (!foregroundReadAllowed() || now < retryAfterAt
+      || (!force && (now < nextCheckAt || (!recovering && now < retryAt))))) {
       return Promise.resolve();
     }
     const previousStatus = configStatus.value;
@@ -384,7 +385,7 @@ export const useConfig = defineStore("config", () => {
   }
 
   return { config, publicStatsAuthority, configStatus, transientFailure, interfaceLanguages, offeredLocales, syncFailed, loading,
-    load, refresh: () => load(true), recover: () => load(false, true), revalidate: load, ensureLoaded: load, startRefresh, invalidate, feeConfigValid, isEnabled,
+    load, refresh: () => load(true), recover: () => load(false, true), recoveryNotBefore: () => retryAfterAt, revalidate: load, ensureLoaded: load, startRefresh, invalidate, feeConfigValid, isEnabled,
     _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 

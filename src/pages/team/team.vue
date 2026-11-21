@@ -629,7 +629,8 @@ useAutoRecovery({
 });
 useAutoRecovery({
   failed: () => recoveryConfig.configStatus === "failed" && !recoveryConfig.loading,
-  retry: () => inviteRulesOpen() ? recoveryConfig.recover() : recoveryConfig.load(),
+  retry: () => recoveryConfig.recover(),
+  retryNotBefore: () => recoveryConfig.recoveryNotBefore(),
   // Pull is locked while the rules sheet is open; keep reading every 30 s until it closes (03 §3.5.2).
   repeatMs: 30_000, repeatWhile: inviteRulesOpen,
 });
