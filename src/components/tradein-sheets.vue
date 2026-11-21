@@ -1226,6 +1226,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         commandKey:()=>{const saved=readCapacityPending(scope.accountKey);const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};writeCapacityPending(scope.accountKey,original);return key;},
         onReplacementRefused: reason => {
           if (!current() || !props.active) return;
+          if (effectiveOperation === 'replace') sheet.replacementPaymentRefusal = { targetProductNo: target, reason };
           capacityCommandKey.value = null;
           savedCapacity.value = null;
           capacityResumeAllowed.value = false;

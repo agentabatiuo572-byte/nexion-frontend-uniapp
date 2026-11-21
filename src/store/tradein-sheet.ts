@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import type { CanonicalCapacityReplaceQuote, CanonicalTradeinQuote } from "@/api/device-e3-api";
+import type { tradeinPaymentRejection } from "@/lib/order-payment-rejection";
 
 /**
  * Trade-in flow sheet state machine — Batch C (2026-05-27).
@@ -74,6 +75,10 @@ export type TradeinSheetState =
 
 export const useTradeinSheet = defineStore("tradeinSheet", () => {
   const state = ref<TradeinSheetState>({ kind: "none" });
+  const replacementPaymentRefusal = ref<{
+    targetProductNo: string;
+    reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>;
+  } | null>(null);
 
   /** FEAT-DEV02 结算抵扣上下文:确认置换后写入,checkout 读它渲染抵扣行并在
    *  持久块原子执行(移除旧机+净额扣款+新机继承旧机所在位置);「移除」清空恢复原价。
@@ -171,5 +176,5 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
     state.value = { kind: "none" };
   }
 
-  return { state, appliedTradein, applyTradein, clearApplied, appliedBy, showChoice, showKeepRecovery, showRetire, showTradein, showReplace, showCanonicalReplace, showBlock, showRetireBlock, hide };
+  return { state, replacementPaymentRefusal, appliedTradein, applyTradein, clearApplied, appliedBy, showChoice, showKeepRecovery, showRetire, showTradein, showReplace, showCanonicalReplace, showBlock, showRetireBlock, hide };
 });

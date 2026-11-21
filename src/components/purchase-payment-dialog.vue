@@ -150,7 +150,7 @@
             <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
           </view>
           <text v-if="conclusion" class="pp-wait__s">{{ conclusion.body }}</text>
-          <text v-else-if="ready && !s.error" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
+          <text v-else-if="ready && !waitingOffline" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
         </view>
         <template v-if="!isBank && ready">
           <view class="pp-card__top"><text class="pp-card__t">{{ copy.address }}</text><NxTag tone="brand" :label="networkName" /></view>
@@ -248,6 +248,7 @@ import { useT } from '@/i18n/use-t';
 import { purchasePaymentCopy, paymentRowStatus, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { appReadOnline } from '@/lib/foreground-read';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { hostedPaymentUrlPattern, validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
@@ -307,7 +308,8 @@ const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
-const waitTone = computed(() => s.error || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
+const waitingOffline = computed(() => !appReadOnline.value || s.error);
+const waitTone = computed(() => waitingOffline.value || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
 const quoteStatus = computed(() => {
   const c = copy.value;
   if (s.originalRecovery) return c.checkingOriginalPayment;
@@ -317,11 +319,11 @@ const quoteStatus = computed(() => {
 });
 const waitTitle = computed(() => {
   const c = copy.value;
+  if (waitingOffline.value && !retryMessage.value) return c.offline;
   if (s.originalRecovery) return c.checkingOriginalPayment;
   if (s.canResubmit) return c.originalPaymentNotFoundRetry;
   if (s.busy && !s.intent) return c.creating;
   if (retryMessage.value) return retryMessage.value;
-  if (s.error) return c.offline;
   if (confirming.value) return c.confirming;
   return ready.value ? c.waiting : c.checkingOriginalPayment;
 });
@@ -469,6 +471,9 @@ const appHide = () => { appHidden = true; payment.pause(); };
 const appShow = () => { appHidden = false; if (active.value && s.open) payment.wake(); };
 function visibility() { if (typeof document === 'undefined' || !s.open) return; if (document.hidden) payment.pause(); else if (active.value) payment.wake(); }
 watch(() => app.accountKey, () => payment.close());
+watch(appReadOnline, online => {
+  if (online && active.value && s.open && !appHidden && (typeof document === 'undefined' || !document.hidden)) void payment.query();
+});
 // Channel availability is read when the method sheet opens.
 watch(() => active.value && s.open && !s.concluded && !s.pending && s.policy === null, load => { if (load) void payment.loadPolicy(); }, { immediate: true });
 onShow(() => { active.value = true; if (s.open) payment.wake(); });
