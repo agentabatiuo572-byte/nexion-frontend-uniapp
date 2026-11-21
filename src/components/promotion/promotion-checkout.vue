@@ -726,7 +726,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-section { min-width:0; }
 .checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); }
 /* Same product summary as checkout.vue: device image as the main visual, quantity on its own full-width row. */
-.checkout-product-line { --checkout-art:120px; --checkout-art-h:76px; --checkout-art-image:128px; display:grid; grid-template-columns:var(--checkout-art) minmax(0,1fr); align-items:center; column-gap:var(--v5-space-3); padding:var(--ui-space-inset-hero) var(--ui-space-inset-hero) var(--v5-space-1); border-color:color-mix(in srgb,var(--v5-border) 40%,transparent); }
+.checkout-product-line { --checkout-art:120px; --checkout-art-h:76px; --checkout-art-image:128px; display:grid; grid-template-columns:var(--checkout-art) minmax(0,1fr); align-items:center; gap:0 var(--v5-space-3); padding:var(--ui-space-inset-hero) var(--ui-space-inset-hero) var(--v5-space-1); border-color:color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-product-art { position:relative; width:var(--checkout-art); height:var(--checkout-art-h); }
 .checkout-product-art .promotion-image { position:absolute; left:50%; top:50%; width:var(--checkout-art-image); height:var(--checkout-art-image); transform:translate(-50%, -57%); pointer-events:none; }
 .checkout-product-line:has(> .checkout-product-art:empty) { grid-template-columns:minmax(0,1fr); }
