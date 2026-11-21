@@ -98,6 +98,8 @@ const titleStyle: CSSProperties = {
   fontWeight: 600,
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
+  // A two-line title splits evenly instead of leaving one word alone (06 §6.3).
+  textWrap: "balance",
 };
 const descStyle: CSSProperties = {
   marginTop: "6px",
