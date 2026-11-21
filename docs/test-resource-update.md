@@ -4,6 +4,8 @@
 
 ## 签发和登记
 
+2026-11-22 已核实，现有 `ai.uvel.app` 构建 2026112201 与正式候选共用 Android 签名证书。此产品宿主及其配套资源当前只留本地。签发工具会拦截该证书；产品路径需先取得获准的 TEST 专属宿主并登记独立证书指纹。更换签名会影响已有安装的原地升级，需要单独决定。三星标准调试基座使用已核实的 DCloud 证书，按下节操作。
+
 1. 使用 Windows PowerShell 7，在 TEST 发布操作者的 Windows 账号下运行 `./scripts/test-resource-key.ps1` 读取已登记公钥。首次登记才使用 `-Create`。同名密钥存在时读取原公钥。Windows CNG 软件提供程序保存不可导出的 P-256 签名密钥。App 钉住未压缩 SEC1 公钥，Java TEST 配置 SPKI DER 的 Base64。更换 Windows 账号或设备需要重新核对信任根。公钥文件位于 `src/services/test-resource-trust.json`。
 2. 留存已确认的签名宿主 APK、独立验收回执中的 APK SHA-256，以及当时完整的 `app-plus` 编译输出目录。用相同编译器、插件、UTS 代理和原生配置编译本次 `test` 提交。构建时使用 TEST API、同一 appId、更高的资源构建号和新版本名称。
 3. 执行下面的签发命令。脚本核验 APK 签名及包名，将冻结的基准目录与 APK 内置资源对照，再比较本次编译的原生模块、引擎文件与 manifest。资源包只收录可安装的前端资源。该版本每个产物只授权实际验证过的一个原生构建号。输出的 `.wgt` 和同名 `.json` 一起交付。

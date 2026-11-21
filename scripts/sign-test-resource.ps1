@@ -21,7 +21,13 @@ $Resources = (Resolve-Path -LiteralPath $Resources).Path
 if ((Get-FileHash -LiteralPath $HostApk).Hash.ToLowerInvariant() -cne $HostSha256) { throw 'The baseline APK does not match its approved TEST receipt.' }
 $verified = & $Java -jar $ApkSignerJar verify --print-certs $HostApk
 $certificates = @($verified | Select-String '^Signer #\d+ certificate SHA-256 digest: (.+)$')
-$cert = if ($DebugDeviceJsSha256) { 'd75c1fa2b9ae867ce688a8adc6deac7cd6ba96f43a751fd10a200fa5974ac636' } else { '38066bdb885ce8b52e29af497a32972c21ffcc421f122198fad02a21d02666e1' }
+# Enroll a reviewed, TEST-exclusive product-host certificate here when that host exists.
+$productTestCertificate = ''
+$sharedProductionCertificate = '38066bdb885ce8b52e29af497a32972c21ffcc421f122198fad02a21d02666e1'
+$cert = if ($DebugDeviceJsSha256) { 'd75c1fa2b9ae867ce688a8adc6deac7cd6ba96f43a751fd10a200fa5974ac636' } else { $productTestCertificate }
+if ($cert -cnotmatch '^[0-9a-f]{64}$' -or $cert -ceq $sharedProductionCertificate) {
+    throw 'Product-host resource signing is on hold until a TEST-exclusive Android certificate is enrolled.'
+}
 if ($LASTEXITCODE -ne 0 -or $certificates.Count -ne 1 -or $certificates[0].Matches[0].Groups[1].Value -cne $cert) {
     throw 'The host APK must carry the approved Android TEST signing identity.'
 }
