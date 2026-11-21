@@ -14,7 +14,8 @@
       </view>
       <view v-else class="quota-content">
         <view class="quota-hero nx-tint">
-          <view v-if="heroTier && focusedProductId" class="quota-hero__main"><view class="quota-hero__copy"><text class="quota-headline">{{ heroTier.name }}</text><view class="quota-hero__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ heroPriceParts[0] }}</text><text v-if="heroPriceParts[1]" class="quota-price-fraction">.{{ heroPriceParts[1] }}</text></view></view><image v-if="heroImage" :src="heroImage" mode="aspectFit" class="quota-hero__image" :alt="heroTier?.name" /><TeamArt v-else kind="members" :size="112" /></view>
+          <!-- Entered from a product: the hero names it; its image and price are on the card right below, not repeated here. -->
+          <text v-if="heroTier && focusedProductId" class="quota-headline">{{ heroTier.name }}</text>
           <view class="quota-invite-count">
             <view ref="inviteRingRef" class="quota-ring" :style="{ '--nx-viz-ring': inviteRingInView === false ? 0 : inviteRingPct, transition: inviteRingInView === false ? 'none' : VIZ_RING_TRANSITION }"><view class="quota-ring__hole nx-num-metric"><text class="quota-invite-count__number">{{ visibility.mask(activeDirectText) }}</text><text>{{ visibility.hidden ? '' : remoteApiEnabled && !remoteSnapshot ? '/—' : `/${directInvites}` }}</text></view></view>
             <view class="quota-invite-count__copy"><text>{{ t.quota.yourInvites }}</text><text v-if="inviteStepText" class="quota-invite-count__step">{{ inviteStepText }}</text><text class="quota-body">{{ t.quota.heroBody }}</text></view>
@@ -26,10 +27,10 @@
         <view v-if="quotaReady && !focusedTiers.length" class="quota-state" role="status"><text>{{ t.empty.listTitle }}</text></view>
         <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" :label="t.empty.devicesCta" @click="go('/pages/store/store')"><text class="nx-after-chevron">{{ t.empty.devicesCta }}</text></NxButton></view>
         <!-- One tier: a full-width card. Two or more: a carousel where the next card peeks in, with position dots (04.2). -->
-        <QuotaTierCard v-if="focusedTiers.length === 1" class="quota-single" :tier="focusedTiers[0]" wide :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" />
+        <QuotaTierCard v-if="focusedTiers.length === 1" class="quota-single" :tier="focusedTiers[0]" wide :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" :blocked-note="quotaBlockedNote" @navigate="go" />
         <template v-else-if="focusedTiers.length">
           <scroll-view scroll-x class="quota-carousel" :show-scrollbar="false" @scroll="onCarouselScroll">
-            <view class="quota-carousel__track"><QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" /></view>
+            <view class="quota-carousel__track"><QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" :blocked-note="quotaBlockedNote" @navigate="go" /></view>
           </scroll-view>
           <view class="quota-dots" aria-hidden="true"><view v-for="(tier, index) in focusedTiers" :key="tier.productId" class="quota-dot" :class="{ 'quota-dot--active': index === carouselIndex }" /></view>
         </template>
@@ -48,15 +49,12 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
-import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
-import TeamArt from '@/components/team/team-art.vue';
-import { getProductMedia } from '@/lib/product-media';
 import QuotaTierCard, { type QuotaTier, type QuotaCondition } from "@/components/team/quota-tier-card.vue";
 import PurchaseEligibilityPanel from "@/components/store/purchase-eligibility-panel.vue";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
@@ -351,9 +349,9 @@ function onCarouselScroll(event: { detail: { scrollLeft: number; scrollWidth: nu
 }
 
 const heroTier = computed(() => focusedTiers.value[0]);
-const heroPriceParts = computed(() => formatFinanceAmount(heroTier.value?.price).split('.'));
-const heroImage = computed(() => heroTier.value ? getProductMedia(heroTier.value.productId)?.src ?? heroTier.value.imageUrl : undefined);
 const quotaReady = computed(() => !remoteApiEnabled || (catalogDisplayReady.value && remoteSnapshot.value !== null && !remoteRefreshing.value && !remoteError.value && productCatalogState.status === 'ready'));
+// The reason shown under a blocked buy: a failed read says so; otherwise the read is still running.
+const quotaBlockedNote = computed(() => quotaReady.value ? "" : remoteError.value || productCatalogState.status === "error" ? t.value.quota.unconfirmedNote : t.value.quota.updatingNote);
 useAutoRecovery({ failed: () => remoteApiEnabled && !conditionsOnly.value && !!remoteError.value && !remoteRefreshing.value, retry: refreshRemoteQuota });
 useAutoRecovery({ failed: () => remoteApiEnabled && productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
 useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && conditionEligibility.value.status === "error", retry: retryConditionEligibility });
@@ -361,22 +359,17 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 
 <style scoped>
 .quota-page { color:var(--v5-ink);padding-bottom:28px; }.quota-content { padding:var(--v5-space-3) var(--v5-space-5) 0; }
-.quota-hero__main { display:flex;align-items:center;gap:var(--v5-space-2); }.quota-hero__copy { flex:1;min-width:0; }
 .quota-headline { display:block;font:600 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5);letter-spacing:-.02em;overflow-wrap:break-word; }
-.quota-hero__image { flex:none;width:42%;height:128px;object-fit:contain; }
-.quota-body { display:block;margin-top:var(--v5-space-2);font:400 var(--ui-type-list-subtitle)/1.7 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }.quota-caption { display:block;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.quota-body { display:block;margin-top:var(--v5-space-2);font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }.quota-caption { display:block;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .quota-state { padding-block:28px;display:flex;flex-direction:column;gap:var(--ui-space-inset); }
-@media(max-width:374px) { .quota-content { padding-inline:var(--v5-space-4); } .quota-hero__image { height:112px; } }
+@media(max-width:374px) { .quota-content { padding-inline:var(--v5-space-4); } }
 /* Hero: the page's one focal card, brand tint (01 §1.1.2); overview title, amount and the invite ring. */
 .quota-hero { --nx-tint: var(--v5-brand); margin-top: var(--v5-space-1); padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); }
 .quota-hero .quota-headline { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); letter-spacing:-.01em; }
-.quota-hero__price { display:flex; align-items:baseline; margin-top:var(--v5-space-1); font:500 24px/32px var(--font-amount); letter-spacing:-.02em; }
-.quota-price-symbol { margin-right:2px; font-size:max(12px, .55em); color:var(--v5-ink-3); }
-.quota-price-fraction { color:var(--v5-ink-3); }
 .quota-invite-count { display:flex; align-items:center; gap:var(--ui-space-inset); margin-top:var(--ui-space-inset); }
 .quota-hero > .quota-invite-count:first-child { margin-top:0; }
 .quota-ring { display: grid; place-items: center; flex: none; width: 72px; height: 72px; border-radius: 999px; background: conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%), var(--v5-surface-3) 0); }
-.quota-ring__hole { display:flex; align-items:center; justify-content:center; width:58px; height:58px; border-radius:999px; background:var(--v5-surface); font:500 17px/22px var(--font-metric); color:var(--v5-ink); white-space:nowrap; }
+.quota-ring__hole { display:flex; align-items:center; justify-content:center; width:58px; height:58px; border-radius:999px; background:var(--v5-surface); font:var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); color:var(--v5-ink); white-space:nowrap; }
 .quota-invite-count__copy { flex:1; min-width:0; font:400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .quota-invite-count__copy > text { display:block; }
 .quota-invite-count__step { margin-top:2px; font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color:var(--v5-ink); }
