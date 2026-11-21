@@ -20,7 +20,7 @@
         <view v-if="remoteLoading && !remoteSnapshot" class="nx-glass-card mx-4" :style="listStyle">
           <text class="block" style="padding: 18px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ w.remoteLoading }}</text>
         </view>
-        <EmptyState v-else-if="remoteError && !remoteSnapshot" kind="recoverable-error" :title="w.remoteUnavailable" :cta-label="w.retry" @cta="refreshRemote" />
+        <EmptyState v-else-if="remoteError && !remoteSnapshot" kind="recoverable-error" :title="w.remoteUnavailable" :cta-label="t.ui.reload" @cta="refreshRemote" />
         <template v-if="remoteSnapshot">
           <view v-if="!remoteGroups.length" class="mx-4" style="padding:var(--v5-space-6) 0;color:var(--v5-ink-3)" role="status">
             <text class="block">{{ emptyAchievements }}</text>

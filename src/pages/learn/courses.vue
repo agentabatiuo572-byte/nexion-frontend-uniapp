@@ -3,7 +3,7 @@
     <view class="learning-center">
       <SubPageHeader design back="/pages/me/me" :title="t.learning.centerTitle" />
       <view v-if="loading && !overview" class="learning-state" role="status"><text>{{ t.learning.centerLoading }}</text></view>
-      <EmptyState v-else-if="error && !overview" kind="recoverable-error" :title="t.learning.centerTitle" :desc="errorText" :cta-label="t.ui.retry" @cta="retryCourses" />
+      <EmptyState v-else-if="error && !overview" kind="recoverable-error" :title="t.learning.centerTitle" :desc="errorText" :cta-label="t.ui.reload" @cta="retryCourses" />
       <view v-if="!overview && !error" class="learning-summary">
         <view class="learning-summary__line"><text class="learning-summary__progress">{{ fmt(pageCopy.progress, {done:'—',total:'—'}) }}</text><view class="learning-summary__earned"><text>{{ pageCopy.earned }}</text><text class="learning-reward">— UVT</text></view></view>
         <view class="course-list__heading"><text class="course-list__title">{{ pageCopy.allCourses }}</text><text class="course-list__count">—</text></view>

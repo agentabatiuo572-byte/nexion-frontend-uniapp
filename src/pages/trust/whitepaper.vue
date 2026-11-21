@@ -3,7 +3,7 @@
     <CardStagger class="wp-root" style="padding-bottom: 24px">
       <SubPageHeader back="/pages/trust/trust" plain solid />
 
-      <EmptyState v-if="!whitepaper && status === 'error'" kind="recoverable-error" :title="copy.wpError" :cta-label="t.ui.retry" @cta="refresh" />
+      <EmptyState v-if="!whitepaper && status === 'error'" kind="recoverable-error" :title="copy.wpError" :cta-label="t.ui.reload" @cta="refresh" />
       <view v-else class="px-4 wp-page">
         <view class="wp-cover">
           <view class="wp-cover__top">

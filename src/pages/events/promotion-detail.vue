@@ -12,7 +12,7 @@
         <template #actionIcon><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z" /><path d="M14 3.5V8h4M9.5 12h5M9.5 15.5h5" /></svg></template>
       </SubPageHeader>
 
-      <EmptyState v-if="!activity && status === 'error'" kind="recoverable-error" :title="c.loadError" :desc="c.loadErrorNote" :cta-label="c.retry" @cta="retry" />
+      <EmptyState v-if="!activity && status === 'error'" kind="recoverable-error" :title="c.loadError" :desc="c.loadErrorNote" :cta-label="t.ui.reload" @cta="retry" />
       <view v-else-if="!activity" class="lp-body" role="status" aria-busy="true" :aria-label="t.promotion.loading">
         <view class="lp-tags"><view class="lp-skel lp-skel--tag" /><view class="lp-skel lp-skel--chip" /></view>
         <view class="lp-skel lp-skel--title" />

@@ -6,7 +6,7 @@
         <view class="binary-content">
           <view ref="comparisonRef">
           <EmptyState v-if="remoteApiEnabled && pageState.primary === 'error'" kind="recoverable-error"
-            :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.network.retry"
+            :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.ui.reload"
             compact @cta="retryCanonicalData" />
           <view v-else-if="remoteApiEnabled && pageState.primary === 'loading' && !snapshot" class="binary-loading"
             role="status" aria-live="polite" aria-busy="true" />

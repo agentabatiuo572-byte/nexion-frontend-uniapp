@@ -15,7 +15,8 @@
       <SubPageHeader back="/pages/me/wallet-exchange" />
       <view class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px; color: var(--v5-ink-2)">
         <text class="block" style="font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight)">{{ exchangeAvailable === false ? w.pausedTitle : exchangeLoading ? t.howPublished.loading : t.howPublished.unavailableTitle }}</text>
-        <text class="block" style="margin-top: 8px; font-size: var(--ui-type-list-subtitle); line-height: 1.6">{{ exchangeAvailable === false ? w.pausedBody : exchangeLoading ? '' : t.exchange.remoteUnavailableClosed }}</text>
+        <!-- A failed capability read says only that the guide did not load (the title); the line below is for a paused exchange. -->
+        <text v-if="exchangeAvailable === false" class="block" style="margin-top: 8px; font-size: var(--ui-type-list-subtitle); line-height: 1.6">{{ w.pausedBody }}</text>
         <view v-if="!exchangeLoading && exchangeAvailable === null" class="nx-card-recovery-action" role="button" tabindex="0" style="margin: 12px 0 0 -12px" @click="loadExchangeCaps"  @keydown.enter.prevent="loadExchangeCaps" @keydown.space.prevent="loadExchangeCaps"><text>{{ t.ui.reload }}</text></view>
         <view v-if="exchangeAvailable === false" role="button" tabindex="0" style="margin-top: 16px; color: var(--v5-brand)" @click="goBack"  @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ w.ctaBack }}</text></view>
       </view>

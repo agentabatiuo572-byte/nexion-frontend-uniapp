@@ -4,7 +4,7 @@
       <SubPageHeader back="/pages/team/team" :title="pointsCopy.title" />
       <view class="leader-content">
         <GlassSegments class="nx-leader-periods" surface="glass" selection="flat" :label="pointsCopy.title" :model-value="period" @select="selectPeriod" :options="periodOptions" />
-        <EmptyState v-if="remoteApiEnabled && remoteState === 'error' && !remoteSnapshot" kind="recoverable-error" :title="t.leaderboard.loadError" :cta-label="t.leaderboard.retry" @cta="loadRemote()" />
+        <EmptyState v-if="remoteApiEnabled && remoteState === 'error' && !remoteSnapshot" kind="recoverable-error" :title="t.leaderboard.loadError" :cta-label="t.ui.reload" @cta="loadRemote()" />
         <view v-else-if="remoteApiEnabled && remoteState === 'loading' && !remoteSnapshot" class="leader-state" role="status" aria-busy="true"><text>{{ t.leaderboard.loading }}</text></view>
         <template v-if="!remoteApiEnabled || remoteSnapshot !== null">
           <view v-if="paused" role="status" aria-live="polite" class="leader-state">

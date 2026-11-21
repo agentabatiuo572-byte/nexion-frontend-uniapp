@@ -2,7 +2,7 @@
   <AppChassis active="team">
     <view class="records-page nx-viz-motion">
       <SubPageHeader :back="AMBASSADOR_ROUTES.agent" :title="t.headerTitles.teamAgentApplications" />
-      <EmptyState v-if="readState === 'error' && !rows" kind="recoverable-error" :title="c.recordsLoadError" :cta-label="t.agent.retry" @cta="retry" />
+      <EmptyState v-if="readState === 'error' && !rows" kind="recoverable-error" :title="c.recordsLoadError" :cta-label="t.ui.reload" @cta="retry" />
       <view v-else-if="!rows" class="records-loading" role="status" aria-busy="true"><text>{{ t.agent.loading }}</text></view>
       <EmptyState v-else-if="rows.length === 0" kind="empty-list" :title="c.recordsEmpty" />
       <CardStagger v-else class="records-content">

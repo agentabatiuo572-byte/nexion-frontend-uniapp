@@ -5,7 +5,7 @@
 
       <view class="px-4 doc-page">
         <text v-if="!document && status !== 'error'" class="doc-state" role="status" aria-live="polite">{{ copy.documentsLoading }}</text>
-        <EmptyState v-else-if="!document" kind="recoverable-error" :title="copy.documentsError" :cta-label="t.ui.retry" @cta="refresh" />
+        <EmptyState v-else-if="!document" kind="recoverable-error" :title="copy.documentsError" :cta-label="t.ui.reload" @cta="refresh" />
         <template v-else>
           <view class="doc-head">
             <text class="block doc-head__title">{{ title }}</text>

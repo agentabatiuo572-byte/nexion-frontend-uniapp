@@ -5,7 +5,7 @@
     <view class="raffle-status" role="status" aria-live="polite">
       <text v-if="loading && !snapshot">{{ copy.loading }}</text>
     </view>
-    <EmptyState v-if="error && !snapshot && !loading" kind="recoverable-error" :title="copy.error" :cta-label="copy.retry" @cta="load" />
+    <EmptyState v-if="error && !snapshot && !loading" kind="recoverable-error" :title="copy.error" :cta-label="uiT.ui.reload" @cta="load" />
     <template v-if="snapshot">
       <view class="raffle-row"><text>{{ copy.available }}</text><text class="raffle-number">{{ snapshot.availableTickets }}</text></view>
       <text v-if="!snapshot.draws.length" class="raffle-copy">{{ copy.empty }}</text>
@@ -42,6 +42,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import EmptyState from "@/components/empty-state.vue";
+import { useT } from "@/i18n/use-t";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { apiClient, apiRuntimeConfig } from "@/api/runtime";
@@ -59,6 +60,7 @@ import { uiLocale, serverLanguage } from "@/i18n";
 const app = useApp(), locale = useLocaleStore(), api = createGenesisRaffleApi(apiClient);
 const language = computed(() => serverLanguage(locale.code));
 const copy = computed(() => genesisRaffleCopy[uiLocale(locale.code)]);
+const uiT = useT();
 const snapshot = ref<GenesisRaffleState | null>(null), loading = ref(true), error = ref(false), busy = ref("");
 const pending = ref<Record<string, PendingRaffleEntry | null>>({}), tickets = ref<Record<string, string>>({});
 const notice = ref<Record<string, "success" | "error" | "pending">>({}), now = ref(Date.now());

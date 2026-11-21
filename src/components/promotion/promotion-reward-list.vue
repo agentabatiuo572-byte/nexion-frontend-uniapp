@@ -5,7 +5,7 @@
     <!-- Embedded in the reward records the list is one block: a failed first read shows the unknown placeholder and
          recovers on its own (03 §3.5.2). On its own page it is the whole page and keeps the one 重新加载. -->
     <view v-if="embedded && error && !rewards.length" class="promotion-flat"><text>—</text></view>
-    <EmptyState v-else-if="error && !rewards.length" kind="recoverable-error" :title="t.promotion.error" :cta-label="t.promotion.retry" @cta="load(true)" />
+    <EmptyState v-else-if="error && !rewards.length" kind="recoverable-error" :title="t.promotion.error" :cta-label="t.ui.reload" @cta="load(true)" />
     <view v-else-if="sessionReady && !loading && !rewards.length && !error" class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.emptyRewards }}</text>
       <text class="promotion-copy">{{ t.promotion.emptyNote }}</text>

@@ -3,7 +3,7 @@
     <view class="agent-page nx-viz-motion">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamAgent" />
 
-      <EmptyState v-if="pageReadState === 'error' && !policy" kind="recoverable-error" :title="t.agent.loadError" :cta-label="t.agent.retry" @cta="retryAgentPage" />
+      <EmptyState v-if="pageReadState === 'error' && !policy" kind="recoverable-error" :title="t.agent.loadError" :cta-label="t.ui.reload" @cta="retryAgentPage" />
       <view v-else-if="pageReadState === 'loading' && !policy" class="agent-loading" role="status" aria-busy="true"><text>{{ t.agent.loading }}</text></view>
       <CardStagger v-if="policy" class="agent-content">
         <!-- The page focus: headline, the V1→V5 track and eligibility share one soft-glass card. -->

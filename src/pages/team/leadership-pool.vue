@@ -7,7 +7,7 @@
       <view class="pool-content">
 
 
-        <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="retryRemotePool" />
+        <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="remoteState === 'hold' ? t.pool.retry : t.ui.reload" @cta="retryRemotePool" />
         <template v-else>
         <view class="pool-hero nx-tint">
           <view class="pool-share">

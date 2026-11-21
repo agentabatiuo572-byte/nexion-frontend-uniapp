@@ -56,7 +56,7 @@
         kind="recoverable-error"
         :title="recoveryCopy.unavailable"
         :desc="recoveryCopy.retryHint"
-        :cta-label="t.ui.retry"
+        :cta-label="t.ui.reload"
         @cta="retrySearchSources"
       />
 

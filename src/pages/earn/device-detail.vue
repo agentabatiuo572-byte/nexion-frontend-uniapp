@@ -28,7 +28,7 @@
         kind="recoverable-error"
         :title="t.empty.errorTitle"
         :desc="t.empty.errorDesc"
-        :cta-label="t.empty.errorCta"
+        :cta-label="t.ui.reload"
         emphasis
         @cta="retryFleet"
       />
