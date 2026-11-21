@@ -44,7 +44,7 @@
                opens it, and the order number with its copy button sits below, outside that tap area. -->
           <view class="order-card__row" :role="o.kind === 'genesis' ? 'button' : undefined" :tabindex="o.kind === 'genesis' ? 0 : undefined" :aria-label="o.kind === 'genesis' ? orderCardLabel(o) : undefined" @click="o.kind === 'genesis' && goOrder(o)">
             <LoopScope class="order-card__thumb" aria-hidden="true">
-              <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="orderImage(o)" :scope-key="o.id" />
+              <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="o.imageUrl" :scope-key="o.id" />
               <image v-else class="order-card__image nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
             </LoopScope>
             <view class="order-card__info">
@@ -104,7 +104,6 @@ import { commerceOrderTitle } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { commerceAmount as formatAmount } from "@/lib/commerce-review";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
-import { revalidateProductCatalog } from "@/store/product-catalog";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -112,7 +111,7 @@ import EmptyState from "@/components/empty-state.vue";
 import GlassSegments from "@/components/glass-segments.vue";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
+import { GENESIS_MEDIA } from "@/lib/product-media";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";
 import { useOrders, type Order, type OrderStatus } from "@/store/orders";
@@ -275,7 +274,6 @@ const scrollPager = useManualScrollLoadMore(scrollAnchor, {
 });
 onShow(() => {
   ordersPageActive = true;
-  if (remoteSessionReady.value) void revalidateProductCatalog();
   preserveOrdersOriginInH5();
   void refreshOrders();
 });
@@ -296,7 +294,7 @@ watch(() => app.accountBindingEpoch, () => {
 // onShow can land before the cookie restore binds the account. The deferred
 // read starts here instead, so the page never settles on an account-state error.
 watch(remoteSessionReady, (ready, wasReady) => {
-  if (ready && !wasReady && ordersPageActive) { void revalidateProductCatalog(); void refreshOrders(); }
+  if (ready && !wasReady && ordersPageActive) void refreshOrders();
 });
 
 // A later catalog response clears the shared orders without rebinding the account.
@@ -387,12 +385,6 @@ function badge(status: OrderStatus): Badge {
       return { label: t.value.orders.statusChargeback, tone: "danger", icon: ["M12 2v12m0 4v4m-7-5 3 3m11-3-3 3"] };
   }
 }
-// Use the same approved SKU main image as the storefront. A bundle shows its first line.
-function orderImage(order: OrderListItem): string | undefined {
-  if (order.kind === "genesis") return GENESIS_MEDIA.showcase;
-  return getOrderProductMedia(order.productId, order.lineItems)?.src;
-}
-
 function dateText(ts: number): string {
   return Number.isFinite(ts) && Number.isFinite(new Date(ts).getTime())
     ? formatTrialDate(ts, dateLocale())

@@ -52,7 +52,8 @@
          the bare title hides as content scrolls into the reserved header gap. -->
     <view v-if="!isTabRoute && navHeader" class="nx-navheader" :class="{ 'nx-navheader--capsule': navCapsule }" :style="{ top: statusBarHeight + 'px', height: navHeaderH + 'px' }">
       <LiquidGlass v-if="navCapsule" :radius="navHeaderH / 2" tone="navigation" backdrop=".nx-page-enter" />
-      <view class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack"  @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
+      <view v-if="navHeader.noBack" class="nx-nav-side" aria-hidden="true" />
+      <view v-else class="nx-nav-side" role="button" tabindex="0" :aria-label="t.privacy.back" @click="navBack"  @keydown.enter.prevent="onKeyboardActivate($event, navBack)" @keydown.space.prevent="onKeyboardActivate($event, navBack)">
         <view class="nx-nav-glass">
           <LiquidGlass v-if="!navCapsule" :radius="18" tone="navigation" backdrop=".nx-page-enter" />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>

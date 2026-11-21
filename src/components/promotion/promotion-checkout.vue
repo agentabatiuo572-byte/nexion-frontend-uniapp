@@ -2,7 +2,7 @@
   <view class="promotion promotion-main" :class="{'promotion-main--result':order?.paymentStatus==='PAID'}">
     <view v-if="!auth.isAuthenticated" class="promotion-flat"><text class="promotion-title">{{ p.signIn }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ p.signIn }}</text></PromotionAction></view>
     <view v-else-if="loading" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
-    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?getProduct(items[0].productNo)?.imageUrl:undefined" :amount="order.paidTotalUsdt??order.amountUsdt??''" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices">
+    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?.imageUrl ?? undefined" :amount="order.paidTotalUsdt??order.amountUsdt??''" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices">
       <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
     <template v-else>
@@ -12,7 +12,7 @@
       <view v-if="catalogReadFailed" class="promotion-notice" role="alert"><text>{{ t.store.catalogErrorBody }}</text><PromotionAction class="promotion-link" role="button" tabindex="0" :aria-disabled="busy" @click="loadQuote"><text>{{ t.store.catalogRetry }}</text></PromotionAction></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
-          <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl&&!brokenImages.includes(item.productNo)" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" @error="brokenImages.push(item.productNo)" /></view>
+          <view class="checkout-product-art"><image v-if="item.imageUrl&&!brokenImages.includes(item.productNo)" :src="item.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" @error="brokenImages.push(item.productNo)" /></view>
           <view class="promotion-grow"><text class="checkout-item-name">{{ selectedItemName(item) }}</text>
             <CheckoutAmount v-if="displayQuote||order" class="checkout-line-price" :value="itemSubtotal(item)" currency="USD" />
           </view>
@@ -135,7 +135,7 @@ import { onBeforeRouteLeave } from 'vue-router';
 import { promotionApi,deviceE3Api,purchaseEligibilityApi,sessionVault } from '@/api/runtime';
 import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api';
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
-import type { PromotionItem } from '@/api/promotion-api';
+import type { OrderReceipt, PromotionItem } from '@/api/promotion-api';
 import { checkoutQuoteBlock, validatePromotionItems, type CheckoutQuoteBlock } from '@/api/promotion-api';
 import type { RewardDisclosure,Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
@@ -157,7 +157,7 @@ import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadlin
 import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { onPurchaseRecordReleased, refusedPurchasePayment } from '@/store/purchase-payment';
+import { onPurchaseRecordReleased, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
@@ -275,7 +275,7 @@ function recoverKeepBeforeNewPurchase(reopen=false):boolean {
   return false;
 }
 const rewardsReleased=computed(()=>!!order.value&&['CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus));
-const items=computed(()=>order.value?.items??displayQuote.value?.items??selection.value);const rewards=computed(()=>order.value?.rewards??displayQuote.value?.expectedRewards??[]);
+const items=computed<Array<{productNo:string;quantity:number;productName?:string;imageUrl?:string|null;subtotalUsdt?:string}>>(()=>order.value?.items??displayQuote.value?.items??selection.value);const rewards=computed(()=>order.value?.rewards??displayQuote.value?.expectedRewards??[]);
 // Match the published device FAQ's scope in store/detail; do not extend it to SHARE.
 const hasDevicePolicy=computed(()=>items.value.some(item=>{const product=getProduct(item.productNo);return !!product&&product.productType!=='SHARE';}));
 function canChangeQuantity(productNo:string,delta:-1|1):boolean {
@@ -453,6 +453,8 @@ async function selectVoucher(id:string|null){
 }
 async function createOrder(){if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;await run(()=>session.create());if(canPay.value&&current()&&visible.value){paymentSheetOpen.value=true;void confirmPayment();}}
 const paymentDialogOwner=`promotion-payment:${Date.now()}:${Math.random()}`;
+// Photo signatures can renew while payment terms stay the same.
+function orderItemSignature(items:OrderReceipt['items']){return JSON.stringify(items?.map(({imageUrl,...line})=>line));}
 async function pay(){
   updateClock();if(paymentEntryChecking.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
   if(session.externalPaymentRefused){
@@ -469,11 +471,11 @@ async function pay(){
     if(!recovered||!canPay.value||!current()||!visible.value)return;
     const expectedOrder=order.value,generation=readGeneration,runtime=captureRuntimeRevision(),sessionRevision=sessionVault.revision();
     if(!expectedOrder)return;
-    const signature=JSON.stringify([expectedOrder.orderNo,expectedOrder.amountUsdt,expectedOrder.payBy,expectedOrder.items]);
+    const signature=JSON.stringify([expectedOrder.orderNo,expectedOrder.amountUsdt,expectedOrder.payBy,orderItemSignature(expectedOrder.items)]);
     const entryCurrent=()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
       &&(sessionVault.revision()===sessionRevision||sessionVault.isRefreshContinuation(sessionRevision))
       &&session.confirmed&&!session.unknown&&order.value?.paymentStatus==='PENDING'
-      &&JSON.stringify([order.value.orderNo,order.value.amountUsdt,order.value.payBy,order.value.items])===signature;
+      &&JSON.stringify([order.value.orderNo,order.value.amountUsdt,order.value.payBy,orderItemSignature(order.value.items)])===signature;
     let ready=false,blocked='';
     await run(async()=>{
       const items=(expectedOrder.items??[]).map(({productNo,quantity})=>({productNo,quantity}));
@@ -497,13 +499,13 @@ async function confirmPayment(){
   if(!expectedOrder)return;
   const {orderNo,amountUsdt}=expectedOrder;
   if(amountUsdt===undefined||!Number.isFinite(Number(amountUsdt)))return;
-  const lines=JSON.stringify(expectedOrder.items),payBy=expectedOrder.payBy;
+  const lines=orderItemSignature(expectedOrder.items),payBy=expectedOrder.payBy;
   const paymentCurrent=()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
     &&(sessionVault.revision()===sessionRevision||sessionVault.isRefreshContinuation(sessionRevision))
-    &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&JSON.stringify(order.value?.items)===lines&&order.value?.payBy===payBy
+    &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&orderItemSignature(order.value?.items)===lines&&order.value?.payBy===payBy
     &&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&!session.unknown;
   paymentConfirming.value=true;paymentSheetOpen.value=false;
-  let rejection='',paymentDestination='';
+  let rejection='',paymentDestination='',paymentReplace=false;paymentLeaveApproved=false;
   try{
     await run(async()=>{
       await executeSelectedPurchase({amount:amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,
@@ -522,7 +524,7 @@ async function confirmPayment(){
           }
         },
         paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
-          navigate:href=>{paymentDestination=href;},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);},
+          navigate:(href,replace)=>{paymentDestination=href;paymentReplace=!!replace;paymentLeaveApproved=routeLeavesPurchase(href);},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);paymentReplace=false;},
           commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}});
     });
     if(!readCurrent(generation)||paymentDestination)return;
@@ -539,7 +541,8 @@ async function confirmPayment(){
     }
   }finally{
     paymentConfirming.value=false;
-    if(paymentDestination&&readCurrent(generation))await navTo(paymentDestination);
+    // The order page replaces a finished checkout, so back does not return to it.
+    if(paymentDestination&&readCurrent(generation))await (paymentReplace?replaceWithOrder:navTo)(paymentDestination);
   }
 }
 let recoveryReadGeneration=-1;
@@ -651,8 +654,13 @@ function viewDevices(){if(current()&&visible.value&&order.value?.paymentStatus==
 function openWalletTopup(){paymentSheetOpen.value=false;void navTo('/pages/me/wallet-topup');}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref(selection.value,props.activityId,props)));}
 let disposeGuard:(()=>void)|null=null;
+// A leave the user confirmed inside the payment flow keeps the order for later; it is not a checkout cancel.
+let paymentLeaveApproved=false;
 async function requestLeave():Promise<boolean>{
-  if(nativeBackApproved)return true;
+  if(nativeBackApproved||paymentLeaveApproved)return true;
+  // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
+  const pending=session.record.pending;
+  if(pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)return !busy.value&&!paymentConfirming.value;
   if(!current()||!visible.value||busy.value||paymentConfirming.value||leaving.value)return false;
   if(!session.record.order&&!session.record.pending)return true;
   leaving.value=true;paymentSheetOpen.value=false;
@@ -697,7 +705,7 @@ function hide(){
   disposeGuard?.();disposeGuard=null;
 }
 function show(){
-  visible.value=true;nativeBackApproved=false;if(!current())return;
+  visible.value=true;nativeBackApproved=false;paymentLeaveApproved=false;if(!current())return;
   startWalletTimer();
   if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(allowAuxiliaryNavigation);
   if(busy.value){refreshOnIdle=true;return;}

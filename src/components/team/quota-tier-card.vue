@@ -46,7 +46,6 @@ import NxButton from '@/components/ui/nx-button.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
 import { useT } from '@/i18n/use-t';
 import { fmt } from '@/i18n/format';
-import { getProductMedia } from '@/lib/product-media';
 import { useProductImage } from '@/composables/use-product-image';
 import { useScrollGrowProgress, VIZ_RING_TRANSITION } from '@/composables/use-scroll-grow-progress';
 export interface QuotaCondition {
@@ -86,8 +85,7 @@ const visibility = useDataVisibility();
 const locale = useLocaleStore();
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const displayName = computed(() => (props.tier.name));
-const productImage = computed(() => getProductMedia(props.tier.productId)?.src ?? props.tier.imageUrl);
-const { imageSrc, imageError } = useProductImage(() => productImage.value ?? undefined);
+const { imageSrc, imageError } = useProductImage(() => props.tier.imageUrl);
 const { elRef: stockBarRef, inView: stockBarInView } = useScrollGrowProgress();
 const unlocked = computed(() => {
   const met = props.tier.conditions.map(condition => condition.current >= condition.required);

@@ -1,3 +1,4 @@
+import { productMediaUrl } from "@/api/product-catalog-contract";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { DeviceKind, TaskCategory } from "@/store/types";
@@ -21,6 +22,7 @@ export interface AppHomeWorkload {
 }
 
 export interface AppHomeDeviceRanking {
+  imageUrl?: string;
   rank: number;
   name: string | null;
   kind: DeviceKind | null;
@@ -37,8 +39,8 @@ export interface AppHomeOnGridClient {
 
 export interface AppHomeDoTheMath {
   basis: "OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT";
-  base: { kind: DeviceKind; productNo?: string; name: string; dailyUsdt: number };
-  target: { productNo: string; kind: DeviceKind; name: string; dailyUsdt: number; priceUsdt: number };
+  base: { kind: DeviceKind; productNo?: string; imageUrl?: string; name: string; dailyUsdt: number };
+  target: { productNo: string; kind: DeviceKind; imageUrl?: string; name: string; dailyUsdt: number; priceUsdt: number };
   multiplier: number;
   paybackDays: number;
 }
@@ -133,7 +135,7 @@ function ranking(v: unknown): AppHomeDeviceRanking {
   const kind = v.kind == null ? null : (typeof v.kind === "string" && DEVICE_KINDS.has(v.kind as DeviceKind) ? v.kind as DeviceKind : null);
   const dailyUsdt = v.dailyUsdt == null ? null : nonNegative(v.dailyUsdt);
   if (rank === null || rank < 1 || (v.kind != null && kind === null) || (v.dailyUsdt != null && dailyUsdt === null)) return invalid();
-  return { rank, name: text(v.name), kind, dailyUsdt };
+  return { rank, name: text(v.name), kind, dailyUsdt, imageUrl: productMediaUrl(v.imageUrl) };
 }
 function client(v: unknown): AppHomeOnGridClient {
   if (!isRow(v)) return invalid();
@@ -162,8 +164,8 @@ function doTheMath(v: unknown): AppHomeDoTheMath | null {
       || paybackDays !== Math.round(priceUsdt / targetDaily)) return invalid();
   return {
     basis: v.basis,
-    base: { kind: baseKind, productNo: text(v.base.productNo) ?? undefined, name: baseName, dailyUsdt: baseDaily },
-    target: { productNo, kind: targetKind, name: targetName, dailyUsdt: targetDaily, priceUsdt },
+    base: { kind: baseKind, productNo: text(v.base.productNo) ?? undefined, imageUrl: productMediaUrl(v.base.imageUrl), name: baseName, dailyUsdt: baseDaily },
+    target: { productNo, kind: targetKind, imageUrl: productMediaUrl(v.target.imageUrl), name: targetName, dailyUsdt: targetDaily, priceUsdt },
     multiplier, paybackDays,
   };
 }

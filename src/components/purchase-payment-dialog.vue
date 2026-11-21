@@ -1,18 +1,21 @@
 <template>
-  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" role="status">
-    <view v-for="row in showHistory ? records : pending" :key="row.commandKey" class="purchase-payment__row"><text :style="{ flexBasis: rowBasis(row) }">{{ row.summary }} · {{ rowLabel(row) }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
+  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" :class="{ 'has-close': !showHistory }" :style="barBottom === null ? undefined : { bottom: barBottom + 'px' }" role="status">
+    <view v-if="!showHistory" class="purchase-payment-resume__close nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="payment.dismissResume(pending)" @keydown.enter.prevent="payment.dismissResume(pending)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+    </view>
+    <!-- Outside Orders the bar is one line with the count (user 2026-11-22); Orders lists each payment to pick from. -->
+    <view v-if="!showHistory" class="purchase-payment__row"><text>{{ fill(copy.resumeCount, { n: pending.length }) }}</text><NxButton :label="copy.viewProgress" variant="link" icon="chevron-right" @click="openPending" /></view>
+    <view v-for="row in showHistory ? records : []" :key="row.commandKey" class="purchase-payment__row"><text :style="{ flexBasis: rowBasis(row) }">{{ row.summary }} · {{ rowLabel(row) }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
   </view>
 
   <!-- Step sheet: method → network / bank confirmation. -->
-  <view v-if="sheetOpen" class="pp-mask nx-sheet-fade-in">
+  <view v-if="sheetOpen && !s.notice" class="pp-mask nx-sheet-fade-in">
     <!-- The tap-to-close layer is a sibling under the sheet (as in NxSheet): uni H5 hands handlers plain-object targets, so
-         @click.self never matched and a mask tap closed nothing. It closes like ✕; taps on the sheet never reach it. -->
+         @click.self never matched and a mask tap closed nothing. It dismisses the sheet; taps on the sheet never reach it. -->
     <view class="pp-scrim" aria-hidden="true" @click="payment.close" />
     <view id="pp-sheet" class="pp-sheet nx-glass-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="sheetTitle">
       <view class="pp-head">
-        <view v-if="s.step !== 'methods' && !s.originalRecovery" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-        </view>
+        <!-- Payment steps close only (user 2026-11-22): no back arrow; closing and paying again starts at the methods. -->
         <view class="pp-head__text">
           <text class="pp-title" role="heading">{{ sheetTitle }}</text>
           <view v-if="s.step === 'methods' && deadlineLeft !== null" class="pp-cd" :class="{ 'is-urgent': deadlineLeft < URGENT_MS }">
@@ -20,7 +23,7 @@
             <text>{{ fill(copy.closesIn, { t: clock(deadlineLeft) }) }}</text>
           </view>
         </view>
-        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="payment.close" @keydown.enter.prevent="payment.close">
+        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="closeSheet" @keydown.enter.prevent="closeSheet">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -102,8 +105,10 @@
   <view v-if="pageOpen" id="pp-page" class="pp-page" role="dialog" aria-modal="true" :aria-label="pageTitle" :style="{ paddingTop: statusBar + 'px' }">
     <DeviceStatusBar />
     <view class="pp-nav">
-      <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.back" @click="leavePage" @keydown.enter.prevent="leavePage">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      <!-- The funds-received status page shows no top control; 查看订单 is its way on. -->
+      <view v-if="received" class="pp-nav__gap" aria-hidden="true" />
+      <view v-else class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="leavePage" @keydown.enter.prevent="leavePage">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
       <text class="pp-nav__t" role="heading">{{ pageTitle }}</text>
       <view class="pp-nav__gap" aria-hidden="true" />
@@ -185,7 +190,7 @@
     </view>
     <view v-if="received" class="pp-bar pp-bar--done nx-glass-bar">
       <text class="nx-tray-note">{{ copy.leaveOk }}</text>
-      <NxButton :label="copy.viewOrder" variant="primary" @click="payment.openOrder" />
+      <NxButton :label="copy.viewOrder" variant="primary" @click="openPaidOrder" />
     </view>
     <view v-if="networkPaused && s.orderNo" class="pp-bar nx-glass-bar">
       <NxButton :label="copy.viewOrder" variant="primary" @click="payment.openOrder" />
@@ -197,7 +202,7 @@
     <DeviceStatusBar />
     <view class="pp-cashier__bar" :style="{ paddingTop: statusBar + 'px' }">
       <view class="pp-cashier__row">
-        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.closeCashier" @click="payment.closeCashier" @keydown.enter.prevent="payment.closeCashier">
+        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.closeCashier" @click="leaveCashier" @keydown.enter.prevent="leaveCashier">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
         <view class="pp-cashier__mid">
@@ -237,7 +242,7 @@
     :icon="notice.icon" :tone="notice.tone" :busy="s.busy" @primary="notice.onPrimary" @secondary="notice.onSecondary" />
 </template>
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import NxButton from '@/components/ui/nx-button.vue';
@@ -247,7 +252,8 @@ import NxTag from '@/components/ui/nx-tag.vue';
 import NxCodeValue from '@/components/ui/nx-code-value.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
-import { usePurchasePayment, purchaseConclusion, type PurchaseNotice } from '@/store/purchase-payment';
+import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, type PurchaseNotice } from '@/store/purchase-payment';
+import { foregroundReadAllowed } from '@/lib/foreground-read';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
@@ -259,11 +265,12 @@ import { formatGroupedAmount } from '@/lib/amount-display';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import { toast } from '@/store/ui';
+import { navTo } from '@/lib/route';
 import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
 import qrcode from 'qrcode-generator';
 const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale = useLocaleStore();
 // The order detail shows its own payment state in the hero, so it hides the floating bar.
-withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
+const props = withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
 const URGENT_MS = 5 * 60000;
 // Space the bank page leaves for the tray (04 §4.0 multi-row tray: its height + 38): tray 108 (8 + note 4 + 32 for two
 // lines + gap 8 + button 48 + 8) + 22 off the screen bottom + 16 above it. Fixed whether or not the save button shows, so the native view never resizes.
@@ -272,9 +279,30 @@ const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
-const pending = computed(() => { app.accountKey; s.revision; return payment.pending(); });
+const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
+// The bar counts payments still under way; a delivered one is finished and is found on its order.
+const pending = computed(() => unsettled.value.filter(row => !row.businessDelivered && !payment.resumeDismissed(row)));
+// One payment opens directly; several are listed on Orders.
+function openPending() { if (pending.value.length === 1) void payment.resume(pending.value[0]); else void navTo('/pages/store/orders'); }
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
 const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
+// Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
+// payment leaves the bar, and a closed one returns when its status changes.
+const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.length > 0);
+function readResumeRows() { const accountKey = app.accountKey; void refreshPendingPayments(accountKey, () => resumeWatched.value && app.accountKey === accountKey && foregroundReadAllowed()); }
+useVisibleInterval(readResumeRows, 15000, () => resumeWatched.value);
+// The bar floats 12px above what sits at the bottom of the page, the tab bar, the floating support button or the
+// page's action tray, so it never covers or touches them (02: nothing covers the support button); their heights differ by page and state, so they are measured while the bar shows.
+const barShown = computed(() => props.showResume && active.value && !s.open && (pending.value.length > 0 || props.showHistory && records.value.length > 0));
+const barBottom = ref<number | null>(null);
+function placeBar() {
+  uni.createSelectorQuery().selectAll('.nx-tabbar-pill, .nx-glass-bar, .nx-support-bubble').boundingClientRect(found => {
+    const tops = (Array.isArray(found) ? found : [found]).filter(rect => rect && (rect.height ?? 0) > 0).map(rect => rect.top as number);
+    barBottom.value = tops.length ? Math.max(0, uni.getSystemInfoSync().windowHeight - Math.min(...tops) + 12) : null;
+  }).exec();
+}
+watch(() => barShown.value && s.revision, shown => { if (shown !== false) setTimeout(placeBar, 50); }, { immediate: true });
+useVisibleInterval(placeBar, 2000, () => barShown.value);
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
@@ -345,6 +373,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     : { primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }) };
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
   switch (kind) {
+    // The order exists but no payment started yet: it stays for later and the close still ends on the store home.
+    case 'keepOrder': return { icon: 'info', tone: 'warning', title: c.keepOrderTitle, body: c.keepOrderBody, primary: c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: payment.leaveToStore };
     case 'reminder': return s.method === 'HDPAY_BANK'
       ? { icon: 'shield', tone: 'brand', title: c.remindBankTitle, body: c.remindBank, primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss }
       : { icon: 'shield', tone: 'brand', title: c.remindUsdtTitle, body: fill(s.method === 'CREGIS_USDT_TRC20' ? c.remindTrc20 : s.method === 'CREGIS_USDT_ERC20' ? c.remindErc20 : c.remindBep20, { amt: s.quote ? amount(s.quote.totalUsdt) : '—' }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss };
@@ -361,7 +391,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'leave': return { icon: 'alert', tone: 'warning', title: networkPaused.value ? fill(c.networkPausedTitle, { network: networkName.value }) : c.leaveTitle,
-      body: networkPaused.value ? c.networkPaused : c.leaveBody, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: payment.close };
+      // Trial conversion, trade-in and capacity payments have no order page; they resume from Orders.
+      body: networkPaused.value ? c.networkPaused : order ? c.leaveBody : c.leaveBodyNoOrder, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: networkPaused.value ? dismiss : continuePaying, onSecondary: payment.leaveToStore };
     case 'networkPaused': return { icon: 'info', tone: 'warning', title: fill(c.networkPausedTitle, { network: networkName.value }), body: c.networkPaused,
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
       ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
@@ -449,9 +480,20 @@ function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
   next?.focus();
   if (choose && next) next.click();
 }
-function leavePage() { if (received.value) payment.openOrder(); else payment.notify('leave'); }
+// The top close ends the payment on the store home; a payment already started asks first (user 2026-11-22).
+function leavePage() { if (received.value) payment.leaveToStore(); else payment.notify('leave'); }
+// The bank page sits in a native view above the notice, so it closes before the question is asked.
+// The question opens after the bank page has closed and handed focus back, so the question keeps focus.
+function leaveCashier() { payment.closeCashier(); void nextTick(() => payment.notify('leave')); }
+// The method sheet's close ends on the store home too (user 2026-11-22); an order already placed asks first.
+function closeSheet() { if (s.kind === 'ORDER_PAY' && s.orderNo) payment.notify('keepOrder'); else payment.leaveToStore(); }
+// A payment without an order (trial, trade-in, capacity) is followed from Orders.
+function openPaidOrder() { if (s.kind === 'ORDER_PAY' && s.orderNo) payment.openOrder(); else payment.openOrders(); }
+// Continuing a bank payment means its bank page; other payments stay on their payment page.
+function continuePaying() { dismiss(); if (isBank.value && ready.value) payment.openCashier(); }
 
-useDialogA11y(sheetOpen, '#pp-sheet', payment.close, true, 3);
+// A notice over the sheet owns Escape, Tab and back until it is answered.
+useDialogA11y(computed(() => sheetOpen.value && !s.notice), '#pp-sheet', payment.close, true, 3);
 useDialogA11y(computed(() => pageOpen.value && !s.cashier && !s.notice), '#pp-page', leavePage, true, 3);
 useDialogA11y(computed(() => active.value && s.open && s.cashier), '.pp-cashier', payment.closeCashier, true, 4);
 
@@ -752,9 +794,19 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__row2 { display: flex; gap: 8px; }
 .pp-cashier__done { flex: 1; }
 
-.purchase-payment__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.purchase-payment__row > text { flex: 1; min-width: 0; }
-.purchase-payment__row > :last-child { flex-shrink: 0; margin-left: auto; white-space: nowrap; }
-.purchase-payment__row:last-child { border-bottom: 0; }
-.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 64px); display: grid; gap: var(--v5-space-2); max-height: 160px; overflow: auto; padding: var(--v5-space-2) var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
+/* One line sits in a 56px row with equal space above and below; the 48px text action keeps its touch height inside it. */
+.purchase-payment__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 56px; box-sizing: border-box; padding: 4px 0; color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.purchase-payment__row > text { flex: 1; min-width: 0; padding-block: 6px; }
+/* The text action's own 8px inline padding sits in the bar padding, so its label keeps the same 16px inset as the row text. */
+.purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; margin-right: -8px; }
+/* The text action's hit area stops short of the close mark's 44px target. */
+.purchase-payment-resume.has-close { padding-right: 56px; }
+.purchase-payment-resume__close { position: absolute; top: 14px; right: var(--v5-space-3); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+.purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
+.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
+
+.purchase-payment-resume:not(.has-close) .purchase-payment__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.purchase-payment-resume:not(.has-close) .purchase-payment__row > text { flex: 1; min-width: 0; }
+.purchase-payment-resume:not(.has-close) .purchase-payment__row > :last-child { flex-shrink: 0; margin-left: auto; white-space: nowrap; }
+.purchase-payment-resume:not(.has-close) .purchase-payment__row:last-child { border-bottom: 0; }
 </style>

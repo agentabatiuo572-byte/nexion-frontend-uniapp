@@ -4,7 +4,6 @@ import type { Messages } from '@/i18n/messages/en';
 import { fmt } from '@/i18n/format';
 import { sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
-import { getProductMedia } from '@/lib/product-media';
 import { productCatalogState } from '@/store/product-catalog';
 import { displayDeadline, localized, rewardAmount, rewardSummary } from './promotion-display';
 
@@ -17,17 +16,13 @@ export function promotionLandingHref(activityId: string): string {
   return '/pages/events/promotion-detail?id=' + encodeURIComponent(activityId);
 }
 
-// The store catalog is read for a signed-in session only. Anonymous visitors get the
-// bundled artwork for a known SKU and no catalog name or price.
+// The store catalog supplies current names and prices for a signed-in session.
 function catalogReady(): boolean {
   void productCatalogState.revision;
   return (productCatalogState.status === 'ready' || (productCatalogState.status === 'loading' && productCatalogState.serverCanonical)) && !!sessionVault.read();
 }
 export function landingProduct(sku: string) {
   return catalogReady() ? getProduct(sku) : undefined;
-}
-export function landingProductImage(sku: string): string | undefined {
-  return catalogReady() ? getProduct(sku)?.imageUrl : getProductMedia(sku)?.src;
 }
 export function landingProductName(activity: PublicPromotion, sku: string): string {
   const gift = activity.rewardRules.flatMap(rule => [rule.buyerReward, rule.inviterReward])

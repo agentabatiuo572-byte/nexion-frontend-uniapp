@@ -56,8 +56,6 @@ import NxSheet from '@/components/ui/nx-sheet.vue';
 import { isPromotionActive,promotionDisclosures } from '@/lib/promotion-entry';
 import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { promotionMachineSlots } from '@/components/catalog-machine-image';
-import { getProduct } from '@/mock/products';
-import { productCatalogState,refreshProductCatalog,revalidateProductCatalog } from '@/store/product-catalog';
 const emit=defineEmits<{(e:'share'):void}>(),t=useT(),app=useApp(),auth=useAuth(),locale=useLocaleStore();const activities=ref<PublicPromotion[]>([]),progress=ref<Record<string,ReferralProgress>>({}),loading=ref(false),error=ref(false),hasMore=ref(false),listRead=ref(false);let cursor:string|null=null,generation=0,alive=true,visible=true;
 const visibility=useDataVisibility();
 const copy=computed(()=>teamRedesignCopy(locale.code)),expandedActivity=ref<string|null>(null);
@@ -79,9 +77,7 @@ function startProgressUpdates(){
 }
 function referralImageProps(activity:PublicPromotion){
   const slot=promotionMachineSlots(activity).find(item=>item.role==='purchase');
-  void productCatalogState.revision;
-  const readable=productCatalogState.status==='ready'||(productCatalogState.status==='loading'&&productCatalogState.serverCanonical);
-  return {sku:slot?.sku,imageUrl:auth.isAuthenticated&&readable&&slot?getProduct(slot.sku)?.imageUrl:undefined,
+  return {sku:slot?.sku,imageUrl:auth.isAuthenticated?slot?.imageUrl:undefined,
     scopeKey:activity.activityId+':purchase',refreshKey:JSON.stringify([activity.version,imageRefresh.value[activity.activityId]])};
 }
 function qualifyingCount(id:string){return progress.value[id]?.qualifyingOrders??'—';}
@@ -96,13 +92,11 @@ async function loadActivities(reset=false,passive=false){
   if(!visible||!remoteApiEnabled||(!reset&&loading.value))return;
   if(reset){generation++;progressBusy.value={};termsActivity.value=null;}
   const current=currentRead();loading.value=true;if(!passive)error.value=false;
-  const catalogRead=reset&&auth.isAuthenticated&&sessionVault.read()
-    ?passive?revalidateProductCatalog():refreshProductCatalog(productCatalogState.status!=='loading'):Promise.resolve();
   try{
     const query={cursor:reset?null:cursor,limit:20},authenticated=auth.isAuthenticated;
     const read=()=>promotionApi.list(query,authenticated);
     const list=passive?runPassiveTabRead('promotion-list',read,{...query,authenticated}):(invalidatePassiveTabRead('promotion-list'),read());
-    const [page]=await Promise.all([list,catalogRead]);if(!current())return;
+    const page=await list;if(!current())return;
     listRead.value=true;error.value=false;
     const returnedIds=new Set(page.items.map(p=>p.activityId));
     const previous=reset?[]:activities.value.filter(p=>!returnedIds.has(p.activityId));

@@ -297,7 +297,7 @@ const isGrace = computed(() => status.value === "grace");
 const trialProductId = computed(() => resolveTrialCheckoutProductId(cfg.value.trialProductId));
 // The catalogue array is not reactive: read it only once a read has settled, so the lookup re-runs per read.
 const trialProduct = computed(() => (productCatalogState.status === "ready" && trialProductId.value ? getProduct(trialProductId.value) : undefined));
-const trialImageUrl = computed(() => trialProduct.value?.imageUrl);
+const trialImageUrl = computed(() => cfg.value.imageUrl);
 const trialCatalogLoading = computed(() => productCatalogState.status !== "ready" && productCatalogState.status !== "error");
 const trialProductUnavailable = computed(() => {
   if (productCatalogState.status !== "ready") return true;

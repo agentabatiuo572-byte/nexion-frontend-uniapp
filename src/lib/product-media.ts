@@ -13,11 +13,6 @@ export function getProductMedia(id: string | null | undefined) {
   return current?.imageUrl ? { src: current.imageUrl, tierCode: productTierCode(current.id, current.tier) } : null;
 }
 
-/** Historical trade-in snapshots can append a quantity to the SKU. Artwork only; never rewrite order identity. */
-export function getOrderProductMedia(productNo: string, lineItems?: readonly { sku: string }[]) {
-  return getProductMedia(lineItems?.[0]?.sku ?? productNo.replace(/×[1-9]\d*$/, ""));
-}
-
 // Genesis is an independent entitlement, never a seventh device SKU.
 export const GENESIS_MEDIA = {
   showcase: `${ROOT}/genesis.png`,

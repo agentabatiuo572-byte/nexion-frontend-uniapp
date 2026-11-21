@@ -34,6 +34,7 @@ export function useTrialPresentation(displayActive?: () => boolean) {
   const deviceName = computed(() => retained.value
     ? resolveTrialDeviceName(retained.value.config.trialProductId, retained.value.config.trialProductName) : null);
   const productId = computed(() => retained.value ? resolveTrialCheckoutProductId(retained.value.config.trialProductId) : null);
+  const imageUrl = computed(() => retained.value?.config.imageUrl);
   const reservedSlots = computed(() => presentationReady.value && trial.authorityStatus !== "error" ? (active.value ? 1 : 0) : null);
   const remainingMs = computed(() => {
     if (!presentationReady.value || !retained.value) return null;
@@ -64,7 +65,7 @@ export function useTrialPresentation(displayActive?: () => boolean) {
     ? null : estimatedOffsetUSD.value > 0 ? Math.min(1, offsetUSD.value / estimatedOffsetUSD.value) : 0);
 
   return {
-    presentationReady, actionsReady, status, active, config, deviceName, productId, reservedSlots,
+    presentationReady, actionsReady, status, active, config, deviceName, productId, imageUrl, reservedSlots,
     remainingMs, shadowUSD, shadowNEX, offsetUSD, remainderUSD, estimatedUSD, estimatedOffsetUSD, offsetProgress,
     refresh: () => trial.poll(Date.now()),
   };

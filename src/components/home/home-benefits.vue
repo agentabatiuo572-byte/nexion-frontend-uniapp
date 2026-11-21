@@ -89,7 +89,6 @@ import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { useTrialLifecycleCopy, formatTrialCountdown, formatTrialRemaining } from '@/i18n/trial-lifecycle';
 import { fmt, fmtMoney } from '@/i18n/format';
 import { formatAmount } from "@/lib/amount-display";
-import { getProductMedia } from "@/lib/product-media";
 import { voucherBenefitSummary } from '@/lib/voucher-benefit-summary';
 import { voucherSupportsSurface } from '@/lib/voucher-sheet-authority';
 import { navTo } from '@/lib/route';
@@ -132,7 +131,7 @@ const trialOfferEnabled = computed(() => trialView.actionsReady.value && (capaci
 // B53: only the confirmed trial product is named; until then the card shows the same "—" as its unknown amounts, never a default S1.
 const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '—');
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
-const trialArt = computed(() => getProductMedia(confirmedOffer.value ? confirmedOffer.value.productId : trialView.productId.value)?.src);
+const trialArt = computed(() => confirmedOffer.value ? confirmedOffer.value.imageUrl : trialView.imageUrl.value);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
 // Same capped estimate the trial page and checkout quote (BUG 78).
 const estimateText = computed(() => {

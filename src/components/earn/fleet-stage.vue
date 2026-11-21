@@ -49,7 +49,6 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { deviceName } from "@/lib/device-copy";
 import { deviceTaskRecovering } from "@/lib/task-progress";
-import { getProductMedia } from "@/lib/product-media";
 import { useApp } from "@/store/app";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useFleetSlots } from "@/composables/use-fleet-slots";
@@ -75,7 +74,7 @@ const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus ===
   || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
 const fleetVisible = computed(() => !remoteApiEnabled || app.remoteFleetHasSnapshot);
 const freeSlotsText = computed(() => fmt(t.value.myDevices.emptySlots, { n: fleet.freeSlots.value }));
-const trialArt = computed(() => getProductMedia(fleet.trial.productId.value)?.src ?? null);
+const trialArt = fleet.trial.imageUrl;
 
 type StageItem = { key: string; name: string; online: boolean; device: Device | null };
 // The trial comes first, then the active fleet in its existing order.

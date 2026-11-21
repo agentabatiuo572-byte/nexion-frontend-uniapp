@@ -13,7 +13,7 @@ import { useDeviceProductImage } from "@/composables/use-device-product-image";
 
 const props = defineProps<{ device?: Device; src?: string | null }>();
 // Without a fleet row (trial, ranking tier) the artwork comes from the given image instead.
-const { imageSrc, imageError } = useDeviceProductImage(() => props.device ?? { kind: "phone", productCode: "", capacitySource: "server" });
+const { imageSrc, imageError } = useDeviceProductImage(() => props.device);
 const srcFailed = ref(false);
 watch(() => props.src, () => { srcFailed.value = false; });
 const resolved = computed(() => props.device ? imageSrc.value : srcFailed.value ? null : props.src ?? null);

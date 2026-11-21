@@ -35,7 +35,7 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
+        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -149,7 +149,7 @@
     </view>
     <template #pageFixed>
       <!-- The order's next actions sit in the thumb zone at the bottom of the page (DS-30), whatever its state. -->
-      <view v-if="order && stickyActionsVisible" class="order-sticky nx-glass-bar">
+      <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
           <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
@@ -196,8 +196,6 @@ import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from "@/components/checkout/CheckoutResult.vue";
 import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
-import { getOrderProductMedia } from "@/lib/product-media";
-import { revalidateProductCatalog } from "@/store/product-catalog";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import { useT } from "@/i18n/use-t";
@@ -326,7 +324,6 @@ async function refreshOrderWallet(): Promise<boolean> {
 }
 async function refreshOrder() {
   if (!remoteApiEnabled || !detailVisible || !id.value.trim() || !remoteOrderBoundAccount.value) return;
-  void revalidateProductCatalog();
   if (remoteOrderRefreshing.value && activeRemoteOrderScope
     && isCurrentDetailScope(activeRemoteOrderScope)) return remoteOrderRead;
   const scope = captureDetailScope();
@@ -447,16 +444,6 @@ const fullyVoucherSettled = computed(() => order.value != null
   && order.value.paymentMethod?.toUpperCase() === "VOUCHER"
   && order.value.status !== "placed");
 
-// Sticky chassis nav header — back + "Order details" title. The order number
-// stays in the summary card; a long id is not a page title. Getter form: falls
-// back to "not found" before the order loads / for a bad id.
-useSetPageHeader(() => ({
-  title: showTrialResult.value || paymentResultVisible.value ? checkoutFlowCopy(locale.code).resultTitle : order.value
-    ? t.value.orders.detailTitle
-    : (showRemoteOrderLoading.value || remoteOrderError.value ? t.value.orders.title : t.value.orders.notFound),
-  backHref: ordersBackHref.value,
-}));
-
 // While on this page, tick orders every 3s so the provisioning bar moves
 // visibly. The global ORDER_TICK loop (App.vue, 6s) also advances orders; this
 // faster local tick just gives the detail view a tighter feel.
@@ -494,6 +481,21 @@ const paymentNoticeReason = ref('');
 const noticeCancelFailed = ref(false);
 const paymentResultOrder = ref<Order|null>(null);
 const resultOrder = computed(() => order.value ?? paymentResultOrder.value);
+// Same branch as the template's result view: the header drops back and retitles only while that view is on screen.
+const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value && (showTrialResult.value || paymentResultVisible.value));
+
+// Sticky chassis nav header — back + "Order details" title. The order number
+// stays in the summary card; a long id is not a page title. Getter form: falls
+// back to "not found" before the order loads / for a bad id.
+useSetPageHeader(() => ({
+  title: resultShown.value ? checkoutFlowCopy(locale.code).resultTitle : order.value
+    ? t.value.orders.detailTitle
+    : (showRemoteOrderLoading.value || remoteOrderError.value ? t.value.orders.title : t.value.orders.notFound),
+  backHref: ordersBackHref.value,
+  // A failed first read keeps the order page's title and back.
+  noBack: resultShown.value,
+}));
+
 const pendingCopy = computed(() => checkoutFlowCopy(locale.code));
 const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'>(() => remoteOrderError.value ? 'error' : resultOrder.value?.status === 'activated'
   ? 'activated' : resultOrder.value?.status === 'inventory' ? 'inventory' : walletPaymentConfirmed.value || resultOrder.value?.status === 'paid' || resultOrder.value?.status === 'provisioning' ? 'processing' : 'error');
@@ -677,9 +679,7 @@ const externalPayment = computed(() => { purchasePaymentState.revision; return o
 watch(() => purchasePaymentState.notice, notice => {
   if (notice === 'existing' && purchasePaymentState.orderNo === id.value) paymentLookupScope = null;
 });
-const heroImage = computed(() => order.value
-  ? getOrderProductMedia(order.value.productId, order.value.lineItems)?.src
-  : undefined);
+const heroImage = computed(() => order.value?.imageUrl);
 
 // lucide outline paths per status (Clock / CheckCircle2 / Server / Cpu / XCircle)
 function iconFor(status: OrderStatus): string[] {
@@ -1210,7 +1210,7 @@ const sectionLabelStyle: CSSProperties = {
 .trial-result-head { display:flex;flex-direction:column;align-items:center;gap:var(--v5-space-2);padding:var(--v5-space-4) 0;text-align:center; }
 .trial-result-icon { width:64px;height:64px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand); }
 .trial-result-title { font-size:var(--ui-type-page-title);line-height:var(--ui-type-page-title-lh);font-weight:600;color:var(--v5-ink); }
-.trial-result-body { font-size:var(--ui-type-body);line-height:var(--ui-type-body-lh);color:var(--v5-ink-2);overflow-wrap:anywhere; }
+.trial-result-body { display:block;text-align:center;font-size:var(--ui-type-body);line-height:var(--ui-type-body-lh);color:var(--v5-ink-2);overflow-wrap:break-word; }
 .trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l);background:color-mix(in srgb, var(--v5-brand) 10%, transparent);border:1px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); }
 .trial-result-credit-label { font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);font-weight:600;color:var(--v5-ink-2); }
 .trial-result-row, .trial-result-line { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);color:var(--v5-ink-3); }

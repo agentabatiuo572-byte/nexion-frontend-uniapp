@@ -105,10 +105,11 @@ import TeamArt from '@/components/team/team-art.vue';
 import PromotionTerms from './promotion-terms.vue';
 import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { promotionMachineSlots } from '@/components/catalog-machine-image';
+import { productImageCacheKey } from '@/lib/product-image-cache';
 import { useLoopsInView } from '@/composables/use-loops-in-view';
 import { getHomePromotions,readHomePromotions } from '@/store/home-promotions';
 import { landingCopy } from '@/i18n/promotion-landing';
-import { landingKind,landingProductImage,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
+import { landingKind,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
 const props=withDefaults(defineProps<{mode?:'home'|'events';activities?:PublicPromotion[];active?:boolean;tinted?:boolean}>(),{mode:'home',active:true,tinted:false});
 // The fallback product art floats only while the entry is on screen and its page is shown.
 const loops=useLoopsInView('.promotion-entry');
@@ -139,13 +140,12 @@ function activityKind(activity:EntryPromotion):'gift'|'coupon'|'spark'|'plain' {
 }
 function activityArt(activity:EntryPromotion){const kind=activityKind(activity);return kind==='plain'?'spark':kind;}
 function promoSlots(activity:EntryPromotion) {
-  void app.accountKey;void app.accountBindingEpoch;void productCatalogState.revision;
-  const ready=(productCatalogState.status==='ready'||(productCatalogState.status==='loading'&&productCatalogState.serverCanonical))&&!!sessionVault.read();
-  return ('displayOnly' in activity ? activity.slots : promotionMachineSlots(activity)).map(slot=>({...slot,imageUrl:ready?getProduct(slot.sku)?.imageUrl:undefined}));
+  if (!('displayOnly' in activity)) return promotionMachineSlots(activity);
+  return activity.slots.map(slot=>({...slot,imageUrl:slot.imageUrl&&productImageCacheKey(slot.imageUrl)?slot.imageUrl:null}));
 }
 const fence=createPromotionReadFence();let visible=true,pendingTicket:number|null=null;
 // The published banner contract has no theme variants. In light mode use the
-// same published rules and catalog images in a theme-aware, readable layout.
+// same published rules and product images in a theme-aware, readable layout.
 function bannerUrl(activity:EntryPromotion){return theme.resolved==='dark'&&activity.bannerImageUrl?apiRuntimeConfig.baseUrl.replace(/\/+$/,'')+activity.bannerImageUrl:null;}
 function bannerKey(activity:EntryPromotion){return JSON.stringify([app.accountKey,app.accountBindingEpoch,locale.code,activity.activityId,activity.version,bannerUrl(activity),imageRefresh.value]);}
 function bannerReady(activity:EntryPromotion){return !!bannerUrl(activity)&&loadedBanners.value.has(bannerKey(activity));}
@@ -182,7 +182,7 @@ function landingCards(activity:EntryPromotion){
   if(!kind||!rule)return [];
   void app.accountKey;void app.accountBindingEpoch;
   const reward=rule.buyerReward,parts=rewardParts(activity,reward),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
-  return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:rewardPartsText(parts,t.value.promotion),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
+  return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:rewardPartsText(parts,t.value.promotion),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:activity.productImages?.[rule.productNo],giftSku,giftImage:giftSku?activity.productImages?.[giftSku]:undefined}];
 }
 async function openTerms(activity:EntryPromotion){
   if (!('displayOnly' in activity)) {termsActivity.value=activity;return;}
@@ -201,9 +201,8 @@ async function load(reset:boolean,preserveImages=false){
   if(props.activities===undefined&&pendingTicket!==null&&fence.current(pendingTicket))return;
   if(reset&&!preserveImages){imageRefresh.value++;loadedBanners.value.clear();termsActivity.value=null;}
   // Join a shared read already in flight; otherwise explicitly revalidate the catalog.
-  const catalogRead=reset&&remoteApiEnabled&&sessionVault.read()
-    ?preserveImages?revalidateProductCatalog():refreshProductCatalog(productCatalogState.status!=='loading'):Promise.resolve();
-  if(props.activities!==undefined){fence.invalidate();liveItems.value=props.activities.filter(isPromotionActive);liveListRead.value=true;cursor.value=null;hasMore.value=false;activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));status.value='ready';await catalogRead;return;}
+  if(reset&&remoteApiEnabled&&sessionVault.read())void (preserveImages?revalidateProductCatalog():refreshProductCatalog(productCatalogState.status!=='loading'));
+  if(props.activities!==undefined){fence.invalidate();liveItems.value=props.activities.filter(isPromotionActive);liveListRead.value=true;cursor.value=null;hasMore.value=false;activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));status.value='ready';return;}
   const ticket=fence.next(),identity=`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
   pendingTicket=ticket;
   status.value='loading';
@@ -211,7 +210,7 @@ async function load(reset:boolean,preserveImages=false){
   try{
     const read=props.mode==='home'&&reset?readHomePromotions(identity,!!sessionVault.read(),!preserveImages)
       :promotionApi.list({limit:20,cursor:reset?null:cursor.value,...(props.mode==='home'?{placement:'home.purchase-promotion' as const}:{})},!!sessionVault.read());
-    const [page]=await Promise.all([read,catalogRead]);
+    const page=await read;
     if(!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`)return;
     const rows=reset?[]:liveItems.value;
     liveItems.value=[...new Map([...rows,...page.items.filter(isPromotionActive)].map(item=>[item.activityId,item])).values()];

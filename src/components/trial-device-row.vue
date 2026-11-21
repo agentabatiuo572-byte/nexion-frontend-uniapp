@@ -2,7 +2,7 @@
   <view v-if="presentation.active.value" ref="loopRef" class="trial-device-row" :class="[`trial-device-row--${variant}`, { 'nx-glass-card': variant === 'inventory', 'nx-loops-paused': !loops.running.value }]" data-trial-device-row="true" data-device-key="trial:current">
     <view class="trial-device-row__heading" :role="variant === 'inventory' ? undefined : 'button'" :tabindex="variant === 'inventory' ? undefined : '0'" :aria-label="`${copy.details}: ${presentation.deviceName.value || '—'} · ${statusText} · ${presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining} ${remainingText}`" :aria-expanded="variant === 'earn' ? isExpanded : undefined" :aria-controls="variant === 'earn' ? `trial-device-details-${variant}` : undefined" @click="onRowClick" @keydown.enter.stop.prevent="onRowClick" @keydown.space.stop.prevent="onRowClick">
       <view class="trial-device-row__main">
-        <view class="trial-device-row__art" aria-hidden="true"><image v-if="productMedia" class="trial-device-row__image" :src="productMedia.src" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view>
+        <view class="trial-device-row__art" aria-hidden="true"><image v-if="presentation.imageUrl.value" class="trial-device-row__image" :src="presentation.imageUrl.value" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view>
         <view class="trial-device-row__identity"><text class="trial-device-row__name">{{ presentation.deviceName.value || '—' }}</text><text v-if="variant === 'inventory'" class="trial-device-row__tag">{{ copy.imageBadge }}</text><text class="trial-device-row__status" :class="{ 'trial-device-row__status--online': isOnline }">{{ statusText }}</text></view>
       </view>
       <view class="trial-device-row__summary">
@@ -42,7 +42,6 @@ import { useT } from "@/i18n/use-t";
 import { formatTrialRemaining } from "@/i18n/trial-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
-import { getProductMedia } from "@/lib/product-media";
 
 const props = withDefaults(defineProps<{ variant?: "home" | "earn" | "inventory"; expanded?: boolean; showCancel?: boolean; cancelBusy?: boolean }>(), { variant: "earn", expanded: undefined });
 const visibility = useDataVisibility();
@@ -58,7 +57,6 @@ const t = useT();
 const localExpanded = ref(false);
 // The warehouse card is always open; Earn keeps its disclosure.
 const isExpanded = computed(() => props.variant === "inventory" || (props.expanded ?? localExpanded.value));
-const productMedia = computed(() => getProductMedia(presentation.productId.value));
 const isOnline = computed(() => presentation.presentationReady.value && presentation.status.value === "active");
 const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
   : isOnline.value ? t.value.earn.online : copy.value.grace);

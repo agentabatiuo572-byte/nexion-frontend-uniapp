@@ -17,7 +17,7 @@
       </view>
 
       <view class="tcs-device">
-        <CatalogMachineImage class="tcs-device-art" :sku="trialView.productId.value" :image-url="getProductMedia(trialView.productId.value)?.src" scope-key="trial-claim" />
+        <CatalogMachineImage class="tcs-device-art" :sku="trialView.productId.value" :image-url="trialView.imageUrl.value" scope-key="trial-claim" />
         <view class="tcs-device-meta"><text class="tcs-device-caption">{{ copy.productLabel }}</text><text class="tcs-device-name">{{ trialView.deviceName.value ?? '-' }}</text><text class="tcs-device-duration">{{ durationText }}</text></view>
       </view>
 
@@ -52,7 +52,6 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { remoteApiEnabled } from "@/api/runtime";
-import { getProductMedia } from "@/lib/product-media";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { navTo } from "@/lib/route";

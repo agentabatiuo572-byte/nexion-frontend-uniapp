@@ -1,7 +1,7 @@
 <!-- Checkout review presentation. Transaction quotes, confirmation and recovery remain server-authoritative. -->
 <template>
   <AppChassis active="store">
-    <template #pageTop><SubPageHeader class="checkout-header" design :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
+    <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
     <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
@@ -19,6 +19,7 @@
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);white-space:pre-line;text-wrap:pretty">{{ t.tradein.recoveryChecking }}</text>
       </view>
+      <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" :state="checkoutResultState" :product-name="completedOrder?.productName" :product-image="completedOrder?.imageUrl" :amount="completedOrder?.paidTotal ?? completedOrder?.total" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" />
       <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
@@ -170,8 +171,6 @@
           </view>
         </view>
 
-        <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay" :state="checkoutResultState" :product-name="product.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? netPrice" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" />
-
         <!-- === confirmed === -->
         <view v-else-if="step === 'confirmed'" class="nx-glass-card mx-4 rounded-2xl text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
           <template v-if="firstOrderCelebrating">
@@ -251,8 +250,6 @@
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <text v-if="checkoutOutOfStock || checkoutCapacityBlocked" class="nx-tray-note w-full">{{ checkoutOutOfStock ? t.store.temporarilyOutOfStock : checkoutCapacityMessage }}</text>
-        <!-- A saved external payment is a note above the button with a link back to it (04 §4.0 tray note), not a floating card. -->
-        <text v-for="row in resumeRows" :key="row.commandKey" class="checkout-sticky-note nx-tray-note" role="status">{{ row.summary }} · {{ paymentRowStatus(paymentCopy, row) }} <text class="checkout-resume-link nx-after-chevron" role="link" tabindex="0" @click="purchasePayment.resume(row)" @keydown.enter.prevent="purchasePayment.resume(row)">{{ paymentCopy.view }}</text></text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="checkoutOutOfStock || checkoutCapacityBlocked || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
@@ -293,7 +290,6 @@ import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { commerceCopy } from '@/lib/commerce-review';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
-import { purchasePaymentCopy, paymentRowStatus } from '@/lib/purchase-payment-copy';
 import { useLocaleStore } from "@/store/locale";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
@@ -332,7 +328,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -426,7 +422,8 @@ const keepCheckoutTarget = ref<string | null>(null), keepCheckoutReadError = ref
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
-onBackPress(options => { if (options.from === 'navigateBack') return false; requestCheckoutBack(); return true; });
+// An open payment layer registers its own back handler on this page; checkout leaves that press to it.
+onBackPress(options => { if (options.from === 'navigateBack') return false; if (!purchasePayment.state.open) requestCheckoutBack(); return true; });
 const auth = useAuth();
 const orders = useOrders();
 const voucher = useVoucher();
@@ -1949,6 +1946,9 @@ async function cancelCheckout() {
   let leaveError = '';
   try {
     const action = readOrderAction(scope.accountKey, created.orderNo);
+    // A bank or USDT payment already started cannot be cancelled (ORDER_EXTERNAL_PAYMENT_IN_PROGRESS): back leaves the
+    // order as it is, the payment bar keeps it in reach, and an unpaid one closes at its deadline.
+    if (action?.kind === 'pay' && action.paymentMethod === 'EXTERNAL') { navBack(checkoutBackHref.value); return; }
     let unseenPaymentKey: string | null = null;
     if (action?.kind === 'pay') {
       const outcome = await readPaymentCommand(apiClient, 'order-pay', action.key);
@@ -2630,9 +2630,7 @@ function isTopCheckoutPage(): boolean {
   return !!checkoutPage && (top === checkoutPage || top?.$vm === checkoutPage);
 }
 const purchasePayment = usePurchasePayment();
-const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
 // Saved external payments the user can go back to; the payment layer covers the tray while it is open.
-const resumeRows = computed(() => { app.accountKey; purchasePayment.state.revision; return purchasePayment.state.open ? [] : purchasePayment.pending(); });
 useAutoRecovery({
   failed: () => remoteApiEnabled && pendingCreateUnresolved.value && !createLookupUnavailable.value
     && !paymentFlowBusy.value && !checkoutLeaving.value && isTopCheckoutPage(),
@@ -2659,9 +2657,8 @@ useAutoRecovery({
     && purchasePayment.unsettledCheckoutPayments(!remoteTradeinRecoveryRequired.value).length > 0,
   retry: () => {
     const scope = captureCheckoutRoute();
-    return refreshExpiredCheckoutPayments(scope.accountKey,
-      () => isCurrentCheckoutRoute(scope) && isTopCheckoutPage() && foregroundReadAllowed(),
-      !remoteTradeinRecoveryRequired.value);
+    // The same read the payment bar runs: expiry, review and delivery all apply, once for both.
+    return refreshPendingPayments(scope.accountKey, () => isCurrentCheckoutRoute(scope) && isTopCheckoutPage() && foregroundReadAllowed());
   },
   repeatMs: 15_000,
 });
@@ -3432,10 +3429,7 @@ button.checkout-policy-link::after { border:0; }
 .checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
 .checkout-sticky { position:absolute; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; }
 .checkout-sticky-copy { min-width:0; }
-.checkout-sticky-note { flex:1 0 100%; }
 /* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
-.checkout-resume-link { display:inline-block; padding:13px 4px; margin:-13px -4px; font:var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color:var(--v5-ink-3); white-space:nowrap; cursor:pointer; }
-.checkout-resume-link:active { opacity:.6; }
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }
 .checkout-sticky--single :deep(.nx-button) { flex:1 1 auto; }

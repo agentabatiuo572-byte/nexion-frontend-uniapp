@@ -43,6 +43,7 @@ export interface OrderTimelineEvent {
 export interface Order {
   id: string;               // ORD-20260516-1234
   productId: Exclude<DeviceKind, "phone">;
+  imageUrl?: string;
   productName: string;
   quantity: number;
   /** Number of products represented by a canonical bundle order. */
@@ -228,6 +229,7 @@ export const useOrders = defineStore("orders", () => {
       id: row.orderNo,
       productId: row.productNo as Order["productId"],
       productName: row.productName,
+      imageUrl: row.imageUrl,
       quantity: row.quantity,
       ...(row.itemCount != null && { itemCount: row.itemCount }),
       ...(row.lineItems != null && { lineItems: row.lineItems }),

@@ -209,6 +209,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     capacityFull: boolean;
     deviceName: string;
     productId: string | null;
+    imageUrl?: string;
     trialDays: number;
     estimatedOffsetUSD: number | null;
   } | null>(null);
@@ -393,6 +394,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         capacityFull,
         deviceName: config.trialProductName,
         productId: resolveTrialCheckoutProductId(config.trialProductId),
+        imageUrl: config.imageUrl,
         trialDays: config.trialDays,
         estimatedOffsetUSD: config.shadowDailyUSD === null ? null
           : computeTrialOffset(config, config.shadowDailyUSD * config.trialDays).offsetUSD,

@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { productMediaUrl } from "@/api/product-catalog-contract";
 import { ref } from "vue";
 import { formatAmount } from "@/lib/amount-display";
 import { parseTrialBooleanConfig } from "@/lib/trial-config-enum";
@@ -26,6 +27,7 @@ export interface TrialConfig {
   trialProductId: TrialProductId;
   /** Server-owned E1 display name for the selected product. */
   trialProductName: string;
+  imageUrl?: string;
   /** Trial product price (conversion checkout subtotal) */
   trialPriceUSD: number;
   /** Null when the selected SKU has no confirmed daily earnings. */
@@ -156,6 +158,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       trialOffsetCapUSD: cap("trialOffsetCapUSD"),
       trialProductId,
       trialProductName,
+      imageUrl: productMediaUrl(raw.imageUrl),
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
       shadowDailyUSD,
       shadowDailyNEX,

@@ -222,7 +222,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (intent.status === 'EXPIRED') {
       if (intent.reason === 'PAYMENT_FAILED' && graceOver) closeUnpaidOrder(intent);
       // A new provider success after release is evidence for support. It cannot deliver or hold quota again.
-      if (['delivered', 'delivery-failed'].includes(scenario)) return lateArrival(intent, now);
+      // Only money arriving after the payment window is a late payment; a failed bank attempt before the deadline stays failed.
+      if (['delivered', 'delivery-failed'].includes(scenario) && graceOver) return lateArrival(intent, now);
       return intent;
     }
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;

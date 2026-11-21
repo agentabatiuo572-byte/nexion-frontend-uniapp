@@ -214,7 +214,6 @@ import { useSession } from "@/store/session";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { canControlDevice } from "@/lib/device-control-platform";
-import { getProductMedia } from "@/lib/product-media";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { useFreeTrial } from "@/store/free-trial";
 import type { Device } from "@/store/types";
@@ -309,7 +308,7 @@ const bays = computed<Bay[]>(() => {
   if (trialListed.value) {
     const name = trialPresentation.deviceName.value || "—";
     const online = trial.status === "active";
-    list.push({ key: "trial", kind: "trial", image: getProductMedia(trialPresentation.productId.value)?.src, name, online,
+    list.push({ key: "trial", kind: "trial", image: trialPresentation.imageUrl.value, name, online,
       label: `${name} · ${trialCopy.value.imageBadge}${online ? " · " + t.value.earn.online : ""}`, target: "trial" });
   }
   for (const d of activeDevices.value) {

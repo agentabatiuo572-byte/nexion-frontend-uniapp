@@ -20,7 +20,7 @@ import { useDeviceProductImage } from "@/composables/use-device-product-image";
 const props = defineProps<{ device?: Device; image?: string; name: string; online: boolean; badge?: string; label: string }>();
 const emit = defineEmits<{ (e: "open"): void }>();
 // A trial bay has no fleet row; its art comes from the trial product instead.
-const { imageSrc, imageError } = useDeviceProductImage(() => props.device ?? { kind: "phone", productCode: "", capacitySource: "server" } as Device);
+const { imageSrc, imageError } = useDeviceProductImage(() => props.device);
 const src = computed(() => props.image ?? (props.device ? imageSrc.value : undefined));
 </script>
 

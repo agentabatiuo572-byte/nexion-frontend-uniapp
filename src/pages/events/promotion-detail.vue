@@ -133,7 +133,7 @@
               <view v-if="slab.count !== null" class="lp-slab__head"><text class="lp-slab__label">{{ c.myDevices }}</text><text class="lp-slab__count"><text class="lp-slab__count-number">{{ slab.count }}</text> {{ c.deviceUnit }}</text></view>
               <view v-if="slab.fleetRow" class="lp-slab__fleet">
                 <view v-for="(device, index) in slab.thumbs" :key="device.id" class="lp-owned lp-own" :class="'lp-own--' + index">
-                  <view class="lp-owned__art"><CatalogMachineImage class="lp-fill" :sku="device.sku" :image-url="productImage(device.sku)" :scope-key="'owned:' + device.id" /><text v-if="index === slab.thumbs.length - 1 && slab.more" class="lp-owned__more">+{{ slab.more }}</text></view>
+                  <view class="lp-owned__art"><CatalogMachineImage class="lp-fill" :sku="device.sku" :image-url="device.imageUrl" :scope-key="'owned:' + device.id" /><text v-if="index === slab.thumbs.length - 1 && slab.more" class="lp-owned__more">+{{ slab.more }}</text></view>
                   <text class="lp-owned__name">{{ device.label }}</text>
                 </view>
                 <view class="lp-slab__plus" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view>
@@ -227,7 +227,7 @@ import { navReplace, navTo, takeNavigationQuery } from '@/lib/route';
 import { displayDeadline, localized } from '@/lib/promotion-display';
 import { formatDayMonth, formatDisplayDateTime, formatDisplayTime } from '@/lib/display-date';
 import { createPromotionReadFence, isPromotionActive, promotionDetailHref, promotionDisclosures, promotionStoreHref } from '@/lib/promotion-entry';
-import { landingKind, landingProduct, landingProductImage, landingProductName, promotionLandingHref, promotionRemaining, promotionRepurchaseInterval, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
+import { landingKind, landingProduct, landingProductName, promotionLandingHref, promotionRemaining, promotionRepurchaseInterval, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
 import { productCopy } from '@/lib/product-copy';
 import { getProductMedia } from '@/lib/product-media';
 
@@ -263,9 +263,9 @@ const stateView = computed(() => phase.value !== 'active' || refused.value || si
 const stageMode = computed(() => phase.value === 'ended' ? 'ended' : signInNeeded.value ? 'signin' : 'full');
 const readIdentity = () => `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
 
-// Catalog names and images follow the signed-in session; reading the account keys keeps them reactive.
+// Catalog names follow the signed-in session; reading the account keys keeps them reactive.
 function productName(sku: string): string { void app.accountKey; void app.accountBindingEpoch; return activity.value ? landingProductName(activity.value, sku) : sku; }
-function productImage(sku: string): string | undefined { void app.accountKey; void app.accountBindingEpoch; return landingProductImage(sku); }
+function productImage(sku: string): string | undefined { return activity.value?.productImages?.[sku]; }
 const priceText = (price: number) => fmtMoney(price).replace(/^\$/, '').replace(/\.00$/, '');
 // Long published amounts step down before they could clip (01.2).
 function amountSize(amount: string, hero = false) { return amount.length > 6 ? 'lp-amount--s' : amount.length > 4 || (hero && amount.length > 3) ? 'lp-amount--m' : ''; }
@@ -427,7 +427,7 @@ const slab = computed(() => {
   return {
     // A refused member with devices gets no count: "N devices" would contradict the first-purchase prompt.
     count: owned && !(refused.value && owned.length > 0) ? owned.length : null, fleetRow, refused: refused.value,
-    thumbs: fleetRow ? owned.slice(0, 3).map(device => { const sku = device.kind; return { id: device.id, sku, label: getProductMedia(sku)?.tierCode ?? device.name }; }) : [],
+    thumbs: fleetRow ? owned.slice(0, 3).map(device => { const sku = device.kind; return { id: device.id, sku, imageUrl: device.imageUrl, label: getProductMedia(sku)?.tierCode ?? device.name }; }) : [],
     more: fleetRow && owned.length > 3 ? owned.length - 3 : 0,
     target: r.productNo, targetName: productName(r.productNo), rewardText: partsText(parts), tagText: discount ? partsText(parts) : '+' + partsText(parts), uvt: parts.asset === 'UVT', line: [before, after],
   };
@@ -465,10 +465,9 @@ async function load() {
   if (!activityId || !remoteApiEnabled) { status.value = 'error'; return; }
   reading.value = true;
   if (!activity.value) status.value = 'loading';
-  // Join the shared catalog read so names, prices and images match the store.
-  const catalogRead = signedIn ? refreshProductCatalog() : Promise.resolve(true);
+  if (signedIn) void refreshProductCatalog();
   try {
-    const [item] = await Promise.all([promotionApi.get(activityId, signedIn), catalogRead]);
+    const item = await promotionApi.get(activityId, signedIn);
     if (!fence.current(ticket) || identity !== readIdentity()) return;
     if (!landingKind(item)) { void navReplace(promotionStoreHref(activityId)); return; }
     activity.value = item; readAt.value = Date.now(); now.value = readAt.value; status.value = 'ready';

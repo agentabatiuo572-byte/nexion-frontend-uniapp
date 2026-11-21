@@ -1,3 +1,4 @@
+import { productMediaUrl } from "./product-catalog-contract";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
@@ -12,6 +13,7 @@ export interface CanonicalE3Device {
   name: string;
   deviceType: string;
   productCode: string;
+  imageUrl?: string;
   monthlyTargetActive: boolean;
   status: string;
   runtimeStatus?: "ONLINE" | "OFFLINE" | "UNKNOWN";
@@ -282,6 +284,7 @@ function device(value: unknown): CanonicalE3Device {
     name: string(source.name),
     deviceType: string(source.deviceType),
     productCode: string(source.productCode),
+    imageUrl: productMediaUrl(source.imageUrl),
     monthlyTargetActive: source.monthlyTargetActive === undefined ? false : boolean(source.monthlyTargetActive),
     status: string(source.status).toUpperCase(),
     runtimeStatus: source.runtimeStatus === "ONLINE" || source.runtimeStatus === "OFFLINE" ? source.runtimeStatus : "UNKNOWN",

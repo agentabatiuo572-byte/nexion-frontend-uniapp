@@ -35,7 +35,6 @@ import { formatTrialCountdown } from "@/i18n/trial-lifecycle";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { formatAmount } from "@/lib/amount-display";
-import { getProductMedia } from "@/lib/product-media";
 import { navTo } from "@/lib/route";
 import NxTag from "@/components/ui/nx-tag.vue";
 import DeviceArt from "@/components/device-art.vue";
@@ -51,7 +50,7 @@ const loops = useLoopsInView(".trial-stage");
 const loopRef = loops.elRef;
 
 const name = computed(() => presentation.deviceName.value || "—");
-const art = computed(() => getProductMedia(presentation.productId.value)?.src ?? null);
+const art = presentation.imageUrl;
 const online = computed(() => presentation.presentationReady.value && presentation.status.value === "active");
 const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
   : online.value ? t.value.earn.online : copy.value.grace);
