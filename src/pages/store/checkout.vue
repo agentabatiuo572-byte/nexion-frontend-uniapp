@@ -248,6 +248,8 @@
         <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+        <!-- A saved external payment is a note above the button with a link back to it (04 §4.0 tray note), not a floating card. -->
+        <text v-for="row in resumeRows" :key="row.commandKey" class="checkout-sticky-note nx-tray-note" role="status">{{ row.summary }} · {{ paymentRowStatus(paymentCopy, row) }} <text class="checkout-resume-link nx-after-chevron" role="link" tabindex="0" @click="purchasePayment.resume(row)" @keydown.enter.prevent="purchasePayment.resume(row)">{{ paymentCopy.view }}</text></text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
@@ -287,6 +289,7 @@ import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { commerceCopy } from '@/lib/commerce-review';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
+import { purchasePaymentCopy, paymentRowStatus } from '@/lib/purchase-payment-copy';
 import { useLocaleStore } from "@/store/locale";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
@@ -2512,6 +2515,9 @@ async function submitRemoteOrder(): Promise<void> {
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
 const purchasePayment = usePurchasePayment();
+const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
+// Saved external payments the user can go back to; the payment layer covers the tray while it is open.
+const resumeRows = computed(() => { app.accountKey; purchasePayment.state.revision; return purchasePayment.state.open ? [] : purchasePayment.pending(); });
 useAutoRecovery({
   failed: () => remoteApiEnabled && pageAlive && pageVisible && auth.isAuthenticated
     && !promotionRoute.value && remoteTradeinRecoveryError.value && !remoteTradeinRecoveryBusy.value
@@ -3259,6 +3265,10 @@ button.checkout-policy-link::after { border:0; }
 .checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
 .checkout-sticky { position:absolute; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; }
 .checkout-sticky-copy { min-width:0; }
+.checkout-sticky-note { flex:1 0 100%; }
+/* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
+.checkout-resume-link { display:inline-block; padding:13px 4px; margin:-13px -4px; font:var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color:var(--v5-ink-3); white-space:nowrap; cursor:pointer; }
+.checkout-resume-link:active { opacity:.6; }
 .checkout-total { display:block; font:600 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }
 .checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }

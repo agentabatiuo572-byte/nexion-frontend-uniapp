@@ -472,4 +472,8 @@ const uz: typeof zh = {
 export type PurchasePaymentCopy = typeof zh;
 const copy: Record<UiLocale, PurchasePaymentCopy> = { zh, en, vi, id, ms, fil, ru, kk, uz };
 export function purchasePaymentCopy(locale: string) { return copy[uiLocale(locale)]; }
+/** Status of a saved external payment as its resume row shows it (payment dialog strip, checkout tray note). */
+export function paymentRowStatus(c: PurchasePaymentCopy, row: { lastStatus?: string; businessDelivered?: boolean }) {
+  return row.lastStatus === 'MANUAL_REVIEW' ? c.review : row.lastStatus === 'EXPIRED' ? c.ended : row.businessDelivered ? c.delivered : c.resume;
+}
 export function fillCopy(text: string, values: Record<string, string | number>) { return text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? '')); }
