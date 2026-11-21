@@ -265,9 +265,9 @@ const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale 
 // The order detail shows its own payment state in the hero, so it hides the floating bar.
 withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
 const URGENT_MS = 5 * 60000;
-// Space the bank page leaves for the tray: 22 off the screen bottom (04 §4.0) + tray 108 (8 + note 4 + 32 for two lines
-// + gap 8 + button 48 + 8) + 8 above it. Fixed whether or not the save button shows, so the native view never resizes.
-const CASHIER_FOOT = 138;
+// Space the bank page leaves for the tray (04 §4.0 multi-row tray: its height + 38): tray 108 (8 + note 4 + 32 for two
+// lines + gap 8 + button 48 + 8) + 22 off the screen bottom + 16 above it. Fixed whether or not the save button shows, so the native view never resizes.
+const CASHIER_FOOT = 146;
 const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
@@ -718,7 +718,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__frame { flex: 1; min-height: 0; background: #fff; }
 .pp-cashier__frame iframe { display: block; width: 100%; height: 100%; border: 0; }
 /* Reserved space under the bank page (CASHIER_FOOT); the native bank webview ends where it starts. */
-.pp-cashier__foot { flex: none; height: 138px; }
+.pp-cashier__foot { flex: none; height: 146px; }
 .pp-cashier__tray { position: fixed; z-index: 1; display: flex; flex-direction: column; }
 /* The note keeps two lines in every language so the tray height never changes. */
 .pp-cashier__note { box-sizing: content-box; height: 32px; display: flex; align-items: center; justify-content: center; overflow-wrap: break-word; }
