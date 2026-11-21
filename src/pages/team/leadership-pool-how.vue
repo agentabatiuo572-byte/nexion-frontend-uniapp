@@ -80,7 +80,7 @@ import { useApp } from "@/store/app";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useVRank, type VRank } from "@/store/v-rank";
 import { rankLabel } from "@/lib/v-rank-copy";
-import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
+import { leadershipPoolReadFailure } from "@/lib/leadership-pool-state";
 import { leadershipHowFacts } from "@/lib/leadership-how-facts";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
@@ -151,8 +151,12 @@ async function loadRemotePool(refreshRank = true) {
     remoteState.value = "ready";
   } catch (cause) {
     if (!current()) return;
-    remotePool.value = null; ruleFacts.value = null;
-    remoteState.value = leadershipPoolFailureState(cause);
+    const failure = leadershipPoolReadFailure(cause);
+    if (!failure.retainSnapshot) {
+      remotePool.value = null;
+      ruleFacts.value = null;
+    }
+    remoteState.value = failure.state;
   }
 }
 
@@ -163,7 +167,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, loca
 }, { flush: 'sync' });
 const unsubscribeRemotePoolRun = subscribeRuntimeRevision(() => { if (remoteApiEnabled) void loadRemotePool(); });
 onShow(() => { pageVisible = true; void loadRemotePool(); });
-onHide(() => { pageVisible = false; remoteRequest++; remotePool.value = null; remoteState.value = "loading"; });
+onHide(() => { pageVisible = false; remoteRequest++; remoteState.value = "loading"; });
 onUnmounted(() => { mounted = false; remoteRequest += 1; remotePool.value = null; unsubscribeRemotePoolRun(); });
 function goBack() { navBack("/pages/team/leadership-pool"); }
 

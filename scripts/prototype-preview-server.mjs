@@ -314,7 +314,8 @@ const server=http.createServer(async(req,res)=>{
         return sendJson(res,{code:503,message:'NOTIFICATION_PAGE_UNAVAILABLE',data:null},503);
       const businessRead=req.method==='GET'&&(recoveryReads.has(url.pathname)||/^\/api\/(config\/(platform|v-rank|exchange|repurchase|staking|commission)|store\/(catalog|purchase-eligibility)|team\/(rank|binary)|app\/(team|payments|deposits|home\/overview|proof|network|security|support|developer)|content\/(learning|trust|how-it-works|i18n)|quests\/state|events|points\/state|devices\/earnings|exchange|repurchase|withdrawals|payout-addresses|deposits|notifications|goals|promotions|promotion-rewards|tasks|payment-methods|developer|public\/referrals|legal\/(privacy|risk)|staking|stakes)/.test(url.pathname));
       if(bankTopupEndpoint&&state.dataState==='error')return sendJson(res,{code:503,message:url.pathname.endsWith('/config')?'PAYMENT_CONFIG_UNAVAILABLE':url.pathname.endsWith('/fx-quote')?'FX_QUOTE_UNAVAILABLE':'VIETQR_RUNTIME_PROFILE_INVALID',data:null},503);
-      if(businessRead&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
+      const walletBillsRead=req.method==='GET'&&url.pathname==='/api/app/wallet/bills';
+      if((businessRead||walletBillsRead)&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
       if(businessRead&&state.dataState==='loading')await new Promise(resolve=>setTimeout(resolve,5000));
       // A material read that answers late with the facts it saw when it arrived (simulates a GET overtaken by a POST).
       if(req.method==='GET'&&state.ambassadorIoState==='late-read-once'&&/^\/api\/app\/team\/ambassador-applications\/\d+\/materials$/.test(url.pathname)){

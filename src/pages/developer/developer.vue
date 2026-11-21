@@ -215,6 +215,7 @@ import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs
 import { useLocaleStore } from "@/store/locale";
 import { validateDeveloperAccess, validateDeveloperWebhook, type DeveloperFormIssue } from "./developer-form-validation";
 import { developerAccessReviewReasonKey, developerAccessState, isDeveloperApprovalRequired, isDeveloperCapabilityUnavailable, isDeveloperDocsNotReleased, type DeveloperAccessCopyKey } from "./developer-access-state";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
@@ -586,10 +587,10 @@ async function loadDocs() {
     docs.value = value;
   } catch (cause) {
     if (!docsFenceCurrent(fence)) return;
-    docs.value = null;
     // "No documentation published yet" is a product state, not a failed load.
-    if (isDeveloperDocsNotReleased(cause)) docsNotReleased.value = true;
-    else docsLoadFailed.value = true;
+    docsNotReleased.value = isDeveloperDocsNotReleased(cause);
+    if (docsNotReleased.value || !isTransientReadFailure(cause)) docs.value = null;
+    docsLoadFailed.value = !docsNotReleased.value;
   }
 }
 async function revokeApiKey(id: number) {
