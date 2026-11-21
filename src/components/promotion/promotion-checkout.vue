@@ -150,7 +150,7 @@ import { useOrders } from '@/store/orders';
 import { computeVoucherDiscount,isVoucherValid,voucherAppliesToSku,type VoucherDef } from '@/mock/vouchers';
 import { ApiError,asApiError,isApiRefusal } from '@/api/errors';
 import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,settleProductCatalogRefresh,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
-import { navTo,navBack,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
+import { navTo,navBack,navReplace,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
 import { fmt } from '@/i18n/format';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord,PROMOTION_CHECKOUT_TABLE } from '@/lib/promotion-checkout-session';
 import { acquireAccountCommandKey,readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
@@ -562,9 +562,17 @@ async function recover():Promise<boolean>{
     if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
+    const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
+    // If recovery was part of Back, let that navigation finish.
+    if (openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
+      && (!props.orderNo || props.orderNo !== order.value?.orderNo)) {
+      const requestedHref = props.orderNo
+        ? '/pages/store/checkout?orderNo=' + encodeURIComponent(props.orderNo)
+        : promotionCheckoutHref(props.items, props.activityId, props);
+      return await navReplace(requestedHref);
+    }
     const reopenPurchase = ordinaryMultiItemEntry && canStartNew.value && !session.record.quote?.activityId
-      && !order.value?.rewards?.length
-      && (order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED');
+      && !order.value?.rewards?.length && unpaidOrderEnded;
     if (reopenPurchase) {
       // The replacement quote has its own read generation.
       recoveryGeneration=null;
