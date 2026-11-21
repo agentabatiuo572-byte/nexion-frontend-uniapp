@@ -5,7 +5,7 @@
     <view class="raffle-status" role="status" aria-live="polite">
       <text v-if="loading && !snapshot">{{ copy.loading }}</text>
     </view>
-    <EmptyState v-if="error && !snapshot && !loading" kind="recoverable-error" :title="copy.error" :cta-label="uiT.ui.reload" @cta="load" />
+    <EmptyState v-if="error && !snapshot && !loading" kind="recoverable-error" page :title="copy.error" :cta-label="uiT.ui.reload" @cta="load" />
     <template v-if="snapshot">
       <view class="raffle-row"><text>{{ copy.available }}</text><text class="raffle-number">{{ snapshot.availableTickets }}</text></view>
       <text v-if="!snapshot.draws.length" class="raffle-copy">{{ copy.empty }}</text>

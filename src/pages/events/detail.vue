@@ -2,7 +2,7 @@
   <AppChassis active="home"><view class="event-detail" :aria-busy="loading">
     <SubPageHeader back="/pages/events/events?source=legacy" :title="copy.title" />
     <text v-if="loading && !detail" class="event-copy" role="status">{{ copy.loading }}</text>
-    <EmptyState v-else-if="!detail" kind="recoverable-error" :title="copy.unavailable" :cta-label="uiT.ui.reload" @cta="load" />
+    <EmptyState v-else-if="!detail" kind="recoverable-error" page :title="copy.unavailable" :cta-label="uiT.ui.reload" @cta="load" />
     <template v-else>
       <view class="nx-glass-card event-section">
         <text class="event-title">{{ detail.event.title }}</text>

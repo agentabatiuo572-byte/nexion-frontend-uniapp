@@ -16,7 +16,7 @@
         <SubPageHeader back="/pages/me/me" :title="t.proof.title" />
 
         <view v-if="remoteLoading && !proofDisplayReady" :style="remoteErrorStyle" role="status" aria-busy="true"><text>{{ recoveryTitle }}</text></view>
-        <EmptyState v-else-if="!proofDisplayReady || !proofReady" kind="recoverable-error" :title="recoveryTitle" :desc="recoveryHint" :cta-label="proofDisplayReady ? t.ui.retry : t.ui.reload" @cta="refreshRemoteProof" />
+        <EmptyState v-else-if="!proofDisplayReady || !proofReady" kind="recoverable-error" :page="!proofDisplayReady" :title="recoveryTitle" :desc="recoveryHint" :cta-label="proofDisplayReady ? t.ui.retry : t.ui.reload" @cta="refreshRemoteProof" />
 
       <view v-if="proofDisplayReady" :style="bodyStyle">
         <!-- Variant tabs -->
