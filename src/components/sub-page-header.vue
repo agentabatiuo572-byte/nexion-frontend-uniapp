@@ -15,14 +15,15 @@
       class="spv-side spv-back"
       role="button"
       tabindex="0"
-      :aria-label="t.profile.back"
+      :aria-label="close ? t.ui.close : t.profile.back"
       @click="goBack"
 
       @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)"
     >
       <view class="spv-glass nx-design-glass">
         <LiquidGlass :radius="22" tone="navigation" :blur="8" />
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+        <svg v-if="close" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
     </view>
     <view class="spv-titlewrap">
@@ -68,7 +69,8 @@ import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
-const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void; plain?: boolean; design?: boolean; solid?: boolean; actionLabel?: string; action?: () => void }>();
+// close: the page ends a flow, so its left control is a close mark rather than a back arrow.
+const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void; plain?: boolean; design?: boolean; solid?: boolean; actionLabel?: string; action?: () => void; close?: boolean }>();
 // 待支付浮动条在场时 chassis 让内容整体下让一带,并把同一个值 provide 下来:sticky 行钉在带的下沿,
 // 不与浮动条重叠(chassis 外渲染 / 无条时为 0)。
 const pendingBarInset = inject(PENDING_BAR_INSET_KEY, ref(0));

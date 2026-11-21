@@ -163,6 +163,9 @@ function pendingPayments() {
     return [];
   }
 }
+// Rows closed on the floating bar, for this run of the App only. The records stay; a new payment or a new status shows again.
+const dismissedResume = reactive(new Set<string>());
+const resumeKey = (row: PendingExternal) => [account(), row.commandKey, row.lastStatus ?? '', row.businessDelivered ? 1 : 0].join('|');
 function unsettledCheckoutPayments(includeTradein: boolean) {
   return pendingPayments().filter(row => (row.kind === 'ORDER_PAY' || (includeTradein && row.kind === 'TRADE_IN'))
     && row.lastStatus !== 'MANUAL_REVIEW' && row.lastStatus !== 'DELIVERED' && !row.businessDelivered);
@@ -278,10 +281,11 @@ function readPendingPayment() {
 }
 // A checkout owner may defer navigation until its payment operation releases
 // the page leave guard. Cold resumes use ordinary navigation directly.
-function closeAndNavigate(href: string) {
-  const navigate = context?.navigate;
+// A purchase page whose payment ends on its order is finished: replace sends the order page in its place, so back skips it.
+function closeAndNavigate(href: string, replace = false) {
+  const owner = context, navigate = owner?.navigate;
   finish(null);
-  if (navigate) navigate(href); else void navTo(href);
+  if (navigate) navigate(href); else if (replace && owner) void navReplace(href); else void navTo(href);
 }
 async function openConditions() {
   const { accountKey, orderNo, notice } = state;
@@ -681,11 +685,13 @@ export function usePurchasePayment() {
         + (deadlineAt ? `&deadline=${deadlineAt}` : '');
       closeAndNavigate(`/pages/me/wallet-topup?${query}`);
     },
-    openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); else finish(null); },
+    openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`, true); else finish(null); },
     support: () => closeAndNavigate('/pages/me/support'),
     openConditions,
     reorder: () => { const again = context?.reorder, orderNo = state.orderNo; finish(null); if (again) again(); else if (orderNo && !onOrderPage(orderNo)) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
     pending: pendingPayments, unsettledCheckoutPayments, resume,
+    resumeDismissed: (row: PendingExternal) => dismissedResume.has(resumeKey(row)),
+    dismissResume: (rows: PendingExternal[]) => { rows.forEach(row => dismissedResume.add(resumeKey(row))); },
     records: () => { try { return displayRecords(); } catch { return []; } },
     viewOrder: () => { const intent = state.intent, pending = state.pending; if (!intent?.receipt || !pending) return; const orderNo = validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt); finish(null); void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
   };

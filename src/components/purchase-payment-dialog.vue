@@ -1,5 +1,8 @@
 <template>
-  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" role="status">
+  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" :class="{ 'has-close': !showHistory }" role="status">
+    <view v-if="!showHistory" class="purchase-payment-resume__close nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="payment.dismissResume(pending)" @keydown.enter.prevent="payment.dismissResume(pending)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+    </view>
     <view v-for="row in showHistory ? records : pending" :key="row.commandKey" class="purchase-payment__row"><text>{{ row.summary }} · {{ row.lastStatus === 'MANUAL_REVIEW' ? copy.review : row.lastStatus === 'EXPIRED' ? copy.ended : row.businessDelivered ? copy.delivered : copy.resume }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
   </view>
 
@@ -99,8 +102,8 @@
   <view v-if="pageOpen" id="pp-page" class="pp-page" role="dialog" aria-modal="true" :aria-label="pageTitle" :style="{ paddingTop: statusBar + 'px' }">
     <DeviceStatusBar />
     <view class="pp-nav">
-      <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.back" @click="leavePage" @keydown.enter.prevent="leavePage">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="leavePage" @keydown.enter.prevent="leavePage">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
       <text class="pp-nav__t" role="heading">{{ pageTitle }}</text>
       <view class="pp-nav__gap" aria-hidden="true" />
@@ -251,7 +254,7 @@ const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
-const pending = computed(() => { app.accountKey; s.revision; return payment.pending(); });
+const pending = computed(() => { app.accountKey; s.revision; return payment.pending().filter(row => !payment.resumeDismissed(row)); });
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
 const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
@@ -324,7 +327,7 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'leave': return { icon: 'alert', tone: 'warning', title: networkPaused.value ? fill(c.networkPausedTitle, { network: networkName.value }) : c.leaveTitle,
-      body: networkPaused.value ? c.networkPaused : c.leaveBody, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: payment.close };
+      body: networkPaused.value ? c.networkPaused : c.leaveBody, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: leavePayment };
     case 'networkPaused': return { icon: 'info', tone: 'warning', title: fill(c.networkPausedTitle, { network: networkName.value }), body: c.networkPaused,
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
       ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
@@ -401,6 +404,8 @@ function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
   if (choose && next) next.click();
 }
 function leavePage() { if (received.value) payment.openOrder(); else payment.notify('leave'); }
+// Leaving an order payment that a purchase page started ends that purchase on the order page; a resumed payment only closes.
+function leavePayment() { if (s.kind === 'ORDER_PAY' && s.orderNo && !s.coldResume) payment.openOrder(); else payment.close(); }
 
 useDialogA11y(sheetOpen, '#pp-sheet', payment.close, true, 3);
 useDialogA11y(computed(() => pageOpen.value && !s.cashier && !s.notice), '#pp-page', leavePage, true, 3);
@@ -580,5 +585,8 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .purchase-payment__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .purchase-payment__row > text { flex: 1; min-width: 0; }
 .purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; }
+.purchase-payment-resume.has-close { padding-right: 44px; }
+.purchase-payment-resume__close { position: absolute; top: var(--v5-space-2); right: var(--v5-space-2); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+.purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
 .purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 64px); display: grid; gap: var(--v5-space-2); max-height: 160px; overflow: auto; padding: var(--v5-space-2) var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
 </style>
