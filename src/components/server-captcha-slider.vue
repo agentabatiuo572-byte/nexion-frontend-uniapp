@@ -172,6 +172,8 @@ onUnmounted(()=>{closed=true;generation++;clearSkeleton();if(finishTimer)clearTi
 .cs-layer { position: fixed; inset: 0; z-index: 9500; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: max(16px, var(--nx-overlay-top)) 16px var(--nx-overlay-bottom); }
 .cs-mask { position: absolute; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(4px); }
 .cs-card { position: relative; width: 100%; max-width: 340px; max-height: 100%; box-sizing: border-box; overflow-y: auto; background: var(--nx-glass-fill); border: none; border-radius: var(--nx-glass-radius); box-shadow: var(--nx-glass-edge); padding: 18px; }
+/* border: none above outranks the shared sheet outline, so forced colours get it back here. */
+@media (forced-colors: active) { .cs-card { border: 1px solid CanvasText; } }
 .cs-head { display: flex; align-items: flex-start; justify-content: space-between; }
 .cs-head__txt { display: flex; flex-direction: column; gap: 3px; }
 .cs-title { font-family: var(--font-v5); font-size: var(--ui-type-hero-title); font-weight: var(--ui-type-hero-title-weight); color: var(--v5-ink); }

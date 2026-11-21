@@ -4036,7 +4036,7 @@ export const kk: Messages = {
     prize: "Сыйақы:",
     sevenLayerNetwork: "Команда сыйақысы",
     todayMatch: "Теңгерім сыйақысы",
-    weeklyPool: "Ынталандыру қоры",
+    weeklyPool: "Апта ынталандыру қоры",
     thisMonth: "Осы айдағы команда сыйақылары",
     votes: "дауыс",
     viewDetails: "Толығырақ қарау",

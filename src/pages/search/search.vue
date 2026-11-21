@@ -221,7 +221,8 @@ const searchableProducts = computed(() => !remoteApiEnabled ? PRODUCTS
 function productSearchDetail(p: Product): string {
   if (!remoteApiEnabled) return productCopy(t.value, p).tagline;
   const gpu = specRow(t.value.store.specGpu, p.gpu);
-  const vram = specRow(t.value.store.specVram, p.vram);
+  // A Cloud Share shows no video memory.
+  const vram = p.productType === "SHARE" ? null : specRow(t.value.store.specVram, p.vram);
   return [gpu && specText(t.value, gpu.v), vram && specText(t.value, vram.v, undefined, "vram")]
     .filter(Boolean).join(" · ");
 }

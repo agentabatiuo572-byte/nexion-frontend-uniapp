@@ -417,7 +417,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 .commission-filter-trigger svg { flex: none; }
 /* Two options per row; an option whose label does not fit half the width (ru «Сотрудничество») takes a full row instead of breaking mid-word. */
 .commission-filter-options { display: flex; flex-wrap: wrap; gap: 8px; }
-.commission-filter-option { flex: 0 1 calc(50% - 4px); min-width: min(100%, max-content); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: break-word; cursor: pointer; }
+/* Fills the free half beside an odd last option, so regular options stay half width while a long one grows to the full row. */
+.commission-filter-options::after { content: ""; flex: 1 0 calc(50% - 4px); height: 0; margin-top: -8px; }
+.commission-filter-option { flex: 1 0 calc(50% - 4px); min-width: -webkit-fit-content; min-width: fit-content; max-width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: break-word; cursor: pointer; }
 .commission-filter-option--selected { color: var(--v5-brand); background: var(--v5-brand-soft); }
 .commission-filter-option__count { flex: none; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); font-variant-numeric: tabular-nums; }
 .commission-filter-trigger:focus-visible, .commission-filter-option:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }

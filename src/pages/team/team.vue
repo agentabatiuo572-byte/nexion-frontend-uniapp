@@ -671,6 +671,8 @@ useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !rec
 .team-bento__fraction { color: var(--v5-ink-3); }
 .team-bento__caption { font: 500 var(--ui-type-description)/18px var(--font-v5); color: var(--v5-ink); }
 .team-bento__muted { color: var(--v5-ink-3); }
+/* The vote count after the pool title keeps its number and unit together when the caption wraps. */
+.team-bento__pool .team-bento__muted { white-space: nowrap; }
 .team-bento__meta { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
 .team-bento__podium { position: absolute; right: var(--ui-space-inset); bottom: 14px; display: flex; align-items: flex-end; gap: var(--v5-space-1); }
 .team-bento__podium > view { width: 22px; border-radius: 6px 6px 2px 2px; }

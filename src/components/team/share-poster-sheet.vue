@@ -548,6 +548,8 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-mask { position: fixed; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); z-index: 8000; }
 .ps-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--nx-glass-fill); border: none; display: flex; flex-direction: column; max-height: min(92vh, calc(100vh - var(--nx-overlay-top))); overflow: hidden; box-sizing: border-box; animation: ps-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ps-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+/* border: none above outranks the shared sheet outline, so forced colours get it back here. */
+@media (forced-colors: active) { .ps-sheet { border: 1px solid CanvasText; } }
 .ps-grab { flex-shrink: 0; width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: var(--ui-space-row-y) auto 0; }
 .ps-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: var(--ui-space-row-y) 20px; }
 /* The safe-area inset sits inside the scroller, so the list scrolls down to the screen edge instead of being cut by an opaque band. */
