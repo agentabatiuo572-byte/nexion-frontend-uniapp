@@ -134,8 +134,10 @@ export function revalidateProductCatalog(): Promise<boolean> {
 
 /** Follow a replacement read; a superseded response is never a catalog failure. */
 export async function settleProductCatalogRefresh(read: Promise<boolean>): Promise<boolean> {
+  const binding = catalogBindingEpoch;
   for (;;) {
     await read;
+    if (binding !== catalogBindingEpoch) return false;
     if (refreshInFlight && refreshInFlight !== read) { read = refreshInFlight; continue; }
     if (productCatalogState.status !== "loading") return productCatalogState.status === "ready";
     read = refreshProductCatalog(true);

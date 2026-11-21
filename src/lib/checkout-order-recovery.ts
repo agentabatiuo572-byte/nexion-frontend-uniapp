@@ -63,24 +63,26 @@ export function finishCheckoutTradein(accountKey: string, pointer: CheckoutTrade
   if (readCheckoutTradein(accountKey, pointer.productNo)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
 }
 
+type OrderRecoveryResult = "absent" | "handled" | "navigation-failed";
+
 /** Recovery only navigates to the original server order; it never creates or pays. */
 export async function recoverCheckoutOrder(accountKey: string, productNo: string, deps: {
   list: OrderApi["list"]; isCurrent(): boolean; isCurrentAccount(): boolean; navigate(url: string): Promise<boolean>;
-}): Promise<boolean> {
+}): Promise<OrderRecoveryResult> {
   const pointer = readAccountRow<Row>(KEY, accountKey)?.orders?.[productNo];
   if (pointer?.tradeinQuote) {
     if (deps.isCurrent()) await deps.navigate(`/pages/store/checkout?product=${encodeURIComponent(productNo)}`);
-    return true;
+    return "handled";
   }
-  if (!pointer || pointer.productNo !== productNo || typeof pointer.orderNo !== "string" || !pointer.orderNo.trim()) return false;
-  if (!deps.isCurrent()) return true;
+  if (!pointer || pointer.productNo !== productNo || typeof pointer.orderNo !== "string" || !pointer.orderNo.trim()) return "absent";
+  if (!deps.isCurrent()) return "handled";
   let found: CanonicalOrder | undefined;
   try {
     let cursor: string | null = null;
     const visited = new Set<string>();
     do {
       const page: CanonicalOrderList = await deps.list(cursor, 100);
-      if (!deps.isCurrent()) return true;
+      if (!deps.isCurrent()) return "handled";
       found = page.orders.find((order) => order.orderNo === pointer.orderNo);
       if (found) break;
       cursor = page.nextCursor ?? null;
@@ -88,15 +90,16 @@ export async function recoverCheckoutOrder(accountKey: string, productNo: string
       visited.add(cursor);
     } while (cursor);
   } catch { /* The canonical order page offers a read-only retry during outages. */ }
-  if (!deps.isCurrent()) return true;
+  if (!deps.isCurrent()) return "handled";
   const navigated = await deps.navigate(`/pages/store/order-detail?id=${encodeURIComponent(pointer.orderNo)}`);
+  if (!navigated) return "navigation-failed";
   // Successful navigation may already have unloaded checkout. Retire only the
   // same account generation and receipt, never a newer recovery pointer.
   const current = readAccountRow<Row>(KEY, accountKey)?.orders?.[productNo];
-  if (navigated && deps.isCurrentAccount() && found?.productNo === productNo && found.quantity === 1 && terminal.has(found.canonicalStatus)
+  if (deps.isCurrentAccount() && found?.productNo === productNo && found.quantity === 1 && terminal.has(found.canonicalStatus)
       && current?.orderNo === pointer.orderNo && current.commandKey === pointer.commandKey && current.intent === pointer.intent) {
     releaseAccountCommandKey(COMMANDS_KEY, accountKey, pointer.intent, pointer.commandKey);
     forgetCheckoutOrder(accountKey, productNo, pointer.orderNo);
   }
-  return true;
+  return "handled";
 }
