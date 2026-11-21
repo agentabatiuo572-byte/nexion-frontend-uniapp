@@ -387,6 +387,10 @@ const stopCapacityRelease = onPurchaseRecordReleased((accountKey, key) => {
   refreshKeepRecovery();
 });
 onUnmounted(stopCapacityRelease);
+// Once the original payment is confirmed gone, a keep-recovery sheet has nothing left to show or resume: close it
+// instead of leaving an empty dialog.
+watch(() => props.active && state.value.kind === 'keep-recovery' && !capacityRecovery.value && !capacityRecoveryUnavailable.value && !keepRecoveryError.value,
+  empty => { if (empty) hide(); });
 watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,state,
   ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl],()=>{
   capacityRecoveryGeneration++;
