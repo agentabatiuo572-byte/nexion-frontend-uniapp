@@ -103,14 +103,17 @@ function trackFocus(): void {
   document.addEventListener("focusout", (ev) => {
     const left = ev.target instanceof Element ? ev.target : null;
     setTimeout(() => {
-      if (!left || (document.activeElement && document.activeElement !== document.body) || (left.isConnected && shown(left))) return;
+      const active = document.activeElement;
       const top = topLayer();
+      // While a layer is open focus stays in it (a removed control, a tap on a persistent sheet's scrim or on empty
+      // space): back to the layer root, not its first field, so no keyboard opens.
       if (top?.el) {
-        if (!top.el.hasAttribute("tabindex")) top.el.setAttribute("tabindex", "-1");
-        top.el.focus();
-      } else if (!top && Date.now() - restoredAt < 5_000) {
-        const landing = relocate(null, null);
-        landing?.focus();
+        if (!active || active === document.body || !top.el.contains(active)) focusFirst([() => landingSpot(top.el)]);
+        return;
+      }
+      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left))) return;
+      if (Date.now() - restoredAt < 5_000) {
+        const landing = focusFirst(fallbacks(null, null));
         if (landing) settleOnLanding(landing);
       }
     }, 0);
@@ -147,6 +150,11 @@ function topLayer(): { layer: Layer; el: HTMLElement | null } | null {
 const inertByUs = new Set<Element>();
 // Live regions (the toast host) stay readable over a dialog; inert set by someone else is left alone.
 const KEEP_READABLE = "script, style, link, template, [aria-live]";
+const FOCUSABLE = '[tabindex]:not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href]';
+const CAN_FOCUS = 'a[href], button, input, select, textarea, [tabindex]';
+// A layer's own tap-to-close scrim sits beside its root (NxSheet, the payment method sheet): an aria-hidden surface with no
+// controls of its own. It is part of that layer, so it stays clickable; its persistent / busy guard stays in its handler.
+const ownScrim = (el: Element) => el.getAttribute("aria-hidden") === "true" && !el.querySelector(CAN_FOCUS);
 function syncInert(): void {
   if (typeof document === "undefined") return;
   inertByUs.forEach((el) => el.removeAttribute("inert"));
@@ -154,23 +162,48 @@ function syncInert(): void {
   const top = topLayer()?.el;
   for (let node: Element | null = top ?? null; node && node !== document.body && node.parentElement; node = node.parentElement) {
     for (const sibling of Array.from(node.parentElement.children)) {
-      if (sibling === node || sibling.hasAttribute("inert") || sibling.matches(KEEP_READABLE)) continue;
+      if (sibling === node || sibling.hasAttribute("inert") || sibling.matches(KEEP_READABLE) || (node === top && ownScrim(sibling))) continue;
       sibling.setAttribute("inert", "");
       inertByUs.add(sibling);
     }
   }
 }
-const FOCUSABLE = '[tabindex]:not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href]';
-const usable = (el: Element | null | undefined): el is HTMLElement | SVGElement =>
-  !!el && el !== document.body && shown(el) && el.getAttribute("aria-disabled") !== "true" && !(el as HTMLButtonElement).disabled && !el.closest("[inert]");
+/** One test for every focus target (the trigger, its replacement, a Tab stop, a fallback): on screen and not
+ *  visibility-hidden, focusable, not inert, not disabled. */
+function canTake(el: Element | null | undefined): el is HTMLElement | SVGElement {
+  if (!(el instanceof HTMLElement || el instanceof SVGElement) || el === document.body) return false;
+  if (!shown(el) || el.closest("[inert]") || el.getAttribute("aria-disabled") === "true" || (el as HTMLButtonElement).disabled) return false;
+  return getComputedStyle(el).visibility === "visible" && el.matches(CAN_FOCUS);
+}
+type Candidate = Element | null | undefined | (() => Element | null | undefined);
+/** Focus the first candidate that can take it and really does; otherwise go on down the list. */
+function focusFirst(candidates: Candidate[]): HTMLElement | SVGElement | null {
+  for (const candidate of candidates) {
+    const el = typeof candidate === "function" ? candidate() : candidate;
+    if (!canTake(el)) continue;
+    el.focus();
+    if (document.activeElement === el) return el;
+  }
+  return null;
+}
 const firstFocusable = (scope: ParentNode): HTMLElement | null =>
-  Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).find(usable) ?? null;
-/** Focus something real inside el: its first usable control, else el itself (tabindex -1 keeps it out of the Tab order). */
+  Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).find(canTake) ?? null;
+/** A heading, the main region or a layer root takes focus through tabindex -1, which keeps it out of the Tab order. */
+function landingSpot(el: HTMLElement | null | undefined): HTMLElement | null {
+  if (!el || !shown(el) || el.closest("[inert]")) return null;
+  // Given back on blur: a lasting tabindex would make later taps on empty space focus this element.
+  // It is not a control, so no focus ring around a whole sheet or page; real controls keep theirs.
+  if (!el.hasAttribute("tabindex")) {
+    el.setAttribute("tabindex", "-1");
+    el.style.outline = "none";
+    el.addEventListener("blur", () => { el.removeAttribute("tabindex"); el.style.removeProperty("outline"); }, { once: true });
+  }
+  return el;
+}
+/** Focus something real inside el: its first usable control, else el itself. */
 function focusInside(el: HTMLElement): void {
-  if (el.contains(document.activeElement) && usable(document.activeElement)) return;
-  const target = firstFocusable(el) ?? el;
-  if (target === el && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
-  target.focus();
+  if (el.contains(document.activeElement) && canTake(document.activeElement)) return;
+  focusFirst([() => firstFocusable(el), () => landingSpot(el)]);
 }
 const MAIN_REGION = '[role="main"], main, uni-page-body';
 /** Focus that fell back to the page's main region moves on to its heading or bottom-bar action once the page draws one
@@ -181,41 +214,30 @@ function settleOnLanding(landing: Element): void {
   const timer = setInterval(() => {
     tries += 1;
     if (document.activeElement !== landing || tries > 10) { clearInterval(timer); return; }
-    const better = relocate(null, null);
-    if (better && better !== landing) { clearInterval(timer); better.focus(); }
+    const better = fallbacks(null, null).map((next) => () => { const el = next(); return el && el !== landing && !el.matches(MAIN_REGION) ? el : null; });
+    if (focusFirst(better)) clearInterval(timer);
   }, 150);
 }
 const accessibleName = (el: Element) => (el.getAttribute("aria-label") || el.textContent || "").trim();
 
-/** The trigger's replacement: same test id, else same role, name and first class; else the page's bottom-bar action; else the visible heading. */
-function relocate(trace: { testid: string | null; role: string | null; name: string; cls: string | null } | null, scope: HTMLElement | null): HTMLElement | SVGElement | null {
-  const visible = <T extends Element>(list: ArrayLike<T>): T[] => Array.from(list).filter(usable);
+/** Where focus goes when the trigger cannot take it, in order: the trigger's replacement (same test id, else same role,
+ *  name and first class); inside a layer still open below, its first control, else its root; with no layer left, the
+ *  page's bottom-bar action, the visible heading, the main region. Never <body>. */
+function fallbacks(trace: { testid: string | null; role: string | null; name: string; cls: string | null } | null, scope: HTMLElement | null): (() => Element | null | undefined)[] {
   const within: ParentNode = scope ?? document;
-  if (trace?.testid) {
-    const [hit] = visible(within.querySelectorAll<HTMLElement>(`[data-testid="${CSS.escape(trace.testid)}"]`));
-    if (hit) return hit;
-  }
+  const all = (selector: string) => Array.from(within.querySelectorAll<HTMLElement>(selector));
+  const list: (() => Element | null | undefined)[] = [];
+  if (trace?.testid) for (const el of all(`[data-testid="${CSS.escape(trace.testid)}"]`)) list.push(() => el);
   if (trace?.name) {
     const same = trace.role ? `[role="${CSS.escape(trace.role)}"]` : '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea';
     // Same name and same first class: a redrawn copy of the control, not another control that happens to share its name.
-    const hit = visible(within.querySelectorAll<HTMLElement>(same)).find((x) => accessibleName(x) === trace.name && (!trace.cls || x.classList.contains(trace.cls)));
-    if (hit) return hit;
+    for (const el of all(same)) if (accessibleName(el) === trace.name && (!trace.cls || el.classList.contains(trace.cls))) list.push(() => el);
   }
-  // A layer is still open below: stay inside it.
-  if (scope) {
-    if (!scope.hasAttribute("tabindex") && !firstFocusable(scope)) scope.setAttribute("tabindex", "-1");
-    return firstFocusable(scope) ?? scope;
-  }
-  // Next: the page's main action in its bottom bar, the reasonable next step (03 §3.5).
-  const [action] = visible(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse();
-  if (action) return action;
-  // Last: the visible page heading, else the page's main region. Never <body>.
-  const [heading] = Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2')).filter((x) => shown(x) && !x.closest("[inert]"));
-  const landing = heading ?? Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION)).find((x) => shown(x) && !x.closest("[inert]"));
-  if (!landing) return null;
-  // Neither is in the Tab order; tabindex -1 lets it take focus without adding a Tab stop.
-  if (!landing.hasAttribute("tabindex")) landing.setAttribute("tabindex", "-1");
-  return landing;
+  if (scope) return [...list, () => firstFocusable(scope), () => landingSpot(scope)];
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse()) list.push(() => el);
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION))) list.push(() => landingSpot(el));
+  return list;
 }
 
 /**
@@ -268,6 +290,8 @@ export function useDialogA11y(
   const layer: Layer = { order: 0, root: () => rootEl() };
   // Closed only because a newer layer took over (a notice over the payment page): the trigger is kept for its return.
   let paused = false;
+  // Only a layer that really opened hands focus back (the immediate watch runs the closed branch on mount).
+  let wasOpen = false;
   const forget = () => { previousFocus = null; previousTrace = null; };
 
   const rootEl = (): HTMLElement | null | undefined =>
@@ -284,7 +308,8 @@ export function useDialogA11y(
     // 🔴 用 getClientRects 判可见,不用 offsetParent:`position: fixed` 元素的 offsetParent
     // **恒为 null**(除非祖先有 transform),而弹层里恰恰常有 fixed 的吸底操作条 ——
     // 拿 offsetParent 过滤会把它们整批当成"隐藏"剔掉,Tab 就再也停不到确认按钮上。
-    return Array.from(root_.querySelectorAll<HTMLElement>(sel)).filter((x) => x.getClientRects().length > 0);
+    // Same test as every other focus target: visibility:hidden still has a rect, and inert / aria-disabled controls are no Tab stop.
+    return Array.from(root_.querySelectorAll<HTMLElement>(sel)).filter(canTake);
   }
 
   function onKeydown(ev: KeyboardEvent): void {
@@ -317,6 +342,8 @@ export function useDialogA11y(
   /** 关闭后把焦点还回触发它的那个控件,否则焦点回到文档开头,用户要重新 Tab 一遍。
    *  触发控件已被重绘或藏起时,回到同一位置的新控件,再不行落到页面主操作或可见标题(03 §3.5)。 */
   function restore(): void {
+    if (!wasOpen) return;
+    wasOpen = false;
     const top = topLayer();
     // A layer opened after this one is on screen: this one was only paused. Keep its trigger and leave focus up there.
     if (top && top.layer.order > openedAt) {
@@ -326,12 +353,11 @@ export function useDialogA11y(
     }
     // Otherwise focus goes back inside the layer still open below, if any, else to the page.
     const scope = top?.el ?? null;
+    const inScope = (el: Element | null | undefined) => !!el && (!scope || scope.contains(el));
     const active = document.activeElement;
-    const settled = usable(active) && (!scope || scope.contains(active));
-    const back = usable(previousFocus) && (!scope || scope.contains(previousFocus)) ? previousFocus
-      // A parent dialog closing in the same step may already have restored focus; move it only when it is really lost.
-      : settled ? null : relocate(previousTrace, scope);
-    back?.focus();
+    // A parent dialog closing in the same step may already have restored focus; move it only when it is really lost.
+    const settled = canTake(active) && inScope(active);
+    const back = focusFirst([() => (inScope(previousFocus) ? previousFocus : null), ...(settled ? [] : fallbacks(previousTrace, scope))]);
     restoredAt = Date.now();
     if (back) settleOnLanding(back);
     previousFocus = null;
@@ -358,6 +384,7 @@ export function useDialogA11y(
         previousTrace = previousFocus && previousFocus !== document.body ? { testid: previousFocus.getAttribute("data-testid"), role: previousFocus.getAttribute("role"), name: accessibleName(previousFocus), cls: previousFocus.classList[0] ?? null } : null;
       }
       paused = false;
+      wasOpen = true;
       openedAt = ++openSeq;
       layer.order = openedAt;
       openLayers.push(layer);
