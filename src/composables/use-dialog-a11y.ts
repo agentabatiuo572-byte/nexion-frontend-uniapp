@@ -89,11 +89,31 @@ const shown = (el: Element) => el.isConnected && el.getClientRects().length > 0;
 // while the order is created) has already let focus fall to <body> by the time the open watch runs.
 let lastFocus: HTMLElement | SVGElement | null = null;
 let tracking = false;
+// When the dialog last handed focus back to the page; a control removed soon after (a card moving once its action
+// finished) must not leave focus on <body>.
+let restoredAt = 0;
 function trackFocus(): void {
   if (tracking || typeof document === "undefined") return;
   tracking = true;
   document.addEventListener("focusin", (ev) => {
     if (ev.target instanceof HTMLElement || ev.target instanceof SVGElement) lastFocus = ev.target;
+  }, true);
+  // The focused control was removed or hidden (not an ordinary blur such as a tap on empty space): inside an open layer
+  // focus goes to that layer, and right after a dialog closed it goes to the page's next reasonable place (03 §3.5).
+  document.addEventListener("focusout", (ev) => {
+    const left = ev.target instanceof Element ? ev.target : null;
+    setTimeout(() => {
+      if (!left || (document.activeElement && document.activeElement !== document.body) || (left.isConnected && shown(left))) return;
+      const top = topLayer();
+      if (top?.el) {
+        if (!top.el.hasAttribute("tabindex")) top.el.setAttribute("tabindex", "-1");
+        top.el.focus();
+      } else if (!top && Date.now() - restoredAt < 5_000) {
+        const landing = relocate(null, null);
+        landing?.focus();
+        if (landing) settleOnLanding(landing);
+      }
+    }, 0);
   }, true);
 }
 // Dialogs that close in the same tick (a notice over the payment page, both closed by one exit) return focus once:
@@ -109,29 +129,93 @@ function scheduleRestore(order: number, run: () => void, drop: () => void): void
     batch.slice(1).forEach((entry) => entry.drop());
   });
 }
+// Dialogs open on this document, in opening order. Each one listens on the document, so a stacked pair would both see
+// one key press (stopPropagation cannot stop another listener on the same node). The top shown layer alone answers Esc
+// and Tab, is the only part of the page a screen reader can reach (everything beside its ancestor path is inert), and
+// takes focus when it opens; closing it hands focus back inside the layer below (03 §3.5). A layer whose root is not on
+// screen (a dialog left open in a hidden tab) never counts as the top.
+type Layer = { order: number; root: () => HTMLElement | null | undefined };
+const openLayers: Layer[] = [];
+const dropLayer = (layer: Layer) => { const index = openLayers.indexOf(layer); if (index >= 0) openLayers.splice(index, 1); };
+function topLayer(): { layer: Layer; el: HTMLElement | null } | null {
+  for (let i = openLayers.length - 1; i >= 0; i--) {
+    const el = openLayers[i].root() ?? null;
+    if (!el || shown(el)) return { layer: openLayers[i], el };
+  }
+  return null;
+}
+const inertByUs = new Set<Element>();
+// Live regions (the toast host) stay readable over a dialog; inert set by someone else is left alone.
+const KEEP_READABLE = "script, style, link, template, [aria-live]";
+function syncInert(): void {
+  if (typeof document === "undefined") return;
+  inertByUs.forEach((el) => el.removeAttribute("inert"));
+  inertByUs.clear();
+  const top = topLayer()?.el;
+  for (let node: Element | null = top ?? null; node && node !== document.body && node.parentElement; node = node.parentElement) {
+    for (const sibling of Array.from(node.parentElement.children)) {
+      if (sibling === node || sibling.hasAttribute("inert") || sibling.matches(KEEP_READABLE)) continue;
+      sibling.setAttribute("inert", "");
+      inertByUs.add(sibling);
+    }
+  }
+}
+const FOCUSABLE = '[tabindex]:not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href]';
+const usable = (el: Element | null | undefined): el is HTMLElement | SVGElement =>
+  !!el && el !== document.body && shown(el) && el.getAttribute("aria-disabled") !== "true" && !(el as HTMLButtonElement).disabled && !el.closest("[inert]");
+const firstFocusable = (scope: ParentNode): HTMLElement | null =>
+  Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).find(usable) ?? null;
+/** Focus something real inside el: its first usable control, else el itself (tabindex -1 keeps it out of the Tab order). */
+function focusInside(el: HTMLElement): void {
+  if (el.contains(document.activeElement) && usable(document.activeElement)) return;
+  const target = firstFocusable(el) ?? el;
+  if (target === el && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+  target.focus();
+}
+const MAIN_REGION = '[role="main"], main, uni-page-body';
+/** Focus that fell back to the page's main region moves on to its heading or bottom-bar action once the page draws one
+ *  (a result page renders its head just after the payment dialog closes), unless the user has moved on. */
+function settleOnLanding(landing: Element): void {
+  if (!landing.matches(MAIN_REGION)) return;
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    if (document.activeElement !== landing || tries > 10) { clearInterval(timer); return; }
+    const better = relocate(null, null);
+    if (better && better !== landing) { clearInterval(timer); better.focus(); }
+  }, 150);
+}
 const accessibleName = (el: Element) => (el.getAttribute("aria-label") || el.textContent || "").trim();
 
 /** The trigger's replacement: same test id, else same role, name and first class; else the page's bottom-bar action; else the visible heading. */
-function relocate(trace: { testid: string | null; role: string | null; name: string; cls: string | null }): HTMLElement | SVGElement | null {
-  const visible = <T extends Element>(list: ArrayLike<T>): T[] => Array.from(list).filter(shown);
-  if (trace.testid) {
-    const [hit] = visible(document.querySelectorAll<HTMLElement>(`[data-testid="${CSS.escape(trace.testid)}"]`));
+function relocate(trace: { testid: string | null; role: string | null; name: string; cls: string | null } | null, scope: HTMLElement | null): HTMLElement | SVGElement | null {
+  const visible = <T extends Element>(list: ArrayLike<T>): T[] => Array.from(list).filter(usable);
+  const within: ParentNode = scope ?? document;
+  if (trace?.testid) {
+    const [hit] = visible(within.querySelectorAll<HTMLElement>(`[data-testid="${CSS.escape(trace.testid)}"]`));
     if (hit) return hit;
   }
-  if (trace.name) {
+  if (trace?.name) {
     const same = trace.role ? `[role="${CSS.escape(trace.role)}"]` : '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea';
     // Same name and same first class: a redrawn copy of the control, not another control that happens to share its name.
-    const hit = visible(document.querySelectorAll<HTMLElement>(same)).find((x) => accessibleName(x) === trace.name && (!trace.cls || x.classList.contains(trace.cls)));
+    const hit = visible(within.querySelectorAll<HTMLElement>(same)).find((x) => accessibleName(x) === trace.name && (!trace.cls || x.classList.contains(trace.cls)));
     if (hit) return hit;
+  }
+  // A layer is still open below: stay inside it.
+  if (scope) {
+    if (!scope.hasAttribute("tabindex") && !firstFocusable(scope)) scope.setAttribute("tabindex", "-1");
+    return firstFocusable(scope) ?? scope;
   }
   // Next: the page's main action in its bottom bar, the reasonable next step (03 §3.5).
   const [action] = visible(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse();
   if (action) return action;
-  const [heading] = visible(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'));
-  if (!heading) return null;
-  // A heading is not in the Tab order; tabindex -1 lets it take focus without adding a Tab stop.
-  if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
-  return heading;
+  // Last: the visible page heading, else the page's main region. Never <body>.
+  const [heading] = Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2')).filter((x) => shown(x) && !x.closest("[inert]"));
+  const landing = heading ?? Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION)).find((x) => shown(x) && !x.closest("[inert]"));
+  if (!landing) return null;
+  // Neither is in the Tab order; tabindex -1 lets it take focus without adding a Tab stop.
+  if (!landing.hasAttribute("tabindex")) landing.setAttribute("tabindex", "-1");
+  return landing;
 }
 
 /**
@@ -181,6 +265,9 @@ export function useDialogA11y(
   // order and redraws its pay button): its test id, else its role and accessible name.
   let previousTrace: { testid: string | null; role: string | null; name: string; cls: string | null } | null = null;
   let openedAt = 0;
+  const layer: Layer = { order: 0, root: () => rootEl() };
+  // Closed only because a newer layer took over (a notice over the payment page): the trigger is kept for its return.
+  let paused = false;
   const forget = () => { previousFocus = null; previousTrace = null; };
 
   const rootEl = (): HTMLElement | null | undefined =>
@@ -202,6 +289,8 @@ export function useDialogA11y(
 
   function onKeydown(ev: KeyboardEvent): void {
     if (!open.value) return;
+    const top = topLayer();
+    if (top && top.layer !== layer) return;
     if (ev.key === "Escape") {
       if (!close) return;   // 没有取消语义的弹层:别吃掉 Esc,更别假装关掉了
       ev.preventDefault();
@@ -228,13 +317,23 @@ export function useDialogA11y(
   /** 关闭后把焦点还回触发它的那个控件,否则焦点回到文档开头,用户要重新 Tab 一遍。
    *  触发控件已被重绘或藏起时,回到同一位置的新控件,再不行落到页面主操作或可见标题(03 §3.5)。 */
   function restore(): void {
-    // Another modal opened as this one closed (the payment sheet hands over to the payment page) and holds focus: leave it there.
-    const holder = document.activeElement?.closest('[aria-modal="true"]');
-    if (holder && holder !== rootEl() && shown(holder)) { previousFocus = null; previousTrace = null; return; }
-    // Fall back only when focus is really lost: a parent dialog closing in the same step may already have restored it.
-    const lost = !document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected;
-    const back = previousFocus && shown(previousFocus) ? previousFocus : previousTrace && lost ? relocate(previousTrace) : null;
+    const top = topLayer();
+    // A layer opened after this one is on screen: this one was only paused. Keep its trigger and leave focus up there.
+    if (top && top.layer.order > openedAt) {
+      paused = true;
+      if (top.el) focusInside(top.el);
+      return;
+    }
+    // Otherwise focus goes back inside the layer still open below, if any, else to the page.
+    const scope = top?.el ?? null;
+    const active = document.activeElement;
+    const settled = usable(active) && (!scope || scope.contains(active));
+    const back = usable(previousFocus) && (!scope || scope.contains(previousFocus)) ? previousFocus
+      // A parent dialog closing in the same step may already have restored focus; move it only when it is really lost.
+      : settled ? null : relocate(previousTrace, scope);
     back?.focus();
+    restoredAt = Date.now();
+    if (back) settleOnLanding(back);
     previousFocus = null;
     previousTrace = null;
   }
@@ -248,18 +347,36 @@ export function useDialogA11y(
   watch(open, async (isOpen) => {
     if (typeof document === "undefined") return;
     detach();
+    dropLayer(layer);
     if (isOpen) {
       const active = document.activeElement;
-      previousFocus = active instanceof HTMLElement && active !== document.body || active instanceof SVGElement ? active : lastFocus;
+      const candidate = active instanceof HTMLElement && active !== document.body || active instanceof SVGElement ? active : lastFocus;
+      const modal = candidate?.closest('[aria-modal="true"]');
+      // Back from a pause, focus sits in the layer that is about to go: keep the trigger recorded before the pause.
+      if (!(paused && (previousFocus || previousTrace) && (!candidate || modal && modal !== rootEl()))) {
+        previousFocus = candidate;
+        previousTrace = previousFocus && previousFocus !== document.body ? { testid: previousFocus.getAttribute("data-testid"), role: previousFocus.getAttribute("role"), name: accessibleName(previousFocus), cls: previousFocus.classList[0] ?? null } : null;
+      }
+      paused = false;
       openedAt = ++openSeq;
-      previousTrace = previousFocus && previousFocus !== document.body ? { testid: previousFocus.getAttribute("data-testid"), role: previousFocus.getAttribute("role"), name: accessibleName(previousFocus), cls: previousFocus.classList[0] ?? null } : null;
+      layer.order = openedAt;
+      openLayers.push(layer);
       document.addEventListener("keydown", onKeydown, true);
       await nextTick();
       // 焦点必须真的移进来:不移的话读屏用户不知道弹层开了,键盘用户按 Tab 时
       // 焦点还在背景的触发按钮上,第一下 Tab 就走去了背景的下一个控件。
-      focusables()[0]?.focus();
+      // A layer that is still animating in may have no control on screen yet: try for a few frames, then take the root.
+      for (let frame = 0; frame < 6 && open.value; frame++) {
+        const top = topLayer();
+        if (top && top.layer.order > openedAt) break; // a newer layer already took over
+        syncInert();
+        const el = rootEl();
+        if (el && (firstFocusable(el) || frame === 5)) { focusInside(el); break; }
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      }
       return;
     }
+    syncInert();
     scheduleRestore(openedAt, restore, forget);
   // immediate:有些弹层不是靠自身的 v-if 开关,而是**整个组件被父级 v-if 挂载**
   // (captcha-slider 就是这样)。它们的 open 恒为 true,不给 immediate 的话 watch
@@ -270,6 +387,8 @@ export function useDialogA11y(
   // A dialog removed by its parent's v-if while still open (open stays true) is closing too: return focus the same way.
   onBeforeUnmount(() => {
     detach();
+    dropLayer(layer);
+    syncInert();
     if (open.value && (previousFocus || previousTrace)) scheduleRestore(openedAt, restore, forget);
   });
 }

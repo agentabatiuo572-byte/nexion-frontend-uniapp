@@ -3,7 +3,7 @@
     <view class="payment-pin-sheet" :class="{ 'nx-glass-sheet': !standalone }" @click.stop>
       <view class="payment-pin-header">
         <text class="payment-pin-title" role="heading" aria-level="2" aria-live="polite">{{ title }}</text>
-        <view class="payment-pin-close" :class="{ 'nx-frosted-button': standalone }" role="button" tabindex="0" :aria-label="t.paymentPin.close" @click="requestClose">
+        <view class="payment-pin-close" :class="{ 'nx-frosted-button': standalone }" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" :aria-label="t.paymentPin.close" @click="requestClose">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path :d="standalone ? 'm15 18-6-6 6-6' : 'm6 6 12 12M18 6 6 18'" /></svg>
         </view>
       </view>
@@ -54,7 +54,7 @@
           </template>
         </template>
         <text v-if="errorMessage" class="payment-pin-error" role="alert">{{ errorMessage }}</text>
-        <view v-if="!standalone" class="payment-pin-link payment-pin-link--muted" role="button" tabindex="0" @click="requestClose">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
+        <view v-if="!standalone" class="payment-pin-link payment-pin-link--muted" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="requestClose">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
       </view>
     </view>
   </view>
@@ -145,6 +145,8 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
 .payment-pin-link--muted { color: var(--v5-ink-2); }
 .payment-pin-link[aria-disabled="true"] { opacity: .45; }
+/* While the PIN is submitting the exits are held: say so to assistive tech and show it (03 §3.1 disabled 50%). */
+.payment-pin-close[aria-disabled="true"] { opacity: .5; }
 .payment-pin-phone { display: block; font-weight: 600; margin-top: var(--v5-space-2); }
 .payment-pin-code { width: 100%; min-height: 48px; padding: var(--v5-space-3); border-radius: var(--v5-radius-s); color: var(--v5-ink); background: var(--v5-surface-2); border: 1px solid var(--v5-border); }
 .payment-pin-error { display: block; color: var(--v5-danger); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
