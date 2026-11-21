@@ -20,7 +20,7 @@
             <text>{{ fill(copy.closesIn, { t: clock(deadlineLeft) }) }}</text>
           </view>
         </view>
-        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="payment.close" @keydown.enter.prevent="payment.close">
+        <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="closeSheet" @keydown.enter.prevent="closeSheet">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -131,7 +131,7 @@
       </view>
       <view class="pp-done__foot">
         <text class="pp-note">{{ copy.leaveOk }}</text>
-        <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
+        <NxButton :label="copy.viewOrder" variant="secondary" @click="openPaidOrder" />
       </view>
     </view>
 
@@ -228,7 +228,7 @@
     :icon="notice.icon" :tone="notice.tone" :busy="s.busy" @primary="notice.onPrimary" @secondary="notice.onSecondary" />
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import NxButton from '@/components/ui/nx-button.vue';
@@ -336,6 +336,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     : { primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }) };
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
   switch (kind) {
+    // The order exists but no payment started yet: it stays for later and the close still ends on the store home.
+    case 'keepOrder': return { icon: 'info', tone: 'warning', title: c.keepOrderTitle, body: c.keepOrderBody, primary: c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: payment.leaveToStore };
     case 'reminder': return s.method === 'HDPAY_BANK'
       ? { icon: 'shield', tone: 'brand', title: c.remindBankTitle, body: c.remindBank, primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss }
       : { icon: 'shield', tone: 'brand', title: c.remindUsdtTitle, body: fill(s.method === 'CREGIS_USDT_TRC20' ? c.remindTrc20 : s.method === 'CREGIS_USDT_ERC20' ? c.remindErc20 : c.remindBep20, { amt: s.quote ? amount(s.quote.totalUsdt) : '—' }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss };
@@ -432,7 +434,12 @@ function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
 // The top close ends the payment on the store home; a payment already started asks first (user 2026-11-22).
 function leavePage() { if (received.value) payment.leaveToStore(); else payment.notify('leave'); }
 // The bank page sits in a native view above the notice, so it closes before the question is asked.
-function leaveCashier() { payment.closeCashier(); payment.notify('leave'); }
+// The question opens after the bank page has closed and handed focus back, so the question keeps focus.
+function leaveCashier() { payment.closeCashier(); void nextTick(() => payment.notify('leave')); }
+// The method sheet's close ends on the store home too (user 2026-11-22); an order already placed asks first.
+function closeSheet() { if (s.kind === 'ORDER_PAY' && s.orderNo) payment.notify('keepOrder'); else payment.leaveToStore(); }
+// A payment without an order (trial, trade-in, capacity) is followed from Orders.
+function openPaidOrder() { if (s.kind === 'ORDER_PAY' && s.orderNo) payment.openOrder(); else payment.openOrders(); }
 // Continuing a bank payment means its bank page; other payments stay on their payment page.
 function continuePaying() { dismiss(); if (isBank.value && ready.value) payment.openCashier(); }
 
