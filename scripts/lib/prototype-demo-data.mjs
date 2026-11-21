@@ -161,38 +161,44 @@ function demoPaidPurchase(order) {
 }
 
 const approvedQuotaSku='stellarbox-s1';
+const demoPaymentQuotaHolds=new WeakMap();
 
 function demoHardwareQuota(product,state,points,now){
-  const monthlyStock=60,month=demoTeamBusinessDate(now).slice(0,7);
+  const monthlyStock=state.quotaMonthlyStock??60,month=demoTeamBusinessDate(now).slice(0,7);
   const sameMonth=at=>at<=now&&demoTeamBusinessDate(at).slice(0,7)===month;
   const sampleAt=state.previewFactsAt??demoStartedAt;
-  const soldOut=state.catalogState==='soldout'&&product.id==='stellarbox-s1';
+  const soldOut=state.catalogState==='soldout'&&product.id===approvedQuotaSku;
   const seeded=sameMonth(sampleAt)?(soldOut?monthlyStock:7):0;
-  const used=(state.createdOrders??[]).filter(order=>demoPaidPurchase(order)
+  const sold=(state.createdOrders??[]).filter(order=>demoPaidPurchase(order)
     &&order.hardwareQuotaUsedAt!=null&&sameMonth(order.hardwareQuotaUsedAt))
     .flatMap(order=>order.lineItems).filter(line=>line.sku===product.id).reduce((sum,line)=>sum+line.quantity,0);
+  const soldThisMonth=seeded+sold;
+  const pendingThisMonth=[...(demoPaymentQuotaHolds.get(state)??[])].filter(hold=>sameMonth(hold.at))
+    .reduce((sum,hold)=>sum+hold.quantity,0);
+  const usedThisMonth=soldThisMonth+pendingThisMonth;
+  const remaining=Math.max(0,monthlyStock-usedThisMonth);
   return {productId:product.id,quotaCode:product.id.toUpperCase(),name:product.name,price:product.price,
-    monthlyStock,soldThisMonth:seeded+used,unlockKind:'ALL',
+    monthlyStock,soldThisMonth,pendingThisMonth,usedThisMonth,remaining,unlockKind:'ALL',
     // The legacy open preset keeps its original orders and uses a quota without a points requirement.
     conditions:state.walletLegacySeed&&state.catalogState==='available'?[]:
       [{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:points}],
-    perks:[],available:product.available};
+    perks:[],available:product.available&&remaining>0};
 }
 
 function demoE1PurchaseRule(product) {
   return {policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
 }
 
-function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
+function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkMonthlyQuota=true) {
   const e1=demoE1PurchaseRule(product);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
-  if(state.quotaState==='approved'&&product.id===approvedQuotaSku){
+  if(checkMonthlyQuota&&state.quotaState==='approved'&&product.id===approvedQuotaSku){
     const quota=demoHardwareQuota(product,state,points,now);
     const [condition]=quota.conditions;
     const gap=condition?Math.max(0,condition.required-condition.current):0;
-    const remaining=Math.max(0,quota.monthlyStock-quota.soldThisMonth);
+    const {remaining}=quota;
     f4b.conditions=[...(condition?[{...condition,gap,met:gap===0}]:[]),
-      {kind:'monthlyQuota',required:quota.monthlyStock,current:quota.soldThisMonth,gap:remaining,met:remaining>=quantity}];
+      {kind:'monthlyQuota',required:quota.monthlyStock,current:quota.usedThisMonth,gap:remaining,met:remaining>=quantity}];
     f4b.eligible=gap===0&&remaining>=quantity;
     f4b.decisionCode=remaining<quantity?'F4B_MONTHLY_QUOTA_EXHAUSTED':gap>0?'F4B_REQUIREMENTS_NOT_MET':'ELIGIBLE';
   }
@@ -207,12 +213,24 @@ function requireDemoMonthlyQuota(policy) {
   if(policy.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED')refuse('ORDER_MONTHLY_QUOTA_EXHAUSTED');
 }
 
-export function requireDemoExternalPaymentQuota(state,products,items,now) {
-  const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
-  for(const {productNo,quantity} of items){
-    const product=products.find(row=>row.id===productNo);
-    if(product)requireDemoMonthlyQuota(demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
+export function requireDemoExternalPaymentQuota(state,products,items,now,reserve=false) {
+  const product=products.find(row=>row.id===approvedQuotaSku);
+  const quantity=state.quotaState==='approved'&&product
+    ? items.filter(item=>item.productNo===product.id).reduce((sum,item)=>sum+item.quantity,0) : 0;
+  if(quantity>0){
+    const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+    requireDemoMonthlyQuota(demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
   }
+  if(!reserve||state.quotaHoldMode==='legacy-live-quota')return null;
+  // Even a purchase without a configured tier captures the decision made at intent creation.
+  const hold={at:now,quantity};
+  if(!demoPaymentQuotaHolds.has(state))demoPaymentQuotaHolds.set(state,new Set());
+  demoPaymentQuotaHolds.get(state).add(hold);
+  return hold;
+}
+
+export function removeDemoPaymentQuotaHold(state,hold) {
+  demoPaymentQuotaHolds.get(state)?.delete(hold);
 }
 
 export function requireDemoExternalOrderGate(products,items) {
@@ -224,8 +242,8 @@ export function requireDemoExternalOrderGate(products,items) {
   }
 }
 
-export function requireDemoPurchase(state,products,items,now,settlement=false) {
-  const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null) {
+  const points=quotaHold ? 0 : demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
   const quantities=new Map();
   for(const item of items){
     if(!Number.isInteger(item.quantity)||item.quantity<1){
@@ -233,11 +251,11 @@ export function requireDemoPurchase(state,products,items,now,settlement=false) {
     }
     quantities.set(item.productNo,(quantities.get(item.productNo)??0)+item.quantity);
   }
-  let hardwareQuotaUsedAt=null;
+  let hardwareQuotaUsedAt=quotaHold?.quantity ? quotaHold.at : null;
   for(const [sku,quantity] of quantities){
     const product=products.find(item=>item.id===sku);
     if(!product||state.dataState==='empty')throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
-    const {eligible,decisionCode,policies}=demoSkuPurchaseRules(state,product,points,now,quantity);
+    const {eligible,decisionCode,policies}=demoSkuPurchaseRules(state,product,points,now,quantity,!quotaHold);
     if(eligible){
       if(settlement&&policies[1].decisionCode==='ELIGIBLE')hardwareQuotaUsedAt=now;
       continue;
@@ -554,7 +572,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
     return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,empty?[]:products,
-      productNo=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true));
+      productNo=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true,request.verifiedPayment?.quotaHold));
   }
   if(pathname==='/api/devices/activate'&&request.method()==='POST'){
     const {deviceId,expectedVersion,clientMaxDevices=null}=request.postDataJSON();

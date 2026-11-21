@@ -51,7 +51,10 @@ let locale='zh';
 // Continue from an imported epoch, so the first scenario change never reuses it.
 let scenarioEpoch=state.scenarioEpoch??0;
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
-const fixtureFor=(url,request)=>demoFixture(url,locale,state,request);
+const fixtureFor=(url,request)=>{
+  if(['/api/app/team/quota','/api/store/purchase-eligibility'].includes(url.pathname))checkoutFlow?.observePayments();
+  return demoFixture(url,locale,state,request);
+};
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
 await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor});
@@ -157,6 +160,9 @@ const server=http.createServer(async(req,res)=>{
         updatePreviewHomeDisplay(state,update,Date.now());
         // A live trial conversion policy change keeps existing quotes and payment intents.
         if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
+        // API-only preview controls for the last quota spot and pre-hold compatibility.
+        if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
+        if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(update.reset||update.savedAttemptState)authDemo.reset();
