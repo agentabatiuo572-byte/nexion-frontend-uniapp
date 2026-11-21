@@ -25,10 +25,10 @@
       <EmptyState
         v-if="inventoryError"
         class="mx-4"
-        kind="recoverable-error"
+        kind="recoverable-error" page
         :title="t.empty.errorTitle"
         :desc="t.empty.errorDesc"
-        :cta-label="t.empty.errorCta"
+        :cta-label="t.ui.reload"
         emphasis
         @cta="retryInventory"
       />

@@ -32,10 +32,23 @@ export function demoNotifications(locale, state, now, device, order) {
       body: text('本次服务维护已完成，消息与订单查询已恢复。\n如页面仍显示维护前的内容，请返回后重新打开；尚未完成的操作请先查看当前状态再继续。', 'Maintenance is complete. Messages and order lookups are available again.\nIf a page still shows earlier information, reopen it. Check the current status of unfinished actions before continuing.', 'Bảo trì đã hoàn tất. Tin nhắn và tra cứu đơn hàng đã hoạt động lại.\nNếu trang vẫn hiển thị nội dung cũ, hãy mở lại. Kiểm tra trạng thái thao tác chưa hoàn tất trước khi tiếp tục.'),
       ctaHref: '', createdAt: at(0) },
   ];
+  // Both paging modes use the same older notices so the failed cursor can be retried.
+  if (state.notificationPageState === 'paginated' || state.notificationPageState === 'error') {
+    const latest = at(4);
+    for (let index = 0; index < 100; index += 1) {
+      const createdAt = latest - index * 3_600_000;
+      rows.push({
+        id: 900 - index, kind: 'system',
+        title: text(`历史服务公告 ${index + 1}`, `Past service notice ${index + 1}`, `Thông báo dịch vụ trước đây ${index + 1}`),
+        body: text('本次例行服务检查已完成。', 'The scheduled service check is complete.', 'Đã hoàn tất kiểm tra dịch vụ định kỳ.'),
+        ctaHref: '', createdAt, readAt: createdAt + 60_000,
+      });
+    }
+  }
   return rows.filter(row => !state.clearedNotificationIds?.includes(row.id)).map(row => ({
     ...row, priority: row.id === 903 ? 'high' : 'normal',
     ctaLabel: row.ctaHref ? text('查看详情', 'View details', 'Xem chi tiết') : '',
-    readAt: state.read || state.readIds?.includes(row.id) || row.id >= 904 ? now : null,
+    readAt: row.readAt ?? (state.read || state.readIds?.includes(row.id) || row.id >= 904 ? now : null),
   })).sort((a, b) => b.id - a.id);
 }
 
@@ -46,14 +59,18 @@ export function demoNotificationPage(rows, params) {
   if (cursor !== null && (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(cursor) || cursor <= 0)) {
     throw Object.assign(new Error('NOTIFICATION_CURSOR_INVALID'), { status: 400 });
   }
-  // Cap the fixture page so its small sample exercises the real cursor flow.
-  const limit = Math.min(3, Math.max(1, Math.trunc(Number(params.get('limit')) || 3)));
+  const rawLimit = params.get('limit')?.trim();
+  const requestedLimit = rawLimit ? Number(rawLimit) : 30;
+  if (rawLimit && (!/^[+-]?\d+$/.test(rawLimit) || requestedLimit < -2_147_483_648 || requestedLimit > 2_147_483_647)) {
+    throw Object.assign(new Error('NOTIFICATION_LIMIT_INVALID'), { status: 400 });
+  }
+  const limit = Math.max(1, Math.min(requestedLimit, 100));
   const remaining = cursor === null ? rows : rows.filter(row => row.id < cursor);
   const items = remaining.slice(0, limit);
   const unread = rows.filter(row => row.readAt === null);
   return {
     items,
-    nextCursor: remaining.length > items.length ? String(items.at(-1).id) : null,
+    nextCursor: remaining.length > limit ? String(items.at(-1).id) : null,
     unread: unread.length,
     actionableUnread: unread.filter(row => row.kind !== 'marketing').length,
   };

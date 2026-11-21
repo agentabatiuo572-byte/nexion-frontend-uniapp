@@ -2,7 +2,10 @@
   <view class="promotion promotion-main">
     <PromotionAction role="button" tabindex="0" @click="chooseState" @keydown.enter.prevent="chooseState" @keydown.space.prevent="chooseState"><text>{{ state ? t.promotion[rewardStateKey(state)] : t.promotion.allStates }}</text></PromotionAction>
     <view v-if="(loading || !sessionReady) && !rewards.length" class="promotion-flat" role="status"><text>{{ t.promotion.loading }}</text></view>
-    <EmptyState v-if="error && !rewards.length" kind="recoverable-error" :title="t.promotion.error" :cta-label="t.promotion.retry" @cta="load(true)" />
+    <!-- Embedded in the reward records the list is one block: a failed first read shows the unknown placeholder and
+         recovers on its own (03 §3.5.2). On its own page it is the whole page and keeps the one 重新加载. -->
+    <view v-if="embedded && error && !rewards.length" class="promotion-flat"><text>—</text></view>
+    <EmptyState v-else-if="error && !rewards.length" kind="recoverable-error" page :title="t.promotion.error" :cta-label="t.ui.reload" @cta="load(true)" />
     <view v-else-if="sessionReady && !loading && !rewards.length && !error" class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.emptyRewards }}</text>
       <text class="promotion-copy">{{ t.promotion.emptyNote }}</text>
@@ -39,7 +42,7 @@ import { binarySessionReady } from "@/lib/binary-session-ready";
 import { rewardStateKey } from "@/lib/promotion-display";
 import { navTo } from "@/lib/route";
 
-const props = withDefaults(defineProps<{ activityId?: string; orderNo?: string }>(), { activityId: "", orderNo: "" });
+const props = withDefaults(defineProps<{ activityId?: string; orderNo?: string; embedded?: boolean }>(), { activityId: "", orderNo: "", embedded: false });
 const t = useT(), app = useApp(), auth = useAuth();
 const sessionReady = computed(() => binarySessionReady({
   remote: remoteApiEnabled,

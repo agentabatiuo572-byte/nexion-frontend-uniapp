@@ -4,7 +4,7 @@
       <SubPageHeader back="/pages/team/rank" :title="guide.pageTitle" plain design />
       <view class="rank-how-content">
         <view v-if="state.loading && !state.policy" class="how-state" role="status" aria-live="polite" aria-busy="true"><text>{{ statusText }}</text></view>
-        <EmptyState v-else-if="state.error || incomplete" kind="recoverable-error" :title="statusText" :cta-label="content.copy.retry" @cta="reload" />
+        <EmptyState v-else-if="state.error || incomplete" kind="recoverable-error" page :title="statusText" :cta-label="t.ui.reload" @cta="reload" />
         <template v-else>
           <TeamRuleHero kind="growth" :title="guide.headline" :sub="guide.intro" :sections="directory" :nav-label="ruleCopy.contents" data-rank-how="published" />
 

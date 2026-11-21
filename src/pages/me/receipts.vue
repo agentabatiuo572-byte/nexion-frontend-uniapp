@@ -40,10 +40,10 @@
         </view>
         <EmptyState
           v-if="showRemoteReceiptInitialError"
-          kind="recoverable-error"
+          kind="recoverable-error" page
           :title="t.empty.errorTitle"
           :desc="t.empty.errorDesc"
-          :cta-label="t.empty.errorCta"
+          :cta-label="t.ui.reload"
           emphasis
           @cta="retryRemoteReceipts"
         />

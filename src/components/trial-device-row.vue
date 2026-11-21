@@ -16,7 +16,6 @@
       <view v-if="!hidePersonalData" class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view v-viz-inview :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
-      <view v-if="!presentation.presentationReady.value" class="trial-device-row__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view v-if="!presentation.presentationReady.value" class="trial-device-row__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
       <view class="trial-device-row__actions">
         <view v-if="variant === 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
         <view class="trial-device-row__details" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails" @keydown.enter.stop.prevent="goDetails" @keydown.space.stop.prevent="goDetails"><text>{{ copy.detailsAction }}</text></view>
@@ -106,9 +105,6 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__progress > view { height:100%; border-radius:inherit; background:var(--v5-brand); }
 .trial-device-row__estimate { margin-top:6px; }
 .trial-device-row__note { display:block; margin-top:8px; font:400 11px/17px var(--font-v5); color:var(--v5-ink-3); }
-.trial-device-row__notice { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; margin-top:8px; color:var(--v5-warning-ink); font:400 12px/18px var(--font-v5); }
-.trial-device-row__notice.nx-inline-recovery { display:grid; gap:12px; }
-.trial-device-row__retry { display:flex; align-items:center; min-height:44px; padding:0 8px; color:var(--v5-brand); }
 .trial-device-row__actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 8px; margin-top:8px; }
 /* Keep the mobile hit area while the visible pill remains a compact 32px. */
 .trial-device-row__actions > view { position:relative; display:inline-flex; flex:0 1 auto; align-items:center; justify-content:center; min-height:44px; max-width:100%; box-sizing:border-box; padding:8px 12px; border-radius:var(--v5-radius-full); font:500 clamp(12px,3.34vw,13px)/18px var(--font-v5); text-align:center; }

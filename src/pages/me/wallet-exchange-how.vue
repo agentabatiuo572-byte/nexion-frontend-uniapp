@@ -13,10 +13,11 @@
     </HowPublishedContent>
     <view v-else-if="remoteApiEnabled" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/wallet-exchange" />
-      <view class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px; color: var(--v5-ink-2)">
-        <text class="block" style="font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight)">{{ exchangeAvailable === false ? w.pausedTitle : exchangeLoading ? t.howPublished.loading : t.howPublished.unavailableTitle }}</text>
-        <text class="block" style="margin-top: 8px; font-size: var(--ui-type-list-subtitle); line-height: 1.6">{{ exchangeAvailable === false ? w.pausedBody : exchangeLoading ? '' : t.exchange.remoteUnavailableClosed }}</text>
-        <view v-if="!exchangeLoading && exchangeAvailable === null" role="button" tabindex="0" style="margin-top: 16px; color: var(--v5-brand)" @click="loadExchangeCaps"  @keydown.enter.prevent="loadExchangeCaps" @keydown.space.prevent="loadExchangeCaps"><text>{{ t.ui.retry }}</text></view>
+      <!-- A failed capability read leaves the guide with nothing to show: the shared whole-page result, as on every other guide. -->
+      <EmptyState v-if="capsFailed && exchangeAvailable === null" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" :cta-busy="exchangeLoading" @cta="loadExchangeCaps" />
+      <view v-else class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px; color: var(--v5-ink-2)">
+        <text class="block" style="font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight)">{{ exchangeAvailable === false ? w.pausedTitle : t.howPublished.loading }}</text>
+        <text v-if="exchangeAvailable === false" class="block" style="margin-top: 8px; font-size: var(--ui-type-list-subtitle); line-height: 1.6">{{ w.pausedBody }}</text>
         <view v-if="exchangeAvailable === false" role="button" tabindex="0" style="margin-top: 16px; color: var(--v5-brand)" @click="goBack"  @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ w.ctaBack }}</text></view>
       </view>
     </view>
@@ -33,6 +34,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { navBack } from "@/lib/route";
 import { computed, onUnmounted, ref } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { HowContentBlock } from "@/api/how-content-api";
@@ -44,6 +46,8 @@ const t = useT();
 const w = computed(() => t.value.exchangeHowItWorks);
 const exchangeAvailable = ref<boolean | null>(null);
 const exchangeLoading = ref(remoteApiEnabled);
+// View only: once the read has failed, the result stays on screen while a re-read runs.
+const capsFailed = ref(false);
 let capsRequest = 0;
 
 async function loadExchangeCaps() {
@@ -53,9 +57,10 @@ async function loadExchangeCaps() {
   exchangeLoading.value = true;
   try {
     const caps = await exchangeApi.fetchCaps();
-    if (request === capsRequest) exchangeAvailable.value = caps.swapEnabled;
+    if (request === capsRequest) { exchangeAvailable.value = caps.swapEnabled; capsFailed.value = false; }
   } catch {
     // Unknown is not open: the guide must not claim swaps can be submitted.
+    if (request === capsRequest) capsFailed.value = true;
   } finally {
     if (request === capsRequest) exchangeLoading.value = false;
   }

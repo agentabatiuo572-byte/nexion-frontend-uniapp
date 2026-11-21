@@ -4,7 +4,7 @@
       <SubPageHeader back="/pages/team/team" :title="t.network.pageTitle" />
 
       <view class="network-content">
-        <EmptyState v-if="remoteApiEnabled && network.remoteStatus === 'error' && !network.hasRemoteSnapshot" kind="recoverable-error" :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.network.retry" @cta="network.refreshCanonicalNetwork()" />
+        <EmptyState v-if="remoteApiEnabled && network.remoteStatus === 'error' && !network.hasRemoteSnapshot" kind="recoverable-error" page :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.ui.reload" @cta="network.refreshCanonicalNetwork()" />
         <template v-else>
         <view class="network-overview nx-tint">
           <view class="network-overview__head">

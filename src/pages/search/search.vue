@@ -53,10 +53,10 @@
 
       <EmptyState
         v-else-if="searchResultState.body === 'recoverable-error'"
-        kind="recoverable-error"
+        kind="recoverable-error" page
         :title="recoveryCopy.unavailable"
         :desc="recoveryCopy.retryHint"
-        :cta-label="t.ui.retry"
+        :cta-label="t.ui.reload"
         @cta="retrySearchSources"
       />
 

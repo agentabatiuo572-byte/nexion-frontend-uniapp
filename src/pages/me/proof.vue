@@ -16,7 +16,7 @@
         <SubPageHeader back="/pages/me/me" :title="t.proof.title" />
 
         <view v-if="remoteLoading && !proofDisplayReady" :style="remoteErrorStyle" role="status" aria-busy="true"><text>{{ recoveryTitle }}</text></view>
-        <EmptyState v-else-if="!proofDisplayReady || !proofReady" kind="recoverable-error" :title="recoveryTitle" :desc="recoveryHint" :cta-label="t.ui.retry" @cta="refreshRemoteProof" />
+        <EmptyState v-else-if="!proofDisplayReady || !proofReady" kind="recoverable-error" :page="!proofDisplayReady" :title="recoveryTitle" :desc="recoveryHint" :cta-label="proofDisplayReady ? t.ui.retry : t.ui.reload" :cta-busy="remoteLoading" @cta="refreshRemoteProof" />
 
       <view v-if="proofDisplayReady" :style="bodyStyle">
         <!-- Variant tabs -->
@@ -215,6 +215,7 @@ import type { ProofSnapshot } from "@/api/proof-api";
 import { proofStreakFacts } from "@/lib/proof-streak";
 import { proofPosterText } from "@/lib/proof-poster-values";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 type Variant = "earnings" | "streak" | "network";
@@ -282,10 +283,13 @@ async function refreshRemoteProof() {
     // failures stay distinct: a missing base does not invalidate proof facts.
     const [facts] = await Promise.allSettled([proofApi.snapshot(), config.load()]);
     if (!current()) return;
-    if (facts.status === "fulfilled") remoteSnapshot.value = facts.value;
-    else { remoteSnapshot.value = null; remoteError.value = true; }
-  } catch {
-    if (current()) { remoteSnapshot.value = null; remoteError.value = true; }
+    if (facts.status === "rejected") throw facts.reason;
+    remoteSnapshot.value = facts.value;
+  } catch (cause) {
+    if (current()) {
+      if (!isTransientReadFailure(cause)) remoteSnapshot.value = null;
+      remoteError.value = true;
+    }
   } finally {
     if (current()) remoteLoading.value = false;
   }
@@ -353,7 +357,7 @@ const activeDays = computed<number | null>(() => remoteApiEnabled ? remoteSnapsh
 // [FEAT-SHARE1] 链接单源收编:构造走 lib/share(禁自拼 nexgrid.ai/ref/)。
 const refCode = computed(() => remoteApiEnabled ? remoteSnapshot.value?.referralCode ?? "—" : app.user.referralCode);
 const referralLink = computed(() => refCode.value === "—" ? "" : buildShareLink(refCode.value));
-const proofDisplayReady = computed(() => !remoteApiEnabled || (!remoteError.value && remoteSnapshot.value !== null));
+const proofDisplayReady = computed(() => !remoteApiEnabled || remoteSnapshot.value !== null);
 const proofReady = computed(() => remoteMounted && !remoteLoading.value
   && (!remoteApiEnabled || (!remoteError.value && remoteSnapshot.value !== null))
   && referralLink.value.trim().length > 0);

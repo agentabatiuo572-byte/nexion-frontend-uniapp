@@ -7,7 +7,7 @@
       <HowHero v-if="!state.error && !content.incomplete" kind="ledger" :title="s(sectionId.hero).title" :sub="s(sectionId.hero).body" :sections="directory" :nav-label="guideCopy.contents" />
 
       <view v-if="state.loading && !state.snapshot" class="commission-guide-state" role="status" aria-busy="true"><text>{{ content.copy.loading }}</text></view>
-      <EmptyState v-else-if="state.error || content.incomplete" kind="recoverable-error" :title="content.copy.unavailable" :cta-label="content.copy.retry" @cta="reload" />
+      <EmptyState v-else-if="state.error || content.incomplete" kind="recoverable-error" page :title="content.copy.unavailable" :cta-label="t.ui.reload" @cta="reload" />
 
       <template v-if="!state.error && !content.incomplete">
         <HowSection anchor="overview" :title="s(sectionId.overview).title" :body="s(sectionId.overview).body" />

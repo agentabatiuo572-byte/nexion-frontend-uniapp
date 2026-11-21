@@ -15,7 +15,7 @@
         <view :style="skelStyle('66%', '34px', '8px')" />
         <view :style="skelStyle('88%', '14px', '12px')" />
       </view>
-      <EmptyState v-else-if="trackingReadError && !wd" kind="recoverable-error" :title="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="retryTrackedWithdrawal" />
+      <EmptyState v-else-if="trackingReadError && !wd" kind="recoverable-error" page :title="t.empty.errorDesc" :cta-label="t.ui.reload" @cta="retryTrackedWithdrawal" />
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
       <view v-else-if="!wd" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ deepLinkMiss ? t.wallet.withdrawalNotFound : t.wallet.noActiveWithdrawal }}</text>

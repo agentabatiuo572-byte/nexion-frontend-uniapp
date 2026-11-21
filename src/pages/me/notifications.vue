@@ -25,7 +25,7 @@
         <template #option="{ option }"><text class="message-option-label">{{ option.label }}</text><view v-if="option.hasUnread && option.value !== 'all'" class="message-category-dot" aria-hidden="true" /></template>
       </GlassSegments>
       <scroll-view :key="section" scroll-y class="message-scroll" :class="{ 'message-scroll--notifications': section === 'notifications' }" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
-      <ServiceMessageList v-if="section === 'service'" />
+      <ServiceMessageList v-if="section === 'service'" :retry="serviceRecovery.retry" />
       <view v-else class="notification-feed" :class="{ 'notification-feed--failed': notifs.readFailedWithoutData }" :aria-busy="notifs.loading">
         <view v-if="!notifs.loading && !notifs.readFailedWithoutData && notifs.nextCursor && filtered.length === 0" role="status" class="message-state"><text>{{ t.notifs.moreToCheck }}</text></view>
         <EmptyState v-if="!notifs.loading && !notifs.readFailedWithoutData && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
@@ -132,7 +132,7 @@ const notificationRecovery = useAutoRecovery({
   // The fixed message feed has its own scroller outside the chassis pull surface.
   repeatMs: 30_000,
 });
-useAutoRecovery({
+const serviceRecovery = useAutoRecovery({
   failed: () => remoteApiEnabled && !!center.serviceReadError && !conversations.loading && !conversations.categoryLoading,
   retry: () => center.refreshService(),
   repeatMs: 30_000,

@@ -7,7 +7,7 @@
       <view class="pool-content">
 
 
-        <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="retryRemotePool" />
+        <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" page :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="remoteState === 'hold' ? t.pool.retry : t.ui.reload" @cta="retryRemotePool" />
         <template v-else>
         <view class="pool-hero nx-tint">
           <view class="pool-share">
@@ -100,7 +100,7 @@ import { networkReauditCopy } from "@/i18n/network-reaudit";
 import { useLocaleStore } from "@/store/locale";
 import { apiRuntimeConfig, remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
-import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
+import { leadershipPoolReadFailure } from "@/lib/leadership-pool-state";
 import { createPayoutClock } from "@/lib/payout-clock";
 import { useAuth } from '@/store/auth';
 import { useApp } from "@/store/app";
@@ -270,8 +270,12 @@ async function loadRemotePool(refreshRank = true) {
     remoteState.value = "ready";
   } catch (cause) {
     if (!current()) return;
-    remotePool.value = null; poolRules.value = null;
-    remoteState.value = leadershipPoolFailureState(cause);
+    const failure = leadershipPoolReadFailure(cause);
+    if (!failure.retainSnapshot) {
+      remotePool.value = null;
+      poolRules.value = null;
+    }
+    remoteState.value = failure.state;
   }
 }
 
@@ -289,13 +293,15 @@ const unsubscribePoolRun = subscribeRuntimeRevision(() => {
 });
 onShow(() => {
   pageVisible = true;
-  if (remoteApiEnabled) void loadRemotePool();
+  if (remoteApiEnabled) {
+    if (remotePool.value && Date.parse(remotePool.value.nextPayoutAt) <= Date.now()) remotePool.value = null;
+    void loadRemotePool();
+  }
   payoutClock.start();
 });
 onHide(() => {
   pageVisible = false;
   remoteRequest += 1;
-  remotePool.value = null;
   remoteState.value = remoteApiEnabled ? "loading" : "ready";
   payoutClock.stop();
 });
