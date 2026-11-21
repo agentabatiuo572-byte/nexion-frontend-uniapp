@@ -150,7 +150,7 @@ const vi: typeof zh = {
   warnBep20: 'Chỉ chuyển USDT qua mạng BSC (BEP20), đúng số tiền cần trả; chuyển sai mạng sẽ không thể lấy lại. Ví bên ngoài thu thêm phí gas BNB.',
   warnErc20: 'Chỉ chuyển USDT qua mạng Ethereum (ERC20), đúng số tiền cần trả; chuyển sai mạng sẽ không thể lấy lại. Ví bên ngoài thu thêm phí gas ETH.',
   bankPage: 'Trang thanh toán ngân hàng', reopen: 'Mở lại trang thanh toán', warnBank: 'Chỉ thanh toán trên trang thanh toán, không tự chuyển vào tài khoản khác; số tiền phải đúng như trên trang.',
-  cashierTitle: 'Thanh toán bằng thẻ', cashierCloses: 'Đơn đóng sau {t}', secure: 'Trang thanh toán an toàn', autoReturn: "Thanh toán xong có thể quay lại ngay. Trang tự đóng khi khoản thanh toán được xác nhận.", closeCashier: 'Đóng trang thanh toán', paidReturn: "Tôi đã thanh toán, quay lại",
+  cashierTitle: 'Thanh toán bằng thẻ', cashierCloses: 'Đơn đóng sau {t}', secure: 'Trang thanh toán an toàn', autoReturn: "Thanh toán xong có thể quay lại ngay. Trang tự đóng khi khoản thanh toán được xác nhận.", closeCashier: 'Đóng trang thanh toán', paidReturn: "Đã thanh toán, quay lại",
   resultTitle: 'Kết quả thanh toán', received: 'Đã nhận thanh toán', provisioning: 'Đang kích hoạt thiết bị, xong sẽ tự chuyển trang', provisionTrack: 'Tiến độ kích hoạt', trackPaid: 'Đã thanh toán', trackProvision: 'Kích hoạt',
   paidAmount: 'Số tiền đã trả', paidMethod: 'Phương thức', product: 'Sản phẩm', leaveOk: 'Bạn có thể rời trang này, chúng tôi sẽ báo khi kích hoạt xong', viewOrder: 'Xem đơn hàng',
   leaveTitle: 'Thanh toán đang diễn ra', leaveBody: 'Bạn có thể tiếp tục trong chi tiết đơn hàng. Vui lòng không thanh toán lại.', continuePay: 'Tiếp tục thanh toán', leave: 'Rời đi',
@@ -170,7 +170,7 @@ const vi: typeof zh = {
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
-  cashierSaveQr: 'Simpan kode QR',
+  cashierSaveQr: 'Simpan QR',
   cashierImageSaved: 'Tersimpan di galeri',
   cashierImageSaveFailed: 'Kode QR gagal disimpan. Ambil tangkapan layar saja.',
   cashierAlbumPermissionDenied: 'Izinkan akses foto di Pengaturan, lalu coba lagi',
@@ -206,7 +206,7 @@ const id: typeof zh = {
   warnBep20: 'Kirim USDT hanya lewat BSC (BEP20), tepat sebesar total bayar. Dana yang dikirim lewat jaringan lain tidak dapat dipulihkan. Biaya gas dalam BNB dibayar terpisah melalui dompet eksternal.',
   warnErc20: 'Kirim USDT hanya lewat Ethereum (ERC20), tepat sebesar total bayar. Dana yang dikirim lewat jaringan lain tidak dapat dipulihkan. Biaya gas dalam ETH dibayar terpisah melalui dompet eksternal.',
   bankPage: 'Halaman pembayaran bank', reopen: 'Buka lagi halaman pembayaran', warnBank: 'Bayar hanya di halaman pembayaran. Jangan transfer ke rekening lain, dan bayar tepat sesuai jumlah yang tertera.',
-  cashierTitle: 'Pembayaran kartu bank', cashierCloses: 'Pesanan ditutup dalam {t}', secure: 'Halaman pembayaran aman', autoReturn: "Setelah membayar, Anda bisa kembali kapan saja. Halaman ini tertutup setelah pembayaran dikonfirmasi.", closeCashier: 'Tutup halaman pembayaran', paidReturn: "Sudah bayar, kembali",
+  cashierTitle: 'Pembayaran kartu bank', cashierCloses: 'Pesanan ditutup dalam {t}', secure: 'Halaman pembayaran aman', autoReturn: "Usai membayar, Anda bisa kembali kapan saja. Halaman tertutup saat pembayaran dikonfirmasi.", closeCashier: 'Tutup halaman pembayaran', paidReturn: "Sudah bayar, kembali",
   resultTitle: 'Hasil pembayaran', received: 'Pembayaran diterima', provisioning: 'Menyiapkan perangkat Anda. Anda akan diarahkan ke sana setelah siap.', provisionTrack: 'Progres penyiapan', trackPaid: 'Dibayar', trackProvision: 'Disiapkan',
   paidAmount: 'Jumlah dibayar', paidMethod: 'Dibayar dengan', product: 'Barang', leaveOk: 'Anda boleh meninggalkan halaman ini. Kami akan memberi tahu saat penyiapan selesai.', viewOrder: 'Lihat pesanan',
   leaveTitle: 'Pembayaran sedang berjalan', leaveBody: 'Anda bisa melanjutkan dari detail pesanan nanti. Jangan membayar dua kali.', continuePay: 'Lanjut bayar', leave: 'Keluar',
@@ -226,7 +226,7 @@ const id: typeof zh = {
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
-  cashierSaveQr: 'Simpan kod QR',
+  cashierSaveQr: 'Simpan QR',
   cashierImageSaved: 'Disimpan ke galeri',
   cashierImageSaveFailed: 'Kod QR gagal disimpan. Ambil tangkapan skrin sahaja.',
   cashierAlbumPermissionDenied: 'Benarkan akses foto dalam Tetapan, kemudian cuba lagi',
@@ -282,7 +282,7 @@ const ms: typeof zh = {
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
-  cashierSaveQr: 'I-save ang QR',
+  cashierSaveQr: 'I-save QR',
   cashierImageSaved: 'Na-save sa gallery',
   cashierImageSaveFailed: 'Hindi na-save ang QR code. Mag-screenshot na lang.',
   cashierAlbumPermissionDenied: 'Payagan ang access sa photos sa Settings, saka subukan ulit',
@@ -318,7 +318,7 @@ const fil: typeof zh = {
   warnBep20: 'Magpadala lang ng USDT sa BSC (BEP20), eksaktong halagang babayaran. Hindi na mababawi ang pondong ipinadala sa ibang network. Hiwalay na naniningil ng BNB gas ang wallet mo.',
   warnErc20: 'Magpadala lang ng USDT sa Ethereum (ERC20), eksaktong halagang babayaran. Hindi na mababawi ang pondong ipinadala sa ibang network. Hiwalay na naniningil ng ETH gas ang wallet mo.',
   bankPage: 'Page ng bayad sa bangko', reopen: 'Buksan ulit ang page ng bayad', warnBank: 'Sa page ng bayad lang magbayad. Huwag mag-transfer sa ibang account, at bayaran ang eksaktong halagang nakikita roon.',
-  cashierTitle: 'Bayad via card', cashierCloses: 'Magsasara ang order sa {t}', secure: 'Secure na page ng bayad', autoReturn: "Puwede kang bumalik pagkabayad. Kusang magsasara ang page kapag nakumpirma ang bayad.", closeCashier: 'Isara ang page ng bayad', paidReturn: "Nakabayad na, bumalik",
+  cashierTitle: 'Bayad via card', cashierCloses: 'Magsasara ang order sa {t}', secure: 'Secure na page ng bayad', autoReturn: "Puwedeng bumalik pagkabayad. Kusang magsasara ito kapag nakumpirma ang bayad.", closeCashier: 'Isara ang page ng bayad', paidReturn: "Nakabayad na, bumalik",
   resultTitle: 'Resulta ng bayad', received: 'Natanggap ang bayad', provisioning: 'Sine-setup ang device mo. Dadalhin ka roon kapag handa na.', provisionTrack: 'Progreso ng setup', trackPaid: 'Bayad na', trackProvision: 'Sine-setup',
   paidAmount: 'Halagang ibinayad', paidMethod: 'Paraan ng bayad', product: 'Item', leaveOk: 'Puwede mo nang iwan ang page na ito. Aabisuhan ka namin kapag tapos na ang setup.', viewOrder: 'Tingnan ang order',
   leaveTitle: 'Nagbabayad pa', leaveBody: 'Puwede mong ituloy mamaya mula sa detalye ng order. Huwag magbayad nang dalawang beses.', continuePay: 'Ituloy ang bayad', leave: 'Umalis',
@@ -374,7 +374,7 @@ const ru: typeof zh = {
   warnBep20: 'Отправляйте USDT только в сети BSC (BEP20), ровно сумму к оплате. Средства, отправленные через другую сеть, вернуть нельзя. Внешний кошелёк отдельно взимает комиссию за газ в BNB.',
   warnErc20: 'Отправляйте USDT только в сети Ethereum (ERC20), ровно сумму к оплате. Средства, отправленные через другую сеть, вернуть нельзя. Внешний кошелёк отдельно взимает комиссию за газ в ETH.',
   bankPage: 'Страница оплаты картой', reopen: 'Открыть оплату снова', warnBank: 'Платите только на странице оплаты. Не переводите на другие счета и платите ровно указанную там сумму.',
-  cashierTitle: 'Оплата картой', cashierCloses: 'Закроется через {t}', secure: 'Защищённая страница оплаты', autoReturn: "Вернуться можно сразу после оплаты. После подтверждения страница закроется сама.", closeCashier: 'Закрыть оплату', paidReturn: "Оплачено, вернуться",
+  cashierTitle: 'Оплата картой', cashierCloses: 'Закроется через {t}', secure: 'Защищённая страница оплаты', autoReturn: "Вернуться можно сразу после оплаты. После подтверждения страница закроется сама.", closeCashier: 'Закрыть оплату', paidReturn: "Оплачено, назад",
   resultTitle: 'Результат оплаты', received: 'Оплата получена', provisioning: 'Подключаем устройство. Когда оно будет готово, его страница откроется автоматически.', provisionTrack: 'Ход подключения', trackPaid: 'Оплачено', trackProvision: 'Подключение',
   paidAmount: 'Оплачено', paidMethod: 'Способ', product: 'Товар', leaveOk: 'Можно уйти со страницы. Мы сообщим, когда подключение завершится.', viewOrder: 'Открыть заказ',
   leaveTitle: 'Оплата ещё идёт', leaveBody: 'Продолжить можно позже в деталях заказа. Не платите дважды.', continuePay: 'Продолжить', leave: 'Уйти',
