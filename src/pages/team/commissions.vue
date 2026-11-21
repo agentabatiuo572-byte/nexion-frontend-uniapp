@@ -40,11 +40,11 @@
         <view class="commission-filter-bar">
           <text>{{ filterCopy.title }}</text>
           <view class="commission-filter-trigger" role="button" tabindex="0" aria-haspopup="dialog" :aria-expanded="filterOpen" @click="filterOpen = true" @keydown.enter.prevent="filterOpen = true" @keydown.space.prevent="filterOpen = true">
-            <text>{{ selectedFilterLabel }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            <view class="commission-filter-trigger__surface nx-frosted-button"><text>{{ selectedFilterLabel }}</text><NxIcon name="chevron-down" :size="16" /></view>
           </view>
         </view>
 
-        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text>${{ visibility.mask(formatAmount(byKind[filter].usdt)) }} · {{ visibility.mask(formatAmount(byKind[filter].nex)) }} UVT</text></view>
+        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text class="commission-filter-summary__value">${{ visibility.mask(formatAmount(byKind[filter].usdt)) }} · {{ visibility.mask(formatAmount(byKind[filter].nex)) }} UVT</text></view>
 
         <EmptyState v-if="filtered.length === 0 && !hasMoreEvents" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
         <view v-if="filtered.length > 0" class="commission-days">
@@ -102,7 +102,7 @@
     </view>
     <NxSheet :open="filterOpen" :title="filterCopy.title" @close="filterOpen = false">
       <view class="commission-filter-options">
-        <view v-for="option in filterOptions" :key="option.value" class="commission-filter-option" :class="{ 'commission-filter-option--selected': filter === option.value }" role="button" tabindex="0" :aria-pressed="filter === option.value" :aria-label="option.fullLabel" @click="selectFilter(option.value)" @keydown.enter.prevent="selectFilter(option.value)" @keydown.space.prevent="selectFilter(option.value)">
+        <view v-for="option in filterOptions" :key="option.value" class="commission-filter-option" :class="{ 'commission-filter-option--selected nx-frosted-button': filter === option.value }" role="button" tabindex="0" :aria-pressed="filter === option.value" :aria-label="option.fullLabel" @click="selectFilter(option.value)" @keydown.enter.prevent="selectFilter(option.value)" @keydown.space.prevent="selectFilter(option.value)">
           <text>{{ option.label }}</text><text class="commission-filter-option__count">{{ visibility.mask(option.count ?? '—') }}</text>
         </view>
       </view>
@@ -410,17 +410,25 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 .commission-day__card { padding: 0 var(--ui-space-inset); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .reward-income-icon { width: 36px; height: 36px; border-radius: 12px; color: var(--v5-ink-2); background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .reward-income-event { align-items: center; }
-.commission-filter-summary { display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;color:var(--v5-ink-2);font-size:12px; }
+/* Field name muted, amount in the main ink (01 §1.1.1 pairing 1). */
+.commission-filter-summary { display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;color:var(--v5-ink-3);font:400 12px/16px var(--font-v5); }
+.commission-filter-summary__value { color:var(--v5-ink);font-variant-numeric:tabular-nums; }
 .commission-filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); }
-.commission-filter-trigger { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; max-width: 70%; padding: 0 14px; color: var(--v5-ink); font: 600 13px/18px var(--font-v5); cursor: pointer; }
-.commission-filter-trigger::before { content: ""; position: absolute; inset: 4px 0; z-index: -1; border-radius: 999px; background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), color-mix(in srgb, var(--v5-ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-ink) 8%, transparent); }
-.commission-filter-trigger svg { flex: none; }
+/* Neutral glass S (03 §3.1): 32px visible capsule inside a 44px hit row, compact button role. */
+.commission-filter-trigger { display: flex; align-items: center; min-height: 44px; max-width: 70%; cursor: pointer; }
+.commission-filter-trigger__surface { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 32px; box-sizing: border-box; padding: 6px 12px; border-radius: 999px; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); }
+.commission-filter-trigger__surface svg { flex: none; }
+.commission-filter-trigger:active .commission-filter-trigger__surface { transform: scale(.98); }
 /* Two options per row; an option whose label does not fit half the width (ru «Сотрудничество») takes a full row instead of breaking mid-word. */
 .commission-filter-options { display: flex; flex-wrap: wrap; gap: 8px; }
 /* Fills the free half beside an odd last option, so regular options stay half width while a long one grows to the full row. */
 .commission-filter-options::after { content: ""; flex: 1 0 calc(50% - 4px); height: 0; margin-top: -8px; }
-.commission-filter-option { flex: 1 0 calc(50% - 4px); min-width: -webkit-fit-content; min-width: fit-content; max-width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: break-word; cursor: pointer; }
-.commission-filter-option--selected { color: var(--v5-brand); background: var(--v5-brand-soft); }
+/* Option chips (design-rules): unselected flat ink 6% without rim or blur; selected is brand liquid glass,
+   the shared frosted material with the brand 14% fill and brand text, as the Earn device chips. */
+.commission-filter-option { flex: 1 0 calc(50% - 4px); min-width: -webkit-fit-content; min-width: fit-content; max-width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 999px; color: var(--v5-ink-2); font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); overflow-wrap: break-word; cursor: pointer; }
+.commission-filter-option:not(.commission-filter-option--selected) { background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.commission-filter-option:active { transform: scale(.98); }
+.commission-filter-option--selected { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); color: var(--v5-brand); }
 .commission-filter-option__count { flex: none; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); font-variant-numeric: tabular-nums; }
 .commission-filter-trigger:focus-visible, .commission-filter-option:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 /* Keyboard focus must be visible on the self-drawn tiles/pills — they are
