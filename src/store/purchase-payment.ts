@@ -1,9 +1,10 @@
 import { reactive } from 'vue';
-import { apiClient } from '@/api/runtime';
-import { asApiError, isApiRefusal } from '@/api/errors';
+import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
+import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
 import { useApp } from './app';
+import { useOrders } from './orders';
 import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
 import { clearOrderAction, readOrderAction } from '@/lib/order-command-fence';
 import { navTo, navReplace } from '@/lib/route';
@@ -11,6 +12,7 @@ import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { purchaseEligibilityUnlockHref } from '@/lib/purchase-eligibility-copy';
 import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { getT } from '@/i18n/use-t';
 import { toast } from './ui';
@@ -20,22 +22,46 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
   tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
-  intentNo?: string; lookupOnly?: boolean; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
+  intentNo?: string; lookupOnly?: boolean; quotaRefusal?: QuotaRefusal; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged';
+type QuotaRefusal = 'rejectQuotaPaused' | 'rejectQuotaMonthFull' | 'rejectQuotaSoldOut' | 'rejectConditionsUnmet' | 'rejectPurchaseSetup';
+type EligibilityRetry = 'rejectEligibilityUnavailable';
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | QuotaRefusal;
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
 // Another payment for this purchase is still open, perhaps from another device: say so rather than asking to review the order.
 const ORDER_REFUSALS: Record<string, PurchaseNotice> = { ORDER_PAYMENT_EXPIRED: 'orderExpired', ORDER_NOT_PAYABLE: 'orderClosed', ORDER_NOT_FOUND: 'orderMissing', PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED: 'existing' };
 const TRIAL_REFUSALS = ['TRIAL_QUOTE_CHANGED', 'TRIAL_AMOUNT_MISMATCH'];
+function quotaNotice(cause: ApiError, kind: PurchaseKind): QuotaRefusal | EligibilityRetry | undefined {
+  if (cause.kind !== 'http' || cause.status !== cause.code) return;
+  if (cause.status === 409) {
+    switch (cause.message) {
+      case 'ORDER_MONTHLY_QUOTA_PAUSED': return 'rejectQuotaPaused';
+      case 'ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET': return 'rejectConditionsUnmet';
+      case 'ORDER_MONTHLY_QUOTA_EXHAUSTED': return 'rejectQuotaMonthFull';
+      case 'PURCHASE_GATE_SOLD_OUT': return kind === 'ORDER_PAY' ? 'rejectQuotaSoldOut' : undefined;
+    }
+  }
+  if (cause.status === 503 && cause.message === 'ORDER_MONTHLY_QUOTA_UNAVAILABLE') return 'rejectEligibilityUnavailable';
+  if (cause.status === 403 && kind !== 'ORDER_PAY' && kind !== 'TRIAL_CONVERT') {
+    switch (cause.message) {
+      case 'PURCHASE_GATE_SOLD_OUT': return 'rejectQuotaSoldOut';
+      case 'PURCHASE_GATE_NOT_MET': return 'rejectConditionsUnmet';
+      case 'PURCHASE_GATE_INVALID':
+      case 'PURCHASE_GATE_FACTS_INVALID': return 'rejectPurchaseSetup';
+      case 'PURCHASE_GATE_FACTS_UNAVAILABLE': return 'rejectEligibilityUnavailable';
+    }
+  }
+}
 const api = createPurchasePaymentApi(apiClient);
 const deposits = createCregisDepositApi(apiClient);
 const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
-  step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', image: '', deadlineAt: null as number | null,
+  step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', productNo: '', image: '', deadlineAt: null as number | null,
   policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, notice: '' as PurchaseNotice, cashier: false,
+  retryNotice: '' as '' | EligibilityRetry,
   pausedPaymentMethod: null as ExternalPaymentMethod | null,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
   loading: false, retrying: false, busy: false, error: false, unavailable: false, pendingReadError: false, concluded: false, revision: 0 });
@@ -161,6 +187,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   // Legacy recovery rows have only the quote identity; bind their first validated original intent for subsequent reads.
   const known = { ...pending, paymentMethod: intent.paymentMethod, network: intent.network,
     intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
+  delete known.quotaRefusal;
   if (known.businessDelivered) {
     const payload = JSON.parse(known.fingerprint)[1] as Record<string, unknown>;
     validatePurchasePaymentReceipt(known.kind, payload, intent.receipt, intent);
@@ -196,8 +223,14 @@ function gone(pending: PendingExternal, accountKey: string) {
   Object.assign(state, { pending: null, intent: null, quote: null, error: false });
   conclude('gone');
 }
+function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
+  releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+  releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+  release(pending);
+  Object.assign(state, { pending: null, quote: null, intent: null });
+}
 /** The payment ended with an answer: nothing of it stays behind the notice and no further read or write runs. */
-function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, { notice, concluded: true, cashier: false }); }
+function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, { notice, retryNotice: '', concluded: true, cashier: false }); }
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
   requestVersion++; stopTimers(); openCashierOnReady = false;
@@ -235,6 +268,32 @@ function closeAndNavigate(href: string) {
   const navigate = context?.navigate;
   finish(null);
   if (navigate) navigate(href); else void navTo(href);
+}
+async function openConditions() {
+  const { accountKey, orderNo } = state;
+  const version = requestVersion;
+  let productNo = state.productNo;
+  let href = '/pages/team/quota';
+  try {
+    if (orderNo) {
+      const orders = useOrders();
+      const order = orders.getById(orderNo) ?? await orders.ensureRemoteOrder(orderNo);
+      if (!owns(version, accountKey)) return;
+      // A bundle can be refused on any line. The quota page lists all applicable tiers.
+      if (order && (order.lineItems?.length ?? 1) === 1) productNo = order.lineItems?.[0]?.sku ?? order.productId;
+    }
+    if (productNo) {
+      href = `/pages/team/quota?product=${encodeURIComponent(productNo)}&intent=tradein-conditions`;
+      const snapshot = await purchaseEligibilityApi.get(productNo);
+      const unlockHref = purchaseEligibilityUnlockHref(snapshot, productNo);
+      if (unlockHref === '/pages/team/rank' || snapshot.policies.some(policy => policy.decisionCode === 'F4B_REQUIREMENTS_NOT_MET')) {
+        href = unlockHref;
+      }
+    }
+  } catch {
+    // The conditions page can retry its own eligibility read.
+  }
+  if (owns(version, accountKey)) closeAndNavigate(href);
 }
 /** Reads continue on their own: every 5 s while the payment is open, backing off after failures, paused in the background. */
 function schedule(version: number, accountKey: string, failed: boolean) {
@@ -275,7 +334,7 @@ function channelUnavailable(error: unknown, method: PurchaseMethod) {
 }
 function hideChannel(method: ExternalPaymentMethod) {
   state.policy = { ...(state.policy ?? { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true }), [method]: false };
-  state.notice = ''; reviewedQuote = confirmedQuote = null;
+  state.notice = ''; state.retryNotice = ''; reviewedQuote = confirmedQuote = null;
 }
 /** Before an intent exists, leave an unavailable channel and try another payment method. */
 function reconcileChannel() {
@@ -290,7 +349,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || state.concluded || !context) return;
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
-  if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; }
+  if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; state.retryNotice = ''; }
   state.method = method; state.quote = null; state.error = false; state.retrying = false; state.unavailable = false;
   clearTimeout(quoteTimer);
   const version = ++requestVersion, accountKey = state.accountKey, expected = context;
@@ -303,7 +362,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     // A trial's offset grows with accrual under one quote version, so only its rise needs a new confirmation.
     const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
     if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged || !expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
-    state.quote = quote; quoteFailures = 0;
+    state.quote = quote; quoteFailures = 0; state.retryNotice = '';
     const reviewed = confirmedQuote ?? reviewedQuote;
     if (reviewed && !samePaymentTerms(reviewed, quote)) {
       confirmedQuote = null; state.notice = 'quoteChanged'; reviewedQuote = quote;
@@ -314,8 +373,11 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     quoteTimer = setTimeout(() => { if (owns(version, accountKey)) void select(method); }, Math.min(2147483647, Math.max(1000, Date.parse(quote.expiresAt) - Date.now() - 30000)));
   } catch (error) {
     if (!owns(version, accountKey)) return;
-    if (error instanceof Error && error.message === 'PURCHASE_CONTEXT_CHANGED') { state.notice = 'changed'; return; }
     const cause = asApiError(error);
+    const quota = quotaNotice(cause, expected.kind);
+    state.retryNotice = quota === 'rejectEligibilityUnavailable' ? quota : '';
+    if (error instanceof Error && error.message === 'PURCHASE_CONTEXT_CHANGED') { state.notice = 'changed'; return; }
+    if (quota && quota !== 'rejectEligibilityUnavailable') { conclude(quota); return; }
     const replacement = expected.kind === 'TRADE_IN' || expected.kind === 'CAPACITY_REPLACE';
     const replacementRefusal = replacement && tradeinPaymentRejection(cause, 'external');
     if (replacementRefusal) {
@@ -329,8 +391,8 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
       reconcileChannel();
       return;
     }
-    // Only a network failure or a 5xx can change on retry; anything else is the server's answer.
-    if (cause.kind !== 'network' && (cause.status ?? 0) < 500
+    // Eligibility reads can also fail transiently with a specific 403.
+    if (!state.retryNotice && cause.kind !== 'network' && (cause.status ?? 0) < 500
         && !(replacement && isApiRefusal(cause, 503, TRADEIN_RUNTIME_RECOVERING))) {
       const refusal = ORDER_REFUSALS[cause.message];
       if (refusal) conclude(refusal); else state.notice = 'changed';
@@ -341,7 +403,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   } finally { if (owns(version, accountKey)) state.loading = false; }
 }
 /** An order past its deadline can no longer be paid; other purchases get a fresh quote and deadline from their own page. */
-function deadlinePassed() { if (state.kind === 'ORDER_PAY') conclude('orderExpired'); else state.notice = 'changed'; }
+function deadlinePassed() { state.retryNotice = ''; if (state.kind === 'ORDER_PAY') conclude('orderExpired'); else state.notice = 'changed'; }
 function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
@@ -373,11 +435,18 @@ async function query() {
     if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
     if (result) accept(result, pending);
+    else if (pending.quotaRefusal) {
+      releaseUncreatedPayment(pending, accountKey);
+      conclude(pending.quotaRefusal);
+    }
     else if (pending.intentNo || pending.lookupOnly) gone(pending, accountKey);
     else state.unavailable = true;
   } catch {
     failed = true;
-    if (owns(version, accountKey) && !state.concluded) state.error = true;
+    if (owns(version, accountKey) && !state.concluded) {
+      state.error = true;
+      if (pending.quotaRefusal) conclude(pending.quotaRefusal);
+    }
   }
   finally { if (owns(version, accountKey)) { state.busy = false; schedule(version, accountKey, failed); } }
 }
@@ -385,19 +454,28 @@ async function query() {
 async function submitOriginal() {
   const pending = state.pending;
   if (!pending || state.busy || state.concluded) return;
-  if (pending.intentNo || pending.lookupOnly) return query();
+  if (pending.intentNo || pending.lookupOnly || pending.quotaRefusal) return query();
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false, lookup = false;
   state.busy = true; state.unavailable = false;
   try {
     const intent = await api.create(pending.paymentQuoteId, pending.commandKey);
-    if (owns(version, accountKey) && !state.concluded) { state.error = false; accept(intent, pending); }
+    if (owns(version, accountKey) && !state.concluded) { state.error = false; state.retryNotice = ''; accept(intent, pending); }
   } catch (error) {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
+      const quota = quotaNotice(cause, pending.kind);
+      state.retryNotice = '';
+      if (quota === 'rejectEligibilityUnavailable') {
+        // Retry the stored quote under the same command key.
+        state.retryNotice = quota;
+        state.unavailable = true;
+        state.error = true;
+        return;
+      }
       const replacement = pending.kind === 'TRADE_IN' || pending.kind === 'CAPACITY_REPLACE';
       const replacementRefusal = replacement && tradeinPaymentRejection(cause, 'external');
       if (replacementRefusal) {
@@ -427,13 +505,19 @@ async function submitOriginal() {
       const rejectedQuote = unavailable || cause.kind === 'http' && cause.status === cause.code
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
           || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND');
-      const definiteRefusal = !pending.intentNo && (rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
+      const definiteRefusal = !pending.intentNo && (quota || rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
       state.error = !definiteRefusal;
       if (definiteRefusal) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
         // Another open payment ends every kind of purchase here; it must not fall back to quoting again.
-        const refusal = pending.kind === 'ORDER_PAY' || cause.message === 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'
-          ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined;
+        const refusal = quota ?? (pending.kind === 'ORDER_PAY' || cause.message === 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'
+          ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined);
+        if (quota) {
+          // Remember the refusal across reloads until the original-key lookup has an answer.
+          const readOnly = { ...pending, quotaRefusal: quota };
+          state.pending = readOnly;
+          try { save(readOnly); } catch { /* Keep read-only recovery for this session even if storage fails. */ }
+        }
         let existing: PurchasePaymentIntent | null;
         try { existing = await api.find(pending.kind, pending.commandKey); }
         catch {
@@ -446,16 +530,11 @@ async function submitOriginal() {
         }
         if (!owns(version, accountKey)) return;
         state.error = false;
-        if (!existing) {
-          // A definite refusal plus a successful empty lookup releases the caller's matching unknown command too.
-          releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-          releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
-        }
         if (existing) accept(existing, pending);
-        else if (refusal) { release(pending); Object.assign(state, { pending: null, quote: null, intent: null }); conclude(refusal); }
         else {
-          release(pending);
-          Object.assign(state, { pending: null, quote: null, intent: null });
+          // A definite refusal plus a successful empty lookup releases the caller's matching unknown command too.
+          releaseUncreatedPayment(pending, accountKey);
+          if (refusal) { conclude(refusal); return; }
           if (unavailable) hideChannel(pending.paymentMethod ?? (state.method as ExternalPaymentMethod));
           // A cold resume has no caller to quote again; return through the existing order exit.
           if (state.coldResume) {
@@ -521,12 +600,14 @@ function restart(step: 'bank' | 'methods') {
   Object.assign(state, { pending: null, intent: null, quote: null, notice: '', cashier: false });
   if (step === 'bank') void select('HDPAY_BANK', 'bank'); else choose('WALLET');
 }
-function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'orderNo' | 'image' | 'deadlineAt'> & { amount?: number | string }, pending: PendingExternal | null) {
+function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload' | 'orderNo' | 'image' | 'deadlineAt'> & { amount?: number | string }, pending: PendingExternal | null) {
   const accountKey = account();
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
   reviewedQuote = confirmedQuote = null;
+  const productNo = value.kind === 'TRIAL_CONVERT' ? value.payload.productNo : value.payload.targetProductNo;
   Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
-    orderNo: value.orderNo ?? '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null, policy: null, notice: '', cashier: false,
+    orderNo: value.orderNo ?? '', productNo: typeof productNo === 'string' ? productNo.trim() : '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null,
+    policy: null, notice: '', retryNotice: '', cashier: false,
     pausedPaymentMethod: null, quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });
 }
 export function requestPurchasePayment(value: PurchasePaymentContext): Promise<PurchaseChoice | null> {
@@ -542,7 +623,7 @@ async function resume(pending: PendingExternal) {
   if (state.open) return;
   context = null;
   const payload = JSON.parse(pending.fingerprint)[1] as Record<string, unknown>;
-  open({ summary: pending.summary, kind: pending.kind, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
+  open({ summary: pending.summary, kind: pending.kind, payload, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
   // No active purchase callback after reload. A delivered intent returns to the original order.
   void waitForChoice().then(result => {
     if (result?.method !== 'EXTERNAL' || !result.receipt || typeof result.receipt !== 'object') return;
@@ -573,6 +654,7 @@ export function usePurchasePayment() {
     },
     openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); else finish(null); },
     support: () => closeAndNavigate('/pages/me/support'),
+    openConditions,
     reorder: () => { const again = context?.reorder, orderNo = state.orderNo; finish(null); if (again) again(); else if (orderNo && !onOrderPage(orderNo)) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
     pending: pendingPayments, unsettledCheckoutPayments, resume,
     records: () => { try { return displayRecords(); } catch { return []; } },

@@ -198,6 +198,19 @@ function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
     policies:[e1,f4b]};
 }
 
+function requireDemoMonthlyQuota(policy) {
+  if(policy.conditions.some(row=>row.kind==='teamComputePoints'&&!row.met))refuse('ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET');
+  if(policy.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED')refuse('ORDER_MONTHLY_QUOTA_EXHAUSTED');
+}
+
+export function requireDemoExternalPaymentQuota(state,products,items,now) {
+  const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+  for(const {productNo,quantity} of items){
+    const product=products.find(row=>row.id===productNo);
+    if(product)requireDemoMonthlyQuota(demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
+  }
+}
+
 export function requireDemoPurchase(state,products,items,now,settlement=false) {
   const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
   const quantities=new Map();
@@ -216,10 +229,7 @@ export function requireDemoPurchase(state,products,items,now,settlement=false) {
       if(settlement&&policies[1].decisionCode==='ELIGIBLE')hardwareQuotaUsedAt=now;
       continue;
     }
-    if(settlement&&policies[0].eligible){
-      if(policies[1].conditions.some(row=>row.kind==='teamComputePoints'&&!row.met))refuse('ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET');
-      if(decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED')refuse('ORDER_MONTHLY_QUOTA_EXHAUSTED');
-    }
+    if(settlement&&policies[0].eligible)requireDemoMonthlyQuota(policies[1]);
     refuse(decisionCode);
   }
   return hardwareQuotaUsedAt;

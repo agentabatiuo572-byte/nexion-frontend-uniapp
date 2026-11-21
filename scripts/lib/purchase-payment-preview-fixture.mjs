@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,requireDemoExternalPaymentQuota,requireDemoPurchase} from './prototype-demo-data.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 const base = '/api/app/purchase-payment';
@@ -38,6 +38,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return refusal ? refused(409, refusal) : null;
   }
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
+  const quotaItems = (kind, payload, order) => kind === 'ORDER_PAY'
+    ? order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity}))
+    : [{productNo: kind === 'TRIAL_CONVERT' ? payload.productNo : payload.targetProductNo, quantity: 1}];
   // The account's one order list.
   const ordersOf = origin => demoAccountOrders(new URL(origin), locale(), state);
   // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
@@ -198,10 +201,6 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       // one has already been closed by the deadline task, so it is not payable either.
       if (body.kind === 'ORDER_PAY' && !order) return {status: 404, message: 'ORDER_NOT_FOUND', data: null};
       if (body.kind === 'ORDER_PAY' && (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT')) return {status: 409, message: 'ORDER_NOT_PAYABLE', data: null};
-      if(body.kind==='ORDER_PAY'){
-        requireDemoPurchase(state,demoProducts(state,url.origin),
-          order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),Date.now());
-      }
       if (!commandKinds[body.kind] || (body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : body.kind !== 'ORDER_PAY' && !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
       const bank = body.paymentMethod === 'HDPAY_BANK', erc20 = body.paymentMethod === 'CREGIS_USDT_ERC20';
       const trial = body.kind === 'TRIAL_CONVERT'
@@ -226,6 +225,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!configured(body.paymentMethod)) return refused(503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
       const now = Date.now(), deadline = order ? Number(order.expiresAt) : now + paymentWindow;
       if (deadline <= now) return refused(409, 'ORDER_PAYMENT_EXPIRED');
+      const products = demoProducts(state, url.origin), items = quotaItems(body.kind, body.payload, order);
+      requireDemoExternalPaymentQuota(state, products, items, now);
+      if (body.kind === 'ORDER_PAY') requireDemoPurchase(state, products, items, now);
       const adjustment = Number(BigInt(subtotal) * 10000n - micros) / 1000000;
       const channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
       if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};
@@ -248,8 +250,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
       if (Date.parse(source.quote.expiresAt) <= Date.now()) return refused(409, 'PURCHASE_PAYMENT_QUOTE_EXPIRED');
+      const order = subject.orderNo ? ordersOf(url.origin).find(row => row.orderNo === subject.orderNo) : null;
       if (subject.orderNo) {
-        const order = ordersOf(url.origin).find(row => row.orderNo === subject.orderNo);
         if (!order) return refused(404, 'ORDER_NOT_FOUND');
         if (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT') return refused(409, 'ORDER_NOT_PAYABLE');
       }
@@ -263,6 +265,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const refusal = replacementRefusal(url, request, subject.kind, source.payload);
       if (refusal) return refusal;
       if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
+      requireDemoExternalPaymentQuota(state, demoProducts(state, url.origin), quotaItems(subject.kind, source.payload, order), Date.now());
       const intentNo = `PPI-PREVIEW-${++sequence}`;
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
