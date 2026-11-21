@@ -268,6 +268,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
+import { warrantyMonths } from "@/lib/warranty-months";
 import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { activePhoneDailyRate, storeYieldMultiplier } from "@/lib/store-upgrade";
@@ -511,13 +512,14 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
   if (!p) return [];
   const s = t.value.store;
   // A Cloud Share is a share of pooled compute, so it shows no video memory or power (user 2026-11-21).
+  const months = warrantyMonths(p.warranty);
   const share = p.productType === "SHARE";
   return [
     { k: s.specGpu, v: specText(t.value, p.gpu, "—") },
     share ? null : { k: s.specVram, v: specText(t.value, p.vram, "—", "vram") },
     share ? null : { k: s.specPower, v: specText(t.value, p.power, "—", "power") },
     { k: s.specOnlineRate, v: specText(t.value, p.uptime, "—") },
-    specRow(s.specWarranty, p.warranty),
+    months === undefined ? specRow(s.specWarranty, p.warranty) : { k: s.specWarrantyDuration, v: months },
   ].filter((r): r is SpecRow => r !== null);
 });
 

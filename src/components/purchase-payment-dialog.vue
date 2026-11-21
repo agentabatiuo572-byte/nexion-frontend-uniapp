@@ -235,7 +235,6 @@ import { usePurchasePayment, purchaseConclusion, type PurchaseNotice } from '@/s
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
-import { useTrialLifecycleCopy } from '@/i18n/trial-lifecycle';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
@@ -252,7 +251,6 @@ const URGENT_MS = 5 * 60000;
 const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
-const trialCopy = useTrialLifecycleCopy();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const pending = computed(() => { app.accountKey; s.revision; return payment.pending(); });
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
@@ -347,32 +345,33 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'networkPaused': return { icon: 'info', tone: 'warning', title: fill(c.networkPausedTitle, { network: networkName.value }), body: c.networkPaused,
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
       ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
-    case 'quoteChanged': return { icon: 'info', tone: 'warning', title: c.changedTitle,
-      body: s.quote ? `${c.changed} ${c.total}: ${s.method === 'HDPAY_BANK' ? '$' : ''}${amount(s.quote.totalUsdt)}${s.method === 'HDPAY_BANK' ? '' : ' USDT'}` : c.changed,
+    // The sheet stays open on the new amount, so paying again is the second confirmation.
+    case 'quoteChanged': return { icon: 'info', tone: 'warning', title: c.quoteChangedTitle,
+      body: s.quote ? fill(c.quoteChanged, { amt: s.method === 'HDPAY_BANK' ? `$${amount(s.quote.totalUsdt)}` : `${amount(s.quote.totalUsdt)}\u00A0USDT` }) : c.changed,
       primary: c.ok, onPrimary: dismiss, onSecondary: dismiss };
     case 'changed': return { icon: 'info', tone: 'warning', title: c.changedTitle, body: c.changed, primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close, ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
+    // A refusal with only one way out is told in a toast as the sheet closes (03 §3.5).
     case 'rejectTradeinBusy':
     case 'rejectTradeinWalletOnly':
     case 'rejectTradeinOwner':
     case 'rejectQuotaPaused':
     case 'rejectQuotaMonthFull':
     case 'rejectQuotaSoldOut':
+    case 'rejectCapacitySourceChanged':
+    case 'trialConversionClosed':
+    case 'trialNotConvertible': {
+      const flow = checkoutFlowCopy(locale.code);
+      return { icon: 'info', tone: 'warning', title: flow[`${kind}Title`], body: flow[`${kind}Body`], primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
+    }
+    // A refusal with a next step asks: the action is the primary button, closing the quiet one.
     case 'rejectConditionsUnmet':
     case 'rejectGateConditionsUnmet':
-    case 'rejectPurchaseSetup':
-    case 'rejectCapacitySourceChanged': {
-      const flow = checkoutFlowCopy(locale.code);
-      const body = flow[kind === 'rejectGateConditionsUnmet' ? 'rejectConditionsUnmet' : kind];
-      const refusal = { icon: 'info', tone: 'warning', title: flow.cannotPay, body, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close } as const;
-      if (kind === 'rejectPurchaseSetup') return { ...refusal, secondary: c.support, onSecondary: payment.support };
-      if (kind === 'rejectConditionsUnmet' || kind === 'rejectGateConditionsUnmet') return { ...refusal, secondary: t.value.tradein.purchaseViewConditions, onSecondary: payment.openConditions };
-      return refusal;
+    case 'rejectPurchaseSetup': {
+      const flow = checkoutFlowCopy(locale.code), setup = kind === 'rejectPurchaseSetup';
+      return { icon: 'info', tone: 'warning', title: setup ? flow.rejectPurchaseSetupTitle : flow.rejectConditionsUnmetTitle, body: flow.noCharge,
+        primary: setup ? c.support : t.value.tradein.purchaseViewConditions, secondary: c.close,
+        onPrimary: setup ? payment.support : payment.openConditions, onSecondary: payment.close };
     }
-    case 'trialConversionClosed':
-    case 'trialNotConvertible':
-      return { icon: 'info', tone: 'warning', title: checkoutFlowCopy(locale.code).cannotPay,
-        body: kind === 'trialConversionClosed' ? t.value.trial.eligReasonClosed : trialCopy.value.endedBody,
-        primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
     case 'orderExpired': return { ...refused, title: c.orderExpiredTitle, body: c.orderExpired };
     case 'orderClosed': return { ...refused, title: c.orderClosedTitle, body: c.orderClosed };
     // There is no order to open, so only ordering again remains.
@@ -391,12 +390,14 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
   }
 }
 const notice = computed(() => noticeFor(s.notice));
-const acknowledgementOnly = computed(() => !!notice.value && !notice.value.secondary
-  && (s.notice === 'timeout' || s.notice === 'gone' || s.notice === 'changed' || s.notice === 'orderMissing' || s.notice === 'networkPaused'));
+const TOAST_NOTICES: PurchaseNotice[] = ['timeout', 'gone', 'changed', 'orderMissing', 'networkPaused', 'quoteChanged', 'rejectTradeinBusy', 'rejectTradeinWalletOnly', 'rejectTradeinOwner',
+  'rejectQuotaPaused', 'rejectQuotaMonthFull', 'rejectQuotaSoldOut', 'rejectCapacitySourceChanged', 'trialConversionClosed', 'trialNotConvertible'];
+const acknowledgementOnly = computed(() => !!notice.value && !notice.value.secondary && TOAST_NOTICES.includes(s.notice));
+// The notice's only exit runs at once (close, or stay on the sheet for a new quote), and a toast says what happened.
 watch(() => active.value && s.open && acknowledgementOnly.value, show => {
   if (!show || !notice.value) return;
-  const { title, body } = notice.value;
-  payment.close();
+  const { title, body, onPrimary } = notice.value;
+  onPrimary();
   toast.warn(title, body);
 }, { immediate: true });
 // Both final results and a reversible network pause hide all instructions to send funds.
