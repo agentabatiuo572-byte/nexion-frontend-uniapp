@@ -1321,7 +1321,7 @@ trustReserve: "No verifiable reserve information available.",
     // FEAT-DEV02 — retire flow: pick an upgrade target
     retireTitle: "Upgrade trade-in",
     retireSubtitle: "Choose an upgrade for your {name}",
-    retireTargetOption: "{name} · ${price} · ≈${net} after credit",
+    retireTargetOption: "{name} · {price} · {net} after credit",
     retireEarlyTag: "Early upgrade",
     retireNoTargets: "No upgrade targets are available right now",
     // Trade-in confirm (proceeds to checkout)
@@ -1365,7 +1365,7 @@ trustReserve: "No verifiable reserve information available.",
     purchaseConditions: {"rank": "Team rank", "activeDirect": "Activated friends you invited", "teamComputePoints": "Team compute", "lifetimeQuota": "Lifetime quota (used / total)", "monthlyQuota": "Monthly quota (used / total)"},
     inheritActiveHint: "After payment, the old device’s unfinished task is cancelled and the device is recovered for trade-in. The new device takes its compute slot and activates automatically.",
     inheritInventoryHint: "After payment, the old device is traded in and removed. The new device stays in inventory and can be activated later.",
-    sheetDisclaimer: "The credit only applies to this purchase; it does not go to your balance and cannot be withdrawn.",
+    sheetDisclaimer: "The credit only applies to this purchase; it does not go to your balance and cannot be withdrawn. The sooner you trade in, the more credit you get.",
     // Checkout credit row
     checkoutCreditChip: "{name} credit −${credit}",
     checkoutRowLabel: "Trade-in credit",

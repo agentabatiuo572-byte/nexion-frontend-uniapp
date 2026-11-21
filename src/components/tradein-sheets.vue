@@ -942,12 +942,13 @@ const retireView = computed(() => {
     const early = !!p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase)
       && (!remoteApiEnabled || canonicalTradeinConfig.value?.earlyAccessEnabled === true);
     const remotePayable = remoteRetirePayables.value.get(p.id);
+    // Display values carry their own $ and ≈, so a pending or failed quote reads a bare 「—」 (01 §1.2).
     const net = remoteApiEnabled
-      ? (remotePayable == null ? "—" : formatGroupedAmount(remotePayable))
-      : formatGroupedAmount(Math.max(0, p.price - previewCredit(device, p.price)));
+      ? (remotePayable == null ? "—" : `≈$${formatGroupedAmount(remotePayable)}`)
+      : `≈$${formatGroupedAmount(Math.max(0, p.price - previewCredit(device, p.price)))}`;
     const base = fmt(t.value.tradein.retireTargetOption, {
       name: p.name,
-      price: formatGroupedAmount(p.price),
+      price: `$${formatGroupedAmount(p.price)}`,
       net,
     });
     return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
