@@ -159,6 +159,26 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
   }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
 }
 
+function withItemImages(receipt,imageFor) {
+  return {...receipt,items:receipt.items.map(item=>({...item,imageUrl:imageFor(item.productNo)}))};
+}
+
+// Mirrors PromotionItemImageAdvice at the HTTP boundary, including command replays.
+export function demoPromotionResponse(url,method,data,state) {
+  const path=url.pathname;
+  let field;
+  if(method==='POST'&&/^\/api\/orders(?:\/(?:quote|bundle|[^/]+\/(?:pay|cancel)))?$/.test(path))field='';
+  if(method==='GET'&&path.startsWith('/api/promotion-commands/'))field='order';
+  if(method==='GET'&&path.startsWith('/api/app/payment-commands/'))field='receipt';
+  if(field===undefined)return data;
+  const receipt=field?data?.[field]:data;
+  if(!Array.isArray(receipt?.items)||(receipt.promotionQuoteId==null&&receipt.quoteId==null)
+    ||receipt.sourceEnvironment==='SANDBOX')return data;
+  const products=demoProducts(state,url.origin);
+  const projected=withItemImages(receipt,sku=>products.find(product=>product.id===sku)?.imageUrl??null);
+  return field?{...data,[field]:projected}:projected;
+}
+
 function demoPaidPurchase(order) {
   return ['PAID','CONFIRMED','SUCCESS'].includes(order.paymentStatus)
     &&!['REFUNDED','CHARGEBACK'].includes(order.orderStatus);
@@ -180,7 +200,7 @@ function demoHardwareQuota(product,state,points,now){
     .reduce((sum,hold)=>sum+hold.quantity,0);
   const usedThisMonth=soldThisMonth+pendingThisMonth;
   const remaining=Math.max(0,monthlyStock-usedThisMonth);
-  return {productId:product.id,quotaCode:product.id.toUpperCase(),name:product.name,price:product.price,
+  return {productId:product.id,quotaCode:product.id.toUpperCase(),name:product.name,price:product.price,imageUrl:product.imageUrl,
     monthlyStock,soldThisMonth,pendingThisMonth,usedThisMonth,remaining,unlockKind:'ALL',
     // The legacy open preset keeps its original orders and uses a quota without a points requirement.
     conditions:state.walletLegacySeed&&state.catalogState==='available'?[]:
@@ -340,7 +360,8 @@ function demoOrders(products,state,now,device41) {
     const placedAt=original==='provisioning_failed'&&repurchaseDays!==undefined
       ? at-repurchaseDays*day-samplePaidAfter
       : device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[demoPaymentScenario(state)]??0):at-(i+1)*day;
-    return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?(longRef?'E4-REFUND-'+orderNo:'DEMO-REFUND-1'):null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
+    const settled=paymentStatus==='PAID'||paymentStatus==='REFUNDED';
+    return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paidTotalUsdt:settled?unitPrice.toFixed(2):null,paymentMethod:settled||paymentStatus==='CHARGEBACK'?'UVEL_WALLET':'PENDING',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?(longRef?'E4-REFUND-'+orderNo:'DEMO-REFUND-1'):null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:unitPrice,lineAmountUsdt:unitPrice}]};
   }).filter(order=>!accountDeletionWallet(state)||(['COMPLETED','CANCELLED','CLOSED','FAILED','REFUNDED'].includes(order.orderStatus)&&['PAID','FAILED','CANCELLED','REFUNDED','EXPIRED'].includes(order.paymentStatus)));
 }
@@ -588,6 +609,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin);
+  const imageFor=sku=>products.find(product=>product.id===sku)?.imageUrl??null;
   if (pathname === '/api/config/phone-tiers') return { tiers: [1,2,3,4,5].map(tier => ({
     tier, name:`Tier ${tier}`, baseRateUsdt:[.02,.04,.06,.09,.12][tier-1], baseRateNex:tier*.1, effectiveAt:iso,
   })), sources:['Local prototype demo'] };
@@ -607,8 +629,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
-    return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,empty?[]:products,
+    const result=trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,empty?[]:products,
       productNo=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true,request.verifiedPayment?.quotaHold));
+    const imageUrl=imageFor(result?.config?.trialProductId);
+    return imageUrl?{...result,config:{...result.config,imageUrl}}:result;
   }
   const deactivation=pathname.match(/^\/api\/device\/(\d+)\/deactivate$/);
   if((deactivation||pathname==='/api/devices/activate')&&request.method()==='POST'){
@@ -663,8 +687,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
+  // History uses PENDING for orders without a payment record. Command receipts have no selected rail.
+  const orderReceiptProjection=order=>order?.paymentMethod==='PENDING'?{...order,paymentMethod:null}:order;
   const remember=(operation,targetId,response,order)=>{
-    if(commandKey){state.commands??={};state.commands[commandKey]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(order),response:structuredClone(response)};}
+    if(commandKey){state.commands??={};state.commands[commandKey]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(orderReceiptProjection(order)),response:structuredClone(response)};}
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
@@ -725,9 +751,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         {code:'LL',name:'Llama 70B',unit:null,price:.0024,deltaPct:18.7,sparkline:[.3,.35,.4,.42,.6,.78,.88],flagshipDeltaPct:32.1},
         {code:'VG',name:'Video generation',unit:null,price:.1,deltaPct:-1.2,sparkline:[.8,.75,.78,.72,.7,.72,.69],flagshipDeltaPct:null},
       ],deviceRankings:[
-        {rank:1,kind:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,bestFor:null},
-        {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null},
-        {rank:3,kind:'phone',name:null,dailyUsdt:.06,bestFor:null},
+        {rank:1,kind:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,bestFor:null,imageUrl:imageFor('stellarbox-pro')},
+        {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null,imageUrl:imageFor('stellarbox-s1')},
+        {rank:3,kind:'phone',name:null,dailyUsdt:.06,bestFor:null,imageUrl:null},
       ]};
       const devices=demoFleetFacts(url,locale,state).devices;
       const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
@@ -1045,7 +1071,16 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);
   if(pathname==='/api/genesis/account') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:{...authority,series:null,sale:null,eligibility:null,marketEnabled:false,emissionOpen:false,holdings:[],emissions:[],orders:[],walletBalanceUsdt:5280};
   if(pathname==='/api/genesis/eligibility') return {...authority,eligible:false,reasons:['SALE_NOT_OPEN'],ownedCount:0,maxPerUser:2,remainingCap:2,minAccountAgeDays:0,accountAgeDays:Math.floor((now-demoH4Account(state).createdAt)/day),status:'NOT_ELIGIBLE',reservedAllocation:null,reservedAllocationUnit:'UVT',priorityRank:null,priorityTier:'NONE',qualificationReasonCodes:['NO_ACTIVE_HOLDINGS'],policyVersion:null,effectiveAt:null,asOf:iso,serverTime:iso,provenance:{source:'nx_genesis_holding+nx_config_item',environment:'PRODUCTION',runId:''},halted:false};
-  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:demoAccountOrders(url,locale,state,now),nextCursor:null};
+  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')){
+    const orders=demoAccountOrders(url,locale,state,now).map(order=>{
+      const projected={...order,imageUrl:imageFor(order.lineItems?.[0]?.sku??order.productNo)};
+      if(order.orderType==='BUNDLE'){
+        projected.lineItems=order.lineItems.map(line=>({...line,imageUrl:imageFor(line.sku)}));
+      }
+      return order.items?withItemImages(projected,imageFor):projected;
+    });
+    return {...authority,runId:null,source:'server',orders,nextCursor:null};
+  }
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
     const bundle=pathname==='/api/orders/bundle';
@@ -1094,13 +1129,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:quote?amount.toFixed(2):amount,placedAt:now,
       computePoints:lines.reduce((total,line)=>total+products.find(p=>p.id===line.productNo).computePoints*line.quantity,0),orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
     if(quote)Object.assign(order,{promotionQuoteId:quote.quoteId,payBy:new Date(now+paymentWindow).toISOString(),items:quote.items.map(l=>({...l,productName:products.find(p=>p.id===l.productNo).name})),rewards:quote.expectedRewards});
-    Object.assign(order,{paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',expiresAt:now+paymentWindow,paidAt:null,activatedAt:null,targetDeviceId:null,targetDeviceInstanceNo:null});
+    Object.assign(order,{paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',expiresAt:now+paymentWindow,paidAt:null,activatedAt:null,targetDeviceId:null,targetDeviceInstanceNo:null});
     if(voucher){
       if(voucher.voucherId==='V-DESIGN')state.voucherUsed=true;
       Object.assign(order,{voucherId:voucher.voucherId,voucherRedemption:voucher});
     }
     state.createdOrders||=[];state.createdOrders.unshift(order);
-    const response=quote?order:bundle&&input.productNos?{orderNo:order.orderNo,orderType:'BUNDLE',itemCount:lines.length,productNos:input.productNos,subtotalUsdt:subtotal,discountRate,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server',policyVersion:1}:{orderNo:order.orderNo,subtotalUsdt:subtotal,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,voucherId:order.voucherId||null,voucherRedemption:order.voucherRedemption??null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server'};
+    const response=quote?orderReceiptProjection(order):bundle&&input.productNos?{orderNo:order.orderNo,orderType:'BUNDLE',itemCount:lines.length,productNos:input.productNos,subtotalUsdt:subtotal,discountRate,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server',policyVersion:1}:{orderNo:order.orderNo,subtotalUsdt:subtotal,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,voucherId:order.voucherId||null,voucherRedemption:order.voucherRedemption??null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server'};
     // The checkout fixture owns ordinary create replay. Promotion readback still needs its receipt.
     if(request.tracksOrderCreate&&!quote)return response;
     return remember(lines.length>1?'createBundle':'createOrder',quote?.quoteId||order.orderNo,response,order);
@@ -1114,7 +1149,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const replay=order.paymentStatus==='PAID',amount=Number(order.amountUsdt);
     if(action==='cancel'){
       // Same rule as the backend: an already cancelled order replays its receipt; any other settled order cannot be cancelled.
-      if(order.paymentStatus==='CANCELLED'&&order.orderStatus==='CANCELLED')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
+      if(order.paymentStatus==='CANCELLED'&&order.orderStatus==='CANCELLED')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?orderReceiptProjection(order):{}),...authority,source:'server',
         orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:true},order);
       if(order.paymentStatus!=='PENDING')refuse('ORDER_NOT_CANCELLABLE');
       (state.orderStatuses??={})[orderNo]='cancelled';
@@ -1122,10 +1157,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         order=Object.assign(writable,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
           activationStatus:'WAITING_PAYMENT',paidAt:null,activatedAt:null});
       }
-      return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
+      return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?orderReceiptProjection(order):{}),...authority,source:'server',
         orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:false},order);
     }
-    const paymentNo='DEMO-PAY-'+orderNo,paymentMethod=amount===0?'VOUCHER':'WALLET';
+    const paymentNo='DEMO-PAY-'+orderNo,paymentMethod=amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt=amount.toFixed(2);
     if(replay){
       if(order.orderStatus!=='COMPLETED'||order.activationStatus!=='ACTIVATED')refuse('ORDER_NOT_PAYABLE');
       if(order.paymentNo!==paymentNo)refuse('ORDER_PAYMENT_STATE_CONFLICT');
@@ -1142,12 +1177,12 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       (state.orderStatuses??={})[orderNo]='activated';
       if(!writable)(state.createdOrders??=[]).push(order);
       order=Object.assign(writable??order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
-        activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
+        activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod,paidTotalUsdt});
     }
     const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,
       paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',
-      amountUsdt:order.promotionQuoteId?amount.toFixed(2):amount,paymentMethod,
+      amountUsdt:order.promotionQuoteId?paidTotalUsdt:amount,paidTotalUsdt,paymentMethod,
       walletBalanceAfterUsdt:amount===0?null:balanceAfter,idempotent:replay};
     return remember('payOrder',orderNo,response,order);
   }
@@ -1201,6 +1236,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       // Like PromotionPublicService, an offer that is not running is never eligible.
       if(item.state!=='ACTIVE')item.eligibility='INELIGIBLE';
       if(state.machineImageState==='banner'&&item.state==='ACTIVE')item.bannerImageUrl=`/api/promotions/${item.activityId}/banner/${item.version}`;
+      const imageSkus=new Set(item.productNos);
+      for(const rule of item.rewardRules){
+        for(const reward of [rule.buyerReward,rule.inviterReward]){
+          if(reward?.type==='DEVICE')imageSkus.add(reward.giftProductNo);
+        }
+      }
+      item.productImages=Object.fromEntries([...imageSkus].map(sku=>[sku,imageFor(sku)]).filter(([,imageUrl])=>imageUrl));
       return item;
     });
     if(pathname!=='/api/promotions') return items.find(item=>item.activityId===pathname.split('/').pop())||{};
@@ -1431,6 +1473,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     data.realizedTodayUsdt=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsUsdt??0),0).toFixed(6));
     data.realizedTodayNex=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsNex??0),0).toFixed(6));
     Object.assign(data,facts);
+    data.devices=facts.devices.map(device=>({...device,imageUrl:imageFor(device.productCode.toLowerCase())}));
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {

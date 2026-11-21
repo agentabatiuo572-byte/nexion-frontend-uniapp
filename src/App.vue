@@ -2,10 +2,13 @@
 import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { refreshActivePage } from "@/lib/active-page-refresh";
-import { appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
+import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
 import { installNativePush, refreshNativePush, flushNativePushClick } from "@/services/native-push";
+// #ifdef APP-PLUS
+import { checkUpdate, guardUpdate, installUpdateGuard } from "@/services/native-update";
+// #endif
 import { navReset } from "@/lib/route";
 import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
@@ -423,11 +426,11 @@ function runScheduledReads(route: string, reconnected = false) {
 }
 
 function installForegroundReadSignals() {
-  let outage = false;
   const syncOnline = (online: boolean) => {
+    const disconnected = !online && !appDeviceOffline.value;
+    appDeviceOffline.value = !online;
     appReadOnline.value = online;
-    if (!online && !outage) toast.warn(useT().value.ui.networkDisconnected);
-    outage = !online;
+    if (disconnected) toast.warn(useT().value.ui.networkDisconnected);
   };
   // #ifdef H5
   const syncDocument = () => { documentReadVisible.value = !document.hidden; };
@@ -1065,6 +1068,7 @@ function questIdForRoute(route: string): QuestTaskId | null {
 
 function checkQuestRoute() {
   // #ifdef APP-PLUS
+  if (guardUpdate(readCurrentRoute())) return;
   flushNativePushClick();
   // #endif
   const route = readCurrentRoute();
@@ -1260,6 +1264,7 @@ function ensureBusinessLoopsRunning(): boolean {
 
 onLaunch(() => {
   // #ifdef APP-PLUS
+  installUpdateGuard();
   reportNativeSessionTiming("ON_LAUNCH_ENTER");
   // #endif
   // 🔴 必须在下面任何 early return 之前挂:退役路由 / 静态评审页同样有自造按钮,
@@ -1348,6 +1353,7 @@ onShow(() => {
   appReadForeground.value = true;
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
+  void checkUpdate();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");
   refreshNativePush();
   // #endif

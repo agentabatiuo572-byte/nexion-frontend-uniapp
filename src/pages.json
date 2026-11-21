@@ -346,6 +346,12 @@
       "path": "pages/me/preferences",
       "style": { "navigationStyle": "custom" }
     },
+    // #ifdef APP-PLUS
+    {
+      "path": "pages/me/app-update",
+      "style": { "navigationStyle": "custom", "app-plus": { "popGesture": "none" } }
+    },
+    // #endif
     {
       "path": "pages/me/risk-disclosure",
       "style": { "navigationStyle": "custom" }

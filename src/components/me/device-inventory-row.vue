@@ -54,9 +54,32 @@
         </view>
       </view>
       <view v-if="showAction" class="device-inventory-row__actions">
-        <NxButton v-if="active" class="device-inventory-row__action" size="small" variant="secondary" :label="actionLabel" :disabled="actionDisabled" @click="onAction" />
-        <NxButton v-if="tradeinCtaLabel" class="device-inventory-row__tradein-cta" size="small" :variant="active ? 'brand' : 'secondary'" :label="tradeinCtaLabel" @click="emit('quote-info', false); emit('tradein')" />
+        <!-- An activated card keeps one 更多 control; trade-in and deactivation live in its bottom sheet (03 §3.5.1 选择). -->
+        <NxButton v-if="active" class="device-inventory-row__more" size="small" variant="text" :label="moreLabel" :disabled="moreDisabled"
+          aria-haspopup="dialog" :aria-expanded="menuOpen" @click="menuOpen = true"><NxIcon name="more" :size="20" /></NxButton>
+        <NxButton v-if="tradeinCtaLabel && !active" class="device-inventory-row__tradein-cta" size="small" variant="secondary" :label="tradeinCtaLabel" @click="emit('quote-info', false); emit('tradein')" />
         <NxButton v-if="!active" class="device-inventory-row__action device-inventory-row__action--activate" size="small" variant="brand" :label="actionLabel" :disabled="actionDisabled" @click="onAction" />
+        <!-- display: contents keeps the closed host out of the button row; taps in the sheet stay off the page's close-on-tap. -->
+        <view v-if="active" class="device-inventory-row__menu-host" @click.stop>
+          <NxSheet :open="menuOpen" :title="deviceName(t, device)" @close="menuOpen = false">
+            <view class="device-inventory-row__menu" role="group" :aria-label="t.myDevices.inventoryMoreActions">
+              <view v-if="tradeinCtaLabel" class="device-inventory-row__menu-row" role="button" tabindex="0"
+                @click="chooseMenu('tradein')" @keydown.enter.stop.prevent="chooseMenu('tradein')" @keydown.space.stop.prevent="chooseMenu('tradein')">
+                <view class="device-inventory-row__menu-icon device-inventory-row__menu-icon--brand" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4" /><path d="M3 7h18" /><path d="M7 21l-4-4 4-4" /><path d="M21 17H3" /></svg></view>
+                <text class="device-inventory-row__menu-label">{{ tradeinCtaLabel }}</text>
+                <view class="device-inventory-row__menu-chevron"><NxIcon name="chevron-right" :size="16" /></view>
+              </view>
+              <view class="device-inventory-row__menu-row device-inventory-row__menu-row--danger" role="button" :tabindex="actionDisabled ? -1 : 0" :aria-disabled="actionDisabled"
+                @click="chooseMenu('toggle')" @keydown.enter.stop.prevent="chooseMenu('toggle')" @keydown.space.stop.prevent="chooseMenu('toggle')">
+                <view class="device-inventory-row__menu-icon device-inventory-row__menu-icon--neutral" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M6.3 5.3a9 9 0 1 0 11.4 0" /></svg></view>
+                <view class="device-inventory-row__menu-copy">
+                  <text class="device-inventory-row__menu-label">{{ actionLabel }}</text>
+                  <text v-if="actionDisabled && device.pendingDeactivate" class="device-inventory-row__menu-desc">{{ pendingChipLabel }}</text>
+                </view>
+              </view>
+            </view>
+          </NxSheet>
+        </view>
       </view>
     </view>
     <!-- An explanation the user opens is a bottom sheet (03 §3.5.1); taps inside it stay off the page's close-on-tap. -->
@@ -71,7 +94,8 @@
 
 <script setup lang="ts">
 import DeviceUnclassifiedCard from "@/components/device-unclassified-card.vue";
-import { computed, ref } from "vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
+import { computed, nextTick, ref } from "vue";
 import type { Device } from "@/store/types";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
@@ -155,6 +179,22 @@ function onAction() {
   if (!props.showAction || actionDisabled.value) return;
   emit("toggle");
 }
+// 更多: the menu holds trade-in (only when this device has an entry) and deactivation. While a deactivation is pending
+// the deactivate row is disabled with its reason; the button itself is disabled only when nothing else is left in it.
+const menuOpen = ref(false);
+const moreLabel = computed(() => `${t.value.myDevices.inventoryMoreActions} · ${deviceName(t.value, props.device)}`);
+const moreDisabled = computed(() => actionDisabled.value && !props.tradeinCtaLabel);
+async function chooseMenu(action: "toggle" | "tradein") {
+  if (action === "toggle" && actionDisabled.value) return;
+  // The sheet closes first and hands focus back to 更多, so the confirm or trade-in sheet that opens next returns it there.
+  menuOpen.value = false;
+  await nextTick();
+  await nextTick();
+  if (action === "tradein") {
+    emit("quote-info", false);
+    emit("tradein");
+  } else onAction();
+}
 </script>
 
 <style scoped>
@@ -214,4 +254,27 @@ function onAction() {
   .device-inventory-row__image { width: 66px; height: 54px; }
 }
 @media (prefers-reduced-motion: reduce) { .device-inventory-row__eq > view { animation: none; } .device-inventory-row__fill { transition: none; } }
+/* 更多: a bare 20px icon, no fill, rim or stroke (user), in the card's secondary-icon ink like the ⓘ beside it, in a 44px
+   hit box (01 §1.3) whose icon sits flush with the card's content edge. Pressing dims the icon instead of scaling it. */
+.device-inventory-row__actions .device-inventory-row__more { min-width: 44px; margin-right: -12px; color: var(--v5-ink-3); }
+.device-inventory-row__more :deep(.nx-button__surface) { flex: none; width: 44px; padding: 0; }
+.device-inventory-row__actions .device-inventory-row__more:not(.nx-button--disabled):active { opacity: .6; transform: none; }
+.device-inventory-row__menu-host { display: contents; }
+.device-inventory-row__menu { overflow: hidden; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
+.device-inventory-row__menu-row { display: flex; align-items: center; gap: 12px; min-height: 56px; box-sizing: border-box; padding: 12px 16px; border-bottom: 1px solid var(--v5-border); }
+.device-inventory-row__menu-row:last-child { border-bottom: 0; }
+.device-inventory-row__menu-row:not([aria-disabled="true"]):active { background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.device-inventory-row__menu-row[role="button"]:focus-visible { outline-offset: -2px; }
+.device-inventory-row__menu-row[aria-disabled="true"] { cursor: default; }
+.device-inventory-row__menu-row[aria-disabled="true"] :is(.device-inventory-row__menu-icon, .device-inventory-row__menu-label) { opacity: .5; }
+.device-inventory-row__menu-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 10px; }
+.device-inventory-row__menu-icon--brand { background: var(--v5-brand-soft); color: var(--v5-brand); }
+/* A destructive row swaps only its text to the error colour (03 §3.1); its icon tile stays neutral. */
+.device-inventory-row__menu-icon--neutral { background: var(--v5-surface-3); color: var(--v5-ink-2); }
+.device-inventory-row__menu-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+/* Menu rows use the list-title role at 400 (03 §3.5); a destructive action only swaps its text to the error colour (03 §3.1). */
+.device-inventory-row__menu-label { flex: 1; min-width: 0; color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
+.device-inventory-row__menu-row--danger .device-inventory-row__menu-label { color: var(--v5-danger); }
+.device-inventory-row__menu-desc { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.device-inventory-row__menu-chevron { display: flex; flex: none; color: var(--v5-ink-4); }
 </style>

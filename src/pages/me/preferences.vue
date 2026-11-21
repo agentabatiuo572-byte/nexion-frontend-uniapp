@@ -67,6 +67,17 @@
         </view>
         <text class="block mx-1" :style="footerStyle">{{ w.notifFooter }}</text>
       </view>
+      <!-- #ifdef APP-PLUS -->
+      <view class="mx-4" style="margin-top: 20px">
+        <text class="block" :style="headingStyle">{{ words.about }}</text>
+        <view class="nx-glass-card" :style="cardStyle">
+          <view class="push-settings-row" role="button" tabindex="0" @click="navTo(updateRoute)" @keydown.enter.prevent="navTo(updateRoute)">
+            <text style="flex: 1">{{ words.title }}</text><text class="push-settings-action">{{ nativeVersion }}</text>
+            <NxIcon name="chevron-right" />
+          </view>
+        </view>
+      </view>
+      <!-- #endif -->
     </view>
   </AppChassis>
 </template>
@@ -85,6 +96,9 @@ import { nativePushPermission, nativePushRegistrationUnavailable, openNativePush
 import { nativePushCopy } from "@/i18n/native-push";
 import { useLocaleStore } from "@/store/locale";
 import { uiLocale } from "@/i18n";
+import { navTo } from "@/lib/route";
+import { installed, updateRoute, words } from "@/services/native-update";
+const nativeVersion = computed(() => installed.value?.name || plus.runtime.version || "—");
 const pushLocale = useLocaleStore();
 const pushSettingsFailed = ref(false);
 const pushCopy = computed(() => nativePushCopy[uiLocale(pushLocale.code)]);

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
-import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
+import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
@@ -18,6 +18,7 @@ import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
 import { demoAccountId, previewAccountId, previewSelectedAccountId } from './lib/prototype-demo-identity.mjs';
 import { demoPaymentIntentMissing, demoPaymentScenario, selectDemoPaymentState } from './lib/prototype-demo-payment-mode.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
+import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.mjs';
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
@@ -57,7 +58,7 @@ let scenarioEpoch=state.scenarioEpoch??0;
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
 const fixtureFor=(url,request)=>{
   if(['/api/app/team/quota','/api/store/purchase-eligibility'].includes(url.pathname))checkoutFlow?.observePayments();
-  return demoFixture(url,locale,state,request);
+  return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,request),state);
 };
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
@@ -73,9 +74,15 @@ const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
 // Runs in every App page before the App starts (design rule at demoSeedFleet). It drops the records of another
 // scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
-function previewScenarioPage(scenario,keys){
-  // The fixture's hosted URL is a placeholder. Keep the App on its current intent page.
+function previewScenarioPage(scenario,keys,purchaseCashierPrefix){
+  // Keep the bank top-up placeholder on its current page.
   window.navigation?.addEventListener('navigate',event=>{if(event.destination.url==='https://api.hdpayadmin.com/pay/demo-preview-only')event.preventDefault();});
+  // The app validates the hosted address first. Rewrite it before assigning the iframe's source.
+  const iframeSrc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src');
+  Object.defineProperty(HTMLIFrameElement.prototype,'src',{...iframeSrc,set(value){
+    const local=typeof value==='string'&&value.startsWith(purchaseCashierPrefix)?new URL(value).pathname:value;
+    iframeSrc.set.call(this,local);
+  }});
   if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
   const follow=value=>{if(value&&value!==scenario)location.reload();};
   // Once another page has entered a new scenario the shared records are that scenario's: this page may neither write nor
@@ -139,7 +146,7 @@ function selectedSupportAccount(url) {
 }
 function scenarioSeed(url) {
   const sample=state.messageState==='transferred'?selectedSupportAccount(url)?.supportTransferSample:null;
-  return '<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');'
+  return '<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+');'
     +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(sample??null)+','+JSON.stringify(demoAccountId)+');</script>';
 }
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
@@ -154,6 +161,12 @@ const server=http.createServer(async(req,res)=>{
   try {
     const url=new URL(req.url,'http://127.0.0.1:'+server.address().port);
     res.setHeader('Cache-Control','no-store');
+    if(req.method==='GET'&&url.pathname.startsWith(previewPurchaseCashier.pathname)){
+      const intentNo=url.pathname.slice(previewPurchaseCashier.pathname.length);
+      if(!/^PPI-PREVIEW-\d+$/.test(intentNo)){res.writeHead(404);return res.end();}
+      res.setHeader('Content-Type',mime['.html']);
+      return res.end(`<!doctype html><html lang="zh"><meta charset="utf-8"><title>模拟银行卡收银台</title><h1>模拟银行卡收银台</h1><p>${intentNo}</p></html>`);
+    }
     if(checkoutFlow&&url.pathname==='/__checkout/state'){
       if(req.method==='POST'){
         let raw='';for await(const chunk of req)raw+=chunk;const update=JSON.parse(raw||'{}');
@@ -300,7 +313,8 @@ const server=http.createServer(async(req,res)=>{
         if(staleWrite())return refuseStale();
         const response=await checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         if(response.drop){res.destroy();return;}
-        return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
+        const data=response.status===200?demoPromotionResponse(url,req.method,response.data,state):response.data;
+        return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data},response.status);
       }
       if(req.method==='POST'&&authDemo.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
