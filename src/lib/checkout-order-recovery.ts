@@ -10,6 +10,15 @@ export type CheckoutTradeinRecovery = Pointer & { tradeinQuote: CanonicalTradein
 type Row = { orders: Record<string, Pointer> };
 const terminal = new Set(["activated", "inventory", "cancelled", "expired", "refunded", "chargeback"]);
 
+/** A current local pointer can select the original B60 query, never prove the order exists. */
+export function readCheckoutOrderPointer(accountKey: string, productNo: string): Pick<Pointer, "orderNo" | "commandKey"> | null {
+  const pointer = readAccountRow<Row>(KEY, accountKey, true)?.orders?.[productNo];
+  if (!pointer || pointer.productNo !== productNo || pointer.tradeinQuote
+      || typeof pointer.orderNo !== "string" || !pointer.orderNo.trim()
+      || typeof pointer.commandKey !== "string" || !pointer.commandKey.trim()) return null;
+  return { orderNo: pointer.orderNo, commandKey: pointer.commandKey };
+}
+
 export function rememberCheckoutOrder(accountKey: string, pointer: Pointer): void {
   const row = readAccountRow<Row>(KEY, accountKey, true);
   if (row?.orders?.[pointer.productNo]?.tradeinQuote

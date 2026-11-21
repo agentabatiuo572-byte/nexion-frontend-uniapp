@@ -24,8 +24,12 @@ export function readAccountRow<T>(tableKey: string, accountKey: string, throwOnR
 export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T): boolean {
   try {
     const raw = uni.getStorageSync(tableKey) as Record<string, T> | "";
+    const key = normalizeAccountKey(accountKey);
+    // #ifdef H5
+    if (raw && typeof raw === "object" && JSON.stringify(raw[key]) === JSON.stringify(row)) return true;
+    // #endif
     const table = raw && typeof raw === "object" ? { ...raw } : ({} as Record<string, T>);
-    table[normalizeAccountKey(accountKey)] = row;
+    table[key] = row;
     uni.setStorageSync(tableKey, table);
     return true;
   } catch {

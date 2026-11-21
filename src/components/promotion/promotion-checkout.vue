@@ -7,7 +7,7 @@
       <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action" role="button" :tabindex="done&&resultSettled?0:-1" :aria-disabled="busy" :aria-hidden="!(done&&resultSettled)" :style="{visibility:done&&resultSettled?'visible':'hidden'}" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
     <template v-else>
-      <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
+      <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction v-if="!foregroundCapacityTarget||foregroundCapacityResumable" class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
       <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
@@ -157,13 +157,13 @@ import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadlin
 import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { onPurchaseRecordReleased, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
+import { onPurchaseRecordReleased, pendingOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute } from '@/lib/advisor-chat-route';
 import { useConversations } from '@/store/conversations';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
-const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string}>();
+const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;readCapacityRecovery?:(target:string)=>Promise<boolean>}>();
 function formatDiscount(value: Parameters<typeof formatAmount>[0]): string {
   return formatCheckoutReviewAmount(value, 'USD', { discount: true });
 }
@@ -257,7 +257,7 @@ const selection=ref(props.items.map(({productNo,quantity})=>({productNo,quantity
 // A product image that fails to load is dropped, so its art column collapses like the single-item card's.
 const brokenImages=ref<string[]>([]);
 const keepRecoveryTarget=ref<string|null>(null),keepRecoveryReadError=ref(false),tradein=useTradeinSheet();
-function recoverKeepBeforeNewPurchase(reopen=false):boolean {
+function recoverKeepBeforeNewPurchase(reopen=false,showRecovery=true):boolean {
   // Original orders and commands always recover before any new purchase gate.
   if(props.orderNo||session.record.order||session.record.pending)return false;
   const previous=keepRecoveryTarget.value;
@@ -275,7 +275,7 @@ function recoverKeepBeforeNewPurchase(reopen=false):boolean {
     catch{keepRecoveryReadError.value=true;}
     keepRecoveryTarget.value=productNo;
     freshQuoteReady.value=false;quoteFresh.value=false;quotePresentation.value=null;
-    if(reopen||previous!==productNo)tradein.showKeepRecovery(productNo as DeviceKind);
+    if(showRecovery&&(reopen||previous!==productNo))tradein.showKeepRecovery(productNo as DeviceKind);
     return true;
   }
   return false;
@@ -353,30 +353,34 @@ async function run(action:()=>Promise<void>){
   try{await action();}catch(cause){if(current())showOperationError(cause);}
   finally{if(current()){writeBusy.value=false;revision.value++;updateClock();}}
 }
-async function loadQuote(recheckCapacity=false){
+let foregroundQuoteAt = -Infinity;
+async function loadQuote(recheckCapacity=false,foreground=false){
   const block=quoteBlock.value;
   if(block&&block!=='unavailable'&&!(recheckCapacity&&block==='capacity'))return;
   if(busy.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
-  if(recoverKeepBeforeNewPurchase())return;
+  if(!foreground&&recoverKeepBeforeNewPurchase())return;
+  if(foreground)foregroundQuoteAt=Date.now();
   // A failed later read invalidates the successful catalog promise saved at mount.
   if(productCatalogState.status==='error')catalogRefresh=null;
   const generation=++readGeneration,inputKey=quotePresentationKey();
   quoteRead.value=generation;error.value='';activityConflict.value=false;
   if(quotePresentation.value?.key!==inputKey){quotePresentation.value=null;promotion.value=null;}
-  voucherOpen.value=false;freshQuoteReady.value=false;promotionReceivedAt=null;termsOpen.value=false;receivedAt=null;quoteFresh.value=false;
+  if(!foreground){voucherOpen.value=false;freshQuoteReady.value=false;promotionReceivedAt=null;termsOpen.value=false;receivedAt=null;quoteFresh.value=false;}
   try{
-    try{session.invalidateQuote();revision.value++;}catch(cause){quotePresentation.value=null;throw cause;}
-    // Publishing the catalog invalidates voucher reads. Quote only after this
-    // checkout's catalog refresh has finished, as with its wallet read.
-    catalogRefresh??=refreshProductCatalog(true);
-    const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
-    if(!readCurrent(generation))return;
-    if(!catalogReady){
-      catalogRefresh=null;quotePresentation.value=null;promotion.value=null;quoteBlock.value='unavailable';
-      return;
+    if(!foreground){
+      try{session.invalidateQuote();revision.value++;}catch(cause){quotePresentation.value=null;throw cause;}
+      // Publishing the catalog invalidates voucher reads. Quote only after this
+      // checkout's catalog refresh has finished, as with its wallet read.
+      catalogRefresh??=refreshProductCatalog(true);
+      const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
+      if(!readCurrent(generation))return;
+      if(!catalogReady){
+        catalogRefresh=null;quotePresentation.value=null;promotion.value=null;quoteBlock.value='unavailable';
+        return;
+      }
     }
     const sampledAt=readTrustedMonotonicNowMs();
-    if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
+    if(!foreground&&props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
       if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?value:null;promotionReceivedAt=sampledAt;updateClock();}
     }).catch(()=>{});
     try{
@@ -384,7 +388,7 @@ async function loadQuote(recheckCapacity=false){
       let result:Quote;
       let selectedId:string|null=voucherId.value;
       let activityId=props.activityId||null;
-      if(eventVoucherId){
+      if(!foreground&&eventVoucherId){
         eventVoucherStatus.value='loading';
         const refreshed=await voucher.refreshRemote();if(!readCurrent(generation))return;
         if(!refreshed)throw new Error('VOUCHER_STATE_UNAVAILABLE');
@@ -400,7 +404,11 @@ async function loadQuote(recheckCapacity=false){
           }
         }
       }
-      if(eventVoucherId){
+      if(foreground){
+        const previous=session.record.quote;
+        const selectedActivity=previous?.activityId??(eventVoucherId?promotion.value?.activityId??null:activityId);
+        result=await promotionApi.quote(requestedItems,selectedActivity,selectedId,!eventVoucherId);
+      }else if(eventVoucherId){
         result=await promotionApi.quote(requestedItems,activityId,voucherId.value,false);
         selectedId=eventVoucherId;
       }else{
@@ -435,7 +443,7 @@ async function loadQuote(recheckCapacity=false){
       if(!readCurrent(generation))return;
       if(!(cause instanceof ApiError&&cause.kind==='network')){quotePresentation.value=null;promotion.value=null;}
       quoteBlock.value=checkoutQuoteBlock(cause);
-      if(quoteBlock.value)return;
+      if(quoteBlock.value){if(foreground){freshQuoteReady.value=false;quoteFresh.value=false;}return;}
       throw cause;
     }
   }catch(cause){
@@ -571,20 +579,20 @@ async function confirmPayment(){
   }
 }
 let recoveryReadGeneration=-1;
-function recover():Promise<boolean>{
+function recover(foreground=false):Promise<boolean>{
   if(!current()||!visible.value||busy.value)return Promise.resolve(false);
   if(recoveryRead.value){
     // Back can arrive while the foreground read is checking this same order.
     if(recoveryReadGeneration===readGeneration)return recoveryRead.value;
     // A read from before the page was hidden cannot answer for this visit: read again once it ends.
-    return recoveryRead.value.then(()=>recover());
+    return recoveryRead.value.then(()=>recover(foreground));
   }
   if(session.busy)return Promise.resolve(false);
   recoveryReadGeneration=readGeneration;
-  recoveryRead.value=readCheckout().finally(()=>{recoveryRead.value=null;});
+  recoveryRead.value=readCheckout(foreground).finally(()=>{recoveryRead.value=null;});
   return recoveryRead.value;
 }
-async function readCheckout():Promise<boolean>{
+async function readCheckout(foreground=false):Promise<boolean>{
   const generation=readGeneration;
   recoveryGeneration=generation;
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
@@ -597,7 +605,7 @@ async function readCheckout():Promise<boolean>{
     revision.value++;
     const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
     // If recovery was part of Back, let that navigation finish.
-    if (openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
+    if (!foreground && openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
       && (!props.orderNo || props.orderNo !== order.value?.orderNo)) {
       const requestedHref = props.orderNo
         ? '/pages/store/checkout?orderNo=' + encodeURIComponent(props.orderNo)
@@ -606,7 +614,7 @@ async function readCheckout():Promise<boolean>{
     }
     const reopenPurchase = ordinaryMultiItemEntry && canStartNew.value && !session.record.quote?.activityId
       && !order.value?.rewards?.length && unpaidOrderEnded;
-    if (reopenPurchase) {
+    if (!foreground && reopenPurchase) {
       // The replacement quote has its own read generation.
       recoveryGeneration=null;
       await Promise.all([startNewPurchase(),refreshWallet(true)]);
@@ -615,7 +623,7 @@ async function readCheckout():Promise<boolean>{
     await loadOrderClock();
     if(!readCurrent(generation))return false;
     if(order.value?.paymentStatus==='PAID')await readActivation();
-    else if(!clockOnly)await refreshWallet(true,true);
+    else if(!clockOnly&&!foreground)await refreshWallet(true,true);
     return readCurrent(generation)&&!unknown.value;
   }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
   finally{recoveryGeneration=null;}
@@ -726,8 +734,56 @@ function back():boolean{
   void requestLeave().then(ok=>{if(ok&&current()){nativeBackApproved=true;navBack('/store');}});
   return true;
 }
-function hide(){
+const foregroundCapacityTarget=ref<string|null>(null);
+const foregroundCapacityResumable=ref(false);
+const foregroundCapacityReading=ref(false);
+let foregroundPaymentSignature:string|undefined;
+async function recoverForegroundCapacity(){
+  const target=foregroundCapacityTarget.value;
+  if(!target||foregroundCapacityReading.value||!props.readCapacityRecovery)return;
+  foregroundCapacityReading.value=true;
+  try{
+    foregroundCapacityResumable.value=await props.readCapacityRecovery(target);
+    if(current()&&visible.value&&!recoverKeepBeforeNewPurchase(false,false))foregroundCapacityTarget.value=null;
+  }finally{foregroundCapacityReading.value=false;}
+}
+useAutoRecovery({
+  active:()=>current()&&visible.value,
+  failed:()=>!!foregroundCapacityTarget.value&&!foregroundCapacityReading.value&&!foregroundCapacityResumable.value,
+  retry:recoverForegroundCapacity,
+  repeatMs:30_000,
+});
+function pauseBrowserTab(){
   if(walletTimer){clearInterval(walletTimer);walletTimer=undefined;}
+  paymentSheetOpen.value=false;termsOpen.value=false;voucherOpen.value=false;
+  useUI().clearConfirmsBy(paymentDialogOwner);
+}
+function resumeBrowserTab(){if(current()&&visible.value)startWalletTimer();}
+function refreshForegroundReview():boolean{
+  if(!current()||!visible.value||!auth.isAuthenticated||purchaseReadBusy())return false;
+  try{
+    const changed=session.restoreForegroundRecovery();
+    const signature=order.value?JSON.stringify(pendingOrderPayment(account,order.value.orderNo)):undefined;
+    const paymentChanged=signature!==foregroundPaymentSignature;
+    foregroundPaymentSignature=signature;
+    if(changed||paymentChanged){
+      revision.value++;
+      if(session.record.pending||session.record.order)void recover(true);
+      return true;
+    }
+    if(session.record.pending||session.record.order||props.orderNo)return true;
+    if(recoverKeepBeforeNewPurchase(false,false)){
+      foregroundCapacityTarget.value=keepRecoveryTarget.value;
+      void recoverForegroundCapacity();
+    }else{
+      foregroundCapacityTarget.value=null;
+      void loadQuote(true,true);
+    }
+  }catch{recoveryReadFailed.value=true;}
+  return true;
+}
+function hide(){
+  pauseBrowserTab();
   visible.value=false;quotePresentation.value=null;readGeneration++;walletGeneration++;resultGeneration++;resultReading.value=false;paymentSheetOpen.value=false;walletState.value='idle';refreshOnIdle=false;termsOpen.value=false;voucherOpen.value=false;promotion.value=null;promotionReceivedAt=null;
   quoteRead.value=null;
   useUI().clearConfirmsBy(paymentDialogOwner);
@@ -760,13 +816,13 @@ const footer = computed(() => {
 });
 const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
 const resultVisible = computed(() => order.value?.paymentStatus === 'PAID');
-defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible});
+defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{
     if(!visible.value||!current()||loading.value||busy.value||paymentConfirming.value||paymentSheetOpen.value||leaving.value||termsOpen.value||voucherOpen.value||voucherLoading.value)return;
     if(walletState.value!=='loading')void refreshWallet(true);
-    if(!quoteBlock.value&&!session.record.order&&!session.record.pending)void loadQuote();
+    if(Date.now()-foregroundQuoteAt>=30_000&&!quoteBlock.value&&!session.record.order&&!session.record.pending)void loadQuote();
   },30000);
 }
 onMounted(async()=>{

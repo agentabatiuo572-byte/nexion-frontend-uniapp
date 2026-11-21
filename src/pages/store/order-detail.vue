@@ -238,6 +238,7 @@ const auth = useAuth();
 
 const id = ref("");
 const autoPayRequested = ref(false);
+let automaticPaymentDiscovery = true;
 let pendingPaymentIntentAccount = '';
 // FEAT-TRIAL05: `?result=trial` (set by checkout) opens the purchase result once; the order view is one tap away.
 const showTrialResult = ref(false);
@@ -281,6 +282,7 @@ onLoad((options) => {
   const from = o.from ?? (queryMatchesOrder && query.getAll("from").length === 1 ? query.get("from") : "");
   showTrialResult.value = (o.result ?? (queryMatchesOrder && query.getAll("result").length === 1 ? query.get("result") : "")) === "trial";
   autoPayRequested.value = (o.pay ?? (queryMatchesOrder && query.getAll('pay').length === 1 ? query.get('pay') : '')) === '1';
+  automaticPaymentDiscovery = (o.readback ?? (queryMatchesOrder ? query.get('readback') : null)) !== '1';
   orderOrigin.value = from === "me" || from === "store" ? from : "";
   ordersBackHref.value = orderOrigin.value ? `/store/orders?from=${orderOrigin.value}` : "/store/orders";
   preserveOrderOriginInH5();
@@ -344,7 +346,7 @@ async function refreshOrder(discoverPayment = true) {
       if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
         orderPresentation.value = result ?? null;
         remoteOrderError.value = false;
-        if (discoverPayment && result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
+        if (automaticPaymentDiscovery && discoverPayment && result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
             && !refusedPayment.value && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
           paymentLookupScope = scope;
           await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, result.productName,
