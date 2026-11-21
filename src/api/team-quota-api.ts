@@ -9,6 +9,8 @@ export interface TeamQuotaCondition { kind: "rank" | "directRefs" | "teamCompute
 export interface TeamQuotaTier {
   productId: string; quotaCode: string; name: string; price: number; monthlyStock: number; soldThisMonth: number;
   unlockKind: "ALL" | "EITHER"; conditions: TeamQuotaCondition[]; perks: string[]; available: boolean;
+  // BUG-549 to wire: parse() does not read these yet. usedThisMonth includes unpaid orders; remaining = max(0, monthlyStock − usedThisMonth).
+  usedThisMonth?: number; remaining?: number;
 }
 export interface TeamQuotaSnapshot {
   source: "server"; sourceEnvironment: TeamQuotaEnvironment; runId: string;

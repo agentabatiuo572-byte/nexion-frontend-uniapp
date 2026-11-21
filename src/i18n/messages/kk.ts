@@ -4902,7 +4902,7 @@ export const kk: Messages = {
   quota: {
     availableDevices: "Құрылғылар",
     buy: "Сатып алу",
-    stockUnavailable: "Осы кезеңде сатылып кетті",
+    stockUnavailable: "Бұл кезеңде орын әзірге жоқ",
     focusedTierMissing: "Бұл тауарда квота шегі жоқ. Сатып алу талаптарын тауар бетінен қараңыз.",
     pageTitle: "Жабдық квотасы",
     yourInvites: "Белсенді достар",
@@ -4911,7 +4911,7 @@ export const kk: Messages = {
     unlocked: "АШЫЛДЫ",
     locked: "ЖАБЫҚ",
     priceLine: "${price}",
-    soldPct: "{pct}% сатылды",
+    totalLabel: "Барлығы {n}",
     leftLabel: "{n} қалды",
     unlockEither: "Кез келген шартпен ашылады",
     unlockAll: "Барлық шарт қажет",

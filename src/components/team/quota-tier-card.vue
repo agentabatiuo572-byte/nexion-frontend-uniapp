@@ -2,7 +2,7 @@
   <view class="quota-tier nx-tint nx-viz-motion" :aria-busy="pending">
     <view class="quota-tier__top">
       <text class="quota-product__qualification" :class="{ 'quota-product__qualification--met': !visibility.hidden && !pending && unlocked }"><svg v-if="!visibility.hidden && !pending && unlocked" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>{{ visibility.mask(pending ? '—' : unlocked ? t.quota.unlocked : t.quota.locked) }}</text>
-      <view ref="stockBarRef" class="quota-stock" :aria-label="`${fmt(t.quota.leftLabel, { n: pending ? '—' : stockLeft })} · ${fmt(t.quota.soldPct, { pct: pending ? '—' : Math.round(stockPct * 100) })}`">
+      <view ref="stockBarRef" class="quota-stock" :aria-label="`${fmt(t.quota.leftLabel, { n: pending ? '—' : stockLeft })} · ${fmt(t.quota.totalLabel, { n: pending ? '—' : tier.monthlyStock })}`">
         <view class="quota-stock__ring" :style="stockRingStyle"><view class="quota-stock__hole nx-num-metric"><text>{{ pending ? '—' : stockLeft }}</text></view></view>
       </view>
     </view>
@@ -55,6 +55,10 @@ export interface QuotaTier {
   price: number;
   monthlyStock: number;
   soldThisMonth: number;
+  /** BUG-549: used this month including unpaid payment orders; an old server omits it and soldThisMonth stands in. */
+  usedThisMonth?: number;
+  /** BUG-549: the server's buyable remainder (unpaid orders already counted); an old server omits it and monthlyStock − used stands in. */
+  remaining?: number;
   unlockKind: "either" | "all";
   conditions: QuotaCondition[];
   perks: string[];
@@ -81,8 +85,10 @@ const unlocked = computed(() => {
   const met = props.tier.conditions.map(condition => condition.current >= condition.required);
   return met.length === 0 || (props.tier.unlockKind === 'either' ? met.some(Boolean) : met.every(Boolean));
 });
-const stockPct = computed(() => props.tier.monthlyStock > 0 ? Math.min(1, props.tier.soldThisMonth / props.tier.monthlyStock) : 1);
-const stockLeft = computed(() => Math.max(0, props.tier.monthlyStock - props.tier.soldThisMonth));
+// The ring fills with what is used (unpaid orders included); the centre shows what can still be bought.
+const stockUsed = computed(() => props.tier.usedThisMonth ?? props.tier.soldThisMonth);
+const stockPct = computed(() => props.tier.monthlyStock > 0 ? Math.min(1, stockUsed.value / props.tier.monthlyStock) : 1);
+const stockLeft = computed(() => props.tier.remaining ?? Math.max(0, props.tier.monthlyStock - stockUsed.value));
 const priceParts = computed(() => formatFinanceAmount(props.tier.price).split('.'));
 const stockRingStyle = computed(() => ({ '--nx-viz-ring': props.pending || stockBarInView.value === false ? 0 : stockPct.value * 100, transition: props.pending || stockBarInView.value === false ? 'none' : VIZ_RING_TRANSITION }));
 function conditionLabel(condition: QuotaCondition) {
@@ -114,14 +120,14 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 .quota-stock__track { height:3px;background:var(--v5-surface-3);border-radius:9px;overflow:hidden;margin-top:var(--v5-space-2); }.quota-stock__track > view { height:100%;background:var(--v5-ink-3);border-radius:inherit; }
 .quota-conditions { margin-top:22px; }.quota-section-label { display:block;font:600 13px/1.5 var(--font-v5); }.quota-condition { margin-top:var(--ui-space-inset); }.quota-condition__values { margin-left:auto;font:500 13px/18px var(--font-metric);color:var(--v5-brand);font-variant-numeric:tabular-nums;text-align:right; }
 .quota-perks { display:flex;flex-direction:column;gap:6px;margin-top:18px;color:var(--v5-ink-3);font:400 12px/1.6 var(--font-v5);overflow-wrap:break-word; }.quota-actions { margin-top:var(--ui-space-section); }.quota-actions :deep(.nx-button) { width:100%;box-sizing:border-box; }
-.quota-unavailable { display:block;font:400 var(--ui-type-list-subtitle)/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.quota-unavailable { display:block;font:400 var(--ui-type-list-subtitle)/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .quota-product:focus-visible { outline:2px solid var(--v5-brand);outline-offset:4px; }
 .quota-tier__top { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--v5-space-3); margin-bottom:var(--v5-space-3); }
 .quota-tier__top .quota-product__qualification { display:inline-flex; align-items:center; gap:var(--v5-space-1); margin:0; padding:var(--v5-space-1) var(--ui-space-row-y); border-radius:999px; background:var(--v5-surface-3); }
 .quota-tier__top .quota-product__qualification--met { background:color-mix(in srgb,var(--v5-brand) 16%,transparent); }
 .quota-tier__top .quota-stock { flex:none; margin:0; }
 .quota-stock__ring { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; background:conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%),var(--v5-surface-3) 0); }
-.quota-stock__hole { display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:var(--v5-surface); color:var(--v5-ink); font:600 13px/18px var(--font-metric); }
+.quota-stock__hole { display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:var(--v5-surface); color:var(--v5-ink); font:500 13px/18px var(--font-metric); }
 .quota-product .quota-product__price { display:flex; align-items:baseline; gap:0; font:550 18px/24px var(--font-amount); color:var(--v5-ink-2); letter-spacing:-.03em; }
 .quota-price-symbol { font-size:12px; margin-right:2px; color:var(--v5-ink-3); }
 .quota-price-fraction { color:var(--v5-ink-3); }

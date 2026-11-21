@@ -4902,7 +4902,7 @@ export const ru: Messages = {
   quota: {
     availableDevices: "Можно купить",
     buy: "Купить",
-    stockUnavailable: "На этот период всё распродано",
+    stockUnavailable: "В этом периоде мест пока нет",
     focusedTierMissing: "Для этого товара нет квоты. Условия покупки — на странице товара.",
     pageTitle: "Квота оборудования",
     yourInvites: "Активированные друзья",
@@ -4911,7 +4911,7 @@ export const ru: Messages = {
     unlocked: "ОТКРЫТО",
     locked: "ЗАКРЫТО",
     priceLine: "${price}",
-    soldPct: "Продано {pct}%",
+    totalLabel: "Всего {n}",
     leftLabel: "Осталось {n}",
     unlockEither: "Хватит одного условия",
     unlockAll: "Все обязательны",

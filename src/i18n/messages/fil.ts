@@ -4902,7 +4902,7 @@ export const fil: Messages = {
   quota: {
     availableDevices: "Available na device",
     buy: "Bilhin",
-    stockUnavailable: "Ubos na ngayong period",
+    stockUnavailable: "Wala munang slot ngayong period",
     focusedTierMissing: "Walang limit ng quota ang produktong ito. Tingnan ang page ng produkto para sa requirement sa pagbili.",
     pageTitle: "Quota ng hardware",
     yourInvites: "Na-activate na kaibigan",
@@ -4911,7 +4911,7 @@ export const fil: Messages = {
     unlocked: "UNLOCKED",
     locked: "LOCKED",
     priceLine: "${price}",
-    soldPct: "{pct}% naibenta",
+    totalLabel: "Kabuuang {n}",
     leftLabel: "{n} natitira",
     unlockEither: "Isa lang ang kailangan",
     unlockAll: "Kailangan lahat",
