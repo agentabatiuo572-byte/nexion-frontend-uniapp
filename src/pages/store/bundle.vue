@@ -85,7 +85,7 @@
           :style="{ borderBottom: i === products.length - 1 ? 'none' : '1px solid var(--v5-border)' }"
         >
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="itemNameStyle">{{ (p.name) }}</text>
+            <text class="block" :style="itemNameStyle">{{ (p.name) }}</text>
             <text class="block" :style="itemMetaStyle">
               {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
             </text>
@@ -122,7 +122,7 @@
             @keydown="activate($event, () => onAddSuggestion(p))"
           >
             <view class="flex-1 min-w-0 text-left">
-              <text class="block truncate" :style="suggestionNameStyle">{{ (p.name) }}</text>
+              <text class="block" :style="suggestionNameStyle">{{ (p.name) }}</text>
               <text class="block" :style="itemMetaStyle">
                 {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
               </text>
@@ -976,6 +976,7 @@ const itemNameStyle: CSSProperties = {
   fontWeight: "var(--ui-type-list-title-weight)",
   fontSize: "var(--ui-type-list-title)",
   lineHeight: "var(--ui-type-list-title-lh)",
+  overflowWrap: "break-word",
   color: "var(--v5-ink)",
 };
 const itemMetaStyle: CSSProperties = {
