@@ -27,6 +27,7 @@ export function previewAccountId(state, headers) {
   if (state.sessionState === 'signed-out' || state.authState === 'signed-out') return null;
   const session = sessions.get(state);
   if (session) return headers.authorization === 'Bearer ' + session.accessToken ? session.accountId : null;
-  // Keep the pre-sign-in fixture account available to the local preview drivers.
-  return !state.authUser && headers.authorization === 'Bearer local-demo-token' ? demoAccountId : null;
+  // Bootstrap credentials belong only to the default fixture account before sign-in.
+  return !state.authUser && ['Bearer local-demo-token', 'Bearer ' + demoPhoneAccessToken].includes(headers.authorization)
+    ? demoAccountId : null;
 }

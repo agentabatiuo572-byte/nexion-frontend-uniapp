@@ -28,12 +28,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const refused = (status, message) => ({status, message, data: null});
   const handles = path => path.startsWith(base);
   // The preview models one purchasing account, including its seeded payments.
-  const ownsPreviewPayments = request => {
-    const headers = request.headers?.() ?? {};
-    // The preview sign-in endpoint also issues a credential for its formal probe account.
-    const formalProbe = headers.authorization === 'Bearer formal-probe-access-token' && state.authUser?.nickname === 'Formal Probe';
-    return previewAccountId(state, formalProbe ? {...headers, authorization: 'Bearer local-demo-token'} : headers) === demoAccountId;
-  };
+  const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoAccountId;
   const existingIntent = intent => ({
     ...refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'),
     data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo, commandKey: intent.commandKey},
@@ -385,8 +380,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (amount != null && Number(amount).toFixed(6) !== source.quote.businessAmountUsdt)
         return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       const products = demoProducts(state, url.origin), items = quotaItems(subject, source.payload, order);
-      requireDemoExternalPaymentQuota(state, products, items, Date.now());
-      if (order) requireDemoExternalOrderGate(products, items);
+      const now = Date.now();
+      requireDemoExternalPaymentQuota(state, products, items, now);
+      if (order) requireDemoExternalOrderGate(state, products, items, now);
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intentNo = suspended?.intentNo ?? `PPI-PREVIEW-${++sequence}`;
       const intent = suspended ?? {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,

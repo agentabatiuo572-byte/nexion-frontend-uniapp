@@ -1,7 +1,7 @@
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { createHash } from 'node:crypto';
-import { previewAccountId } from './prototype-demo-identity.mjs';
+import { demoAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
@@ -149,7 +149,8 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
-      releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,purchaseGate:null,
+      releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
+      purchaseGate:state.catalogState==='restricted'&&id==='stellarbox-s1'?{mode:'all',enforce:true,rankMin:8}:null,
       purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
       dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
       shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
@@ -181,12 +182,17 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available};
 }
 
-function demoE1PurchaseRule(product) {
-  return {policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+function demoE1PurchaseRule(state,product,now) {
+  const required=product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
+  const current=required?demoH4Account(state,now).rank:0;
+  const gap=Math.max(0,required-current);
+  const eligible=product.available&&gap===0;
+  return {policy:'E1',eligible,decisionCode:!product.available?'PRODUCT_NOT_RELEASED':eligible?'ELIGIBLE':'PURCHASE_GATE_NOT_MET',
+    mode:'ALL',conditions:required?[{kind:'rank',required,current,gap,met:gap===0}]:[]};
 }
 
 function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
-  const e1=demoE1PurchaseRule(product);
+  const e1=demoE1PurchaseRule(state,product,now);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
   if(state.quotaState==='approved'&&product.id===approvedQuotaSku){
     const quota=demoHardwareQuota(product,state,points,now);
@@ -217,11 +223,11 @@ export function requireDemoExternalPaymentQuota(state,products,items,now) {
   }
 }
 
-export function requireDemoExternalOrderGate(products,items) {
+export function requireDemoExternalOrderGate(state,products,items,now) {
   for(const {productNo} of items){
     const product=products.find(row=>row.id===productNo);
     if(!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
-    const e1=demoE1PurchaseRule(product);
+    const e1=demoE1PurchaseRule(state,product,now);
     if(!e1.eligible)refuse(e1.decisionCode);
   }
 }
@@ -565,15 +571,18 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,empty?[]:products,
       productNo=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true));
   }
-  if(pathname==='/api/devices/activate'&&request.method()==='POST'){
-    const {deviceId,expectedVersion,clientMaxDevices=null}=request.postDataJSON();
+  const deactivation=pathname.match(/^\/api\/device\/(\d+)\/deactivate$/);
+  if((deactivation||pathname==='/api/devices/activate')&&request.method()==='POST'){
+    const {deviceId:requestedDeviceId,expectedVersion,clientMaxDevices=null}=request.postDataJSON();
+    const deviceId=deactivation?Number(deactivation[1]):requestedDeviceId;
     const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
+    if(deactivation&&previewAccountId(state,request.headers())!==demoAccountId)fail(403,'DEVICE_FORBIDDEN');
     if(!Number.isInteger(deviceId)||deviceId<=0)fail(422,'DEVICE_ID_REQUIRED');
     if(!Number.isInteger(expectedVersion)||expectedVersion<0)fail(422,'DEVICE_VERSION_REQUIRED');
     const key=request.headers?.()['idempotency-key']?.trim();
     if(!key)fail(422,'IDEMPOTENCY_KEY_REQUIRED');
     if(key.length>128)fail(422,'IDEMPOTENCY_KEY_INVALID');
-    const command=`activate:${key}`;
+    const command=(deactivation?'deactivate:':'activate:')+key;
     const identity=JSON.stringify([deviceId,expectedVersion,clientMaxDevices]);
     const prior=state.deviceActivationReceipts?.[command];
     if(prior){
@@ -583,6 +592,23 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const fleet=demoFleetFacts(url,locale,state);
     const device=fleet.devices.find(row=>row.id===deviceId);
     if(!device)fail(404,'DEVICE_NOT_FOUND');
+    if(deactivation){
+      if((device.ownershipStatus??'OWNED')!=='OWNED')fail(403,'DEVICE_FORBIDDEN');
+      const alreadyDeactivated=device.status==='DEACTIVATED';
+      if(!alreadyDeactivated){
+        if(device.activatedAt===null)refuse('DEVICE_STATE_CONFLICT');
+        if(device.rowVersion!==expectedVersion)refuse('DEVICE_VERSION_CONFLICT');
+        const {refusal}=demoReplacementSourceCheck(device,state,true,
+          path=>demoFixture(new URL(path,url.origin),locale,state,{...request,method:()=> 'GET'},now));
+        if(refusal)refuse(refusal);
+        (state.deviceActivations??={})[deviceId]={status:'DEACTIVATED',runtimeStatus:'OFFLINE',activatedAt:null,
+          deactivatedAt:now,pendingDeactivate:false,rowVersion:expectedVersion+1};
+      }
+      const receipt={deviceId,instanceNo:device.instanceNo,status:'DEACTIVATED',
+        rowVersion:device.rowVersion+Number(!alreadyDeactivated),alreadyDeactivated};
+      (state.deviceActivationReceipts??={})[command]={identity,receipt};
+      return receipt;
+    }
     if(device.rowVersion!==expectedVersion)refuse('DEVICE_VERSION_CONFLICT');
     if(['PHONE','MOBILE'].includes(device.deviceType))refuse('PHONE_CALIBRATION_ACTIVATION_REQUIRED');
     const alreadyActive=device.activatedAt!==null;
@@ -603,7 +629,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
-  if(!request.verifiedPayment&&!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  if(!request.verifiedPayment&&!request.tracksOrderCreate&&!milestoneClaim&&pathname!=='/api/points/sign-in'&&pathname!=='/api/app/trade-in/capacity-replace'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.interfaceLanguages=previewInterfaceLanguages(state.interfaceLanguagesState);
@@ -821,8 +847,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!device)refuse('TRADEIN_SOURCE_NOT_ACTIVE_OR_NOT_OWNED');
     const reason=tradeinSourceReason(device,product);
     if(reason!=='OK')refuse('TRADEIN_'+reason);
-    // External pricing has already checked the target and checks monthly quota separately.
-    if(!request.externalPurchasePricing)requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
+    // External payment pricing checks monthly quota separately from the target gate.
+    const items=[{productNo:product.id,quantity:1}];
+    if(request.externalPurchasePricing)requireDemoExternalOrderGate(state,products,items,now);
+    else requireDemoPurchase(state,products,items,now);
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
     return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
@@ -902,14 +930,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
     const reason=tradeinTargetReason(product);
     if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
-    if(!request.externalPurchasePricing){
-      const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
-      const purchase=demoSkuPurchaseRules(state,product,points,now);
-      if(!purchase.eligible){
-        const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
-        throw Object.assign(new Error(code),{status:403});
-      }
-    }
+    // The capacity quote checks the storefront gate. Monthly hardware quota is enforced by purchase eligibility and settlement.
+    const purchase=demoE1PurchaseRule(state,product,now);
+    if(!purchase.eligible)throw Object.assign(new Error(purchase.decisionCode),{status:403});
     const data=structuredClone(base('/api/app/trade-in/capacity-quote'));
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
     const fleet=demoFleetFacts(url,locale,state),active=fleet.devices.filter(device=>device.activatedAt!==null),full=fleet.slotsUsed>=fleet.slotCap;
@@ -994,6 +1017,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }
     state.createdOrders||=[];state.createdOrders.unshift(order);
     const response=quote?order:input.productNos?{orderNo:order.orderNo,orderType:'BUNDLE',itemCount:lines.length,productNos:input.productNos,subtotalUsdt:subtotal,discountRate,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server',policyVersion:1}:{orderNo:order.orderNo,subtotalUsdt:subtotal,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,voucherId:order.voucherId||null,voucherRedemption:order.voucherRedemption??null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server'};
+    // The checkout fixture owns ordinary create replay. Promotion readback still needs its receipt.
+    if(request.tracksOrderCreate&&!quote)return response;
     return remember(lines.length>1?'createBundle':'createOrder',quote?.quoteId||order.orderNo,response,order);
   }
   const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
