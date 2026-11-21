@@ -18,7 +18,7 @@
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
       </view>
       <view v-if="remoteApiEnabled && !securityPresentation" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
-        <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? "…" : t.security.opFailed }}</text>
+        <text :style="remoteSecurityUnavailableTextStyle">{{ securityUnavailableText }}</text>
       </view>
 
       <view
@@ -111,7 +111,7 @@
       </view>
       <view v-if="securityPresentation?.nextCursor" class="mx-4 flex justify-center" :style="revokeAllRowStyle"
         role="button" :tabindex="sessionPageLoading ? -1 : 0" :aria-disabled="sessionPageLoading || !remoteSecurity || remoteSecurityLoading"
-        @click="loadMoreSessions">
+        @click="loadMoreSessions()">
         <text>{{ t.notifs.loadMore }}</text>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.sessionsHint }}</text>
@@ -133,7 +133,7 @@
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !securityPresentation ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
     <NxSheet :open="editingPwd" :title="t.security.passwordTitle" @close="cancelPwd" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CURRENT" :aria-invalid="pwdErrorField === PWD_FIELD_CURRENT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CURRENT ? 'security-pwd-error-current' : undefined" @input="onCurrent" />
@@ -171,7 +171,7 @@
             <input class="w-full" :style="pwdInputStyle" password :value="phonePassword" :placeholder="t.security.currentPassword"
               :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="phonePassword = detailVal($event)" />
             <NxButton variant="primary" size="medium" class="flex items-center justify-center active:opacity-80"
-              :disabled="securityBusy || !phonePolicy || phonePolicy.remainingChanges === 0"
+              :disabled="securityBusy || !phoneChangeAllowed"
               @click="startPhoneChange"><text>{{ t.security.phoneChangeSendCodes }}</text></NxButton>
           </template>
           <template v-else>
@@ -188,7 +188,7 @@
             </view>
           </template>
           <text v-if="phoneError" class="block" :style="errStyle" role="alert">{{ phoneError }}</text>
-          <view v-if="!phonePolicy" role="button" tabindex="0" :style="[rowSubStyle, { minHeight: '44px', display: 'flex', alignItems: 'center', font: '600 13px/20px var(--font-v5)' }]" @click="loadPhonePolicy">
+          <view v-if="!phonePolicy || phonePolicyReadFailed" role="button" tabindex="0" :style="[rowSubStyle, { minHeight: '44px', display: 'flex', alignItems: 'center', font: '600 13px/20px var(--font-v5)' }]" @click="loadPhonePolicy">
             {{ t.ui.retry }}
           </view>
         </view></NxSheet>
@@ -226,6 +226,7 @@ import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import AppChassis from "@/components/app-chassis.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -285,6 +286,7 @@ const securityPageFence = createP318AccountPageFence(
 );
 const securityConfirmOwner = `p3-18-security:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
 let securityPageVisible = true;
+let releaseActiveRefresh = () => {};
 
 const remoteSecurity = ref<SecurityState | null>(null);
 const securityPresentation = ref<SecurityState | null>(null);
@@ -301,6 +303,9 @@ function readPhoneBinding() {
 }
 readPhoneBinding();
 const phonePolicy = ref<PhoneNumberChangePolicy | null>(null);
+const phonePolicyLoading = ref(false);
+const phonePolicyReadFailed = ref(false);
+const phoneChangeAllowed = computed(() => !!phonePolicy.value && !phonePolicyReadFailed.value && phonePolicy.value.remainingChanges > 0);
 const phoneEditing = ref(false);
 const showPhoneCountries = ref(false);
 function selectPhoneCountry(value: string) { phoneCountry.value = value.slice(1); }
@@ -362,7 +367,12 @@ function syncDeletionSubmittedReason(accountKey: string) {
 
 const remoteSecurityLoading = ref(false);
 const remoteSecurityReadFailed = ref(false);
+const securityUnavailableText = computed(() => {
+  if (remoteSecurityReadFailed.value) return `${t.value.wallet.syncFailedTitle} · ${t.value.wallet.syncFailedBody}`;
+  return remoteSecurityLoading.value ? "…" : t.value.wallet.syncFailedTitle;
+});
 const sessionPageLoading = ref(false);
+const sessionPageReadFailed = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
   : security.twoFactorEnabled);
@@ -453,7 +463,10 @@ function isCurrentSecurityRequest(
 }
 
 function clearSecurityAccountState(keepPresentation = false) {
-  if (!keepPresentation) securityPresentation.value = null;
+  if (!keepPresentation) {
+    securityPresentation.value = null;
+    deletionStatus.value = { status: "NONE" };
+  }
   twoFactorSheetOpen.value = false;
   deletionSheetOpen.value = false;
   deletionDebtOpen.value = false;
@@ -463,8 +476,11 @@ function clearSecurityAccountState(keepPresentation = false) {
   remoteSecurityLoading.value = false;
   remoteSecurityReadFailed.value = false;
   sessionPageLoading.value = false;
+  sessionPageReadFailed.value = false;
   remoteSecurity.value = null;
   phonePolicy.value = null;
+  phonePolicyLoading.value = false;
+  phonePolicyReadFailed.value = false;
   phoneEditing.value = false;
   phoneNext.value = "";
   phonePassword.value = "";
@@ -472,7 +488,6 @@ function clearSecurityAccountState(keepPresentation = false) {
   phoneNewCode.value = "";
   phoneChallenge.value = null;
   phoneError.value = "";
-  deletionStatus.value = { status: "NONE" };
   editingPwd.value = false;
   current.value = "";
   next.value = "";
@@ -497,20 +512,44 @@ function refreshSecurityForCurrentAccount() {
   }
 }
 
+async function refreshVisibleSecurity() {
+  if (!remoteApiEnabled || !securityPageVisible) return;
+  // The shared recovery registry already handles failed overview and policy reads on this pull.
+  const refreshOverview = !remoteSecurityReadFailed.value && !remoteSecurityLoading.value && !sessionPageLoading.value;
+  await Promise.all([
+    refreshOverview && (sessionPageReadFailed.value ? loadMoreSessions(true) : loadRemoteSecurity()),
+    !phonePolicyReadFailed.value && loadPhonePolicy(),
+  ]);
+}
+
 async function loadPhonePolicy() {
+  if (phonePolicyLoading.value) return;
   const pageScope = securityPageFence.capture("phone-policy");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  phonePolicyLoading.value = true;
   try {
     const policy = await accountApi.phoneNumberPolicy();
-    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) phonePolicy.value = policy;
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    phonePolicy.value = policy;
+    phonePolicyReadFailed.value = false;
   } catch (cause) {
-    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) {
-      phonePolicy.value = null;
-      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+      clearSecurityAccountState();
+    } else {
+      phonePolicyReadFailed.value = true;
     }
+  } finally {
+    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) phonePolicyLoading.value = false;
   }
 }
+
+useAutoRecovery({
+  failed: () => remoteApiEnabled && phonePolicyReadFailed.value && !phonePolicyLoading.value,
+  retry: loadPhonePolicy,
+});
 
 function phoneChangeMessage(cause: unknown) {
   if (cause instanceof ApiError) {
@@ -534,7 +573,7 @@ function resetPhoneChallenge() {
 }
 
 async function startPhoneChange() {
-  if (securityBusy.value || !phonePolicy.value || phonePolicy.value.remainingChanges === 0) return;
+  if (securityBusy.value || !phoneChangeAllowed.value) return;
   phoneError.value = "";
   if (!phonePassword.value || !validateNationalPhone("+" + phoneCountry.value, phoneNext.value)) {
     phoneError.value = t.value.security.phoneChangeCheckInput;
@@ -594,15 +633,19 @@ async function confirmPhoneChange() {
 
 onShow(() => {
   securityPageVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleSecurity, "pages/me/security");
   readPhoneBinding();
   refreshSecurityForCurrentAccount();
 });
 onHide(() => {
   securityPageVisible = false;
+  releaseActiveRefresh();
   clearSecurityAccountState(true);
 });
 onUnmounted(() => {
   securityPageVisible = false;
+  releaseActiveRefresh();
   clearSecurityAccountState();
 });
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.accountId], () => {
@@ -638,10 +681,10 @@ async function loadRemoteSecurity(): Promise<boolean> {
     securityPresentation.value = { ...securityState, sessions: [...securityState.sessions] };
     deletionStatus.value = accountDeletion;
     remoteSecurityReadFailed.value = false;
+    sessionPageReadFailed.value = false;
     return true;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
-    securityPresentation.value = null;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
       clearSecurityAccountState();
     } else {
@@ -659,7 +702,7 @@ useAutoRecovery({
   retry: loadRemoteSecurity,
 });
 
-async function loadMoreSessions(): Promise<void> {
+async function loadMoreSessions(fromPull = false): Promise<void> {
   const snapshot = remoteSecurity.value;
   if (!snapshot?.nextCursor || sessionPageLoading.value || remoteSecurityLoading.value) return;
   const pageScope = securityPageFence.capture("security-sessions-page");
@@ -674,12 +717,14 @@ async function loadMoreSessions(): Promise<void> {
     remoteSecurity.value = { ...snapshot, nextCursor: nextPage.nextCursor,
       sessions: [...snapshot.sessions, ...nextPage.sessions.filter((row) => !existing.has(row.id))] };
     securityPresentation.value = { ...remoteSecurity.value, sessions: [...remoteSecurity.value.sessions] };
+    sessionPageReadFailed.value = false;
   } catch (cause) {
-    if (isCurrentSecurityRequest(pageScope, scope, accountKey) && remoteSecurity.value === snapshot) {
-      securityPresentation.value = null;
-      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
-      toast.error(securityErrorMessage(cause));
-    }
+    if (!isCurrentSecurityRequest(pageScope, scope, accountKey) || remoteSecurity.value !== snapshot) return;
+    const unauthorized = cause instanceof ApiError && (cause.status === 401 || cause.status === 403);
+    if (unauthorized) clearSecurityAccountState();
+    else sessionPageReadFailed.value = true;
+    if (fromPull) throw cause;
+    toast.error(unauthorized ? securityErrorMessage(cause) : t.value.empty.errorTitle);
   } finally {
     if (isCurrentSecurityRequest(pageScope, scope, accountKey)) sessionPageLoading.value = false;
   }
