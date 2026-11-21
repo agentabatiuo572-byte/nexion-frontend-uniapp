@@ -15,11 +15,13 @@ const copy = {
 };
 export function commerceCopy(locale:string) { return copy[uiLocale(locale)]; }
 export function commerceAmount(value:Parameters<typeof formatAmount>[0]) { return formatAmount(value).replace(/\B(?=(\d{3})+\.)/g, ','); }
+export function commerceOrderHasPayment(order: Pick<Order, 'paidTotal' | 'paidAt'>): boolean {
+  return order.paidTotal != null || order.paidAt != null;
+}
 export function commerceOrderAmount(order: Pick<Order, 'total' | 'paidTotal' | 'paidAt' | 'paymentMethod'>): { value: Order['total']; currency: 'USD' | 'USDT' } {
-  const paid = order.paidTotal != null || order.paidAt != null;
   return {
     value: order.paidTotal ?? order.total,
-    currency: paid && order.paymentMethod !== 'HDPAY_BANK' ? 'USDT' : 'USD',
+    currency: commerceOrderHasPayment(order) && order.paymentMethod !== 'HDPAY_BANK' ? 'USDT' : 'USD',
   };
 }
 export function commerceOrderTitle(order:{productName:string;quantity:number;lineItems?:{sku:string;quantity:number}[]},locale:string) {

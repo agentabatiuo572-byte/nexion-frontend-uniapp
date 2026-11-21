@@ -96,11 +96,11 @@
           </view>
         </view>
 
-        <!-- Order summary: the total leads, then only the lines that explain it, then the record. -->
+        <!-- The settlement and the calculation of the original amount due are separate. -->
         <view class="order-summary order-block">
           <text class="order-summary__title">{{ t.orders.orderSummary }}</text>
           <view class="order-summary__total">
-            <text class="order-summary__total-label">{{ order.trialReward ? purchaseCopy.orderPaid : t.orders.total }}</text>
+            <text class="order-summary__total-label">{{ summaryPaid ? purchaseCopy.orderPaid : paymentCopy.payable }}</text>
             <CheckoutAmount class="order-summary__amount" v-bind="commerceOrderAmount(order)" />
           </view>
           <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
@@ -116,10 +116,12 @@
           <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
           <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
           <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`−${summaryMoney(order.discount)}`" brand />
+          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="`−${summaryMoney(order.tradeInCredit ?? 0)}`" brand />
           <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
           <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="`−${summaryMoney(order.promoDiscountUSD ?? 0)}`" brand />
           <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`−${summaryMoney(order.trialOffsetUSD ?? 0)}`" brand />
           <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="`−${summaryMoney(order.earlyDiscountUSD ?? 0)}`" brand />
+          <DetailRow v-if="summaryPaid" :label="paymentCopy.payable" :value="summaryMoney(order.total, true)" />
           <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" brand />
           <template v-if="order.status === 'refunded'">
             <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="usdt(order.refundAmountUsdt)" brand />
@@ -179,7 +181,8 @@
 <script setup lang="ts">
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { dateLocale } from "@/i18n/format";
-import { commerceOrderAmount, commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
+import { commerceOrderAmount, commerceOrderHasPayment, commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
+import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
@@ -396,6 +399,8 @@ watch(liveOrder, value => {
 }, { immediate: true, flush: 'sync' });
 // Runtime invalidation still clears the shared store and every command uses liveOrder.
 const order = computed(() => orderEnvironmentInvalidated.value ? undefined : liveOrder.value ?? orderPresentation.value ?? undefined);
+const summaryPaid = computed(() => !!order.value && commerceOrderHasPayment(order.value));
+const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
 const orderQuantity = computed(() => order.value?.lineItems?.reduce((total, item) => total + item.quantity, 0) ?? order.value?.quantity ?? 0);
 const refundChannelLabel = computed(() => order.value?.refundChannel === "WALLET"
   ? t.value.promotion.wallet : t.value.orders.refundDetailsUnavailable);
