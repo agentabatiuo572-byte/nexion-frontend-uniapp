@@ -1849,7 +1849,7 @@ export const id: Messages = {
     replaceWarning: "Perangkat aktif dengan pendapatan terendah harus dinonaktifkan agar {newKind} bisa online.",
     replaceLowestDeviceLabel: "Dinonaktifkan",
     replaceLowestText: "{name} · ${earn}/hari ini",
-    replaceTaskHint: "Setelah diganti, tugas yang berjalan batal tanpa pendapatan; perangkat masuk inventaris.",
+    replaceTaskHint: "Setelah diganti, tugas yang belum selesai dibatalkan tanpa pendapatan; perangkat masuk inventaris.",
     replaceReplaceCta: "Ganti dan aktifkan {newKind}",
     replaceKeepCta: "Beli {newKind} harga penuh",
     replaceCancel: "Batal",

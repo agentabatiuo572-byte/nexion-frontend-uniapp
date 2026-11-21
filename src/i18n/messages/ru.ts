@@ -1849,7 +1849,7 @@ export const ru: Messages = {
     replaceWarning: "Чтобы подключить устройство {newKind} к сети, нужно отключить активное устройство с наименьшим доходом.",
     replaceLowestDeviceLabel: "Отключить",
     replaceLowestText: "{name} · сегодня ${earn}/день",
-    replaceTaskHint: "После замены текущая задача отменяется без дохода, устройство уходит на склад.",
+    replaceTaskHint: "После замены незавершённая задача отменяется без дохода, устройство уходит на склад.",
     replaceReplaceCta: "Заменить и активировать {newKind}",
     replaceKeepCta: "Купить {newKind} по полной цене",
     replaceCancel: "Отмена",
