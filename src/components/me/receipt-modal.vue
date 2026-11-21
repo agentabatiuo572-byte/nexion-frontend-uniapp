@@ -278,7 +278,7 @@ const shareReceipt = computed(() => {
   const r = props.receipt;
   if (!r || !isCanonicalComputeReceipt(r)) return false;
   return app.devices.find((device) => device.id === String(r.deviceId))?.kind === "cloud-share"
-    || ["SHARE", "CLOUD_SHARE"].includes(r.deviceType.toUpperCase());
+    || ["SHARE", "CLOUD_SHARE"].includes(r.deviceType.toUpperCase().replace(/[\s-]+/g, "_"));
 });
 
 // Stable internal keys also identify copied fields. The current review explicitly
