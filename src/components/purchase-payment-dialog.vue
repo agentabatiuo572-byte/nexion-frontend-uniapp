@@ -216,7 +216,12 @@
       <iframe :src="cashierUrl" :title="copy.bankPage" referrerpolicy="no-referrer" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox" />
       <!-- #endif -->
     </view>
-    <view class="pp-cashier__foot" :style="{ paddingBottom: cashierFootPad + 'px' }"><view class="pp-pulse" aria-hidden="true" /><text>{{ copy.autoReturn }}</text></view>
+    <!-- Docked under the bank page, never over it (its QR code stays clear): a note above the action, as in a tray (04 §4.0).
+         The bank page does not close itself; returning keeps the automatic checks running. -->
+    <view class="pp-cashier__foot" :style="{ paddingBottom: cashierFootPad + 'px' }">
+      <text class="pp-cashier__note">{{ copy.autoReturn }}</text>
+      <NxButton class="pp-cashier__done" :label="copy.paidReturn" variant="primary" @click="payment.closeCashier" />
+    </view>
   </view>
 
   <NxNoticeDialog v-if="active && s.open && notice && !acknowledgementOnly" :open="true" :title="notice.title" :body="notice.body" :primary="notice.primary" :secondary="notice.secondary"
@@ -251,6 +256,8 @@ const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale 
 // The order detail shows its own payment state in the hero, so it hides the floating bar.
 withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
 const URGENT_MS = 5 * 60000;
+// Height of the bank page footer above the safe area: 12 top + 32 note (two lines) + 8 gap + 48 button.
+const CASHIER_FOOT = 100;
 const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
@@ -445,7 +452,7 @@ watch(() => active.value && s.open && s.cashier ? cashierUrl.value : '', url => 
   cashierView?.close(); cashierView = null;
   if (!url) return;
   const plus = (globalThis as unknown as { plus: PlusRuntime }).plus;
-  cashierView = plus.webview.create(url, `uvel-purchase-cashier-${Date.now()}`, { top: `${statusBar + 82}px`, bottom: `${cashierFootPad + 32}px` });
+  cashierView = plus.webview.create(url, `uvel-purchase-cashier-${Date.now()}`, { top: `${statusBar + 82}px`, bottom: `${cashierFootPad + CASHIER_FOOT}px` });
   cashierView.overrideUrlLoading({ mode: 'allow', match: hostedPaymentUrlPattern }, event => plus.runtime.openURL(event.url));
   plus.webview.currentWebview().append(cashierView);
 });
@@ -611,8 +618,10 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__lock { position: relative; z-index: 120; height: 26px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-cashier__frame { flex: 1; min-height: 0; background: #fff; }
 .pp-cashier__frame iframe { display: block; width: 100%; height: 100%; border: 0; }
-.pp-cashier__foot { flex: none; padding-top: var(--v5-space-3); min-height: 20px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); background: var(--v5-surface); box-shadow: 0 -1px 0 var(--v5-border); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.pp-pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 0 5px color-mix(in srgb, var(--v5-brand) 20%, transparent); }
+/* Fixed height (CASHIER_FOOT + safe area): the native bank webview ends where it starts. The note keeps two lines. */
+.pp-cashier__foot { flex: none; box-sizing: content-box; height: 88px; padding: var(--v5-space-3) var(--v5-space-4) 0; display: flex; flex-direction: column; align-items: stretch; gap: var(--v5-space-2); background: var(--v5-surface); box-shadow: 0 -1px 0 var(--v5-border); }
+.pp-cashier__note { display: flex; align-items: center; justify-content: center; height: 32px; text-align: center; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-wrap: pretty; overflow-wrap: break-word; }
+.pp-cashier__done { display: flex; width: 100%; }
 
 .purchase-payment__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .purchase-payment__row > text { flex: 1; min-width: 0; }
