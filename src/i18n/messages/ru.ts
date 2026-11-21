@@ -4898,6 +4898,7 @@ export const ru: Messages = {
     availableDevices: "Можно купить",
     buy: "Купить",
     stockUnavailable: "В этом периоде мест пока нет",
+    updatingNote: "Обновляем места",
     focusedTierMissing: "Для этого товара нет квоты. Условия покупки — на странице товара.",
     pageTitle: "Квота оборудования",
     yourInvites: "Активированные друзья",

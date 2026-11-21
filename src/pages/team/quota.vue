@@ -24,7 +24,7 @@
         <view v-if="remoteApiEnabled && !remoteSnapshot && !remoteError" class="quota-state" role="status" aria-live="polite" :aria-busy="remoteRefreshing"><text>{{ remoteRefreshing ? auditCopy.loading : '—' }}</text></view>
         <view v-if="remoteApiEnabled && !catalogDisplayReady" class="quota-state"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><text>—</text></view>
         <view v-if="quotaReady && !focusedTiers.length" class="quota-state" role="status"><text>{{ t.empty.listTitle }}</text></view>
-        <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" :label="t.empty.devicesCta" @click="go('/pages/store/store')" /></view>
+        <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" icon="chevron-right" :label="t.empty.devicesCta" @click="go('/pages/store/store')" /></view>
         <!-- Tiers swipe sideways as large product cards (P-41). -->
         <view v-if="focusedTiers.length" class="quota-carousel">
         <QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" />
@@ -357,8 +357,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 /* Tiers are separate sections; conditions remain inside their owning product. */
 .quota-content :deep(.quota-tier) { padding: 26px 0; margin: 0; border: 0; border-bottom: 1px solid var(--v5-border); border-radius: 0; }
 .quota-content :deep(.quota-product__name) { font-size: var(--ui-type-subheading); line-height: var(--ui-type-subheading-lh); }
-.quota-content :deep(.quota-product__price) { font-size:18px; line-height:24px; }
-.quota-content :deep(.quota-product__qualification) { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
+.quota-content :deep(.quota-product__price) { font-size:var(--ui-type-metric-value); line-height:var(--ui-type-metric-value-lh); }
 .quota-content :deep(.quota-product__image) { width: 64px; height: 72px; }
 .quota-content :deep(.quota-section-label) { font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; }
 .quota-content :deep(.quota-conditions) { padding-top: 18px; border-top: 1px solid var(--v5-border); }

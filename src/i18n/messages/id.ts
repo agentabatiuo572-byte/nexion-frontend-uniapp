@@ -4898,6 +4898,7 @@ export const id: Messages = {
     availableDevices: "Perangkat tersedia",
     buy: "Beli",
     stockUnavailable: "Kuota periode ini sedang habis",
+    updatingNote: "Memperbarui kuota",
     focusedTierMissing: "Produk ini tanpa batas kuota. Lihat halaman produk untuk syarat pembelian.",
     pageTitle: "Kuota perangkat keras",
     yourInvites: "Teman yang aktif",

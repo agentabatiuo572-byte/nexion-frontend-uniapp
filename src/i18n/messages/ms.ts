@@ -4897,7 +4897,8 @@ export const ms: Messages = {
   quota: {
     availableDevices: "Peranti tersedia",
     buy: "Beli",
-    stockUnavailable: "Kuota tempoh ini habis buat masa ini",
+    stockUnavailable: "Kuota tempoh ini habis buat sementara",
+    updatingNote: "Mengemas kini kuota",
     focusedTierMissing: "Produk ini tiada had kuota. Lihat halaman produk untuk syarat pembelian.",
     pageTitle: "Kuota perkakasan",
     yourInvites: "Rakan diaktifkan",
