@@ -116,11 +116,6 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const quotaItems = (subject, payload, order) => subject.kind === 'ORDER_PAY'
     ? order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity}))
     : [{productNo: subject.kind === 'TRIAL_CONVERT' ? payload.productNo : subject.targetProductNo, quantity: 1}];
-  function requirePurchase(products, items, order, now) {
-    const quantity = requireDemoExternalPaymentQuota(state, products, items, now);
-    if (order) requireDemoPurchase(state, products, items, now);
-    return quantity;
-  }
   // The account's one order list.
   const ordersOf = origin => demoAccountOrders(new URL(origin), locale(), state);
   // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
@@ -363,7 +358,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const quoteProducts = items.map(({productNo}) =>
         state.dataState === 'empty' ? undefined : products.find(product => product.id === productNo));
       if (order && quoteProducts.some(product => !product)) return refused(409, 'ORDER_ITEM_SNAPSHOT_CONFLICT');
-      requireDemoQuoteStock(quoteProducts);
+      if (!order) requireDemoQuoteStock(quoteProducts);
       const replacementQuote = Object.hasOwn(replacementPaths, kind)
         ? replacementPricing(url, request, subject, payload) : undefined;
       const amount = trial ? trial.quote.amountUsdt : order?.amountUsdt ?? replacementQuote.payableUsdt;
@@ -374,7 +369,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!configured(body.paymentMethod)) return refused(503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
       const now = Date.now(), deadline = order ? Number(order.expiresAt) : now + paymentWindow;
       if (deadline <= now) return refused(409, 'ORDER_PAYMENT_EXPIRED');
-      requirePurchase(products, items, order, now);
+      requireDemoExternalPaymentQuota(state, products, items, now);
+      if (order) requireDemoExternalOrderGate(state, products, items, now);
       const adjustment = Number(BigInt(subtotal) * 10000n - micros) / 1000000;
       const channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
       if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};

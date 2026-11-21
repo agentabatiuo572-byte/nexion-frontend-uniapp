@@ -41,7 +41,7 @@
     <view class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.expected }}</text>
       <text v-if="quoteStatus==='loading'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-      <text v-else-if="quoteStatus==='error'||quoteStatus==='unavailable'||quoteStatus==='outOfStock'" class="promotion-copy" role="alert">{{ quoteStatus==='outOfStock' ? t.store.temporarilyOutOfStock : t.promotion.errorNote }}</text>
+      <text v-else-if="quoteStatus==='error'||quoteBlock" class="promotion-copy" role="alert">{{ quoteBlock ? checkoutQuoteBlockCopy(quoteBlock,t) : t.promotion.errorNote }}</text>
       <text v-else-if="!quote" class="promotion-copy">{{ t.promotion.awaitingQuote }}</text>
       <template v-if="quote">
         <RewardRows :expected="quote.expectedRewards" :lines="quote.items" />
@@ -55,7 +55,7 @@
     </view>
     <view v-if="activity" class="promotion-link" role="button" tabindex="0" @click="termsOpen=true"><text>{{ t.promotion.rulesLink }}</text></view>
     <view v-if="!signedIn" class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ t.promotion.signIn }}</text></view>
-    <view v-else class="promotion-action" role="button" :tabindex="canQuote?0:-1" :aria-disabled="!canQuote" @click="refreshQuote"><text>{{ t.promotion.quote }}</text></view>
+    <view v-else class="promotion-action" role="button" :tabindex="canQuote?0:-1" :aria-disabled="!canQuote" @click="canQuote && refreshQuote()"><text>{{ t.promotion.quote }}</text></view>
     <text v-if="selection.length<2" class="promotion-copy">{{ t.promotion.selectTwo }}</text>
     <view class="promotion-action primary" role="button" :tabindex="canContinue?0:-1" :aria-disabled="!canContinue" @click="continueCheckout"><text>{{ t.promotion.continue }}</text></view>
     <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionStoreHref(scopeId))"><text>{{ t.promotion.buyMore }}</text></view>
@@ -72,8 +72,7 @@ import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
 import { commerceCopy } from '@/lib/commerce-review';
 import { promotionApi,sessionVault } from '@/api/runtime';
-import { ApiError } from '@/api/errors';
-import { isCheckoutQuoteOutOfStock } from '@/api/promotion-api';
+import { checkoutQuoteBlock,type CheckoutQuoteBlock } from '@/api/promotion-api';
 import type { Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
 import { useApp } from '@/store/app';
@@ -85,7 +84,7 @@ import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { catalogProductImageUrl } from '@/lib/product-image';
 import { productTaskLevelsText } from '@/lib/product-copy';
-import { localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
+import { checkoutQuoteBlockCopy,localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
 import { createPromotionReadFence,isEntryQuoteFresh,restoreEntrySelection,promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionDisclosures,promotionStoreHref,validEntryItems,type EntryItem,type EntrySelectionDraft } from '@/lib/promotion-entry';
@@ -96,8 +95,9 @@ const props=defineProps<{activityId:string;initialItems:EntryItem[]}>();
 const app=useApp(),locale=useLocaleStore(),t=useT(),phase=useProductPhase();
 const scopeId=ref(props.activityId),selection=ref<EntryItem[]>([]),termsOpen=ref(false);
 const {activity,status:contextStatus,available,refresh:refreshContext}=usePromotionContext(scopeId);
-const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'|'unavailable'|'outOfStock'>('idle');
-const fence=createPromotionReadFence();let visible=true;
+const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'>('idle');
+const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
+const fence=createPromotionReadFence();const visible=ref(true);
 const clockNow=()=>typeof performance!=='undefined'?performance.now():Date.now();
 let quoteReceivedAt=0;let expiryTimer:ReturnType<typeof setInterval>|null=null;
 const storageKey='growth-promotion-selection:'+props.activityId;
@@ -130,13 +130,21 @@ const singleActivityProduct=computed(()=>{if(!scopeId.value||!available.value||c
 function openSingleProduct(){if(singleActivityProduct.value)void navTo(promotionDetailHref(singleActivityProduct.value.id,scopeId.value));}
 const suggestions=computed(()=>catalog.value.filter(product=>!selection.value.some(item=>item.productNo===product.id)&&product.productType!=='SHARE'&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(product.id))));
 const productsReady=computed(()=>catalogStatus.value==='ready'&&selection.value.every(item=>{const product=productFor(item.productNo);return product&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(item.productNo));}));
-const canQuote=computed(()=>signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value)&&quoteStatus.value!=='loading'&&quoteStatus.value!=='outOfStock');
+const canReadQuote=computed(()=>visible.value&&signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
+const canQuote=computed(()=>canReadQuote.value&&quoteStatus.value!=='loading'&&!quoteBlock.value);
 const canContinue=computed(()=>canQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE');
-useAutoRecovery({failed:()=>quoteStatus.value==='unavailable'&&canQuote.value,retry:refreshQuote});
-function invalidate(preserveOutOfStock=false){
+useAutoRecovery({
+  active:()=>visible.value,
+  failed:()=>quoteBlock.value==='unavailable'&&canReadQuote.value,
+  retry:refreshQuote,
+  repeatMs:30_000,
+  quiet:false,
+});
+function invalidate(preserveBlock=false){
   fence.invalidate();
   quote.value=null;
-  if(!preserveOutOfStock||quoteStatus.value!=='outOfStock')quoteStatus.value='idle';
+  quoteStatus.value='idle';
+  if(!preserveBlock)quoteBlock.value=null;
 }
 watch(selection,()=>{invalidate();writeAccountRow(storageKey,app.accountKey,{items:selection.value,entryItems:props.initialItems});},{deep:true,flush:'sync'});
 watch([()=>activity.value?.version,()=>locale.code],()=>{invalidate(true);termsOpen.value=false;},{flush:'sync'});
@@ -147,25 +155,25 @@ function changeQuantity(productNo:string,delta:number){const item=selection.valu
 function clearScope(){invalidate();void navTo(promotionStoreHref());}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(promotionBundleHref(scopeId.value,selection.value)));}
 async function refreshQuote(){
-  if(!visible||!canQuote.value)return;
+  if(!canReadQuote.value||quoteStatus.value==='loading'||(quoteBlock.value&&quoteBlock.value!=='unavailable'))return;
   const ticket=fence.next(),identity=`${app.accountKey}:${app.accountBindingEpoch}`,chosen=selection.value.map(item=>({...item}));
   quote.value=null;quoteStatus.value='loading';
   try{
     const result=await promotionApi.quote(chosen,scopeId.value||null);
-    if(!visible||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
-    quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
+    if(!visible.value||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
+    quoteBlock.value=null;quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
   }catch(cause){
-    if(!visible||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
-    if(isCheckoutQuoteOutOfStock(cause))quoteStatus.value='outOfStock';
-    else quoteStatus.value=cause instanceof ApiError&&cause.status===503?'unavailable':'error';
+    if(!visible.value||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
+    quoteBlock.value=checkoutQuoteBlock(cause);
+    quoteStatus.value=quoteBlock.value?'idle':'error';
   }
 }
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
 function continueCheckout(){if(!quote.value)return;if(!freshQuote()){invalidate();return;}if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));}
 onMounted(()=>{expiryTimer=setInterval(()=>{if(quote.value&&!freshQuote())invalidate();},1000);});
-onHide(()=>{visible=false;invalidate(true);termsOpen.value=false;});
-onShow(()=>{visible=true;invalidate(true);});
-onBeforeUnmount(()=>{visible=false;fence.invalidate();if(expiryTimer)clearInterval(expiryTimer);});
+onHide(()=>{visible.value=false;invalidate(true);termsOpen.value=false;});
+onShow(()=>{visible.value=true;invalidate(true);});
+onBeforeUnmount(()=>{visible.value=false;fence.invalidate();if(expiryTimer)clearInterval(expiryTimer);});
 </script>
 <style src="./promotion.css"></style>
 <style scoped>

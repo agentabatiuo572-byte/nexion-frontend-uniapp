@@ -37,6 +37,14 @@ function removeCheckoutPointer(accountKey: string, row: Row, productNo: string):
 
 /** Pending RETIRE requests survive refresh with their original source version and key. */
 export function readCheckoutTradein(accountKey: string, productNo: string): CheckoutTradeinRecovery | null {
+  // #ifdef H5
+  // uni.getStorageSync returns an empty string on browser storage errors.
+  // Check access before treating an empty trade-in lookup as no original record.
+  if (typeof window !== "undefined") {
+    try { window.localStorage.getItem(KEY); }
+    catch { throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE"); }
+  }
+  // #endif
   const row = readAccountRow<Row>(KEY, accountKey, true);
   if (!row) return null;
   const pointer = row.orders?.[productNo];

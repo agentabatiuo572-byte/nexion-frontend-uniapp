@@ -330,7 +330,7 @@ import { navReplace, navReset, navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
-import { asApiError, isApiRefusal } from "@/api/errors";
+import { ApiError, asApiError, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
@@ -2014,15 +2014,15 @@ function remoteOrderKey(): string {
   return acquireAccountCommandKey(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, intent, "h7-order");
 }
 
-function retireRemoteOrderKey(): void {
-  const intent = remoteOrderIntent();
-  const accountKey = orders.currentAccountKey();
-  const persisted = readAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey);
-  if (persisted?.commands?.[intent]) {
+function retireRemoteOrderKey(intent = remoteOrderIntent(), accountKey = orders.currentAccountKey(), expectedKey?: string): void {
+  const persisted = readAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, expectedKey !== undefined);
+  const storedKey = persisted?.commands?.[intent];
+  if (persisted?.commands && storedKey && (expectedKey === undefined || storedKey === expectedKey)) {
     const commands = { ...persisted.commands };
     delete commands[intent];
     // persist-verdict-ok: 退役旧键失败只会让下一次同 intent 复用旧键(服务端幂等回同一单),不铸新单
-    writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, { commands });
+    const saved = writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, { commands });
+    if (expectedKey !== undefined && !saved) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
   }
   remoteOrderCommandKey.clear();
 }
@@ -2284,6 +2284,24 @@ async function readPendingCheckoutCreate() {
     confirmedMissingCreateKey.value = pending.request.idempotencyKey;
     step.value = 'select-payment';
     toast.info(t.value.store.coPendingCreateNotFound);
+    if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute());
+  } else if (result.status === 'FAILED') {
+    // The rejected command stays recorded server-side. Release its local intent for a fresh explicit submission.
+    retireRemoteOrderKey(pending.intent, scope.accountKey, pending.request.idempotencyKey);
+    forgetCheckoutCreate(scope.accountKey, pending);
+    pendingCheckoutCreate.value = null;
+    createLookupUnavailable.value = false;
+    step.value = 'select-payment';
+    const failure = new ApiError({ kind: 'http', status: result.code, code: result.code, message: result.message });
+    const reason = isApiRefusal(failure, 409, 'PURCHASE_GATE_SOLD_OUT')
+      ? t.value.store.purchaseEligibilityQuotaDepleted
+      : isApiRefusal(failure, 403, 'PURCHASE_GATE_NOT_MET', 'PURCHASE_GATE_SOLD_OUT')
+        || isApiRefusal(failure, 409, 'PURCHASE_GATE_NOT_MET')
+        ? t.value.store.coCapacityPurchaseConditions
+        : isApiRefusal(failure, 404, 'PRODUCT_NOT_AVAILABLE')
+          ? t.value.store.coCapacityProductUnavailable
+          : orderPaymentRejection(failure, locale.code) ?? t.value.tradein.errPurchaseFailed;
+    toast.warn(reason);
     if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute());
   } else if (result.status === 'SUCCEEDED') {
     rememberCheckoutOrder(scope.accountKey, { productNo: scope.productNo, orderNo: result.orderNo,

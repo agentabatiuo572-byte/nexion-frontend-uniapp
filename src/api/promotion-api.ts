@@ -9,9 +9,14 @@ const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USD
 export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null};
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
-export function isCheckoutQuoteOutOfStock(cause: unknown): boolean {
-  return isApiRefusal(cause, 404, 'PRODUCT_NOT_AVAILABLE')
-    || isApiRefusal(cause, 409, 'BUNDLE_PRODUCT_NOT_AVAILABLE');
+export type CheckoutQuoteBlock = 'outOfStock' | 'soldOut' | 'productMissing' | 'unavailable';
+export function checkoutQuoteBlock(cause: unknown): CheckoutQuoteBlock | null {
+  if (isApiRefusal(cause, 404, 'PRODUCT_NOT_AVAILABLE')
+      || isApiRefusal(cause, 409, 'BUNDLE_PRODUCT_NOT_AVAILABLE')) return 'outOfStock';
+  if (isApiRefusal(cause, 409, 'PURCHASE_GATE_SOLD_OUT')) return 'soldOut';
+  if (isApiRefusal(cause, 404, 'PROMOTION_RESOURCE_NOT_FOUND')) return 'productMissing';
+  if (cause instanceof ApiError && cause.status === 503) return 'unavailable';
+  return null;
 }
 export type PromotionOperation='createOrder'|'createBundle'|'payOrder'|'cancelOrder';
 let quoteSequence=0;

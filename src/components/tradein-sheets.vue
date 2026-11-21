@@ -406,6 +406,18 @@ useAutoRecovery({
 });
 const quoteRequestGeneration = ref(0);
 const quoteLoading = ref(false);
+const retireTargetRead = ref<{ sourceId: string; targetKind: DeviceKind; price: number } | null>(null);
+useAutoRecovery({
+  active: () => props.active && state.value.kind === "retire",
+  failed: () => retireTargetRead.value !== null,
+  retry: async () => {
+    const target = retireTargetRead.value;
+    if (!target) return;
+    const device = app.devices.find(row => row.id === target.sourceId);
+    if (device) await openTradeinQuote(device, target.targetKind, target.price);
+  },
+  repeatMs: 30_000,
+});
 const purchaseSnapshot = ref<PurchaseEligibilitySnapshot | null>(null);
 // One opening request is handed to the confirmation watcher once; retries and checkout always read again.
 let purchaseOpeningRead: {
@@ -568,6 +580,7 @@ watch([state, () => props.active, () => apiRuntimeConfig.environment, () => apiR
 }], () => {
   quoteRequestGeneration.value++;
   quoteLoading.value = false;
+  retireTargetRead.value = null;
 }, { flush: "sync" });
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   quoteRequestGeneration.value += 1;
@@ -580,6 +593,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   remoteRetireRequest += 1;
   capacityCommandKey.value = null;
   quoteLoading.value = false;
+  retireTargetRead.value = null;
   // app.bindAccount is followed by the global account rebind in the same stack.
   void nextTick(() => loadCanonicalTradeinConfig());
 }, { flush: "sync" });
@@ -699,7 +713,16 @@ async function openTradeinQuote(oldDevice: Device, targetKind: DeviceKind, newPr
     && app.devices.find(device => device.id === oldDevice.id)?.rowVersion === sourceRowVersion;
   try {
     // Recover an existing command before starting a new quote or qualification read.
-    if (readCheckoutTradein(app.accountKey, targetKind)) {
+    let original;
+    try {
+      original = readCheckoutTradein(app.accountKey, targetKind);
+    } catch (error) {
+      if (openingState.kind !== "retire") throw error;
+      retireTargetRead.value = { sourceId: oldDevice.id, targetKind, price: newPrice };
+      return;
+    }
+    retireTargetRead.value = null;
+    if (original) {
       sheet.showTradein(oldDevice.id, targetKind, newPrice);
       return;
     }

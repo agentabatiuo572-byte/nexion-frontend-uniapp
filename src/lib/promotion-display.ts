@@ -3,6 +3,19 @@ import { formatAmount } from "./amount-display";
 import { formatDisplayDateTime } from "./display-date";
 import type { LocalizedText, RewardState, PublicRewardSpec, RewardSpec } from '../api/promotion-contracts';
 import { serverLanguage } from "@/i18n";
+import type { Messages } from "@/i18n/messages/en";
+import type { CheckoutQuoteBlock } from "@/api/promotion-api";
+
+export function checkoutQuoteBlockCopy(block: CheckoutQuoteBlock | null, copy: Messages): string {
+  switch (block) {
+    case 'outOfStock': return copy.store.temporarilyOutOfStock;
+    case 'soldOut': return copy.store.purchaseEligibilityQuotaDepleted;
+    case 'productMissing': return copy.store.coCapacityProductUnavailable;
+    case 'unavailable': return copy.wallet.syncFailedBody;
+    default: return '';
+  }
+}
+
 export function localized(value: LocalizedText | null | undefined, language: string): string { return value?.[serverLanguage(language)] ?? ''; }
 /** Decimal string multiplication is display-only; eligibility and groups come from the server. */
 export function rewardAmount(reward: PublicRewardSpec | RewardSpec, groups=1): string {
