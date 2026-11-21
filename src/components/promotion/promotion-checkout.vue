@@ -8,8 +8,7 @@
     <template v-else>
       <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
-      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
-      <view v-if="catalogReadFailed" class="promotion-notice" role="alert"><text>{{ t.store.catalogErrorBody }}</text><PromotionAction class="promotion-link" role="button" tabindex="0" :aria-disabled="busy" @click="loadQuote"><text>{{ t.store.catalogRetry }}</text></PromotionAction></view>
+      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
           <view class="checkout-product-art"><image v-if="item.imageUrl&&!brokenImages.includes(item.productNo)" :src="item.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" @error="brokenImages.push(item.productNo)" /></view>
@@ -329,7 +328,11 @@ async function loadOrderClock(){
   const fleet=await deviceE3Api.fleet();if(!readCurrent(read)||generation!==clockGeneration)return;
   orderClock={serverNow:fleet.serverNow,at:sampledAt};updateClock();
 }
-const catalogReadFailed=computed(()=>freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&productCatalogState.status==='error');
+watch(()=>productCatalogState.status,status=>{
+  if(status==='error'&&current()&&visible.value&&freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&!quoteBlock.value){
+    quoteBlock.value='unavailable';
+  }
+});
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!quoteBlock.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
 const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
@@ -345,8 +348,10 @@ async function run(action:()=>Promise<void>){
   try{await action();}catch(cause){if(current())showOperationError(cause);}
   finally{if(current()){writeBusy.value=false;revision.value++;updateClock();}}
 }
-async function loadQuote(){
-  if((quoteBlock.value&&quoteBlock.value!=='unavailable')||busy.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
+async function loadQuote(recheckCapacity=false){
+  const block=quoteBlock.value;
+  if(block&&block!=='unavailable'&&!(recheckCapacity&&block==='capacity'))return;
+  if(busy.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
   if(recoverKeepBeforeNewPurchase())return;
   // A failed later read invalidates the successful catalog promise saved at mount.
   if(productCatalogState.status==='error')catalogRefresh=null;
@@ -361,7 +366,10 @@ async function loadQuote(){
     catalogRefresh??=refreshProductCatalog(true);
     const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
     if(!readCurrent(generation))return;
-    if(!catalogReady){catalogRefresh=null;quotePresentation.value=null;promotion.value=null;throw new Error('PRODUCT_CATALOG_UNAVAILABLE');}
+    if(!catalogReady){
+      catalogRefresh=null;quotePresentation.value=null;promotion.value=null;quoteBlock.value='unavailable';
+      return;
+    }
     const sampledAt=readTrustedMonotonicNowMs();
     if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
       if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?value:null;promotionReceivedAt=sampledAt;updateClock();}
@@ -718,11 +726,12 @@ function hide(){
   disposeGuard?.();disposeGuard=null;
 }
 function show(){
+  const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
   visible.value=true;nativeBackApproved=false;paymentLeaveApproved=false;if(!current())return;
   startWalletTimer();
   if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(allowAuxiliaryNavigation);
   if(busy.value){refreshOnIdle=true;return;}
-  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);if(!quoteBlock.value)void loadQuote();}
+  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);if(!quoteBlock.value||recheckCapacity)void loadQuote(recheckCapacity);}
 }
 watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible.value&&current())show();}});
 const footer = computed(() => {

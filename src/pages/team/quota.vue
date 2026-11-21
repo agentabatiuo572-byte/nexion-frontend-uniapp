@@ -147,6 +147,8 @@ onLoad((options) => {
   const requested = typeof options?.product === "string" ? options.product.trim() : fallback?.trim() ?? "";
   focusedProductId.value = requested.slice(0, 64);
   conditionsOnly.value = (options?.intent ?? query.get("intent")) === "tradein-conditions";
+  // An explicit new entry can revisit an earlier terminal result. Its own recovery still stops on 404.
+  if (remoteApiEnabled && conditionsOnly.value && conditionEligibility.value.unavailable) void readConditionEligibility();
 });
 
 onShow(() => {
