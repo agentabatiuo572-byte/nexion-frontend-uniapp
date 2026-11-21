@@ -4,7 +4,10 @@
   </view>
 
   <!-- Step sheet: method → network / bank confirmation. -->
-  <view v-if="sheetOpen" class="pp-mask nx-sheet-fade-in" @click.self="payment.close">
+  <view v-if="sheetOpen" class="pp-mask nx-sheet-fade-in">
+    <!-- The tap-to-close layer is a sibling under the sheet (as in NxSheet): uni H5 hands handlers plain-object targets, so
+         @click.self never matched and a mask tap closed nothing. It closes like ✕; taps on the sheet never reach it. -->
+    <view class="pp-scrim" aria-hidden="true" @click="payment.close" />
     <view id="pp-sheet" class="pp-sheet nx-glass-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="sheetTitle">
       <view class="pp-head">
         <view v-if="s.step !== 'methods' && !s.originalRecovery" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
@@ -482,7 +485,8 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 </script>
 <style scoped>
 .pp-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: var(--v5-bg-color-mask); }
-.pp-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) var(--nx-overlay-bottom); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; color: var(--v5-ink); }
+.pp-scrim { position: absolute; inset: 0; }
+.pp-sheet { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) var(--nx-overlay-bottom); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; color: var(--v5-ink); }
 .pp-head { flex: none; display: flex; align-items: center; gap: var(--v5-space-3); }
 .pp-head__text { flex: 1; min-width: 0; }
 .pp-title { display: block; font: 600 var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
