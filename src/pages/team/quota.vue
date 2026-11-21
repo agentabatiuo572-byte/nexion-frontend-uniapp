@@ -2,10 +2,15 @@
   <AppChassis active="team">
     <view class="quota-page nx-viz-motion">
       <SubPageHeader :back="conditionsOnly ? '/pages/me/devices' : focusedProductId ? `/pages/store/detail?id=${encodeURIComponent(focusedProductId)}` : '/pages/team/team'" :title="conditionsOnly ? t.store.purchaseEligibilityProductPolicy : t.quota.pageTitle" plain design />
-      <view v-if="conditionsOnly" class="quota-content">
+      <!-- Nothing to show: one sentence and the page's single reload, centred (03 §3.4, §3.5.2); automatic recovery keeps
+           running. Once the conditions are on screen there is no retry. -->
+      <view v-if="conditionsOnly && conditionEligibility.status === 'error'" class="quota-content quota-page-failure" role="alert">
+        <text class="quota-page-failure__copy">{{ t.store.purchaseEligibilityError }}</text>
+        <view class="nx-card-recovery-action quota-page-failure__reload" role="button" tabindex="0" @click="retryConditionEligibility" @keydown.enter.prevent="retryConditionEligibility" @keydown.space.prevent="retryConditionEligibility"><text>{{ t.ui.reload }}</text></view>
+      </view>
+      <view v-else-if="conditionsOnly" class="quota-content">
         <text class="quota-headline">{{ focusedProductName }}</text>
         <PurchaseEligibilityPanel :status="conditionEligibility.status" :snapshot="conditionEligibility.snapshot" />
-        <NxButton variant="secondary" :label="t.store.purchaseEligibilityRetry" :busy="conditionEligibility.status === 'loading'" @click="retryConditionEligibility" />
       </view>
       <view v-else-if="!focusedTierPresent" class="quota-content quota-state">
         <text class="quota-headline">{{ focusedProductName }}</text>
@@ -364,6 +369,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-headline { display:block;font:600 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5);letter-spacing:-.02em;overflow-wrap:break-word; }
 .quota-body { display:block;margin-top:var(--v5-space-2);font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }.quota-caption { display:block;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .quota-state { padding-block:28px;display:flex;flex-direction:column;gap:var(--ui-space-inset); }
+.quota-page-failure { min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--v5-space-2);text-align:center; }
+.quota-page-failure__copy { color:var(--v5-ink-2);font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);overflow-wrap:break-word; }
+.quota-page-failure .quota-page-failure__reload { margin:0;align-self:center; }
 @media(max-width:374px) { .quota-content { padding-inline:var(--v5-space-4); } }
 /* Hero: the page's one focal card, brand tint (01 §1.1.2); overview title, amount and the invite ring. */
 .quota-hero { --nx-tint: var(--v5-brand); margin-top: var(--v5-space-1); padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); }
