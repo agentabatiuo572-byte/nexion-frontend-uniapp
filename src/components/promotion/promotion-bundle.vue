@@ -5,7 +5,6 @@
       <text v-if="!scopeId||activity" class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
       <text v-if="scopeId&&(contextStatus==='loading'||contextStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
       <text v-if="scopeId && !activity && contextStatus === 'error'" class="promotion-copy">—</text>
-      <text v-if="scopeId&&activity&&contextStatus==='ready'&&!available" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
     </view>
     <view v-if="singleActivityProduct" class="promotion-flat" data-testid="single-activity-guidance"><text class="promotion-copy">{{ commerceCopy(locale.code).singleActivity }}</text><view class="promotion-action primary" role="button" tabindex="0" @click="openSingleProduct" @keydown.enter.prevent="openSingleProduct" @keydown.space.prevent="openSingleProduct"><text>{{ commerceCopy(locale.code).singlePurchase }}</text></view></view>
     <template v-else-if="!scopeId||activity">
@@ -40,13 +39,11 @@
     </view>
     <view class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.expected }}</text>
-      <text v-if="quoteStatus==='loading'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-      <text v-else-if="quoteStatus==='error'||quoteStatus==='unavailable'" class="promotion-copy" role="alert">{{ t.promotion.errorNote }}</text>
       <template v-if="quote">
         <RewardRows :expected="quote.expectedRewards" :lines="quote.items" />
         <text v-for="(warning,index) in quote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text>
         <view class="promotion-summary"><text>{{ t.promotion.subtotal }}</text><CheckoutAmount :value="quote.subtotalUsdt" currency="USD" /></view>
-        <view class="promotion-summary"><text>{{ t.promotion.discount }}</text><text class="bundle-discount">{{ formatCheckoutReviewAmount(quote.discountUsdt,'USD',{discount:true}) }}</text></view>
+        <view class="promotion-summary"><text>{{ t.promotion.discount }}</text><text class="bundle-discount">{{ formatCheckoutReviewAmount(quote.discountUsdt,'USD',{discount:true,unit:true}) }}</text></view>
         <view class="promotion-summary total"><text>{{ t.promotion.total }}</text><CheckoutAmount :value="quote.amountUsdt" currency="USD" /></view>
       </template>
       <text class="promotion-copy">{{ t.promotion.rewardNote }}</text>
@@ -164,7 +161,13 @@ async function refreshQuote(){
 // Display-only hand-off to the page's bottom action tray (pages/store/bundle.vue #pageFixed); the reason a disabled
 // primary has sits above it there (03 §3.1, 04 §4.0).
 const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
-  note:quoteStatus.value==='outOfStock'?t.value.store.temporarilyOutOfStock:selection.value.length<2?t.value.promotion.selectTwo:quote.value&&quote.value.eligibility!=='ELIGIBLE'?t.value.promotion.disabledNote:signedIn.value&&!quote.value&&quoteStatus.value==='idle'?t.value.promotion.awaitingQuote:'',
+  note:scopeId.value&&contextStatus.value==='ready'&&!available.value?localized(activity.value?.eligibilityMessage,locale.code)||t.value.promotion.disabled
+    :quoteStatus.value==='outOfStock'?t.value.store.temporarilyOutOfStock
+    :quoteStatus.value==='loading'?t.value.promotion.loading
+    :quoteStatus.value==='error'||quoteStatus.value==='unavailable'?t.value.promotion.errorNote
+    :selection.value.length<2?t.value.promotion.selectTwo
+    :quote.value&&quote.value.eligibility!=='ELIGIBLE'?t.value.promotion.disabledNote
+    :signedIn.value&&!quote.value&&quoteStatus.value==='idle'?t.value.promotion.awaitingQuote:'',
   signedIn:signedIn.value,canQuote:canQuote.value,canContinue:canContinue.value,quote:refreshQuote,continue:continueCheckout,signIn,
 });
 defineExpose({footer});
