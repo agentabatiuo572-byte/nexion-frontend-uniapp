@@ -6,6 +6,7 @@ import { notificationPreferenceKind, notificationCategory, type NotificationCate
 import { notificationApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import type { NotificationFilter } from "@/api/notification-api";
 
@@ -162,7 +163,7 @@ export const useNotifications = defineStore("notifications", () => {
       return isCurrent();
     } catch (cause) {
       if (!isCurrent()) return false;
-      actionableUnread.value = null;
+      if (!isTransientReadFailure(cause)) actionableUnread.value = null;
       pageState.value.readError = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
       return false;
     } finally {
