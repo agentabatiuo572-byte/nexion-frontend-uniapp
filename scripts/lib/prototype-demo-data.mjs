@@ -799,7 +799,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!device)refuse('TRADEIN_SOURCE_NOT_ACTIVE_OR_NOT_OWNED');
     const reason=tradeinSourceReason(device,product);
     if(reason!=='OK')refuse('TRADEIN_'+reason);
-    requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
+    // External pricing has already checked the target and checks monthly quota separately.
+    if(!request.externalPurchasePricing)requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
     return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
@@ -860,11 +861,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
     const reason=tradeinTargetReason(product);
     if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
-    const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
-    const purchase=demoSkuPurchaseRules(state,product,points,now);
-    if(!purchase.eligible){
-      const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
-      throw Object.assign(new Error(code),{status:403});
+    if(!request.externalPurchasePricing){
+      const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+      const purchase=demoSkuPurchaseRules(state,product,points,now);
+      if(!purchase.eligible){
+        const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
+        throw Object.assign(new Error(code),{status:403});
+      }
     }
     const data=structuredClone(base('/api/app/trade-in/capacity-quote'));
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});

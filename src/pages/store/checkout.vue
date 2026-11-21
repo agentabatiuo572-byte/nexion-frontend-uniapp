@@ -325,7 +325,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError, isApiRefusal, isSettledRejection } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, usePurchasePayment } from "@/store/purchase-payment";
+import { hasTradeinPurchaseIntent, markTradeinPurchaseExpired, prepareTradeinPaymentRecovery, refreshExpiredCheckoutPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -2083,6 +2083,7 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
               parseReceipt:parseCanonicalTradeinResult});
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           if (!paid) {
+            if (refusedPurchasePayment(submissionScope.accountKey, key)) throw new Error('PAYMENT_CANCELLED');
             // The server no longer holds this payment and its record is released: nothing is left to recover.
             if (!readCheckoutTradein(submissionScope.accountKey, recovery.productNo)) {
               remoteTradeinRecoveryRequired.value = false;
@@ -2176,11 +2177,19 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
     return true;
   }
   if (!recovery) return false;
+  const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
+  const refused = refusedPurchasePayment(scope.accountKey, key);
+  if (refused) {
+    remoteTradeinRecoveryRequired.value = false;
+    remoteTradeinRecoveryError.value = false;
+    if (navigate) return false;
+    await usePurchasePayment().resume(refused);
+    return true;
+  }
   remoteTradeinRecoveryRequired.value = true;
   if (remoteTradeinRecoveryBusy.value) return true;
   remoteTradeinRecoveryBusy.value = true;
   try {
-    const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
     const tracking = prepareTradeinPaymentRecovery(scope.accountKey, key, recovery.tradeinCommandSubmitted === false);
     if (tracking) {
       await tracking;

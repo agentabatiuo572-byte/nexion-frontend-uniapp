@@ -155,6 +155,8 @@ const server=http.createServer(async(req,res)=>{
         }
         state.previewFactsAt??=startedAt;
         updatePreviewHomeDisplay(state,update,Date.now());
+        // A live trial conversion policy change keeps existing quotes and payment intents.
+        if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(update.reset||update.savedAttemptState)authDemo.reset();

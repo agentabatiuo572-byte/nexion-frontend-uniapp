@@ -1,5 +1,5 @@
 import { reactive } from 'vue';
-import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
+import { apiClient } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
@@ -12,7 +12,6 @@ import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
-import { purchaseEligibilityUnlockHref } from '@/lib/purchase-eligibility-copy';
 import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { getT } from '@/i18n/use-t';
 import { toast } from './ui';
@@ -22,35 +21,40 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
   tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
-  intentNo?: string; lookupOnly?: boolean; quotaRefusal?: QuotaRefusal; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
+  intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-type QuotaRefusal = 'rejectQuotaPaused' | 'rejectQuotaMonthFull' | 'rejectQuotaSoldOut' | 'rejectConditionsUnmet' | 'rejectPurchaseSetup';
+type DefinitePaymentNotice = 'rejectQuotaPaused' | 'rejectQuotaMonthFull' | 'rejectQuotaSoldOut' | 'rejectConditionsUnmet' | 'rejectGateConditionsUnmet' | 'rejectPurchaseSetup' | 'trialConversionClosed' | 'trialNotConvertible';
 type EligibilityRetry = 'rejectEligibilityUnavailable';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | QuotaRefusal;
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | DefinitePaymentNotice;
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
 // Another payment for this purchase is still open, perhaps from another device: say so rather than asking to review the order.
 const ORDER_REFUSALS: Record<string, PurchaseNotice> = { ORDER_PAYMENT_EXPIRED: 'orderExpired', ORDER_NOT_PAYABLE: 'orderClosed', ORDER_NOT_FOUND: 'orderMissing', PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED: 'existing' };
 const TRIAL_REFUSALS = ['TRIAL_QUOTE_CHANGED', 'TRIAL_AMOUNT_MISMATCH'];
-function quotaNotice(cause: ApiError, kind: PurchaseKind): QuotaRefusal | EligibilityRetry | undefined {
+function paymentRefusalNotice(cause: ApiError, kind: PurchaseKind): DefinitePaymentNotice | EligibilityRetry | undefined {
   if (cause.kind !== 'http' || cause.status !== cause.code) return;
   if (cause.status === 409) {
     switch (cause.message) {
       case 'ORDER_MONTHLY_QUOTA_PAUSED': return 'rejectQuotaPaused';
       case 'ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET': return 'rejectConditionsUnmet';
       case 'ORDER_MONTHLY_QUOTA_EXHAUSTED': return 'rejectQuotaMonthFull';
-      case 'PURCHASE_GATE_BLOCKED': return kind === 'ORDER_PAY' ? 'rejectConditionsUnmet' : undefined;
+      case 'PURCHASE_GATE_BLOCKED':
+      case 'PURCHASE_GATE_NOT_MET': return kind === 'ORDER_PAY' ? 'rejectGateConditionsUnmet' : undefined;
       case 'PURCHASE_GATE_SOLD_OUT': return kind === 'ORDER_PAY' ? 'rejectQuotaSoldOut' : undefined;
+      case 'PURCHASE_GATE_INVALID': return kind === 'ORDER_PAY' ? 'rejectPurchaseSetup' : undefined;
+      case 'TRIAL_KILL_SWITCH_DISABLED': return kind === 'TRIAL_CONVERT' ? 'trialConversionClosed' : undefined;
+      case 'TRIAL_NOT_CONVERTIBLE': return kind === 'TRIAL_CONVERT' ? 'trialNotConvertible' : undefined;
     }
   }
   if (cause.status === 503 && cause.message === 'ORDER_MONTHLY_QUOTA_UNAVAILABLE') return 'rejectEligibilityUnavailable';
+  if (cause.status === 503 && kind === 'ORDER_PAY' && cause.message === 'PURCHASE_GATE_FACTS_UNAVAILABLE') return 'rejectEligibilityUnavailable';
   if (cause.status === 403 && kind !== 'ORDER_PAY' && kind !== 'TRIAL_CONVERT') {
     switch (cause.message) {
       case 'PURCHASE_GATE_SOLD_OUT': return 'rejectQuotaSoldOut';
-      case 'PURCHASE_GATE_NOT_MET': return 'rejectConditionsUnmet';
+      case 'PURCHASE_GATE_NOT_MET': return 'rejectGateConditionsUnmet';
       case 'PURCHASE_GATE_INVALID':
       case 'PURCHASE_GATE_FACTS_INVALID': return 'rejectPurchaseSetup';
       case 'PURCHASE_GATE_FACTS_UNAVAILABLE': return 'rejectEligibilityUnavailable';
@@ -146,7 +150,7 @@ function displayRecords() {
   state.revision;
   const accountKey = account();
   const expired = unsavedExpiries.get(accountKey);
-  return Object.values(rows(accountKey).records).map(row => expired?.get(row.commandKey) === row.kind
+  return Object.values(rows(accountKey).records).filter(row => !row.quotaRefusal).map(row => expired?.get(row.commandKey) === row.kind
     ? { ...row, lastStatus: 'EXPIRED' } : row);
 }
 function pendingPayments() {
@@ -260,6 +264,15 @@ export function hasTradeinPurchaseIntent(accountKey: string, commandKey: string)
   return rows(accountKey).records[commandKey]?.kind === 'TRADE_IN';
 }
 
+/** A refusal awaiting readback retains its original key outside the payment-in-progress lists. */
+export function refusedPurchasePayment(accountKey: string, commandKey: string): PendingExternal | null {
+  state.revision;
+  try {
+    const pending = rows(accountKey).records[commandKey];
+    return pending?.quotaRefusal ? pending : null;
+  } catch { return null; }
+}
+
 function readPendingPayment() {
   return state.unavailable ? submitOriginal() : query();
 }
@@ -271,30 +284,28 @@ function closeAndNavigate(href: string) {
   if (navigate) navigate(href); else void navTo(href);
 }
 async function openConditions() {
-  const { accountKey, orderNo } = state;
+  const { accountKey, orderNo, notice } = state;
   const version = requestVersion;
   let productNo = state.productNo;
-  let href = '/pages/team/quota';
   try {
     if (orderNo) {
       const orders = useOrders();
       const order = orders.getById(orderNo) ?? await orders.ensureRemoteOrder(orderNo);
       if (!owns(version, accountKey)) return;
-      // A bundle can be refused on any line. The quota page lists all applicable tiers.
       if (order && (order.lineItems?.length ?? 1) === 1) productNo = order.lineItems?.[0]?.sku ?? order.productId;
     }
-    if (productNo) {
-      href = `/pages/team/quota?product=${encodeURIComponent(productNo)}&intent=tradein-conditions`;
-      const snapshot = await purchaseEligibilityApi.get(productNo);
-      const unlockHref = purchaseEligibilityUnlockHref(snapshot, productNo);
-      if (unlockHref === '/pages/team/rank' || snapshot.policies.some(policy => policy.decisionCode === 'F4B_REQUIREMENTS_NOT_MET')) {
-        href = unlockHref;
-      }
-    }
   } catch {
-    // The conditions page can retry its own eligibility read.
+    // The order detail can retry its own product read.
   }
-  if (owns(version, accountKey)) closeAndNavigate(href);
+  if (!owns(version, accountKey)) return;
+  if (orderNo && !productNo) {
+    if (onOrderPage(orderNo)) finish(null);
+    else closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
+  } else if (notice === 'rejectConditionsUnmet') {
+    closeAndNavigate(productNo ? `/pages/team/quota?product=${encodeURIComponent(productNo)}` : '/pages/team/quota');
+  } else if (productNo) {
+    closeAndNavigate(`/pages/store/detail?id=${encodeURIComponent(productNo)}`);
+  } else finish(null);
 }
 /** Reads continue on their own: every 5 s while the payment is open, backing off after failures, paused in the background. */
 function schedule(version: number, accountKey: string, failed: boolean) {
@@ -375,10 +386,10 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   } catch (error) {
     if (!owns(version, accountKey)) return;
     const cause = asApiError(error);
-    const quota = quotaNotice(cause, expected.kind);
-    state.retryNotice = quota === 'rejectEligibilityUnavailable' ? quota : '';
+    const paymentRefusal = paymentRefusalNotice(cause, expected.kind);
+    state.retryNotice = paymentRefusal === 'rejectEligibilityUnavailable' ? paymentRefusal : '';
     if (error instanceof Error && error.message === 'PURCHASE_CONTEXT_CHANGED') { state.notice = 'changed'; return; }
-    if (quota && quota !== 'rejectEligibilityUnavailable') { conclude(quota); return; }
+    if (paymentRefusal && paymentRefusal !== 'rejectEligibilityUnavailable') { conclude(paymentRefusal); return; }
     const replacement = expected.kind === 'TRADE_IN' || expected.kind === 'CAPACITY_REPLACE';
     const replacementRefusal = replacement && tradeinPaymentRejection(cause, 'external');
     if (replacementRefusal) {
@@ -468,11 +479,11 @@ async function submitOriginal() {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
-      const quota = quotaNotice(cause, pending.kind);
+      const paymentRefusal = paymentRefusalNotice(cause, pending.kind);
       state.retryNotice = '';
-      if (quota === 'rejectEligibilityUnavailable') {
+      if (paymentRefusal === 'rejectEligibilityUnavailable') {
         // Retry the stored quote under the same command key.
-        state.retryNotice = quota;
+        state.retryNotice = paymentRefusal;
         state.unavailable = true;
         state.error = true;
         return;
@@ -506,16 +517,16 @@ async function submitOriginal() {
       const rejectedQuote = unavailable || cause.kind === 'http' && cause.status === cause.code
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
           || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND');
-      const definiteRefusal = !pending.intentNo && (quota || rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
+      const definiteRefusal = !pending.intentNo && (paymentRefusal || rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
       state.error = !definiteRefusal;
       if (definiteRefusal) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
         // Another open payment ends every kind of purchase here; it must not fall back to quoting again.
-        const refusal = quota ?? (pending.kind === 'ORDER_PAY' || cause.message === 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'
+        const refusal = paymentRefusal ?? (pending.kind === 'ORDER_PAY' || cause.message === 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'
           ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined);
-        if (quota) {
+        if (paymentRefusal) {
           // Remember the refusal across reloads until the original-key lookup has an answer.
-          const readOnly = { ...pending, quotaRefusal: quota };
+          const readOnly = { ...pending, quotaRefusal: paymentRefusal };
           state.pending = readOnly;
           try { save(readOnly); } catch { /* Keep read-only recovery for this session even if storage fails. */ }
         }
@@ -674,7 +685,7 @@ export function acknowledgePurchasePayment(result: Extract<PurchaseChoice, { met
 export function pendingOrderPayment(accountKey: string, orderNo: string, knownOnly = false): PendingExternal | null {
   try {
     const records = Object.values(rows(accountKey).records).filter(row => row.kind === 'ORDER_PAY' && JSON.parse(row.fingerprint)[1]?.orderNo === orderNo
-      && !['EXPIRED', 'DELIVERED'].includes(row.lastStatus ?? '') && !row.businessDelivered
+      && !row.quotaRefusal && !['EXPIRED', 'DELIVERED'].includes(row.lastStatus ?? '') && !row.businessDelivered
       && (row.lastStatus !== 'MANUAL_REVIEW' || row.lookupOnly && !!row.intentNo));
     return records.find(row => row.intentNo) ?? (knownOnly ? null : records[0] ?? null);
   } catch { return null; }
