@@ -41,7 +41,7 @@ import { useT } from "@/i18n/use-t";
 type AuthProviderLabel = "Passkey" | "Google" | "Apple" | "Telegram";
 
 const t = useT();
-const props = withDefaults(defineProps<{ busy?: boolean; preserveAppearance?: boolean; development?: boolean; providers?: AuthProviderLabel[]; linked?: AuthProviderLabel[] }>(), {
+const props = withDefaults(defineProps<{ busy?: boolean; preserveAppearance?: boolean; development?: boolean; providers?: AuthProviderLabel[]; linked?: AuthProviderLabel[]; unavailableReason?: string }>(), {
   busy: false, preserveAppearance: false,
   linked: () => [],
   providers: () => ["Passkey", "Google", "Apple", "Telegram"],
@@ -51,7 +51,8 @@ const emit = defineEmits<{ (event: "select", provider: AuthProviderLabel): void 
 
 function ariaLabel(provider: AuthProviderLabel): string {
   if (props.linked.includes(provider)) return `${provider} · ${t.value.thirdParty.linked}`;
-  return props.development ? fmt(t.value.authOtp.developmentProviderLabel, { provider }) : provider;
+  const name = props.development ? fmt(t.value.authOtp.developmentProviderLabel, { provider }) : provider;
+  return props.unavailableReason ? `${name} · ${props.unavailableReason}` : name;
 }
 
 function activate(provider: AuthProviderLabel) {

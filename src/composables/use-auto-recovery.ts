@@ -6,7 +6,12 @@ import { registerPageRecovery } from "@/lib/active-page-refresh";
 import { useApp } from "@/store/app";
 
 /** READS only. retry must use the store's account/generation guards and read window. */
-export function useAutoRecovery(options: { failed: () => boolean; retry: () => Promise<unknown>; repeatMs?: number }) {
+export function useAutoRecovery(options: {
+  failed: () => boolean;
+  retry: () => Promise<unknown>;
+  repeatMs?: number;
+  repeatWhile?: () => boolean;
+}) {
   const app = useApp();
   const shown = ref(false);
   const delays = [3_000, 10_000, 30_000];
@@ -23,7 +28,7 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
     timer = undefined;
   }
 
-  function schedule(delay = delays[attempts] ?? options.repeatMs) {
+  function schedule(delay = delays[attempts] ?? (options.repeatWhile?.() === false ? undefined : options.repeatMs)) {
     if (disposed || timer !== undefined || inFlight || !shown.value || !foregroundReadAllowed()
       || !options.failed() || delay === undefined) return;
     const epoch = app.accountBindingEpoch;
@@ -73,10 +78,22 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
     return attempt();
   }
 
+  /** A newly confirmed command can require a readback after a previous read exhausted its budget. */
+  function restartBackoff() {
+    clearTimer();
+    clearTimeout(settleTimer);
+    attempts = 0;
+    schedule();
+  }
+
   function show() {
     shown.value = true;
     release();
-    release = registerPageRecovery({ failed: options.failed, pending: () => inFlight !== null, retry, quiet: options.repeatMs !== undefined });
+    release = registerPageRecovery({
+      failed: options.failed, pending: () => inFlight !== null, retry,
+      // Conditional repeats also serve ordinary failed reads when pull is available.
+      quiet: options.repeatMs !== undefined && options.repeatWhile === undefined,
+    });
     attempts = 0;
     // Foreground/reconnect reads are jittered separately from normal backoff.
     schedule(300 + Math.random() * 700);
@@ -92,6 +109,11 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
     // A read from elsewhere also turns failed() off, so only a recovery that holds renews the budget.
     else settleTimer = setTimeout(() => { clearTimer(); attempts = 0; retryAt = 0; }, 5_000);
   });
+  if (options.repeatWhile) watch(options.repeatWhile, () => {
+    if (attempts < delays.length) return;
+    clearTimer();
+    schedule();
+  });
   watch(foregroundReadAllowed, (allowed, wasAllowed) => {
     clearTimer();
     if (allowed && !wasAllowed) { attempts = 0; schedule(300 + Math.random() * 700); }
@@ -102,5 +124,5 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
   });
   onBeforeUnmount(() => { disposed = true; clearTimer(); clearTimeout(settleTimer); release(); });
 
-  return { retry };
+  return { retry, restartBackoff };
 }
