@@ -330,6 +330,7 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       primary: c.ok, onPrimary: dismiss, onSecondary: dismiss };
     case 'changed': return { icon: 'info', tone: 'warning', title: c.changedTitle, body: c.changed, primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close, ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
     case 'rejectTradeinBusy':
+    case 'rejectTradeinWalletOnly':
     case 'rejectTradeinOwner':
     case 'rejectCapacitySourceChanged': {
       const flow = checkoutFlowCopy(locale.code);
