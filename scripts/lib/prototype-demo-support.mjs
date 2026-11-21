@@ -1,5 +1,6 @@
 // Local-only conversation samples; no message leaves the preview server.
 import { createHash } from 'node:crypto';
+import { demoAccountId } from './prototype-demo-identity.mjs';
 
 // The preview has one authenticated demo account. Tests may switch that server
 // identity; the browser never supplies the account used to select a marker.
@@ -57,9 +58,11 @@ function restoreMessageCommands(state) {
   }
   state.supportMessageCommands.push(...recovered.values());
 }
-function replayCommand(state,key,fingerprint) {
+function replayCommand(state,key,fingerprint,accountId) {
   const saved=state.supportMessageCommands.find(command=>command.key===key);
   if(!saved)return;
+  if((saved.accountId??demoAccountId)!==accountId)
+    throw Object.assign(new Error('SUPPORT_COMMAND_NOT_FOUND'),{status:404});
   const detail=state.supportConversations.find(row=>row.conversation.conversationNo===saved.conversationNo);
   if(!saved.fingerprint||saved.fingerprint!==fingerprint)
     throw Object.assign(new Error('消息请求标识已被使用'),{status:409});
@@ -149,7 +152,7 @@ export function setTransferSampleOutcome(state) {
   }
   const last=detail.messages.at(-1);
   Object.assign(detail.conversation,{version:detail.conversation.version+1,lastMessage:last.content,lastMessageAt:createdAt,lastPublicMessageId:last.id});
-  state.supportMessageCommands.push({key:sample.key,conversationNo:sample.conversationNo,
+  state.supportMessageCommands.push({key:sample.key,accountId:sample.accountId,conversationNo:sample.conversationNo,
     fingerprint:commandFingerprint('reply',sample.conversationNo,{body:sample.text})});
   sample.committed=true;
 }
@@ -167,6 +170,7 @@ export function supportDemo(url,locale,state,request) {
     clearedPeers:(state.supportUserClearMarkers||[]).filter(row=>row.accountId===supportAccountId(state)).map(({accountId,...marker})=>structuredClone(marker))};
   if(p===root+'/attachments/policy')return {available:false,allowedMimeTypes:[],maxBytes:null,maxPixels:null,ttlSeconds:null,unavailableReason:text('演示暂不上传附件','Attachments are unavailable in this demo','Bản mẫu chưa hỗ trợ tệp đính kèm')};
   if(p===root+'/conversation-categories')return [{type:'advisor',enabled:true},{type:'support',enabled:true},{type:'ai',enabled:false}];
+  const senderAccountId=request.accountId??demoAccountId;
   const scenario=state.messageState||'normal';
   if(state.supportConversations==null) {
     // The demo account's advisor conversation opens with the registration welcome.
@@ -306,7 +310,7 @@ export function supportDemo(url,locale,state,request) {
   }
   if(p===root+'/conversations'&&method==='POST') {
     const fingerprint=commandFingerprint('create',undefined,input);
-    const existing=replayCommand(state,input.clientMessageId,fingerprint);if(existing)return supportUserView(state,existing);
+    const existing=replayCommand(state,input.clientMessageId,fingerprint,senderAccountId);if(existing)return supportUserView(state,existing);
     // Without an advisor (unassigned welcome) the message continues the waiting, ownerless conversation.
     const ownerAgentId=scenario==='welcome-unassigned'?null:String(state.supportAdvisorId??1),messageId=nextMessageId();
     let detail=state.supportConversations.filter(row=>row.conversation.ownerAgentId===ownerAgentId)
@@ -320,7 +324,7 @@ export function supportDemo(url,locale,state,request) {
       detail={clientMessageId:input.clientMessageId,conversation:{id,conversationNo:'DEMO-SUPPORT-'+id,conversationType:input.conversationType.toLowerCase(),status:'OPEN',version:1,ownerAgentId,ownerAgentName:ownerAgentId?'Demo support':'待分配',unreadCount:0,lastMessage:input.openingText,lastMessageAt:now,lastPublicMessageId:messageId},messages:[message],historyTruncated:false,nextCursor:null};
       state.supportConversations.unshift(detail);
     }
-    state.supportMessageCommands.push({key:input.clientMessageId,fingerprint,conversationNo:detail.conversation.conversationNo});
+    state.supportMessageCommands.push({key:input.clientMessageId,fingerprint,accountId:senderAccountId,conversationNo:detail.conversation.conversationNo});
     return supportUserView(state,detail);
   }
   const match=p.match(/^\/api\/app\/support\/conversations\/(DEMO-SUPPORT-\d+)(?:\/(read|replies|dismiss))?$/);
@@ -362,12 +366,12 @@ export function supportDemo(url,locale,state,request) {
     if(match[2]==='dismiss') {const marker={conversationNo:match[1],throughMessageId:input.throughMessageId};state.supportDismissals=state.supportDismissals.filter(item=>item.conversationNo!==match[1]).concat(marker);return marker;}
     if(match[2]==='replies') {
       const fingerprint=commandFingerprint('reply',match[1],input);
-      if(!replayCommand(state,input.clientMessageId,fingerprint)) {
+      if(!replayCommand(state,input.clientMessageId,fingerprint,senderAccountId)) {
         if(detail.writeState?.canReply===false)
           throw Object.assign(new Error('CONVERSATION_PEER_CHANGED'),{status:409});
         const id=nextMessageId();detail.messages.push({id,clientMessageId:input.clientMessageId,senderType:'user',content:input.body,createdAt:now,receiptStatus:'sent'});
         Object.assign(detail.conversation,{version:detail.conversation.version+1,lastMessage:input.body,lastMessageAt:now,lastPublicMessageId:id});
-        state.supportMessageCommands.push({key:input.clientMessageId,fingerprint,conversationNo:match[1]});
+        state.supportMessageCommands.push({key:input.clientMessageId,fingerprint,accountId:senderAccountId,conversationNo:match[1]});
       }
     }
     const result=supportUserView(state,detail);

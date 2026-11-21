@@ -211,11 +211,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
   function readIntent(intent) {
     if (state.paymentState === 'read-error') return refused(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE');
-    if (state.paymentState === 'intent-missing' && intent) {
-      intents.delete(intent.intentNo);
-      if (intent.orderNo && state.intentOrders) delete state.intentOrders[intent.orderNo];
-      intent = undefined;
-    }
+    if (state.paymentState === 'intent-missing') return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
     return intent ? {status: 200, message: 'OK', data: view(intent)} : refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
   }
   function handle(url, request) {

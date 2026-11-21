@@ -1,6 +1,7 @@
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { createHash } from 'node:crypto';
+import { previewAccountId } from './prototype-demo-identity.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
@@ -307,7 +308,7 @@ const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${uni
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
   if(!state.fleetSeed)demoFleetFacts(url,locale,state);
   return demoScenarioOrders(demoProducts(state,url.origin),state,now,state.fleetSeed.find(device=>device.id===41))
-    .map(order=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
+    .map(({replacementDevice,...order})=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
       targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?order.targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
     }:order);
@@ -394,7 +395,7 @@ export function demoFleetFacts(url,locale,state) {
     const name=order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name;
     session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:Number(order.amountUsdt)/order.quantity,
       activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
-      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
+      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null}),...order.replacementDevice});
   }
   let reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
@@ -829,10 +830,15 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const product=products.find(p=>p.id===quote.targetProductNo);
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true);
     if(!verifiedPayment&&!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
+    const source=(replacingCapacity||(verifiedPayment&&quote.sourceDeviceId!=null))
+      ? demoFleetFacts(url,locale,state).devices.find(device=>device.id===quote.sourceDeviceId) : null;
     if(replacingCapacity){
-      const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===quote.sourceDeviceId);
-      (state.deviceActivations??={})[source.id]={status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',rowVersion:source.rowVersion+1};
+      (state.deviceActivations??={})[source.id]={status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',rowVersion:source.rowVersion+1,
+        ...(verifiedPayment&&{status:'INVENTORY',deactivatedAt:now,pendingDeactivate:false})};
     }else if(!keepingCapacity)(state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
+    const sourceProduct=verifiedPayment&&source
+      ? products.find(item=>item.id.toUpperCase()===source.productCode) : null;
+    const computePoints=verifiedPayment?Math.max(0,product.computePoints-(sourceProduct?.computePoints??0)):product.computePoints;
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
     if(!verifiedPayment)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
       amount:quote.payableUsdt,at:now,category:'purchase',remark:'E3 trade-in upgrade wallet payment'});
@@ -840,10 +846,15 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;
     (state.deviceIds??={})[targetDeviceInstanceNo]=targetDeviceId;
     const canonicalStatus=active?'activated':'inventory';
-    const order={...demoOrders(products,state,now)[0],orderNo,productId:quote.targetProductId,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:verifiedPayment?.paymentMethod??'WALLET',orderType:keepingCapacity?'CAPACITY_KEEP':'TRADE_IN',itemCount:1,
+    const order={...demoOrders(products,state,now)[0],orderNo,productId:quote.targetProductId,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:verifiedPayment?.paymentMethod??'WALLET',orderType:keepingCapacity?'CAPACITY_KEEP':'TRADE_IN',itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:keepingCapacity?null:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
       paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:verifiedPayment?.createdAt??now,expiresAt:null,paidAt:verifiedPayment?.paidAt??now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null,
-      ...(verifiedPayment&&{paymentNo:verifiedPayment.intentNo,paidTotalUsdt:verifiedPayment.totalUsdt})};
+      ...(verifiedPayment&&{paymentNo:verifiedPayment.intentNo,paidTotalUsdt:verifiedPayment.totalUsdt,
+        replacementDevice:{deviceType:product.productType,gpuModel:product.gpu,
+          vramTotalGb:Number.parseInt(product.vram,10),basePowerW:Number.parseInt(product.power,10),
+          status:quote.targetDeviceStatus,runtimeStatus:active?'ONLINE':'OFFLINE',lastSeenAt:active?now:null,
+          purchasedAt:now,actualPaidUsdt:quote.targetPriceUsdt,sourceOrderNo:orderNo,
+          sourceChannel:keepingCapacity?'ORDER':'TRADE_IN',pendingDeactivate:false}})};
     (state.createdOrders||=[]).unshift(order);
     if(currentTask?.status==='RUNNING'){
       recordDemoTaskCancellation(state,sourceAssignment,currentTask);
@@ -999,7 +1010,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const sample=base('/api/promotions').items[0];
     const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
     const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
-    const authenticated=['Bearer local-demo-token','Bearer formal-probe-access-token'].includes(request?.headers?.().authorization);
+    const authenticated=Boolean(previewAccountId(state,request?.headers?.()??{}));
     const exact=state.repurchaseState==='boundary'||state.repurchaseState==='outside';
     const repurchaseWindow=exact?{minDays:30,maxDays:30}:{minDays:state.repurchaseState==='inside'?7:0,maxDays:90};
     const readsPurchaseHistory=authenticated&&!empty&&state.eventState!=='empty';
