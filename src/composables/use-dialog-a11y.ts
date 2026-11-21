@@ -7,6 +7,9 @@ import { onBackPress, onShow as onPageShow, onHide as onPageHide } from "@dcloud
 type Dialog = { close?: () => void; priority: number };
 type DialogPage = { stack: Dialog[]; visible: boolean; backRegistered: boolean };
 const dialogPages = new WeakMap<object, DialogPage>();
+// Back presses a dialog answered. Uni runs every onBackPress handler of the page on one press, so a page's own handler
+// asks here (or whether a dialog is still open) to know the press was not meant for leaving the page.
+const backTaken = new WeakSet<object>();
 
 export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
   // Uni invokes page hooks on the page root, not on a nested sheet component.
@@ -48,6 +51,7 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
       const top = dialogs.stack.reduce<Dialog | undefined>((current, entry) =>
         !current || entry.priority >= current.priority ? entry : current, undefined);
       if (!top) return false;
+      backTaken.add(event);
       // A retry-only overlay has no cancel action; never close a lower dialog.
       top.close?.();
       return true;
@@ -55,6 +59,20 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
   }
 }
 // #endif
+
+/** For a page with its own onBackPress: true when this press belongs to a dialog on the page (02.7 top layer first), so
+ *  the page keeps its leave logic for the next press. Works whichever handler Uni runs first. */
+export function useDialogBackHeld(): (event: object) => boolean {
+  let held = (_event: object) => false;
+  // #ifdef APP-PLUS
+  const owner = getCurrentInstance()?.root;
+  held = (event) => {
+    const page = owner ? dialogPages.get(owner) : undefined;
+    return backTaken.has(event) || !!page && page.backRegistered && page.visible && page.stack.length > 0;
+  };
+  // #endif
+  return held;
+}
 
 /**
  * AppChassis provides this. Dialogs render inside the page's own scroller, so without it a drag on
@@ -206,15 +224,17 @@ function focusInside(el: HTMLElement): void {
   focusFirst([() => firstFocusable(el), () => landingSpot(el)]);
 }
 const MAIN_REGION = '[role="main"], main, uni-page-body';
+// The sub-page header title: the page's own title when the content draws no heading of its own (03 §3.5).
+const PAGE_TITLE = '.spv-title';
 /** Focus that fell back to the page's main region moves on to its heading or bottom-bar action once the page draws one
  *  (a result page renders its head just after the payment dialog closes), unless the user has moved on. */
 function settleOnLanding(landing: Element): void {
-  if (!landing.matches(MAIN_REGION)) return;
+  if (!landing.matches(MAIN_REGION) && !landing.matches(PAGE_TITLE)) return;
   let tries = 0;
   const timer = setInterval(() => {
     tries += 1;
     if (document.activeElement !== landing || tries > 10) { clearInterval(timer); return; }
-    const better = fallbacks(null, null).map((next) => () => { const el = next(); return el && el !== landing && !el.matches(MAIN_REGION) ? el : null; });
+    const better = fallbacks(null, null).map((next) => () => { const el = next(); return el && el !== landing && !el.matches(MAIN_REGION) && !el.matches(PAGE_TITLE) ? el : null; });
     if (focusFirst(better)) clearInterval(timer);
   }, 150);
 }
@@ -222,7 +242,7 @@ const accessibleName = (el: Element) => (el.getAttribute("aria-label") || el.tex
 
 /** Where focus goes when the trigger cannot take it, in order: the trigger's replacement (same test id, else same role,
  *  name and first class); inside a layer still open below, its first control, else its root; with no layer left, the
- *  page's bottom-bar action, the visible heading, the main region. Never <body>. */
+ *  page's bottom-bar action, the visible heading, the page title, the main region. Never <body>. */
 function fallbacks(trace: { testid: string | null; role: string | null; name: string; cls: string | null } | null, scope: HTMLElement | null): (() => Element | null | undefined)[] {
   const within: ParentNode = scope ?? document;
   const all = (selector: string) => Array.from(within.querySelectorAll<HTMLElement>(selector));
@@ -236,6 +256,7 @@ function fallbacks(trace: { testid: string | null; role: string | null; name: st
   if (scope) return [...list, () => firstFocusable(scope), () => landingSpot(scope)];
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse()) list.push(() => el);
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(PAGE_TITLE))) list.push(() => landingSpot(el));
   for (const el of Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION))) list.push(() => landingSpot(el));
   return list;
 }

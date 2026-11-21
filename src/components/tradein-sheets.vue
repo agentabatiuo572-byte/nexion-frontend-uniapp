@@ -60,7 +60,7 @@
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
         <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatGroupedAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
-        <view v-if="capacityResumeAllowed" class="tis-secondary nx-frosted-button" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-secondary-text">{{ recoveryCopy.resume }}</text></view>
+        <view v-if="capacityResumeAllowed" class="tis-cta" :class="{ 'tis-cta-disabled': capacityRecoveryBusy }" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'choice'">
@@ -1705,7 +1705,7 @@ function onForce() {
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => props.active && state.value.kind !== "none"
-  && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none")), ".tis-root", hide);
+  && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none")), ".tis-root", hide, true);
 
 
 </script>
@@ -1911,6 +1911,10 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-cta:active {
   transform: scale(0.98);
+}
+/* Resuming the original payment is the recovery sheet's one forward action: primary L under its order line (03 §3.1). */
+.tis-card-line + .tis-cta {
+  margin-top: 16px;
 }
 .tis-cta-disabled {
   opacity: 0.5;

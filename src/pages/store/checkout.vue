@@ -12,8 +12,8 @@
       <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || createLookupUnavailable }">
         <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle" :description="pendingCreateDescription" />
       </view>
-      <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:var(--v5-space-5)">
-        <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : purchaseRecoveryCopy(locale.code).original }}</text>
+      <view v-else-if="keepCheckoutTarget" class="checkout-page-center" role="status">
+        <text class="checkout-page-state">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : purchaseRecoveryCopy(locale.code).original }}</text>
         <NxButton :label="t.tradein.keepRecoveryAction" @click="recoverCapacityBeforePurchase([keepCheckoutTarget])" />
       </view>
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
@@ -350,6 +350,7 @@ import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
 import { uiLocale } from "@/i18n";
+import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 
@@ -427,8 +428,10 @@ const keepCheckoutReadError = computed(() => keepCheckoutRecovery.value?.command
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
-// An open payment layer registers its own back handler on this page; checkout leaves that press to it.
-onBackPress(options => { if (options.from === 'navigateBack') return false; if (!purchasePayment.state.open) requestCheckoutBack(); return true; });
+// An open payment layer registers its own back handler on this page; checkout leaves that press to it. So does any
+// other dialog on the page (the trade-in recovery sheet, the policy sheet): back closes it first, the next press leaves.
+const dialogHoldsBack = useDialogBackHeld();
+onBackPress(options => { if (options.from === 'navigateBack') return false; if (!purchasePayment.state.open && !dialogHoldsBack(options)) requestCheckoutBack(); return true; });
 const auth = useAuth();
 const orders = useOrders();
 const voucher = useVoucher();
