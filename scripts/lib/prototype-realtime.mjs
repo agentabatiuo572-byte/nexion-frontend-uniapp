@@ -62,11 +62,11 @@ export function createPrototypeRealtime({state,messages,fixtureFor}) {
       });
       server.on('close',()=>{for(const peer of peers)peer.socket.terminate();wss.close();});
     },
-    stateChanged(update) {
+    stateChanged(update, accountId) {
       if(update.reset)messages.reset();
       if(update.messageState||update.reset) {
         // Scenario application was lazy; materialize before the event so reconcile reads it.
-        fixtureFor(new URL('http://127.0.0.1/api/app/support/conversations/cursor'),{method:()=> 'GET'});
+        if(accountId)fixtureFor(new URL('http://127.0.0.1/api/app/support/conversations/cursor'),{method:()=> 'GET',accountId});
         changed();
       }
       for(const peer of peers) {

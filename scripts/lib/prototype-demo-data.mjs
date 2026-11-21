@@ -1031,14 +1031,16 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
   if(orderAction){
-    const [,orderNo,action]=orderAction,order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);
+    const [,orderNo,action]=orderAction;
+    let order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);
     if(!order) return {};
+    const writable=state.createdOrders?.find(row=>row.orderNo===orderNo);
     const replay=order.paymentStatus==='PAID',amount=Number(order.amountUsdt);
     if(action==='cancel'){
       if(replay)refuse('ORDER_NOT_CANCELLABLE');
       (state.orderStatuses??={})[orderNo]='cancelled';
-      if(state.createdOrders?.includes(order)){
-        Object.assign(order,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
+      if(writable){
+        order=Object.assign(writable,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
           activationStatus:'WAITING_PAYMENT',paidAt:null,activatedAt:null});
       }
       return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
@@ -1059,10 +1061,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
           amount,at:now,category:'purchase',remark:'UVEL wallet order settlement'});
       }
       (state.orderStatuses??={})[orderNo]='activated';
-      if(state.createdOrders?.includes(order)){
-        Object.assign(order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
-          activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
-      }
+      if(!writable)(state.createdOrders??=[]).push(order);
+      order=Object.assign(writable??order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
+        activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
     }
     const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,

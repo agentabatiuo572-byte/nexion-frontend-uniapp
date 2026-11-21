@@ -13,9 +13,9 @@ import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/pro
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
-import { setTransferSampleOutcome } from './lib/prototype-demo-support.mjs';
+import { setTransferSampleOutcome, supportStateFor } from './lib/prototype-demo-support.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
-import { previewAccountId } from './lib/prototype-demo-identity.mjs';
+import { demoAccountId, previewAccountId, previewSelectedAccountId } from './lib/prototype-demo-identity.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
@@ -107,32 +107,47 @@ function previewScenarioPage(scenario,keys){
     return nativeFetch.call(this,input,{...init,headers}).then(response=>{follow(response.headers.get('X-Preview-Scenario'));return response;});
   };
 }
-function previewTransferOutbox(run,sample) {
+function previewTransferOutbox(run,sample,defaultAccountId) {
   const marker='uvel-preview-support-transfer', previous=JSON.parse(sessionStorage.getItem(marker)||'null');
-  if(previous?.run===run&&previous?.key===sample?.key||!previous&&!sample)return;
-  const outboxKey='support-human-outbox:user:900001', pendingKey='support-pending-commands:user:900001:canonical-v1:conversations';
-  const outbox=JSON.parse(sessionStorage.getItem(outboxKey)||'{}'), pending=JSON.parse(localStorage.getItem(pendingKey)||'{}');
-  if(previous) {
-    delete outbox['conversation:'+previous.conversationNo];
-    localStorage.removeItem('support-human-send:user:900001:'+previous.key);
-    localStorage.removeItem('support-human-send:user:900001:'+previous.slot);
-    const retainedKey='support-human-pending:user:900001';
-    const retained=JSON.parse(localStorage.getItem(retainedKey)||'{}');
-    delete retained['conversation:'+previous.conversationNo];
-    if(Object.keys(retained).length)localStorage.setItem(retainedKey,JSON.stringify(retained));
-    else localStorage.removeItem(retainedKey);
-    if(pending[previous.slot]===previous.key)delete pending[previous.slot];
+  if(previous?.run===run&&previous?.key===sample?.key&&previous?.accountId===sample?.accountId||!previous&&!sample)return;
+  function update(row,add) {
+    const account='user:'+(row.accountId??defaultAccountId);
+    const outboxKey='support-human-outbox:'+account, pendingKey='support-pending-commands:'+account+':canonical-v1:conversations';
+    const outbox=JSON.parse(sessionStorage.getItem(outboxKey)||'{}'), pending=JSON.parse(localStorage.getItem(pendingKey)||'{}');
+    const slot='conversation:'+row.conversationNo;
+    if(add) {
+      outbox[slot]={text:'',failedSend:{text:row.text,kind:'unknown',settled:false,retryable:true,attempts:1}};
+      pending[row.slot]=row.key;
+    } else {
+      delete outbox[slot];
+      localStorage.removeItem('support-human-send:'+account+':'+row.key);
+      localStorage.removeItem('support-human-send:'+account+':'+row.slot);
+      const retainedKey='support-human-pending:'+account;
+      const retained=JSON.parse(localStorage.getItem(retainedKey)||'{}');
+      delete retained[slot];
+      if(Object.keys(retained).length)localStorage.setItem(retainedKey,JSON.stringify(retained));
+      else localStorage.removeItem(retainedKey);
+      if(pending[row.slot]===row.key)delete pending[row.slot];
+    }
+    sessionStorage.setItem(outboxKey,JSON.stringify(outbox));
+    localStorage.setItem(pendingKey,JSON.stringify(pending));
   }
-  if(sample&&!sample.committed&&!sample.rejected) {
-    outbox['conversation:'+sample.conversationNo]={text:'',failedSend:{text:sample.text,kind:'unknown',settled:false,retryable:true,attempts:1}};
-    pending[sample.slot]=sample.key;
-  }
-  sessionStorage.setItem(outboxKey,JSON.stringify(outbox));
-  localStorage.setItem(pendingKey,JSON.stringify(pending));
-  sessionStorage.setItem(marker,JSON.stringify(sample?{run,key:sample.key,conversationNo:sample.conversationNo,slot:sample.slot}:null));
+  if(previous)update(previous,false);
+  if(sample&&!sample.committed&&!sample.rejected)update(sample,true);
+  sessionStorage.setItem(marker,JSON.stringify(sample?{run,key:sample.key,conversationNo:sample.conversationNo,slot:sample.slot,accountId:sample.accountId}:null));
 }
-const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');'
-  +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(state.supportTransferSample??null)+');</script>';
+function selectedSupportAccount(url) {
+  const accountId=previewSelectedAccountId(state);
+  if(!accountId)return null;
+  if(state.messageState==='transferred')
+    fixtureFor(new URL('/api/app/support/conversations/cursor',url),{method:()=> 'GET',accountId});
+  return supportStateFor(state,accountId);
+}
+function scenarioSeed(url) {
+  const sample=state.messageState==='transferred'?selectedSupportAccount(url)?.supportTransferSample:null;
+  return '<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');'
+    +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(sample??null)+','+JSON.stringify(demoAccountId)+');</script>';
+}
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
 const modeledWrite=/^\/(auth\/users\/(refresh|logout|login)|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|devices\/activate|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/security\/account-deletion(?:\/cancel)?|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
@@ -161,17 +176,16 @@ const server=http.createServer(async(req,res)=>{
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
-        const paymentMode=()=>state.paymentState==='read-error'?state.paymentBeforeReadError:state.paymentState;
+        const paymentMode=()=>state.paymentState==='read-error'?(state.paymentBeforeReadError??'delivered'):state.paymentState;
         const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,wasPaymentMode=paymentMode(),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
         if(update.reset){
-          const accountCreatedAt=state.accountCreatedAt;
+          const {accountCreatedAt,supportConversationSequence}=state;
           for(const key of Object.keys(state))delete state[key];
-          Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
+          Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt,supportConversationSequence});
         }
         state.previewFactsAt??=startedAt;
         updatePreviewHomeDisplay(state,update,Date.now());
-        if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
-        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
         else delete state.paymentBeforeReadError;
         if(state.dataState==='empty')state.withdrawLimitState='open';
@@ -242,8 +256,12 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         if ('bankState' in update) updateDemoBankWithdrawals(state, Date.now());
         if (update.reset || scenarioChange) seedLongBankOrder(state, now);
-        realtime.stateChanged(update);
-        if('supportReadbackState' in update)setTransferSampleOutcome(state);
+        realtime.stateChanged(update,previewSelectedAccountId(state));
+        if(demoOptions.supportReadbackState.some(([value])=>value===update.supportReadbackState)){
+          const supportAccount=selectedSupportAccount(url);
+          if(supportAccount)setTransferSampleOutcome(supportAccount,update.supportReadbackState);
+        }
+        checkoutFlow?.selectPaymentMode(wasPaymentMode);
         if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
@@ -252,7 +270,8 @@ const server=http.createServer(async(req,res)=>{
       const options=state.dataState==='empty'
         ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}
         : demoOptions;
-      return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed,
+      const supportReadbackState=selectedSupportAccount(url)?.supportReadbackState??'missing';
+      return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed,supportReadbackState,
         disabledLongOptions:disabledLongOptions(state),
         ...(longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})});
     }
@@ -361,7 +380,7 @@ const server=http.createServer(async(req,res)=>{
     const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
     const savedAttempt=path.extname(file)==='.html'?authDemo.savedAttempt():null;
     const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
-    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed()+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed(url)+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
