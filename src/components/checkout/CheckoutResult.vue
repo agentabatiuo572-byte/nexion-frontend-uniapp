@@ -1,6 +1,8 @@
 <template>
   <view class="checkout-result" :class="'checkout-result--' + state">
     <view class="checkout-result__body">
+      <!-- Shared result head (03 §3.6.1); the device art and the activation celebration below are the result's body. -->
+      <view class="checkout-result__status"><NxResultHead :tone="headTone" :title="title" :description="description" /></view>
       <view class="checkout-result__art" :class="'is-' + phase">
         <view v-if="celebrating" class="checkout-result__celebration" aria-hidden="true"><view v-for="spark in sparks" :key="spark.index" class="checkout-result__spark" :style="spark.style" /></view>
         <view v-if="(celebrating && phase === 'confirmed') || popped" :key="phase" class="checkout-result__halo" aria-hidden="true" />
@@ -9,7 +11,6 @@
         <view v-if="state === 'activated' && phase === 'activating'" class="checkout-result__orbit" aria-hidden="true" />
         <view v-if="(state === 'activated' || state === 'inventory') && phase === 'complete'" class="checkout-result__check" :class="{ 'is-pop': popped }" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg></view>
       </view>
-      <view class="checkout-result__status" role="status" aria-live="polite"><text class="checkout-result__title" role="heading" aria-level="1">{{ title }}</text><text class="checkout-result__description">{{ description }}</text></view>
       <view v-if="state === 'activated'" class="checkout-result__progress">
         <view class="checkout-result__track" aria-hidden="true"><view class="checkout-result__fill" :class="'is-' + phase" /></view>
         <text class="checkout-result__progress-note">{{ phase === 'confirmed' ? copy.activationNext : phase === 'activating' ? copy.activationProgress : copy.activationComplete }}</text>
@@ -18,11 +19,13 @@
         <text v-if="productName" class="checkout-result__product">{{ productName }}</text>
         <view v-if="showPaidAmount" class="checkout-result__amount"><text>{{ copy.paidAmount }}</text><CheckoutAmount :value="amount" :currency="currency ?? 'USDT'" /></view>
       </view>
-      <slot />
+      <!-- done: the page's own exits wait for the result presentation to finish (PRD purchase payment, line 49). -->
+      <slot :done="phase === 'complete'" />
     </view>
     <view class="checkout-result__actions">
-      <NxButton v-if="state === 'inventory' || (state === 'activated' && phase === 'complete')" :label="copy.devices" variant="primary" @click="emit('devices')" />
-      <template v-else-if="state === 'error' || state === 'processing'">
+      <NxButton v-if="(state === 'inventory' || state === 'activated') && phase === 'complete'" :label="copy.devices" variant="primary" @click="emit('devices')" />
+      <NxButton v-else-if="state === 'failed'" :label="t.orders.copyAndSupport" variant="primary" @click="emit('support')" />
+      <template v-else-if="(state === 'error' || state === 'processing') && phase === 'complete'">
         <NxButton :label="copy.deviceInventory" variant="text" @click="emit('devices')" />
       </template>
       <view v-else class="checkout-result__action-space" aria-hidden="true" />
@@ -35,11 +38,16 @@ import { onHide, onShow } from '@/composables/use-tab-page-lifecycle';
 import { useLocaleStore } from '@/store/locale';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import NxButton from '@/components/ui/nx-button.vue';
+import NxResultHead from '@/components/ui/nx-result-head.vue';
+import { useT } from '@/i18n/use-t';
+import { purchasePaymentCopy } from '@/lib/purchase-payment-copy';
 import CheckoutAmount from './CheckoutAmount.vue';
-const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
-const emit = defineEmits<{ (event: 'devices'): void }>();
+// 'failed' is a server-confirmed provisioning failure (order PAID + PROVISIONING_FAILED); 'error' is only a read-back that has not succeeded yet.
+const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
+const emit = defineEmits<{ (event: 'devices'): void; (event: 'support'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));
+const t = useT();
 const showPaidAmount = computed(() => props.paymentConfirmed && props.amount !== undefined);
 const phase = ref<'confirmed' | 'activating' | 'complete'>('complete');
 // Confetti for the purchase itself; a check pop and halo when activation completes.
@@ -57,10 +65,17 @@ const presentable = computed(() => props.state === 'activated' || props.state ==
 
 const title = computed(() => phase.value === 'confirmed' ? copy.value.paid
   : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activating : copy.value.activated
-  : props.state === 'inventory' ? copy.value.inventory : props.state === 'processing' ? copy.value.processing : copy.value.resultError);
+  : props.state === 'inventory' ? copy.value.inventory : props.state === 'processing' ? copy.value.processing
+  : props.state === 'failed' ? t.value.orders.statusProvisioningFailed : copy.value.resultError);
 const description = computed(() => phase.value === 'confirmed' ? props.state === 'activated' ? copy.value.paidHint : copy.value.paidInventoryHint
   : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activatingHint : copy.value.activatedHint
-  : props.state === 'inventory' ? copy.value.inventoryHint : props.state === 'processing' ? copy.value.processingHint : props.error || copy.value.resultErrorHint);
+  : props.state === 'inventory' ? copy.value.inventoryHint : props.state === 'processing' ? copy.value.processingHint
+  : props.state === 'failed' ? purchasePaymentCopy(locale.code).delivery : props.error || copy.value.resultErrorHint);
+// Head tone follows the status map (03 §3.8): paid and done are success; activating, processing and a paid order whose
+// read-back has not succeeded yet are in progress (03 §3.5.2: no failure before the server confirms one); only the
+// server-confirmed provisioning failure is danger.
+const headTone = computed(() => props.state === 'failed' ? 'danger' : phase.value === 'confirmed' ? 'success'
+  : props.state === 'processing' || props.state === 'error' || phase.value === 'activating' ? 'warning' : 'success');
 const sparks = Array.from({ length: 36 }, (_, index) => ({ index, style: {
   '--x': `${12 + (index * 17) % 77}%`, '--dx': `${(index * 73) % 241 - 120}px`,
   '--dy': `${110 + (index * 37) % 170}px`, '--spin': `${120 + (index * 67) % 540}deg`,
@@ -109,15 +124,15 @@ onBeforeUnmount(() => {
 <style scoped>
 .checkout-result { box-sizing: border-box; display: flex; flex-direction: column; min-height: calc(100dvh - 128px); padding-inline: var(--v5-space-6); color: var(--v5-ink); }
 .checkout-result__body { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; padding-block: var(--v5-space-6); }
-.checkout-result__art { position: relative; isolation: isolate; flex: none; display: grid; place-items: center; height: 156px; margin: 0 0 var(--v5-space-4); }
+/* The art keeps about 30% clear space above the machine, so it starts 16px up to sit close under the head. */
+.checkout-result__art { position: relative; isolation: isolate; flex: none; display: grid; place-items: center; height: 156px; margin: -16px 0 0; }
 .checkout-result__art.is-confirmed .checkout-result__image, .checkout-result__art.is-confirmed .checkout-result__fallback { animation: checkout-confirmed-rise 700ms cubic-bezier(.16, 1, .3, 1) both; }
 .checkout-result__image, .checkout-result__fallback { position: relative; z-index: 1; width: 160px; height: 148px; }
 .checkout-result__fallback { display: grid; place-items: center; color: var(--v5-brand); }
 .checkout-result__fallback svg { width: 80px; height: 80px; }
 .checkout-result__art.is-activating .checkout-result__image { animation: checkout-device-breathe 1600ms ease-in-out infinite; }
-.checkout-result__title { display: block; text-align: center; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); }
-.checkout-result__status { min-height: calc(var(--ui-type-page-title-lh) + var(--v5-space-1) + var(--ui-type-description-lh) * 2); }
-.checkout-result__description { display: block; margin-top: var(--v5-space-1); text-align: center; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+/* Room for the head with a two-line description, so the art does not jump as the phases change. */
+.checkout-result__status { min-height: calc(var(--v5-space-2) + 56px + var(--v5-space-4) + var(--ui-type-page-title-lh) + var(--v5-space-1) + var(--ui-type-description-lh) * 2); }
 .checkout-result__progress { display: grid; grid-template-rows: 6px 36px; justify-items: center; gap: var(--v5-space-2); width: min(100%, 240px); margin: var(--v5-space-4) auto; }
 .checkout-result__track { width: 200px; max-width: 100%; height: 6px; overflow: hidden; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); }
 .checkout-result__fill { width: 0; height: 100%; border-radius: inherit; background: var(--v5-brand); }

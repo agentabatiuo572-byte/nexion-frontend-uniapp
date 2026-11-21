@@ -34,6 +34,12 @@ function activate(event?: Event) { if (!props.disabled && !props.busy && !(event
 .nx-button--small > .nx-button__surface { min-height: 32px; padding: 6px 12px; }
 .nx-button--link { color: var(--v5-ink-3); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
 .nx-button--text > .nx-button__surface, .nx-button--link > .nx-button__surface { padding-inline: 8px; }
+/* Text and link buttons have no container (03 §3.1): outside the bottom tray their box is the label line, so no
+   L/M/S box adds space around the visible text. A transparent layer that takes no layout keeps the 44px target
+   (at least 8px past each end of the label). Tray text buttons keep their row height (03 §3.1 托盘条). */
+.nx-button:is(.nx-button--text, .nx-button--link):not(.nx-glass-bar *, .nx-tray-float) { min-height: 0; padding-block: 0; }
+.nx-button:is(.nx-button--text, .nx-button--link):not(.nx-glass-bar *, .nx-tray-float) > .nx-button__surface { min-height: 0; padding: 0; }
+.nx-button:is(.nx-button--text, .nx-button--link):not(.nx-glass-bar *, .nx-tray-float)::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-8px, calc(50% - 22px)); right: min(-8px, calc(50% - 22px)); }
 .nx-button--disabled { opacity: .5; cursor: default; }
 .nx-button:not(.nx-button--disabled):active { transform: scale(.98); }
 .nx-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
