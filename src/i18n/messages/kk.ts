@@ -2171,6 +2171,7 @@ export const kk: Messages = {
     inventoryPendingDeactivateChip: "Тапсырмадан кейін белсенділігі тоқтайды",
     inventoryRowActivate: "Белсендіру",
     inventoryRowDeactivate: "Тоқтату",
+    inventoryMoreActions: "Басқа әрекеттер",
     inventoryEarnedLabel: "Табыс:",
     inventoryTodayLabel: "Бүгін",
     inventoryRowSlotsFull: "Орындар толы",

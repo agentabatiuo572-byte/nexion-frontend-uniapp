@@ -2171,6 +2171,7 @@ export const id: Messages = {
     inventoryPendingDeactivateChip: "Nonaktif otomatis setelah tugas selesai",
     inventoryRowActivate: "Aktifkan",
     inventoryRowDeactivate: "Nonaktifkan",
+    inventoryMoreActions: "Tindakan lainnya",
     inventoryEarnedLabel: "Pendapatan:",
     inventoryTodayLabel: "Hari ini",
     inventoryRowSlotsFull: "Slot penuh",
