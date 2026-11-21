@@ -26,7 +26,7 @@
         <view v-if="quotaReady && !focusedTiers.length" class="quota-state" role="status"><text>{{ t.empty.listTitle }}</text></view>
         <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" icon="chevron-right" :label="t.empty.devicesCta" @click="go('/pages/store/store')" /></view>
         <!-- Tiers swipe sideways as large product cards (P-41). -->
-        <view v-if="focusedTiers.length" class="quota-carousel">
+        <view v-if="focusedTiers.length" class="quota-carousel" :class="{ 'quota-carousel--single': focusedTiers.length === 1 }">
         <QuotaTierCard v-for="tier in focusedTiers" :key="tier.productId" :tier="tier" :pending="remoteApiEnabled && !remoteSnapshot" :action-blocked="!quotaReady" @navigate="go" />
         </view>
 
@@ -396,4 +396,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-content .quota-carousel :deep(.quota-product__name) { font: 600 var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .quota-content .quota-carousel :deep(.quota-conditions) { padding-top: var(--ui-space-inline); }
 @media (max-width: 374px) { .quota-carousel { margin-inline: -16px; padding-inline: var(--v5-space-4); } .quota-content .quota-carousel :deep(.quota-tier) { width: 248px; } }
+/* A lone tier does not sit in a narrow swipe card: it takes the full content width (layout audit L12). */
+.quota-content .quota-carousel--single :deep(.quota-tier) { flex: 1 1 auto; width: auto; }
 </style>
