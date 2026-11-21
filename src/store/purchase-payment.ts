@@ -18,7 +18,7 @@ import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
-  refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
+  refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
@@ -182,9 +182,11 @@ export async function refreshExpiredCheckoutPayments(accountKey: string, current
   }));
 }
 /** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
-export async function refreshPendingPayments(accountKey: string, current: () => boolean) {
-  if (!current() || account() !== accountKey || state.open) return;
-  await Promise.allSettled(pendingPayments().map(async pending => {
+// One passive read at a time: pages that show the bar at once share it.
+let passiveRead: Promise<unknown> | null = null;
+export function refreshPendingPayments(accountKey: string, current: () => boolean) {
+  if (passiveRead || !current() || account() !== accountKey || state.open) return passiveRead;
+  passiveRead = Promise.allSettled(pendingPayments().map(async pending => {
     const intent = await readIntent(pending);
     if (!intent || intent.status === pending.lastStatus || !current() || account() !== accountKey || state.open) return;
     matches(intent, pending);
@@ -193,7 +195,8 @@ export async function refreshPendingPayments(accountKey: string, current: () => 
     const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
     if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
     save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
-  }));
+  })).finally(() => { passiveRead = null; });
+  return passiveRead;
 }
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
@@ -299,7 +302,7 @@ function readPendingPayment() {
 function closeAndNavigate(href: string, replace = false) {
   const owner = context, navigate = owner?.navigate;
   finish(null);
-  if (navigate) navigate(href); else if (replace && owner) void navReplace(href); else void navTo(href);
+  if (navigate) navigate(href, replace && !!owner); else if (replace && owner) void navReplace(href); else void navTo(href);
 }
 async function openConditions() {
   const { accountKey, orderNo, notice } = state;

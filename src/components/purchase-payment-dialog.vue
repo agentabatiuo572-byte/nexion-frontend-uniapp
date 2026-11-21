@@ -255,14 +255,15 @@ const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
-const pending = computed(() => { app.accountKey; s.revision; return payment.pending().filter(row => !payment.resumeDismissed(row)); });
+const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
+const pending = computed(() => unsettled.value.filter(row => !payment.resumeDismissed(row)));
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
 const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
-// The bar reads its payments while it shows (03 §3.5.2), so a payment that ended leaves it instead of staying "in progress".
-const resumeShown = computed(() => props.showResume && active.value && !s.open && pending.value.length > 0);
-function readResumeRows() { const accountKey = app.accountKey; void refreshPendingPayments(accountKey, () => resumeShown.value && app.accountKey === accountKey && foregroundReadAllowed()); }
-watch(resumeShown, shown => { if (shown) readResumeRows(); }, { immediate: true });
-useVisibleInterval(readResumeRows, 15000, () => resumeShown.value);
+// Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
+// payment leaves the bar, and a closed one returns when its status changes.
+const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.length > 0);
+function readResumeRows() { const accountKey = app.accountKey; void refreshPendingPayments(accountKey, () => resumeWatched.value && app.accountKey === accountKey && foregroundReadAllowed()); }
+useVisibleInterval(readResumeRows, 15000, () => resumeWatched.value);
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().safeAreaInsets?.bottom ?? 0, 30); } catch { return 30; } })();
 
@@ -409,7 +410,7 @@ function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
   next?.focus();
   if (choose && next) next.click();
 }
-function leavePage() { if (received.value) payment.openOrder(); else payment.notify('leave'); }
+function leavePage() { if (received.value) leavePayment(); else payment.notify('leave'); }
 // Leaving an order payment that a purchase page started ends that purchase on the order page; a resumed payment only closes.
 function leavePayment() { if (s.kind === 'ORDER_PAY' && s.orderNo && !s.coldResume) payment.openOrder(); else payment.close(); }
 
@@ -461,7 +462,8 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-head__text { flex: 1; min-width: 0; }
 .pp-title { display: block; font: 600 var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
 .pp-steps { flex: none; display: block; margin-top: 6px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.pp-circ { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+.pp-circ { position: relative; flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+.pp-circ::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; }
 .pp-cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-1); color: var(--v5-warning); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-cd.is-urgent { color: var(--v5-danger); font-weight: 500; }
 .pp-body { min-height: 0; overflow-y: auto; }

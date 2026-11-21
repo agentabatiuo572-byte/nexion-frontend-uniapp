@@ -487,7 +487,7 @@ async function confirmPayment(){
     &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&orderItemSignature(order.value?.items)===lines&&order.value?.payBy===payBy
     &&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&!session.unknown;
   paymentConfirming.value=true;paymentSheetOpen.value=false;
-  let rejection='',paymentDestination='';
+  let rejection='',paymentDestination='',paymentReplace=false;
   try{
     await run(async()=>{
       await executeSelectedPurchase({amount:amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,
@@ -506,7 +506,7 @@ async function confirmPayment(){
           }
         },
         paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
-          navigate:href=>{paymentDestination=href;},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);},
+          navigate:(href,replace)=>{paymentDestination=href;paymentReplace=!!replace;},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);paymentReplace=false;},
           commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}});
     });
     if(!readCurrent(generation)||paymentDestination)return;
@@ -523,7 +523,8 @@ async function confirmPayment(){
     }
   }finally{
     paymentConfirming.value=false;
-    if(paymentDestination&&readCurrent(generation))await navTo(paymentDestination);
+    // The order page replaces a finished checkout, so back does not return to it.
+    if(paymentDestination&&readCurrent(generation))await (paymentReplace?navReplace:navTo)(paymentDestination);
   }
 }
 let recoveryReadGeneration=-1;
