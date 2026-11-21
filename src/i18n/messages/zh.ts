@@ -1298,7 +1298,7 @@ trustReserve: "暂无可核验的储备资料。",
     // FEAT-DEV02 — 主动下架:选升级目标
     retireTitle: "升级置换",
     retireSubtitle: "选择 {name} 的升级目标",
-    retireTargetOption: "{name} · ${price} · 抵后约 ${net}",
+    retireTargetOption: "{name} · {price} · 抵后 {net}",
     retireEarlyTag: "抢先升级",
     retireNoTargets: "当前暂无可用的升级目标",
     // 置换确认(去结算)
@@ -1342,7 +1342,7 @@ trustReserve: "暂无可核验的储备资料。",
     purchaseConditions: {"rank": "团队等级", "activeDirect": "已激活的邀请好友", "teamComputePoints": "团队算力", "lifetimeQuota": "累计名额（已用 / 总额）", "monthlyQuota": "本月名额（已用 / 总额）"},
     inheritActiveHint: "支付完成后，旧设备当前未完成任务将取消，旧设备回收并抵扣，新设备接替原算力槽并自动激活。",
     inheritInventoryHint: "支付完成后，旧设备完成抵扣并移除，新设备保留在仓库，可稍后选择激活。",
-    sheetDisclaimer: "抵扣仅用于本次购买，不进入余额，不可提现。",
+    sheetDisclaimer: "抵扣仅用于本次购买，不进入余额，不可提现。越早置换，抵扣越多。",
     // 结算页抵扣行
     checkoutCreditChip: "{name} 抵扣 −${credit}",
     checkoutRowLabel: "旧机抵扣",

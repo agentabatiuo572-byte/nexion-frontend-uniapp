@@ -1313,7 +1313,7 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
     // FEAT-DEV02 — retire flow: pick an upgrade target
     retireTitle: "Nâng cấp đổi máy",
     retireSubtitle: "Chọn thiết bị nâng cấp cho {name}",
-    retireTargetOption: "{name} · ${price} · còn ≈${net} sau khi trừ",
+    retireTargetOption: "{name} · {price} · còn {net} sau khi trừ",
     retireEarlyTag: "Nâng cấp sớm",
     retireNoTargets: "Hiện chưa có thiết bị nâng cấp khả dụng",
     // Trade-in confirm (proceeds to checkout)
@@ -1357,7 +1357,7 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
     purchaseConditions: {"rank": "Cấp đội nhóm", "activeDirect": "Bạn bè do bạn mời đã kích hoạt", "teamComputePoints": "Điểm của nhóm", "lifetimeQuota": "Suất mua tích lũy (đã dùng / tổng)", "monthlyQuota": "Suất mua trong tháng (đã dùng / tổng)"},
     inheritActiveHint: "Sau thanh toán, tác vụ chưa hoàn tất của thiết bị cũ sẽ bị hủy và thiết bị được thu hồi để trừ giá. Thiết bị mới tiếp quản khe tính toán và tự động kích hoạt.",
     inheritInventoryHint: "Sau thanh toán, thiết bị cũ được dùng để trừ giá rồi được gỡ bỏ. Thiết bị mới ở trong kho và có thể kích hoạt sau.",
-    sheetDisclaimer: "Khoản khấu trừ chỉ áp dụng cho lần mua này, không vào số dư và không thể rút.",
+    sheetDisclaimer: "Khoản khấu trừ chỉ áp dụng cho lần mua này, không vào số dư và không thể rút. Đổi càng sớm, mức khấu trừ càng cao.",
     // Checkout credit row
     checkoutCreditChip: "Trừ giá {name} −${credit}",
     checkoutRowLabel: "Trừ giá đổi máy",
