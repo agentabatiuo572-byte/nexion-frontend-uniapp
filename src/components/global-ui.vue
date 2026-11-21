@@ -205,6 +205,6 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   color: var(--v5-on-brand);
 }
 .nx-btn--danger .nx-btn__label { color: #fff; }
-/* Cancel is visually subordinate to the primary CTA (UVEL conversion rule). */
-.nx-btn__label--ghost { color: var(--v5-ink-3); }
+/* The secondary exit is a text button under the primary: brand text, no container (03 §3.1, §3.5 居中确认框). */
+.nx-btn__label--ghost { color: var(--v5-brand); }
 </style>

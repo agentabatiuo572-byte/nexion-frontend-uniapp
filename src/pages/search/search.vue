@@ -41,7 +41,7 @@
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
         <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
-        <view class="nx-search-help active:opacity-75" role="button" tabindex="0"
+        <view class="nx-search-help nx-frosted-button" role="button" tabindex="0"
           @click="openHelp" @keydown.enter.prevent="openHelp" @keydown.space.prevent="openHelp">
           <text>{{ t.me.helpFaq }}</text>
         </view>
@@ -56,7 +56,7 @@
         kind="recoverable-error"
         :title="recoveryCopy.unavailable"
         :desc="recoveryCopy.retryHint"
-        :cta-label="t.ui.retry"
+        :cta-label="t.ui.reload"
         @cta="retrySearchSources"
       />
 
@@ -87,10 +87,10 @@
               @keydown.enter.prevent="openHit(h)" @keydown.space.prevent="openHit(h)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ h.label }}</text>
-                <text v-if="h.sublabel" class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ h.sublabel }}</text>
+                <text class="block nx-search-row__title">{{ h.label }}</text>
+                <text v-if="h.sublabel" class="block nx-search-row__sub">{{ h.sublabel }}</text>
               </view>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
+              <NxIcon class="shrink-0 nx-search-row__chev" name="chevron-right" :size="16" />
             </view>
           </view>
         </view>
@@ -107,6 +107,7 @@ import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
@@ -501,14 +502,40 @@ function rowStyle(isLast: boolean): CSSProperties {
 .nx-search-row:active {
   background: var(--v5-surface-2);
 }
+/* Brand glass S (03 §3.1): 32px capsule, compact button role; the shared frosted material supplies fill and rim. */
 .nx-search-help {
+  --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent);
+  --ui-button-ink: var(--v5-brand);
+  --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface));
   width: max-content;
+  min-height: 32px;
+  box-sizing: border-box;
   margin: 14px auto 0;
-  padding: 9px 14px;
+  padding: 7px 12px;
   border-radius: 999px;
-  background: var(--v5-brand-soft);
-  color: var(--v5-brand);
-  font-size: 13px;
-  font-weight: 600;
+  font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5);
+}
+.nx-search-help:active {
+  transform: scale(.98);
+}
+/* Result rows: list title role at the content-row weight, at most two lines before the ellipsis (03 §3.6.1);
+   the chevron marks an entry into the next level (03 §3.1). */
+.nx-search-row__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);
+  color: var(--v5-ink);
+}
+.nx-search-row__sub {
+  margin-top: 2px;
+  overflow-wrap: break-word;
+  font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);
+  color: var(--v5-ink-3);
+}
+.nx-search-row__chev {
+  color: var(--v5-ink-4);
 }
 </style>

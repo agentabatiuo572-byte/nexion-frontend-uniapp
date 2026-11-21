@@ -130,12 +130,11 @@
           </view><svg v-if="!deletionPending" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </view>
         <!-- A request in progress: what was submitted reads as a row of the card, and withdrawing it is the card's last
-             action, in the shared in-card action style (it restores the account, so it is not drawn as a danger action). -->
+             action. The card is solid, so the in-card secondary action is neutral glass M at the bottom right (03 §3.1);
+             it restores the account, so it is not drawn as a danger action. -->
         <AccountDeletionReason v-if="remoteApiEnabled && pendingDeletionReason !== null" class="security-danger-reason" :reason="pendingDeletionReason" />
-        <view v-if="remoteApiEnabled && deletionCanCancel" class="nx-card-footer">
-          <view class="nx-card-action" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest" @click="handleCancelAccountDeletion">
-            <text>{{ t.security.cancelDeletionRequest }}</text>
-          </view>
+        <view v-if="remoteApiEnabled && deletionCanCancel" class="security-danger-actions">
+          <NxButton variant="secondary" size="medium" :label="t.security.cancelDeletionRequest" @click="handleCancelAccountDeletion" />
         </view>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
@@ -1150,6 +1149,7 @@ async function handleCancelAccountDeletion() {
     title: t.value.security.cancelDeletionRequest,
     message: t.value.security.cancelDeletionMessage,
     confirmLabel: t.value.security.cancelDeletionRequest,
+    cancelLabel: t.value.security.keepDeletionRequest,
     owner: securityConfirmOwner,
   });
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -1438,13 +1438,16 @@ const dangerLabelStyle: CSSProperties = {
 .security-danger-label--pending { color:var(--v5-ink-3)!important; }
 /* In the card the submitted reason is a divided row, not a filled box (the box stays for the retry form in the sheet). */
 .security-danger .security-danger-reason { padding:12px 0 14px; border-radius:0; background:transparent; border-top:1px solid var(--v5-border); }
+/* The M button's 44px hit area adds 2px above and below its 40px surface, so 14px here leaves the card's 16px inset. */
+.security-danger-actions { display:flex; justify-content:flex-end; padding-bottom:14px; }
 .security-sheet-form { display:flex; flex-direction:column; gap:var(--v5-space-3); }
 .security-sheet-form input { box-sizing:border-box; min-width:0; }
 .security-sheet-form .nx-button { flex:1; }
-.security-sheet-note { font-size:13px; line-height:20px; color:var(--v5-ink-3); }
+/* Sheet body copy uses the short-body role (10 §10.1: 弹层正文). */
+.security-sheet-note { font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color:var(--v5-ink-2); }
 .security-reason-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .security-reason-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-width:0; }
-.security-reason-label { min-width:0; font:600 13px/18px var(--font-v5); color:var(--v5-ink-2); }
+.security-reason-label { min-width:0; font:500 13px/18px var(--font-v5); color:var(--v5-ink-2); }
 .security-reason-count { flex:none; font:500 12px/16px var(--font-jet-mono); color:var(--v5-ink-3); }
 .security-reason-count--over { color:var(--v5-danger); }
 .security-reason-input { display:block; box-sizing:border-box; width:100%; height:88px; padding:10px 12px; border-radius:8px; background:var(--v5-surface-2); font-family:var(--font-v5); font-size:var(--ui-type-input); line-height:20px; color:var(--v5-ink); overflow-wrap:break-word; }

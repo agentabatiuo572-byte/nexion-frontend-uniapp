@@ -365,7 +365,7 @@ const leadershipPoolPrimary = computed(() =>
 );
 const poolAmountParts = computed(() => !remotePoolReadable.value ? null : formatUsdOverviewParts(leadershipPoolUnlocked.value ? projectedPayout.value : leadershipPoolTotal.value));
 const leadershipPoolLineA = computed(() =>
-  !remotePoolReadable.value ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : "—") : leadershipPoolUnlocked.value ? `${visibility.mask(myVotes.value)} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
+  !remotePoolReadable.value ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : "—") : leadershipPoolUnlocked.value ? `${visibility.mask(myVotes.value)}\u00A0${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
 );
 const poolThisWeekText = computed(() => {
   const rate = remoteApiEnabled ? remotePool.value?.injectRate : 0.05;
@@ -669,11 +669,10 @@ useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !rec
 .team-bento__unit { margin-left: 6px; font: 400 13px/1 var(--font-v5); color: var(--v5-ink-3); }
 .team-bento__currency { font-size: 14px; }
 .team-bento__fraction { color: var(--v5-ink-3); }
-.team-bento__caption { font: 500 var(--ui-type-description)/18px var(--font-v5); color: var(--v5-ink); }
+/* The caption names the figure above it: auxiliary description role, 400, muted (10 §10.1; 01 §1.1.1 pairing 1). */
+.team-bento__caption { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .team-bento__muted { color: var(--v5-ink-3); }
-/* The vote count after the pool title keeps its number and unit together when the caption wraps. */
-.team-bento__pool .team-bento__muted { white-space: nowrap; }
-.team-bento__meta { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.team-bento__meta { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .team-bento__podium { position: absolute; right: var(--ui-space-inset); bottom: 14px; display: flex; align-items: flex-end; gap: var(--v5-space-1); }
 .team-bento__podium > view { width: 22px; border-radius: 6px 6px 2px 2px; }
 .team-bento__card--gold { display: grid; grid-template-columns: minmax(0, 1fr) 74px; gap: var(--v5-space-3); }
