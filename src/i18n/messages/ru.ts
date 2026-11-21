@@ -2178,7 +2178,7 @@ export const ru: Messages = {
     inventoryPendingDeactivateChip: "Отключится после задачи",
     inventoryRowActivate: "Включить",
     inventoryRowDeactivate: "Отключить",
-    inventoryEarnedLabel: "Доход:",
+    inventoryEarnedLabel: "Доход",
     inventoryTodayLabel: "Сегодня",
     inventoryRowSlotsFull: "Слоты заняты",
     phoneActivationTitle: "Активировать телефон",

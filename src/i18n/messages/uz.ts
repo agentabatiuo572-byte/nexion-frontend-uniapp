@@ -2178,7 +2178,7 @@ export const uz: Messages = {
     inventoryPendingDeactivateChip: "Vazifa tugagach oʻchiriladi",
     inventoryRowActivate: "Yoqish",
     inventoryRowDeactivate: "Oʻchirish",
-    inventoryEarnedLabel: "Daromad:",
+    inventoryEarnedLabel: "Daromad",
     inventoryTodayLabel: "Bugun",
     inventoryRowSlotsFull: "Slotlar toʻla",
     phoneActivationTitle: "Shu telefonni faollashtirish",
