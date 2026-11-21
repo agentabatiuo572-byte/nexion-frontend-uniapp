@@ -16,7 +16,7 @@
     </view>
     <text v-if="presentation.status.value === 'grace'" class="trial-stage__note">{{ copy.grace }}</text>
     <text class="trial-stage__note">{{ copy.creditNote }}</text>
-    <view v-if="!presentation.presentationReady.value" class="trial-stage__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view class="trial-stage__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
+    <view v-if="!presentation.presentationReady.value" class="trial-stage__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view class="trial-stage__retry nx-inline-recovery__action" role="button" tabindex="0" @click="trial.refreshVisible()"><text>{{ copy.retry }}</text></view></view>
     <view class="trial-stage__actions">
       <view class="trial-stage__group">
         <view class="trial-stage__pill" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails"><text class="trial-stage__pill-face nx-frosted-button">{{ copy.detailsAction }}</text></view>
@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useFreeTrial } from "@/store/free-trial";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
@@ -42,7 +43,9 @@ import JobGauge from "./job-gauge.vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const visibility = useDataVisibility();
-const presentation = useTrialPresentation();
+const trial = useFreeTrial();
+const presentation = useTrialPresentation(undefined, { retainOnReadFailure: true });
+defineExpose({ readFailedWithoutData: presentation.readFailedWithoutData });
 const copy = useTrialFleetCopy();
 const t = useT();
 // The online dot breathes only while the stage is on screen and the page is shown.
@@ -51,8 +54,8 @@ const loopRef = loops.elRef;
 
 const name = computed(() => presentation.deviceName.value || "—");
 const art = presentation.imageUrl;
-const online = computed(() => presentation.presentationReady.value && presentation.status.value === "active");
-const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
+const online = computed(() => presentation.displayReady.value && presentation.status.value === "active");
+const statusText = computed(() => !presentation.displayReady.value ? copy.value.statusUnknown
   : online.value ? t.value.earn.online : copy.value.grace);
 const remaining = computed(() => presentation.remainingMs.value === null ? "—" : formatTrialCountdown(presentation.remainingMs.value));
 const gaugeProgress = computed(() => visibility.hidden || presentation.offsetProgress.value === null ? null : Math.round(presentation.offsetProgress.value * 100));

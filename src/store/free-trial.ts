@@ -1,3 +1,4 @@
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { TRIAL_CONVERT_COMMANDS_TABLE } from '@/lib/purchase-caller-record';
 import { invalidateBeforePassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
@@ -190,6 +191,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   );
   const authorityError = ref<string | null>(null);
   const lastReadFailed = ref(false);
+  const transientReadFailure = ref(false);
   const authoritativeShadowUSD = ref(0);
   const authoritativeShadowNEX = ref(0);
   const authoritativeOffsetUSD = ref<number | null>(null);
@@ -311,7 +313,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityError.value = error;
   }
 
-  function markAuthorityReadFailure(error: string) {
+  function markAuthorityReadFailure(error: string, transient = false) {
+    transientReadFailure.value = transient;
     lastReadFailed.value = true;
     const boundary = status.value === "active" ? expiresAt.value : status.value === "grace" ? graceEndsAt.value : null;
     if (boundary !== null && serverTimeAt(Date.now()) >= boundary) {
@@ -346,6 +349,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       authorityStatus.value = "ready";
       authorityError.value = null;
       lastReadFailed.value = false;
+      transientReadFailure.value = false;
       return true;
     }
     // Validate the whole policy before committing snapshot or promotion presentation.
@@ -406,6 +410,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityStatus.value = "ready";
     authorityError.value = null;
     lastReadFailed.value = false;
+    transientReadFailure.value = false;
     return true;
   }
 
@@ -426,7 +431,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       .catch((error: unknown) => {
         if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
-          markAuthorityReadFailure(asApiError(error).message);
+          markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
         }
         return false;
       })
@@ -480,7 +485,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     } catch (error) {
       if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
         lastAppliedSequence = sequence;
-        markAuthorityReadFailure(asApiError(error).message);
+        markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
       }
       return false;
     }
@@ -497,6 +502,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       confirmedHeroVisible.value = false;
       confirmedHomeOffer.value = null;
       lastReadFailed.value = false;
+      transientReadFailure.value = false;
       confirmedLifecycle = null;
       pendingExpiryClaim = null;
       announcedExpiryClaims.clear();
@@ -923,7 +929,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   return {
     status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
-    authorityStatus, authorityError, lastReadFailed, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
+    authorityStatus, authorityError, lastReadFailed, transientReadFailure, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
