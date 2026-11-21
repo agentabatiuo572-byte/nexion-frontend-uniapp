@@ -30,14 +30,12 @@
 </template>
 
 <script setup lang="ts">
-import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed } from "vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ConversationSwipeRow from './conversation-swipe-row.vue';
 import { useConversationDelete } from '@/composables/use-conversation-delete';
 import { useConversations } from "@/store/conversations";
 
-import { useMessageDrawer } from "@/store/message-drawer";
 import { useT } from "@/i18n/use-t";
 import { fmt, dateLocale } from "@/i18n/format";
 import { formatDisplayDateTime } from "@/lib/display-date";
@@ -46,7 +44,7 @@ import { localizedIdleClose } from "@/lib/support-idle-message";
 import { formatUnreadBadge } from "@/lib/unread-badge";
 
 const emit = defineEmits<{ (event: "navigate"): void }>();
-const conversations = useConversations(), center = useMessageDrawer();
+const conversations = useConversations();
 const t = useT();
 const actions = useConversationDelete();
 type ServiceKind = "advisor" | "support";
@@ -75,14 +73,6 @@ function go(route: string) { emit("navigate"); navTo(route); }
 function openRow(row: Row) {
   go(`/pages/support/chat?cid=${encodeURIComponent(row.id)}`);
 }
-async function retry() {
-  if (loading.value) return;
-  await center.refresh();
-}
-useAutoRecovery({
-  failed: () => !loading.value && failed.value,
-  retry,
-});
 </script>
 
 <style scoped>

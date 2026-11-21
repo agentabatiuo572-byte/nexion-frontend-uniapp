@@ -107,6 +107,7 @@ import TaskCenter from "@/components/earn/task-center.vue";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useFreeTrial } from "@/store/free-trial";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -128,6 +129,10 @@ function goStaking() {
 }
 const range = ref<Range>("Today");
 const freeTrial = useFreeTrial();
+const trialClaimSheet = useTrialClaimSheet();
+const trialReadFailed = () => remoteApiEnabled && !trialClaimSheet.open && freeTrial.lastReadFailed;
+const readVisibleTrial = () => freeTrial.refreshVisible();
+useAutoRecovery({ failed: trialReadFailed, retry: readVisibleTrial });
 let earnPageVisible = false;
 let earnObservationEpoch = 0;
 let releaseActiveRefresh = () => {};
@@ -138,7 +143,7 @@ useAutoRecovery({
 async function refreshVisibleEarn() {
   if (!earnPageVisible || !remoteApiEnabled) return;
   await Promise.allSettled([
-    freeTrial.refreshVisible(),
+    trialReadFailed() || trialClaimSheet.open ? undefined : readVisibleTrial(),
     // Failed reads are awaited by the shared section registry, once each.
     app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error" ? undefined : app.ensureRemoteFleet(),
     app.homeTruthStatus === "error" ? undefined : app.ensureHomeTruth(),
@@ -153,7 +158,7 @@ onShow(() => {
   releaseActiveRefresh = registerActivePageRefresh(refreshVisibleEarn);
   app.setTaskReadPageVisible("earn", true);
   if (remoteApiEnabled) {
-    void freeTrial.refreshVisible();
+    if (!trialReadFailed() && !trialClaimSheet.open) void readVisibleTrial();
     void app.ensureRemoteFleet().catch(() => undefined);
     void app.ensureHomeTruth().catch(() => undefined);
     void observeDayOneEarnPage();

@@ -11,6 +11,7 @@ export function useAutoRecovery(options: {
   retry: () => Promise<unknown>;
   repeatMs?: number;
   repeatWhile?: () => boolean;
+  retryNotBefore?: () => number;
 }) {
   const app = useApp();
   const shown = ref(false);
@@ -28,6 +29,8 @@ export function useAutoRecovery(options: {
     timer = undefined;
   }
 
+  const retryWait = () => Math.max(retryAt, options.retryNotBefore?.() ?? 0) - Date.now();
+
   function schedule(delay = delays[attempts] ?? (options.repeatWhile?.() === false ? undefined : options.repeatMs)) {
     if (disposed || timer !== undefined || inFlight || !shown.value || !foregroundReadAllowed()
       || !options.failed() || delay === undefined) return;
@@ -37,16 +40,19 @@ export function useAutoRecovery(options: {
       timer = undefined;
       if (disposed || !shown.value || !foregroundReadAllowed()
         || epoch !== app.accountBindingEpoch || account !== app.accountKey) return;
+      const wait = retryWait();
+      if (wait > 0) { schedule(wait); return; }
       attempts += 1;
       void attempt();
-    }, Math.max(delay === options.repeatMs ? delay : delay * (0.85 + Math.random() * 0.3), retryAt - Date.now()));
+    }, Math.max(delay === options.repeatMs ? delay : delay * (0.85 + Math.random() * 0.3), retryWait()));
   }
 
   function attempt(): Promise<boolean> {
     if (inFlight) return inFlight;
     if (disposed || !shown.value || !foregroundReadAllowed()) return Promise.resolve(false);
     if (!options.failed()) return Promise.resolve(true);
-    if (Date.now() < retryAt) { schedule(retryAt - Date.now()); return Promise.resolve(false); }
+    const wait = retryWait();
+    if (wait > 0) { schedule(wait); return Promise.resolve(false); }
     const epoch = app.accountBindingEpoch;
     const account = app.accountKey;
     const current = () => !disposed && epoch === app.accountBindingEpoch && account === app.accountKey;

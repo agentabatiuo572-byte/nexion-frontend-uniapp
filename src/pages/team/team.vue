@@ -620,8 +620,20 @@ const recoveryConfig = useConfig();
 useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
 useAutoRecovery({ failed: () => remoteApiEnabled && !!vrank.remoteError, retry: () => vrank.refreshCanonicalVRank() });
-useAutoRecovery({ failed: () => remoteApiEnabled && !!referralRewards.error && !referralRewards.loading, retry: () => referralRewards.refresh() });
-useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !recoveryConfig.loading, retry: () => recoveryConfig.load() });
+const inviteRulesOpen = () => inviteCard.value?.rulesOpen === true;
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!referralRewards.error && !referralRewards.loading,
+  retry: () => referralRewards.refresh(),
+  // Pull is locked while the rules sheet is open; keep reading every 30 s until it closes (03 §3.5.2).
+  repeatMs: 30_000, repeatWhile: inviteRulesOpen,
+});
+useAutoRecovery({
+  failed: () => recoveryConfig.configStatus === "failed" && !recoveryConfig.loading,
+  retry: () => recoveryConfig.recover(),
+  retryNotBefore: () => recoveryConfig.recoveryNotBefore(),
+  // Pull is locked while the rules sheet is open; keep reading every 30 s until it closes (03 §3.5.2).
+  repeatMs: 30_000, repeatWhile: inviteRulesOpen,
+});
 </script>
 
 <style scoped>

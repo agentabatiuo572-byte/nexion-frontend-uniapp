@@ -137,7 +137,8 @@ function openPoster() {
   posterOpen.value = true;
 }
 // Other invitation entries (rank, quota, leaderboard, referral campaign) open the poster.
-defineExpose({ openPoster });
+const rulesOpen = computed(() => detailOpen.value && detailMode.value === "rules");
+defineExpose({ openPoster, rulesOpen });
 
 
 let visible = false;

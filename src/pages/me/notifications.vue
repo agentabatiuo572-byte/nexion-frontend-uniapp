@@ -12,7 +12,7 @@
           <view class="message-heading-row">
             <text class="message-title" :class="{ 'message-title--hidden': !headerState.title }" :aria-hidden="!headerState.title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text>
             <view class="message-subtitle" role="status"><view v-if="center.totalUnread" class="message-status-dot" aria-hidden="true" /><text>{{ unreadLabel }}</text></view>
-            <view v-if="section === 'notifications' && notifs.unread > 0" class="message-button message-mark-all" role="button" :tabindex="headerState.title && !markingAll && !clearingRead ? 0 : -1" :aria-disabled="markingAll || clearingRead" :aria-label="t.notifs.markAll" @click="markAll"><text>{{ actionCopy.markAllShort }}</text></view>
+            <view v-if="canManageNotifications && notifs.unread > 0" class="message-button message-mark-all" role="button" :tabindex="headerState.title && !markingAll && !clearingRead ? 0 : -1" :aria-disabled="markingAll || clearingRead" :aria-label="t.notifs.markAll" @click="markAll"><text>{{ actionCopy.markAllShort }}</text></view>
           </view>
         </view>
       </view>
@@ -27,8 +27,8 @@
       <scroll-view :key="section" scroll-y class="message-scroll" :class="{ 'message-scroll--notifications': section === 'notifications' }" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
       <ServiceMessageList v-if="section === 'service'" />
       <view v-else class="notification-feed" :aria-busy="notifs.loading">
-        <view v-if="!notifs.loading && !notifs.error && notifs.nextCursor && filtered.length === 0" role="status" class="message-state"><text>{{ t.notifs.moreToCheck }}</text></view>
-        <EmptyState v-if="!notifs.loading && !notifs.error && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
+        <view v-if="!notifs.loading && !notifs.readFailedWithoutData && notifs.nextCursor && filtered.length === 0" role="status" class="message-state"><text>{{ t.notifs.moreToCheck }}</text></view>
+        <EmptyState v-if="!notifs.loading && !notifs.readFailedWithoutData && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
         <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
           <text v-if="index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts)" class="notification-date" role="heading" aria-level="2">{{ dateHeading(n.ts) }}</text>
           <view class="notification-row" role="button" tabindex="0" :aria-label="platformDisplayText(n.title)" :aria-expanded="directNotice(n) ? undefined : expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
@@ -38,13 +38,13 @@
           </view>
           <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ keepUnits(platformDisplayText(n.body)) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="16" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
         </view>
-        <view v-if="notifs.error && (notifs.hasRemoteSnapshot || notifs.items.length === 0)" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
-        <view v-if="notifs.loading && !filtered.length" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
-        <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loadingMore ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
+        <view v-if="notifs.readFailedWithoutData" data-testid="notification-error" class="message-state" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.reload" @click="notificationRecovery.retry()"><text>{{ t.ui.reload }}</text></view></view>
+        <view v-if="notifs.loading && !filtered.length && !notifs.readFailedWithoutData" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
+        <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="loadMoreNotifications()"><LiquidGlass :radius="22" /><text>{{ notifs.loadingMore ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
       </view>
       <view class="message-scroll-compensation" :style="{ height: headerCompensation + 'px' }" aria-hidden="true" />
       </scroll-view>
-      <view v-if="section === 'notifications'" class="notification-management">
+      <view v-if="canManageNotifications" class="notification-management">
         <NxButton variant="secondary" size="medium" :disabled="clearingRead || markingAll || notifs.loading" @click="confirmClearRead">{{ actionCopy.clearRead }}</NxButton>
       </view>
     </view>
@@ -53,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { displayTimestamp, formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
@@ -78,7 +79,7 @@ import { useApp } from "@/store/app";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { isDirectNotificationSummary } from "@/lib/notification-summary";
 import { notificationActionsCopy } from "@/i18n/notification-actions";
-import { confirm, useUI } from "@/store/ui";
+import { confirm, toast, useUI } from "@/store/ui";
 import { uiLocale } from "@/i18n";
 
 const t = useT();
@@ -102,7 +103,16 @@ function isCurrentIntent(intent: ReturnType<typeof captureIntent>) {
 // store 保留机器码(SESSION_EXPIRED / NOTIFICATION_UNAVAILABLE / 服务端 envelope 原文…),
 // 视图侧统一映射成用户文案 —— 裸插值会把工程码上屏,违反「页面文案禁止错误码」。
 // 写法与 risk-disclosure.vue:108 同源。
-const notifsErrorText = computed(() => notifs.error ? t.value.notifs.loadFailed : "");
+const notifsErrorText = computed(() => notifs.readFailedWithoutData ? t.value.notifs.loadFailed : "");
+watch(() => notifs.commandError, error => {
+  if (error && pageVisible.value) toast.error(t.value.notifs.loadFailed);
+}, { flush: "sync" });
+
+async function loadMoreNotifications() {
+  const intent = captureIntent();
+  if (!isCurrentIntent(intent)) return;
+  if (await notifs.loadMoreRemote() === false && isCurrentIntent(intent)) toast.error(t.value.notifs.loadFailed);
+}
 
 const center = useMessageDrawer();
 const conversations = useConversations();
@@ -116,22 +126,26 @@ const section = computed({ get: () => center.section, set: (value: MessageSectio
   if (!sectionAccountWasBound && sectionEntryAllowed) initialSection = value;
   preserveSectionInH5();
 } });
-const summaryRecovery = computed(() => ({
-  // The notification row also carries command outcomes; only a failed read
-  // without a snapshot belongs to this automatic summary recovery.
-  visible: !!conversations.error || conversations.categoryAvailabilityStatus === "failed"
-    || (!!notifs.error && !notifs.hasRemoteSnapshot),
-  busy: center.loading || conversations.categoryLoading,
-}));
-async function retrySummary() {
-  if (!pageVisible.value || disposed || summaryRecovery.value.busy) return;
-  await center.refresh();
-}
-useAutoRecovery({
-  // The service list owns this same refresh while its tab is shown.
-  failed: () => remoteApiEnabled && section.value !== "service" && summaryRecovery.value.visible && !summaryRecovery.value.busy,
-  retry: retrySummary,
+const notificationRecovery = useAutoRecovery({
+  failed: () => remoteApiEnabled && !!notifs.readError,
+  retry: () => notifs.loading ? Promise.resolve() : notifs.refreshRemote(),
+  // The fixed message feed has its own scroller outside the chassis pull surface.
+  repeatMs: 30_000,
 });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!center.serviceReadError && !conversations.loading && !conversations.categoryLoading,
+  retry: () => center.refreshService(),
+  repeatMs: 30_000,
+});
+function refreshHealthyNotifications() {
+  if (remoteApiEnabled && !notifs.loading && !notifs.readError) {
+    return notifs.refreshRemote();
+  }
+}
+function refreshHealthyService() {
+  if (!center.serviceReadError) return center.refreshService();
+}
+let releaseActiveRefresh = () => {};
 function preserveSectionInH5() {
   if (!sectionLoaded || disposed || !pageVisible.value || typeof window === "undefined"
     || typeof window.history?.replaceState !== "function") return;
@@ -157,7 +171,14 @@ const sectionOptions = computed(() => [
   { value: "notifications", label: t.value.notifs.notificationsTab, hasUnread: notifs.unread > 0 },
   { value: "service", label: t.value.notifs.serviceTab, hasUnread: center.serviceUnread > 0 },
 ]);
-const unreadLabel = computed(() => center.error ? t.value.notifs.unreadUnavailable : center.totalUnread > 0 ? fmt(t.value.notifs.unreadCount, { n: center.totalUnread }) : center.loading ? t.value.notifs.unreadUnavailable : t.value.notifs.allCaughtUp);
+const unreadLabel = computed(() => {
+  if (notifs.readFailedWithoutData || center.serviceReadError) {
+    return t.value.notifs.unreadUnavailable;
+  }
+  if (center.totalUnread > 0) return fmt(t.value.notifs.unreadCount, { n: center.totalUnread });
+  const unreadLoading = conversations.loading || (notifs.loading && !notifs.hasRemoteSnapshot);
+  return unreadLoading ? t.value.notifs.unreadUnavailable : t.value.notifs.allCaughtUp;
+});
 type Filter = "all" | NotificationCategory;
 const filter = ref<Filter>("all");
 const filterIds: Filter[] = ["all", "finance", "device", "team", "rewards", "system"];
@@ -184,17 +205,18 @@ function toggle(n: Notification) {
   void notifs.markRead(n.id);
   expandedId.value = expandedId.value === n.id ? null : n.id;
 }
+const canManageNotifications = computed(() => section.value === "notifications" && !notifs.readFailedWithoutData);
 const markingAll = ref(false);
-async function markAll() { if (markingAll.value || clearingRead.value) return; markingAll.value = true; try { await notifs.markAllRead(); } finally { markingAll.value = false; } }
+async function markAll() { if (!canManageNotifications.value || markingAll.value || clearingRead.value) return; markingAll.value = true; try { await notifs.markAllRead(); } finally { markingAll.value = false; } }
 async function confirmClearRead() {
   const intent = captureIntent();
-  if (!isCurrentIntent(intent) || clearingRead.value || markingAll.value || notifs.loading) return;
+  if (!isCurrentIntent(intent) || !canManageNotifications.value || clearingRead.value || markingAll.value || notifs.loading) return;
   clearingRead.value = true;
   try {
     const copy = actionCopy.value;
     const accepted = await confirm({ owner: confirmOwner, title: copy.title, message: copy.message,
       confirmLabel: copy.confirm, cancelLabel: copy.cancel, icon: 'warn', danger: true });
-    if (accepted && isCurrentIntent(intent)) await notifs.clearRead();
+    if (accepted && isCurrentIntent(intent) && canManageNotifications.value) await notifs.clearRead();
   } finally {
     if (isCurrentIntent(intent)) clearingRead.value = false;
   }
@@ -213,7 +235,10 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextE
   }
   preserveSectionInH5();
   expandedId.value = null; filter.value = "all"; resetHeader();
-  if (!disposed && pageVisible.value && foregroundReadAllowed()) void center.refresh();
+  if (!disposed && pageVisible.value && foregroundReadAllowed()) {
+    void refreshHealthyNotifications();
+    void refreshHealthyService();
+  }
 });
 
 function dateHeading(ts: number): string {
@@ -298,18 +323,21 @@ function invalidatePendingIntents() {
 }
 function invalidatePage() {
   pageVisible.value = false;
+  releaseActiveRefresh();
   invalidatePendingIntents();
 }
 watch(() => [app.accountKey, app.accountBindingEpoch], invalidatePendingIntents, { flush: "sync" });
 onShow(() => {
   if (disposed) return;
   pageVisible.value = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshHealthyNotifications, "pages/me/notifications");
   preserveSectionInH5();
 });
 watch([pageVisible, foregroundReadAllowed], ([visible, allowed], [wasVisible]) => {
   if (disposed || !visible || !allowed) return;
-  if (!wasVisible || section.value === "service") void center.refresh();
-  else if (!notifs.loading) void notifs.refreshRemote();
+  void refreshHealthyNotifications();
+  if (!wasVisible || section.value === "service") void refreshHealthyService();
 });
 onHide(invalidatePage);
 onUnmounted(() => { disposed = true; invalidatePage(); });

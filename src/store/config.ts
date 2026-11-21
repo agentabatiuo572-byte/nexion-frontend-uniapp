@@ -7,6 +7,8 @@ import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
 import { apiRuntimeConfig, apiRuntimeClientOrigin, platformConfigApi, remoteApiEnabled } from "@/api/runtime";
 import { parseInterfaceLanguages, type PlatformPublicStatsAuthority } from "@/api/platform-config-api";
+import { ApiError } from "@/api/errors";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { LOCALES, type UiLocale } from "@/i18n";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 
@@ -135,6 +137,7 @@ export const useConfig = defineStore("config", () => {
   };
   const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
   const publicStatsAuthority = ref<PlatformPublicStatsAuthority | null>(null);
+  const transientFailure = ref(false);
   const configStatus = ref<"idle" | "loading" | "ready" | "failed">(remoteApiEnabled ? "idle" : "ready");
   // Language eligibility alone is cached, without restoring platform readiness, version or timers.
   const interfaceLanguages = ref<readonly UiLocale[] | null>(restoreInterfaceLanguages(interfaceLanguagesCacheKey));
@@ -187,6 +190,7 @@ export const useConfig = defineStore("config", () => {
   let invalidation = 0;
   let nextCheckAt = 0;
   let retryAt = 0;
+  let retryAfterAt = 0;
   const guestSlot = Math.floor(Math.random() * CONFIG_REFRESH_MS);
   let refreshSlot = guestSlot;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -224,6 +228,7 @@ export const useConfig = defineStore("config", () => {
     clearRemotePlatformAuthority();
     interfaceLanguages.value = null;
     configStatus.value = "failed";
+    transientFailure.value = false;
   }
   function currentClient(): boolean {
     if (originKey() !== clientOrigin && !environmentInvalidated) invalidateEnvironment();
@@ -261,11 +266,12 @@ export const useConfig = defineStore("config", () => {
     scheduleRefresh();
   }
 
-  function load(force = false): Promise<void> {
+  function load(force = false, recovering = false): Promise<void> {
     if (!currentClient()) return Promise.resolve();
     if (currentLoad) return currentLoad;
     const now = Date.now();
-    if (remoteApiEnabled && (!foregroundReadAllowed() || (!force && (now < retryAt || now < nextCheckAt)))) {
+    if (remoteApiEnabled && (!foregroundReadAllowed() || now < retryAfterAt
+      || (!force && (now < nextCheckAt || (!recovering && now < retryAt))))) {
       return Promise.resolve();
     }
     invalidateBeforePassiveTabRead("config");
@@ -326,14 +332,20 @@ export const useConfig = defineStore("config", () => {
         snapshotVersion = version;
         nextCheckAt = nextSlot(Date.now());
         retryAt = 0;
+        retryAfterAt = 0;
+        transientFailure.value = false;
         syncFailed.value = false;
         if (!current()) return;
         configStatus.value = "ready";
-      } catch {
+      } catch (error) {
         if (!current()) return;
         snapshotVersion = null;
         nextCheckAt = 0;
-        retryAt = Date.now() + CONFIG_RETRY_MS;
+        const failedAt = Date.now();
+        const retryAfterMs = error instanceof ApiError ? error.retryAfterMs ?? 0 : 0;
+        retryAfterAt = failedAt + retryAfterMs;
+        retryAt = failedAt + Math.max(CONFIG_RETRY_MS, retryAfterMs);
+        transientFailure.value = isTransientReadFailure(error);
         clearRemotePlatformAuthority();
         if (!current()) return;
         configStatus.value = "failed";
@@ -395,8 +407,9 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, publicStatsAuthority, configStatus, interfaceLanguages, offeredLocales, syncFailed, loading,
-    load, refresh: () => load(true), revalidate, ensureLoaded, startRefresh, invalidate,
+  return { config, publicStatsAuthority, configStatus, transientFailure, interfaceLanguages, offeredLocales, syncFailed, loading,
+    load, refresh: () => load(true), recover: () => load(false, true), recoveryNotBefore: () => retryAfterAt,
+    revalidate, ensureLoaded, startRefresh, invalidate,
     feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 

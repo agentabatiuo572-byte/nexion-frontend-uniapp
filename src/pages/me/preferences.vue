@@ -7,13 +7,6 @@
   <AppChassis active="me">
     <view class="message-family" style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" plain />
-      <view v-if="prefs.error" class="mx-4 nx-inline-recovery" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
-        <text class="nx-inline-recovery__copy">{{ preferenceError }}</text>
-        <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
-
       <!-- Sound -->
       <view class="mx-4">
         <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
@@ -29,7 +22,7 @@
       <!-- Notification kinds -->
       <view class="mx-4" style="margin-top: 20px">
         <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
-        <text v-if="!prefs.remoteReady && !prefs.error" class="block" role="status" aria-live="polite">{{ w.loading }}</text>
+        <text v-if="!prefs.remoteReady" class="block" role="status" aria-live="polite">{{ prefs.readFailedWithoutData ? w.notifUnavailable : w.loading }}</text>
         <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
@@ -38,7 +31,7 @@
             :value="prefs.remoteReady ? prefs.notifPrefs[k] : null"
             :unknown-label="t.uiChrome.unavailable"
             :last="i === notifKinds.length - 1"
-            @toggle="prefs.toggleNotifKind(k)"
+            @toggle="saveNotificationPreference(k)"
           >
             <template #icon>
               <view :style="dotStyle(k)" />
@@ -52,20 +45,55 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onUnmounted, type CSSProperties } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
+import { toast } from "@/store/ui";
 
 const t = useT();
 const w = computed(() => t.value.preferences);
 const prefs = usePreferences();
-const preferenceError = computed(() => {
-  const labels = t.value.preferences as typeof t.value.preferences & Record<"updateFailed" | "unavailable", string>;
-  return prefs.error === "updateFailed" ? labels.updateFailed : labels.unavailable;
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!prefs.readError,
+  retry: () => prefs.refreshRemote(),
 });
+function refreshHealthyPreferences() {
+  if (remoteApiEnabled && !prefs.readError && !prefs.loading) return prefs.refreshRemote();
+}
+let pageVisit = 0;
+let pageVisible = false;
+let releaseActiveRefresh = () => {};
+onShow(() => {
+  pageVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshHealthyPreferences, "pages/me/preferences");
+  void refreshHealthyPreferences();
+});
+function leavePreferences() {
+  pageVisible = false;
+  pageVisit++;
+  releaseActiveRefresh();
+}
+onHide(leavePreferences);
+onUnmounted(leavePreferences);
+
+async function saveNotificationPreference(kind: NotifKind) {
+  if (!pageVisible || !prefs.remoteReady) return;
+  const visit = pageVisit;
+  const account = remoteAccountScope.snapshot();
+  const result = await prefs.toggleNotifKind(kind);
+  if (result === "failed" && pageVisible && visit === pageVisit && remoteAccountScope.isCurrent(account)) {
+    toast.error(t.value.preferences.updateFailed);
+  }
+}
 
 // Mandatory kinds cannot be switched off, so they are not listed.
 const notifKinds = (["commission", "team", "market", "genesis", "system"] as NotifKind[]).filter(k => !isMandatoryNotifKind(k));
