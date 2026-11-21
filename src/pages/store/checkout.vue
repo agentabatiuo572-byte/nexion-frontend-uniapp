@@ -746,6 +746,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       return;
     }
     if (eligibility === "outOfStock") {
+      eligibilityCatalogUnconfirmed.value = false;
       if (resumeSessionId && resumePendingSession(resumeSessionId)) return;
       ordinaryCheckoutInitialized.value = true;
       return;
