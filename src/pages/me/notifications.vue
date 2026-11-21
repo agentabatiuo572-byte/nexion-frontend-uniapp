@@ -12,7 +12,7 @@
           <view class="message-heading-row">
             <text class="message-title" :class="{ 'message-title--hidden': !headerState.title }" :aria-hidden="!headerState.title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text>
             <view class="message-subtitle" role="status"><view v-if="center.totalUnread" class="message-status-dot" aria-hidden="true" /><text>{{ unreadLabel }}</text></view>
-            <view v-if="section === 'notifications' && notifs.unread > 0" class="message-button message-mark-all" role="button" :tabindex="headerState.title && !markingAll && !clearingRead ? 0 : -1" :aria-disabled="markingAll || clearingRead" :aria-label="t.notifs.markAll" @click="markAll"><text>{{ actionCopy.markAllShort }}</text></view>
+            <view v-if="canManageNotifications && notifs.unread > 0" class="message-button message-mark-all" role="button" :tabindex="headerState.title && !markingAll && !clearingRead ? 0 : -1" :aria-disabled="markingAll || clearingRead" :aria-label="t.notifs.markAll" @click="markAll"><text>{{ actionCopy.markAllShort }}</text></view>
           </view>
         </view>
       </view>
@@ -44,7 +44,7 @@
       </view>
       <view class="message-scroll-compensation" :style="{ height: headerCompensation + 'px' }" aria-hidden="true" />
       </scroll-view>
-      <view v-if="section === 'notifications'" class="notification-management">
+      <view v-if="canManageNotifications" class="notification-management">
         <NxButton variant="secondary" size="medium" :disabled="clearingRead || markingAll || notifs.loading" @click="confirmClearRead">{{ actionCopy.clearRead }}</NxButton>
       </view>
     </view>
@@ -203,17 +203,18 @@ function toggle(n: Notification) {
   void notifs.markRead(n.id);
   expandedId.value = expandedId.value === n.id ? null : n.id;
 }
+const canManageNotifications = computed(() => section.value === "notifications" && !notifs.readFailedWithoutData);
 const markingAll = ref(false);
-async function markAll() { if (markingAll.value || clearingRead.value) return; markingAll.value = true; try { await notifs.markAllRead(); } finally { markingAll.value = false; } }
+async function markAll() { if (!canManageNotifications.value || markingAll.value || clearingRead.value) return; markingAll.value = true; try { await notifs.markAllRead(); } finally { markingAll.value = false; } }
 async function confirmClearRead() {
   const intent = captureIntent();
-  if (!isCurrentIntent(intent) || clearingRead.value || markingAll.value || notifs.loading) return;
+  if (!isCurrentIntent(intent) || !canManageNotifications.value || clearingRead.value || markingAll.value || notifs.loading) return;
   clearingRead.value = true;
   try {
     const copy = actionCopy.value;
     const accepted = await confirm({ owner: confirmOwner, title: copy.title, message: copy.message,
       confirmLabel: copy.confirm, cancelLabel: copy.cancel, icon: 'warn', danger: true });
-    if (accepted && isCurrentIntent(intent)) await notifs.clearRead();
+    if (accepted && isCurrentIntent(intent) && canManageNotifications.value) await notifs.clearRead();
   } finally {
     if (isCurrentIntent(intent)) clearingRead.value = false;
   }
