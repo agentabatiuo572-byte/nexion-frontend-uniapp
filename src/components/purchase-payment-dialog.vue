@@ -250,7 +250,7 @@ import { purchasePaymentCopy, paymentRowStatus, fillCopy as fill } from '@/lib/p
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
-import { hostedPaymentUrlPattern, validateHostedPaymentUrl } from '@/lib/hosted-payment';
+import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import { toast } from '@/store/ui';
 import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
@@ -446,20 +446,95 @@ useDialogA11y(sheetOpen, '#pp-sheet', payment.close, true, 3);
 useDialogA11y(computed(() => pageOpen.value && !s.cashier && !s.notice), '#pp-page', leavePage, true, 3);
 useDialogA11y(computed(() => active.value && s.open && s.cashier), '.pp-cashier', payment.closeCashier, true, 4);
 
+const visibleCashierUrl = computed(() => active.value && s.open && s.cashier ? cashierUrl.value : '');
+const cashierLoaded = ref(false);
+const canSaveCashierImage = computed(() => !!visibleCashierUrl.value && cashierLoaded.value);
+type CashierImageResult = 'saved' | 'permission-denied' | 'failed' | 'unavailable';
+
+async function saveCashierImage(): Promise<CashierImageResult> {
+  // #ifdef APP-PLUS
+  const view = cashierView;
+  const Bitmap = plus.nativeObj.Bitmap;
+  if (!view || !Bitmap || !canSaveCashierImage.value || savingCashierImage) return 'unavailable';
+  savingCashierImage = true;
+  let bitmap: PlusNativeObjBitmap | undefined;
+  const id = `uvel-cashier-${Date.now()}`;
+  const path = `_doc/${id}.png`;
+  try {
+    if (!await requestCashierWritePermission()) return 'permission-denied';
+    if (cashierView !== view || !canSaveCashierImage.value) return 'unavailable';
+    const capture = bitmap = new Bitmap(id);
+    await new Promise<void>((resolve, reject) => view.draw(capture, resolve, reject, { check: true }));
+    await new Promise<void>((resolve, reject) => capture.save(path, { format: 'png' }, () => resolve(), reject));
+    try {
+      await new Promise<void>((resolve, reject) => plus.gallery.save(path, () => resolve(), reject));
+    } catch {
+      // HTML5+ accepts the permission name as a string, though its declaration types the enum object.
+      const galleryPermission = 'GALLERY' as unknown as PlusNavigatorPermissionNames;
+      return plus.navigator.checkPermission(galleryPermission) === 'denied' ? 'permission-denied' : 'failed';
+    }
+    return 'saved';
+  } catch {
+    return 'failed';
+  } finally {
+    savingCashierImage = false;
+    if (bitmap) {
+      bitmap.clear();
+      plus.io.resolveLocalFileSystemURL(path, entry => entry.remove(), () => {});
+    }
+  }
+  // #endif
+  // #ifndef APP-PLUS
+  return 'unavailable';
+  // #endif
+}
+
+defineExpose({ canSaveCashierImage, saveCashierImage });
+
 // #ifdef APP-PLUS
-// The bank page is a native child webview under the UVEL bar; links it does not own (bank apps) open outside.
-type PlusWebview = { close(): void; overrideUrlLoading(options: { mode: string; match: string }, callback: (event: { url: string }) => void): void };
-type PlusRuntime = { webview: { create(url: string, id: string, styles: Record<string, string>): PlusWebview; currentWebview(): { append(view: PlusWebview): void } }; runtime: { openURL(url: string): void } };
-let cashierView: PlusWebview | null = null;
-watch(() => active.value && s.open && s.cashier ? cashierUrl.value : '', url => {
-  cashierView?.close(); cashierView = null;
+const cashierHttpsPattern = '^[Hh][Tt][Tt][Pp][Ss]://.*$';
+const cashierHttps = new RegExp(cashierHttpsPattern);
+let cashierView: PlusWebviewWebviewObject | null = null;
+let savingCashierImage = false;
+
+async function requestCashierWritePermission(): Promise<boolean> {
+  if (plus.os.name !== 'Android' || plus.android.getAttribute('android.os.Build$VERSION', 'SDK_INT') >= 29) return true;
+  const permission = 'android.permission.WRITE_EXTERNAL_STORAGE';
+  return new Promise((resolve, reject) => {
+    plus.android.requestPermissions([permission], result => resolve(result.granted.includes(permission)), reject);
+  });
+}
+
+function closeNativeCashier() {
+  const view = cashierView;
+  cashierView = null;
+  cashierLoaded.value = false;
+  view?.close();
+}
+
+watch(visibleCashierUrl, url => {
+  closeNativeCashier();
   if (!url) return;
-  const plus = (globalThis as unknown as { plus: PlusRuntime }).plus;
-  cashierView = plus.webview.create(url, `uvel-purchase-cashier-${Date.now()}`, { top: `${statusBar + 82}px`, bottom: `${cashierFootPad + CASHIER_FOOT}px` });
-  cashierView.overrideUrlLoading({ mode: 'allow', match: hostedPaymentUrlPattern }, event => plus.runtime.openURL(event.url));
-  plus.webview.currentWebview().append(cashierView);
+  const view = plus.webview.create('', `uvel-purchase-cashier-${Date.now()}`, {
+    top: `${statusBar + 82}px`, bottom: `${cashierFootPad + CASHIER_FOOT}px`, plusrequire: 'none',
+  });
+  cashierView = view;
+  // The hosted URL was validated at entry. The cashier may then navigate to any HTTPS page.
+  view.overrideUrlLoading({ mode: 'allow', match: cashierHttpsPattern }, (event: { url: string }) => {
+    if (cashierView === view && !cashierHttps.test(event.url)) plus.runtime.openURL(event.url);
+  });
+  view.setJsFile('_www/static/app/cashier-navigation.js');
+  function setLoaded(loaded: boolean) {
+    if (cashierView === view) cashierLoaded.value = loaded;
+  }
+  view.addEventListener('loading', () => setLoaded(false));
+  view.addEventListener('error', () => setLoaded(false));
+  view.addEventListener('close', () => setLoaded(false));
+  view.addEventListener('loaded', () => setLoaded(cashierHttps.test(view.getURL())));
+  plus.webview.currentWebview().append(view);
+  view.loadURL(url);
 });
-onUnmounted(() => { cashierView?.close(); cashierView = null; });
+onUnmounted(closeNativeCashier);
 // #endif
 
 // Leaving for a wallet or bank app keeps the payment open and only pauses reads; navigating away closes it.

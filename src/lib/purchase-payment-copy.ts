@@ -1,7 +1,18 @@
 import { uiLocale, type UiLocale } from '@/i18n';
 
+const enCashierImageCopy = {
+  cashierSaveQr: 'Save QR code to Photos',
+  cashierImageSaved: 'Saved to Photos',
+  cashierImageSaveFailed: 'Couldn’t save the payment QR code',
+  cashierAlbumPermissionDenied: 'Allow photo access in Settings to save the QR code',
+};
+
 // Purchase payment copy. Never name a payment provider or its domain in the App.
 const zh = {
+  cashierSaveQr: '保存二维码到相册',
+  cashierImageSaved: '已保存到相册',
+  cashierImageSaveFailed: '无法保存付款二维码',
+  cashierAlbumPermissionDenied: '请在系统设置中允许相册权限后再保存',
   checkingOriginalPayment: "正在确认原付款单…",
   originalPaymentNotFoundRetry: "原付款请求未送达。点「重新付款」按原请求重新发送。",
   originalPaymentUnavailableTitle: "查不到原付款记录",
@@ -54,6 +65,7 @@ const zh = {
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
 const en: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Confirming the original payment…",
   originalPaymentNotFoundRetry: "The original request did not arrive. Tap Pay again to resend it.",
   originalPaymentUnavailableTitle: "Original payment not found",
@@ -106,6 +118,7 @@ const en: typeof zh = {
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Đang xác nhận khoản thanh toán ban đầu…",
   originalPaymentNotFoundRetry: "Yêu cầu ban đầu chưa đến được hệ thống. Nhấn “Thanh toán lại” để gửi lại.",
   originalPaymentUnavailableTitle: "Không tìm thấy khoản thanh toán ban đầu",
@@ -158,6 +171,7 @@ const vi: typeof zh = {
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Mengonfirmasi pembayaran awal…",
   originalPaymentNotFoundRetry: "Permintaan awal tidak terkirim. Ketuk “Bayar lagi” untuk mengirim ulang.",
   originalPaymentUnavailableTitle: "Pembayaran awal tidak ditemukan",
@@ -210,6 +224,7 @@ const id: typeof zh = {
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Mengesahkan pembayaran asal…",
   originalPaymentNotFoundRetry: "Permintaan asal tidak sampai. Ketik “Bayar semula” untuk menghantarnya semula.",
   originalPaymentUnavailableTitle: "Pembayaran asal tidak ditemui",
@@ -262,6 +277,7 @@ const ms: typeof zh = {
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Kinukumpirma ang orihinal na bayad…",
   originalPaymentNotFoundRetry: "Hindi dumating ang orihinal na request. I-tap ang “Magbayad ulit” para ipadala ito ulit.",
   originalPaymentUnavailableTitle: "Hindi makita ang orihinal na bayad",
@@ -314,6 +330,7 @@ const fil: typeof zh = {
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Подтверждаем исходный платёж…",
   originalPaymentNotFoundRetry: "Исходный запрос не дошёл. Нажмите «Оплатить снова», чтобы отправить его повторно.",
   originalPaymentUnavailableTitle: "Исходный платёж не найден",
@@ -366,6 +383,7 @@ const ru: typeof zh = {
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
 const kk: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Бастапқы төлем расталуда…",
   originalPaymentNotFoundRetry: "Бастапқы сұраныс жетпеді. Қайта жіберу үшін «Қайта төлеу» түймесін басыңыз.",
   originalPaymentUnavailableTitle: "Бастапқы төлем табылмады",
@@ -418,6 +436,7 @@ const kk: typeof zh = {
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
+  ...enCashierImageCopy,
   checkingOriginalPayment: "Asl toʻlov tasdiqlanmoqda…",
   originalPaymentNotFoundRetry: "Asl soʻrov yetib bormadi. Qayta yuborish uchun «Qayta toʻlash» tugmasini bosing.",
   originalPaymentUnavailableTitle: "Asl toʻlov topilmadi",
