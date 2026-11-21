@@ -3266,7 +3266,7 @@ export const ms: Messages = {
     timeDaysAgo: "{n} hari lalu",
     deleteAccount: "Mohon pemadaman akaun",
     deleteAccountHint: "Selesaikan baki, staking dan pesanan sebelum pemadaman. Dana tidak dilucutkan kerana pemadaman. Rekod kewangan dan keselamatan yang wajib disimpan menurut undang-undang tidak dipadam serta-merta.",
-    deleteAccountPending: "Permohonan pemadaman akaun telah dihantar. Jangan hantar semula.",
+    deleteAccountPending: "Permohonan pemadaman akaun telah dihantar dan sedang disemak.",
     deleteAccountConfirm: "Hantar permohonan pemadaman akaun UVEL?\n\nAnda akan dilog keluar. Semak status permohonan untuk melihat bila ia selesai.",
     deleteAccountSettlementRequirements: "Sebelum pemadaman boleh diselesaikan:\n• Baki USDT dan UVT yang tersedia mestilah sifar, tanpa dana dibekukan untuk pengeluaran.\n• Tiada pengeluaran, deposit atau pertukaran sedang diproses.\n• Semua staking dan pesanan peranti telah tamat.\n\nDana tidak dilucutkan kerana pemadaman. Dana atau pesanan yang belum selesai akan menghalang pemadaman. Selepas selesai, batalkan permohonan asal dan hantar permohonan baharu.",
     deleteAccountBlockedByBalance: "Tersedia: {usdt}\u00A0USDT dan {nex}\u00A0UVT. Buat pengeluaran atau pertukaran sendiri jika tersedia. Jika amaun terlalu kecil untuk dikeluarkan atau ditukar, hubungi sokongan untuk bantuan menyelesaikan baki sebelum meneruskan pemadaman. Dana tidak dilucutkan kerana pemadaman.",

@@ -2841,7 +2841,7 @@ autoDetect: "自动识别即将推出",
     timeDaysAgo: "{n} 天前",
     deleteAccount: "提交账号注销申请",
     deleteAccountHint: "注销前须结清余额、质押及订单。余额不会因注销作废。注销不会立即删除依法需保留的财务与安全记录。",
-    deleteAccountPending: "注销申请已提交，请勿重复提交。",
+    deleteAccountPending: "注销申请已提交，正在审核。",
     deleteAccountConfirm:
       "确定提交 UVEL 账号注销申请?\n\n提交后将退出登录；最终清理状态以注销申请进度为准。",
     deleteAccountSettlementRequirements: "完成注销前须满足：\n• USDT、UVT 可用余额均为 0，且无提现冻结金额。\n• 没有处理中的提现、充值或兑换。\n• 质押和设备订单均已结束。\n\n余额不会因注销作废。未结清会阻止完成注销；结清后请取消原申请再重新提交。",

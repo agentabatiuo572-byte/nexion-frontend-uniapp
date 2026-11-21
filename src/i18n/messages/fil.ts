@@ -3266,7 +3266,7 @@ export const fil: Messages = {
     timeDaysAgo: "{n}d nakaraan",
     deleteAccount: "Humiling na i-delete ang account",
     deleteAccountHint: "Ayusin muna ang mga balanse, staking at order bago mag-delete. Hindi mawawala ang pondo dahil sa pag-delete. Hindi agad mabubura ang mga rekord sa pananalapi at seguridad na kailangang itago ayon sa batas.",
-    deleteAccountPending: "Naipadala na ang kahilingan sa pagbura ng account. Huwag itong ipadala ulit.",
+    deleteAccountPending: "Naipadala na ang kahilingan sa pagbura ng account at sinusuri na.",
     deleteAccountConfirm: "Magsumite ng request na i-delete ang UVEL account?\n\nMala-log out ka. Tingnan ang status ng request para sa pagkumpleto.",
     deleteAccountSettlementRequirements: "Bago makumpleto ang pag-delete:\n• Dapat zero ang available na USDT at UVT, at walang pondong naka-freeze para sa pag-withdraw.\n• Walang withdrawal, deposit o exchange na pinoproseso.\n• Tapos na ang lahat ng staking at order ng device.\n\nHindi mawawala ang pondo dahil sa pag-delete. Hahadlang sa pagkumpleto ang hindi pa naayos na pondo o order. Kapag naayos na, kanselahin ang dating request at magsumite ng bago.",
     deleteAccountBlockedByBalance: "Available: {usdt}\u00A0USDT at {nex}\u00A0UVT. Mag-withdraw o mag-exchange muna kung maaari. Kung masyadong maliit ang halaga para ma-withdraw o ma-exchange, makipag-ugnayan sa suporta para matulungang ayusin ang balanse bago magpatuloy sa pag-delete. Hindi mawawala ang pondo dahil sa pag-delete.",
