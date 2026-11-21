@@ -681,7 +681,6 @@ async function loadMoreSessions(): Promise<void> {
     securityPresentation.value = { ...remoteSecurity.value, sessions: [...remoteSecurity.value.sessions] };
   } catch (cause) {
     if (isCurrentSecurityRequest(pageScope, scope, accountKey) && remoteSecurity.value === snapshot) {
-      securityPresentation.value = null;
       if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
       toast.error(securityErrorMessage(cause));
     }
