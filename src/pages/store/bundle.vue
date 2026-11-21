@@ -21,7 +21,7 @@
 -->
 <template>
   <AppChassis active="store">
-    <PromotionBundle v-if="promotionActivityId" :key="promotionActivityId" :activity-id="promotionActivityId" :initial-items="promotionInitialItems" />
+    <PromotionBundle v-if="promotionActivityId" :key="promotionActivityId" ref="promotionBundle" :activity-id="promotionActivityId" :initial-items="promotionInitialItems" />
     <template v-else>
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
@@ -179,6 +179,16 @@
     <!-- Page main action in the shared bottom action bar (04 §4.0): a lone button floats; the
          disabled reason sits above the button in the tray. -->
     <template #pageFixed>
+      <!-- Activity bundle: the quote step is a plain text button, the purchase the one primary; the reason the primary is
+           disabled sits above both (03 §3.1, 04 §4.0). Signed out, signing in is the only action. -->
+      <view v-if="promotionActivityId && promotionBundle?.footer" class="promotion-bar nx-glass-bar">
+        <text v-if="promotionBundle.footer.note" class="nx-tray-note" role="status">{{ promotionBundle.footer.note }}</text>
+        <template v-if="promotionBundle.footer.signedIn">
+          <view class="promotion-bar__text nx-tray-text" role="button" :tabindex="promotionBundle.footer.canQuote ? 0 : -1" :aria-disabled="!promotionBundle.footer.canQuote" @click="promotionBundle.footer.quote" @keydown="activate($event, promotionBundle.footer.quote)"><text>{{ t.promotion.quote }}</text></view>
+          <view class="promotion-bar__cta" role="button" :tabindex="promotionBundle.footer.canContinue ? 0 : -1" :aria-disabled="!promotionBundle.footer.canContinue" @click="promotionBundle.footer.continue" @keydown="activate($event, promotionBundle.footer.continue)"><text>{{ t.promotion.continue }}</text><NxIcon name="arrow-right" :size="20" /></view>
+        </template>
+        <view v-else class="promotion-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
+      </view>
       <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure && products.length > 0" class="bundle-bar nx-glass-bar">
         <text v-if="checkoutUnavailable && checkoutHint" class="nx-tray-note">{{ checkoutHint }}</text>
         <view
@@ -257,6 +267,7 @@ const phase = useProductPhase();
 const app = useApp();
 const promotionActivityId=ref('');
 const promotionInitialItems=ref<EntryItem[]>([]);
+const promotionBundle=ref<InstanceType<typeof PromotionBundle>|null>(null);
 const orders = useOrders();
 const pending = usePendingCheckout();
 
@@ -1046,9 +1057,21 @@ function rowValueStyle(tint?: string, big = false): CSSProperties {
 .bundle-bar-space { visibility: hidden; padding: 0 32px 22px; }
 .bundle-bar-space--tray { padding-bottom: 46px; }
 .bundle-bar-space__note { display: block; padding-top: 4px; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: anywhere; text-wrap: pretty; }
+.promotion-bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; align-items: center; animation: bundle-bar-in .42s cubic-bezier(.16,1,.3,1) .2s both; }
+.promotion-bar .nx-tray-note { flex: 1 1 100%; }
+/* Each button keeps its label on one line; when both do not fit one row they stack full width (03 §3.6.1). */
+.promotion-bar__text, .promotion-bar__cta { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; min-height: 48px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
+.promotion-bar__text { padding: 0 12px; }
+.promotion-bar__cta { padding: 0 20px; background: var(--v5-brand); color: var(--v5-on-brand); }
+.promotion-bar :deep(uni-text), .promotion-bar :deep(text) { white-space: nowrap; }
+.promotion-bar .nx-tray-note :deep(uni-text), .promotion-bar .nx-tray-note { white-space: normal; }
+.promotion-bar__text[aria-disabled="false"]:active { opacity: .6; }
+.promotion-bar__cta[aria-disabled="false"]:active, .promotion-bar__cta:not([aria-disabled]):active { transform: scale(.98); }
+.promotion-bar__text:focus-visible, .promotion-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 @keyframes bundle-bar-in { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .bundle-bar { animation: none; }
+  .bundle-bar, .promotion-bar { animation: none; }
+  .promotion-bar__cta:active { transform: none; }
   .bundle-bar__cta[aria-disabled="false"]:active { transform: none; }
 }
 </style>
