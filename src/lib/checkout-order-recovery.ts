@@ -25,22 +25,31 @@ export function rememberCheckoutOrder(accountKey: string, pointer: Pointer): voi
 export function forgetCheckoutOrder(accountKey: string, productNo: string, orderNo: string): void {
   const row = readAccountRow<Row>(KEY, accountKey);
   if (row?.orders?.[productNo]?.orderNo !== orderNo) return;
+  // A failed cleanup only retains the safe read-only recovery route.
+  removeCheckoutPointer(accountKey, row, productNo);
+}
+
+function removeCheckoutPointer(accountKey: string, row: Row, productNo: string): boolean {
   const orders = { ...row.orders };
   delete orders[productNo];
-  // A failed cleanup only retains the safe read-only recovery route.
-  writeAccountRow(KEY, accountKey, { orders });
+  return writeAccountRow(KEY, accountKey, { orders });
 }
 
 /** Pending RETIRE requests survive refresh with their original source version and key. */
 export function readCheckoutTradein(accountKey: string, productNo: string): CheckoutTradeinRecovery | null {
-  const pointer = readAccountRow<Row>(KEY, accountKey, true)?.orders?.[productNo];
+  const row = readAccountRow<Row>(KEY, accountKey, true);
+  if (!row) return null;
+  const pointer = row.orders?.[productNo];
   if (!pointer?.tradeinQuote) return null;
   const quote = pointer.tradeinQuote;
   if (pointer.productNo !== productNo || quote.targetProductNo !== productNo
       || (pointer.tradeinCommandSubmitted !== undefined && typeof pointer.tradeinCommandSubmitted !== 'boolean')
-      || !pointer.commandKey || !pointer.intent || !Number.isSafeInteger(quote.sourceRowVersion)
+      || typeof pointer.commandKey !== "string" || !pointer.commandKey.trim()
+      || typeof pointer.intent !== "string" || !pointer.intent.trim() || !Number.isSafeInteger(quote.sourceRowVersion)
       || quote.sourceRowVersion < 0 || !["ACTIVE", "INACTIVE"].includes(quote.targetDeviceStatus)) {
-    throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+    // The payment API can recover any in-flight order from the next purchase attempt.
+    if (!removeCheckoutPointer(accountKey, row, productNo)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+    return null;
   }
   return pointer as CheckoutTradeinRecovery;
 }

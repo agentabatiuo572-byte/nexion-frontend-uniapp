@@ -427,7 +427,7 @@ const purchaseEligibilityMessage = computed(() => resolvePurchaseEligibilityMess
 ));
 useAutoRecovery({
   active: () => stickyPageVisible.value,
-  failed: () => remoteApiEnabled && (eligibility.value.status === "error"
+  failed: () => remoteApiEnabled && !stockUnavailable.value && (eligibility.value.status === "error"
     || eligibility.value.status === "ready" && purchaseEligibilityMessage.value === "error"),
   retry: retryEligibility,
 });
