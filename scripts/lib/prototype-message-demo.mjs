@@ -6,8 +6,10 @@ import { demoAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 const root='/api/app/support';
 const commandPath=/^\/api\/app\/support\/conversations(?:\/(DEMO-SUPPORT-\d+)\/(replies|read))?$/;
 const receiptPath=/^\/api\/app\/support\/commands\/([^/]+)$/;
-const ok=data=>({status:200,body:{code:0,message:'OK',data}});
+const ok=data=>({status:200,body:{code:0,message:'success',data}});
 const fail=(status,message)=>({status,body:{code:status,message,data:null}});
+const peerChangedReceipt=(conversationNo,key,clientMessageId)=>({status:'REJECTED',sent:false,conversationNo,
+  operation:'APP_CONVERSATION_REPLY',idempotencyKey:key,clientMessageId,businessCode:409,businessReason:'CONVERSATION_PEER_CHANGED'});
 
 export function createPrototypeMessages({state,fixtureFor}) {
   const receipts=new Map();
@@ -26,9 +28,13 @@ export function createPrototypeMessages({state,fixtureFor}) {
           if(!accountId)return fail(401,'AUTH_REQUIRED');
           if(accountId!==(transfer.accountId??demoAccountId))return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
         }
-        if(transfer?.key===key&&transfer.rejected)return ok({status:'REJECTED',sent:false,conversationNo:transfer.conversationNo,
-          operation:'APP_CONVERSATION_REPLY',idempotencyKey:key,clientMessageId:key,businessCode:409,businessReason:'CONVERSATION_PEER_CHANGED'});
+        if(transfer?.key===key&&transfer.rejected)return ok(peerChangedReceipt(transfer.conversationNo,key,key));
         if(transfer?.key===key&&!transfer.committed)return fail(404,'SUPPORT_COMMAND_NOT_FOUND');
+        if(saved?.rejection) {
+          const accountId=previewAccountId(state,request.headers?.()??{});
+          if(!accountId)return fail(401,'AUTH_REQUIRED');
+          return accountId===saved.rejection.accountId?ok(saved.rejection.result):fail(404,'SUPPORT_COMMAND_NOT_FOUND');
+        }
         const clearance=state.supportClearCommands?.find(row=>row.accountId===supportAccountId(state)&&row.key===key);
         if(clearance)return ok({resultType:'CONVERSATION_USER_CLEAR',result:structuredClone(clearance.result)});
         const conversationNo=saved?.result?.conversation.conversationNo
@@ -81,8 +87,10 @@ export function createPrototypeMessages({state,fixtureFor}) {
       if(operation!=='read')receipts.set(key,saved);
       saved.pending=execute().then(response=>{
         saved.response=structuredClone(response);
-        // A restored fixture may reject this payload while the original key remains replayable.
-        if(response.status===409&&receipts.get(key)===saved)receipts.delete(key);
+        if(response.status!==409||receipts.get(key)!==saved)return;
+        if(operation==='reply'&&response.body.message==='CONVERSATION_PEER_CHANGED'&&/^[A-Za-z0-9_-]{8,128}$/.test(input.clientMessageId)) {
+          saved.rejection={accountId:supportAccountId(state),result:peerChangedReceipt(match[1],key,input.clientMessageId)};
+        } else receipts.delete(key);
       });
       await saved.pending;
       if(operation!=='read'&&scenario==='unknown'&&saved.response.status===200) {

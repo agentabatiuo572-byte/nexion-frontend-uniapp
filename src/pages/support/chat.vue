@@ -884,7 +884,7 @@ function receiptFor(status: "sent" | "read" | undefined, isLatestReceipt: boolea
   return status === "read" ? t.value.conversations.receiptRead : t.value.conversations.receiptSent;
 }
 
-const conversationThread = ref<{ prepareHistoryPrepend(): Promise<boolean> } | null>(null);
+const conversationThread = ref<{ prepareHistoryPrepend(): Promise<boolean>; finishHistoryPrepend(): void } | null>(null);
 
 function humanMessageRecommendation(message: ConvMessage): Partial<ThreadMsg> {
   if (message.kind !== "SKU" && message.kind !== "LINK") return {};
@@ -956,14 +956,22 @@ async function loadEarlierHumanHistory() {
   if (!scope) return;
   humanEarlierBusy.value=true;
   const request=historyRetryGeneration;
+  const thread = conversationThread.value;
   try {
-    const prepared = await conversationThread.value?.prepareHistoryPrepend();
+    const prepared = await thread?.prepareHistoryPrepend();
     if (!humanRealtime.isCurrent(scope.epoch, scope.id) || request !== historyRetryGeneration) return;
     if (prepared !== true) { toast.warn(t.value.security.opFailed); return; }
     await convStore.loadEarlierThread(scope.id, () => humanRealtime.isCurrent(scope.epoch, scope.id));
   } catch {
     if (humanRealtime.isCurrent(scope.epoch, scope.id)) toast.warn(t.value.security.opFailed);
-  } finally { if(request===historyRetryGeneration)humanEarlierBusy.value=false; }
+  } finally {
+    // Let the thread consume the anchor first if this request actually prepended rows.
+    await nextTick();
+    if (request === historyRetryGeneration) {
+      thread?.finishHistoryPrepend();
+      humanEarlierBusy.value = false;
+    }
+  }
 }
 
 let continuingConversation = false;

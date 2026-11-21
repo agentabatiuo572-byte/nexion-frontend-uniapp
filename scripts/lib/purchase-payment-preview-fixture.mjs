@@ -88,7 +88,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
     const now = Date.now(), age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
-    if (scenario === 'intent-missing') return intent;
+    if (scenario === 'intent-missing' || intent.deliveryNotModeled) return intent;
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED' && intent.reason === 'PAYMENT_FAILED' && graceOver) return timeOut(intent);
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;
@@ -119,7 +119,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (intent.kind === 'TRIAL_CONVERT') return deliverTrial(intent);
     // Trade-in and capacity fixtures cover open, unknown and rejected commands. Their
     // business delivery/fleet mutation is not simulated here.
-    if (intent.kind !== 'ORDER_PAY') return Object.assign(intent, {status: 'FUNDS_CONFIRMED'});
+    if (intent.kind !== 'ORDER_PAY') return Object.assign(intent, {deliveryNotModeled: true});
     const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
     // Delivery needs the order; funds for an order that cannot be found never become a success.
     if (!order) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
@@ -143,8 +143,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }
+  function requireModeledDelivery(intent) {
+    if (intent.deliveryNotModeled) throw Object.assign(new Error('PURCHASE_PAYMENT_DELIVERY_NOT_MODELED'), {status:503});
+  }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
+    requireModeledDelivery(intent);
     const {createdAt, orderNo, deadline, origin, payload, payloadKey, pricingAt, paidAt, ...row} = intent, open = Date.now() < deadline;
     const networkEnabled = networkGate(row.paymentMethod) === null;
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
@@ -154,6 +158,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
     if (!intent) return null;
     if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
+    requireModeledDelivery(intent);
     const original = {kind, commandKey: key, canResumeSameKey: false};
     const receipt = intent.receipt;
     if (receipt != null) {
