@@ -18,7 +18,10 @@ import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
+  /** Recheck order facts after any read already in flight. */
+  checkCurrent?: () => Promise<PurchaseContextCheck>;
   refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
+export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
@@ -403,6 +406,11 @@ function reconcileChannel() {
   if (other && available(other)) void select(other);
   else choose('WALLET');
 }
+function acceptQuoteContext(check: PurchaseContextCheck): boolean {
+  if (check === 'changed') throw new Error('PURCHASE_CONTEXT_CHANGED');
+  if (check === 'abandoned') { finish(null); return false; }
+  return true;
+}
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || state.concluded || !context) return;
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
@@ -414,12 +422,15 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (method === 'WALLET' || !available(method)) { state.loading = false; return; }
   state.loading = true;
   try {
-    if (!expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
+    const before = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
+    if (!owns(version, accountKey) || !acceptQuoteContext(before)) return;
     const quote = await api.quote(expected.kind, method, expected.payload);
     if (!owns(version, accountKey)) return;
+    const after = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
+    if (!owns(version, accountKey) || !acceptQuoteContext(after)) return;
     // A trial's offset grows with accrual under one quote version, so only its rise needs a new confirmation.
     const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
-    if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged || !expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
+    if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged) throw new Error('PURCHASE_CONTEXT_CHANGED');
     state.quote = quote; quoteFailures = 0; state.retryNotice = '';
     const reviewed = confirmedQuote ?? reviewedQuote;
     if (reviewed && !samePaymentTerms(reviewed, quote)) {
@@ -615,8 +626,20 @@ async function submitOriginal() {
   }
 }
 async function confirm() {
-  if (!context || state.loading || state.busy || state.pending || account() !== state.accountKey) return;
-  if (!context.current()) { state.notice = 'changed'; return; }
+  const expected = context, accountKey = state.accountKey;
+  if (!expected || state.loading || state.busy || state.pending || account() !== accountKey) return;
+  if (expected.checkCurrent) {
+    const version = requestVersion, notice = state.notice;
+    state.loading = true;
+    try {
+      const check = await expected.checkCurrent();
+      if (!owns(version, accountKey) || state.notice !== notice) return;
+      if (check === 'abandoned') { finish(null); return; }
+      if (check === 'changed') { state.notice = 'changed'; return; }
+    } finally {
+      if (owns(version, accountKey)) state.loading = false;
+    }
+  } else if (!expected.current()) { state.notice = 'changed'; return; }
   if (state.method === 'WALLET') { finish({ method: 'WALLET' }); return; }
   const quote = state.quote;
   if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { deadlinePassed(); return; }
@@ -626,14 +649,14 @@ async function confirm() {
     confirmedQuote = null; state.notice = 'quoteChanged'; return;
   }
   state.notice = ''; confirmedQuote = null;
-  const scope = fingerprint(context);
-  const commandKey = context.commandKey?.() ?? acquireAccountCommandKey(KEYS, state.accountKey, scope, 'purchase');
+  const scope = fingerprint(expected);
+  const commandKey = expected.commandKey?.() ?? acquireAccountCommandKey(KEYS, state.accountKey, scope, 'purchase');
   openCashierOnReady = quote.paymentMethod === 'HDPAY_BANK';
   clearTimeout(quoteTimer);
   const original = rows(state.accountKey).records[commandKey];
   if (original) { state.pending = original; await query(); return; }
-  const pending = { fingerprint: scope, kind: context.kind, commandKey, paymentQuoteId: quote.paymentQuoteId,
-    paymentMethod: quote.paymentMethod, network: quote.network, summary: context.summary };
+  const pending = { fingerprint: scope, kind: expected.kind, commandKey, paymentQuoteId: quote.paymentQuoteId,
+    paymentMethod: quote.paymentMethod, network: quote.network, summary: expected.summary };
   save(pending); state.pending = pending;
   await submitOriginal();
 }
