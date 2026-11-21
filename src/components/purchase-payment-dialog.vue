@@ -259,12 +259,11 @@ const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
-// The bar counts payments still under way; a delivered one is finished and is found on its order.
-const pending = computed(() => unsettled.value.filter(row => !row.businessDelivered && !payment.resumeDismissed(row)));
+// Orders lists every unfinished payment; dismissal applies only to the floating count.
+const records = computed(() => unsettled.value.filter(row => !row.validated && !row.businessDelivered && row.lastStatus !== 'DELIVERED'));
+const pending = computed(() => records.value.filter(row => !payment.resumeDismissed(row)));
 // One payment opens directly; several are listed on Orders.
 function openPending() { if (pending.value.length === 1) void payment.resume(pending.value[0]); else void navTo('/pages/store/orders'); }
-// A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
-const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
 // Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
 // payment leaves the bar, and a closed one returns when its status changes.
 const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.length > 0);
