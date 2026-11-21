@@ -86,7 +86,8 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
       return row?.request === request && remoteEligibilityRowCurrent(id, row) ? [{ id, row }] : [];
     });
     if (rows.length === 0) return;
-    await Promise.allSettled(PRODUCTS.filter(product => isProductAvailable(product, phase.value)).map(async product => {
+    const targets = PRODUCTS.filter(product => product.productType === "DEVICE" && isProductAvailable(product, phase.value));
+    await Promise.allSettled(targets.map(async product => {
       const snapshot = await deviceE3Api.eligibility(product.id);
       if (!snapshot.enabled || !snapshot.eligible || snapshot.targetProductNo !== product.id) return;
       await Promise.allSettled(rows.map(async ({ id, row }) => {
@@ -150,7 +151,7 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
     if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return {};
     const targets = PRODUCTS.filter(
       (p) =>
-        (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+        p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
         isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
     );
     if (targets.length === 0) return {};

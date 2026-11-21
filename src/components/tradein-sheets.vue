@@ -827,7 +827,8 @@ async function loadRemoteRetireTargets() {
     && isCurrentAccountScope(requestScope) && key === remoteRetireLoadKey.value && state.value === current
     && requestOrigin.environment === apiRuntimeConfig.environment && requestOrigin.baseUrl === apiRuntimeConfig.baseUrl;
   const paid = source.paidPriceUsdt ?? 0;
-  const candidates = PRODUCTS.filter((product) => !config.requireHigherPrice || product.price > paid);
+  const candidates = PRODUCTS.filter(product => product.productType === "DEVICE"
+    && (!config.requireHigherPrice || product.price > paid));
   remoteRetirePending.value = candidates.length > 0;
   await Promise.allSettled(candidates.map(async ({ id }) => {
     try {
@@ -899,7 +900,7 @@ const retireView = computed(() => {
   // 「仅限更高价」与「已上架 ∨ 抢先购窗口」均为运营可配规则,消费 flag 不硬编码。
   const targets = PRODUCTS.filter(
     (p) =>
-      (!remoteApiEnabled || canonicalTradeinConfig.value?.enabled) &&
+      p.productType === "DEVICE" && (!remoteApiEnabled || canonicalTradeinConfig.value?.enabled) &&
       (!(remoteApiEnabled ? canonicalTradeinConfig.value?.requireHigherPrice !== false : TRADEIN_LADDER_RULES.requireHigherPrice) || p.price > paid) &&
       (remoteApiEnabled
         ? remoteRetireEligibleTargets.value.has(p.id)

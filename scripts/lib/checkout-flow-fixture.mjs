@@ -2,11 +2,15 @@
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoFixture,demoOrderTimedOut,demoTimedOutOrder} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
+import {previewAccountId} from './prototype-demo-identity.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const pin = createPaymentPinFlowFixture();
   pin.state.loggedIn = true;
   const receipts = new Map();
+  const orderCreates = new Map();
+  let delayCreate;
+  const configureCreateDelay = () => { delayCreate = { scenario: state.scenarioEpoch }; };
   const ok = data => ({status:200,message:'OK',data});
   const external = createPurchasePaymentPreviewFixture(state, locale);
   const tradeinCommands = new Map([
@@ -17,12 +21,53 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   // A reset or scenario change starts a fresh account: replayed receipts and payment command receipts belong to the
   // old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
-  function handle(url, request) {
+  async function handle(url, request) {
     if (epoch !== state.scenarioEpoch) {
       epoch = state.scenarioEpoch; receipts.clear();
+      orderCreates.clear();
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
+    if (path === '/api/orders/create-command' || (path === '/api/orders' && method === 'POST')) {
+      const headers = request.headers();
+      const owner = previewAccountId(state, headers);
+      if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
+      // Java String.trim() removes characters no greater than U+0020.
+      const trimmed = typeof key === 'string' ? key.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g,'') : '';
+      if (!trimmed) return {status:422,message:'IDEMPOTENCY_KEY_REQUIRED',data:null};
+      if (trimmed.length > 128) return {status:422,message:'IDEMPOTENCY_KEY_INVALID',data:null};
+      const command = JSON.stringify([owner, trimmed]);
+      const entry = orderCreates.get(command);
+      if (path === '/api/orders/create-command') {
+        if (method !== 'GET') return {status:405,message:'METHOD_NOT_ALLOWED',data:null};
+        if (!entry) return {status:404,message:'ORDER_CREATE_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND'}};
+        if (entry.receipt) {
+          const order = state.createdOrders?.find(row => row.orderNo === entry.receipt.orderNo);
+          if (order) {
+            const orderStatus = demoOrderTimedOut(order,state,Date.now()) ? demoTimedOutOrder.orderStatus : order.orderStatus;
+            return ok({status:'SUCCEEDED',orderNo:order.orderNo,orderStatus});
+          }
+        }
+        return ok({status:'PROCESSING'});
+      }
+      if (entry) return entry.receipt ? ok(entry.receipt) : {status:409,message:'IDEMPOTENCY_RESULT_UNKNOWN',data:null};
+      const originalEpoch = epoch;
+      const creating = {receipt:null};
+      orderCreates.set(command, creating);
+      try {
+        if (delayCreate && delayCreate.scenario === state.scenarioEpoch) {
+          delayCreate = undefined;
+          await new Promise(resolve=>setTimeout(resolve, 6000));
+        }
+        if (state.scenarioEpoch !== originalEpoch || owner !== previewAccountId(state, headers)) {
+          return {status:409,message:'PREVIEW_CREATE_SCOPE_CHANGED',data:null};
+        }
+        creating.receipt = demoFixture(url,locale(),state,{...request,tracksOrderCreate:true});
+        return ok(creating.receipt);
+      } finally {
+        if (!creating.receipt && orderCreates.get(command) === creating) orderCreates.delete(command);
+      }
+    }
     const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
     if (paymentCommand) {
       if (!external.ownsPreviewPayments(request)) return {status:404,message:'PURCHASE_PAYMENT_INTENT_NOT_FOUND',data:null};
@@ -57,7 +102,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     if (path === '/api/orders' && method === 'GET') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/quote') return ok(demoFixture(url,locale(),state,request));
-    if (['/api/orders','/api/orders/bundle'].includes(path) && method === 'POST') {
+    if (path === '/api/orders/bundle' && method === 'POST') {
       if (receipts.has(path+key)) return ok(receipts.get(path+key));
       const result = demoFixture(url,locale(),state,request);
       receipts.set(path+key,result);
@@ -98,6 +143,6 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     return ok(demoFixture(url,locale(),state,request));
   }
-  return {handles,handle,pin,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
+  return {handles,handle,pin,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     selectPaymentMode:external.selectPaymentMode};
 }
