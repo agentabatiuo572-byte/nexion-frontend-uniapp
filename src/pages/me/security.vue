@@ -17,11 +17,8 @@
       <view v-if="modeLabel" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
         <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
       </view>
-      <view v-if="remoteApiEnabled && !securityPresentation" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
-        <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? "…" : t.security.opFailed }}</text>
-        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity">
-          <text :style="remoteSecurityRetryTextStyle">{{ t.ui.retry }}</text>
-        </view>
+      <view v-if="remoteApiEnabled && !securityPresentation && remoteSecurityLoading" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" role="status" aria-live="polite">
+        <text :style="remoteSecurityUnavailableTextStyle">{{ computeCopy.loading }}</text>
       </view>
 
       <view
@@ -139,7 +136,7 @@
       </view>
       <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
-    <NxSheet :open="editingPwd" :title="t.security.passwordTitle" @close="cancelPwd" class="security-half-sheet"><view class="security-sheet-form">
+    <NxSheet :open="editingPwd" :title="t.security.passwordTitle" persistent @close="cancelPwd" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CURRENT" :aria-invalid="pwdErrorField === PWD_FIELD_CURRENT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CURRENT ? 'security-pwd-error-current' : undefined" @input="onCurrent" />
           <input class="w-full" :style="pwdInputStyle" password :value="next" :placeholder="t.security.newPassword" :aria-label="t.security.newPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_NEXT" :aria-invalid="pwdErrorField === PWD_FIELD_NEXT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_NEXT ? 'security-pwd-error-next' : undefined" @input="onNext" />
           <input class="w-full" :style="pwdInputStyle" password :value="confirmPwd" :placeholder="t.security.confirmPassword" :aria-label="t.security.confirmPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CONFIRM" :aria-invalid="pwdErrorField === PWD_FIELD_CONFIRM ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CONFIRM ? 'security-pwd-error-confirm' : undefined" @input="onConfirmPwd" />
@@ -152,7 +149,7 @@
             <NxButton variant="secondary" size="medium" class="flex-1 flex items-center justify-center" :disabled="securityBusy" @click="cancelPwd"><text>{{ t.ui.cancel }}</text></NxButton>
             <NxButton variant="primary" size="medium" class="flex-1 flex items-center justify-center" :disabled="securityBusy" @click="submitPasswordChange"><text>{{ t.ui.save }}</text></NxButton>
           </view></template></NxSheet>
-    <NxSheet :open="twoFactorSheetOpen" :title="t.security.twoFactorTitle" @close="closeTwoFactorSheet" class="security-half-sheet"><view class="security-sheet-form">
+    <NxSheet :open="twoFactorSheetOpen" :title="t.security.twoFactorTitle" persistent @close="closeTwoFactorSheet" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :aria-invalid="twoFactorPasswordError ? 'true' : 'false'" :aria-describedby="twoFactorPasswordError ? 'security-2fa-password-error' : undefined" :focus="twoFactorPasswordFocus" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
           <text v-if="twoFactorPasswordError" id="security-2fa-password-error" class="block" :style="errStyle" role="alert">{{ twoFactorPasswordError }}</text>
           <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="flex" style="gap: var(--v5-space-2); margin-top: 8px">
@@ -161,7 +158,7 @@
           </view>
           <text v-if="remoteApiEnabled && twoFactorChallengeNo" class="block" :style="rowSubStyle">{{ fmt(t.addrRebind.otpBody, { phone: twoFactorPhoneMasked }) }}</text>
         </view><template #footer><NxButton v-if="!twoFactorChallengeNo" variant="primary" :busy="securityBusy" @click="toggleTwoFactor(requestedTwoFactor)">{{ t.ui.confirm }}</NxButton></template></NxSheet>
-    <NxSheet :open="phoneEditing" :title="t.security.phoneChangeTitle" @close="!securityBusy && (phoneEditing = false)" class="security-half-sheet"><view class="security-sheet-form">
+    <NxSheet :open="phoneEditing" :title="t.security.phoneChangeTitle" persistent @close="!securityBusy && (phoneEditing = false)" class="security-half-sheet"><view class="security-sheet-form">
           <text v-if="phonePolicy && phonePolicy.remainingChanges === 0" class="block" :style="rowSubStyle">
             {{ t.security.phoneChangeLimit }} {{ phonePolicy.nextAvailableAt ? formatDisplayDate(phonePolicy.nextAvailableAt, dateLocale()) : "" }}
           </text>
@@ -196,7 +193,7 @@
             {{ t.ui.retry }}
           </view>
         </view></NxSheet>
-    <NxSheet :open="deletionSheetOpen" :title="t.security.deleteAccount" @close="closeDeletionSheet" class="security-half-sheet"><view class="security-sheet-form"><text class="security-sheet-note">{{ t.security.deleteAccountHint }}</text><template v-if="remoteApiEnabled && !deletionPending">
+    <NxSheet :open="deletionSheetOpen" :title="t.security.deleteAccount" persistent @close="closeDeletionSheet" class="security-half-sheet"><view class="security-sheet-form"><text class="security-sheet-note">{{ t.security.deleteAccountHint }}</text><template v-if="remoteApiEnabled && !deletionPending">
           <!-- Optional reason before the password. A retry after an unknown result resends the submitted reason, so it shows read-only. -->
           <AccountDeletionReason v-if="deletionSubmittedReason !== null" :reason="deletionSubmittedReason" retry />
           <view v-else class="security-reason-field">
@@ -226,11 +223,13 @@ import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import AppChassis from "@/components/app-chassis.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { parseServerTimestamp } from "@/api/server-time";
 import { useT } from "@/i18n/use-t";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { fmt } from "@/i18n/format";
 import { useSecurity } from "@/store/security";
 import { captureAccountScope, isCurrentAccountScope, rebindAccountScopedStores } from "@/lib/account-scope";
@@ -262,6 +261,8 @@ const SECURITY_COMMAND_TABLE = "nexgrid-security-command-accounts-v1";
 const DELETION_REQUEST_INTENT = "account-deletion-request";
 
 const t = useT();
+// The shared 「正在读取…」 status, in all nine languages, replaces a bare 「…」 while the security state loads (03 §3.6.1).
+const computeCopy = useComputeV2Copy();
 const retiredFlow = ref(false);
 
 // 已下线验证流深链兜底：toast 提供即时反馈，页内 notice 保持可发现，
@@ -271,7 +272,6 @@ onLoad((options) => {
     retiredFlow.value = true;
     toast.info(t.value.topupChrome.flowRetired);
   }
-  if (remoteApiEnabled) void loadRemoteSecurity();
 });
 const security = useSecurity();
 const auth = useAuth();
@@ -366,6 +366,7 @@ function syncDeletionSubmittedReason(accountKey: string) {
 }
 
 const remoteSecurityLoading = ref(false);
+const remoteSecurityReadFailed = ref(false);
 const sessionPageLoading = ref(false);
 const twoFactorEnabled = computed<boolean | null>(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled ?? null
@@ -457,7 +458,10 @@ function isCurrentSecurityRequest(
 }
 
 function clearSecurityAccountState(keepPresentation = false) {
-  if (!keepPresentation) securityPresentation.value = null;
+  if (!keepPresentation) {
+    securityPresentation.value = null;
+    remoteSecurityReadFailed.value = false;
+  }
   twoFactorSheetOpen.value = false;
   deletionSheetOpen.value = false;
   deletionDebtOpen.value = false;
@@ -495,7 +499,7 @@ function clearSecurityAccountState(keepPresentation = false) {
 
 function refreshSecurityForCurrentAccount() {
   if (securityPageVisible && remoteApiEnabled) {
-    void loadRemoteSecurity();
+    if (!remoteSecurityReadFailed.value && !remoteSecurityLoading.value) void loadRemoteSecurity();
     void loadPhonePolicy();
   }
 }
@@ -640,18 +644,25 @@ async function loadRemoteSecurity(): Promise<boolean> {
     remoteSecurity.value = securityState;
     securityPresentation.value = { ...securityState, sessions: [...securityState.sessions] };
     deletionStatus.value = accountDeletion;
+    remoteSecurityReadFailed.value = false;
     return true;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
-    securityPresentation.value = null;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+    else remoteSecurityReadFailed.value = true;
     console.warn("[security] overview load failed:", cause);
-    err.value = t.value.security.opFailed;
     return false;
   } finally {
     if (isCurrentSecurityRequest(pageScope, scope, accountKey)) remoteSecurityLoading.value = false;
   }
 }
+
+useAutoRecovery({
+  failed: () => remoteApiEnabled && remoteSecurityReadFailed.value && !remoteSecurityLoading.value,
+  retry: loadRemoteSecurity,
+  repeatMs: 30_000,
+  quiet: false,
+});
 
 async function loadMoreSessions(): Promise<void> {
   const snapshot = remoteSecurity.value;
@@ -670,7 +681,6 @@ async function loadMoreSessions(): Promise<void> {
     securityPresentation.value = { ...remoteSecurity.value, sessions: [...remoteSecurity.value.sessions] };
   } catch (cause) {
     if (isCurrentSecurityRequest(pageScope, scope, accountKey) && remoteSecurity.value === snapshot) {
-      securityPresentation.value = null;
       if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
       toast.error(securityErrorMessage(cause));
     }
@@ -1294,10 +1304,6 @@ const remoteSecurityUnavailableTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
-};
-const remoteSecurityRetryTextStyle: CSSProperties = {
-  font: "600 13px/20px var(--font-v5)",
-  color: "var(--v5-brand)",
 };
 const unavailableValueStyle: CSSProperties = {
   marginLeft: "auto",
