@@ -88,7 +88,7 @@
         </LoopScope>
 
         <!-- Pending remote orders can retry only the idempotent UVEL wallet debit. -->
-        <view v-if="(orderAction || orderCommandUnavailable) && !externalPayment" class="order-block" role="status">
+        <view v-if="(orderAction || orderCommandUnavailable) && !externalPayment && !refusedPayment" class="order-block" role="status">
           <text class="block">{{ orderAction?.kind==='cancel' ? recoveryCopy.cancelPending : recoveryCopy.paymentPending }}</text>
           <view class="flex flex-wrap gap-2 mt-3">
             <NxButton v-if="orderAction?.kind==='cancel'" variant="secondary" size="small" :label="recoveryCopy.retryCancel" :disabled="orderCommandQuerying || cancellingOrder" @click="recoverOrderAction(true)" />
@@ -189,7 +189,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { discoverOrderPayment, pendingOrderPayment, usePurchasePayment, onPurchaseRecordReleased } from "@/store/purchase-payment";
+import { discoverOrderPayment, pendingOrderPayment, refusedPurchasePayment, usePurchasePayment, onPurchaseRecordReleased } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue";
@@ -340,7 +340,7 @@ async function refreshOrder() {
         orderPresentation.value = result ?? null;
         remoteOrderError.value = false;
         if (result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
-            && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
+            && !refusedPayment.value && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
           paymentLookupScope = scope;
           await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, result.productName,
             () => isCurrentDetailScope(scope) && liveOrder.value?.status === 'placed');
@@ -501,6 +501,8 @@ const orderCommandUnavailable = ref(false);
 const orderCommandQuerying = ref(false);
 const orderCommandReading = ref(false);
 const resumePaymentAllowed = ref(false);
+const refusedPayment = computed(() => orderAction.value?.kind === 'pay'
+  ? refusedPurchasePayment(app.accountKey, orderAction.value.key) : null);
 const recoveryCopy = computed(()=>purchaseRecoveryCopy(locale.code));
 let cancelAttemptSequence = 0;
 function currentOrderPayable(): boolean {
@@ -534,7 +536,7 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
   else orderCommandReading.value=true;
   try {
     const action=readOrderAction(accountKey,id.value);orderAction.value=action;orderCommandUnavailable.value=false;
-    if (!action) { resumePaymentAllowed.value=false;return; }
+    if (!action || refusedPayment.value) { resumePaymentAllowed.value=false;return; }
     if (action.kind==='cancel') {
       if (retryCancel) await orders.cancelOrderRemote(action.orderNo);
       if (!isCurrentDetailScope(scope)) return;
@@ -598,7 +600,7 @@ useAutoRecovery({
 });
 useAutoRecovery({
   failed: () => remoteApiEnabled && !!remoteOrderBoundAccount.value && !purchaseReadBusy() && !resumePaymentAllowed.value
-    && (orderCommandUnavailable.value || !!orderAction.value)
+    && !refusedPayment.value && (orderCommandUnavailable.value || !!orderAction.value)
     && (!liveOrder.value || liveOrder.value.status === 'placed' || ['paid','provisioning'].includes(liveOrder.value.status)),
   retry: () => recoverOrderAction(false),
   repeatMs: 15_000,
@@ -846,7 +848,8 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     if (remoteOrderError.value || !liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
     let original = liveOrder.value;
     restoreOrderAction();
-    const originalPayment = original.status === 'placed' && pendingOrderPayment(scope.accountScope.accountKey, original.id);
+    const originalPayment = original.status === 'placed'
+      && (pendingOrderPayment(scope.accountScope.accountKey, original.id) ?? refusedPayment.value);
     if (originalPayment) {
       autoPayRequested.value = false;
       pendingPaymentIntentAccount = '';

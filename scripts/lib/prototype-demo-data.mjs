@@ -181,8 +181,12 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available};
 }
 
+function demoE1PurchaseRule(product) {
+  return {policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+}
+
 function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
-  const e1={policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+  const e1=demoE1PurchaseRule(product);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
   if(state.quotaState==='approved'&&product.id===approvedQuotaSku){
     const quota=demoHardwareQuota(product,state,points,now);
@@ -198,6 +202,28 @@ function demoSkuPurchaseRules(state,product,points,now,quantity=1) {
   return {eligible:e1.eligible&&f4b.eligible&&stocked,
     decisionCode:!e1.eligible?e1.decisionCode:!f4b.eligible?f4b.decisionCode:!stocked?'PURCHASE_GATE_SOLD_OUT':'ELIGIBLE',
     policies:[e1,f4b]};
+}
+
+function requireDemoMonthlyQuota(policy) {
+  if(policy.conditions.some(row=>row.kind==='teamComputePoints'&&!row.met))refuse('ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET');
+  if(policy.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED')refuse('ORDER_MONTHLY_QUOTA_EXHAUSTED');
+}
+
+export function requireDemoExternalPaymentQuota(state,products,items,now) {
+  const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+  for(const {productNo,quantity} of items){
+    const product=products.find(row=>row.id===productNo);
+    if(product)requireDemoMonthlyQuota(demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
+  }
+}
+
+export function requireDemoExternalOrderGate(products,items) {
+  for(const {productNo} of items){
+    const product=products.find(row=>row.id===productNo);
+    if(!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+    const e1=demoE1PurchaseRule(product);
+    if(!e1.eligible)refuse(e1.decisionCode);
+  }
 }
 
 export function requireDemoPurchase(state,products,items,now,settlement=false) {
@@ -218,10 +244,7 @@ export function requireDemoPurchase(state,products,items,now,settlement=false) {
       if(settlement&&policies[1].decisionCode==='ELIGIBLE')hardwareQuotaUsedAt=now;
       continue;
     }
-    if(settlement&&policies[0].eligible){
-      if(policies[1].conditions.some(row=>row.kind==='teamComputePoints'&&!row.met))refuse('ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET');
-      if(decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED')refuse('ORDER_MONTHLY_QUOTA_EXHAUSTED');
-    }
+    if(settlement&&policies[0].eligible)requireDemoMonthlyQuota(policies[1]);
     refuse(decisionCode);
   }
   return hardwareQuotaUsedAt;
@@ -798,7 +821,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!device)refuse('TRADEIN_SOURCE_NOT_ACTIVE_OR_NOT_OWNED');
     const reason=tradeinSourceReason(device,product);
     if(reason!=='OK')refuse('TRADEIN_'+reason);
-    requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
+    // External pricing has already checked the target and checks monthly quota separately.
+    if(!request.externalPurchasePricing)requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
     return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
@@ -878,11 +902,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
     const reason=tradeinTargetReason(product);
     if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
-    const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
-    const purchase=demoSkuPurchaseRules(state,product,points,now);
-    if(!purchase.eligible){
-      const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
-      throw Object.assign(new Error(code),{status:403});
+    if(!request.externalPurchasePricing){
+      const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
+      const purchase=demoSkuPurchaseRules(state,product,points,now);
+      if(!purchase.eligible){
+        const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
+        throw Object.assign(new Error(code),{status:403});
+      }
     }
     const data=structuredClone(base('/api/app/trade-in/capacity-quote'));
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
@@ -978,7 +1004,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const writable=state.createdOrders?.find(row=>row.orderNo===orderNo);
     const replay=order.paymentStatus==='PAID',amount=Number(order.amountUsdt);
     if(action==='cancel'){
-      if(replay)refuse('ORDER_NOT_CANCELLABLE');
+      // Same rule as the backend: an already cancelled order replays its receipt; any other settled order cannot be cancelled.
+      if(order.paymentStatus==='CANCELLED'&&order.orderStatus==='CANCELLED')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
+        orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:true},order);
+      if(order.paymentStatus!=='PENDING')refuse('ORDER_NOT_CANCELLABLE');
       (state.orderStatuses??={})[orderNo]='cancelled';
       if(writable){
         order=Object.assign(writable,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
