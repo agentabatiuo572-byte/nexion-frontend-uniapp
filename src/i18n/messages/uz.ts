@@ -4897,7 +4897,7 @@ export const uz: Messages = {
   quota: {
     availableDevices: "Mavjud qurilmalar",
     buy: "Olish",
-    stockUnavailable: "Bu davrda sotilib boʻldi",
+    stockUnavailable: "Bu davrda hozircha joy yoʻq",
     focusedTierMissing: "Bu mahsulotda kvota cheklovi yoʻq. Xarid shartlarini mahsulot sahifasida koʻring.",
     pageTitle: "Qurilma kvotasi",
     yourInvites: "Faol doʻstlar",
@@ -4906,7 +4906,7 @@ export const uz: Messages = {
     unlocked: "OCHIQ",
     locked: "YOPIQ",
     priceLine: "${price}",
-    soldPct: "{pct}% sotildi",
+    totalLabel: "Jami {n}",
     leftLabel: "{n} ta qoldi",
     unlockEither: "Biri yetarli",
     unlockAll: "Barcha ochish shartlari",

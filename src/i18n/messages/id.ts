@@ -4897,7 +4897,7 @@ export const id: Messages = {
   quota: {
     availableDevices: "Perangkat tersedia",
     buy: "Beli",
-    stockUnavailable: "Habis periode ini",
+    stockUnavailable: "Kuota periode ini sedang habis",
     focusedTierMissing: "Produk ini tanpa batas kuota. Lihat halaman produk untuk syarat pembelian.",
     pageTitle: "Kuota perangkat keras",
     yourInvites: "Teman yang aktif",
@@ -4906,7 +4906,7 @@ export const id: Messages = {
     unlocked: "TERBUKA",
     locked: "TERKUNCI",
     priceLine: "${price}",
-    soldPct: "{pct}% terjual",
+    totalLabel: "Total {n}",
     leftLabel: "Sisa {n}",
     unlockEither: "Buka dengan salah satu",
     unlockAll: "Semua syarat wajib",
