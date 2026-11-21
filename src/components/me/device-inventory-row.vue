@@ -71,7 +71,7 @@
               </view>
               <view class="device-inventory-row__menu-row device-inventory-row__menu-row--danger" role="button" :tabindex="actionDisabled ? -1 : 0" :aria-disabled="actionDisabled"
                 @click="chooseMenu('toggle')" @keydown.enter.stop.prevent="chooseMenu('toggle')" @keydown.space.stop.prevent="chooseMenu('toggle')">
-                <view class="device-inventory-row__menu-icon device-inventory-row__menu-icon--danger" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M6.3 5.3a9 9 0 1 0 11.4 0" /></svg></view>
+                <view class="device-inventory-row__menu-icon device-inventory-row__menu-icon--neutral" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M6.3 5.3a9 9 0 1 0 11.4 0" /></svg></view>
                 <view class="device-inventory-row__menu-copy">
                   <text class="device-inventory-row__menu-label">{{ actionLabel }}</text>
                   <text v-if="actionDisabled && device.pendingDeactivate" class="device-inventory-row__menu-desc">{{ pendingChipLabel }}</text>
@@ -265,7 +265,8 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__menu-row[aria-disabled="true"] :is(.device-inventory-row__menu-icon, .device-inventory-row__menu-label) { opacity: .5; }
 .device-inventory-row__menu-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 10px; }
 .device-inventory-row__menu-icon--brand { background: var(--v5-brand-soft); color: var(--v5-brand); }
-.device-inventory-row__menu-icon--danger { background: var(--v5-danger-soft); color: var(--v5-danger); }
+/* A destructive row swaps only its text to the error colour (03 §3.1); its icon tile stays neutral. */
+.device-inventory-row__menu-icon--neutral { background: var(--v5-surface-3); color: var(--v5-ink-2); }
 .device-inventory-row__menu-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 /* Menu rows use the list-title role at 400 (03 §3.5); a destructive action only swaps its text to the error colour (03 §3.1). */
 .device-inventory-row__menu-label { flex: 1; min-width: 0; color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }

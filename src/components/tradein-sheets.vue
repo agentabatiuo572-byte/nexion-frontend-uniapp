@@ -46,7 +46,7 @@
                         one server transaction)
 -->
 <template>
-  <view v-if="active && state.kind !== 'none' && (state.kind !== 'tradein' || tradeinView || purchaseRecovery !== 'none')" class="tis-root" role="dialog" aria-modal="true" :aria-label="t.tradein.choiceTitle">
+  <view v-if="active && state.kind !== 'none' && (state.kind !== 'tradein' || tradeinView || purchaseRecovery !== 'none')" class="tis-root" role="dialog" aria-modal="true" :aria-labelledby="titleId">
     <view class="tis-backdrop" @click="hide" />
 
     <view class="nx-glass-sheet tis-panel" @click.stop>
@@ -56,7 +56,7 @@
 
       <!-- ─────────── 1. choice — trade-in or full price ─────────── -->
       <template v-if="capacityRecovery || capacityRecoveryUnavailable || keepRecoveryError">
-        <view class="tis-head"><text class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
+        <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
         <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
         <view v-if="capacityResumeAllowed" class="tis-secondary" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-secondary-text">{{ recoveryCopy.resume }}</text></view>
@@ -64,7 +64,7 @@
       </template>
       <template v-else-if="state.kind === 'choice'">
         <view class="tis-head">
-          <text class="tis-title">{{ t.tradein.choiceTitle }}</text>
+          <text :id="titleId" class="tis-title">{{ t.tradein.choiceTitle }}</text>
         </view>
         <view class="tis-opt-list">
           <view
@@ -93,7 +93,7 @@
       <!-- ─────────── 1.5 retire — FEAT-DEV02 主动下架:选升级目标 ─────────── -->
       <template v-else-if="state.kind === 'retire' && retireView">
         <view class="tis-head">
-          <text class="tis-title">{{ t.tradein.retireTitle }}</text>
+          <text :id="titleId" class="tis-title">{{ t.tradein.retireTitle }}</text>
           <text class="tis-subtitle" role="status" :aria-busy="retireView.loading">{{ retireView.subtitle }}</text>
         </view>
         <view class="tis-opt-list">
@@ -111,21 +111,21 @@
 
       <!-- ─────────── 2. tradein — 置换确认(去结算) ─────────── -->
       <template v-else-if="state.kind === 'tradein' && purchaseRecovery !== 'none'">
-        <view class="tis-head"><text class="tis-title">{{ t.tradein.recoveryPending }}</text></view>
+        <view class="tis-head"><text :id="titleId" class="tis-title">{{ t.tradein.recoveryPending }}</text></view>
         <text v-if="purchaseRecovery === 'error'" class="tis-disclaimer" role="alert">{{ t.tradein.errPleaseRetry }}</text>
         <view class="tis-cta" :style="ctaHalo" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && remoteApiEnabled && purchaseMessage === 'error'">
         <view class="tis-head" role="status" :aria-busy="purchaseStatus === 'loading' || purchaseStatus === 'idle'">
-          <text class="tis-title">{{ purchaseStatus === 'loading' || purchaseStatus === 'idle' ? t.store.purchaseEligibilityLoading : t.store.purchaseEligibilityError }}</text>
+          <text :id="titleId" class="tis-title">{{ purchaseStatus === 'loading' || purchaseStatus === 'idle' ? t.store.purchaseEligibilityLoading : t.store.purchaseEligibilityError }}</text>
         </view>
         <view v-if="purchaseStatus === 'error' || purchaseStatus === 'ready'" class="tis-cta" :style="ctaHalo" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && tradeinView">
         <view class="tis-head tis-head-mb4">
-          <text class="tis-title">{{ purchaseConfirmed ? tradeinView.title : t.tradein.purchaseBlockedTitle }}</text>
+          <text :id="titleId" class="tis-title">{{ purchaseConfirmed ? tradeinView.title : t.tradein.purchaseBlockedTitle }}</text>
         </view>
 
         <!-- 旧机 / 累计产出 / 档位 / 抵扣 / 预计应付 — soft surface card, no border -->
@@ -171,7 +171,7 @@
       <!-- ─────────── 3. replace — Path B slot-full ─────────── -->
       <template v-else-if="state.kind === 'replace' && replaceView">
         <view class="tis-head">
-          <text class="tis-title">{{ t.tradein.replaceTitle }}</text>
+          <text :id="titleId" class="tis-title">{{ t.tradein.replaceTitle }}</text>
           <text class="tis-subtitle">{{ replaceView.warning }}</text>
         </view>
 
@@ -217,7 +217,7 @@
            PR-D 债 #1)。置于全部具体分支之后、block 之前,只接住 view-null 漏网。 -->
       <template v-else-if="state.kind === 'retire' || state.kind === 'tradein' || state.kind === 'replace'">
         <view class="tis-head">
-          <text class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
+          <text :id="titleId" class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
           <text class="tis-subtitle">{{ t.tradein.errPleaseRetry }}</text>
         </view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
@@ -230,7 +230,7 @@
         <view class="tis-block-head">
           <svg class="tis-block-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <view class="tis-block-meta">
-            <text class="tis-title">{{ blockTitle }}</text>
+            <text :id="titleId" class="tis-title">{{ blockTitle }}</text>
             <text class="tis-block-warn">{{ state.origin === 'retire' ? t.tradein.retireBlockWarning : t.tradein.blockWarning }}</text>
           </view>
         </view>
@@ -266,7 +266,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
@@ -311,6 +311,8 @@ import { CAPACITY_RECOVERY_TABLE, capacityIntent, readCapacityPending, type Capa
 import { CAPACITY_COMMAND_TABLE, readPendingKeepCommand, type PendingKeepCommand } from "@/lib/keep-command-recovery";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
+// Each step renders exactly one .tis-title; the dialog takes its accessible name from whichever one is on screen.
+const titleId = `tis-title-${getCurrentInstance()?.uid}`;
 const sheet = useTradeinSheet();
 const app = useApp();
 const pending = usePendingCheckout();
