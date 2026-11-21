@@ -5,7 +5,7 @@
   Detailed specs, progress, queue proof and Notify CTA stay collapsed by default.
 -->
 <template>
-  <view ref="cardRef" class="nx-glass-card relative overflow-hidden" :style="rootStyle">
+  <view ref="cardRef" class="nx-glass-card locked-card relative overflow-hidden" :style="rootStyle">
     <!-- aurora drift bg (paused off screen or while the page is hidden) -->
     <view ref="auroraRef" aria-hidden class="locked-card__aurora" :class="{ 'is-paused': !auroraLoop.running.value }" />
     <!-- 24px grid overlay -->
@@ -20,7 +20,7 @@
         </view>
         <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" :aria-expanded="detailsOpen" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
-            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 500; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
+            <text class="locked-card__eyebrow">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
               <view class="grid place-items-center" :style="toggleStyle">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
@@ -41,10 +41,10 @@
         </view>
       </view>
 
-      <!-- Bottom row — Notify + queue social proof -->
-      <view v-if="detailsOpen" class="mt-3 flex items-center" style="gap: 10px">
-        <view class="flex-1 inline-flex items-center justify-center nx-frosted-button locked-card__notify" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path :d="serverSubscribed ? 'm5 12 4 4L19 6' : 'M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'" /><path v-if="!serverSubscribed" d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+      <!-- Card footer: the notify action is a text action (03 §3.1 P-67 .nx-card-action), kept on the solid card. -->
+      <view v-if="detailsOpen" class="nx-card-footer locked-card__footer">
+        <view class="nx-card-action locked-card__notify" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="serverSubscribed ? 'm5 12 4 4L19 6' : 'M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'" /><path v-if="!serverSubscribed" d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text>{{ notifyBusy ? t.store.coLoading : t.store.lockedNotifyMe }}</text>
         </view>
       </view>
@@ -207,9 +207,10 @@ function toggleDetails() {
   if (detailsOpen.value && notificationStatus.value === "idle") void reloadNotificationState();
 }
 
-const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
+// A solid content card (01 §1.1.2): surface fill, the default surface radius; light adds the light shadow (scoped CSS).
+const rootStyle: CSSProperties = {
+  background: "var(--v5-surface)",
+  borderRadius: "var(--ui-radius-surface)",
 };
 
 const lockBoxStyle: CSSProperties = {
@@ -244,7 +245,6 @@ const toggleBaseStyle: CSSProperties = {
   height: "28px",
   borderRadius: "999px",
   color: "var(--v5-brand-2-ink)",
-  background: "var(--v5-brand-2-soft)",
   transition: "transform 160ms ease",
 };
 const toggleStyle = computed<CSSProperties>(() => ({
@@ -270,12 +270,13 @@ const barFillStyle = computed<CSSProperties>(() => ({
 
 </script>
 <style scoped>
-/* The coming-soon card is a neutral solid content card (01 §1.1.2): it is not a main visual listed in 04 and has no
-   approved board, so it carries no corner light and no grid. The decorative layers stay in the markup but do not render. */
+/* The coming-soon card is a neutral solid content card (01 §1.1.2): no board marks it as a focal block, so it carries no
+   corner light and no grid; the decorative layers stay in the markup but do not render. In-card icon controls have no fill. */
+[data-theme="light"] .locked-card { box-shadow: var(--v5-glass-shadow); }
 .locked-card__aurora, .locked-card__grid { display: none; }
 /* The lock dot is a static mark: only live state loops (07 §7.1, design-rules Motion). */
 .locked-card__dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--v5-tech-cyan); border: 2px solid var(--v5-surface); }
-/* In-card action on a solid card: the shared neutral glass M (03 §3.1), button role 15/20 at 500. */
-.locked-card__notify { gap: 6px; min-height: 40px; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
-.locked-card__notify:active { transform: scale(.98); }
+/* Eyebrow: label role 12/16 at 500 in the coral ink, interface font (10 §10.1; Mono is for codes and live numbers, 01 §1.2). */
+.locked-card__eyebrow { color: var(--v5-brand-2-ink); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
+.locked-card__footer { margin-top: 12px; }
 </style>
