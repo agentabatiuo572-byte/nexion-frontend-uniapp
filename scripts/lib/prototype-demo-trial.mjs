@@ -15,7 +15,6 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   if(!url.pathname.startsWith('/api/trial/'))return undefined;
   const now=Date.now(),mode=state.trialState||'follow';
   const data=structuredClone(fixture(new URL('/api/trial/state',url.origin),locale,{offers:true},request));
-  if(mode==='read-error')refuse('TRIAL_STATE_UNAVAILABLE');
   const switched=state.catalogState==='trial-h2-switched';
   const originalProduct=products.find(product=>product.id===previewDefaultTrialSku);
   const product=switched?products.find(product=>product.id==='stellarbox-pro'):originalProduct;
