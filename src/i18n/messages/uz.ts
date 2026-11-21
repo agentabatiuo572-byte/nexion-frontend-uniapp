@@ -1809,6 +1809,7 @@ export const uz: Messages = {
     recoveryChecking: "Oldingi almashtirish natijasi tekshirilmoqda. Qayta toʻlamang.\nSahifa avtomatik yangilanadi.",
     keepRecoveryPending: "Eski qurilmani saqlab xarid qilish natijasi tasdiqlanmagan.",
     keepRecoveryChecking: "Eski qurilmani saqlab xarid qilish natijasi tekshirilmoqda. Qayta toʻlamang.\nSahifa avtomatik yangilanadi.",
+    keepRecoveryResumable: "Eski qurilmani saqlab qilingan oldingi xarid hali toʻlanmagan.\nYangi buyurtma bermang.",
     keepRecoveryReadError: "Asl xarid soʻrovini aniqlab boʻlmadi. Qayta toʻlashdan oldin buyurtmalaringizni tekshiring yoki yordam xizmatiga murojaat qiling.",
     purchasePoliciesAll: "Quyidagi barcha xarid shartlari bajarilishi kerak",
     purchaseProductPolicy: "Mahsulot xarid shartlari",

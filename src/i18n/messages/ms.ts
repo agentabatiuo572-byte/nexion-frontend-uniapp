@@ -1809,6 +1809,7 @@ export const ms: Messages = {
     recoveryChecking: "Sedang menyemak keputusan tukar beli sebelumnya. Jangan bayar lagi.\nHalaman ini akan dikemas kini secara automatik.",
     keepRecoveryPending: "Keputusan simpan-dan-beli sebelumnya belum disahkan.",
     keepRecoveryChecking: "Sedang menyemak keputusan simpan-dan-beli sebelumnya. Jangan bayar lagi.\nHalaman ini akan dikemas kini secara automatik.",
+    keepRecoveryResumable: "Pembelian simpan-dan-beli sebelumnya belum dibayar.\nJangan buat pesanan baharu.",
     keepRecoveryReadError: "Permintaan pembelian asal tidak dapat dikenal pasti. Semak pesanan anda atau hubungi khidmat pelanggan sebelum membayar lagi.",
     purchasePoliciesAll: "Semua syarat pembelian di bawah mesti dipenuhi",
     purchaseProductPolicy: "Syarat pembelian produk",

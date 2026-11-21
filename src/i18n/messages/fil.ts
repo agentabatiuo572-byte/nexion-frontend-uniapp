@@ -1809,6 +1809,7 @@ export const fil: Messages = {
     recoveryChecking: "Sinusuri ang resulta ng naunang trade-in. Huwag magbayad ulit.\nKusang mag-a-update ang page na ito.",
     keepRecoveryPending: "Hindi pa kumpirmado ang pagbili mo habang pinananatili ang lumang device.",
     keepRecoveryChecking: "Sinusuri ang naunang pagbili habang pinananatili ang lumang device. Huwag magbayad ulit.\nKusang mag-a-update ang page na ito.",
+    keepRecoveryResumable: "Hindi pa bayad ang naunang pagbili habang pinananatili ang lumang device.\nHuwag nang gumawa ng bagong order.",
     keepRecoveryReadError: "Hindi matukoy ang orihinal na request sa pagbili. Tingnan muna ang mga order mo o makipag-ugnayan sa support. Huwag magbayad ulit.",
     purchasePoliciesAll: "Kailangang matugunan lahat ng patakaran sa ibaba",
     purchaseProductPolicy: "Kondisyon sa pagbili ng produkto",
