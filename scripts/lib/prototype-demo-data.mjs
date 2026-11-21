@@ -11,7 +11,7 @@ import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
-import { auxiliaryDemo } from './prototype-demo-auxiliary.mjs';
+import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
@@ -893,12 +893,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
       paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,inventoryUsedAt:now,hardwareQuotaUsedAt,activatedAt:active?now:null};
     (state.createdOrders||=[]).unshift(order);
-    if(currentTask?.executionMode==='SIMULATED'&&currentTask.status==='RUNNING'){
-      const cancelledTask={...currentTask,status:'CANCELLED',rewardUsdt:0,rewardAmount:'0.000000'};
+    if(currentTask?.status==='RUNNING'){
       if(state.computeCycleStarts)delete state.computeCycleStarts[quote.sourceDeviceId];
-      (state.cancelledReplacementAssignments??={})[quote.sourceDeviceId]={
-        ...sourceAssignment,currentTask:null,recentTasks:[cancelledTask,...sourceAssignment.recentTasks],simulationState:'STOPPED',
-      };
+      recordDemoTaskCancellation(state,sourceAssignment,currentTask);
     }
     const receipt={tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance};
     return replacingCapacity?receipt:remember('tradeinSubmit',orderNo,receipt,order);

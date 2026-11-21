@@ -7,17 +7,24 @@ import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
-export function demoReplacementAssignmentHistory(state, projection) {
-  if(projection.protocolVersion!==3||!state.cancelledReplacementAssignments)return projection;
-  const assignments=new Map(projection.devices.map(row=>[row.deviceId,row]));
-  for(const saved of Object.values(state.cancelledReplacementAssignments)){
-    const live=assignments.get(saved.deviceId);
-    const cancelled=saved.recentTasks.filter(task=>task.status==='CANCELLED');
-    const restarted=live?.currentTask&&!cancelled.some(task=>task.taskNo===live.currentTask.taskNo);
-    // Recycled devices leave the fleet, but their terminal task remains readable.
-    assignments.set(saved.deviceId,restarted?{...live,recentTasks:[...cancelled,...live.recentTasks]}:saved);
+export function recordDemoTaskCancellation(state, assignment, task) {
+  const {deviceId,instanceNo,deviceType}=assignment;
+  const {taskNo,startedAt,completableAt,queuedAt}=task;
+  (state.cancelledReplacementTasks??={})[taskNo]={deviceId,instanceNo,deviceType,taskNo,startedAt,completableAt,queuedAt};
+}
+
+export function demoTaskAssignments(state, devices, assignment, cancelledTask) {
+  const assignments=new Map(devices.map(device=>[device.id,assignment(device)]));
+  for(const saved of Object.values(state.cancelledReplacementTasks??{})){
+    const {deviceId,instanceNo,deviceType,taskNo}=saved;
+    // Recycled devices leave the fleet, but their task history remains readable.
+    const row=assignments.get(deviceId)??assignment({id:deviceId,instanceNo,deviceType,activatedAt:null});
+    if(row.currentTask?.taskNo===taskNo)row.currentTask=null;
+    if(!row.currentTask&&'simulationState' in row)row.simulationState='STOPPED';
+    row.recentTasks.unshift(cancelledTask(saved));
+    assignments.set(deviceId,row);
   }
-  return {...projection,devices:[...assignments.values()]};
+  return [...assignments.values()];
 }
 
 export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts) {
@@ -83,8 +90,10 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
     const task=(sample,status)=>{
       const completed=status==='COMPLETED';
+      const cancelled=status==='CANCELLED';
       const completedAt=completed?new Date(sample.completedAt).toISOString():null;
-      const startedAt=new Date(completed?sample.completedAt-sample.durationSec*1000:now-300000).toISOString();
+      const startedAt=sample.startedAt??new Date(completed?sample.completedAt-sample.durationSec*1000:now-300000).toISOString();
+      const simulation=cancelled&&sample.simulation?{...sample.simulation,rewardAmount:'0.000000'}:sample.simulation;
       return {...proof,serverCanonical:true,
         ...((v2||v3)&&{protocolVersion:v3?3:2,queuedAt:v3?startedAt:null,
           actualDurationSec:v3?(completed?sample.durationSec:300):null,pausedAt:null,pausedSeconds:0,configVersion:v3?sample.configVersion:null,
@@ -92,25 +101,33 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
           settledAt:completed?new Date(sample.postedAt).toISOString():null}),
         taskNo:sample.taskNo,deviceId:sample.deviceId,taskId:'demo-'+sample.taskClass.toLowerCase(),
         taskName:sample.taskName,taskClass:sample.taskClass,model:sample.model,client:sample.client,
-        status,rewardUsdt:sample.amount,requiredSeconds:sample.durationSec,...sample.simulation,
+        status,rewardUsdt:cancelled?0:sample.amount,requiredSeconds:sample.durationSec,...simulation,
         startedAt,
-        completableAt:completedAt??new Date(now+300000).toISOString(),completedAt,
+        completableAt:sample.completableAt??completedAt??new Date(now+300000).toISOString(),completedAt,
         receiptNo:completed?sample.receiptNo:null,proofNonce:null,proofExpiresAt:null};
     };
-    const assignments=devices.map(device=>{
-      const hasSample=device.id===settlement?.deviceId;
-      const currentSample=hasSample?{...settlement,taskNo:'DEMO-TASK-4',durationSec:600}:null;
-      if(currentSample?.simulation) {
-        currentSample.amount=0.031874;
-        currentSample.simulation={...currentSample.simulation,rewardAmount:'0.031874'};
-      }
+    const currentSample=settlement?{...settlement,taskNo:'DEMO-TASK-4',durationSec:600}:null;
+    if(currentSample?.simulation) {
+      currentSample.amount=0.031874;
+      currentSample.simulation={...currentSample.simulation,rewardAmount:'0.031874'};
+    }
+    const assignment=device=>{
+      const hasSample=device.id===currentSample?.deviceId;
+      const restartedAt=state.deviceActivations?.[device.id]?.activatedAt;
+      const sample=restartedAt&&hasSample?{...currentSample,taskNo:`DEMO-TASK-${device.id}-${restartedAt}`,
+        startedAt:new Date(restartedAt).toISOString(),completableAt:new Date(restartedAt+currentSample.durationSec*1000).toISOString()}:currentSample;
+      const running=hasSample&&device.activatedAt!==null;
       return {deviceId:device.id,instanceNo:device.instanceNo,deviceType:device.deviceType,lockUntil:null,
-        currentTask:currentSample&&device.activatedAt!==null?task(currentSample,'RUNNING'):null,
+        currentTask:running?task(sample,'RUNNING'):null,
         recentTasks:hasSample?(settlement.simulation?settledTasks:[settlement]).map(sample=>task(sample,'COMPLETED')):[],
-        ...(v3&&{phoneValidUntil:null,simulationState:currentSample&&device.activatedAt!==null?'CLOSING':'WAITING_CONFIG'}),
+        ...(v3&&{phoneValidUntil:null,simulationState:running?'CLOSING':'WAITING_CONFIG'}),
         ...(v2&&{recoveryPending:false,recoveryReason:null})};
-    });
-    return demoReplacementAssignmentHistory(state,{...proof,serverCanonical:true,serverNow:iso,devices:assignments,...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})});
+    };
+    // The v1 history contract accepts completed tasks only.
+    const assignments=v2||v3
+      ?demoTaskAssignments(state,devices,assignment,saved=>task({...currentSample,...saved},'CANCELLED'))
+      :devices.map(assignment);
+    return {...proof,serverCanonical:true,serverNow:iso,devices:assignments,...(v3?{protocolVersion:3,pendingEarned:[]}:v2?{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]}:{})};
   }
   if(p==='/api/tasks/v2/settlements'||p.startsWith('/api/tasks/v2/settlements/')) {
     const tasks=demoSettledTasks(state,state.previewFactsAt??now).filter(task=>task.batchNo);
