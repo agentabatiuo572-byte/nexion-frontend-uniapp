@@ -34,7 +34,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   };
   const existingIntent = intent => ({
     ...refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'),
-    data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo},
+    data: intent.kind === 'ORDER_PAY' ? null : {intentNo: intent.intentNo, commandKey: intent.commandKey},
   });
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   const positiveId = value => /^\+?\d+$/.test(String(value).trim()) && Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;

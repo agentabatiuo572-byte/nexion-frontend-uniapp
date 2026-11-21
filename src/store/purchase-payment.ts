@@ -27,7 +27,7 @@ export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receip
 export type PurchaseStep = 'methods' | 'network' | 'bank';
 type DefinitePaymentNotice = 'rejectQuotaPaused' | 'rejectQuotaMonthFull' | 'rejectQuotaSoldOut' | 'rejectConditionsUnmet' | 'rejectGateConditionsUnmet' | 'rejectPurchaseSetup' | 'trialConversionClosed' | 'trialNotConvertible';
 type EligibilityRetry = 'rejectEligibilityUnavailable';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | DefinitePaymentNotice;
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'originalUnavailable' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | DefinitePaymentNotice;
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
@@ -69,7 +69,7 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   retryNotice: '' as '' | EligibilityRetry,
   pausedPaymentMethod: null as ExternalPaymentMethod | null,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
-  originalRecovery: null as { intentNo: string; kind: PurchaseKind; fingerprint: string; summary: string } | null,
+  originalRecovery: null as { intentNo: string; commandKey?: string; kind: PurchaseKind; fingerprint: string; summary: string } | null,
   loading: false, retrying: false, reading: false, busy: false, error: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
@@ -399,7 +399,8 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     const cause = asApiError(error);
     if (cause.purchaseIntentNo && expected.kind !== 'ORDER_PAY') {
-      state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: expected.kind, fingerprint: fingerprint(expected), summary: expected.summary };
+      state.originalRecovery = { intentNo: cause.purchaseIntentNo, commandKey: cause.purchaseIntentCommandKey,
+        kind: expected.kind, fingerprint: fingerprint(expected), summary: expected.summary };
       await query();
       return;
     }
@@ -463,7 +464,9 @@ async function query() {
   state.reading = true;
   try {
     if (recovery) {
-      const intent = await api.get(recovery.intentNo);
+      let intent = await api.get(recovery.intentNo);
+      if (!owns(version, accountKey) || state.concluded) return;
+      if (!intent && recovery.commandKey) intent = await api.find(recovery.kind, recovery.commandKey);
       if (!owns(version, accountKey) || state.concluded) return;
       if (intent && (intent.intentNo !== recovery.intentNo || intent.kind !== recovery.kind)) {
         throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
@@ -485,7 +488,7 @@ async function query() {
         }
         openCashierOnReady = false;
         accept(intent, original);
-      } else conclude('existing');
+      } else conclude('originalUnavailable');
       state.originalRecovery = null;
       return;
     }
@@ -519,7 +522,7 @@ async function submitOriginal() {
   if (state.originalRecovery || pending.intentNo || pending.lookupOnly || pending.quotaRefusal) return query();
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false, lookup = false;
-  state.busy = true; state.canResubmit = false;
+  Object.assign(state, { busy: true, canResubmit: false, error: false, retryNotice: '' });
   try {
     const intent = await api.create(pending.paymentQuoteId, pending.commandKey);
     if (owns(version, accountKey) && !state.concluded) { state.error = false; state.retryNotice = ''; accept(intent, pending); }
@@ -530,7 +533,8 @@ async function submitOriginal() {
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
       if (cause.purchaseIntentNo && pending.kind !== 'ORDER_PAY') {
-        state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: pending.kind, fingerprint: pending.fingerprint, summary: pending.summary };
+        state.originalRecovery = { intentNo: cause.purchaseIntentNo, commandKey: cause.purchaseIntentCommandKey,
+          kind: pending.kind, fingerprint: pending.fingerprint, summary: pending.summary };
         Object.assign(state, { error: false, retrying: false, retryNotice: '' });
         lookup = true;
         return;
