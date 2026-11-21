@@ -296,6 +296,7 @@ import { isProductAvailable } from "@/store/product-availability";
 import { useOrders } from "@/store/orders";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision } from "@/domain/e20-capacity-coordinator";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
+import { onPurchaseRecordReleased, refusedPurchasePayment } from "@/store/purchase-payment";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
 import { readPaymentCommand } from "@/api/payment-command-api";
 import { parseCanonicalTradeinResult,parseCanonicalCapacityKeepResult,type CanonicalTradeinResult,type CanonicalCapacityKeepResult } from "@/api/device-e3-api";
@@ -353,7 +354,10 @@ function readPendingKeep(targetProductNo?: DeviceKind): PendingKeepCommand | nul
 function refreshKeepRecovery(target: DeviceKind | null = keepTarget()): void {
   keepRecovery.value = null; keepRecoveryError.value = false;
   if (!remoteApiEnabled || !target) return;
-  try { keepRecovery.value = readPendingKeep(target); }
+  try {
+    const pending = readPendingKeep(target);
+    if (pending && !refusedPurchasePayment(app.accountKey, pending.key)) keepRecovery.value = pending;
+  }
   catch { keepRecoveryError.value = true; }
 }
 watch([() => app.accountKey, () => app.accountBindingEpoch, keepTarget], () => refreshKeepRecovery(), { immediate: true, flush: "sync" });
@@ -364,7 +368,9 @@ function onRecoverKeep(): void {
   if (!command) return;
   void recoverCapacityPurchase(false);
 }
-const capacityRecovery = ref<CapacityPending|null>(null);
+const savedCapacity = ref<CapacityPending|null>(null);
+const capacityRefusal = computed(() => savedCapacity.value && refusedPurchasePayment(app.accountKey, savedCapacity.value.key));
+const capacityRecovery = computed(() => capacityRefusal.value ? null : savedCapacity.value);
 const capacityRecoveryBusy = ref(false);
 const capacityReadBusy = ref(false);
 const capacityPageShown = ref(true);
@@ -373,11 +379,18 @@ onShow(() => { capacityPageShown.value=true; });
 onHide(() => { capacityPageShown.value=false;capacityRecoveryGeneration++; });
 const capacityResumeAllowed = ref(false);
 const capacityRecoveryUnavailable = ref(false);
+const stopCapacityRelease = onPurchaseRecordReleased((accountKey, key) => {
+  if (accountKey !== app.accountKey || savedCapacity.value?.key !== key) return;
+  savedCapacity.value = null;
+  capacityResumeAllowed.value = false;
+  refreshKeepRecovery();
+});
+onUnmounted(stopCapacityRelease);
 watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,state,
   ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl],()=>{
   capacityRecoveryGeneration++;
   capacityResumeAllowed.value=false;
-  try { capacityRecovery.value=remoteApiEnabled?readCapacityPending(app.accountKey):null;capacityRecoveryUnavailable.value=false; }
+  try { savedCapacity.value=remoteApiEnabled?readCapacityPending(app.accountKey):null;capacityRecoveryUnavailable.value=false; }
   catch { capacityRecoveryUnavailable.value=true; }
 },{immediate:true,flush:'sync'});
 useAutoRecovery({
@@ -721,6 +734,7 @@ async function onChooseFullPrice() {
   const s = state.value;
   if (s.kind !== "choice" || quoteLoading.value) return;
   if (remoteApiEnabled) {
+    if (capacityRefusal.value) { void recoverCapacityPurchase(true); return; }
     refreshKeepRecovery(s.targetKind);
     if (keepRecovery.value) { onRecoverKeep(); return; }
     if (keepRecoveryError.value) { toast.warn(t.value.tradein.errPleaseRetry); return; }
@@ -1085,7 +1099,7 @@ function canonicalCapacityKey(
 function writeCapacityPending(accountKey:string,pending:CapacityPending|null):void {
   if (!writeAccountRow(CAPACITY_RECOVERY_TABLE,accountKey,{pending})
       || readCapacityPending(accountKey)?.key!==(pending?.key)) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
-  capacityRecovery.value=pending;
+  savedCapacity.value=pending;
   capacityResumeAllowed.value=false;
 }
 
@@ -1129,8 +1143,10 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
       }
     }
     let receipt:CanonicalTradeinResult|CanonicalCapacityKeepResult|null=null;
-    if (original) {
-      capacityRecovery.value=original;
+    const refused = original && refusedPurchasePayment(scope.accountKey, original.key);
+    if (refused && readOnlyCurrent) return;
+    if (original && !refused) {
+      savedCapacity.value=original;
       const result=await readPaymentCommand(apiClient,original.operation==='replace'?'capacity-replace':'capacity-keep',original.key);
       if (!current()) return;
       if (result.status==='SUCCEEDED') receipt=original.operation==='replace'
@@ -1154,7 +1170,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
     if (!receipt) {
       if (readOnlyCurrent) return;
       const purchaseIsCurrent=()=>current()&&props.active&&(state.value.kind==='replace'||state.value.kind==='choice'||allowOriginalResume&&state.value.kind==='keep-recovery')
-        &&(allowOriginalResume?readCapacityPending(scope.accountKey)?.intent===intent
+        &&(allowOriginalResume||refused?readCapacityPending(scope.accountKey)?.intent===intent
           :state.value.kind==='replace'&&state.value.newKind===newKind&&!!state.value.canonicalCapacityQuote&&capacityIntent(operation,state.value.canonicalCapacityQuote)===requestedIntent);
       receipt=await executeSelectedPurchase({amount:payable,currency:'USDT',summary},async authorization=>{
         const saved=readCapacityPending(scope.accountKey);
@@ -1175,18 +1191,19 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
       },purchaseIsCurrent,{kind:effectiveOperation==='replace'?'CAPACITY_REPLACE':'CAPACITY_KEEP',
         payload:{targetProductNo:target,expectedPayableUsdt:payable,...(effectiveOperation==='replace'?{sourceDeviceId:frozen!.sourceDeviceId}: {})},
         tradeinKey: original?.key,
+        refusedPaymentKey: refused?.commandKey,
         commandKey:()=>{const saved=readCapacityPending(scope.accountKey);const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};writeCapacityPending(scope.accountKey,original);return key;},
         onReplacementRefused: reason => {
           if (!current() || !props.active) return;
           capacityCommandKey.value = null;
-          capacityRecovery.value = null;
+          savedCapacity.value = null;
           capacityResumeAllowed.value = false;
           hide();
           if (reason === 'rejectCapacitySourceChanged') void refreshCapacityReplacement(target as DeviceKind);
         },
         parseReceipt:raw=>effectiveOperation==='replace'?parseCanonicalTradeinResult(raw):parseCanonicalCapacityKeepResult(raw)});
       // The record may have been released with a payment the server no longer holds.
-      if (!receipt) { capacityRecovery.value=readCapacityPending(scope.accountKey); return; }
+      if (!receipt) { savedCapacity.value=readCapacityPending(scope.accountKey); return; }
     }
     if (!current()||!original) return;
     if (Math.abs(purchasePrincipalUsdt(receipt)-payable)>0.000001
@@ -1209,7 +1226,7 @@ async function recoverCapacityPurchase(resume=false):Promise<void> {
   const current=()=>isCurrentAccountScope(scope)&&props.active&&capacityPageShown.value&&generation===capacityRecoveryGeneration;
   try {
     const pending=readCapacityPending(app.accountKey);
-    if (!pending) {capacityRecovery.value=null;capacityResumeAllowed.value=false;capacityRecoveryUnavailable.value=false;refreshKeepRecovery();return;}
+    if (!pending) {savedCapacity.value=null;capacityResumeAllowed.value=false;capacityRecoveryUnavailable.value=false;refreshKeepRecovery();return;}
     capacityRecoveryUnavailable.value=false;
     await runCanonicalCapacityPurchase(pending.operation,pending.quote,(pending.quote?pending.quote.targetProductNo:pending.targetProductNo) as DeviceKind,resume,resume?undefined:current);
   } catch { if(current())capacityRecoveryUnavailable.value=true; }
@@ -1307,6 +1324,7 @@ async function submitCanonicalCapacityReplacement(
 function onReplace() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
+  if (remoteApiEnabled&&capacityRefusal.value) { void recoverCapacityPurchase(true);return; }
   if (remoteApiEnabled&&(capacityRecovery.value||capacityRecoveryUnavailable.value)) { void recoverCapacityPurchase(false);return; }
   if (!canReplaceSource.value || replaceView.value?.insufficient) return;
   if (remoteApiEnabled) {
@@ -1481,6 +1499,7 @@ async function submitCanonicalKeepBuy(
 function onKeepBuy() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
+  if (remoteApiEnabled&&capacityRefusal.value) { void recoverCapacityPurchase(true);return; }
   if (remoteApiEnabled&&(capacityRecovery.value||capacityRecoveryUnavailable.value)) { void recoverCapacityPurchase(false);return; }
   if (remoteApiEnabled) {
     refreshKeepRecovery(s.newKind);

@@ -577,11 +577,22 @@ function purchaseEligibilityFailureCopy(): string {
     : t.value.store.gateBlockedToast;
 }
 
-function recoverCapacityBeforePurchase(targets: string[]): boolean {
+let refusedCapacityTarget: string | null = null;
+function recoverCapacityBeforePurchase(targets: string[], explicit = false): boolean {
+  refusedCapacityTarget = null;
   keepCheckoutTarget.value = null; keepCheckoutReadError.value = false;
   if (!remoteApiEnabled) return false;
   for (const target of targets) {
-    try { if (!readCapacityPending(app.accountKey, target)) continue; }
+    try {
+      const pending = readCapacityPending(app.accountKey, target);
+      if (!pending) continue;
+      if (refusedPurchasePayment(app.accountKey, pending.key)) {
+        refusedCapacityTarget = target;
+        if (!explicit || !pending.quote) continue;
+        tradein.showCanonicalReplace(target as DeviceKind, pending.quote.payableUsdt, pending.quote);
+        return true;
+      }
+    }
     catch { keepCheckoutReadError.value = true; }
     keepCheckoutTarget.value = target;
     productId.value = target;
@@ -653,6 +664,11 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, catalogRead?: 
       if (trialCheckoutSource) navBack("/pages/me/trial");
       else navTo("/store");
       setTimeout(() => { toast.info(unavailableCopy, undefined, 2600); }, 120);
+      return;
+    }
+    // The existing trade-in action can read a refused original before any new-purchase gate.
+    if (refusedCapacityTarget === routeScope.productNo) {
+      tradeinAvailable.value = true;
       return;
     }
     if (!hasOriginalCheckout.value && pp.inventoryMode === "FINITE" && (pp.stock ?? 0) <= 0) {
@@ -980,6 +996,7 @@ async function reAddTradein() {
   reAddingTradein.value = true;
   interceptFired = false;
   try {
+    if (recoverCapacityBeforePurchase([scope.productNo], true)) return;
     const opened = await fireTradeinIntercept('interactive');
     if (!isCurrentCheckoutRoute(scope)) return;
     if (opened) removedTradein.value = false;
@@ -2265,7 +2282,7 @@ async function submitRemoteOrder(): Promise<void> {
   const reviewedTotal = confirmationTotal.value;
   const reviewedTrialVersion = trialView.value.quoteVersion;
   if (await resumePendingRemoteTradein(submissionScope)
-      || (!hasOriginalCheckout.value && recoverCapacityBeforePurchase([submissionScope.productNo]))) { confirming = false; return; }
+      || (!hasOriginalCheckout.value && recoverCapacityBeforePurchase([submissionScope.productNo], true))) { confirming = false; return; }
   const walletReceiptScope = app.captureRemoteAccountRequest();
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
