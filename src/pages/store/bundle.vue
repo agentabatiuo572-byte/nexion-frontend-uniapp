@@ -130,9 +130,12 @@
               <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.gateBlockedToast) }}</text>
               <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             </view>
-            <view v-if="!eligibilityUnavailable(p.id)" class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
+            <view v-if="!eligibilityUnavailable(p.id)" class="shrink-0 flex items-center" style="gap: 4px">
+            <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
               <svg v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
               <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+            </view>
+            <NxIcon v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" name="chevron-right" :size="16" style="color: var(--v5-ink-4)" />
             </view>
           </view>
         </view>
@@ -163,30 +166,34 @@
             <text :style="rowLabelStyle(false)">{{ t.bundle.estimatedDaily }}</text>
             <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">${{ cumulativeDailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
-          <!-- Checkout CTA — 结算不可用时置灰 + 换文案(禁用原因),下一步走 CTA 下方那句 hint。
-               箭头 / 上传图标一并撤掉:禁用态上留着「向前」的箭头是反语义的。 -->
-          <view
-            class="w-full flex items-center justify-center"
-            :class="checkoutUnavailable ? '' : 'active:scale-[0.98]'"
-            :style="ctaStyle"
-            role="button"
-            tabindex="0"
-            :aria-disabled="checkoutUnavailable"
-            :aria-label="ctaText"
-            @click.stop="onCheckout"
-            @keydown="activate($event, onCheckout)"
-          >
-            <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18" /><path d="M5 10l7-7 7 7" /><path d="M5 21h14" /></svg>
-            <text :style="ctaLabelStyle">{{ ctaText }}</text>
-            <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-          </view>
-          <!-- 禁用原因 + 下一步(项目不变量:业务链必须有下一步 / 禁用原因)。 -->
-          <text v-if="checkoutUnavailable" class="block" :style="ctaHintStyle">{{ checkoutHint }}</text>
         </view>
+      </view>
+      <!-- Room for the bottom action bar: the hidden note copy tracks the tray note's height. -->
+      <view v-if="products.length > 0" class="bundle-bar-space" :class="{ 'bundle-bar-space--tray': checkoutUnavailable && checkoutHint }" aria-hidden="true">
+        <text v-if="checkoutUnavailable && checkoutHint" class="bundle-bar-space__note">{{ checkoutHint }}</text>
       </view>
       </template>
       </template>
     </view>
+    </template>
+    <!-- Page main action in the shared bottom action bar (04 §4.0): a lone button floats; the
+         disabled reason sits above the button in the tray. -->
+    <template #pageFixed>
+      <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure && products.length > 0" class="bundle-bar nx-glass-bar">
+        <text v-if="checkoutUnavailable && checkoutHint" class="nx-tray-note">{{ checkoutHint }}</text>
+        <view
+          class="bundle-bar__cta"
+          role="button"
+          tabindex="0"
+          :aria-disabled="checkoutUnavailable"
+          :aria-label="ctaText"
+          @click.stop="onCheckout"
+          @keydown="activate($event, onCheckout)"
+        >
+          <text>{{ ctaText }}</text>
+          <NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" />
+        </view>
+      </view>
     </template>
   </AppChassis>
 </template>
@@ -207,6 +214,7 @@ import PromotionBundle from '@/components/promotion/promotion-bundle.vue';
 import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
@@ -1024,32 +1032,23 @@ function rowValueStyle(tint?: string, big = false): CSSProperties {
   };
 }
 
-// disabled 态按设计系统的状态派生公式:填充降 surface 系 + 文字/图标降 ink-4 + 去掉 glow。
-const ctaStyle = computed<CSSProperties>(() => ({
-  marginTop: "14px",
-  gap: "6px",
-  height: "50px",
-  borderRadius: "999px",
-  background: checkoutUnavailable.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
-  boxShadow: checkoutUnavailable.value ? "none" : "var(--v5-spotlight-brand)",
-  color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
-}));
-const ctaLabelStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "var(--ui-type-button)",
-  letterSpacing: "-0.005em",
-  color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
-}));
-// 禁用原因 + 下一步那句。text-wrap: pretty 走排版铁律(禁末行孤字)。
-const ctaHintStyle: CSSProperties = {
-  marginTop: "10px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  lineHeight: 1.5,
-  color: "var(--v5-ink-3)",
-  textWrap: "pretty",
-};
-
-
 </script>
+
+<style scoped>
+.bundle-bar { position: absolute; z-index: 36; display: flex; flex-direction: column; animation: bundle-bar-in .42s cubic-bezier(.16,1,.3,1) .2s both; }
+/* Primary L 48 (03 §3.1); the shared bar rules restyle it while aria-disabled. */
+.bundle-bar__cta { display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 20px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
+.bundle-bar__cta :deep(uni-text), .bundle-bar__cta :deep(text) { white-space: nowrap; }
+.bundle-bar__cta[aria-disabled="false"]:active { transform: scale(.98); }
+.bundle-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+/* Sub-page content already ends 64px above the screen bottom (pb-6 24 + chassis 40). Floating: 48 + 22 + 16;
+   tray: 8 + note + 8 + 48 + 8, plus 22 + 16. */
+.bundle-bar-space { visibility: hidden; padding: 0 32px 22px; }
+.bundle-bar-space--tray { padding-bottom: 46px; }
+.bundle-bar-space__note { display: block; padding-top: 4px; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: anywhere; text-wrap: pretty; }
+@keyframes bundle-bar-in { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .bundle-bar { animation: none; }
+  .bundle-bar__cta[aria-disabled="false"]:active { transform: none; }
+}
+</style>
