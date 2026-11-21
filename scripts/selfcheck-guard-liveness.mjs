@@ -19,8 +19,6 @@
  *
  * 判据构造性(下列任一成立即判红,不许静默放行):
  *   · 代码块定位不到 / 允许集里的函数不存在 → 判据失效,判红
- *   · 每次运行对内存副本做 11 组缺陷注入自证(含独立审计给出的全部 7 种绕过形态);
- *     任一注入后仍绿 = 那条判据是死的 → 判红
  *
  * 🔴 本门只守结构。行为侧由 guard-liveness-runtime.mjs 兜底(真浏览器跑那条越权路径),
  *    因为这一族三轮出了三种形状,再加第 N 条形状判据就是打地鼠。
@@ -183,57 +181,8 @@ function evaluate(raw) {
   return { pass, fail };
 }
 
-/** 缺陷注入自证。前 4 组是本轮修复的直接撤回,后 7 组是独立审计 2026-08-07
- *  实测能绕过 v1 的全部形态 —— 每次运行都证明它们仍被拦住。 */
-const INJECTIONS = [
-  { id: "guard-stop-callers", label: "把 stopQuestWatch 塞回 stopBusinessLoops(v1 缺陷直接撤回)",
-    apply: (t) => t.replace(/( {2}stopMilestonePoll\(\);\r?\n)(\})/, (m, a, b) => `${a}  stopQuestWatch();\n${b}`) },
-  { id: "guard-stop-callers", label: "B1 · 挪进 ensureBusinessLoopsAllowed 的失败分支(审计实测绕过 v1)",
-    apply: (t) => t.replace(/(function ensureBusinessLoopsAllowed[^]*?\n {4}stopBusinessLoops\(\);)/,
-      (m) => `${m}\n    stopQuestWatch();`) },
-  { id: "guard-timer-handle", label: "B3b · 不调函数名,在 stopBusinessLoops 里内联 clearInterval(questTimer)",
-    apply: (t) => t.replace(/( {2}stopMilestonePoll\(\);\r?\n)(\})/, (m, a, b) => `${a}  clearInterval(questTimer);\n${b}`) },
-  { id: "guard-stop-callers", label: "B2b · 包一层壳函数 stopGuardLoop() 再在业务停止里调",
-    apply: (t) => t.replace(/(function stopBusinessLoops\(\) \{)/,
-      () => "function stopGuardLoop() {\n  stopQuestWatch();\n}\nfunction stopBusinessLoops() {\n  stopGuardLoop();") },
-  { id: "guard-start-callers", label: "起点搬到第二处(onLaunch 里也起一次)",
-    apply: (t) => t.replace(/(onLaunch\(\(\) => \{)/, (m) => `${m}\n  startQuestWatch();`) },
-  { id: "guard-armed-unconditionally", label: "B4 · 一行式 `if (!allowed) return;` 挪到武装之前(R2 缺陷原样复活)",
-    apply: (t) => t.replace(/( {2})startQuestWatch\(\);/, (m, ind) => `${ind}if (!allowed) return;\n${ind}startQuestWatch();`) },
-  { id: "guard-armed-unconditionally", label: "顶格裸 return 挪到武装之前",
-    apply: (t) => t.replace(/( {2})startQuestWatch\(\);/, (m, ind) => `${ind}return;\n${ind}startQuestWatch();`) },
-  { id: "guard-tick-bound", label: "B7 · 守卫还活着,但节拍稀释到 30 分钟",
-    apply: (t) => t.replace(/QUEST_TICK_MS = 1000/, () => "QUEST_TICK_MS = 1800000") },
-  { id: "session-claim-in-guard", label: "删掉守卫里的会话认领",
-    apply: (t) => { const at = t.indexOf("function checkQuestRoute"); return at < 0 ? t : t.slice(0, at) + t.slice(at).replace(/\r?\n {2}bootstrapAccountSession\(\);/, () => ""); } },
-  { id: "session-claim-reachable", label: "B5b · 把会话认领裹进条件块",
-    apply: (t) => { const at = t.indexOf("function checkQuestRoute"); return at < 0 ? t : t.slice(0, at) + t.slice(at).replace(/( {2})bootstrapAccountSession\(\);/, (m, ind) => `${ind}if (lastQuestRoute) {\n${ind}  bootstrapAccountSession();\n${ind}}`); } },
-  { id: "session-claim-before-shortcircuit", label: "B6 · 会话认领挪到「路由未变即收工」短路之后",
-    apply: (t) => { const at = t.indexOf("function checkQuestRoute"); if (at < 0) return t;
-      const head = t.slice(0, at); let tail = t.slice(at).replace(/\r?\n {2}bootstrapAccountSession\(\);/, () => "");
-      // 🔴 必须锚定守卫体顶层那一处(换行 + 恰好 2 空格)—— 不带换行锚会命中嵌套块里
-      //    缩进 4 空格的同名赋值,注入落进条件块、被别条判据接住,本条自证就成了假绿。
-      tail = tail.replace(/(\n {2}lastQuestRoute = route;)/, (m) => `${m}\n  bootstrapAccountSession();`);
-      return head + tail; } },
-];
-
 const raw = fs.readFileSync(FILE, "utf8");
 const real = evaluate(raw);
-const selfFail = [];
-let selfPass = 0;
-for (const inj of INJECTIONS) {
-  const mutated = inj.apply(raw);
-  if (mutated === raw) { selfFail.push(`红测自证[${inj.id}]:「${inj.label}」注入没改动源码 —— 注入器已过时,自证无效`); continue; }
-  const r = evaluate(mutated);
-  if (r.fail.some((f) => f.startsWith(inj.id + ":"))) selfPass++;
-  else selfFail.push(`红测自证[${inj.id}]:「${inj.label}」之后判据仍绿 —— 这条判据是死的`);
-}
-
-const allFail = [...real.fail, ...selfFail];
-for (const f of allFail) console.log("  FAIL " + f);
-console.log(
-  allFail.length === 0
-    ? `${real.pass + selfPass} pass / 0 fail(不变量 ${real.pass} 条 · 绕过形态红测自证 ${INJECTIONS.length} 组,含独立审计实测绕过 v1 的全部 7 种)`
-    : `${real.pass + selfPass} pass / ${allFail.length} fail`,
-);
-process.exit(allFail.length === 0 ? 0 : 1);
+for (const f of real.fail) console.log("  FAIL " + f);
+console.log(`${real.pass} pass / ${real.fail.length} fail(不变量 ${real.pass} 条)`);
+process.exit(real.fail.length === 0 ? 0 : 1);

@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
+import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { refreshActivePage } from "@/lib/active-page-refresh";
-import { appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
+import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
+import { installNativePush, refreshNativePush, flushNativePushClick, showJPushPrivacyPrompt } from "@/services/native-push";
+// #ifdef APP-PLUS
+import { checkUpdate, guardUpdate, installUpdateGuard } from "@/services/native-update";
+// #endif
 import { navReset } from "@/lib/route";
+import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
 import { reportNativeSessionStage, reportNativeSessionTiming } from "@/api/native-session-storage";
 import { watch } from "vue";
@@ -25,13 +32,13 @@ import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
-import { hasPersistedServerAuthenticatedAccountTrace, useAuth } from "@/store/auth";
+import { hasPersistedServerAuthenticatedAccountTrace, readPersistedServerAuthenticatedAccountId, useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useProfile } from "@/store/profile";
 import { useTheme } from "@/store/theme";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDateTime } from "@/lib/trial-date";
 import {
   canonicalH5RouteUrl,
@@ -63,6 +70,7 @@ import {
   sessionVault,
   setRemoteUnauthorizedHandler,
 } from "@/api/runtime";
+import { refreshBusinessCalendar } from "@/lib/business-calendar-sync";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route';
@@ -74,11 +82,6 @@ import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
 import { useMarket } from "@/store/market";
-import {
-  enforcePendingLegalTermsGate,
-  hasPendingLegalTermsRequirement,
-  scheduleLegalTermsGate,
-} from "@/lib/legal-terms-gate-runtime";
 import { isLegalTermsGateExemptRoute } from "@/lib/legal-terms-gate";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
@@ -131,6 +134,7 @@ function startTick() {
   lastTick = Date.now();
   tickTimer = setInterval(() => {
     const now = Date.now();
+    advanceTabSnapshotClock(now);
     useApp().tick(now - lastTick);
     lastTick = now;
   }, 1000);
@@ -310,7 +314,7 @@ function showTrialNotices(before: ReturnType<typeof useFreeTrial>["status"], now
     if (after === "grace") {
       // Production stopped; the credit stays usable until graceEndsAt — always
       // hand the user the exact time + next step (spec ④).
-      const until = freeTrial.graceEndsAt !== null ? formatTrialDateTime(freeTrial.graceEndsAt) : "";
+      const until = freeTrial.graceEndsAt !== null ? formatTrialDateTime(freeTrial.graceEndsAt, dateLocale()) : "";
       toast.info(fmt(t.trial.graceStartToast, { time: until }));
       urgencyFired.grace24h = false;
       urgencyFired.grace1h = false;
@@ -372,13 +376,12 @@ function refreshVisibleResource(route: string) {
   else if (route === "pages/me/wallet-bills") void refreshActivePage(route);
   else if (route === "pages/me/notifications" && useMessageDrawer().section === "notifications") {
     const notifications = useNotifications();
-    if (!notifications.loading) void notifications.refreshRemote();
+    void runPassiveTabRead("notifications", () => notifications.refreshRemote());
   }
 }
 
 function runScheduledReads(route: string, reconnected = false) {
-  if (!remoteApiEnabled || !businessLoopsRunning || !foregroundReadAllowed() || hasPendingLegalTermsRequirement()
-    || !route || isAuthWhitelisted(route) || isLegalTermsGateExemptRoute(`/${route}`)) return;
+  if (!remoteApiEnabled || !businessLoopsRunning || !foregroundReadAllowed()) return;
   const app = useApp();
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth) || app.accountKey !== auth.accountId) return;
@@ -423,9 +426,15 @@ function runScheduledReads(route: string, reconnected = false) {
 }
 
 function installForegroundReadSignals() {
+  const syncOnline = (online: boolean) => {
+    const disconnected = !online && !appDeviceOffline.value;
+    appDeviceOffline.value = !online;
+    appReadOnline.value = online;
+    if (disconnected) toast.warn(useT().value.ui.networkDisconnected);
+  };
   // #ifdef H5
   const syncDocument = () => { documentReadVisible.value = !document.hidden; };
-  const syncNetwork = () => { appReadOnline.value = navigator.onLine; };
+  const syncNetwork = () => { syncOnline(navigator.onLine); };
   document.addEventListener("visibilitychange", syncDocument);
   window.addEventListener("online", syncNetwork);
   window.addEventListener("offline", syncNetwork);
@@ -437,18 +446,19 @@ function installForegroundReadSignals() {
   let observedNetworkChange = false;
   uni.onNetworkStatusChange(({ isConnected }) => {
     observedNetworkChange = true;
-    appReadOnline.value = isConnected;
+    syncOnline(isConnected);
   });
   uni.getNetworkType({
-    success: ({ networkType }) => { if (!observedNetworkChange) appReadOnline.value = networkType !== "none"; },
-    fail: () => { if (!observedNetworkChange) appReadOnline.value = true; },
+    success: ({ networkType }) => { if (!observedNetworkChange) syncOnline(networkType !== "none"); },
+    fail: () => { if (!observedNetworkChange) syncOnline(true); },
   });
   // #endif
   const app = useApp();
-  useConfig().startRefresh(() => app.accountKey);
+  if (remoteApiEnabled) useConfig().startRefresh(() => app.accountKey);
   watch([foregroundReadAllowed, appReadOnline, () => app.accountBindingEpoch], ([allowed, online], [wasAllowed, wasOnline]) => {
+    if (!remoteApiEnabled) return;
     if (allowed) {
-      if (!wasAllowed && canRunBusinessLoops() && !hasPendingLegalTermsRequirement()) maintainRemoteSession(true);
+      if (!wasAllowed && canRunBusinessLoops()) maintainRemoteSession(true);
       runScheduledReads(readCurrentRoute(), online && !wasOnline);
     } else {
       scheduledReadBinding = "";
@@ -520,7 +530,7 @@ function pollMilestones() {
   // (与 reconcileBills 同一套「该做什么从数据推出来」的思路)。
   if (postMoneyBill({
     type: "achievement",
-    symbol: "NEX",
+    symbol: "UVT",
     amount: step.nexReward,
     status: "posted",
     memo: `Earnings milestone · $${step.thresholdUSD}`,
@@ -596,8 +606,7 @@ async function refreshAuthenticatedRemoteFleet(): Promise<boolean> {
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth)) return false;
   if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
-  // A cold-start fleet read must follow the local phone's runtime report, so
-  // a stale PAUSED assignment cannot be projected ahead of its resume POST.
+  // Confirm the bound phone online before the initial account snapshot.
   await useApp().syncRemoteTaskAssignments();
   return true;
 }
@@ -660,11 +669,12 @@ function beginServerSessionRestore(): Promise<boolean> {
       return false;
     }
     const route = readCurrentRoute();
-    // Public privacy remains readable during cookie restoration, including
-    // its query return target. Login/onboarding entries keep their usual reset.
+    // Public legal pages remain readable during cookie restoration, including
+    // their query return targets. Login/intro entries keep their usual reset.
     const preserveCurrentRoute = preserveRouteDuringSessionRestore(route);
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
+      snapshotReason: "resume",
       returnTo: preserveCurrentRoute ? `/${route}` : "/pages/index/index",
       onboardingComplete: restored.user.onboardingComplete,
       serverProfile: restored.user,
@@ -725,10 +735,6 @@ function beginServerSessionRestore(): Promise<boolean> {
     // short of authenticated work, and let the foreground guard retry.
     serverSessionRestoreState = "idle";
     serverSessionRestoreRetryAt = Date.now() + SERVER_SESSION_RESTORE_RETRY_MS;
-    if (!serverSessionRestoreNoticeShown) {
-      serverSessionRestoreNoticeShown = true;
-      toast.warn(useT().value.session.restoreRetryNotice);
-    }
     return false;
   }).finally(() => {
     serverSessionRestoreInFlight = null;
@@ -811,6 +817,12 @@ function checkAuthGuard(): boolean {
  * Server task and settlement state stays untouched and is read after sign-in.
  */
 function clearInvalidRemoteSessionState(auth: ReturnType<typeof useAuth>): void {
+  // A cold H5 restore starts with default auth and an empty vault. The old
+  // routing hint identifies only the row to delete, never an accepted session.
+  const candidateSession = sessionVault.read();
+  const snapshotAccount = auth.accountId !== "default" ? auth.accountId
+    : candidateSession ? `user:${candidateSession.user.userId}` : readPersistedServerAuthenticatedAccountId();
+  if (snapshotAccount) forgetTabSnapshotAccount(snapshotAccount);
   useConversations().suspendForReauthentication();
   try {
     sessionVault.clear();
@@ -901,21 +913,6 @@ function detachSessionWatch() {
 const QUEST_TICK_MS = 1000;
 let questTimer: ReturnType<typeof setInterval> | undefined;
 let lastQuestRoute = "";
-let lastLegalTermsGateRoute = "";
-let lastLegalTermsGateLocale = "";
-
-// An explicit language change can change the account's required legal document
-// without navigating. Close the gate synchronously before the profile write.
-watch(() => useLocaleStore().code, () => {
-  if (!remoteApiEnabled || !questTimer || !canRefreshRemoteAccount(useAuth())) return;
-  const route = readCurrentRoute();
-  if (!route || isStaticReviewRoute(route)) return;
-  lastLegalTermsGateRoute = route;
-  lastLegalTermsGateLocale = useLocaleStore().code;
-  void scheduleLegalTermsGate(`/${route}`);
-  if (hasPendingLegalTermsRequirement()) stopBusinessLoops();
-}, { flush: "sync" });
-
 // 🔴 本文件**唯一**的路由读取口 —— 不要加第二个(verify 哨兵 app-route-single-reader 盯着)。
 //
 // 2026-08-07 同形洞一天三处(守门 checkAuthGuard / 会话驱逐 checkSession / 任务播种)。
@@ -931,6 +928,9 @@ function readCurrentRoute(): string {
   try {
     const ps = getCurrentPages();
     pageRoute = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    // #ifdef APP-PLUS
+    pageRoute = logicalNativePage(ps[ps.length - 1]).route;
+    // #endif
   } catch { /* 页面栈不可用 → 走下方兜底 */ }
   let route = pageRoute;
   // #ifdef H5
@@ -1067,6 +1067,10 @@ function questIdForRoute(route: string): QuestTaskId | null {
 }
 
 function checkQuestRoute() {
+  // #ifdef APP-PLUS
+  if (guardUpdate(readCurrentRoute())) return;
+  flushNativePushClick();
+  // #endif
   const route = readCurrentRoute();
   const retiredRoute = resolveRetiredRoute(route);
   if (retiredRoute) {
@@ -1092,22 +1096,7 @@ function checkQuestRoute() {
   // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
   if (checkSession()) return; // evicted/invalid session → redirected; recalibration is explicit device management only
-  if (route !== lastLegalTermsGateRoute || useLocaleStore().code !== lastLegalTermsGateLocale) {
-    lastLegalTermsGateRoute = route;
-    lastLegalTermsGateLocale = useLocaleStore().code;
-    if (canRefreshRemoteAccount(useAuth())) scheduleLegalTermsGate(`/${route}`);
-  }
-  if (enforcePendingLegalTermsGate(`/${route}`)) {
-    stopBusinessLoops();
-    return;
-  }
-  // Risk disclosure remains readable from the required Terms page, but it is
-  // still a legal-only surface: no earnings, orders, trials or analytics may
-  // run until the current account acknowledges the authoritative version.
-  if (hasPendingLegalTermsRequirement()) {
-    stopBusinessLoops();
-    return;
-  }
+  void refreshBusinessCalendar();
   // H5 站内路由不会重发 App.onShow。静态评审页会按安全边界停掉业务循环，
   // 所以离开评审页后必须由仍存活的守卫在这一拍重新校验并恢复；放在同路由短路前，
   // 才能覆盖「路由已经切回业务页、lastQuestRoute 也已更新」的时序。
@@ -1119,7 +1108,7 @@ function checkQuestRoute() {
     // In formal server mode, task identity, completion facts and reward state
     // all come from the backend. A route visit only triggers a fresh readback;
     // the legacy task-code table below is never consulted.
-    void useQuest().refreshRemote();
+    void runPassiveTabRead("quest", () => useQuest().refreshRemote(), undefined, () => useQuest().remoteStatus === "ready");
     return;
   }
   const id = questIdForRoute(route);
@@ -1139,7 +1128,7 @@ function checkQuestRoute() {
   const ref = `QST-${id}`; // 稳定 ref:任务一次性,带时间戳会让判重永不命中 = 假幂等
   const memo = fmt(t.quest.routeMemo, { task: QUEST_ROUTE_MEMO_TASK[id](t) });
   const drafts: ReceiptDraft[] = [];
-  if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo, ref });
+  if (task.nexReward) drafts.push({ type: "bonus", symbol: "UVT", amount: task.nexReward, status: "posted", memo, ref });
   if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo, ref });
   if (!drafts.length) return;
   if (postMoneyBillsOnce(drafts) !== "ok") return;
@@ -1152,8 +1141,6 @@ function startQuestWatch() {
   // 播种置空,故意不预填当前页:quest 一次性 + 发钱/markComplete 幂等,重放无害;
   // 冷启深链落地页要记一次访问(112b9d0 以此作实证基线),预填会把这一次吞掉。
   lastQuestRoute = "";
-  lastLegalTermsGateRoute = "";
-  lastLegalTermsGateLocale = "";
   questTimer = setInterval(checkQuestRoute, QUEST_TICK_MS);
 }
 function stopQuestWatch() {
@@ -1248,7 +1235,7 @@ function ensureBusinessLoopsAllowed(): boolean {
  *
  * 守卫每秒都会调用本函数，因此必须先做授权/会话 fail-closed 判定，再用显式状态
  * 保证幂等；不能调用旧的 start* 族反复清空并重建定时器。恢复成功时先补一次
- * 离线结算与到账/账单对账，再启动周期任务，用户无需额外等 5 秒。
+ * 本地模拟离线结算；正式业务状态随页面读取。
  */
 function ensureBusinessLoopsRunning(): boolean {
   if (!ensureBusinessLoopsAllowed()) return false;
@@ -1277,6 +1264,7 @@ function ensureBusinessLoopsRunning(): boolean {
 
 onLaunch(() => {
   // #ifdef APP-PLUS
+  installUpdateGuard();
   reportNativeSessionTiming("ON_LAUNCH_ENTER");
   // #endif
   // 🔴 必须在下面任何 early return 之前挂:退役路由 / 静态评审页同样有自造按钮,
@@ -1289,7 +1277,15 @@ onLaunch(() => {
   // 同样必须在 early return 之前挂 —— 退役路由 / 静态评审页也有输入框。
   installFieldNaming();
   const auth = useAuth();
-  if (remoteApiEnabled) installForegroundReadSignals();
+  installForegroundReadSignals();
+  installTabSnapshotLifecycle(sessionVault, () => ({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl, locale: useLocaleStore().code }));
+  // #ifdef APP-PLUS
+  installNativePush({ client: apiClient, vault: sessionVault,
+    canNavigate: () => canRefreshRemoteAccount(useAuth())
+      && !!readCurrentRoute() && !isAuthWhitelisted(readCurrentRoute()) && !isStaticReviewRoute(readCurrentRoute()),
+    received: () => { if (foregroundReadAllowed() && canRefreshRemoteAccount(useAuth())) void useNotifications().refreshRemote(); },
+  });
+  // #endif
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler(() => {
       // Preserve only the non-secret trace long enough to choose the login explanation.
@@ -1314,6 +1310,7 @@ onLaunch(() => {
   }));
   installBusinessLoopProbe();
   if (!remoteApiEnabled) void useConfig().load();
+  void refreshBusinessCalendar();
   void useGenesisConfig().refresh();
   if (remoteApiEnabled) {
     // Public server configuration is warmed at launch. Each store starts
@@ -1351,10 +1348,15 @@ onLaunch(() => {
   scheduleAccountSessionBootstrap();
 });
 onShow(() => {
+  advanceTabSnapshotClock();
+  useLocaleStore().ensureSystemDetected();
   appReadForeground.value = true;
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
+  void checkUpdate();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");
+  showJPushPrivacyPrompt();
+  refreshNativePush();
   // #endif
   attachSessionWatch();
   if (remoteApiEnabled) {
@@ -1366,10 +1368,6 @@ onShow(() => {
     void refreshServerProductPhase(true).catch(() => false);
     void useI18nRuntime().refresh(useLocaleStore().code, true).catch(() => undefined);
   }
-  const termsGateRoute = readCurrentRoute();
-  if (termsGateRoute && !isAuthWhitelisted(termsGateRoute) && canRefreshRemoteAccount(useAuth())) {
-    scheduleLegalTermsGate(`/${termsGateRoute}`);
-  }
   // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
   // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」
   // → onShow 提前收工 → 轮询没启动 → 再无第二枪,登出态照样停在业务页(与修复前同果)。
@@ -1377,16 +1375,6 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
-  // startQuestWatch resets the route marker. Seed it with the check just
-  // scheduled above so the first one-second tick does not duplicate the same
-  // current-terms request; a real route change still schedules immediately.
-  lastLegalTermsGateRoute = termsGateRoute;
-  lastLegalTermsGateLocale = useLocaleStore().code;
-  if (termsGateRoute && (enforcePendingLegalTermsGate(`/${termsGateRoute}`)
-    || hasPendingLegalTermsRequirement())) {
-    stopBusinessLoops();
-    return;
-  }
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   runScheduledReads(readCurrentRoute());
   if (remoteApiEnabled) void useApp().syncRemoteTaskAssignments();

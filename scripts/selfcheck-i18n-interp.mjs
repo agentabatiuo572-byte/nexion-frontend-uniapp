@@ -69,7 +69,7 @@ const ESCAPE = "i18n-raw-ok";
 // render. Match the enclosing call instead; a completed earlier fmt() cannot
 // cover a later reference because its closing parenthesis is before that ref.
 function fmtWrapsReference(text, index) {
-  const calls = /\bfmt\s*\(/g;
+  const calls = /\b(?:fmt|courseDurationText)\s*\(/g;
   for (const call of text.matchAll(calls)) {
     const open = call.index + call[0].lastIndexOf("(");
     let depth = 0;

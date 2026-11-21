@@ -1,3 +1,4 @@
+import { revokeAcceptedTabSnapshots } from "./tab-first-screen-snapshot";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useGenesis } from "@/store/genesis";
 import { useVRank } from "@/store/v-rank";
@@ -26,7 +27,6 @@ import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { usePreferences } from "@/store/preferences";
 import { useReceipts } from "@/store/receipts";
-import { useTickets } from "@/store/tickets";
 import { useCart } from "@/store/cart";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { useProfile } from "@/store/profile";
@@ -34,13 +34,11 @@ import { useSecurity } from "@/store/security";
 import { useRewardsSeen } from "@/store/rewards-seen";
 import { useSponsorship } from "@/store/sponsorship";
 import { useConversations } from "@/store/conversations";
-import { useNova } from "@/store/nova";
 import { useRankSnapshot } from "@/store/rank-snapshot";
 import { useGenesisPoints } from "@/store/genesis-points";
 import { useNetworkRank } from "@/store/network-rank";
 import { bindEarningsReleaseAccount } from "@/store/earning-release";
 import { useReferralReward } from "@/store/referral-reward";
-import { useRepurchase } from "@/store/repurchase";
 import { useNetwork } from "@/store/network";
 import { prepareProductCatalog } from "@/store/product-catalog";
 import { prepareServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
@@ -72,13 +70,14 @@ export function isCurrentAccountScope(request: RemoteAccountRequest): boolean {
  *  批2 券/试用/兑换:券包 · 试用状态机 · swap 记录 · 兑换风控计数(日限) · 绑卡 · 签到状态机 · 提现地址簿(包 E 地址直管)
  *  批3 任务/成就/游戏化:任务完成 · 周任务 · 活动任务 · 里程碑 fired · 成就 · 目标 · 幸运转盘票据 · 每日增益
  *  批4 记录/账户:通知 feed · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置 · 奖励已读水位线
- *  批5 会话记录:会话中心(advisor/support) · Nova 记录 — 非持久,换号 = reset 重播种
+ *  批5 会话记录:会话中心(advisor/support) — 非持久,换号 = reset 重播种
  * 顺带保留设备级(平台态/设备偏好,不迁):主题 · 语言 · preferences · auth 登录态 ·
  * session · risk-cluster · risk-identity · earning-release(以 accountKey 为参的注册表,已按账号)·
  * product-phase · trial-config · genesis-config(运营镜像)。
  * sponsorship 的推荐归因也按账号重绑，避免同设备不同账号串展示/串礼。
  */
 export function rebindAccountScopedStores(accountKey: string): void {
+  revokeAcceptedTabSnapshots();
   useMessageDrawer().bindAccount();
   remoteAccountScope.bind(accountKey);
   const accountScope = remoteAccountScope.snapshot();
@@ -122,7 +121,6 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useWeeklyQuest().bindAccount(accountKey);
   useReferralReward().bindAccount(accountKey);
   useNetwork().bindAccount(accountKey);
-  useRepurchase().bindAccount(accountKey);
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
   useGenesisPoints().bindAccount(accountKey);
   useNetworkRank().bindAccount(accountKey);
@@ -135,16 +133,14 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useNotifications().bindAccount(accountKey);
   usePreferences().bindAccount(accountKey);
   useReceipts().bindAccount(accountKey);
-  useTickets().bindAccount(accountKey);
   useCart().bindAccount(accountKey);
   usePendingCheckout().bindAccount(accountKey); // 待支付会话(结算扫码步的发票):换号必换行
   useProfile().bindAccount(accountKey);
   useSecurity().bindAccount(accountKey);
   useSponsorship().bindAccount(accountKey);
-  // 会话中心 + Nova 是非持久会话记录(无按账号存储),换号语义 = 清空重播种——
-  // 防上一账号的客服对话/Nova 推送在 SPA 内切号(reLaunch 不重载文档)后被下一账号看到。
+  // 会话中心是非持久会话记录(无按账号存储),换号语义 = 清空重播种——
+  // 防上一账号的客服对话在 SPA 内切号(reLaunch 不重载文档)后被下一账号看到。
   useConversations().bindAccount(accountKey);
-  useNova().reset();
   // rewards-seen 读 bills(已在上方先重绑)派生红点,故放最后。
   useRewardsSeen().bindAccount(accountKey);
 }

@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { serverLanguage } from "@/i18n";
 import type { ApiEnvironment } from "./runtime-config";
 import { normalizeQuestActionRoute } from "@/lib/quest-presentation";
 
@@ -258,7 +259,7 @@ export function createQuestApi(client: ApiClient, mode: ApiEnvironment = "prod")
   return {
     state: async (locale = "en") => parseQuestSnapshot(await client.request({
       method: "GET",
-      path: `/api/quests/state?locale=${encodeURIComponent(["en", "zh", "vi"].includes(locale) ? locale : "en")}`,
+      path: `/api/quests/state?locale=${encodeURIComponent(serverLanguage(locale))}`,
     }), mode),
     claim: async (questCode, idempotencyKey, instanceKey) => parseQuestClaim(await client.request({
       method: "POST",

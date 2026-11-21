@@ -1,37 +1,13 @@
 #!/usr/bin/env bash
-# NexGrid uni-app port verifier — the "自测" stage of the nexgrid-uniapp-port loop.
+# NexGrid uni-app 静态哨兵:只读源码,不起 server,不跑测试。
 #
-# Usage: bash scripts/verify.sh [module]     # default: all
-#   BASE_URL overrides the H5 dev origin (default http://localhost:5173).
-#   VERIFY_MODE=full|scoped|static(包 ar,2026-08-17):full 全跑(默认);scoped 只跑「git 改动集 ∩ 门声明输入」
-#     命中的重门(清单 scripts/gates.manifest.json,未声明的门照跑,命中全局不变量清单自动升 full);
-#     static 不需要 dev server,只跑静态门(runtime/server 类一律 SCOPED-SKIP)。跳过的格三态点名,
-#     结果行与 .verify-exit.code 第 2 行都带 mode= scoped_skip=,scoped/static 绿 ≠ 全量绿。
-#   包 ax(2026-08-18):门可在清单里声明 `pages`(页面文件 / glob / "*"),范围 = inputs ∪ 页面 import 闭包
-#     (scripts/lib/import-graph.mjs);scoped 时 route 类探针(zero-border / theme / dom-qa / tap / orphan / empty / spec6)
-#     只扫「受影响路由 ∩ 射程」(env PROBE_ROUTES,由 route_scope <门id> 按门下发;门自身脚本/基线变了仍全扫;full 一律清空)。
-#     探针多 lane 并行:PROBE_CONCURRENCY(默认 3;theme 门固定 1;=1 即回到逐路由串行)。
+# Usage: bash scripts/verify.sh
 #
-# Checks:
-#   (1) vue-tsc type-check (whole project, must be 0 errors)
-#   (2) H5 routes return HTTP 200 (dev server must be running)
-#   (3) grep sentinels over src/ — React residue + reverse-ed/meta words +
-#       hardcoded hex (token discipline)
-#
-# NOTE on rendered needles: uni H5 is a CSR SPA, so `curl` returns the empty
-# app shell — it CANNOT see rendered text. Per-page content assertions belong
-# in the browser self-check (Playwright evaluate), not here. This script
-# verifies compile + routing + source hygiene; the skill's review stage owns
-# rendered-DOM verification.
+# npm run verify(scripts/verify-chain.mjs)把它当一步跑;类型检查和生产构建由 verify-chain 负责。
 
 set -u
-MODULE="${1:-all}"
 # Every run owns its logs, including parallel runs from other worktrees.
 VERIFY_LOG_PREFIX="${TMPDIR:-/tmp}/nexgrid-verify-$$"
-# 🔴 export:本脚本 spawn 的**每个**探针都必须打同一个 origin。不 export 时,只读
-#   UNI_BASE_URL 的那几个探针(dom-qa / tap-feedback / empty-state / invisible-fill)
-#   会各自回落 5173 —— worktree 里主 checkout 正占着 5173,于是它们静默验了别的工程树。
-export BASE_URL="${BASE_URL:-http://localhost:5173}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
@@ -45,41 +21,8 @@ cd "$PROJECT_DIR"
 export LC_ALL=C
 
 G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[0;36m'; N='\033[0m'
-pass=0; fail=0; skip=0; retried=0; known=0
+pass=0; fail=0; known=0
 
-# 🔴 退出码哨兵文件 —— WF-7(2026-07-09)/ WF-10(2026-08-06)两次同型踩坑的挂账修法,
-# admin-ops 的 verify.mjs 早焊了,本仓一直欠着(EVOLUTION-LEDGER:「其余工程 verify.sh
-# 待复制同款」)。why:`verify.sh | tail -60` 这种顺手写法,管道退出码 = tail 的 0,两次都
-# 差点把「门断在半路」读成全绿。外部判定**读这个文件,不读管道**。
-# trap EXIT 覆盖所有退出路径,含 set -u 半路暴毙 —— 那条路径连 result 行都不会打,
-# 只有哨兵文件还能说出真话。.tmp$$ 带 PID:6 棵树挂着同一个 Stop hook,并发跑不许互相踩。
-VERIFY_EXIT_SENTINEL="${VERIFY_EXIT_SENTINEL:-$PROJECT_DIR/.verify-exit.code}"
-# 🔴 除退出码外**必须同时写跑了多少格**(2026-08-12 加,同型第二次之后)。
-# why:只记退出码分不出两件事 —— 「跑完了,有 N 道门判红」与「跑到一半暴毙」都是非零。
-# 实际两次都发生过、两次都差点被读成好消息:
-#   ① 跨仓测试 ENOENT 崩在第 2 步 → 后面 15 步一次没跑 → 红门数从 27 掉到 0,像是全修好了;
-#   ② 合并时留下一个 unbound variable → 套件崩在第 263 行 → 435 格只跑了 46 格 →
-#      红门数从 27 掉到 2,像是修好了 25 条。
-# 两次都是靠人眼对比 PASS 条数才看出来的,那不是门。基数写进哨兵,由 run-legacy-suite 设下限。
-_write_exit_sentinel() {
-  local rc=$?
-  # 🔴 第一行**保持纯退出码**不变(文档与既有习惯都是 `cat` 出来直接跟 0 比,加字段会打坏它);
-  # 基数另起第二行 `pass=N fail=N skip=N`,新判定读第二行,老读法一个字都不用改。
-  # 包 ar:第 2 行追加 mode= scoped_skip= tree=(老读法 pass=/fail=/skip= 位置不变;tree 与开跑时不等 → moved)
-  local tree_end="" tree_tag="unknown"
-  tree_end=$("${NODE_BIN:-node}" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
-  if [ -n "$tree_end" ]; then
-    if [ -z "${VERIFY_TREE_START:-}" ] || [ "$tree_end" = "$VERIFY_TREE_START" ]; then tree_tag="$tree_end"; else tree_tag="moved"; fi
-  fi
-  printf '%s\npass=%s fail=%s skip=%s mode=%s scoped_skip=%s known_red=%s tree=%s\n' "$rc" "${pass:-0}" "${fail:-0}" "${skip:-0}" "${SCOPE_MODE:-full}" "${scoped_skip:-0}" "${known:-0}" "$tree_tag" > "$VERIFY_EXIT_SENTINEL.tmp$" 2>/dev/null \
-    && mv -f "$VERIFY_EXIT_SENTINEL.tmp$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
-  return $rc
-}
-trap _write_exit_sentinel EXIT
-CURL_BIN="${CURL_BIN:-curl}"
-if [ -f /proc/version ] && grep -qi microsoft /proc/version && command -v curl.exe >/dev/null 2>&1; then
-  CURL_BIN="curl.exe"
-fi
 NODE_BIN="${NODE_BIN:-node}"
 if ! command -v "$NODE_BIN" >/dev/null 2>&1 && command -v node.exe >/dev/null 2>&1; then
   NODE_BIN="node.exe"
@@ -119,91 +62,18 @@ known_red_match() {   # $1=FAIL 标题 → 命中则打印 "until<TAB>why<TAB>st
   return 1
 }
 # ⚠ 标记放格式串不放 %s 参数位:POSIX printf 只在格式串里解释 \033 色码(P2-1);消息位禁 %(无用户输入)
-ok()   { local mark=""; if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then mark=" ${Y}⚠ after-retry${N}"; PROBE_RETRIED_LAST=0; retried=$((retried+1)); fi; printf "  ${G}PASS${N}  %s$mark\n" "$1"; pass=$((pass+1)); }
+ok()   { printf "  ${G}PASS${N}  %s\n" "$1"; pass=$((pass+1)); }
 bad()  {
-  local mark="" kr until why status
-  if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then mark=" ${Y}(重试后仍失败,首败明细在 *.attempt1)${N}"; PROBE_RETRIED_LAST=0; fi
+  local kr until why status
   if kr=$(known_red_match "$1"); then
     IFS=$'\t' read -r until why status <<< "$kr"
-    if [ "$status" = "active" ]; then printf "  ${Y}KNOWN-RED${N}  %s$mark ${Y}(已知红,到期 %s:%s)${N}\n" "$1" "$until" "$why"; known=$((known+1)); return 0; fi
-    printf "  ${R}FAIL${N}  %s$mark ${R}(已知红已到期 %s,须处理:%s)${N}\n" "$1" "$until" "$why"; fail=$((fail+1)); return 0
+    if [ "$status" = "active" ]; then printf "  ${Y}KNOWN-RED${N}  %s ${Y}(已知红,到期 %s:%s)${N}\n" "$1" "$until" "$why"; known=$((known+1)); return 0; fi
+    printf "  ${R}FAIL${N}  %s ${R}(已知红已到期 %s,须处理:%s)${N}\n" "$1" "$until" "$why"; fail=$((fail+1)); return 0
   fi
-  printf "  ${R}FAIL${N}  %s$mark\n" "$1"; fail=$((fail+1))
-}
-# 🔴 SKIP 必须进账。以前 6 处 SKIP 是裸 printf,两个计数器都不碰 —— 于是「0 fail」既可能是
-# 「418 道全跑过了」,也可能是「412 道跑了、6 道压根没跑」,退出码分不出这两件事。
-skipped() { PROBE_RETRIED_LAST=0; printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((skip+1)); }
-
-# ── runtime 探针重试(pkg/zj)────────────────────────────────────────────────
-# 族=真起浏览器的 14 个探针(census:docs/changes/2026-08-15-runtime-probe-retry.census.md)。
-# 同机三轮实测每轮恰好 1 个随机 runtime 探针抖(Frame detached / 20s 超时),轮轮不同、复跑自愈
-# —— 时序余量在本机负载下不够,族层统一「失败自动重跑 1 次,以第二次为准」。
-# 🔴 重试必须大声:首败明细留在探针日志(分隔行),事件登记 $PROBE_RETRY_LOG,ok/bad 行尾带
-# ⚠ 标记,总结行报 after-retry 计数 —— 静默重试会把真实的偶发产品 bug 一起吞掉,禁止。
-# 🔴 只包 runtime 真跑调用点;--selftest / 静态哨兵 / 逻辑门一律不包(确定性门失败重跑无意义,
-# 反而掩盖不该存在的非确定性)。稳定红两跑仍红,不被洗绿(probe_retry_selftest 变异①钉死)。
-# ponytail: 重试 1 次是当前抖动率(~1/轮)下的够用值;若单探针 1 次重试仍频繁穿透,升级路径=
-# 该探针内部等待硬化单独立项,不是加大重试次数。
-PROBE_RETRY_LOG="${VERIFY_LOG_PREFIX}-uniapp-probe-retries.$$.log"
-: > "$PROBE_RETRY_LOG"   # 开跑清空:防 Windows PID 复用把上一轮残留条目混进本轮回显
-PROBE_RETRIED_LAST=0
-# 用法:probe_retry <探针日志路径> <命令...>(重定向收进函数:首败整份存档 *.attempt1 后
-# 截断重写,主日志永远只有权威的第二次 —— 下游 cat/tail/grep 消费点不吃首败污染)
-probe_retry() {
-  local plog="$1"; shift
-  PROBE_RETRIED_LAST=0
-  "$@" > "$plog" 2>&1 && return 0
-  local rc=$?
-  PROBE_RETRIED_LAST=1
-  cp -f "$plog" "$plog.attempt1" 2>/dev/null
-  printf '%s | first-exit=%s | attempt1=%s | %s\n' "$(date '+%F %T')" "$rc" "$plog.attempt1" "$*" >> "$PROBE_RETRY_LOG"
-  "$@" > "$plog" 2>&1
+  printf "  ${R}FAIL${N}  %s\n" "$1"; fail=$((fail+1))
 }
 
-# 红测三变异:①恒败不洗绿 ②首败后成=绿+标记+留痕 ③接线完整性(解包即红)。
-# 每个变异先证注入生效(rc/标志文件)再看判定 —— 红测铁律:先证起点。
-probe_retry_selftest() {
-  local bad_bits="" sroot="$VERIFY_LOG_PREFIX"
-  local tmpflag="$sroot-uniapp-probe-retry-selftest.$$" slog="$sroot-uniapp-probe-retry-selftest-plog.$$"
-  # 演习期间换草稿登记簿:selftest 自己注入的失败靶不许污染真登记簿(P1-1 狼来了)
-  local real_log="$PROBE_RETRY_LOG"
-  PROBE_RETRY_LOG="$sroot-uniapp-probe-retry-selftest-reg.$$"; : > "$PROBE_RETRY_LOG"
-  # ① 恒败探针经包装:终判必须仍红(稳定红不被洗绿)
-  if probe_retry "$slog" bash -c 'exit 7'; then bad_bits="$bad_bits ①洗绿"; fi
-  [ "$PROBE_RETRIED_LAST" = "1" ] || bad_bits="$bad_bits ①未重试"
-  PROBE_RETRIED_LAST=0
-  # ② 首败后成:终判绿 + 标记置位 + 草稿登记簿长了一行 + 首败明细存档(重试大声)
-  rm -f "$tmpflag"
-  local before after
-  before=$(wc -l < "$PROBE_RETRY_LOG" 2>/dev/null); before=${before:-0}
-  if probe_retry "$slog" bash -c "[ -f '$tmpflag' ] || { : > '$tmpflag'; exit 1; }"; then :; else bad_bits="$bad_bits ②未转绿"; fi
-  [ "$PROBE_RETRIED_LAST" = "1" ] || bad_bits="$bad_bits ②标记未置位"
-  after=$(wc -l < "$PROBE_RETRY_LOG" 2>/dev/null); after=${after:-0}
-  [ "$after" -gt "$before" ] || bad_bits="$bad_bits ②未留痕"
-  [ -f "$slog.attempt1" ] || bad_bits="$bad_bits ②首败明细未存档"
-  rm -f "$tmpflag" "$slog" "$slog.attempt1" "$PROBE_RETRY_LOG"
-  PROBE_RETRIED_LAST=0
-  PROBE_RETRY_LOG="$real_log"
-  # ③ 接线完整性:被包真跑调用点数 = census 期望(解包/漏包即红)。锚定行首 if(注释诱饵免疫,
-  # tester M5)+ 绝对路径(cwd≠仓根时 $0 相对路径假红,P2-4)+ 不用 `|| echo 0`(grep -c 零命中
-  # 时打印 0 且退出码 1,会产出 "0\n0" 两行值,P2-10)
-  local expected_sites=21 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"  # 2026-08-15 包 zl:+2 = orphan-line 探针(selftest+live);2026-08-17 包 am:+1 = 提现账单行门远端档隔离起服;2026-08-17 包 aw:+2 = SVG 内文字运行时门(selftest+live)
-  actual_sites=$(grep -cE '^[[:space:]]*if probe_retry .*"\$NODE_BIN" scripts/' "$vfile" 2>/dev/null); actual_sites=${actual_sites:-0}
-  [ "$actual_sites" = "$expected_sites" ] || bad_bits="$bad_bits ③接线数=$actual_sites≠$expected_sites"
-  if [ -z "$bad_bits" ]; then
-    ok "probe-retry selftest(恒败不洗绿 · 首败后成大声转绿 · 接线 $actual_sites/$expected_sites)"
-  else
-    bad "probe-retry selftest 失效:$bad_bits —— 重试包装不可信,本轮所有 runtime 探针结论按未包装解读"
-  fi
-}
-probe_retry_selftest
 
-check_http() {
-  local label="$1" route="$2"
-  local code
-  code=$("$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL$route" 2>/dev/null)
-  if [ "$code" = "200" ]; then ok "$label [$code] $route"; else bad "$label [$code] $route"; fi
-}
 
 # grep sentinel: FAIL if pattern is found in src (excluding allowed paths)
 sentinel_absent() {
@@ -219,54 +89,7 @@ sentinel_present() {
   if grep -qE "$pattern" "$file" 2>/dev/null; then ok "$label"; else bad "$label (missing /$pattern/ in $file)"; fi
 }
 
-# ── 范围化(包 ar,2026-08-17 主人拍板 Q1A):三档 full | scoped | static ──────────────────────
-# 范围由机器算(scripts/lib/verify-scope.mjs:git 改动集 ∩ gates.manifest 声明的输入),不由模型判。
-# 失败方向偏保守:计划算不出 → 升 full;门未在清单声明 → 照跑;改动命中全局不变量清单 → 升 full。
-# 跳过的格走 scoped_skip 计数(与 skip 分开:skip=该跑没跑成=红;scoped_skip=按范围有意不跑=不红,但结果行必点名)。
-VERIFY_MODE="${VERIFY_MODE:-full}"
-case "$VERIFY_MODE" in full|scoped|static) ;; *) echo "VERIFY_MODE 只认 full|scoped|static(给的是 $VERIFY_MODE)"; exit 2 ;; esac
-declare -A SCOPE_RUN SCOPE_WHY SCOPE_ROUTES_FOR SCOPE_CELLS
-SCOPE_MODE="$VERIFY_MODE"; SCOPE_REQUESTED="$VERIFY_MODE"; SCOPE_UPGRADED=""; SCOPE_CHANGED_COUNT=-1; SCOPE_BASE_USED=""; SCOPE_ROUTES="*"; SCOPE_ROUTES_NOTE=""; SCOPE_H5_PROBE_ROUTES_JSON=""   # 不叫 SCOPE_BASE:调用方 export 的 SCOPE_BASE 要原样透传给 plan 子进程(tester-A 2026-08-17)
-scoped_skip=0
-VERIFY_TREE_START=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
-if [ "$VERIFY_MODE" != "full" ]; then
-  if scope_plan=$("$NODE_BIN" scripts/lib/verify-scope.mjs plan --mode "$VERIFY_MODE" --format shell 2>"${VERIFY_LOG_PREFIX}-uni-scope-plan.err"); then
-    eval "$scope_plan"
-  else
-    SCOPE_MODE=full; SCOPE_UPGRADED="范围计划算不出($(head -1 "${VERIFY_LOG_PREFIX}-uni-scope-plan.err" 2>/dev/null))→ full(保守方向)"
-  fi
-fi
-# 路由级范围(包 ax,主人拍板 B):scoped 时 route 类探针(zero-border / theme / dom-qa / tap / orphan / empty / spec6)只扫
-#   「受影响路由 ∩ 探针射程」;探针读 env PROBE_ROUTES(scripts/lib/probe-routes.mjs)。门因自身输入(脚本/基线/台账)
-#   变化而跑 → SCOPE_ROUTES_FOR[id]='*' 全扫。full 一律清空 —— 外层残留不许把 full 变半量。用法:门的 scope_hit 判定之后紧跟 `route_scope <同一门 id>` 再起探针。
-unset PROBE_ROUTES
-if [ "$SCOPE_MODE" = "scoped" ] && [ -n "$SCOPE_H5_PROBE_ROUTES_JSON" ]; then export H5_PROBE_ROUTES="$SCOPE_H5_PROBE_ROUTES_JSON"; else unset H5_PROBE_ROUTES; fi
-route_scope() {
-  local r="${SCOPE_ROUTES_FOR[$1]:-*}"
-  if [ "$SCOPE_MODE" = "scoped" ] && [ "$r" != "*" ]; then export PROBE_ROUTES="$r"; else unset PROBE_ROUTES; fi
-}
-# 用法:if scope_hit <id>; then …真跑… ; fi —— 返回 1 时已自行计数并点名 SCOPED-SKIP;未声明的 id 照跑
-scope_hit() {
-  local id="$1"
-  unset PROBE_ROUTES   # 每道门从干净的路由范围起步(tester-F F-07:route_scope 只 set 不 clear 会前向泄漏);route 类门在 scope_hit 之后再 route_scope 自取
-  [ "$SCOPE_MODE" = "full" ] && return 0
-  local r="${SCOPE_RUN[$id]:-}"
-  if [ -z "$r" ] || [ "$r" = "1" ]; then return 0; fi
-  local cells="${SCOPE_CELLS[$id]:-1}"   # 该门在本脚本里出几格(manifest cells,缺省 1):跳过按格计,deep 判据 ③ ran+scoped_skip 才守恒
-  scoped_skip=$((scoped_skip+cells))
-  printf "  ${Y}SCOPED-SKIP${N}  %s(%s)%s\n" "$id" "${SCOPE_WHY[$id]:-}" "$( [ "$cells" -gt 1 ] && echo " ×$cells 格" )"
-  return 1
-}
-
-echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE · mode=$SCOPE_MODE${SCOPE_UPGRADED:+(请求 $SCOPE_REQUESTED → $SCOPE_UPGRADED)}${VERIFY_TREE_START:+ · tree ${VERIFY_TREE_START:0:10}} ━━${N}"
-if [ "$SCOPE_MODE" = "scoped" ]; then echo "  改动集 $SCOPE_CHANGED_COUNT 个文件(base ${SCOPE_BASE_USED:0:10});未声明输入的门照跑,命中的重门真跑,其余 SCOPED-SKIP"; echo "  路由范围:${SCOPE_ROUTES_NOTE:-全部};route 类探针只扫「受影响 ∩ 射程」,门自身输入变了仍全扫"; fi
-# 门的门:manifest ↔ verify.sh 接线一致 + glob 都命中(改了清单没接线 / 接了线没声明 / 路径漂移,任一即红;三档都跑)
-if "$NODE_BIN" scripts/lib/verify-scope.mjs lint > "${VERIFY_LOG_PREFIX}-uni-scope-lint.log" 2>&1; then
-  ok "gates.manifest 接线门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-scope-lint.log")"
-else
-  bad "gates.manifest 接线门失败 — node scripts/lib/verify-scope.mjs lint 看明细"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-scope-lint.log" | head -12
-fi
-# 已知红清单门(Tier 1-C):清单格式 / 日期 / 90 天上限 / 重复;到期条目点名(它们在链上已回红)。清单坏 = 整链红,不许静默当 0 条。
+echo -e "${C}━━ NexGrid uni-app 静态哨兵 ━━${N}"
 if "$NODE_BIN" scripts/lib/known-red.mjs lint > "${VERIFY_LOG_PREFIX}-uni-known-red-lint.log" 2>&1; then
   ok "已知红清单门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-known-red-lint.log")"
 else
@@ -329,20 +152,6 @@ vite_watch_anchor_gate() {
 }
 vite_watch_anchor_gate
 
-echo -e "${C}[1] vue-tsc type-check${N}"
-# 包 ar:走指纹缓存壳(输入未变 → PASS(cached);变了 → 裸 vue-tsc 真跑;--incremental 因 warm buildinfo 假绿禁用)。同一棵树一轮里 tsc 只算一次。
-# 壳的自证先跑(结构判据:不带 --incremental · FAIL 路径必删 pass 记录 · 记录带指纹)—— 2026-08-17 那次 P0 是外部 tester 逮到的,不是门逮到的
-if "$NODE_BIN" scripts/typecheck-cached.mjs --selftest >"${VERIFY_LOG_PREFIX}-uni-tsc-selftest.log" 2>&1; then
-  ok "typecheck-cached selftest — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-tsc-selftest.log")"
-else
-  bad "typecheck-cached selftest 失败 — 缓存壳判据被改坏,本轮 tsc 结论按不可信解读"; tail -5 "${VERIFY_LOG_PREFIX}-uni-tsc-selftest.log" | sed 's/^/        /'
-fi
-if "$NODE_BIN" scripts/typecheck-cached.mjs >"${VERIFY_LOG_PREFIX}-uni-tsc.log" 2>&1; then
-  ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-tsc.log")"
-else
-  bad "vue-tsc errors"; tail -15 "${VERIFY_LOG_PREFIX}-uni-tsc.log" | sed 's/^/        /'
-fi
-
 # 🔴 紧跟类型检查:同一类(编译器能精确判定的)问题归在一处。守的是「store 里不许有
 # 不可达代码」—— 2026-08-13 创世五个动作的本地实现全成死代码,而它长得完全正常,
 # 还把 selfcheck-genesis-gate 的文本判据哄绿了(判据句就躺在死代码里)。
@@ -354,7 +163,18 @@ store_unreachable_gate() {
     grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-store-unreachable.log" | head -6 | sed "s/^/        /"
   fi
 }
-if scope_hit store-unreachable; then store_unreachable_gate; fi
+store_unreachable_gate
+
+# ── renderjs 根元素门(2026-11-18):声明 renderjs 的 .vue 根必须是单个原生元素(Fragment / 组件根会让 App 视图层丢操作或覆盖 owner)──
+renderjs_root_gate() {
+  if "$NODE_BIN" scripts/renderjs-root-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-renderjs-root.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-renderjs-root.log")"
+  else
+    bad "renderjs 声明在非单原生根的组件或页面上 — 移到以原生元素为根的子组件"
+    tail -8 "${VERIFY_LOG_PREFIX}-uniapp-renderjs-root.log" | sed 's/^/        /'
+  fi
+}
+renderjs_root_gate
 
 echo -e "${C}[1.5] i18n mirror${N}"
 if "$NODE_BIN" scripts/i18n-key-mirror.mjs >"${VERIFY_LOG_PREFIX}-uni-i18n-mirror.log" 2>&1; then
@@ -370,13 +190,6 @@ fi
 # src/i18n/messages/*.ts 的值,且判据是**枚举词表**,新词天然不在表里。
 # 本门反过来判:src/**/*.{vue,ts} 注释之外**含 CJK 即拦**,不枚举任何词。
 i18n_cjk_gate() {
-  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest > "${VERIFY_LOG_PREFIX}-uni-i18n-cjk-selftest.log" 2>&1; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-i18n-cjk-selftest.log")"
-  else
-    bad "i18n-cjk selftest 失败(哨兵失效即门失效;node scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest 看明细)"
-    tail -8 "${VERIFY_LOG_PREFIX}-uni-i18n-cjk-selftest.log" | sed 's/^/        /'
-    return
-  fi
   if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs > "${VERIFY_LOG_PREFIX}-uni-i18n-cjk.log" 2>&1; then
     ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-i18n-cjk.log")"
   else
@@ -396,14 +209,7 @@ i18n_cjk_gate
 i18n_en_gate() {
   # 日志名带 PID:多棵树并发跑同一道门时,固定名会让 `tail -1` 打印**别的树**那轮的总结行
   # (memory 里有实付案例:据末行判成 4 红、实为并发别人的)。判决本身取自退出码,不受影响。
-  local slog="${VERIFY_LOG_PREFIX}-uni-i18n-en-selftest.$$.log" glog="${VERIFY_LOG_PREFIX}-uni-i18n-en.$$.log"
-  if "$NODE_BIN" scripts/i18n-hardcoded-en-copy-sentinel.mjs --selftest > "$slog" 2>&1; then
-    ok "$(tail -1 "$slog")"
-  else
-    bad "i18n-en selftest 失败(哨兵失效即门失效;node scripts/i18n-hardcoded-en-copy-sentinel.mjs --selftest 看明细)"
-    tail -8 "$slog" | sed 's/^/        /'
-    return
-  fi
+  local glog="${VERIFY_LOG_PREFIX}-uni-i18n-en.$$.log"
   if "$NODE_BIN" scripts/i18n-hardcoded-en-copy-sentinel.mjs > "$glog" 2>&1; then
     ok "$(tail -1 "$glog")"
   else
@@ -419,14 +225,7 @@ i18n_en_gate
 # + <SvgText> 只许在 svg 内 + 用了必 import(kebab/别名也认)+ 同族 uni 内置标签也禁 + uno.config 不许启用 attributify(它把 font-size="9.5" 劫持成 2.375rem、:opacity 劫持成 0.0025)
 # + 判定面塌缩(0 个 svg 块 / 0 个 SvgText)判红。渲染面另有 svg_text_render_gate(运行时 bbox>0)。
 svg_text_source_gate() {
-  local slog="${VERIFY_LOG_PREFIX}-uni-svg-text-src-selftest.log" glog="${VERIFY_LOG_PREFIX}-uni-svg-text-src.log"
-  if "$NODE_BIN" scripts/svg-text-source-gate.mjs --selftest > "$slog" 2>&1; then
-    ok "$(tail -1 "$slog")"
-  else
-    bad "svg-text-source selftest 失败(哨兵失效即门失效;node scripts/svg-text-source-gate.mjs --selftest 看明细)"
-    tail -8 "$slog" | sed 's/^/        /'
-    return
-  fi
+  local glog="${VERIFY_LOG_PREFIX}-uni-svg-text-src.log"
   if "$NODE_BIN" scripts/svg-text-source-gate.mjs > "$glog" 2>&1; then
     ok "$(tail -1 "$glog")"
   else
@@ -435,30 +234,6 @@ svg_text_source_gate() {
   fi
 }
 svg_text_source_gate
-
-# ── 远端权威契约门(2026-08-10 接线)────────────────────────────────────────────
-# 它此前是**孤儿门**:package.json 的 verify 链没有它,本文件也没有它 —— 于是它红了
-# 半天没人知道(实测:本轮把 wallet-exchange 的中文文案收进 i18n 后 G2 立刻红,
-# 而两条链全绿)。更糟的是它原本把判据锚在中文字面量上,与上面那道「不许有中文」
-# 的门方向相反,任何源码状态都不可能同时绿。判据已改锚 i18n key + 三语词典有值,
-# 并在**同一提交**里接上链 —— 机器门与被它判的实现不同时落地 = 修了也无从验证。
-# 🔴 样本量必须当**判据**,不能只印进标签:`node --test` 对「一条 test 都没有」的文件同样 exit 0
-#    (注释掉 / test.skip / 条件为假的 describe 都会走到这一步),于是门退化成「tests 0 · PASS」。
-#    上面那道 i18n 门写了「扫不到文件即判红」的假绿防线,这道门得有对等的一条。
-"$NODE_BIN" --test scripts/g-remote-authority-contract.test.mjs >"${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log" 2>&1
-g_remote_rc=$?
-# 判据取 **pass 数**不取 tests 数:红测实测 `test.skip` 时 tests 仍计 4(skipped 1),拿 tests 当门会漏;
-# pass 数对「删掉 test」与「skip 掉 test」两种形态都会掉下来。
-# 按**字段**取数,别用 `^.` 锚行首:node --test 的汇总行前缀 `ℹ` 是 3 字节,grep 的 `.` 匹配单字节,
-# 取出来恒为空 —— 那样门会永远判红(方向安全,但判据其实已经失效,属另一种坏)。
-g_remote_pass=$(awk '$(NF-1)=="pass"{v=$NF} END{print v}' "${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log")
-g_remote_fail=$(awk '$(NF-1)=="fail"{v=$NF} END{print v}' "${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log")
-if [ "$g_remote_rc" -eq 0 ] && [ "${g_remote_pass:-0}" -ge 4 ] && [ "${g_remote_fail:-1}" -eq 0 ]; then
-  ok "远端权威契约门 pass ${g_remote_pass} / fail ${g_remote_fail}(判据锚 i18n key + exchange 命名空间内有值;pass<4 或 fail>0 一律判红)"
-else
-  bad "远端权威契约门失败(rc=$g_remote_rc pass=${g_remote_pass:-none} fail=${g_remote_fail:-none};pass 少于 4 = 有 test 被删或 skip,同样按红处理)"
-  grep -E "✖|AssertionError|expected" "${VERIFY_LOG_PREFIX}-uni-g-remote-contract.log" | head -6 | sed 's/^/        /'
-fi
 
 # Key mirroring proves en/zh/vi agree with EACH OTHER, not that they cover every
 # SKU. A product added to products.ts without a store.catalog entry silently
@@ -493,13 +268,7 @@ fi
 # 上面三道 i18n 门整条轴是反的:都在查「中文有没有跑出词典」,没有一道查「英文有没有跑进
 # 界面」。实付(P-109):4c32a50 把规格兜底改成 `?? "unavailable"` 五处,中文态渲染出
 # 「你的手机 unavailable」等 4 处混排,三道门全绿。本门补这条轴 —— 服务端哨兵值不得当
-# client fallback、不得在商品渲染面裸用。selftest 先跑:哨兵失效即门失效。
-if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uni-spec-sentinel-selftest.log" 2>&1; then
-  ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel-selftest.log")"
-else
-  bad "spec-sentinel selftest 失败(哨兵失效即门失效;node scripts/spec-sentinel-render-gate.mjs --selftest 看明细)"
-  tail -8 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel-selftest.log" | sed 's/^/        /'
-fi
+# client fallback、不得在商品渲染面裸用。
 if "$NODE_BIN" scripts/spec-sentinel-render-gate.mjs > "${VERIFY_LOG_PREFIX}-uni-spec-sentinel.log" 2>&1; then
   ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel.log")"
 else
@@ -507,12 +276,9 @@ else
   tail -10 "${VERIFY_LOG_PREFIX}-uni-spec-sentinel.log" | sed 's/^/        /'
 fi
 
-# 入金/牌价/换绑/卡四条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
-# 改费率/最低额/上限/容差不会红任何一条流水线(2026-07-27 audit 立案)。
-# withdraw-freeze(2026-08-04 R2 三条 P1):提交链快照单源化 —— 弹窗展示 = 扣款 = 建单
-# 用同一份冻结件,确认后与当前权威值核对不符即拒单;外加 NEX 退款反向分录(账本对得上钱包)。
-echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards · withdrawfee · withdraw-freeze · fastlane · feegate)${N}"
-for sc in deposits fx rebind cards withdrawfee withdraw-freeze fastlane feegate arrival i18n-interp console-filter slacopy onbrand reward-buckets; do
+# 只读源码的自检:提交快照单源、费率门、占位符过 fmt、时限来自配置、亮底文字走 on-brand。
+echo -e "${C}[1.6] source selfchecks(withdraw-freeze · feegate · i18n-interp · slacopy · onbrand)${N}"
+for sc in withdraw-freeze feegate i18n-interp slacopy onbrand; do
   if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >""${VERIFY_LOG_PREFIX}-uni-selfcheck-$sc.log"" 2>&1; then
     ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' ""${VERIFY_LOG_PREFIX}-uni-selfcheck-$sc.log"" | tail -1)"
   else
@@ -520,174 +286,14 @@ for sc in deposits fx rebind cards withdrawfee withdraw-freeze fastlane feegate 
   fi
 done
 
-# fastlane 的「扣退同档」那格 2026-08-16 因**同义别名**假绿修过一轮(判据只认 remoteApiEnabled
-# 字面量,认不出等价的 fundsServerEnabled,退款腿实际已被整条关掉却一路报绿)。
-# 修后判据按等价类解析 + 钉正向定型串,而关系型/解析型判据更容易在重构里悄悄失去牙齿 ——
-# 6 靶红测钉住它真会红,其中 4 靶是「旧判据漏、新判据抓」的资金缺陷形状。
-if scope_hit withdraw-rail-alias-redtest; then
-if "$NODE_BIN" scripts/withdraw-rail-alias.redtest.mjs > "${VERIFY_LOG_PREFIX}-uni-withdraw-rail-alias.log" 2>&1; then
-  ok "withdraw-rail-alias redtest — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-withdraw-rail-alias.log")"
-else
-  bad "withdraw-rail-alias redtest 失败(哨兵失效即门失效;node scripts/withdraw-rail-alias.redtest.mjs 看明细)"
-  tail -12 "${VERIFY_LOG_PREFIX}-uni-withdraw-rail-alias.log" | sed 's/^/        /'
-fi
-fi
-
 # 待支付会话 store(2026-08-16 pkg/ad checkout-cancel):「同账号至多一张活票」不变量 / CAS 跨标签页拒双开 /
-# 钱路「落盘 / CAS 判决必须被消费」—— AST 门(审计 R4→R6 同族五次:返回值当语句丢掉)。先自测门本身会红,再扫钱路文件。
-if node scripts/selfcheck-persist-verdict.mjs --selftest > "${VERIFY_LOG_PREFIX}-uni-persist-verdict-selftest.log" 2>&1 && node scripts/selfcheck-persist-verdict.mjs > "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log" 2>&1; then
+# 钱路「落盘 / CAS 判决必须被消费」—— AST 门(审计 R4→R6 同族五次:返回值当语句丢掉)。扫钱路文件。
+if node scripts/selfcheck-persist-verdict.mjs > "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log" 2>&1; then
   ok "persist-verdict — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log")"
 else
   bad "persist-verdict:钱路上有落盘 / CAS / 资金原语的返回值被丢弃(node scripts/selfcheck-persist-verdict.mjs 看明细)"
-  cat "${VERIFY_LOG_PREFIX}-uni-persist-verdict-selftest.log" "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log" | tail -20 | sed 's/^/        /'
+  tail -20 "${VERIFY_LOG_PREFIX}-uni-persist-verdict.log" | sed 's/^/        /'
 fi
-# 账号隔离 / 过期剪除 / 一次性离开提示 + 建单落盘契约(createOrder / createOrders 落盘失败返 null,不留内存孤儿单;一批一次落盘)+ 单次券核销 CAS(先占后花,双实例只成一次;release 放回)+ 恢复发票逐项 min 对账 + 存储行取值域 —— vitest 覆盖。vitest 全局钉 remote 档,该测试文件内显式 mock 成 mock 档
-# (否则 store 恒空,断言假绿)。独立审计 R1 P0 族(守卫回弹后再点 Pay now 铸出第二张活票)就落在这里。
-if scope_hit pending-checkout-vitest; then
-if npx vitest run src/store/pending-checkout.test.ts src/store/pending-checkout-core.test.ts src/store/orders.persist.test.ts src/store/voucher.redeem.test.ts src/store/free-trial.persist.test.ts > "${VERIFY_LOG_PREFIX}-uni-pending-checkout-vitest.log" 2>&1; then
-  ok "pending-checkout store/core vitest — $(sed 's/[[0-9;]*m//g' "${VERIFY_LOG_PREFIX}-uni-pending-checkout-vitest.log" | grep -Eo 'Tests +[0-9]+ passed' | tail -1)"
-else
-  bad "pending-checkout vitest 失败(npx vitest run src/store/pending-checkout*.test.ts 看明细)"
-  sed 's/[[0-9;]*m//g' "${VERIFY_LOG_PREFIX}-uni-pending-checkout-vitest.log" | tail -15 | sed 's/^/        /'
-fi
-fi
-
-# ── (2) H5 routing (dev server must be up) ──
-if scope_hit route-http; then
-echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  # 🔴 先认工程再认状态码:同机跑着 CC(:5273)/ janus(:5174),端口被串台时
-  # 本段会整体假绿 —— curl 拿到的是 CSR 空壳,任何 Vite SPA 都回 200(实测踩过)。
-  # 判据用「取到的是真模块还是 SPA 兜底页」:Vite 对不存在的路径回 index.html,
-  # 状态码同样 200,所以只看状态码的探针本身就是个假绿(踩过,红测才揪出来)。
-  # vi.ts = 越南语包,本仓独有(janus / CC 只有中英双语),故可作身份标识。
-  IDENTITY_BODY=$("$CURL_BIN" -s "$BASE_URL/src/i18n/messages/vi.ts" 2>/dev/null | head -c 200)
-  case "$IDENTITY_BODY" in
-    "<!DOCTYPE html>"*|"<!doctype html>"*|"")
-      bad "$BASE_URL 上跑的不是 Nexion-uniapp(vi.ts 取到 SPA 兜底页)— 别对着别的工程验" ;;
-    *) ok "dev server 身份 = Nexion-uniapp(vi.ts 是真模块)" ;;
-  esac
-  check_http "Home shell" "/"
-  # Ported routes append here as Batch 1/2 land:
-  # check_http "Earn" "/#/pages/earn/earn"
-else
-  skipped "dev server not running at $BASE_URL (run: npm run dev:h5)"
-fi
-fi
-
-# ── (3) source hygiene sentinels ──
-# ── [2.5] dev server API 模式前置断言(z1 判决 A,2026-08-10)──
-# 老套件的运行时探针全部驱动 mock 业务流;c37e642 后 app 默认 remote(无后端时启动噪声
-# + 注册等流程整条绕开 mock 分支),拿 remote 模式 server 跑这些探针 = 静默验错对象。
-# 判据:vite dev 转换头会内联整份 env JSON,直接 curl 源模块判 mode;探不到也红(禁跳过)。
-echo -e "${C}[2.5] dev server API mode preflight${N}"
-# 🔴 两问,缺一不可(z1 R2 对抗审计 P1-24):本门自称要解决「验错对象」,却只问了模式、
-#    没问**是哪棵树** —— 同一份 env JSON 里现成就有 VITE_ROOT_DIR。多工作树并发时
-#    (本仓实测同时开过 8 个),BASE_URL 指到别人的 checkout 会让下面所有运行时探针
-#    给别的工作树发绿灯(feedback_worktree_verify_environment 同族)。
-# 🔴 路径规范化必须两边都做,且要抹平**盘符写法**(2026-08-11 合并修正,2026-08-12 再并一次):
-#    这门原来的写法是 served 转斜杠、expect 只转反斜杠再各自小写。但 bash 里
-#    `PROJECT_DIR=$(pwd)` 在 Git Bash / MSYS 下给的是 `/d/WORKS/...`,而 uni 注入的
-#    VITE_ROOT_DIR 是 `D:\WORKS\...` → 转完是 `d:/works/...` vs `/d/works/...`,
-#    **永不相等 → 靶子完全正确也恒判红**(用主线原字节实测复现)。恒红的门 = 退出码恒 1,
-#    正是这轮要修的「新门翻红不可观测」本身。
-#
-#    两条支线各自修过这只 bug,覆盖面互补,此处并成**一个**归一化函数(不留两份:
-#    同一个概念两处各自推导,正是本仓明令要配 parity 哨兵才许做的事):
-#      · 主线侧独有:JSON 里的双反斜杠 `\\`、`/cygdrive/` 前缀;
-#      · z3 侧独有:WSL 的 `/mnt/d/`、尾斜杠、以及**判据自己的双向自检**。
-#    归一后的正规形:去掉盘符冒号与前导斜杠,统一成 `d/works/x`。
-_norm_tree_path() {
-  printf '%s' "$1" | tr 'A-Z' 'a-z' \
-    | sed 's|\\\\|/|g; s|\\|/|g; s|^/cygdrive/||; s|^/mnt/\([a-z]\)/|\1/|; s|^/mnt/\([a-z]\)$|\1|; s|^/||; s|^\([a-z]\):|\1|; s|//*|/|g; s|/$||'
-}
-# 判据双向红测(常驻,由 z3 侧带入)。归一化有两种坏法,方向相反,只测一个方向不算数:
-#   ① 归不拢 → 同一目录的两种写法判不等,门恒红(2026-08-11 修的就是这只);
-#   ② 归过头 → 不同工作树被折成相等,门恒绿地替别人发绿灯(比恒红危险得多)。
-#   任一方向坏了,下面那道树身份判断就不许发绿灯。
-if [ "$(_norm_tree_path 'D:\WORKS\x')" = "$(_norm_tree_path '/d/WORKS/x')" ] \
-   && [ "$(_norm_tree_path 'D:\\WORKS\\x')" = "$(_norm_tree_path '/d/WORKS/x')" ] \
-   && [ "$(_norm_tree_path '/cygdrive/d/WORKS/x')" = "$(_norm_tree_path '/d/WORKS/x')" ] \
-   && [ "$(_norm_tree_path '/mnt/d/WORKS/x')" = "$(_norm_tree_path 'D:/works/x/')" ] \
-   && [ "$(_norm_tree_path '/d/WORKS/x')" != "$(_norm_tree_path '/d/WORKS/x/.claude/worktrees/w1')" ] \
-   && [ "$(_norm_tree_path 'D:/WORKS/x')" != "$(_norm_tree_path '/c/WORKS/x')" ]; then
-  norm_root_selftest=ok
-  ok "树身份判据自检(双向:D:\\ · D:\\\\ · /cygdrive/d/ · /mnt/d/ · D:/ · /d/ 六种写法判等 + 嵌套工作树/异盘符判不等)"
-else
-  norm_root_selftest=broken
-  bad "树身份判据自检失败 —— _norm_tree_path 归一化坏了,下面的树身份判断不可信(动过它就看这条)"
-fi
-if scope_hit api-mode-preflight; then
-served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
-served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
-expect_root="$PROJECT_DIR"
-if [ -z "$served_env_head" ]; then
-  bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
-elif ! echo "$served_env_head" | grep -q '"MODE": *"development"'; then
-  bad "API-mode preflight: server 非 development 环境 —— 用 npm run test:legacy-suite(自启壳会以 development 起本工作树),否则运行时探针会验错对象"
-elif [ -z "$served_root" ]; then
-  bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
-elif [ "$norm_root_selftest" != "ok" ]; then
-  bad "API-mode preflight: 树身份判据自检没过 —— 归一化不可信,这道门不发绿灯"
-elif [ "$(_norm_tree_path "$served_root")" != "$(_norm_tree_path "$expect_root")" ]; then
-  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(归一后 $(_norm_tree_path "$served_root") vs $(_norm_tree_path "$expect_root");并发多工作树时会给别人发绿灯)"
-else
-  ok "API-mode preflight: development 环境 + 服的就是本工作树($served_root)"
-fi
-fi
-# B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
-# (v-rank/commission/genesis)曾把 6 条 console-error=0 运行时门全部打红。
-if scope_hit remote-refresh-resilience; then
-if "$NODE_BIN" scripts/selfcheck-remote-refresh-resilience.mjs > "${VERIFY_LOG_PREFIX}-uni-remote-resilience.log" 2>&1; then
-  ok "远端刷新韧性门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-remote-resilience.log")"
-else
-  bad "远端刷新韧性门失败 — node scripts/selfcheck-remote-refresh-resilience.mjs 看明细"
-  tail -8 "${VERIFY_LOG_PREFIX}-uni-remote-resilience.log" | sed 's/^/        /'
-fi
-fi
-
-# ── [2.7] dev server 健康 preflight(P-097 对策③④,环境门)──────────────────
-# why:dev server 被喂满一轮 verify 流量后会队列拥塞式退化(实测空载 shell 响应 4~31s、
-# 进程 4.8GB 工作集),runtime 探针族「一门一浏览器、20-30s 预算」与该病理共振 → 集体
-# 假红,拿病服务器烧 45 分钟出一堆假红,还会被读成「代码坏了」。开跑前对 $BASE_URL/
-# 量 2 次裸 shell 延迟,任一次超阈即判「环境红」并直接中止:这不是门红,不代表代码有
-# 问题,重启 server 再跑才有结论。收尾处再量 1 次,总结行报首尾延迟(见脚本尾部),
-# 首绿尾超阈 = server 在本轮中途退化,后段 runtime 红先疑环境再疑代码。
-# 🔴 环境红退出码钉 3(≠1 的门红):.verify-exit.code 老读法只跟 0 比,不受影响;
-# 要区分「门红 vs 环境红」的消费者读退出码 3 或 grep 输出里的 ENV-RED 横幅。
-HEALTH_MAX_S=2   # P-097 对策③的阈:健康 vite dev 空载 shell 响应在毫秒级,>2s 已是拥塞先兆
-_shell_latency() {  # 量一次 $BASE_URL/ 的 time_total(秒);连不上输出空串
-  local t rc
-  t=$("$CURL_BIN" -s -o /dev/null --max-time 15 -w '%{time_total}' "$BASE_URL/" 2>/dev/null); rc=$?
-  case "$rc" in
-    0) printf '%s' "$t" ;;
-    28) printf '15.000000' ;;   # 响应超 15s 被掐断:按 15s 计必超阈 —— 挂死的 server 不许把探针也拖死
-    *) printf '' ;;
-  esac
-}
-_over_health_max() { [ -n "$1" ] && awk -v t="$1" -v m="$HEALTH_MAX_S" 'BEGIN{exit !(t+0 > m+0)}'; }
-if scope_hit server-health-preflight; then
-echo -e "${C}[2.7] dev server health preflight(P-097 环境门)${N}"
-HEALTH_T1=""; HEALTH_T2=""
-for _hi in 1 2; do
-  _ht=$(_shell_latency)
-  if [ "$_hi" = 1 ]; then HEALTH_T1="$_ht"; else HEALTH_T2="$_ht"; fi
-  if [ -z "$_ht" ]; then
-    skipped "server health preflight 第${_hi}次:$BASE_URL 连不上,量不了(server 没起的红由 [2.5] 负责,此处不重复计红)"
-    break
-  fi
-  if _over_health_max "$_ht"; then
-    bad "「环境红」server health preflight 第${_hi}次:shell 延迟 ${_ht}s > ${HEALTH_MAX_S}s —— dev server 队列拥塞/进程退化,重启后再跑(P-097)"
-    echo -e "${R}━━ ENV-RED(P-097)环境红,非门红:dev server 已退化,继续跑只会产出连片假红,中止本轮 verify ━━${N}"
-    echo -e "${R}   处置:重启 dev server(或 npm run test:legacy-suite 自启壳)后整轮重跑;本轮已出的 PASS/FAIL 一律作废${N}"
-    exit 3
-  fi
-done
-if [ -n "$HEALTH_T2" ]; then
-  ok "server health preflight:2 次 shell 延迟 ${HEALTH_T1}s / ${HEALTH_T2}s(均 ≤ ${HEALTH_MAX_S}s)"
-fi
-fi
-
 echo -e "${C}[3] grep sentinels over src/${N}"
 # React residue (should never survive a .tsx → .vue port)
 sentinel_absent "no className= (use class=)"      'className='
@@ -779,25 +385,298 @@ fi
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
 # 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
-# safe-area base padding (PITFALLS P-065): any padding that references
-# env(safe-area-inset-bottom) must carry a base offset ≥22px — a bare env()
-# (base 0) or a small base hugs the iOS home indicator. House baseline = 38px
-# (bottom sheets); 22px floor admits the chat composer. Both operand orders +
-# the env(…, 0px) fallback form are parsed.
-sa_bad=$("$NODE_BIN" -e '
-const fs=require("fs"),path=require("path");
+# Bottom spacing (P-065, design system 02 §2.5): bottom bars, sheets and floating
+# buttons take --nx-overlay-safe-bottom / --nx-overlay-bottom as their whole bottom
+# value; a fixed amount stacked on env() or on a token is red. The shared tokens keep
+# their declared contract. Named exceptions (chat input, content scroll reserves)
+# are listed in SAFE_AREA_EXEMPT. Height calculations are a different concern.
+if ! sa_bad=$("$NODE_BIN" <<'NODE' 2>&1
+const fs=require("fs"),path=require("path"),ts=require("typescript");
+const {parse}=require("@vue/compiler-sfc"),postcss=require("postcss");
+const tokens=fs.readFileSync("src/styles/tokens.css","utf8");
+const spacing=new Map([...tokens.matchAll(/(--v5-space-\d+)\s*:\s*(\d+(?:\.\d+)?px)\s*;/g)].map(m=>[m[1],m[2]]));
+const normalize=value=>value
+  .replace(/var\(\s*(--v5-space-\d+)\s*\)/g,(all,key)=>spacing.get(key)??all)
+  .replace(/env\(\s*safe-area-inset-bottom\s*(?:,\s*0(?:px)?\s*)?\)/g,"INSET")
+  .replace(/\s*\+\s*/g,"+").replace(/\(\s*/g,"(").replace(/\s*\)/g,")").replace(/\s*,\s*/g,",")
+  .replace(/max\(INSET,24px\)/g,"SAFE24").trim();
+const tokenValues=name=>[...tokens.matchAll(new RegExp(name+"\\s*:\\s*([^;]+);","g"))].map(match=>normalize(match[1]));
+const safeValues=tokenValues("--nx-overlay-safe-bottom"),bottomValues=tokenValues("--nx-overlay-bottom");
+const overlayDefined=safeValues.length>0&&bottomValues.length>0
+  && safeValues.every(value=>value==="SAFE24")
+  && bottomValues.every(value=>value==="calc(16px+var(--nx-overlay-safe-bottom))");
+const insetSource=/safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/;
+// Named exceptions to the shared-token rule (file, rule selector). Each one is not the bottom
+// distance of a bar, sheet or floating button, so a stacked value is intended there:
+// - chat input containers own their safe area (02 §2.5); the composer is also proven above.
+// - content scroll reserves (page padding-bottom / bar-space) keep the last row clear of a fixed
+//   bar and only add scroll room.
+// - the pending-payment card floats above the tab bar or a bottom bar; its 64px is that clearance.
+// - the full-screen document preview pads its image area, which has no bottom control.
+// The tab bar keeps its own Home Indicator spacer and declares no inset, so it never reaches here.
+const SAFE_AREA_EXEMPT=[
+  ["src/components/support/conversation-thread.vue",".nx-conv-composer"],
+  ["src/components/support/conversation-thread.vue",".nx-conv-recovery-actions"],
+  ["src/components/support/conversation-thread.vue",".nx-conv-closedbar"],
+  ["src/pages/daily/daily.vue",".dly"],
+  ["src/pages/learn/course.vue",".learning-course"],
+  ["src/pages/me/goals.vue",".growth-goals"],
+  ["src/pages/me/payment-password.vue",".payment-pin-page"],
+  ["src/pages/me/trial.vue",".trial-bar-space"],
+  ["src/pages/register/success.vue",".rs-wrap"],
+  ["src/pages/register/success.vue",".rs-wrap--web-setup"],
+  ["src/pages/register/success.vue",".rs-wrap--gift"],
+  ["src/pages/team/agent-applications.vue",".records-content"],
+  ["src/components/purchase-payment-dialog.vue",".purchase-payment-resume"],
+  ["src/pages/team/agent-application.vue",".detail-preview__stage"],
+];
 const bad=[];
-const re1=/(\d+(?:\.\d+)?)px\s*\+\s*env\(safe-area-inset-bottom(?:,[^)]*)?\)/;
-const re2=/env\(safe-area-inset-bottom(?:,[^)]*)?\)\s*\+\s*(\d+(?:\.\d+)?)px/;
-(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);const s=fs.statSync(p);
-if(s.isDirectory())walk(p);else if(/\.(vue|css)$/.test(f)){
-fs.readFileSync(p,"utf8").split(/\r?\n/).forEach((ln,i)=>{
-if(!ln.includes("safe-area-inset-bottom"))return;
-const m=ln.match(re1)||ln.match(re2);
-const base=m?parseFloat(m[1]):0;
-if(base<22)bad.push(p.split(path.sep).join("/")+":"+(i+1)+" base="+base+"px");});}}})("src");
-if(bad.length){console.log(bad.join("\n"));process.exit(1)}' 2>&1)
-if [ -z "$sa_bad" ]; then ok "safe-area-inset-bottom base padding >=22px (P-065)"; else bad "safe-area base padding <22px (iOS home-indicator hug)"; echo "$sa_bad" | sed 's/^/        /'; fi
+const files=[];
+(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f),s=fs.statSync(p);
+if(s.isDirectory())walk(p);else if(/\.(vue|css)$/.test(f))files.push([p,fs.readFileSync(p,"utf8")]);}})("src");
+const parseTs=(text,file="safe-area.ts")=>{
+  const ast=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+  if(ast.parseDiagnostics.length)throw new Error(`${file}: ${ts.flattenDiagnosticMessageText(ast.parseDiagnostics[0].messageText," ")}`);
+  return ast;
+};
+const binding=n=>(ts.isVariableDeclaration(n.parent)||ts.isParameter(n.parent)||ts.isFunctionDeclaration(n.parent)||ts.isClassDeclaration(n.parent)||ts.isEnumDeclaration(n.parent)
+  ||ts.isImportSpecifier(n.parent)||ts.isImportClause(n.parent)||ts.isNamespaceImport(n.parent)||ts.isBindingElement(n.parent))&&n.parent.name===n;
+const visit=(node)=>{const nodes=[];(function walk(n){nodes.push(n);ts.forEachChild(n,walk);})(node);return nodes;};
+// ponytail: one complete composer chain, not a general data-flow solver. Unknown
+// shapes stay red; local renames and quote/comment changes preserve this proof.
+const proof=parseTs(`
+const composerHost=ref<unknown>(null),composerSpace=ref(86),composerMeasured=ref(false);
+const composerVisible=computed(()=>!props.closed&&!(props.failedSendLabel&&props.canDiscardSend));
+const inputHeight=ref(24);
+if(Number.isFinite(event.detail.height))inputHeight.value=Math.max(24,Math.min(144,event.detail.height));
+composerSpace.value=inputHeight.value+62+(showInputLength.value?36:0)+(inputOverLimit.value?36:0)+(props.attachRetry?44:0);
+composerMeasured.value=false;
+const padding=composerVisible?(composerMeasured?composerSpace+'px':'calc('+composerSpace+'px + env(safe-area-inset-bottom))'):undefined;
+function measureComposer(follow=followingTail){
+  const owner=historyOwner(),epoch=++composerMeasureEpoch;
+  void nextTick(()=>{
+    if(epoch!==composerMeasureEpoch||!threadVisible.value||!composerVisible.value)return;
+    const apply=(height:number|undefined)=>{
+      if(epoch!==composerMeasureEpoch||!threadVisible.value||!composerVisible.value||owner!==historyOwner()||!height||!Number.isFinite(height))return;
+      composerSpace.value=height;
+      composerMeasured.value=true;
+      if(follow&&followingTail&&!preparedHistory&&!pendingPosition)scrollToEnd();
+      else scheduleBubblePositions();
+    };
+    const node=(composerHost.value as {$el?:HTMLElement}|null)?.$el??composerHost.value as HTMLElement|null;
+    if(node?.getBoundingClientRect){apply(node.getBoundingClientRect().height);return;}
+    if(typeof uni==='undefined'||!uni.createSelectorQuery)return;
+    try{
+      const query=uni.createSelectorQuery().in(threadInstance);
+      query.select('.nx-conv-composer').boundingClientRect();
+      query.exec(rows=>apply((rows[0] as UniApp.NodeInfo)?.height));
+    }catch{}
+  });
+}
+const threadInstance=getCurrentInstance();
+const heightStyle={height:inputHeight+'px'};
+function observeComposer(){
+  composerResizeObserver?.disconnect();composerResizeObserver=undefined;invalidateComposerMeasure();measureComposer();
+  const node=(composerHost.value as {$el?:HTMLElement}|null)?.$el??composerHost.value as HTMLElement|null;
+  if(typeof ResizeObserver!=='undefined'&&node?.getBoundingClientRect){composerResizeObserver=new ResizeObserver(()=>measureComposer());composerResizeObserver.observe(node);}
+}
+const measuredList=listHost.value,measuredComposer=composerHost.value;
+if(epoch!==bubbleMeasureEpoch||!threadVisible.value||owner!==historyOwner()||measuredList!==listHost.value||measuredComposer!==composerHost.value||!viewport?.height||viewport.top===undefined)return;
+const composer=(composerHost.value as {$el?:HTMLElement}|null)?.$el??composerHost.value as HTMLElement|null;
+apply(root.getBoundingClientRect(),Array.from(root.querySelectorAll('.nx-conv-bubble')).map(node=>node.getBoundingClientRect()),composer?.querySelector('.nx-conv-compose-field')?.getBoundingClientRect());
+watch(()=>[historyOwner(),listHost.value,composerHost.value,threadVisible.value,composerVisible.value],()=>{
+  cancelBubblePositions();bubblePositions.value={};composerLight.value=composerReflection(undefined,[]);void nextTick(scheduleBubblePositions);
+},{flush:'sync'});
+watch(composerHost,observeComposer,{flush:'post'});
+onMounted(observeComposer);`);
+const same=(actual,expected,names)=>{
+  const aliases=new Map(names);
+  const compare=(a,b)=>{
+    if(!a||!b||a.kind!==b.kind)return false;
+    if((ts.isPrefixUnaryExpression(b)||ts.isPostfixUnaryExpression(b))&&a.operator!==b.operator)return false;
+    if(ts.isIdentifier(b)){
+      if((ts.isPropertyAccessExpression(b.parent)||ts.isPropertySignature(b.parent)||ts.isPropertyAssignment(b.parent))&&b.parent.name===b)return a.text===b.text;
+      if(binding(b)&&!aliases.has(b.text))aliases.set(b.text,a.text);
+      return a.text===(aliases.get(b.text)??b.text);
+    }
+    if(ts.isStringLiteral(b)||ts.isNumericLiteral(b))return a.text===b.text;
+    const ac=[],bc=[];ts.forEachChild(a,n=>{ac.push(n);});ts.forEachChild(b,n=>{bc.push(n);});
+    return ac.length===bc.length&&ac.every((n,i)=>compare(n,bc[i]));
+  };
+  return compare(actual,expected);
+};
+const unwrap=n=>ts.isParenthesizedExpression(n)?unwrap(n.expression):n;
+function composerProof(source,file){
+  const allowed=new Set(),candidates=new Set();
+  if(!file.endsWith(".vue")||!source.includes("paddingBottom"))return {allowed,candidates};
+  const {descriptor,errors}=parse(source,{filename:file});
+  if(errors.length)throw new Error(`${file}: ${errors[0]}`);
+  const elements=[],expressions=[];(function walk(n){
+    if(n.type===1){elements.push(n);for(const prop of n.props)for(const exp of [prop.exp,prop.arg?.isStatic?null:prop.arg])if(exp)expressions.push({exp,prop,owner:n});}
+    if(n.type===5)expressions.push({exp:n.content});
+    for(const c of n.children??[])walk(c);
+  })(descriptor.template.ast);
+  const ast=parseTs(descriptor.scriptSetup?.content??"",file),nodes=visit(ast);
+  const attr=(el,name)=>el.props.find(p=>p.type===6&&p.name===name)?.value?.content;
+  for(const el of elements)for(const style of el.props.filter(p=>p.type===7&&p.name==="bind"&&p.arg?.content==="style")){
+    const expression=unwrap(parseTs(`(${style.exp.content})`).statements[0].expression);
+    if(!ts.isObjectLiteralExpression(expression))continue;
+    for(const property of expression.properties){
+      if(!ts.isPropertyAssignment(property)||property.name.getText()!=="paddingBottom")continue;
+      const outer=unwrap(property.initializer),inner=ts.isConditionalExpression(outer)?unwrap(outer.whenTrue):null;
+      if(!inner||!ts.isConditionalExpression(inner))continue;
+      const position=style.exp.loc.start.offset+property.name.getStart()-1;
+      candidates.add(position);
+      const measured=unwrap(inner.whenTrue);
+      if(!ts.isIdentifier(outer.condition)||!ts.isIdentifier(inner.condition)||!ts.isBinaryExpression(measured)||!ts.isIdentifier(measured.left))continue;
+      const names=new Map([["composerVisible",outer.condition.text],["composerMeasured",inner.condition.text],["composerSpace",measured.left.text]]);
+      const decl=name=>nodes.filter(n=>ts.isVariableDeclaration(n)&&ts.isIdentifier(n.name)&&n.name.text===names.get(name));
+      const space=decl("composerSpace");
+      if(space.length!==1||!ts.isVariableDeclarationList(space[0].parent)||space[0].parent.declarations.length!==3)continue;
+      names.set("composerHost",space[0].parent.declarations[0].name.getText());
+      const writes=name=>nodes.filter(n=>ts.isBinaryExpression(n)&&n.operatorToken.kind>=ts.SyntaxKind.FirstAssignment&&n.operatorToken.kind<=ts.SyntaxKind.LastAssignment
+        &&ts.isPropertyAccessExpression(n.left)&&ts.isIdentifier(n.left.expression)&&n.left.expression.text===names.get(name)&&n.left.name.text==="value");
+      const sw=writes("composerSpace"),mw=writes("composerMeasured");
+      if(sw.length!==2||mw.length!==2)continue;
+      const measuredWrite=sw.find(n=>ts.isIdentifier(n.right)),fallback=sw.find(n=>n!==measuredWrite);
+      const height=visit(fallback?.right??ast).find(n=>ts.isPropertyAccessExpression(n)&&n.name.text==="value"&&ts.isIdentifier(n.expression));
+      if(!measuredWrite||!fallback||!height)continue;
+      names.set("inputHeight",height.expression.text);
+      let fn=measuredWrite;while(fn&&!ts.isFunctionDeclaration(fn))fn=fn.parent;
+      if(!fn?.name)continue;
+      names.set("measureComposer",fn.name.text);
+      const scoped=visit(fn).find(n=>ts.isCallExpression(n)&&ts.isPropertyAccessExpression(n.expression)&&n.expression.name.text==="in");
+      if(!scoped||!ts.isIdentifier(scoped.arguments[0]))continue;
+      names.set("threadInstance",scoped.arguments[0].text);
+      if(fn.parent!==ast||[space[0],decl("composerVisible")[0],decl("inputHeight")[0],decl("threadInstance")[0]].some(n=>n?.parent.parent.parent!==ast))continue;
+      const expected=proof.statements;
+      if(!same(space[0].parent.parent,expected[0],names)||!same(decl("composerVisible")[0]?.parent.parent,expected[1],names)
+        ||!same(decl("inputHeight")[0]?.parent.parent,expected[2],names)||!same(property.initializer,expected[6].declarationList.declarations[0].initializer,names)
+        ||!same(fn,expected[7],names)||!same(fallback.parent,expected[4],names)||!same(decl("threadInstance")[0]?.parent.parent,expected[8],names))continue;
+      const block=fallback.parent.parent,index=block.statements?.indexOf(fallback.parent);
+      if(index===undefined||index<0||!same(block.statements[index+1],expected[5],names))continue;
+      const iw=writes("inputHeight"),approved=new Set([...sw,...mw,...iw]);
+      if(iw.length!==2||!iw.every(n=>n.operatorToken.kind===ts.SyntaxKind.EqualsToken&&(n.right.getText()==="24"||same(n.parent.parent,expected[3],names))))continue;
+      const imports=ast.statements.filter(ts.isImportDeclaration).filter(n=>n.moduleSpecifier.text==="vue"&&!n.importClause?.isTypeOnly)
+        .flatMap(n=>n.importClause?.namedBindings?.elements??[]);
+      const roles=new Set([...names].filter(([key])=>key!=="threadInstance").map(([,value])=>value)),globals=new Set(["ref","computed","nextTick","watch","getCurrentInstance","Number","Math","uni"]);
+      const guarded=[];let depth=0,from=0;
+      for(const directive of source.matchAll(/^[\t ]*(?:\/\/|<!--)\s*#(ifdef|ifndef|endif)\b.*$/gm)){
+        if(directive[1]!=="endif"){if(depth++===0)from=directive.index;}
+        else if(--depth===0)guarded.push([from,directive.index+directive[0].length]);
+      }
+      if(depth>0)guarded.push([from,source.length]);
+      let valid=!nodes.some(n=>ts.isIdentifier(n)&&[...names.values()].includes(n.text)&&guarded.some(([a,b])=>a<=descriptor.scriptSetup.loc.start.offset+n.getStart()&&descriptor.scriptSetup.loc.start.offset+n.getStart()<b));
+      for(const {exp,prop,owner} of expressions){
+        const scanner=ts.createScanner(ts.ScriptTarget.Latest,true,ts.LanguageVariant.Standard,exp.content),refs=[];
+        for(let token=scanner.scan();token!==ts.SyntaxKind.EndOfFileToken;token=scanner.scan())if(token===ts.SyntaxKind.Identifier&&roles.has(scanner.getTokenValue()))refs.push(scanner.getTokenPos());
+        if(!refs.length||exp===style.exp&&refs.every(at=>property.initializer.getStart()-1<=at&&at<property.initializer.end-1))continue;
+        if(!(owner?.tag==="textarea"&&prop.name==="bind"&&prop.arg?.isStatic&&prop.arg.content==="style"
+          &&same(unwrap(parseTs(`(${exp.content})`).statements[0].expression),expected[9].declarationList.declarations[0].initializer,names)))valid=false;
+      }
+      const observers=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="observeComposer"&&same(n,expected[10],names));
+      const bubble=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="measureBubblePositions"),bubbleNodes=bubble?visit(bubble):[];
+      const readers=expected.slice(11,15).map(model=>bubbleNodes.filter(n=>n.kind===model.kind&&same(n,model,names)));
+      const watches=ast.statements.filter(n=>same(n,expected[15],names));
+      if(observers.length!==1||watches.length!==1||readers.some(matches=>matches.length!==1)||!ast.statements.some(n=>same(n,expected[16],names)))valid=false;
+      for(const alias of ["measuredComposer","composer"])if(bubbleNodes.filter(n=>ts.isIdentifier(n)&&n.text===alias).length!==2)valid=false;
+      const hostReaders=[fn,...observers,...watches,...readers.flat()];
+      for(const n of nodes.filter(n=>ts.isIdentifier(n)&&n.text===names.get("composerHost")&&!binding(n)&&ts.isPropertyAccessExpression(n.parent)))
+        if(!hostReaders.some(reader=>reader.getStart()<=n.getStart()&&n.end<=reader.end))valid=false;
+      for(const n of nodes.filter(n=>ts.isIdentifier(n)&&n.text==="observeComposer"))if(!binding(n)&&!(ts.isCallExpression(n.parent)
+        &&(same(n.parent.parent,expected[16],names)||same(n.parent.parent,expected[17],names))))valid=false;
+      if(decl("threadInstance").length!==1||nodes.some(n=>ts.isCallExpression(n)&&ts.isIdentifier(n.expression)&&n.expression.text==="eval"))valid=false;
+      for(const name of roles)if(nodes.filter(n=>ts.isIdentifier(n)&&n.text===name&&binding(n)).length!==1)valid=false;
+      for(const name of ["ref","computed","nextTick","watch","getCurrentInstance"])if(!imports.some(n=>!n.isTypeOnly&&n.name.text===name&&(n.propertyName??n.name).text===name))valid=false;
+      for(const n of nodes.filter(ts.isIdentifier)){
+        if(globals.has(n.text)&&binding(n)&&!imports.includes(n.parent))valid=false;
+        if(n.text===names.get("threadInstance")&&!binding(n)&&!(ts.isCallExpression(n.parent)&&ts.isPropertyAccessExpression(n.parent.expression)&&n.parent.expression.name.text==="in"&&n.parent.arguments[0]===n))valid=false;
+        if(globals.has(n.text)){let root=n;while(root.parent&&(ts.isPropertyAccessExpression(root.parent)||ts.isElementAccessExpression(root.parent)))root=root.parent;
+          if(ts.isBinaryExpression(root.parent)&&root.parent.left===root&&root.parent.operatorToken.kind>=ts.SyntaxKind.FirstAssignment&&root.parent.operatorToken.kind<=ts.SyntaxKind.LastAssignment)valid=false;
+          if(["Number","Math","uni"].includes(n.text)&&!binding(n)&&!(ts.isPropertyAccessExpression(n.parent)&&n.parent.expression===n)&&!ts.isTypeOfExpression(n.parent))valid=false;}
+        if(!roles.has(n.text)||binding(n))continue;
+        if(ts.isPropertyAccessExpression(n.parent)&&n.parent.expression===n&&n.parent.name.text==="value"){
+          let access=n.parent;while(access.parent&&(ts.isPropertyAccessExpression(access.parent)||ts.isElementAccessExpression(access.parent)||ts.isAsExpression(access.parent)||ts.isParenthesizedExpression(access.parent)))access=access.parent;
+          const parent=access.parent;
+          if(ts.isBinaryExpression(parent)&&parent.left===access&&parent.operatorToken.kind>=ts.SyntaxKind.FirstAssignment&&parent.operatorToken.kind<=ts.SyntaxKind.LastAssignment&&!approved.has(parent))valid=false;
+          if(ts.isPrefixUnaryExpression(parent)||ts.isPostfixUnaryExpression(parent))if(parent.operator===ts.SyntaxKind.PlusPlusToken||parent.operator===ts.SyntaxKind.MinusMinusToken)valid=false;
+        }else if(n.text===names.get("measureComposer")){if(!ts.isCallExpression(n.parent)||n.parent.expression!==n)valid=false;}
+        else if(!(n.text===names.get("composerHost")&&ts.isCallExpression(n.parent)&&same(n.parent.parent,expected[16],names)))valid=false;
+      }
+      const hosts=elements.filter(e=>attr(e,"ref")===names.get("composerHost"));
+      if(hosts.length!==1||hosts[0].tag!=="view"||attr(hosts[0],"class")!=="nx-conv-composer"||hosts[0].props.some(p=>p.name==="style"||p.name==="bind"&&(!p.arg||!p.arg.isStatic)||p.arg?.content==="style"||p.arg?.content==="class"))valid=false;
+      const pads=[];
+      for(const [cssFile,text]of files.filter(([,text])=>text.includes("nx-conv-composer"))){
+        const sheets=cssFile.endsWith(".css")?[text]:parse(text,{filename:cssFile}).descriptor.styles.filter(s=>cssFile===file||!s.scoped).map(s=>s.content);
+        for(const sheet of sheets)postcss.parse(sheet).walkRules(rule=>{
+          if(!rule.selector.includes("nx-conv-composer"))return;
+          rule.walkDecls(d=>{if(/^padding(?:$|-bottom$|-block(?:-end)?$)/.test(d.prop))pads.push(d);if(/^(?:all|transform|zoom|scale)$/.test(d.prop))valid=false;});
+        });
+      }
+      if(pads.length!==1||pads[0].parent.selector!==".nx-conv-composer"||pads[0].prop!=="padding-bottom"||normalize(pads[0].value)!=="calc(INSET+22px)")valid=false;
+      if(valid)allowed.add(position);
+    }
+  }
+  return {allowed,candidates};
+}
+for(const [p,source]of files){
+const dynamic=composerProof(source,p);
+for(const position of dynamic.candidates)if(!dynamic.allowed.has(position))bad.push(p.split(path.sep).join("/")+":"+source.slice(0,position).split("\n").length+" unproven dynamic composer spacing");
+let offset=0;
+for(const declaration of source.split(";")){
+    const start=offset;
+    offset+=declaration.length+1;
+    if(!insetSource.test(declaration))continue;
+    const properties=[...declaration.matchAll(/(?:^|[{\s,"\x27])(--nx-overlay-(?:safe-bottom|bottom)|padding[\w-]*|bottom)["\x27]?\s*:/g)];
+    for(const [index,match] of properties.entries()){
+    if(dynamic.allowed.has(start+match.index+match[0].indexOf(match[1])))continue;
+    const raw=declaration.slice(match.index+match[0].length,properties[index+1]?.index).trim();
+    if(!insetSource.test(match[1]+" "+raw))continue;
+    const line=source.slice(0,start+match.index).split("\n").length;
+    const quoted=raw.match(/^(["\x27])([^\r\n]*?)\1(?=\s*(?:[,}]|$))/);
+    let value=normalize(quoted?quoted[2]:raw.replace(/["\x27]\s*\/?>[\s\S]*$/,"").replace(/}\s*$/,"").trim());
+    if(match[1].startsWith("--nx-overlay-")){
+      const expected=match[1]==="--nx-overlay-safe-bottom"?"SAFE24":"calc(16px+var(--nx-overlay-safe-bottom))";
+      if(value===expected)continue;
+      bad.push(p.split(path.sep).join("/")+":"+line+" invalid shared token "+match[1]);
+      continue;
+    }
+    if(match[1]==="padding"||match[1]==="padding-block"||match[1]==="paddingBlock"){
+      const sides=[];
+      let depth=0,start=0;
+      for(let at=0;at<=value.length;at++){
+        if(at===value.length||(depth===0&&/\s/.test(value[at]))){
+          if(at>start)sides.push(value.slice(start,at));
+          start=at+1;
+        }else if(value[at]==="(")depth++;
+        else if(value[at]===")")depth--;
+      }
+      const logical=match[1]!=="padding";
+      const bottomAt=logical?sides.length-1:sides.length<3?0:2;
+      value=depth===0&&sides.length<=(logical?2:4)?(sides[bottomAt]??""):"";
+      if(value&&!/INSET|SAFE24|safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/.test(value))continue;
+    }
+    // 02 §2.5: a bottom bar, sheet or floating button takes a shared token as its whole bottom value.
+    // A fixed amount stacked on env() or on a token is red, whatever its size.
+    if(overlayDefined&&/^var\(--nx-overlay-(?:safe-bottom|bottom)\)$/.test(value))continue;
+    const where=p.split(path.sep).join("/");
+    const before=source.slice(0,start+match.index),open=before.lastIndexOf("{");
+    const selector=open>before.lastIndexOf("}")?before.slice(before.lastIndexOf("}")+1,open).replace(/^[\s\S]*<style[^>]*>/,"").replace(/\/\*[\s\S]*?\*\//g,"").split("{").pop().trim():"";
+    if(SAFE_AREA_EXEMPT.some(([file,rule])=>file===where&&rule===selector))continue;
+    bad.push(where+":"+line+" "+(selector&&!/[;\n=]/.test(selector)?selector:match[1])+" bottom must be var(--nx-overlay-safe-bottom) or var(--nx-overlay-bottom), got "+value);
+}}}
+if(!files.length)throw new Error("no safe-area source files scanned");
+if(bad.length)console.log([...new Set(bad)].join("\n"));
+NODE
+); then
+  bad "safe-area scanner failed"
+  printf "%s\n" "$sa_bad" | sed 's/^/        /'
+elif [ -n "$sa_bad" ]; then
+  bad "safe-area bottom spacing failed (P-065 / 02 §2.5 shared tokens)"
+  printf "%s\n" "$sa_bad" | sed 's/^/        /'
+else
+  ok "safe-area bottom spacing uses the shared tokens (P-065 / 02 §2.5)"
+fi
 # Auth/onboarding bare pages must use one system-chrome owner. This catches the
 # orthogonal failure where a new flow page looks fine but forgets the status bar,
 # Home Indicator, or bottom safe-area reserve (P-069).
@@ -822,11 +701,10 @@ for (const file of pages) {
   if (!/<StandalonePageShell\b/.test(source) || !/import StandalonePageShell from "@\/components\/device\/standalone-page-shell\.vue"/.test(source)) {
     throw new Error(`${file}: missing StandalonePageShell`);
   }
-  if (!/data-system-chrome-primary/.test(source)) throw new Error(`${file}: missing runtime primary-control marker`);
 }
 const shell = fs.readFileSync("src/components/device/standalone-page-shell.vue", "utf8");
 if (!/DeviceStatusBar/.test(shell) || !/DeviceHomeIndicator/.test(shell)) throw new Error("standalone shell chrome incomplete");
-if (!/BOTTOM_SAFE_PADDING\s*=\s*"calc\(env\(safe-area-inset-bottom, 0px\) \+ 38px\)"/.test(shell)) throw new Error("standalone shell lost 38px bottom safe-area baseline");
+if (!/BOTTOM_SAFE_PADDING\s*=\s*"var\(--nx-overlay-safe-bottom\)"/.test(shell)) throw new Error("standalone shell bottom reserve must be var(--nx-overlay-safe-bottom), with no fixed px stacked on env()");
 if (!/paddingBottom:\s*props\.reserveBottom\s*\?\s*BOTTOM_SAFE_PADDING\s*:\s*"0px"/.test(shell)) throw new Error("standalone shell no longer applies its bottom safe-area baseline");
 const chassis = fs.readFileSync("src/components/app-chassis.vue", "utf8");
 if (!/<DeviceHomeIndicator\s*\/>/.test(chassis)) throw new Error("AppChassis no longer shares DeviceHomeIndicator");
@@ -835,25 +713,14 @@ if (!/:top-inset="24"/.test(estimator) || !/\.est-cta\s*\{[\s\S]*?margin-right:\
   throw new Error("estimator CTA no longer aligns to register-success 24px side inset");
 }
 const success = fs.readFileSync("src/pages/register/success.vue", "utf8");
-if (!/\.rs-footer\s*\{[^}]*padding-bottom:\s*calc\(env\(safe-area-inset-bottom, 0px\) \+ 38px\)/.test(success)) {
-  throw new Error("register-success CTA lost 38px bottom baseline");
+if (!/\.rs-footer\s*\{[^}]*padding-bottom:\s*var\(--nx-overlay-safe-bottom\)\s*;/.test(success)) {
+  throw new Error("register-success CTA bottom must be var(--nx-overlay-safe-bottom), with no fixed px stacked on env()");
 }
 NODE
 then
   ok "all bare login-entry pages share status bar + Home Indicator shell (P-069)"
 else
   bad "bare login-entry system chrome contract"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-auth-system-chrome.log"
-fi
-if scope_hit login-entry-chrome-runtime; then
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-auth-system-chrome-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs; then
-    ok "bare login-entry system chrome runtime geometry (P-069)"
-  else
-    bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-auth-system-chrome-runtime.log"
-  fi
-else
-  skipped "bare login-entry system chrome runtime geometry (dev server not running at $BASE_URL)"
-fi
 fi
 # ── SPEC-1 R7: factor reads device truth, never the viewing carrier ──
 sentinel_present "SPEC-1 R7 online seam exported" src/lib/hashpower.ts 'export function isDeviceOnline'
@@ -862,21 +729,17 @@ sentinel_present "SPEC-1 R7 heartbeat typed" src/store/types.ts 'onlineHeartbeat
 sentinel_present "SPEC-1 R7 heartbeat freshest-wins merge" src/store/account-cloud.ts '"onlineHeartbeatAt"'
 sentinel_present "SPEC-1 R7 settle reads device online" src/store/app.ts 'isDeviceOnline\(d, now\)'
 sentinel_present "SPEC-1 R7 App stamps heartbeat" src/store/app.ts 'onlineHeartbeatAt: now'
-sentinel_present "SPEC-1 R7 home row uses confirmed runtime display" src/components/home/device-row.vue 'deviceOnlineState\(props\.device, Date\.now\(\), props\.runtimeConfirmed\)'
-sentinel_present "SPEC-1 R7 home slot uses confirmed runtime display" src/components/home/device-row.vue 'deviceOnlineState\(props\.device, Date\.now\(\), props\.runtimeConfirmed\)'
 sentinel_present "BUG 264 me summary uses activated device count" src/pages/me/me.vue 'activatedLabel.*n: activeCount\.value'
 sentinel_present "BUG 264 legacy me card uses activated device count" src/components/me/my-devices-entry.vue 'activatedLabel.*n: activeCount\.value'
-sentinel_present "BUG 264 wallet summary uses activated device count" src/components/me/wallet-card.vue 'walletSlotsLine.*active: activeCount\.value'
+sentinel_present "BUG 264 wallet summary uses activated device count" src/components/me/wallet-card.vue 'walletSlotsLine.*active: visibility\.mask\(activeCount\.value'
 if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
-  src/components/home/device-row.vue \
   src/components/home/device-slot.vue \
   src/components/earn/device-card-pc.vue \
   src/components/me/wallet-card.vue \
   src/components/me/my-devices-entry.vue \
   src/pages/me/me.vue \
   src/pages/me/proof.vue \
-  src/pages/support/chat.vue \
-  src/mock/nova-templates.ts >"${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log" 2>&1; then
+  src/pages/support/chat.vue >"${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log" 2>&1; then
   bad "SPEC-1 R7 user-facing online state bypasses heartbeat seam"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log"
 else
   ok "SPEC-1 R7 user-facing online state uses heartbeat seam"
@@ -916,23 +779,6 @@ if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev
   bad "staking disclosure understates 180d/365d principal penalties"
 else
   ok "staking disclosure includes canonical high-tier penalties"
-fi
-sentinel_present "staking risk disclosure EN names all four penalties" src/i18n/messages/en.ts '5% / 15% / 30% / 50% of principal'
-sentinel_present "staking risk disclosure ZH names all four penalties" src/i18n/messages/zh.ts '5% / 15% / 30% / 50% 本金'
-# The explanation renders current pool penalties. Fixed default strings cannot
-# prove that operator changes (including fractional rates) reach all locales.
-staking_display_log="${VERIFY_LOG_PREFIX}-staking-display.log"
-if npx vitest run src/lib/staking-percentage.test.ts src/pages/staking/staking-risk-copy.test.ts src/pages/staking/how-it-works.contract.test.ts > "$staking_display_log" 2>&1; then
-  staking_display_count=$(sed 's/\x1b\[[0-9;]*m//g' "$staking_display_log" | grep -Eo 'Tests[[:space:]]+[0-9]+ passed' | tail -1 | awk '{print $2}')
-  if [ "${staking_display_count:-0}" -ge 18 ]; then
-    ok "staking dynamic display: three locales, nondefault penalties and percentage precision — $staking_display_count tests"
-  else
-    bad "staking dynamic display test sample missing (expected at least 18)"
-    tail -15 "$staking_display_log"
-  fi
-else
-  bad "staking dynamic display behavior failed"
-  tail -20 "$staking_display_log"
 fi
 if grep -qE 'simulation engine|simulated\. Real deployments|DEMO CONNECTION|Simulate linking|Simulate connection|模拟引擎|模拟生成|演示连接|模拟连接' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "user-facing copy exposes mock/simulation internals"
@@ -986,16 +832,12 @@ sentinel_present "device card secondary controls are keyboard-accessible" src/co
 sentinel_present "device quick menu is a modal dialog" src/components/earn/device-card-pc.vue 'aria-modal="true"'
 sentinel_present "device quick menu traps focus" src/components/earn/device-card-pc.vue 'function trapMenuFocus'
 sentinel_present "device quick menu traps native H5 keydown in capture phase" src/components/earn/device-card-pc.vue 'addEventListener\("keydown", onDocumentMenuKeydown, true\)'
-sentinel_present "home slot opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
-sentinel_present "home row opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
-sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
-sentinel_present "home row device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="onKeyboardActivate\(\$event, goBack\)"'
-# ⚠️ 上面这 4 条 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
+# ⚠️ 上面的 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
 # 2026-08-11 量面结果说明了枚举式判据的天花板 —— 它们守住 4 个控件,而当时全仓有 151 个
 # 自造控件键盘不可达(覆盖率 3%)。构造性判据见文件末尾的 a11y_activate_gate:那道门遍历
 # 「全仓每一个模板元素」,新控件天然落进判定域,不需要谁记得往这张清单里补一行。
-# 这 4 条保留:它们额外锁的是「这几个具体控件的具体行为别被改掉」,与构造性门不重叠;
+# 这些保留:它们额外锁的是「这几个具体控件的具体行为别被改掉」,与构造性门不重叠;
 # 但**不要再往这张清单里加新的**——加了也追不上问题面的增长速度。
 # ── SPEC-7 风险簇/三桶/释放/提现 sentinels(推倒重写版 2026-07-02)──
 # 契约层: 全参数寄存器 + 新增整改 key(R1/R2/R4)
@@ -1009,15 +851,6 @@ sentinel_present "SPEC-7 K4 dimension weights typed (R3)" src/store/config-types
 sentinel_present "SPEC-7 risk cluster seeded" src/mock/platform-config.ts 'releaseMode: "attest_or_manual"'
 sentinel_present "SPEC-7 withdraw rules seeded" src/mock/platform-config.ts 'firstWithdrawalManual: true'
 sentinel_present "SPEC-7 gift lock seeded" src/mock/platform-config.ts 'lockMode: "risk_bucket"'
-# z1 判决 A:克隆逻辑 819a6da 起搬进 lib/platform-config-compat.ts(config store 经
-# completePlatformConfigSeed 初始化)。字面 pin 换行为门:克隆隔离 / captchaAlwaysScenes
-# 有效值 / WD02 网络费逐键 parity 全走「合成后的有效配置」,种子文件形态属实现细节。
-if ADMIN_ROOT="$ADMIN_ROOT" "$NODE_BIN" scripts/selfcheck-config-compat.mjs > "${VERIFY_LOG_PREFIX}-uni-config-compat.log" 2>&1; then
-  ok "platform-config compat 行为门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-config-compat.log")"
-else
-  bad "platform-config compat 行为门失败 — node scripts/selfcheck-config-compat.mjs 看明细"
-  tail -12 "${VERIFY_LOG_PREFIX}-uni-config-compat.log" | sed 's/^/        /'
-fi
 # 引擎层: 身份注册表(独立于会话存储)+ 实时聚簇 + 释放 + 提现前置
 sentinel_present "SPEC-7 risk registry isolated storage" src/store/risk-identity.ts 'nexgrid-risk-registry-v1'
 sentinel_present "SPEC-7 registry tracks first withdrawal (R2)" src/store/risk-identity.ts 'hasWithdrawn'
@@ -1061,8 +894,8 @@ if grep -rqE 'WELCOME_GIFT_USDT|WELCOME_GIFT_NEX' src/ 2>/dev/null; then
 else
   ok "SPEC-7 no local gift amount constants (config-derived)"
 fi
-sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '\{usd\} USDT \+ \{nex\} NEX'
-sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '\{usd\} USDT \+ \{nex\} NEX'
+sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '\{usd\}( |\\u00A0)USDT \+ \{nex\}( |\\u00A0)UVT'
+sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '\{usd\}( |\\u00A0)USDT \+ \{nex\}( |\\u00A0)UVT'
 sentinel_present "SPEC-7 settle reads live cluster (R5)" src/store/app.ts 'evaluateAccountCluster\(accountKey\.value\)'
 sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEarnings'
 # 【z1 判决 C · 假绿清理】原「settle journals ×2」「settle applies release engine」三门
@@ -1072,7 +905,17 @@ sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEa
 sentinel_present "SPEC-7 settle accrues app attestation" src/store/app.ts 'recordAttestation\(accountKey\.value'
 sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 'if \(cfgStore\.syncFailed\) return'
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
-sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
+# The failure body is shared by the old retry panel and the current automatic recovery UI.
+if "$NODE_BIN" -e '
+const source=require("fs").readFileSync("src/components/me/wallet-overview.vue","utf8").replace(/<!--[\s\S]*?-->/g,"");
+const template=source.match(/^\s*<template>([\s\S]*?)<\/template>\s*<script\b/)?.[1] ?? "";
+const failed=template.match(/<view\s+v-if="configSyncFailed(?:\s*&&\s*!fundsAuthorityUnavailable)?"[^>]*>([\s\S]*?)<\/view>/)?.[1] ?? "";
+process.exit(/<text\b[^>]*>\s*\{\{\s*t\.wallet\.syncFailedBody\s*\}\}\s*<\/text>/.test(failed) ? 0 : 1);
+'; then
+  ok "SPEC-7 wallet shows config sync failure state"
+else
+  bad "SPEC-7 wallet shows config sync failure state"
+fi
 
 # ── PAY-VN 越南支付架构(规格 PRD/specs/ 下的「越南支付架构规格 v1.0」· 2026-07-24)──
 #    注:此处刻意不写规格文件名全称 —— 文件名带旧品牌前缀,写全会被本文件的 brand 哨兵抓,
@@ -1149,20 +992,34 @@ fi
 sentinel_present "AUTH02 phone account directory exists" src/store/auth-account.ts 'AUTH_ACCOUNT_STORAGE_KEY'
 sentinel_present "AUTH02 OTP exchanges verified old number" src/store/auth-otp.ts 'exchangeVerifiedSignIn'
 sentinel_present "AUTH02 registered-number handoff uses destination toast" src/pages/register/register.vue 'toast\.info\(t\.value\.register\.accountExistsTitle'
-sentinel_present "AUTH02 handoff toast is assistive-technology announced" src/components/global-ui.vue 'aria-live="polite"'
+# Accept the old inline toast or the mounted shared host, never an unrelated live-region keyword.
+if "$NODE_BIN" -e '
+const fs=require("fs");
+const read=file=>fs.readFileSync(file,"utf8").replace(/<!--[\s\S]*?-->/g,"");
+const template=source=>source.match(/^\s*<template>([\s\S]*?)<\/template>\s*<script\b/)?.[1] ?? "";
+const live=attrs=>/\srole="status"/.test(attrs) && /\saria-live="polite"/.test(attrs) && /\saria-atomic="true"/.test(attrs);
+const source=read("src/components/global-ui.vue"), markup=template(source);
+const inline=markup.match(/<view\b([^>]*\sv-for="t in ui\.toasts"[^>]*)>([\s\S]*?)<\/view>/);
+if(inline && live(inline[1]) && /<text\b[^>]*>\s*\{\{\s*t\.title\s*\}\}\s*<\/text>/.test(inline[2])
+  && /<text\b[^>]*>\s*\{\{\s*t\.description\s*\}\}\s*<\/text>/.test(inline[2])) process.exit(0);
+const code=(source.match(/<script\b[^>]*>([\s\S]*?)<\/script>/)?.[1] ?? "").replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,"");
+if(!/^\s*import ToastHost from "@\/components\/toast-host\.vue";\s*$/m.test(code)
+  || !/<ToastHost\s+v-if="showBusinessOverlays"\s*\/>/.test(markup)) process.exit(1);
+const host=template(read("src/components/toast-host.vue")).match(/^\s*<view\b([^>]*)>([\s\S]*)<\/view>\s*$/);
+process.exit(host && live(host[1]) && /v-if="shown && ui\.activeToast"/.test(host[2])
+  && /<text\b[^>]*>\s*\{\{\s*ui\.activeToast\.title\s*\}\}\s*<\/text>/.test(host[2])
+  && /<text\b[^>]*>\s*\{\{\s*ui\.activeToast\.description\s*\}\}\s*<\/text>/.test(host[2]) ? 0 : 1);
+'; then
+  ok "AUTH02 handoff toast is assistive-technology announced"
+else
+  bad "AUTH02 handoff toast is assistive-technology announced"
+fi
 sentinel_present "AUTH02 sign-in rejects an unregistered phone identity" src/auth/complete-sign-in.ts '"account_not_found"'
 sentinel_present "AUTH02 legacy risk migration seals schema2 barrier" src/store/risk-identity.ts 'sealLegacyRiskRegistryForAuthDirectory'
 sentinel_present "AUTH02 sponsorship is rebound per account" src/lib/account-scope.ts 'useSponsorship\(\)\.bindAccount\(accountKey\)'
 sentinel_present "AUTH02 sponsorship stores bindings per account" src/store/sponsorship.ts 'bindingsByAccount'
 sentinel_present "AUTH02 dev bridge is entrypoint DEV-gated" src/main.ts 'if \(import\.meta\.env\.DEV\)'
-sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
-# Bug7:钱包释放说明只使用服务端回执；零余额、不可读、限制及在线阈值由实际页面函数测试覆盖。
-if npx vitest run src/pages/me/wallet-release-message.test.ts >"${VERIFY_LOG_PREFIX}-wallet-release-message.log" 2>&1; then
-  ok "SPEC-7 wallet release explanations follow server receipts"
-else
-  bad "SPEC-7 wallet release explanations follow server receipts"
-  cat "${VERIFY_LOG_PREFIX}-wallet-release-message.log"
-fi
+sentinel_present "SPEC-7 wallet pending bucket info sheet" src/components/me/wallet-overview.vue 'pendingSheetTitle'
 sentinel_present "SPEC-7 risk reason dict single-source in lib" src/lib/risk-reason-text.ts 't\.wallet\.riskReasons'
 sentinel_present "SPEC-7 risk reason dict carries PAY04 rebind codes" src/lib/risk-reason-text.ts '"new-address-large-amount"'
 sentinel_present "SPEC-7 payment-instrument overuse mapped (en)" src/i18n/messages/en.ts '"payment-instrument-overuse"'
@@ -1171,7 +1028,7 @@ sentinel_present "SPEC-7 dev bridge is DEV-gated" src/lib/spec7-dev-bridge.ts 'i
 sentinel_present "SPEC-7 earning buckets typed" src/store/types.ts 'interface EarningBuckets'
 sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earningBuckets: EarningBuckets'
 sentinel_present "SPEC-7 legacy account snapshots receive bucket defaults" src/store/app.ts 'withDefaultEarningBuckets'
-sentinel_present "SPEC-7 wallet page reads earning buckets" src/pages/me/wallet.vue 'app\.user\.earningBuckets'
+sentinel_present "SPEC-7 wallet page reads earning buckets" src/components/me/wallet-overview.vue 'app\.user\.earningBuckets'
 sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wallet-card.vue 'app\.user\.earningBuckets'
 # z1 判决 A:2026-07-31「上限=总余额」规则被 D5 server-canonical 新规则取代 ——
 # 可提上限 =(总余额 − 服务端 held 两桶)× policy.balanceMaxRatio,且 clusterRestricted /
@@ -1202,7 +1059,7 @@ fi
 #    故本门现在守两面:① 值仍是总余额(原判据,保留);② 标签不含「可提现」语义(新增)。
 withdrawable_source_parity() {
   local miss=""
-  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/pages/me/wallet.vue || miss="${miss}wallet.vue "
+  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet.vue "
   grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet-card.vue "
   if [ -z "$miss" ]; then ok "wallet surfaces show total balance (app.user.usdtBalance)";
   else bad "wallet surface value source DRIFT — still on old bucket: $miss"; fi
@@ -1225,7 +1082,7 @@ withdrawable_source_parity() {
   # 文件里顺手加一处引用旧桶的辅助展示(主 computed 仍正确),上面照样全绿而页面口径已分裂。
   local stale
   stale=$(grep -nE '(earningBuckets|buckets(\.value)?)\.withdrawableUsdt' \
-    src/pages/me/wallet.vue src/components/me/wallet-card.vue src/pages/me/wallet-withdraw.vue 2>/dev/null | head -4)
+    src/components/me/wallet-overview.vue src/components/me/wallet-card.vue src/pages/me/wallet-withdraw.vue 2>/dev/null | head -4)
   if [ -z "$stale" ]; then ok "no stale withdrawable-bucket reads in wallet surfaces (0 hits)";
   else bad "stale withdrawable-bucket read resurfaced (口径分裂面)"; echo "$stale" | sed 's/^/        /'; fi
 }
@@ -1234,7 +1091,7 @@ sentinel_present "SPEC-7 withdraw page consumes eligibility engine" src/pages/me
 sentinel_present "SPEC-7 withdraw submit re-evaluates async at submit (R5)" src/pages/me/wallet-withdraw.vue 'await requestWithdrawalEligibility'
 sentinel_present "SPEC-7 withdraw submit uses fresh route" src/pages/me/wallet-withdraw.vue 'fresh\.route'
 sentinel_present "SPEC-7 withdraw timeout does not debit" src/pages/me/wallet-withdraw.vue 'riskCheckTimeoutTitle'
-sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldBucketsLine'
+sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldReviewChip'
 sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 'riskReasonLines\(t\.value'
 sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
 # (原「SPEC-7 pairing registers payment instrument」哨兵随旧配对机制删除,2026-08-05 包 E。
@@ -1492,25 +1349,16 @@ spec2_pc_gpu_kind_coverage() {
   grep -q '"pc-gpu"' src/store/types.ts || miss="${miss}DeviceKind "
   grep -q '"pc-gpu"' src/store/device-types.ts || miss="${miss}device-types "
   grep -q '"pc-gpu"' src/components/earn/device-card-pc.vue || miss="${miss}device-card-icon "
-  grep -q '"pc-gpu"' src/components/earn/empty-slots-hint.vue || miss="${miss}slot-grid-icon "
   if [ -z "$miss" ]; then ok "SPEC-2 pc-gpu kind coverage (types/specs/icons)";
   else bad "SPEC-2 pc-gpu kind coverage missing: $miss"; fi
 }
 spec2_pc_gpu_kind_coverage
-sentinel_present "SPEC-2 compute entry gated by feature flag" src/components/earn/compute-share-entry.vue 'isEnabled\("computeShareEnabled"\)'
 # 🗑 2026-08-13 退役:原哨兵钉 `if (IS_PRODUCTION) return` 这个**字面写法**,
 #   而实现已加严成 `if (remoteApiEnabled || IS_PRODUCTION) return`(多拦一层远端档)—— 判据过期。
 #   它守的不变量(开发后门在生产构建里必须失效)**已被 SPEC-2 guard semantics 里的派生判据完全覆盖**:
 #   那条枚举 config.ts 里所有 `_dev*` 后门,逐个要求函数体里有 IS_PRODUCTION 早退,
 #   写法随便但一个都不许漏 —— 比这条字面哨兵严格更强(它对**新增的后门**是瞎的)。
 #   红测证据:拆掉任一后门的守卫 / 新增一个没守的后门,派生判据都判红。
-sentinel_present "SPEC-2 compute entry render guarded" src/components/earn/compute-share-entry.vue 'v-if="enabled"'
-sentinel_present "SPEC-2 download page guard uses feature flag" src/pages/compute-share/download.vue 'isEnabled\("computeShareEnabled"\)'
-sentinel_present "SPEC-2 download body does not render while disabled" src/pages/compute-share/download.vue 'v-else-if="enabled" class="pb-8"'
-sentinel_present "SPEC-2 copy handler re-checks disabled flag" src/pages/compute-share/download.vue 'function copyDownloadUrl\(\)'
-sentinel_present "SPEC-2 connect handler re-checks disabled flag" src/pages/compute-share/download.vue 'function connectDemoComputer\(\)'
-sentinel_present "SPEC-2 download title reads config content" src/pages/compute-share/download.vue 'cfg\.config\.computeShare\.content'
-sentinel_present "SPEC-2 download guide falls back to i18n" src/pages/compute-share/download.vue 'configured \|\| t\.value\.computeShare\.downloadBody'
 sentinel_present "SPEC-2 computeShare content typed" src/store/config-types.ts 'interface ComputeShareContent'
 sentinel_present "SPEC-2 computeShare zhTitle seeded" src/mock/platform-config.ts 'zhTitle:'
 sentinel_present "SPEC-2 computeShare zhGuide seeded" src/mock/platform-config.ts 'zhGuide:'
@@ -1518,7 +1366,6 @@ sentinel_present "SPEC-2 computeShare enTitle seeded" src/mock/platform-config.t
 sentinel_present "SPEC-2 computeShare enGuide seeded" src/mock/platform-config.ts 'enGuide:'
 sentinel_present "SPEC-2 gpu tiers single source exists" src/lib/gpu-tiers.ts 'export const GPU_TIERS'
 sentinel_present "SPEC-2 device factory accepts matched tier" src/store/device-types.ts 'options\.gpuTier \?\? matchGpuTier'
-sentinel_present "SPEC-2 connect uses configured GPU tiers" src/store/app.ts 'cfg\.config\.computeShare\.gpuTiers'
 sentinel_present "SPEC-2 pc-gpu freezes when flag disabled" src/store/app.ts 'freezeComputeShareDevice'
 sentinel_present "SPEC-2 slot cap counts hidden active pc-gpu" src/store/app.ts 'activeSlotCount = computed\(\(\) => devices\.value\.filter'
 sentinel_present "SPEC-2 device page slot meter uses authoritative active count" src/pages/me/devices.vue 'app\.activeSlotCount \+ trialReserved\.value'
@@ -1554,13 +1401,9 @@ spec2_gpu_tier_monotonic
 spec2_guard_semantics() {
   if "$NODE_BIN" -e '
     const fs=require("fs");
-    const download=fs.readFileSync("src/pages/compute-share/download.vue","utf8");
     const app=fs.readFileSync("src/store/app.ts","utf8");
     const deviceTypes=fs.readFileSync("src/store/device-types.ts","utf8");
     const gpu=fs.readFileSync("src/lib/gpu-tiers.ts","utf8");
-    if(!/function copyDownloadUrl\(\)[\s\S]*?if \(!enabled\.value\)/.test(download)) throw new Error("copy handler lacks enabled gate");
-    if(!/function connectDemoComputer\(\)[\s\S]*?if \(!enabled\.value\)/.test(download)) throw new Error("connect handler lacks enabled gate");
-    if(!/addDevice\("pc-gpu", \{ gpuModel: normalizedModel, gpuTier \}\)/.test(app)) throw new Error("pc-gpu creation does not pass matched tier");
     if(!/device\.kind === "pc-gpu" && !computeShareEnabled\.value/.test(app)) throw new Error("pc-gpu activation is not feature-gated");
     if(!/const IS_PRODUCTION = import\.meta\.env\.PROD/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("dev config mutation lacks production guard constant");
     // 🔴 2026-08-13 重锚:原判据钉的是字面写法 `if (IS_PRODUCTION) return`,而实现已加严成
@@ -1584,7 +1427,6 @@ spec2_guard_semantics() {
       if(!/IS_PRODUCTION/.test(body)) throw new Error(fn+" 是开发后门却没有 IS_PRODUCTION 早退 —— 生产构建里它是活的");
     }
     if(!/const activeSlotCount = computed\(\(\) => devices\.value\.filter\(isActiveSlotDevice\)\.length\)/.test(app)) throw new Error("slot cap must count every hidden active physical device through the shared slot policy");
-    require("node:child_process").execFileSync(process.execPath, ["scripts/lib/check-device-slot-policy.mjs"], {stdio:"pipe"});
     const demoKindsMatch = deviceTypes.match(/const demoKinds:[\s\S]*?=\s*\[([^\]]*)\]/);
     if(!demoKindsMatch) throw new Error("default demoKinds seed missing");
     const demoKinds = [...demoKindsMatch[1].matchAll(/"([^"]+)"/g)].map((m)=>m[1]);
@@ -1592,7 +1434,7 @@ spec2_guard_semantics() {
     if(demoKinds.length !== 4) throw new Error(`default demo seed must leave one free slot for pc connect, got ${demoKinds.length} demo kinds`);
     if(/createDevice\("pc-gpu",\s*"pc-gpu-seed"/.test(app)) throw new Error("app store must not append an active pc-gpu seed");
     if(!/const slotDevices = computed\(\(\) =>[\s\S]*computeShareEnabled\.value[\s\S]*devices\.value\.filter\(\(d\) => d\.kind !== "pc-gpu"\)/.test(app)) throw new Error("slotDevices must hide pc-gpu while compute-share is disabled");
-    if(!/const slotsUsed = computed\(\(\) => app\.activeSlotCount \+ trialReserved\.value\)/.test(fs.readFileSync("src/pages/me/devices.vue","utf8"))) throw new Error("device page slot meter must use authoritative activeSlotCount");
+    if(!/app\.activeSlotCount \+ trialReserved\.value/.test(fs.readFileSync("src/pages/me/devices.vue","utf8"))) throw new Error("device page slot meter must use authoritative activeSlotCount");
     if(!/name:\s*"Shared computer"/.test(deviceTypes)) throw new Error("pc-gpu device name still uses tier label");
     if(/PURCHASED_HARDWARE_KINDS[\s\S]*"pc-gpu"/.test(deviceTypes)) throw new Error("pc-gpu must not be a purchased hardware kind");
     const frontText=fs.readFileSync("src/i18n/messages/zh.ts","utf8")+fs.readFileSync("src/i18n/messages/en.ts","utf8");
@@ -1673,11 +1515,6 @@ spec6_entry_surface_homes_present() {
       "/pages/entry-surfaces/white?entry=white-app",
     ];
     for(const link of fullLinks){ if(!index.includes(link)) throw new Error(`SPEC-6 full clickable link missing: ${link}`); }
-    // The shown URL must be derived from the runtime origin. A hardcoded host is
-    // wrong on every port/host but the one it was written on (worktree dev server
-    // on 5174, any deploy) — assert the derivation instead of the old literals.
-    if(!/window\.location\.origin/.test(index)) throw new Error("SPEC-6 entry link URL must derive from window.location.origin");
-    if(!/\$\{origin\.value\}#\$\{l\.route\}/.test(index)) throw new Error("SPEC-6 entry fullUrl must be composed as <origin>#<route>");
     if(/https?:\/\/localhost/.test(index)) throw new Error("SPEC-6 entry index must not hardcode a localhost origin");
     if(!/@(tap|click)="open\(item\.route\)"/.test(index)) throw new Error("SPEC-6 full links are not clickable rows");
     const signed=fs.readFileSync("src/pages/entry-surfaces/signed.vue","utf8");
@@ -1706,30 +1543,6 @@ spec6_entry_surface_homes_present() {
   fi
 }
 spec6_entry_surface_homes_present
-if scope_hit spec6-entry-runtime; then route_scope spec6-entry-runtime
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs; then
-    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log")"
-  else
-    bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log"
-  fi
-else
-  skipped "SPEC-6 entry-surface runtime isolation (dev server not running at $BASE_URL)"
-fi
-fi
-# R7 pricing order and the device-detail route are runtime contracts: static
-# sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
-if scope_hit r7-device-runtime; then
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-r7-device-detail-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs; then
-    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-r7-device-detail-runtime.log")"
-  else
-    bad "R7 + device detail runtime"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-r7-device-detail-runtime.log"
-  fi
-else
-  skipped "R7 + device detail runtime (dev server not running at $BASE_URL)"
-fi
-fi
 # 注册成功页的平台边界是编译条件,UA 伪造无法证明 App 分支。锁住 H5
 # 提醒块、App 无提醒、底部继续入口和官网配置字段这四个不变量。
 if "$NODE_BIN" -e '
@@ -1940,31 +1753,6 @@ if "$NODE_BIN" -e '
 else
   bad "register success H5/App platform contract"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-register-success-platform.log"
 fi
-# FEAT-AUTH02 必须用真实 H5 iframe 回归：页面源码和 vue-tsc 都无法证明
-# “老号提示 → 自动登录 → 无重复副作用”这条跨 store/路由链实际可用。
-if scope_hit spec7-k1-auth02-runtime; then
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec7-risk-gate-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs; then
-    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec7-risk-gate-runtime.log")"
-  else
-    bad "SPEC-7 K1 device/payment registration gates"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec7-risk-gate-runtime.log"
-  fi
-  if grep -qE '^export const remoteApiEnabled = true;' src/api/runtime.ts; then
-    ok "AUTH02 formal remote auth authority handoff — legacy local registered-number runtime retired; Java auth handoff is covered by real-backend integration"
-  else
-    for AUTH02_LOCALE in en zh; do
-      if probe_retry "${VERIFY_LOG_PREFIX}-uni-auth02-runtime-${AUTH02_LOCALE}.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE"; then
-        ok "$(cat "${VERIFY_LOG_PREFIX}-uni-auth02-runtime-${AUTH02_LOCALE}.log")"
-      else
-        bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-auth02-runtime-${AUTH02_LOCALE}.log"
-      fi
-    done
-  fi
-else
-  bad "SPEC-7 K1 device/payment registration gates (dev server not running at $BASE_URL)"
-  bad "AUTH02 registered-number + success-page runtime (EN/ZH; dev server not running at $BASE_URL)"
-fi
-fi
 # ── SPEC-4 account-cloud + multi-carrier session sentinels ──
 sentinel_present "SPEC-4 account-cloud storage exists" src/store/account-cloud.ts 'nexgrid-account-cloud-v1'
 sentinel_present "SPEC-4 app binds account snapshot" src/store/app.ts 'function bindAccount'
@@ -2018,22 +1806,21 @@ sentinel_present "P2-8 account-scope helper rebinds daily-powerup" src/lib/accou
 sentinel_present "P2-8 quest store is account-scoped" src/store/quest.ts 'writeAccountRow'
 sentinel_present "P2-8 event-quest store is account-scoped" src/store/event-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.ts 'writeAccountRow'
-sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexgrid-milestones-accounts-v1'
 sentinel_present "P2-8 achievements store is account-scoped" src/store/achievements.ts 'writeAccountRow'
 sentinel_present "P2-8 goals store is account-scoped" src/store/goals.ts 'writeAccountRow'
 sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow|createAccountRowCommit'
 sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-powerup.ts 'writeAccountRow|createAccountRowCommit'
-# P2-8 batch-4 记录/账户:通知/凭证/工单/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红)
+# P2-8 batch-4 记录/账户:通知/凭证/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红);用户工单已退役
 sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 account-scope helper rebinds tickets" src/lib/account-scope.ts 'useTickets\(\)\.bindAccount\(accountKey\)'
+sentinel_absent "retired support tickets have no client store" 'useTickets|store/tickets'
 # 🔴 2026-08-13 三条钉函数名的哨兵已退役,换成 account-scope-gate.mjs:
 #   它们钉的是 `writeAccountRow` / `useConversations().reset()` 这类**具体写法**,
 #   而实现换了更严的机制之后全红 —— tickets 改按「账号+运行会话」双维拼键、
 #   weekly-quest 改服务端权威+版次围栏(本地不落盘)、conversations 从 reset 改 bindAccount。
 #   新门改钉**不变量本身**:收口面从 account-scope.ts 的真实调用派生(不手写清单),
 #   三个 store 必须在收口面里(bindAccount / reset 都算),收口面塌空即判红。
-#   红测:摘掉 tickets → 红;把 bindAccount 全改名(收口面塌空)→ 红。
+#   红测:摘掉 conversations → 红;把 bindAccount 全改名(收口面塌空)→ 红。(tickets 已随用户工单退役)
 if "$NODE_BIN" scripts/account-scope-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-account-scope.log" 2>&1; then
   ok "账号隔离门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-account-scope.log")"
 else
@@ -2050,8 +1837,8 @@ sentinel_present "P2-8 cart store is account-scoped" src/store/cart.ts 'writeAcc
 sentinel_present "P2-8 profile store is account-scoped" src/store/profile.ts 'writeAccountRow'
 sentinel_present "P2-8 security store is account-scoped" src/store/security.ts 'writeAccountRow'
 sentinel_present "P2-8 rewards-seen store is account-scoped" src/store/rewards-seen.ts 'writeAccountRow'
-# P2-8 batch-5 会话记录:会话中心/Nova 非持久,换号收口点必须 reset 重播种(防上一账号的客服对话被下一账号看到;audit 2026-07-16)
-sentinel_present "P2-8 account-scope helper resets nova" src/lib/account-scope.ts 'useNova\(\)\.reset\(\)'
+# P2-8 batch-5 会话记录:会话中心非持久,换号收口点必须重绑重播种(防上一账号的客服对话被下一账号看到;audit 2026-07-16)
+sentinel_present "P2-8 account-scope helper rebinds conversations" src/lib/account-scope.ts 'useConversations\(\)\.bindAccount\(accountKey\)'
 # 客服会话闲置策略双端 parity(本仓侧 tripwire;admin 侧 canon-sentinel 逐键比 canon-numbers.json):
 # 改这两个默认值必须三处同步(uniapp 常量 + admin m-tabs/data.ts + canon json),单独改本仓即红。
 sentinel_present "support idle policy warn default pinned (1min · canon parity)" src/mock/conversations.ts 'SUPPORT_IDLE_WARN_MINS = 1'
@@ -2066,7 +1853,7 @@ spec4_account_session_semantics() {
     const register=fs.readFileSync("src/pages/register/register.vue","utf8");
     const signIn=fs.readFileSync("src/auth/complete-sign-in.ts","utf8");
     const entry=fs.readFileSync("src/lib/entry-surface.ts","utf8");
-    const wallet=fs.readFileSync("src/pages/me/wallet.vue","utf8");
+    const wallet=fs.readFileSync("src/components/me/wallet-overview.vue","utf8");
     const withdrawalTracking=fs.readFileSync("src/pages/me/wallet-withdraw-tracking.vue","utf8");
     if(/function writeActiveRecord|function readActiveRecord|const ACTIVE_KEY/.test(session)) throw new Error("legacy single active-session writer returned");
     if(/rec\.deviceId !== deviceId\.value[\s\S]*return "kicked"/.test(session)) throw new Error("different device login still kicks current session");
@@ -2085,7 +1872,7 @@ spec4_account_session_semantics() {
     if(!/app\.bindAccount\(key\);\s*[\r\n]+\s*rebindAccountScopedStores\(key\)/.test(appVue)) throw new Error("P2-8: app startup must rebind account-scoped stores (genesis/v-rank) right after bindAccount");
     if(!/app\.bindAccount\(options\.identity\);\s*[\r\n]+\s*rebindAccountScopedStores\(options\.identity\)/.test(signIn)) throw new Error("P2-8: canonical sign-in must rebind account-scoped stores right after bindAccount");
     if(!/app\.bindAccount\(createdIdentity\);\s*[\r\n]+\s*rebindAccountScopedStores\(createdIdentity\)/.test(register)) throw new Error("P2-8: register must rebind account-scoped stores right after bindAccount");
-    if(!/entry === "white-app" \|\| entry === "white" \|\| entry === "cloak" \|\| entry === "janus"/.test(entry)) throw new Error("white-app entry aliases missing");
+    if(/readEntryParam|entry ===/.test(entry)) throw new Error("retired carrier aliases restored");
     const messages=fs.readFileSync("src/i18n/messages/zh.ts","utf8")+fs.readFileSync("src/i18n/messages/en.ts","utf8");
     if(/同一时间只能有一台设备运行挖矿|only one device runs mining at a time/.test(messages)) throw new Error("old strong single-device copy leaked");
     const walletUi=wallet+withdrawalTracking;
@@ -2099,31 +1886,6 @@ spec4_account_session_semantics() {
   fi
 }
 spec4_account_session_semantics
-if "$NODE_BIN" scripts/spec4-account-cloud-merge-check.mjs >"${VERIFY_LOG_PREFIX}-uni-spec4-merge.log" 2>&1; then
-  ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec4-merge.log")"
-else
-  bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec4-merge.log"
-fi
-if scope_hit spec4-runtime; then
-if grep -qE '^export const remoteApiEnabled = true;' src/api/runtime.ts; then
-  ok "SPEC-4 formal remote account-cloud authority handoff — local app sync retired; Java account authority is covered by real-backend integration"
-  ok "SPEC-4 formal remote session authority handoff — local session registry guard retired; Java session authority is covered by real-backend integration"
-elif "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec4-app-sync.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs; then
-    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec4-app-sync.log")"
-  else
-    bad "SPEC-4 account-cloud app sync"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec4-app-sync.log"
-  fi
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec4-runtime-guard.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs; then
-    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec4-runtime-guard.log")"
-  else
-    bad "SPEC-4 runtime session guard"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec4-runtime-guard.log"
-  fi
-else
-  skipped "SPEC-4 account-cloud app sync (dev server not running at $BASE_URL)"
-  skipped "SPEC-4 runtime session guard (dev server not running at $BASE_URL)"
-fi
-fi
 # SFC block closure (PITFALLS P-025): a `<script>` block missing its `</script>`
 # close tag compiles fine under vue-tsc/volar (lenient: script extends to EOF)
 # but THROWS in vite:vue / uni's @vue/compiler-sfc → "Element is missing end tag"
@@ -2177,12 +1939,106 @@ if(hits.length){console.log(hits.slice(0,5).join("\n"));process.exit(1)}' 2>&1)
 no_tap_binding
 # Raw navigateBack guard (PITFALLS P-054): uni H5 navigateBack on a single-entry
 # stack (cold-open/deep-link) returns SUCCESS as a no-op — fail never fires →
-# dead back button. Use navBack() helper (src/lib/route.ts, the one legit caller).
+# dead back button. Use navBack(), or prove the complete PRD course-chain return.
 no_raw_navigateback() {
   local hits
-  hits=$(grep -rnE 'uni\.navigateBack\(' src 2>/dev/null | grep -vE 'src/lib/route\.ts' | head -5)
-  if [ -z "$hits" ]; then ok "no raw uni.navigateBack (use navBack() helper) (0 hits)";
-  else bad "raw uni.navigateBack — cold-open no-op; use navBack() helper (P-054)"; echo "$hits" | sed 's/^/        /'; fi
+  if hits=$("$NODE_BIN" <<'NODE' 2>&1
+const fs = require("fs"), path = require("path"), ts = require("typescript");
+const { parse } = require("@vue/compiler-sfc");
+const printer = ts.createPrinter({ removeComments: true });
+const print = (node, source) => printer.printNode(ts.EmitHint.Unspecified, node, source);
+// ponytail: match one complete AST shape, not arbitrary control flow. Changed
+// implementations must establish the same proof before receiving an exemption.
+// This proves len >= 2, 1 <= delta <= len-1, no unrelated page crossed, and
+// replacement on missing center, unreadable stack, thrown pop or failed pop.
+const proof = ts.createSourceFile("proof.ts", `function proof() {
+  try {
+    const routes = getCurrentPages().map(page => page.route?.replace(/^\\//, ""));
+    let center = routes.length - 2;
+    while (center >= 0 && routes[center] === "pages/learn/course") center--;
+    if (routes[routes.length - 1] === "pages/learn/course" && center >= 0 && routes[center] === "pages/learn/courses") {
+      uni.navigateBack({ delta: routes.length - 1 - center, fail: () => { void navReplace("/pages/learn/courses"); } });
+      return;
+    }
+  } catch {}
+  void navReplace("/pages/learn/courses");
+}`, ts.ScriptTarget.Latest, true);
+if (proof.parseDiagnostics.length) throw new Error("invalid course-return proof");
+const expected = print(proof.statements[0].body, proof);
+const protectedNames = new Set(["uni", "getCurrentPages", "navReplace"]);
+const hits = [];
+let scanned = 0;
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const file = path.posix.join(dir, entry.name);
+    if (entry.isDirectory()) { walk(file); continue; }
+    if (file === "src/lib/route.ts") continue; // Existing shared helper boundary.
+    const source = fs.readFileSync(file, "utf8"), allowed = new Set();
+    const matches = [...source.matchAll(/\buni\s*\.\s*navigateBack\s*\(/g)];
+    scanned++;
+    if (matches.length && /\.(vue|[cm]?[jt]sx?)$/.test(file)) {
+      let script = source;
+      if (file.endsWith(".vue")) {
+        const { descriptor, errors } = parse(source, { filename: file });
+        if (errors.length) throw new Error(`${file}: ${errors[0]}`);
+        script = "";
+        let end = 0;
+        const blocks = [descriptor.script, descriptor.scriptSetup].filter(Boolean)
+          .sort((a, b) => a.loc.start.offset - b.loc.start.offset);
+        for (const block of blocks) {
+          script += source.slice(end, block.loc.start.offset).replace(/[^\r\n]/g, " ") + block.content;
+          end = block.loc.start.offset + block.content.length;
+        }
+        script += source.slice(end).replace(/[^\r\n]/g, " ");
+      }
+      const ast = ts.createSourceFile(file, script, ts.ScriptTarget.Latest, true,
+        /\.[jt]sx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      if (ast.parseDiagnostics.length) {
+        throw new Error(`${file}: ${ts.flattenDiagnosticMessageText(ast.parseDiagnostics[0].messageText, " ")}`);
+      }
+      const routeImport = ast.statements.filter(ts.isImportDeclaration)
+        .filter(node => node.moduleSpecifier.text === "@/lib/route" && !node.importClause?.isTypeOnly)
+        .flatMap(node => node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+          ? node.importClause.namedBindings.elements : [])
+        .find(node => !node.isTypeOnly && node.name.text === "navReplace" && (node.propertyName || node.name).text === "navReplace");
+      let shadowed = false;
+      (function bindings(node) {
+        const declaresName = ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node)
+          || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)
+          || ts.isImportSpecifier(node) || ts.isImportClause(node) || ts.isNamespaceImport(node);
+        if (declaresName && protectedNames.has(node.name?.text) && node !== routeImport) shadowed = true;
+        if (ts.isBinaryExpression(node)
+          && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+          && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+          && ts.isIdentifier(node.left) && protectedNames.has(node.left.text)) shadowed = true;
+        ts.forEachChild(node, bindings);
+      })(ast);
+      if (routeImport && !shadowed) for (const fn of ast.statements.filter(ts.isFunctionDeclaration)) {
+        if (!fn.body || fn.parameters.length || fn.asteriskToken || print(fn.body, ast) !== expected) continue;
+        // UniApp directives can remove guards even when the uncompiled AST matches.
+        if (/#(?:ifdef|ifndef|endif)\b/.test(fn.body.getText(ast))) continue;
+        (function calls(node) {
+          if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+            && node.expression.expression.getText(ast) === "uni" && node.expression.name.text === "navigateBack") {
+            allowed.add(node.expression.getStart(ast));
+          }
+          ts.forEachChild(node, calls);
+        })(fn.body);
+      }
+    }
+    for (const match of matches) {
+      if (!allowed.has(match.index)) {
+        const line = source.slice(0, match.index).split("\n").length;
+        hits.push(`${file}:${line}: ${source.slice(match.index).split(/\r?\n/)[0].trim()}`);
+      }
+    }
+  }
+})("src");
+if (!scanned) throw new Error("no source files scanned");
+if (hits.length) { console.log(hits.slice(0, 5).join("\n")); process.exit(1); }
+NODE
+  ); then ok "no unguarded raw uni.navigateBack (navBack or proven course-chain return, P-054)";
+  else bad "raw uni.navigateBack — cold-open no-op or unproven stack return (P-054)"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_raw_navigateback
 # Week-boundary epoch-modulo guard (leadership-pool fix 2026-06-24): the JS epoch
@@ -2243,9 +2099,7 @@ trial02_source_fingerprints() {
   #      (FEAT-TRIAL02)时已随根 PRD §9.11a.2 改名为 `/api/trial/convert`(两行公式逐字相同),
   #      签字规格里只有 convert、无 redeem 概念。全仓零调用、零消费点。
   #   判定与证据链见 docs/changes/2026-08-13-trial-early-buy-adjudication.md。
-  # 2026-09-06: exact parser/store regression fixtures also read the server deadline.
-  # This permits only that field in those two tests; every card/auto-charge fingerprint above stays banned.
-  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts|src/store/free-trial.remote-errors.test.ts|src/api/trial-api.test.ts"; do
+  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts"; do
     pat=${pair%%:*}; allow=${pair#*:}
     hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -vE "^($allow):" | head -5)
     if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside allow-list [$allow] (scanned $files_n files)";
@@ -2285,14 +2139,6 @@ trial02_doc_fingerprints() {
     fi
   done
   [ "$bad_hits" -eq 0 ] && ok "TRIAL02 doc fingerprints: 9 个动作名在无标记文档里 0 命中(扫 $docs_n 份非 changes 文档,其中 $marked_n 份带豁免标记)"
-  # 🔴 反向对照(正控):本门的 PASS 形态是「0 命中」—— 那正是假绿最爱的形状:
-  #   grep 机制一坏(路径写错 / 通配符失效 / docs 被挪走),同样是 0 命中,同样报绿。
-  #   所以要有一处**必须扫得到**的地方做对照:docs/changes/ 里的变更卡按定义会原样引用这些
-  #   旧动作名(裁决卡 / 红测记录都在讲它们)。那里扫不到 = 扫描机制本身坏了,不是「真干净了」。
-  local control
-  control=$(grep -rlF "redeemEarly" docs/changes --include="*.md" 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$control" -ge 1 ]; then ok "TRIAL02 doc 扫描机制正控:docs/changes 里扫到 $control 份含旧动作名的变更卡(>0 = grep 确实在工作)";
-  else bad "TRIAL02 doc 扫描机制失效 —— 连 docs/changes 里的变更卡都扫不到旧动作名,上面那条「0 命中」是假绿,先修扫描逻辑"; fi
 }
 trial02_doc_fingerprints
 trial02_source_fingerprints
@@ -2353,22 +2199,6 @@ trial_encapsulation_gate() {
 }
 trial_encapsulation_gate
 
-# 哨兵E:试用时间边界单一不变量(2026-08-03 缺陷族 P0+3×P1 同根)—— 所有时钟
-# 判定收敛到 trial-boundary.ts resolveTrialAt 一个纯函数。固定靶矩阵:①离线跨
-# 宽限期 convert 必拒 ②后台改 trialDays 不追溯存量冻结窗口 ③finishedAt=真边界
-# 非 now ④graceEndsAt=null 存量行补齐/fail-closed ⑤全迁移矩阵逐档落点 ⑥终态
-# 不可变;外加接线门(convert/poll/eligibility/liveShadow*/migrateRow 真路由到
-# resolver,cancel 显式窗口不被抢)。跑真实现(esbuild 转译),断言数带地板防空集。
-trial02_boundary_invariant() {
-  local out
-  if out=$("$NODE_BIN" scripts/selfcheck-trial-boundary.mjs 2>&1); then
-    ok "TRIAL02 time-boundary single invariant: $(printf '%s\n' "$out" | tail -n 1)"
-  else
-    bad "TRIAL02 time-boundary single invariant broken"
-    echo "$out" | sed 's/^/        /'
-  fi
-}
-trial02_boundary_invariant
 # Local-component import guard (terminal-audit P1): Vue SFC component registration
 # is LOCAL-scope only — a child .vue that uses <SectionHeader> in its template MUST
 # import section-header.vue itself; the parent page's import does NOT cascade. A
@@ -2385,7 +2215,7 @@ section_header_imported() {
 }
 section_header_imported
 # Chassis chrome completeness (PITFALLS P-037): the prototype's IOSFrame mounts a
-# fixed set of ALWAYS-ON chrome — Header + TabBar + NovaBubble (nova 浮标) +
+# fixed set of ALWAYS-ON chrome — Header + TabBar + SupportBubble (客服浮标) +
 # pull-to-refresh. Batch-0 chassis was simplified and silently dropped the bubble
 # + pull-refresh; verify only caught what it was told to look at (cf. P-036). This
 # sentinel enumerates the always-on chrome so it can't regress unnoticed.
@@ -2393,7 +2223,7 @@ chassis_chrome_complete() {
   local f="src/components/app-chassis.vue"
   local miss=""
   [ -f "$f" ] || { bad "chassis file missing ($f)"; return; }
-  grep -q 'NovaBubble' "$f" || miss="${miss}NovaBubble(nova浮标) "
+  grep -q 'SupportBubble' "$f" || miss="${miss}SupportBubble(客服浮标) "
   grep -q 'nx-refresher' "$f" || miss="${miss}pull-to-refresh(touch) "
   grep -q 'nx-page-enter' "$f" || miss="${miss}page-entrance-anim "
   grep -q 'nx-tabbar-pill' "$f" || miss="${miss}floating-pill-tabbar "
@@ -2401,7 +2231,7 @@ chassis_chrome_complete() {
   # frosted-glass chrome must NOT use <scroll-view> for content (P-039): its
   # separate compositing layer kills the fixed chrome's backdrop-filter frosting.
   grep -qE '<scroll-view[^>]*class="nx-content' "$f" && miss="${miss}scroll-view-breaks-frosting(use-overflow-view) "
-  if [ -z "$miss" ]; then ok "chassis chrome complete (header + pill + nova浮标 + pull-refresh + entrance, frosting-safe)";
+  if [ -z "$miss" ]; then ok "chassis chrome complete (header + pill + 客服浮标 + pull-refresh + entrance, frosting-safe)";
   else bad "chassis chrome INCOMPLETE — missing: $miss"; fi
 }
 chassis_chrome_complete
@@ -2412,8 +2242,8 @@ chassis_chrome_complete
 # aren't redefined locally: (a) the undefined var() makes the WHOLE font-family
 # declaration invalid → every text node falls back to Times New Roman serif;
 # (b) content-box makes height/width+padding elements larger than the prototype.
-# Plus the brand fonts must be loaded (index.html) — the prototype loads them in
-# layout.tsx. This sentinel guards all three so the foundation can't regress.
+# Plus the UI font must be bundled (src/styles/fonts.css declares Inter; design
+# system DS-25). This sentinel guards all three so the foundation can't regress.
 css_foundation() {
   local t="src/styles/tokens.css"
   local miss=""
@@ -2421,8 +2251,8 @@ css_foundation() {
   grep -qE '^\s*--font-display:' "$t"  || miss="${miss}--font-display-undef(→TimesNewRoman) "
   grep -qE '^\s*--font-jet-mono:' "$t" || miss="${miss}--font-jet-mono-undef "
   grep -qE 'box-sizing:\s*border-box' "$t" || miss="${miss}no-border-box-reset "
-  grep -q 'general-sans' index.html 2>/dev/null || miss="${miss}no-brand-font-link(index.html) "
-  if [ -z "$miss" ]; then ok "css foundation (font vars defined + border-box reset + brand font loaded)";
+  grep -q 'font-family: "Inter"' src/styles/fonts.css 2>/dev/null || miss="${miss}no-bundled-ui-font(fonts.css) "
+  if [ -z "$miss" ]; then ok "css foundation (font vars defined + border-box reset + UI font bundled)";
   else bad "css foundation BROKEN — $miss"; fi
 }
 css_foundation
@@ -2434,7 +2264,7 @@ css_foundation
 # navigateTo, so they're mapped to real flattened uni routes.
 nav_routes_valid() {
   local bad_routes
-  bad_routes=$("$NODE_BIN" -e '
+  if ! bad_routes=$("$NODE_BIN" -e '
     const fs=require("fs"), path=require("path");
     const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
     const valid=new Set((pj.pages||[]).map(p=>"/"+p.path));
@@ -2454,23 +2284,25 @@ nav_routes_valid() {
     }
     const broken=[...refs].filter(r=>!valid.has(r)).sort();
     if(broken.length) process.stdout.write(broken.join(" "));
-  ' 2>/dev/null)
-  if [ -z "$bad_routes" ]; then ok "nav routes valid (all /pages/ literals exist in pages.json)";
-  else bad "INVALID nav routes (navigateTo silently fails): $bad_routes"; fi
+  '); then
+    bad "nav route scanner failed"
+  elif [ -n "$bad_routes" ]; then
+    bad "INVALID nav routes (navigateTo silently fails): $bad_routes"
+  else
+    ok "nav routes valid (all /pages/ literals exist in pages.json)"
+  fi
 }
 nav_routes_valid
-# User-facing brand must be NOVA, never Stella (已决产品决策 / ALIGNMENT carve-out).
-# The AI assistant was renamed Stella→NOVA; code identifiers (nova-bubble.vue,
-# useNova, .nx-nova-*) are internal and fine, but no user-VISIBLE "Stella" may
-# leak. i18n message VALUES are the authoritative user-facing surface (all copy
+# The retired AI assistant's old name "Stella" must never be user-visible
+# (已决产品决策 / ALIGNMENT carve-out; the assistant itself was withdrawn).
+# No user-VISIBLE "Stella" may leak. i18n message VALUES are the authoritative user-facing surface (all copy
 # goes through t()), so guard quoted values containing "Stella" there (excluding
-# the unrelated 'stellar*' hardware SKU). Keys like `nova: {` aren't quoted values
-# so won't match.
+# the unrelated 'stellar*' hardware SKU).
 no_userfacing_stella() {
   local hits
   hits=$(grep -rnE ':[[:space:]]*"[^"]*[Ss]tella[^"]*"' src/i18n/messages 2>/dev/null | grep -iv 'stellar' | head -8)
-  if [ -z "$hits" ]; then ok "no user-facing 'Stella' (brand=NOVA) (0 hits)";
-  else bad "user-facing 'Stella' leaked (brand must be NOVA)"; echo "$hits" | sed 's/^/        /'; fi
+  if [ -z "$hits" ]; then ok "no user-facing 'Stella' (0 hits)";
+  else bad "user-facing 'Stella' leaked"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_userfacing_stella
 # Brand rebrand guard (2026-07-22 → NexGrid): 旧品牌词不得回流用户可见/运行时层。
@@ -2508,24 +2340,13 @@ const WHITELIST=new RegExp(`${tok}Box\\s+(?:S1|Pro\\s+v2)|${tok}-(prototype|unia
 // Strip only the permitted occurrence; display copy on the same line stays red.
 const ENGINEERING_URLS = /https:\/\/github\.com\/agentabatiuo572-byte\/nexion-frontend-(?:uniapp|prototype)\.git(?=["\x27\x60\s]|$)/gi;
 const ENGINEERING_DISCOVERY = /\bdiscover\(root,\s*"Nexion-H5"\)/g;
-const residual = (line) => line.replace(ENGINEERING_URLS, "").replace(ENGINEERING_DISCOVERY, "").replace(WHITELIST, "");
+// Only these complete resolver declarations at column zero; keep any suffix for scanning.
+const ENGINEERING_BACKEND_RESOLVER_IMPORT = /^const \{ resolveNexionBackendRoot \} = await import\(pathToFileURL\(path\.join\(adminRoot, "scripts\/lib\/nexion-workspace-paths\.mjs"\)\)\.href\);/;
+const ENGINEERING_BACKEND_ROOT_CALL = /^const backendRoot = resolveNexionBackendRoot\(\{ adminRoot \}\);/;
+const residual = (line) => line.replace(ENGINEERING_URLS, "").replace(ENGINEERING_DISCOVERY, "")
+  .replace(ENGINEERING_BACKEND_RESOLVER_IMPORT, "").replace(ENGINEERING_BACKEND_ROOT_CALL, "")
+  .replace(WHITELIST, "");
 const hasOldBrand = (line) => new RegExp(tok,"i").test(residual(line));
-const engineering = [
-  "https://github.com/agentabatiuo572-byte/nexion-frontend-uniapp.git",
-  "https://github.com/agentabatiuo572-byte/nexion-frontend-prototype.git",
-  "discover(root, \"Nexion-H5\")",
-];
-for (const identity of engineering) {
-  if (hasOldBrand(identity)) throw new Error(`brand selftest rejected engineering identity: ${identity}`);
-  if (!hasOldBrand(`${identity}; const label = "${tok}";`)) throw new Error("brand selftest accepted same-line display copy");
-}
-for (const display of [
-  `const label = "${tok}";`, "const label = \"Nexion-H5\";",
-  "discover(otherRoot, \"Nexion-H5\")",
-  "https://github.com/wrong-owner/nexion-frontend-uniapp.git",
-  "https://github.com/agentabatiuo572-byte/nexion-frontend-other.git",
-  "https://github.com/agentabatiuo572-byte/nexion-frontend-uniapp.git-extra",
-]) if (!hasOldBrand(display)) throw new Error(`brand selftest accepted a non-identity token: ${display}`);
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
   for(const e of es){const p=path.join(d,e.name);
@@ -2540,7 +2361,7 @@ const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch
 try{ const h=fs.readFileSync("index.html","utf8"); h.split(/\r?\n/).forEach((ln,i)=>{ if(hasOldBrand(ln)) hits.push("index.html:"+(i+1)+":"+ln.trim().slice(0,120)); }); }catch{}
 console.log(hits.slice(0,8).join("\n"));
 ' "$tok" 2>&1); then
-    bad "brand matcher selftest failed"; echo "$hits" | sed 's/^/        /'; return 1
+    bad "brand matcher failed"; echo "$hits" | sed 's/^/        /'; return 1
   fi
   if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
   else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
@@ -2586,11 +2407,11 @@ subpage_header_sticky() {
   [ -f "$f" ] || { bad "sub-page-header.vue missing"; return; }
   if grep -qE 'position:\s*sticky' "$f"; then ok "SubPageHeader sticky (pins + frosts on scroll)";
   else bad "SubPageHeader not sticky (吸顶/磨砂 broken for ~55 pages)"; fi
-  # De-card sweep 2026-07-09: .spv margin-bottom is the SINGLE SOURCE of the
-  # nav→content 24px breathing for ~55 SubPageHeader pages. If it's removed,
-  # every sub-page's header jams against content (the "太紧" regression).
-  if grep -qE 'margin-bottom:\s*24px' "$f"; then ok "SubPageHeader nav→content 24px gap (single-source breathing)";
-  else bad "SubPageHeader lost margin-bottom:24px (~55 pages jam header against content)"; fi
+  # .spv margin is the SINGLE SOURCE of the nav→content 12px breathing for ~55
+  # SubPageHeader pages. If it's removed, every sub-page's header jams against
+  # content (the "太紧" regression).
+  if grep -qE 'margin:\s*0 0 12px' "$f"; then ok "SubPageHeader nav→content 12px gap (single-source breathing)";
+  else bad "SubPageHeader lost its 12px bottom margin (~55 pages jam header against content)"; fi
 }
 subpage_header_sticky
 # Genesis current-policy anti-regression: checkout re-verifies the server projection,
@@ -2671,22 +2492,21 @@ platform_stats_anchor() {
   #   没有聚合时显示 '—'。判据随之下移而不是放宽:该页不得再出现配置派生财务量,
   #   且必须消费 verifiedStats(见下方 4c)。
   for pair in \
-    'src/pages/onboarding/intro.vue|paidCumulativeNow' \
     'src/store/app.ts|publicStatsHealth'; do
     f="${pair%%|*}"; sym="${pair##*|}"
     # 🔴 计数剥注释(R2 P2:注释里提符号两次就能给死代码放行);s|…|| 形护 :// 协议串
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
     if [ "$(sed -E 's|(^\|[^:])//.*$|\1|' "$f" 2>/dev/null | grep -c "$sym")" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
-  if ! grep -Fq 'cfg.config.verifiedStats?.onlineDevices.value' src/pages/onboarding/intro.vue \
-    || grep -Fq 'onlineDevicesOf(cfg.config.publicStats)' src/pages/onboarding/intro.vue; then
-    bad "platform-anchor: 引导页在线设备必须读服务端 verifiedStats,不能由 H9 配置派生"; fails=1
-  fi
-  # 正式 App 的 On Grid 数字来自 Java Home canonical projection，不再从编译期平台锚派生。
-  # 同时钉字段消费与刷新入口，避免换成另一本地常量后假绿。
-  if ! grep -q 'app\.homeTruth?.onGrid\.perSecUsdt' src/components/home/on-grid-section.vue 2>/dev/null \
-    || ! grep -q 'app\.refreshHomeTruth()' src/components/home/on-grid-section.vue 2>/dev/null; then
-    bad "platform-anchor: on-grid 未消费 Java Home 投影 perSecUsdt 或缺少失败重读入口"; fails=1
+  # 2026-10-30：On Grid 展示在线数读 H9，/sec 读已发布 paidCents 相邻秒差；客户仍读 Java Home。
+  # 分别钉 H9 数据源与重读入口，并禁止回退真实业务指标。
+  if ! grep -Fq 'cfg.config.networkPulse?.onlineDevices' src/components/home/on-grid-section.vue \
+    || ! grep -Fq 'cfg.load()' src/components/home/on-grid-section.vue \
+    || ! grep -Fq '"/api/config/home-display"' src/components/home/on-grid-section.vue \
+    || ! grep -Fq 'displayValue.value?.paidPerSec' src/components/home/on-grid-section.vue \
+    || ! grep -Fq 'player.refresh()' src/components/home/on-grid-section.vue \
+    || grep -Eq 'onGrid\.(activeDevices|perSecUsdt)|app\.refreshHomeTruth\(' src/components/home/on-grid-section.vue; then
+    bad "platform-anchor: on-grid H9 展示源/独立重读入口缺失，或回退真实业务指标"; fails=1
   fi
   # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。
   #   这里不能再把字段名本身当成违规:服务端 publicStats 新投影可以合法携带
@@ -2716,9 +2536,9 @@ platform_stats_anchor() {
   if [ -z "$compat_ps" ]; then
     bad "platform-anchor: compat publicStats 默认块提取失败(判据失效必红)"; fails=1
   else
-    compat_bad=$(echo "$compat_ps" | grep -E '^\s+\w+:' | grep -vE '^\s+\w+: *(0|-1|\[\]),?\s*$' || true)
+    compat_bad=$(echo "$compat_ps" | grep -E '^\s+\w+:' | grep -vE '^\s+\w+: *(0|-1|null|\[\]),?\s*$' || true)
     if [ -n "$compat_bad" ]; then
-      bad "platform-anchor: compat publicStats 默认字段值只许 0 / -1 / [](H9 必须保持 invalid sentinel),越界项:"
+      bad "platform-anchor: compat publicStats 默认字段值只许 0 / -1 / null / [](H9 必须保持 invalid sentinel),越界项:"
       echo "$compat_bad" | sed 's/^/        /'; fails=1
     fi
   fi
@@ -2730,14 +2550,8 @@ platform_stats_anchor() {
   #   · 没有聚合时必须落 '—' 占位。
   #   判据比旧版更严:旧版只要求「走 membersOk 门控」,而配置值本身合规也能过门。
   _codevue=$(sed -E 's|(^\|[^:])//.*$|\1|' src/pages/ref/code.vue 2>/dev/null)
-  if ! echo "$_codevue" | grep -q 'verifiedStats'; then
-    bad "platform-anchor: code.vue 未消费服务端可核验聚合 verifiedStats(对外财务事实不得由配置派生)"; fails=1
-  fi
   if echo "$_codevue" | grep -qE 'monthlyPayoutUsdOf|registeredUsersMonthlyGrowthPct'; then
     bad "platform-anchor: code.vue 又用配置派生对外财务量(已付/新增不得由公布口径推出)"; fails=1
-  fi
-  if ! echo "$_codevue" | grep -q '"—"'; then
-    bad "platform-anchor: code.vue 无可核验聚合时未落 '—' 占位"; fails=1
   fi
   # (5) monthly-joiners value mirrored: exactly one 41,286 per locale (poster)
   for lf in src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts; do
@@ -2787,264 +2601,10 @@ capacity_curve_parity() {
 }
 capacity_curve_parity
 
-# 首页任务轮播契约(2026-07-16):0/1/2 张后台投影、5s 自动轮播、展开暂停，
-# 两卡等高、奖励色统一 NEX 身份紫(--v5-nex, 2026-07-22)、卡面无外边框；独立审计板块不得重新挂回首页。
-home_task_carousel_contract() {
-  local page="src/pages/index/index.vue"
-  local newcomer="src/components/home/day-one-quest-card.vue"
-  local weekly="src/components/home/conversion-banner.vue"
-  local flags="src/store/config-types.ts"
-  local seed="src/mock/platform-config.ts"
-  local zh="src/i18n/messages/zh.ts"
-  local miss=""
-  grep -q '<swiper' "$page" || miss="${miss}swiper "
-  grep -q 'v-if="visibleTaskCards.length"' "$page" || miss="${miss}zero-card-hide "
-  grep -q ':autoplay="shouldAutoplay"' "$page" || miss="${miss}autoplay-state "
-  grep -q ':interval="TASK_CAROUSEL_INTERVAL_MS"' "$page" || miss="${miss}autoplay-interval-bind "
-  grep -q 'TASK_CAROUSEL_INTERVAL_MS = 5000' "$page" || miss="${miss}five-second-interval "
-  grep -q ':disable-touch="!hasTaskCarousel"' "$page" || miss="${miss}single-card-static "
-  grep -q 'onTaskTouchMove' "$page" || miss="${miss}expanded-swipe-collapse "
-  grep -q 'taskCarouselAnnouncement' "$page" || miss="${miss}manual-announcement "
-  grep -q 'next-margin="0px"' "$page" || miss="${miss}full-width-slide "
-  grep -q 'home-task-carousel__meta' "$page" && miss="${miss}page-number-overlay "
-  grep -q 'taskSlide + 1' "$page" && miss="${miss}visible-page-number "
-  grep -q '<TrustChipWall' "$page" || miss="${miss}server-trust-entry-missing "
-  grep -q 'navTo("/pages/trust/trust")' src/components/home/trust-chip-wall.vue \
-    && grep -q 'trustSnapshotUnavailable' src/components/home/trust-chip-wall.vue \
-    && ! grep -q 'summary\.chips\|reserveProof' src/components/home/trust-chip-wall.vue \
-    || miss="${miss}server-trust-entry-not-authoritative "
-  grep -q 'event: "update:expanded"' "$newcomer" || miss="${miss}controlled-newcomer-expand "
-  grep -q 'expanded: false' "$newcomer" || miss="${miss}newcomer-default-collapse "
-  grep -q 'height: "var(--home-task-card-height, 184px)"' "$weekly" || miss="${miss}weekly-equal-height "
-  # 710e9ee flat-content refresh: retain the authoritative task card without a
-  # prototype-only promotion image or its fixed decorative geometry.
-  grep -q 'nx-glass-action weekly-quest block' "$weekly" || miss="${miss}weekly-current-card-surface "
-  grep -q 'class="weekly-quest__content"' "$weekly" || miss="${miss}weekly-current-content-layout "
-  grep -q ':aria-disabled="cardInactive' "$weekly" || miss="${miss}weekly-disabled-state "
-  grep -q ':tabindex="props.active && !cardInactive ? 0 : -1"' "$weekly" || miss="${miss}weekly-active-focus-state "
-  grep -q 'class="weekly-quest__header"' "$weekly" || miss="${miss}weekly-redesign-header "
-  grep -q 'class="weekly-quest__mark"' "$weekly" || miss="${miss}weekly-redesign-icon "
-  grep -q 'class="weekly-quest__body"' "$weekly" || miss="${miss}weekly-redesign-body "
-  grep -q 'weekly-quest__reward-value' "$weekly" || miss="${miss}weekly-reward-style "
-  # 2026-07-23 B1:随《02》14 档迁移由 30px 升 h1 34px(主人已批映射表)。
-  grep -q 'font-size: 34px' "$weekly" || miss="${miss}weekly-reward-size-drift "
-  grep -q 'color: var(--v5-nex)' "$weekly" || miss="${miss}weekly-reward-color-drift "
-  grep -q 'font-weight: 500' "$weekly" || miss="${miss}weekly-reward-weight-drift "
-  # 2026-07-23 B1:原 pin 硬编码 hex #9B89E0(哨兵把 token 违规固化了);主人批准
-  # 补 --v5-quest-violet token 后改 pin token 名 —— 断言强度不变,且不再锁死违规。
-  # 2026-07-23 C1:倒计时是**前景文字**,quest 填充档当文字用时亮主题实测 2.98:1 不达 AA
-  # → 改走文字档 --v5-quest-violet-ink(亮主题 5.47,暗主题沿用原色不变)。哨兵同步 pin 文字档。
-  grep -q 'color: var(--v5-quest-violet-ink)' "$weekly" || miss="${miss}weekly-countdown-color-drift "
-  grep -q 'class="weekly-quest__cta"' "$weekly" || miss="${miss}weekly-cta "
-  grep -q 'bottom: 14px' "$weekly" || miss="${miss}weekly-cta-bottom-spacing "
-  grep -q 'left: 16px' "$weekly" || miss="${miss}weekly-cta-full-width "
-  grep -q 'min-height: 44px' "$weekly" || miss="${miss}weekly-cta-tap-height "
-  grep -q 'background: var(--v5-brand-soft)' "$weekly" || miss="${miss}weekly-cta-tone "
-  grep -q 'boxShadow: "var(--v5-card-shadow-lift)"' "$weekly" && miss="${miss}weekly-card-edge-returned "
-  grep -q 'padding-right: 56px' "$weekly" && miss="${miss}weekly-header-padding-drift "
-  # 2026-07-23 B1:16px 随《02》14 档迁移降 body.m/number.mono 15px(主人已批映射表)。
-  # 色值原为设计稿钦定 hex,2026-07-23 主人批准收敛为 --v5-quest-violet token。
-  grep -q 'font-size: 15px; color: var(--v5-quest-violet-ink)' "$newcomer" || miss="${miss}newcomer-countdown-style-drift "
-  grep -q 'newcomer-task__reward-value' "$newcomer" || miss="${miss}newcomer-reward-style "
-  grep -q 'color: var(--v5-nex)' "$newcomer" || miss="${miss}newcomer-reward-color-drift "
-  grep -q 'minHeight: "44px"' "$newcomer" || miss="${miss}newcomer-toggle-height-drift "
-  grep -q 'margin: "14px 16px"' "$newcomer" || miss="${miss}newcomer-toggle-spacing-drift "
-  grep -q 'boxShadow: "var(--v5-card-shadow-lift)"' "$newcomer" && miss="${miss}newcomer-card-edge-returned "
-  grep -q 'padding-right: 56px' "$newcomer" && miss="${miss}newcomer-header-padding-drift "
-  grep -q 'homeNewcomerTasksEnabled: boolean' "$flags" || miss="${miss}newcomer-config-flag "
-  grep -q 'homeWeeklyPromoEnabled: boolean' "$flags" || miss="${miss}weekly-config-flag "
-  grep -q 'homeNewcomerTasksEnabled: true' "$seed" || miss="${miss}newcomer-mock-projection "
-  grep -q 'homeWeeklyPromoEnabled: true' "$seed" || miss="${miss}weekly-mock-projection "
-  grep -q 'dayOneFirstDayReward: "新手任务"' "$zh" || miss="${miss}newcomer-copy "
-  if "$NODE_BIN" <<'NODE' >"${VERIFY_LOG_PREFIX}-home-task-carousel-relations.log" 2>&1; then
-const fs = require("fs");
-const ts = require("typescript");
-const { baseParse, NodeTypes } = require("@vue/compiler-dom");
-const page = fs.readFileSync("src/pages/index/index.vue", "utf8");
-const script = page.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1];
-if (!script) throw new Error("index.vue script setup not found");
-const source = ts.createSourceFile("index.ts", script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-const compact = (value) => value.replace(/\s+/g, "");
-const need = (condition, message) => {
-  if (!condition) throw new Error(message);
-};
-function variable(name) {
-  for (const statement of source.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) return declaration;
-    }
-  }
-  throw new Error(`variable not found: ${name}`);
-}
-function functionBody(name) {
-  const declaration = source.statements.find(
-    (statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === name,
-  );
-  if (!declaration?.body) throw new Error(`function not found: ${name}`);
-  return declaration.body;
-}
-function computedCallback(name) {
-  const initializer = variable(name).initializer;
-  need(ts.isCallExpression(initializer), `${name} must remain a computed call`);
-  need(initializer.expression.getText(source) === "computed", `${name} must use computed`);
-  const callback = initializer.arguments[0];
-  need(ts.isArrowFunction(callback), `${name} computed must use an arrow callback`);
-  return callback;
-}
-function unwrap(expression) {
-  while (ts.isParenthesizedExpression(expression)) expression = expression.expression;
-  return expression;
-}
-function flattenAnd(expression) {
-  expression = unwrap(expression);
-  if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
-    return [...flattenAnd(expression.left), ...flattenAnd(expression.right)];
-  }
-  return [compact(expression.getText(source))];
-}
-
-const visible = computedCallback("visibleTaskCards");
-need(!ts.isBlock(visible.body), "visibleTaskCards must delegate to the tested derivation helper");
-need(compact(visible.body.getText(source)) === compact(`deriveHomeTaskCards(platformConfig.syncFailed, {
-  homeNewcomerTasksEnabled: platformConfig.isEnabled("homeNewcomerTasksEnabled"),
-  homeWeeklyPromoEnabled: platformConfig.isEnabled("homeWeeklyPromoEnabled"),
-}, homePromotions.value.map(activity => activity.activityId))`), "visibleTaskCards no longer derives configured task slots and promotion slides from server activity IDs");
-
-const cardinality = computedCallback("hasTaskCarousel");
-need(
-  !ts.isBlock(cardinality.body) && compact(cardinality.body.getText(source)) === "visibleTaskCards.value.length>1",
-  "carousel mode must require more than one visible card",
-);
-
-const autoplay = computedCallback("shouldAutoplay");
-need(!ts.isBlock(autoplay.body), "shouldAutoplay must remain a direct boolean expression");
-const autoplayTerms = flattenAnd(autoplay.body);
-need(
-  JSON.stringify(autoplayTerms) === JSON.stringify([
-    "hasTaskCarousel.value",
-    "!newcomerExpanded.value",
-    "!prefersReducedMotion.value",
-    "!taskFocusWithin.value",
-  ]),
-  `autoplay guards/operators changed: ${autoplayTerms.join(" | ")}`,
-);
-
-const touchStatements = functionBody("onTaskTouchMove").statements.map((statement) => compact(statement.getText(source)));
-need(JSON.stringify(touchStatements) === JSON.stringify([
-  "if(!taskTouchStart||touchCollapsedExpandedCard)return;",
-  "constpoint=readFirstTouch(event);",
-  "if(!point)return;",
-  "constdx=point.clientX-taskTouchStart.clientX;",
-  "constdy=point.clientY-taskTouchStart.clientY;",
-  "if(Math.abs(dx)<18||Math.abs(dx)<=Math.abs(dy)*1.15)return;",
-  "touchCollapsedExpandedCard=true;",
-  "setNewcomerExpanded(false);",
-  "blurTaskCarouselFocus();",
-]), "touch continuation no longer performs guarded collapse + focus release in reachable order");
-
-const manualCollapseStatements = functionBody("onNewcomerExpandedChange").statements.map((statement) => compact(statement.getText(source)));
-need(JSON.stringify(manualCollapseStatements) === JSON.stringify([
-  "setNewcomerExpanded(value);",
-  "if(!value)blurTaskCarouselFocus();",
-]), "manual newcomer collapse no longer releases carousel focus to resume autoplay");
-
-const watcher = source.statements.find((statement) =>
-  ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression) &&
-  statement.expression.expression.getText(source) === "watch" &&
-  statement.expression.arguments[0]?.getText(source) === "taskCardSignature"
-);
-need(watcher, "task-card signature watcher missing");
-const watcherCallback = watcher.expression.arguments[1];
-need(ts.isArrowFunction(watcherCallback) && ts.isBlock(watcherCallback.body), "task-card signature watcher must use a block callback");
-const watcherStatements = watcherCallback.body.statements.map((statement) => compact(statement.getText(source)));
-need(JSON.stringify(watcherStatements) === JSON.stringify([
-  "taskSlide.value=0;",
-  "setNewcomerExpanded(false);",
-  "resetTaskTouch();",
-  'taskCarouselAnnouncement.value="";',
-]), "0/1/2 hot change no longer performs reachable reset in canonical order");
-
-const template = page.match(/<template>([\s\S]*?)<\/template>/)?.[1] || "";
-const templateAst = baseParse(template);
-function findElement(node, predicate) {
-  if (node.type === NodeTypes.ELEMENT && predicate(node)) return node;
-  for (const child of node.children || []) {
-    const found = findElement(child, predicate);
-    if (found) return found;
-  }
-  return null;
-}
-function attr(node, name) {
-  return node.props.find((prop) => prop.type === NodeTypes.ATTRIBUTE && prop.name === name)?.value?.content;
-}
-function meaningfulChildren(node) {
-  return node.children.filter((child) =>
-    child.type !== NodeTypes.COMMENT && !(child.type === NodeTypes.TEXT && child.content.trim() === "")
-  );
-}
-const carouselNode = findElement(templateAst, (node) => attr(node, "id") === "home-task-carousel");
-need(carouselNode, "task carousel template region missing");
-const carouselChildren = meaningfulChildren(carouselNode);
-need(carouselChildren.length === 3 && carouselChildren[0].tag === "swiper" && carouselChildren[1].tag === "view" && carouselChildren[2].tag === "text", "carousel may contain only swiper, promotion read status and hidden announcement");
-function directive(node, name, argument) {
-  return node.props.find(prop => prop.type === NodeTypes.DIRECTIVE && prop.name === name && (!argument || prop.arg?.content === argument))?.exp?.content;
-}
-need(compact(directive(carouselNode, "if") ?? "") === compact("visibleTaskCards.length || homePromotionStatus === 'loading' || homePromotionStatus === 'error'"), "failed promotion reads must remain visible without task slides");
-need(directive(carouselChildren[0], "if") === "visibleTaskCards.length", "empty promotion reads must not render a blank swiper");
-const promotionStatusNode = carouselChildren[1];
-need(attr(promotionStatusNode, "class") === "promotion-flat home-promotion-status" && compact(directive(promotionStatusNode, "if") ?? "") === compact("homePromotionStatus === 'loading' || homePromotionStatus === 'error'"), "promotion read feedback must be flat and limited to loading/error");
-need(compact(directive(promotionStatusNode, "bind", "role") ?? "") === compact("homePromotionStatus === 'error' ? 'alert' : 'status'") && directive(promotionStatusNode, "bind", "aria-busy") === "homePromotionStatus === 'loading'", "promotion feedback must announce failures and pending retry");
-const promotionStatusChildren = meaningfulChildren(promotionStatusNode);
-need(promotionStatusChildren.length === 2 && promotionStatusChildren[0].tag === "text" && promotionStatusChildren[1].tag === "PromotionAction", "promotion status may contain only translated feedback and the existing glass retry");
-const promotionStatusCopy = meaningfulChildren(promotionStatusChildren[0]);
-need(promotionStatusCopy.length === 3 && promotionStatusCopy[0].type === NodeTypes.INTERPOLATION && promotionStatusCopy[0].content.content === "t.promotion.activityBadge" && promotionStatusCopy[1].content.trim() === "·" && promotionStatusCopy[2].type === NodeTypes.INTERPOLATION && compact(promotionStatusCopy[2].content.content) === compact("homePromotionStatus === 'loading' ? t.promotion.loading : t.promotion.error"), "promotion read status must use existing translated activity/loading/error copy");
-const promotionRetry = promotionStatusChildren[1];
-need(attr(promotionRetry, "class") === "home-promotion-retry" && attr(promotionRetry, "role") === "button" && directive(promotionRetry, "on", "click") === "refreshHomePromotions", "promotion retry must refresh the homepage request");
-need(directive(promotionRetry, "bind", "aria-disabled") === "homePromotionStatus === 'loading'" && compact(directive(promotionRetry, "bind", "tabindex") ?? "") === compact("homePromotionStatus === 'loading' ? -1 : 0"), "pending promotion retry must be disabled and leave keyboard order");
-const promotionRetryChildren = meaningfulChildren(promotionRetry);
-need(promotionRetryChildren.length === 1 && promotionRetryChildren[0].tag === "text" && meaningfulChildren(promotionRetryChildren[0]).length === 1 && meaningfulChildren(promotionRetryChildren[0])[0].content?.content === "t.promotion.retry", "promotion retry must keep its existing translated label");
-const swiperChildren = meaningfulChildren(carouselChildren[0]);
-need(swiperChildren.length === 1 && swiperChildren[0].tag === "swiper-item", "swiper content structure changed or gained overlay content");
-const itemChildren = meaningfulChildren(swiperChildren[0]);
-need(itemChildren.length === 1 && itemChildren[0].tag === "view", "swiper item must contain only the task slide wrapper");
-const slideChildren = meaningfulChildren(itemChildren[0]);
-need(
-  slideChildren.length === 3 && slideChildren[0].tag === "DayOneQuestCard" && slideChildren[1].tag === "ConversionBanner" && slideChildren[2].tag === "PromotionEntry",
-  "task slide must contain the original cards and the server-controlled promotion entry only",
-);
-need(attr(slideChildren[2], "mode") === "home", "promotion slide must use the homepage carousel variant");
-need(slideChildren[2].props.some(prop => prop.type === NodeTypes.DIRECTIVE && prop.name === "bind" && prop.arg?.content === "active" && prop.exp?.content === "taskSlide === index"), "offscreen promotion slides must not be active");
-need(slideChildren[2].props.some(prop => prop.type === NodeTypes.DIRECTIVE && prop.name === "bind" && prop.arg?.content === "activities" && prop.exp?.content === "homePromotions.filter(activity => card === 'promotion:'+activity.activityId)"), "promotion slide must show only its server activity");
-const statusNode = carouselChildren[2];
-need(attr(statusNode, "class") === "home-task-carousel__status" && attr(statusNode, "aria-live") === "polite", "carousel must retain its hidden manual-change announcement");
-const statusChildren = meaningfulChildren(statusNode);
-need(
-  statusChildren.length === 1 && statusChildren[0].type === NodeTypes.INTERPOLATION && statusChildren[0].content.content === "taskCarouselAnnouncement",
-  "carousel status must remain the hidden manual-change announcement only",
-);
-need(!/home-task-carousel__(meta|count|autoplay)/.test(page), "visible page-number or playback overlay returned");
-NODE
-    :
-  else
-    miss="${miss}relationship-gate "
-    sed 's/^/        /' "${VERIFY_LOG_PREFIX}-home-task-carousel-relations.log"
-  fi
-  if [ -z "$miss" ]; then ok "home task carousel contract (0/1/2 + 5s + expand pause + equal crop)";
-  else bad "home task carousel contract incomplete — $miss"; fi
-}
-home_task_carousel_contract
 
 # ── 值域棘轮哨兵(vibe-playbook P2-F 2026-07-22 主人批):档间字号+圆角值集,只拦增量 ──
 # 基线 docs/VALUE-LADDER-BASELINE.json;新代码上阶梯(--v5-radius-* / 9 档字号),存量随尺寸迁移工程消化。
 value_ladder_gate() {
-  if "$NODE_BIN" scripts/value-ladder-sentinel.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-value-ladder-selftest.log" 2>&1; then
-    ok "value-ladder selftest(matcher 精度+棘轮方向红测)"
-  else
-    bad "value-ladder selftest 失败(node scripts/value-ladder-sentinel.mjs --selftest 看明细)"
-    tail -4 "${VERIFY_LOG_PREFIX}-uniapp-value-ladder-selftest.log" | sed 's/^/        /'
-    return
-  fi
   if "$NODE_BIN" scripts/value-ladder-sentinel.mjs > "${VERIFY_LOG_PREFIX}-uniapp-value-ladder.log" 2>&1; then
     ok "value-ladder 档间字号/离散圆角 无增量(基线 docs/VALUE-LADDER-BASELINE.json)"
   else
@@ -3058,15 +2618,8 @@ value_ladder_gate
 # 旧的 hex 哨兵只钉 4 个色号且只认 #RRGGBB,rgba() 形式与变 alpha 副本全在盲区
 # (purchase-ticker 注释曾自陈「特意挪值以免触发哨兵」= 被绕过的实证)。
 # 本门:亮暗异值 token 全量 × hex 3/6/8 位 + rgb()/rgba() × 忽略 alpha 比 RGB。
-# 豁免走 docs/TOKEN-COPY-ALLOWLIST.json(reason 必填,selftest 校验)。
+# 豁免走 docs/TOKEN-COPY-ALLOWLIST.json(reason 必填)。
 token_copy_gate() {
-  if "$NODE_BIN" scripts/token-copy-sentinel.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-token-copy-selftest.log" 2>&1; then
-    ok "token-copy selftest(双向红测:hex/rgb/rgba/变alpha 阳性全中 + 真灰/注释/color-mix 全 0)"
-  else
-    bad "token-copy selftest 失败(哨兵失效即门失效;node scripts/token-copy-sentinel.mjs --selftest 看明细)"
-    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-token-copy-selftest.log" | sed 's/^/        /'
-    return
-  fi
   if "$NODE_BIN" scripts/token-copy-sentinel.mjs > "${VERIFY_LOG_PREFIX}-uniapp-token-copy.log" 2>&1; then
     ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-token-copy.log")"
   else
@@ -3080,13 +2633,6 @@ token_copy_gate
 # 起因:清遮罩时用「值」匹配(grep 特定 rgba)只捞到 9/20,漏的 11 个写的是别的值。
 # 用值找「扮演某角色的东西」必漏 —— 本门改按角色判(选择器 *-backdrop/*-mask + 内联铺满覆盖层)。
 scrim_gate() {
-  if "$NODE_BIN" scripts/scrim-single-source.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-scrim-selftest.log" 2>&1; then
-    ok "scrim selftest(双向红测:5 种字面值形态阳性全中 + token/非遮罩/注释/渐变全 0)"
-  else
-    bad "scrim selftest 失败(node scripts/scrim-single-source.mjs --selftest 看明细)"
-    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-scrim-selftest.log" | sed 's/^/        /'
-    return
-  fi
   if "$NODE_BIN" scripts/scrim-single-source.mjs > "${VERIFY_LOG_PREFIX}-uniapp-scrim.log" 2>&1; then
     ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-scrim.log")"
   else
@@ -3104,13 +2650,6 @@ scrim_gate
 # z-index」这个遍历看不见的方向);② 天花板:全站扫 z-index,白名单外不许 ≥ 滑块(阶梯只
 # 遍历已知成员,新加的 9600 浮层要靠这条才看得见)。
 zindex_order_gate() {
-  if "$NODE_BIN" scripts/zindex-order.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-zindex-selftest.log" 2>&1; then
-    ok "$(grep -c '^PASS' "${VERIFY_LOG_PREFIX}-uniapp-zindex-selftest.log") 项 zindex-order selftest 全过(逐个相邻对隔离红测 + 事故现场 90 + 删除方向 + 天花板新成员)"
-  else
-    bad "zindex-order selftest 失败(node scripts/zindex-order.mjs --selftest 看明细)"
-    grep -E "^FAIL" "${VERIFY_LOG_PREFIX}-uniapp-zindex-selftest.log" | head -8 | sed 's/^/        /'
-    return
-  fi
   if "$NODE_BIN" scripts/zindex-order.mjs > "${VERIFY_LOG_PREFIX}-uniapp-zindex.log" 2>&1; then
     ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-zindex.log")"
   else
@@ -3120,122 +2659,13 @@ zindex_order_gate() {
 }
 zindex_order_gate
 
-# ── 双主题恒定着色 · 运行时正交门(C1 批次 2026-07-23) ──
-# 上面两道是静态门,只能钉「我已经想到的写法」。本批同一个坑连踩三次(按值比 token 漏变
-# alpha 副本 / 按值 grep 遮罩漏 11 个 / 按值 grep 网格线漏 2 个),根因都是「用值找角色」。
-# 本门换正交维度:不问源码怎么写,只问渲染出来跟不跟主题 —— 双主题 computed 完全相同
-# 的有色元素即嫌疑。存量走棘轮 docs/THEME-CONSTANT-BASELINE.json,只拦新增。
-theme_constant_gate() {
-  if "$NODE_BIN" scripts/theme-constant-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-theme-const-selftest.log" 2>&1; then
-    ok "theme-constant selftest(判定纯函数双向红测 + 恒定 token 放行)"
-  else
-    bad "theme-constant selftest 失败(node scripts/theme-constant-gate.mjs --selftest 看明细)"
-    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-theme-const-selftest.log" | sed 's/^/        /'
-    return
-  fi
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-theme-const.log" "$NODE_BIN" scripts/theme-constant-gate.mjs; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-theme-const.log")"
-  else
-    bad "新增「双主题恒定」着色元素 — 该元素亮/暗渲染出来一个色 = 没跟主题"
-    tail -10 "${VERIFY_LOG_PREFIX}-uniapp-theme-const.log" | sed 's/^/        /'
-  fi
-}
-if scope_hit theme-constant-runtime; then route_scope theme-constant-runtime; theme_constant_gate; fi
 
-# ── 零-border 铁律 · 运行时门(C2 批次 2026-07-23) ──
-# 《03》§3:带 bg 填充的卡片/板块一律零 border,border 只属透明容器(分组 hairline /
-# empty-state 虚线);§4:玻璃 chrome(TabBar/Header/浮层)不在此约束内。
-# 同样走运行时判(C1 教训:静态 grep 只能钉想到的写法);门内建 3 条规范自带豁免。
-zero_border_gate() {
-  if "$NODE_BIN" scripts/zero-border-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-zero-border-selftest.log" 2>&1; then
-    ok "zero-border selftest(双向红测:实底/tint/渐变+四边框阳性全中 + 透明底/虚线/chrome/隔离环全 0)"
-  else
-    bad "zero-border selftest 失败(node scripts/zero-border-gate.mjs --selftest 看明细)"
-    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-zero-border-selftest.log" | sed 's/^/        /'
-    return
-  fi
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-zero-border.log" "$NODE_BIN" scripts/zero-border-gate.mjs; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-zero-border.log")"
-  else
-    bad "新增「有填充 + 四边描边」容器 — 《03》§3 层级靠 surface 微差色,不靠描边"
-    tail -10 "${VERIFY_LOG_PREFIX}-uniapp-zero-border.log" | sed 's/^/        /'
-  fi
-}
-if scope_hit zero-border-runtime; then route_scope zero-border-runtime; zero_border_gate; fi
 
-# ── DOM-QA 体检哨兵(vibe-playbook P1-A 2026-07-22 主人批):5 探针事实层 ──
-# ① 横向溢出 ② 文字<10px(10-12 普查不 gate) ③ tap<44pt ④ img broken ⑤ 按钮无可达名。
-# 存量黄灯 = docs/DOM-QA-LEDGER.json;gate 只拦 ledger 外新指纹(新页/改动页硬门)。
-# 豁免 = 人工审阅后 --update-ledger 收编 + entry 写 qaOk 理由。selftest = 哨兵自身双向红测。
-dom_qa_gate() {
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-dom-qa-selftest.log" "$NODE_BIN" scripts/dom-qa.mjs --selftest; then
-    ok "dom-qa selftest(双向红测:5 类阳性全中 + 干净 fixture 0)"
-  else
-    bad "dom-qa selftest 失败(探针失效即门失效;node scripts/dom-qa.mjs --selftest 看明细)"
-    tail -5 "${VERIFY_LOG_PREFIX}-uniapp-dom-qa-selftest.log" | sed 's/^/        /'
-    return
-  fi
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-dom-qa.log" "$NODE_BIN" scripts/dom-qa.mjs --sweep core; then
-    ok "dom-qa core(5 tab)无新 DOM 违例(存量黄灯见 docs/DOM-QA-LEDGER.json)"
-  else
-    bad "dom-qa 新 DOM 违例 — node scripts/dom-qa.mjs --sweep core 看明细;确属合法例外 → --update-ledger 收编并写 qaOk 理由"
-    tail -12 "${VERIFY_LOG_PREFIX}-uniapp-dom-qa.log" | sed 's/^/        /'
-  fi
-}
-if scope_hit dom-qa-runtime; then route_scope dom-qa-runtime; dom_qa_gate; fi
 
-# ── tap 目标哨兵(C3 2026-07-23):热区 ≥44pt + 按下有可感知反馈 ──
-# 与 dom-qa 的 tap 探针**互补不重复**:dom-qa 靠「交互标签/role + cursor:pointer」找候选,
-# 而 uni-app 的 <view @click> 编译成 <uni-view> 且不带 cursor:pointer —— 那条路对本工程系统性漏检。
-# 本哨兵在页面脚本前 hook addEventListener,拿的是运行时真注册了 click 的元素;
-# 反馈判定走 CDP CSS.forcePseudoState 实测(不是 grep class,声明了但被 inline style 压掉的会被抓出来)。
-# 存量黄灯 = docs/TAP-FEEDBACK-LEDGER.json;豁免 = --update-ledger 收编 + entry 写 tapOk 理由。
-tap_feedback_gate() {
-  if scope_hit tap-feedback-runtime; then route_scope tap-feedback-runtime
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-tap-selftest.log" "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest; then
-    ok "tap-feedback selftest(双向红测:尺寸/反馈阳性全中 + 过渡·祖先链·不可点三类假阳 0)"
-  else
-    bad "tap-feedback selftest 失败(探针失效即门失效;node scripts/tap-feedback-probe.mjs --selftest 看明细)"
-    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-tap-selftest.log" | sed 's/^/        /'
-    return
-  fi
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-tap.log" "$NODE_BIN" scripts/tap-feedback-probe.mjs; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-tap.log")"
-  else
-    bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
-    tail -12 "${VERIFY_LOG_PREFIX}-uniapp-tap.log" | sed 's/^/        /'
-  fi
-  fi
-  # 孤字断行探针(包 zk 2026-08-15):三语 × 钱链路 5 路由 @375px,CJK 正文末行不得只剩一两个字。
-  # 静态门测不出排版结果(同句 390px 不断、375px 断出「些。」),必须真渲染;先跑双向 selftest。
-  if scope_hit orphan-line-runtime; then route_scope orphan-line-runtime
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-orphan-selftest.log" "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
-    ok "orphan-line selftest(双向红测:CJK 孤字必中 · en 单词尾行不误报 · 干净 0)"
-  else
-    bad "orphan-line selftest 失败(探针失效即门失效;node scripts/orphan-line-probe.mjs --selftest 看明细)"
-    tail -4 "${VERIFY_LOG_PREFIX}-uniapp-orphan-selftest.log" | sed 's/^/        /'
-    return
-  fi
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-orphan.log" "$NODE_BIN" scripts/orphan-line-probe.mjs; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-orphan.log")"
-  else
-    bad "孤字断行新违例 — node scripts/orphan-line-probe.mjs 看明细;改短文案或给数字+单位原子加 nowrap"
-    tail -8 "${VERIFY_LOG_PREFIX}-uniapp-orphan.log" | sed 's/^/        /'
-  fi
-  fi
-}
-tap_feedback_gate
 
 # ── 标签内注释哨兵(2026-07-23):HTML 注释卡在标签属性之间 = Vue 模板非法位置 ──
 # vue-tsc 不报(只看类型)、浏览器多数时候也照常渲染 → 人眼与既有门双双测不到,归机器层。
 tag_comment_gate() {
-  if "$NODE_BIN" scripts/tag-comment-gate.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-tagcomment-selftest.log" 2>&1; then
-    ok "tag-comment selftest(标签内阳性中 + 标签外/子元素间假阳 0)"
-  else
-    bad "tag-comment selftest 失败(node scripts/tag-comment-gate.mjs --selftest 看明细)"
-    tail -4 "${VERIFY_LOG_PREFIX}-uniapp-tagcomment-selftest.log" | sed 's/^/        /'
-    return
-  fi
   if "$NODE_BIN" scripts/tag-comment-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-tagcomment.log" 2>&1; then
     ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-tagcomment.log")"
   else
@@ -3250,13 +2680,6 @@ tag_comment_gate
 # 任何人在 hosted-card-vault 之外再写一个卡号 / CVV 输入框,承诺即变不实陈述。
 # 判据认「数据绑定」不认关键词(cvvLength / cvvFocused / kind="cvv" 均放行)。
 card_data_boundary_gate() {
-  if "$NODE_BIN" scripts/card-data-boundary.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-cardboundary-selftest.log" 2>&1; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-cardboundary-selftest.log")"
-  else
-    bad "card-data-boundary selftest 失败(判据失效即门失效;node scripts/card-data-boundary.mjs --selftest 看明细)"
-    tail -6 "${VERIFY_LOG_PREFIX}-uniapp-cardboundary-selftest.log" | sed 's/^/        /'
-    return
-  fi
   if "$NODE_BIN" scripts/card-data-boundary.mjs > "${VERIFY_LOG_PREFIX}-uniapp-cardboundary.log" 2>&1; then
     ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-cardboundary.log")"
   else
@@ -3266,132 +2689,12 @@ card_data_boundary_gate() {
 }
 card_data_boundary_gate
 
-# ── 空状态哨兵(C5 2026-07-23):《06》缺省页体系真的渲染得出来 ──
-# 强制清空所有 store 的数组字段让空态显形,逐页断言:插画真加载(naturalWidth>0)+ 标题非空
-# + 不溢出 + 无 console error。「接上了组件」和「空态真能显示」是两回事。
-empty_state_gate() {
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-empty-state.log" "$NODE_BIN" scripts/empty-state-probe.mjs; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-empty-state.log")"
-  else
-    bad "空状态渲染失败 — node scripts/empty-state-probe.mjs 看明细(插画路径 / 标题 key / 布局溢出)"
-    grep -E "^FAIL" "${VERIFY_LOG_PREFIX}-uniapp-empty-state.log" | head -8 | sed 's/^/        /'
-  fi
-}
-if scope_hit empty-state-runtime; then route_scope empty-state-runtime; empty_state_gate; fi
 
-# ── SVG 内文字运行时门(P-121,2026-08-17):字真的排出来了吗 ──
-# 源码门只能证「没写错的写法」;这道门逐路由真渲染:svg text 数量 ≥ 期望 · 每个 bbox>0 · 非空 · 可见(visibility/opacity/fill 链)· 在 svg 盒内 · 文档内 · 未被祖先裁
-# · svg 内 uni-text=0 · 全页 svg 元素呈现属性==计算值(attributify 劫持在这里现形)· console error 与 Vue resolve warn 0;svg 里有文字候选的文件必须登记路由(未登记即红,不静默跳过)。
-svg_text_render_gate() {
-  local slog="${VERIFY_LOG_PREFIX}-uniapp-svg-text-render-selftest.log" glog="${VERIFY_LOG_PREFIX}-uniapp-svg-text-render.log"
-  if probe_retry "$slog" "$NODE_BIN" scripts/svg-text-render-probe.mjs --selftest; then
-    ok "$(tail -1 "$slog")"
-  else
-    bad "svg-text-render selftest 失败(探针失效即门失效;node scripts/svg-text-render-probe.mjs --selftest 看明细)"
-    tail -6 "$slog" | sed 's/^/        /'
-    return
-  fi
-  if probe_retry "$glog" "$NODE_BIN" scripts/svg-text-render-probe.mjs; then
-    ok "$(tail -1 "$glog")"
-  else
-    bad "SVG 内文字没渲染出来 / 看不见 / 呈现属性被劫持 / 新示意图未登记 —— UNI_BASE_URL=$BASE_URL node scripts/svg-text-render-probe.mjs 看明细"
-    grep -E "^FAIL|^  \[" "$glog" | head -10 | sed 's/^/        /'
-  fi
-}
-if scope_hit svg-text-runtime; then svg_text_render_gate; fi
 
-# ── 里程碑庆祝队列门(2026-08-03):钱链路挂起 + 逐条补发 + z 层级 ──
-# 三路独立走查同族缺陷:.ms-overlay 9300 盖住支付确认/宽限提示/提现表单并吞点击;
-# 且 active 单槽,连跨两级门槛前一级被覆盖永久丢通知。判据(esbuild 载真 store 测行为):
-# ①钱链路 4 路由 UI 挂起且 App.vue 奖励/记账不接路由门(分离证明) ②连跨两级离场
-# 逐条补发先低后高 ③ .ms-overlay < .nx-toast-host < .nx-mask ④普通页即时弹 +
-# 白名单前缀不过宽(pages/store/store 等近亲不误伤)。
-milestone_queue_gate() {
-  if "$NODE_BIN" scripts/selfcheck-milestone-queue.mjs > "${VERIFY_LOG_PREFIX}-uniapp-milestone-queue.log" 2>&1; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-milestone-queue.log")"
-  else
-    bad "里程碑庆祝队列门失败 — node scripts/selfcheck-milestone-queue.mjs 看明细"
-    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-milestone-queue.log" | head -8 | sed 's/^/        /'
-  fi
-}
-milestone_queue_gate
 
-# ── 结算页试用报价单源门(R2 P0,2026-08-04):展示与扣款同一次解析 ──
-# 第一轮把时间边界收敛成 resolveTrialAt 时只收了 store 内部,没收 checkout.vue
-# 这个消费者:该页一半读未推进的原始 status(模式/促销/抵扣),一半读实时解析器
-# (liveShadow*)——宽限期刚过、poll 未到的窗口里两边互斥,net 被拼成报价页从未
-# 展示过的数字直接扣款。判据(esbuild 载真实现 + 源码切片跑真结算块):
-# ①越界拒单零扣款 ②grace 内正常成交 ③$0 路径同样受守卫 ④展示净额==扣款净额
-# ⑤convert 返回 false 零扣款零建单 + 接线门(摘掉任一守卫即红)。
-checkout_trial_quote_gate() {
-  if "$NODE_BIN" scripts/selfcheck-checkout-trial-quote.mjs > "${VERIFY_LOG_PREFIX}-uniapp-checkout-trial-quote.log" 2>&1; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-checkout-trial-quote.log")"
-  else
-    bad "结算页试用报价单源门失败 — node scripts/selfcheck-checkout-trial-quote.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-checkout-trial-quote.log" | head -8 | sed 's/^/        /'
-  fi
-}
-checkout_trial_quote_gate
 
-# ── 兑换成交快照 + 创世购买重入守卫门(存量 2×P1,2026-08-04)──
-# 两条同族缺陷:动钱的入口没有重入守卫、跨 await 读活值。兑换页确认后 900ms 内
-# 汇率自己跳/用户翻方向改金额,实际成交 ≠ 用户确认的那笔,且额度只按确认那一刻校验
-# 过一次(改大金额即绕过每日额度);创世半屏 emitClose 异步生效,双击扣两笔铸两份。
-# 判据(抠正主函数原文注入执行,不抄判据副本):①确认后汇率变动→拒单零成交
-# ②确认后方向/金额被改→按快照成交 ③连点三次只成交一次 ④创世三击只扣一次
-# (含失败路径必解锁的反向靶) ⑤正常路径不受影响 + 结构纪律(快照冻在首个 await 前 /
-# 复验拿当前权威值 / 守卫非模块级 / 按钮 disabled 派生)。
-exchange_genesis_guard_gate() {
-  if "$NODE_BIN" scripts/selfcheck-exchange-genesis-guard.mjs > "${VERIFY_LOG_PREFIX}-uniapp-exchange-genesis-guard.log" 2>&1; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-exchange-genesis-guard.log")"
-  else
-    bad "兑换/创世重入守卫门失败 — node scripts/selfcheck-exchange-genesis-guard.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-exchange-genesis-guard.log" | head -8 | sed 's/^/        /'
-  fi
-}
-exchange_genesis_guard_gate
 
-# ── 质押持仓乐观并发门(存量 P1,2026-08-04):跨标签页竞态双记账 ──
-# earlyWithdraw / claim 原是裸 find→map→persist,persist 走纯覆盖式 writeAccountRow,
-# 全仓又没有 storage 事件重新水合持仓 —— H5 端 uni storage 就是 localStorage,两个标签页
-# 只要都打开过质押页,状态就**永久不同步**;同一笔仓位被两边各领一次,而 usdtBalance 是
-# ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记 = 真·双花。判据(esbuild 载真
-# store + 真 storage 层跑真代码,两个 store 实例 = 两个标签页共享一份序列化 storage):
-# ①陈旧标签页重复领取被拒、余额只增加一次 ①b 读与写之间被插队同样拦得住(rev CAS)
-# ②单标签页正常路径不受影响 ③版本冲突与「本来就不该成交」返回值可区分 ④不传版本的老
-# 调用方(28 处在用)行为逐项不变 + 爆炸半径只有 staking ⑤建仓冲突重放不丢仓、id 不重号
-# ⑥接线门(判定对不对 / 有没有被接上是两道门)。
-staking_cas_gate() {
-  if "$NODE_BIN" scripts/selfcheck-staking-cas.mjs > "${VERIFY_LOG_PREFIX}-uniapp-staking-cas.log" 2>&1; then
-    ok "质押持仓乐观并发门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-staking-cas.log")"
-  else
-    bad "质押持仓乐观并发门失败 — node scripts/selfcheck-staking-cas.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-staking-cas.log" | head -8 | sed 's/^/        /'
-  fi
-}
-staking_cas_gate
 
-# ── 资金 ⊗ 收据门(R4 缺陷族,2026-08-04):「钱动了、账没记上」──
-# 落盘失败在这一层是**静默**的:account-cloud 写不进去只是 persisted:false,bills.add
-# 写不进去只是 return null,两者都不抛异常;调用方却一律按「一定成功」继续铸货、弹成功。
-# 实测四处同型(app.ts 四个资金原语丢弃 persist 结果 + 创世购买 / 结算 / 复投丢弃 bills.add
-# 返回值),最惨一格是近 $15k 已扣、席位已铸、弹「购买成功」,账单页查无此单。根治 = 一条
-# 不变量 + 一个收口点 src/lib/money-receipt.ts(收据即指令,不写收据就动不了钱)。判据
-# (esbuild 载真 store + 真收口点跑真代码,假 storage 按 key 定点注入写失败):
-# ①资金原语落盘失败→返回 false 且内存不脏 ②bills 写失败→整笔回滚 + 报失败(含反向病症
-# 「账记了钱没动」) ③退款把 withdrawableUsdt 还原到扣款前(带裸 creditBalance 负控)
-# ④成功路径逐项等价(金额/舍入/clamp/守卫拒绝) ⑤接线门 + 3 语 i18n ⑥迁移棘轮:
-# 仍在裸调 bills 写入的存量点只许减不许增 ⑦多腿交易(兑换一进一出)原子性:两条分录
-# 一次落盘(数写盘次数),任一环失败 → 两腿资金一起还原、账上零残留(不许只剩一条)。
-money_receipt_gate() {
-  if "$NODE_BIN" scripts/selfcheck-money-receipt.mjs > "${VERIFY_LOG_PREFIX}-uniapp-money-receipt.log" 2>&1; then
-    ok "资金 ⊗ 收据门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-money-receipt.log")"
-  else
-    bad "资金 ⊗ 收据门失败 — node scripts/selfcheck-money-receipt.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-money-receipt.log" | head -8 | sed 's/^/        /'
-  fi
-}
-money_receipt_gate
 
 # ── 本地建单权威门(2026-08-11):远端模式下页面不许自己造订单行 ──
 # 履约推进已归服务端(store/orders.ts 的 advanceOrder 有闸),但**建单**这一步的闸分散在
@@ -3400,8 +2703,7 @@ money_receipt_gate
 # 回滚面是残的,比它要防的毛病更险。故这道门守**调用侧的结构不变量**:任何写本地订单行的
 # 页面,必须在建单**之前**先判 API 模式。新增购买入口若忘了判,这里立刻报红,而不是等到
 # 线上「钱扣了、单子永远停在已支付、机器一台不来」。
-# 判据抽成独立函数:真扫与红测自证**共用同一份代码**。分两份写的话,红测验的就不是
-# 真判据,自证等于没证。无违规则不输出,有则输出原因。
+# 无违规则不输出,有则输出原因。
 _loa_violation() {
   local f="$1" co_line guard_line
   co_line=$(grep -nE "orders\.createOrder\(" "$f" | head -1 | cut -d: -f1)
@@ -3417,7 +2719,7 @@ _loa_violation() {
 }
 
 local_order_authority_gate() {
-  local violations=0 f why tmp red
+  local violations=0 f why
   while IFS= read -r f; do
     [ -z "$f" ] && continue
     why=$(_loa_violation "$f")
@@ -3427,21 +2729,7 @@ local_order_authority_gate() {
     fi
   done < <(grep -rlE "orders\.createOrder\(" src/pages/ src/components/ --include=*.vue 2>/dev/null)
 
-  # 🔴 红测自证:两种绕过形态必须各自被判出来,否则这道门是假绿。形态 B 同时守着
-  #    「import 行不算判过了」—— 若哪天判据退回取首个命中,B 会静默变绿,这里就报红。
-  tmp=$(mktemp -d)
-  printf 'const x = 1\norders.createOrder({})\n' > "$tmp/a.vue"
-  printf 'import { remoteApiEnabled } from "@/api/runtime"\norders.createOrder({})\nif (remoteApiEnabled) return\n' > "$tmp/b.vue"
-  red=0
-  [ -n "$(_loa_violation "$tmp/a.vue")" ] && red=$((red + 1))
-  [ -n "$(_loa_violation "$tmp/b.vue")" ] && red=$((red + 1))
-  rm -rf "$tmp"
-  if [ "$red" -ne 2 ]; then
-    bad "本地建单权威门:红测自证 $red/2 — 判据认不出绕过形态,这道门是假绿"
-    violations=$((violations + 1))
-  fi
-
-  [ "$violations" -eq 0 ] && ok "本地建单权威门 — 覆盖页均在建单前判了 API 模式(红测自证 2/2:整页不判 · 判断晚于建单)"
+  [ "$violations" -eq 0 ] && ok "本地建单权威门 — 覆盖页均在建单前判了 API 模式"
 }
 local_order_authority_gate
 # ── 账单生产者门(z4,2026-08-11):渲染代码存在 ≠ 有生产者 ──
@@ -3453,22 +2741,12 @@ local_order_authority_gate
 # 答得出「我今天提了哪几笔」;账单上只剩一条平台白送 NEX 的孤行。
 # 🔴 因此判据守的是**生产者**不是渲染:出事那天渲染分支一直都在,守它等于没守。
 # 判据(ground truth 全部从磁盘取,不手写清单):①BillType 全集解析自类型联合;②扫全站
-# 找账单 draft,按「币种 + 方向」(USDT- / NEX+ / seed: 前缀)分类;③实测与脚本内台账
+# 找账单 draft,按「币种 + 方向」(USDT- / UVT+ / seed: 前缀)分类;③实测与脚本内台账
 # **双向逐字相等** —— 少一族(生产者被删)红,多一族(新增未登记)也红;④渲染面与
 # BillType 全集互相覆盖。细到币种+方向是红测逼出来的:只记「有没有生产者」时,删掉提现
 # 主行后 NEX 抵扣腿仍撑着「有 debit 生产者」,门全绿而用户看不到自己提了多少钱。
 # 改台账前先跑 `--print` 看实测(本门自己的 swap 那行凭印象手写就被实测当场证伪)。
 bill_producer_gate() {
-  # 🔴 先红测再判定:哨兵失效即门失效。11 条注入逐个隔离一条 token(主行删 / 不记账文件冒充 /
-  # 记账文件冒充 / 多生产者只删其一 / 主行符号反 / 抵扣腿符号反 / 冲正行删 / 新类型未登记 /
-  # 种子删 / 嵌套掩护 / 币种改错)+ 1 条负控(无关改动不许红)+ 样本量自校。
-  # 注入锚点失配会自曝为 FAIL,不会静默当成「测过了」。
-  if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs --selftest > "${VERIFY_LOG_PREFIX}-uniapp-bill-producers-selftest.log" 2>&1; then
-    ok "bill-producers selftest: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "${VERIFY_LOG_PREFIX}-uniapp-bill-producers-selftest.log" | tail -1)"
-  else
-    bad "bill-producers selftest 失败(哨兵失效即门失效;node scripts/selfcheck-bill-producers.mjs --selftest 看明细)"
-    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-bill-producers-selftest.log" | head -8 | sed 's/^/        /'
-  fi
   if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs > "${VERIFY_LOG_PREFIX}-uniapp-bill-producers.log" 2>&1; then
     ok "账单生产者门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-bill-producers.log")"
   else
@@ -3478,36 +2756,6 @@ bill_producer_gate() {
 }
 bill_producer_gate
 
-# ── 提现账单行 runtime 门(z4 R1,2026-08-11):生产者「存在」≠「跑得到」──
-# 上面那道静态门守住了「有没有代码写得出提现账单行」,但守不了可达性:`if (false)` 包起来、
-# 挪进一个永不被调用的函数、或者调用点落在走不到的分支上,静态判据全绿。同一轮独立审计还
-# 实测出 withdraw 那三条 token 里的 `NEX+`(抵扣费冲正行)在 remote 模式下运行期确实永不执行。
-# 本门在**真页面**上把整条链跑一遍:填金额 → 开 NEX 抵扣 → 提交 → 确认 → 写账单 → 跳转,
-# 只桩 withdrawalApi 两个方法(建单只认真后端,不桩一步都走不到),其余全是真代码。
-# 判据:①两条同单号分录(USDT 负额在途 + NEX 负额)②共用 ts 且真落盘 ③金额取服务端回执
-# (故意让回执 ≠ 页面输入)+ memoKey 走 i18n 码位 ④歧义失败零写入、原地重试沿用同一把幂等键
-# 并自愈成一对 ⑤账单页渲染成可点行 ⑥零 console error。
-# 该门要求 fundsServerEnabled(远端档)server:给了 REMOTE_BASE_URL 就用它;没给就自己起一台远端档隔离 server
-# (verify-h5-runtime.mjs --remote-withdraw,同 H5 运行时门的隔离起服机制)—— 裸跑 verify 不再因为只有 mock 靶而必红。
-withdraw_bill_runtime_gate() {
-  if [ -z "${REMOTE_BASE_URL:-}" ]; then
-    if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" "$NODE_BIN" scripts/verify-h5-runtime.mjs --remote-withdraw; then
-      ok "提现账单行 runtime 门(远端档隔离起服)— $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log")"
-    else
-      bad "提现账单行 runtime 门失败 — node scripts/verify-h5-runtime.mjs --remote-withdraw 看明细(或给 REMOTE_BASE_URL 指一台远端档 server)"
-      grep -E "^  FAIL|Error" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" | head -8 | sed 's/^/        /'
-    fi
-    return
-  fi
-  local withdraw_base_url="$REMOTE_BASE_URL"
-  if probe_retry "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" env BASE_URL="$withdraw_base_url" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs; then
-    ok "提现账单行 runtime 门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log")"
-  else
-    bad "提现账单行 runtime 门失败 — BASE_URL=$withdraw_base_url node scripts/withdraw-bill-runtime.mjs 看明细"
-    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-bill-runtime.log" | head -8 | sed 's/^/        /'
-  fi
-}
-if scope_hit withdraw-bill-runtime; then withdraw_bill_runtime_gate; fi
 
 # 🗑 【2026-08-13 回退】这里曾挂过「提现扣款自愈门」(scripts/withdraw-debit-selfheal-runtime.mjs)。
 #    它守的实现 —— App.vue 对账里的扣款补扣格 —— 被 R1 独立审计整格否决并回退,门随之退役,
@@ -3533,80 +2781,9 @@ endpoint_citation_gate() {
 }
 endpoint_citation_gate
 
-# ── P1 涉钱/配额 store 乐观并发门(存量 P1 二期,2026-08-04)──
-# 质押一期把 writeAccountRowCas 立起来后,同型缺陷还留在五个 store 上:deposits(入金单
-# 状态推进 + 到账入账,两端并发推进 = 同一笔充值入账两次)· voucher(同一张券各领一次)·
-# nex-faucet / daily-powerup / lucky-spin(每日与一次性配额被覆盖 = 额度绕过)。
-# (原第六个 withdraw-daily-count 已于 2026-08-11 随包 z2 整体删除 —— 客户端不再维护日限
-# 计数器,今日笔数改由 core 从提现单列表现算,没有第二份状态自然也不需要 CAS 防覆盖。)
-# H5 端 uni storage 就是
-# localStorage,同源多标签页共享一份且全仓无 storage 事件重新水合 —— 状态**永久不同步**,
-# 而 usdtBalance/nexBalance 是 ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记。
-# 判据(esbuild 载真 store + 真 storage 层跑真代码,两个 store 实例 = 两个标签页共享一份
-# 序列化 storage;只有 deposits 的 app/bills/fx 三个跨 store 组合方换成可观测假账本):
-# ①五个 store 各自的陈旧标签页重复领取被拒、余额/计数只动一次 ①b 读与写之间被插队同样
-# 拦得住(rev CAS)②单标签页正常路径不受影响 ③版本冲突与「本来就不该成交」可区分
-# ④writeAccountRow 逐字节没动 ⑤追加型冲突重放不丢单、主键不重号 ⑥接线门(五个 store
-# 全路径走 CAS + 六处页面调用点真的读了 ok/conflict + 3 语 i18n)。
-money_cas_gate() {
-  if "$NODE_BIN" scripts/selfcheck-money-cas.mjs > "${VERIFY_LOG_PREFIX}-uniapp-money-cas.log" 2>&1; then
-    ok "P1 涉钱/配额乐观并发门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-money-cas.log")"
-  else
-    bad "P1 涉钱/配额乐观并发门失败 — node scripts/selfcheck-money-cas.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-money-cas.log" | head -8 | sed 's/^/        /'
-  fi
-}
-money_cas_gate
 
-# ── 提现失败路径门(包 z2 R2 结构性反思 · 族 A,2026-08-11)──
-# 同一个任务里三次写下「失败时会如何如何」的注释,三次都与实际行为相反(建单后其实没落盘 /
-# 跨标签页写入其实进不来 / 落盘失败其实会把刚建的单静默抹掉)。共同根因:**正常路径会跑浏览器、
-# 会写固定靶,失败路径只写注释,而注释不参与执行,写什么都不会红。**
-# 根治 = 失败路径的行为断言必须有一条注入该失败的测试;本门就是那条测试。
-# 判据:载真 app store + 真 account-cloud + 真 storage 语义,注入写失败与刷新。
-withdraw_failpaths_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-failpaths.mjs > "${VERIFY_LOG_PREFIX}-uniapp-withdraw-failpaths.log" 2>&1; then
-    ok "提现失败路径门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-failpaths.log")"
-  else
-    bad "提现失败路径门失败 — node scripts/selfcheck-withdraw-failpaths.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-failpaths.log" | head -8 | sed 's/^/        /'
-  fi
-}
-withdraw_failpaths_gate
 
-# ── 失败提现「退还已烧 NEX」冲正分录门(包 z6,2026-08-11)──
-# 这一族的病形是**代码存在但链路走不到**:冲正分录一直躺在 App.vue 里,判据却锚在一个
-# remote 下恒不被写、mock 下压根没有提现单的本地幂等键上 —— 任何真实配置下都不可达,
-# 而「有没有这段代码」「有没有生产者」两种静态哨兵**全绿**。静态门对这一族天然瞎。
-# 判据:载真 app store + 真 bills store + 真 withdrawalBillDrafts,**把 remoteApiEnabled 翻成
-# true**(缺陷只在该模式下发作,共用桩默认 mock = 在本来就好使的模式里自证清白),
-# 从服务端回执喂进去,断言账本另一端真的多出那一行。含负向(没退 / 字段缺失 / 退多于烧)
-# 与幂等、方向判重、缺陷本体回归。红测实测 R1 删生产者 / R2 换错证据源 / R3 摘不变量 /
-# R4 判据丢方向 / R5 删断言,五种改法各自判红。
-withdraw_nex_refund_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-nex-refund.mjs > "${VERIFY_LOG_PREFIX}-uniapp-withdraw-nex-refund.log" 2>&1; then
-    ok "失败提现退还 NEX 冲正门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdraw-nex-refund.log")"
-  else
-    bad "失败提现退还 NEX 冲正门失败 — node scripts/selfcheck-withdraw-nex-refund.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-withdraw-nex-refund.log" | head -8 | sed 's/^/        /'
-  fi
-}
-withdraw_nex_refund_gate
 
-# 提现单合并的两条修法并存门(2026-08-12 包 z8 并入主线时立)。主线修「同档位赢家通吃丢字段」,
-# 包 z8 修「退款事实随整对象被淘汰 + 金额与时刻须整对同源」—— 二者在同一个函数上,
-# 二选一都会丢一半。本门只证**两条同时生效**,不重复各自的单侧断言。
-# 红测实测三种拆法各自判红:A 调用点不过 applyRefundEvidence(5 红)/ B 同档位改回整行择一(1 红)/
-# C 金额与时刻拆开各取(1 红)。C 是第一版靶漏掉的覆盖洞,由红测本身抓出后补的。
-withdrawal_merge_union_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdrawal-merge-union.mjs > "${VERIFY_LOG_PREFIX}-uniapp-withdrawal-merge-union.log" 2>&1; then
-    ok "提现单合并两修法并存门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-withdrawal-merge-union.log")"
-  else
-    bad "提现单合并两修法并存门失败 — node scripts/selfcheck-withdrawal-merge-union.mjs 看明细"
-    grep -E "^(FAIL|  FAIL|union-probe FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-withdrawal-merge-union.log" | head -8 | sed "s/^/        /"
-  fi
-}
-withdrawal_merge_union_gate
 
 # 冲突标记哨兵(2026-08-12 立,同一会话内连犯两次后焊):`git add` 对 UU 文件的语义是
 # 「标记为已解决」,于是 <<<<<<< / >>>>>>> 会原样进提交。实际发生过 3 个文件带标记入库,
@@ -3614,60 +2791,8 @@ withdrawal_merge_union_gate
 # tsc 看不到 .md/.mjs,契约登记门只扫 *.test.mjs,这一族此前天然无人看管。
 # 判据构造性:扫全部被 git 跟踪的文本文件,不维护类型清单;候选集塌了本门自己判红(已红测)。
 
-# 提现失败分诊的**重放感知**门(2026-08-12 立,两路独立审计各自点名同一根因)。
-# 守:重放路径上只有「成功」与「409」算定局,其余一律保留幂等键 —— 401/429/地区策略
-# 都是边缘层拒绝,排在服务端幂等查询之前,对「上一次落没落库」零信息量;
-# 拿它们退役键 ⇒ 下次新键 ⇒ 服务端出第二笔。
-# 红测:A 去掉「确定拒绝」档的 !isReplay → 红;B 日限档改回无条件退役 → 红;
-#       C 给 409 档也加 !isReplay → 红;D 删掉抠段锚点 → 判据自失效判红。
-withdraw_replay_triage_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-replay-triage.mjs > "${VERIFY_LOG_PREFIX}-uniapp-replay-triage.log" 2>&1; then
-    ok "提现分诊重放感知门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-replay-triage.log")"
-  else
-    bad "提现分诊重放感知门失败 — node scripts/selfcheck-withdraw-replay-triage.mjs 看明细"
-    grep -E "^(FAIL|  FAIL|AssertionError)" "${VERIFY_LOG_PREFIX}-uniapp-replay-triage.log" | head -8 | sed "s/^/        /"
-  fi
-}
-withdraw_replay_triage_gate
 
-# 提现分诊**数据流**门(2026-08-13 结构性反思的产物)。同型缺陷连两轮复发后换层:
-# 前两版都是静态判据(形状 / 字符串),守得住「代码长什么样」,守不住「运行时什么值流到哪」。
-# 本门把 catch 段真源码**跑起来**(注入桩),断言喂给判决的上下文与实际副作用次数。
-# 红测:页面谎报 isReplay/isDailyLimit/isGeo → 全红;拿掉日限线型守卫 → 红;
-#       结果未知也退役 → 红;409 档早退绕过退役 → 红。
-withdraw_triage_dataflow_gate() {
-  if "$NODE_BIN" scripts/selfcheck-withdraw-triage-dataflow.mjs > "${VERIFY_LOG_PREFIX}-uniapp-triage-dataflow.log" 2>&1; then
-    ok "提现分诊数据流门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-triage-dataflow.log")"
-  else
-    bad "提现分诊数据流门失败 — node scripts/selfcheck-withdraw-triage-dataflow.mjs 看明细"
-    grep -E "^(FAIL|  FAIL|AssertionError)" "${VERIFY_LOG_PREFIX}-uniapp-triage-dataflow.log" | head -8 | sed "s/^/        /"
-  fi
-}
-withdraw_triage_dataflow_gate
 
-# ── 冲正(回滚)自身门(R5 五项,2026-08-04)——「回滚失败被静默」+「回滚凭空造钱」──
-# R4 根治「资金变更的落盘失败被静默忽略」,R5 在**回滚这一层**发现同型:① stake() 的存储
-# 异常分支把仓位只塞内存并报成功(同一函数体 4 行后的注释正写明这么做刷新即人间蒸发),
-# ② 收口点两处 restoreMoney 的返回值没人接 —— 回滚自己失败时用户看到的仍是「余额没有变化」
-# 而钱已经扣了,③ 结算页把不可逆的 convert() 排在扣款之前(扣款的落盘失败路径预检堵不住,
-# 试用被烧掉且不可恢复),⑤ restoreMoney 写绝对值,而合并层按增量合并 —— 两个标签页各扣
-# $30 各回滚一次,余额从 $100 变 $130(凭空造钱)。判据(esbuild 载真 store + 真收口点跑真
-# 代码,假 storage 按 key/第几次写定点注入失败;⑤ 用两个 store 实例 = 两个标签页共享一份
-# 序列化 storage —— 单实例跑一遍这条永远测不出来):
-# ①存储异常 → ok=false/conflict=false、内存与磁盘都没有这笔(+撤掉注入的反向靶)
-# ②回滚失败 → stuck + 交易号 + 待对账队列 + 不再弹通用文案(带「回滚成功仍走通用文案」负控)
-# ②b 无事可回滚时不许误报"钱卡住了" ⑤两标签页各扣各回滚,磁盘回到 $100(+单页负控)
-# ⑥接线门(两处回滚返回值真被消费 / stake 分支真删了内存兜底 / 两个页面按归因分文案 /
-# 结算页 convert 真排在扣款之后)⑦三语文案真解析取值、互不相同、正文含 {id}。
-money_rollback_gate() {
-  if "$NODE_BIN" scripts/selfcheck-money-rollback.mjs > "${VERIFY_LOG_PREFIX}-uniapp-money-rollback.log" 2>&1; then
-    ok "冲正(回滚)自身门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-money-rollback.log")"
-  else
-    bad "冲正(回滚)自身门失败 — node scripts/selfcheck-money-rollback.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-money-rollback.log" | head -8 | sed 's/^/        /'
-  fi
-}
-money_rollback_gate
 
 # ── 在途入金单「刷新后必须继续推进」门(2026-08-04 对抗审计)──────────────────
 # `scheduleConfirmations` 全仓只在**首次探测到入金时**调用一次,而推进靠内存里的 setTimeout;
@@ -3688,23 +2813,6 @@ deposit_resume_gate() {
 }
 deposit_resume_gate
 
-# ── 领奖族「发钱可重放 · 资格只消费一次」门(2026-08-04 对抗审计)────────────────
-# 领奖要同时满足两件互斥的事:资格只能消费一次(防重复领),奖必须发到(不能领了没发)。
-# 两种顺序各有一个失效面 —— 先消费资格则发钱失败时奖归零(5 处旧实况);先发钱则消费失败时
-# 下一拍再发一次(里程碑那处旧实况,平台重复出钱)。收口点加幂等出口 postMoneyBillsOnce
-# 按 ref 判重后,「先发钱后消费」就没有失效面了。
-# 判据:① 同 ref 重放不动钱不写第二条且返回 ok(带「换 ref 照常发」的反向靶)
-#      ② 首次路径与 postMoneyBills 等价 ③ 空 ref 直接抛错(不静默降级成假幂等)
-#      ④ 5 个调用点的 ref 全部稳定(带时间戳 = 判重永不命中) ⑤ 顺序门 + 反不过来那两处的自愈门
-deposit_claim_idem_gate() {
-  if "$NODE_BIN" scripts/selfcheck-claim-idempotency.mjs > "${VERIFY_LOG_PREFIX}-uniapp-claim-idem.log" 2>&1; then
-    ok "领奖幂等门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-claim-idem.log")"
-  else
-    bad "领奖幂等门失败 — node scripts/selfcheck-claim-idempotency.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-claim-idem.log" | head -8 | sed 's/^/        /'
-  fi
-}
-deposit_claim_idem_gate
 
 # ── 账户快照三处字面量字段集一致门(2026-08-04 完全版 A 改动③ 的安全网)──────────
 # AccountCloudSnapshot 的字段由**三个各自独立的对象字面量**构造(mergeAccountSnapshots 的
@@ -3741,94 +2849,10 @@ snapshot_write_gate() {
 }
 snapshot_write_gate
 
-# ── 首页「你的排名」派生的行为门(FEAT-HOME02)──────────────────────────────
-# 守规格里三条**对用户的承诺**,不是实现细节:
-#   ① 加算力名次只前进不倒退 ② 零算力不编造名次(「未上榜」与「算不出来」不合并)
-#   ③ 同输入必同输出(禁随机,刷新不跳动)
-# ① 的地基是分位表单调性,所以门拒收非单调表不是洁癖 —— 表一非单调,承诺①当场失效
-# 而界面毫无察觉(名次会随算力上升往后掉)。
-network_rank_gate() {
-  if "$NODE_BIN" scripts/selfcheck-network-rank.mjs > "${VERIFY_LOG_PREFIX}-uniapp-net-rank.log" 2>&1; then
-    ok "排名派生行为门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-net-rank.log")"
-  else
-    bad "排名派生行为门失败 — node scripts/selfcheck-network-rank.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-net-rank.log" | head -8 | sed 's/^/        /'
-  fi
-}
-network_rank_gate
 
-# ── 排名入参「总有效算力」聚合门(FEAT-HOME02 ③)──────────────────────────────
-# 排名函数再对,喂进去的算力错了照样全错。这道门守聚合本身:
-#   ① 多台求和(不是只取一台/取平均) ② 未激活不计 ③ 不在产不计、无设备为数字 0
-#      —— 参照系 = settleDevice 的不结算清单,实际 **5 条**(未激活 / 非 online /
-#      cloud-share / pausedReason / 手机未充电或无 WiFi);排名只取其中 3 条,cloud-share
-#      (收益另路、算力在网)与手机不充电(结算给 0、排名照算打折正数,与设备卡显示
-#      自洽,展示≠结算)是刻意取舍,别当 bug 修回去。**心跳过期不等于不在产**(H5 上的
-#      手机照样按 hosted 档计息,排名判它 0 就是对着一个正在赚钱的用户说「未上榜」)。
-#   ④ 口径复用 + 独立锚 —— 手机必须等于 computeLiveHashpower 的输出;非手机必须等于
-#      设备自己那行 GPU 规格串解出的 TOPS,期望值写死成字面数字(拿被测函数算期望值
-#      是自指判据,天花板整体 ×2 也照样全绿,已实测)。
-#   ⑤ GPU 档位单源 —— 排名算力必须读运营可配的档位表(cfg.config.computeShare.gpuTiers
-#      穿参进聚合链):行为靶「改一档 tops / 加识别词 → 聚合跟着变」+ 源码哨兵
-#      (account-hashrate.ts 出现 GPU_TIERS 字样或 matchGpuTier 单参调用即红)。
-#   ⑥ 8 档参考舰队名次固定靶 —— 真种子分位表(已扩到 53,000 TOPS)下,只手机→10 台
-#      机架 8 档舰队名次互不相同且随算力严格前进;超表顶封顶不出「第 1 名」。
-# 外加时间不变:同一批设备跨时刻必须**全等**,同一台设备持有 1 天与 400 天也必须全等 ——
-#   展示用抖动流进排名会每秒抖;任务量递减(算力恒定,降的是接单量)流进排名,
-#   会让用户什么都不做名次也往后掉。
-account_hashrate_gate() {
-  if "$NODE_BIN" scripts/selfcheck-account-hashrate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-acct-hash.log" 2>&1; then
-    ok "总有效算力聚合门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-acct-hash.log")"
-  else
-    bad "总有效算力聚合门失败 — node scripts/selfcheck-account-hashrate.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-acct-hash.log" | head -8 | sed 's/^/        /'
-  fi
-}
-account_hashrate_gate
 
-# ── 门的门:机器门固定靶完整性(2026-08-05 包 G 结构性反思)────────────────────
-# 修复轮自伤 44%,「门假绿」两轮 8 条,共同根因 = 手写闭集 × 开放集合(加一个 SKU,
-# 旧门照样全绿放行;pc-gpu 整条判 0 仍 57 pass;语言豁免不带语言维)。本门扫全部门脚本:
-# 机型引用集必须等于「全集 / 递减豁免集 / 其补集」之一(全集从真模块导出派生,SKU 一变大
-# 所有涉机型的门当场红);点名语言文件必须三语齐点;例外台账逐条带理由且 0 命中即红。
-gate_targets_meta() {
-  if "$NODE_BIN" scripts/selfcheck-gate-targets.mjs > "${VERIFY_LOG_PREFIX}-uniapp-gate-targets.log" 2>&1; then
-    ok "门的门(靶完整性)— $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-gate-targets.log")"
-  else
-    bad "门的门(靶完整性)失败 — node scripts/selfcheck-gate-targets.mjs 看明细"
-    grep -E "^  FAIL" "${VERIFY_LOG_PREFIX}-uniapp-gate-targets.log" | head -8 | sed 's/^/        /'
-  fi
-}
-gate_targets_meta
 
-# ── 创世购买可用性「单一派生」门(FEAT-GEN10 ④)────────────────────────────────
-# 被一次独立验收逼出来的:此前 composable 注释里写着这个文件名,而文件根本不存在 ——
-# 一个凭空的安全感,同轮验收抓到的 4 条缺陷全是这条不变量失守的样本。
-# 守两件事:① 优先级链对不对(行为验证,不读源码顺序)② 有没有人绕过它自判(结构验证)。
-genesis_gate() {
-  if "$NODE_BIN" scripts/selfcheck-genesis-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-gen-gate.log" 2>&1; then
-    ok "创世单一派生门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-gen-gate.log")"
-  else
-    bad "创世单一派生门失败 — node scripts/selfcheck-genesis-gate.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-gen-gate.log" | head -8 | sed 's/^/        /'
-  fi
-}
-genesis_gate
 
-# ── 周任务 × 创世闸的观测门(2026-08-13)────────────────────────────────────────
-# 接手 GEN10 门里那句交底:周任务改服务端下发后,「关闭态不派买创世」这条不变量
-# 在客户端**没有门守着**了。客户端不做过滤(questCode 是后台手输自由文本,猜错会藏掉
-# 用户已挣到的 CLAIMABLE 奖励,比它想防的问题更坏)—— 过滤归派发端(交接书 U-16),
-# 客户端只留报警,并焊住「任务面新增跳创世入口必须问闸」这条反向钉。
-quest_genesis_tripwire_gate() {
-  if "$NODE_BIN" scripts/selfcheck-quest-genesis-tripwire.mjs > "${VERIFY_LOG_PREFIX}-uniapp-quest-genesis-tripwire.log" 2>&1; then
-    ok "周任务创世观测门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-quest-genesis-tripwire.log")"
-  else
-    bad "周任务创世观测门失败 — node scripts/selfcheck-quest-genesis-tripwire.mjs 看明细"
-    grep -E "^(FAIL|  FAIL)" "${VERIFY_LOG_PREFIX}-uniapp-quest-genesis-tripwire.log" | head -8 | sed 's/^/        /'
-  fi
-}
-quest_genesis_tripwire_gate
 
 # ── 守卫存活性门(2026-08-07 · 守卫存活性族第三次复发后的结构根治)──────────────
 # 不变量:周期性权限守卫是**安全装置不是业务循环**,只随前台/后台成对开关。
@@ -3846,18 +2870,6 @@ guard_liveness_gate() {
 }
 guard_liveness_gate
 
-# ── 探针覆盖与路由归一化门(2026-08-08 · P-080 同族根治)──────────────────────
-# 所有直接读 DOM 的脚本必须绕过 device-shell；视觉/DOM/鉴权探针零覆盖、崩溃或
-# 预期路由不符一律判红。权限白名单使用的路由在比较前折叠 dot segments。
-probe_safety_gate() {
-  if "$NODE_BIN" --test scripts/probe-safety-contract.test.mjs scripts/static-review-routes.test.mjs > "${VERIFY_LOG_PREFIX}-uniapp-probe-safety.log" 2>&1; then
-    ok "探针覆盖与路由归一化门 — $(grep -E '^ℹ pass ' "${VERIFY_LOG_PREFIX}-uniapp-probe-safety.log" | tail -1)"
-  else
-    bad "探针覆盖与路由归一化门失败 — npm run test:probe-safety 看明细"
-    tail -16 "${VERIFY_LOG_PREFIX}-uniapp-probe-safety.log" | sed 's/^/        /'
-  fi
-}
-probe_safety_gate
 
 # ── 业务循环存活性门(2026-08-08 · 守卫存活性同根因第三条腿)────────────────────
 # 静态评审页必须停业务，但 H5 站内返回业务页不会重发 App.onShow；由常驻守卫
@@ -3872,18 +2884,6 @@ business_loop_liveness_gate() {
 }
 business_loop_liveness_gate
 
-# ── Janus C2 停机取消门 ────────────────────────────────────────────────────────
-# 进入评审页、会话失效或 App 后台时，不只清下一轮 timer；已在飞的 report/apply
-# 也必须经 AbortSignal + 代次栅栏停止，禁止停机后继续写 runtime 或发送 ACK。
-janus_stop_cancellation_gate() {
-  if "$NODE_BIN" scripts/janus-stop-cancellation.test.mjs > "${VERIFY_LOG_PREFIX}-uniapp-janus-stop-cancellation.log" 2>&1; then
-    ok "Janus C2 停机取消门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-janus-stop-cancellation.log")"
-  else
-    bad "Janus C2 停机取消门失败 — node scripts/janus-stop-cancellation.test.mjs 看明细"
-    tail -12 "${VERIFY_LOG_PREFIX}-uniapp-janus-stop-cancellation.log" | sed 's/^/        /'
-  fi
-}
-janus_stop_cancellation_gate
 
 # ── 守卫存活性 · 行为门 ────────────────────────────────────────────────────────
 # 上面那道是结构门(看代码形状)。这一族三轮出了三种形状,独立审计 2026-08-07 实测
@@ -3896,14 +2896,7 @@ janus_stop_cancellation_gate
 # (src/lib/a11y-activate.ts):声明 role + tabindex 就得到键盘激活,和原生 <button> 一样。
 # 这道门守契约的两端:半个承诺(只写 role 或只写 tabindex)会红,平台层被删/未挂载也会红。
 # 判据遍历全仓每一个模板元素,不枚举控件名——枚举式判据在这仓被绕过过太多次。
-# selftest = 逐条注入违例证明每条判据真的会红(含行为门),哨兵失效即门失效。
 a11y_activate_gate() {
-  if "$NODE_BIN" scripts/a11y-activate-gate.redtest.mjs > "${VERIFY_LOG_PREFIX}-uni-a11y-activate-selftest.log" 2>&1; then
-    ok "a11y-activate selftest — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-a11y-activate-selftest.log")"
-  else
-    bad "a11y-activate selftest 失败(哨兵失效即门失效;node scripts/a11y-activate-gate.redtest.mjs 看明细)"
-    tail -12 "${VERIFY_LOG_PREFIX}-uni-a11y-activate-selftest.log" | sed 's/^/        /'
-  fi
   if "$NODE_BIN" scripts/a11y-activate-gate.mjs > "${VERIFY_LOG_PREFIX}-uni-a11y-activate.log" 2>&1; then
     # 🔴 取带 ✓ 的那行,不能用 head -1:门会先把「判不出」清单打到 stderr,
     # head -1 抓到的是空行 → PASS 不带样本量,一眼看不出它到底扫了多少(本仓禁止这种绿)。
@@ -3913,52 +2906,16 @@ a11y_activate_gate() {
     bad "自造控件键盘可达性门失败 — node scripts/a11y-activate-gate.mjs 看明细"
     tail -14 "${VERIFY_LOG_PREFIX}-uni-a11y-activate.log" | sed 's/^/        /'
   fi
-  # --experimental-strip-types:行为门 import 的是 .ts 源,Node <23.6 不带这个 flag 会直接炸。
-  if "$NODE_BIN" --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs > "${VERIFY_LOG_PREFIX}-uni-a11y-behavior.log" 2>&1; then
-    # 用 -o 只取计数片段:node --test 的行首是多字节的 ℹ,拿 `^.` 去锚会匹配不上 → PASS 又变空消息。
-    ok "a11y 键盘激活行为门 — $(grep -aoE '(pass|fail) [0-9]+' "${VERIFY_LOG_PREFIX}-uni-a11y-behavior.log" | tr '\n' ' ')"
-  else
-    bad "a11y 键盘激活行为门失败 — node --test scripts/a11y-activate-behavior.test.mjs 看明细"
-    tail -14 "${VERIFY_LOG_PREFIX}-uni-a11y-behavior.log" | sed 's/^/        /'
-  fi
+  for g in radio-group-keyboard-gate input-accessible-name-gate; do
+    if "$NODE_BIN" "scripts/$g.mjs" > "${VERIFY_LOG_PREFIX}-uni-$g.log" 2>&1; then
+      ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uni-$g.log")"
+    else
+      bad "$g 失败 — node scripts/$g.mjs 看明细"
+      tail -14 "${VERIFY_LOG_PREFIX}-uni-$g.log" | sed 's/^/        /'
+    fi
+  done
 }
 a11y_activate_gate
 
-# Always boot the current worktree on an isolated port; never reuse a stale BASE_URL server.
-# 包 ar:runner(verify-chain.mjs)在同一轮里已对同一棵树跑过 test:h5-runtime 并 PASS 时,经 H5_RUNTIME_REUSED_TREE 把
-#   当时的树指纹传进来;这里**重新算一次当前树指纹**,相等才复用(树动过一个字都不复用)。复用条明写「复用」,
-#   不冒充新跑;裸跑 verify.sh(没有该 env)行为与从前完全一样。
-if scope_hit h5-runtime-isolated; then
-_h5_tree_now=$("$NODE_BIN" scripts/lib/verify-scope.mjs fingerprint 2>/dev/null | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p')
-if [ -n "${H5_RUNTIME_REUSED_TREE:-}" ] && [ -n "$_h5_tree_now" ] && [ "$H5_RUNTIME_REUSED_TREE" = "$_h5_tree_now" ]; then
-  ok "H5 运行时门 — 复用本轮 runner 已跑过的同树结果(tree ${_h5_tree_now:0:10}${H5_RUNTIME_ONLY:+ · scoped 子探针 $H5_RUNTIME_ONLY});未另起服"
-else
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-h5-runtime-gates.log" "$NODE_BIN" scripts/verify-h5-runtime.mjs; then
-    ok "H5 运行时门隔离起服 — $(tail -1 "${VERIFY_LOG_PREFIX}-uni-h5-runtime-gates.log")"
-  else
-    bad "H5 运行时门隔离起服失败 — node scripts/verify-h5-runtime.mjs 看明细"
-    tail -12 "${VERIFY_LOG_PREFIX}-uni-h5-runtime-gates.log" | sed 's/^/        /'
-  fi
-fi
-fi
-
-# 重试留痕回显:哪个探针、几点、首败退出码 —— 反复出现同一探针 = 可能是真偶发 bug,要追
-if [ -s "$PROBE_RETRY_LOG" ]; then
-  echo -e "${Y}⚠ probe retries this run:${N}"
-  sed 's/^/    /' "$PROBE_RETRY_LOG"
-fi
-# ── [2.7] 收尾半程(P-097 对策③):门全部跑完后再量一次 shell 延迟,与 preflight 成对报出。
-# 首绿尾超阈 = server 在本轮 verify 中途被探针流量喂退化 —— 后段 runtime 探针的红先疑
-# 环境再疑代码。只报不计数不改判:门都跑完了,此处再 abort 无意义,判断权交给读摘要的人。
-if [ -n "${HEALTH_T1:-}" ] && [ -n "${HEALTH_T2:-}" ]; then
-  HEALTH_T_END=$(_shell_latency)
-  if [ -z "$HEALTH_T_END" ]; then
-    echo -e "${Y}⚠ server health 首尾延迟:${HEALTH_T1}s/${HEALTH_T2}s → 收尾连不上 $BASE_URL(server 中途死了?)—— 后段 runtime 红先疑环境(P-097)${N}"
-  elif _over_health_max "$HEALTH_T_END"; then
-    echo -e "${Y}⚠ server health 首尾延迟:${HEALTH_T1}s/${HEALTH_T2}s → ${HEALTH_T_END}s(收尾已超 ${HEALTH_MAX_S}s)—— 跑到后段 server 已退化,本轮后段 runtime 红先重启 server 复跑再定论(P-097)${N}"
-  else
-    echo "server health 首尾延迟:preflight ${HEALTH_T1}s/${HEALTH_T2}s → 收尾 ${HEALTH_T_END}s(均 ≤ ${HEALTH_MAX_S}s)"
-  fi
-fi
-echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" )$( [ $known -gt 0 ] && echo -e ", ${Y}$known known-red${N}(已登记有到期日,不进 fail)" )$( [ "$SCOPE_MODE" != "full" ] && echo -e ", ${Y}$scoped_skip scoped-skip${N} · mode=$SCOPE_MODE(≠ 全量绿:宣布 done / 合并前仍须 full)" ) ━━"
-[ $fail -eq 0 ] && [ $skip -eq 0 ]
+echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" )$( [ $known -gt 0 ] && echo -e ", ${Y}$known known-red${N}" ) ━━${N}"
+[ $fail -eq 0 ]

@@ -1,0 +1,158 @@
+<template>
+  <AppChassis active="home"><view class="event-detail" :aria-busy="loading">
+    <SubPageHeader back="/pages/events/events?source=legacy" :title="copy.title" />
+    <text v-if="loading && !detail" class="event-copy" role="status">{{ copy.loading }}</text>
+    <EmptyState v-else-if="!detail" kind="recoverable-error" page :title="copy.unavailable" :cta-label="uiT.ui.reload" @cta="load" />
+    <template v-else>
+      <view class="nx-glass-card event-section">
+        <text class="event-title">{{ detail.event.title }}</text>
+        <text class="event-copy">{{ detail.event.subtitle }}</text>
+        <text v-if="detail.event.kind==='seasonal'&&detail.rules.voucherId" class="event-copy">{{ copy.voucherTerms }}</text>
+        <text class="event-status" role="status">{{ copy.eligibility[detail.eligibilityReason] }}</text>
+        <text v-if="detail.reminderSubscribed" class="event-copy" role="status">{{ reminderCopy.subscribed }}</text>
+        <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, locale.code) }}</text></view>
+        <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
+      </view>
+      <view v-if="detail.rewards.length" class="nx-glass-card event-section">
+        <text class="event-heading">{{ copy.rewards }}</text>
+        <text v-for="(reward, index) in detail.rewards" :key="index" class="event-copy">{{ reward.type === 'USDT' ? `${reward.pool ? `${copy.labels.poolUsdt} · ` : ''}${formatUsd(reward.quantity ?? reward.amount, 'detail')}` : eventDetailReward(reward, copy) }}</text>
+      </view>
+      <view v-if="ruleRows.length" class="event-section event-section--plain">
+        <text class="event-heading">{{ copy.rules }}</text>
+        <view v-for="row in ruleRows" :key="row.label" class="event-row" :class="{'event-rule-paragraph':[copy.labels.description,copy.labels.terms].includes(row.label)}"><text>{{ row.label }}</text><text>{{ row.value }}</text></view>
+      </view>
+      <view v-if="detail.event.kind !== 'regional' && detail.targetValue > 0" class="event-section event-section--plain">
+        <view class="event-row"><text class="event-heading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
+        <view class="event-progress" role="progressbar" :aria-label="copy.progress" :aria-valuenow="Math.min(detail.progressValue, detail.targetValue)" :aria-valuemin="0" :aria-valuemax="detail.targetValue"><view v-viz-inview class="nx-viz-grow" :style="{ width: `${Math.min(100, detail.progressValue / detail.targetValue * 100)}%` }" /></view>
+      </view>
+      <view v-if="detail.myRewardAmount != null" class="nx-glass-card event-section">
+        <view class="event-row"><text class="event-heading">{{ copy.myReward }}</text><text>{{ formatUsd(detail.myRewardAmount, 'detail') }}</text></view>
+      </view>
+      <view v-if="detail.results.length || detail.event.state === 'ended'" class="event-section event-section--plain">
+        <text class="event-heading">{{ copy.results }}</text>
+        <text v-if="!detail.results.length" class="event-copy">{{ copy.noResults }}</text>
+        <view v-for="(result, index) in detail.results" :key="index" class="event-result">
+          <view v-if="result.region" class="event-row"><text>{{ copy.region }}</text><text>{{ result.region }}</text></view>
+          <view v-if="result.rank != null" class="event-row"><text>{{ copy.rank }}</text><text>{{ result.rank }}</text></view>
+          <view v-if="result.volume != null" class="event-row"><text>{{ copy.volume }}</text><text>{{ formatUsd(result.volume, 'detail') }}</text></view>
+          <view v-if="result.rewardAmount != null" class="event-row"><text>{{ detail.event.kind === 'regional' ? copy.regionPrize : copy.prize }}</text><text>{{ formatUsd(result.rewardAmount, 'detail') }}</text></view>
+        </view>
+      </view>
+      <text v-if="commandError" class="event-copy" role="alert">{{ copy.pending }}</text>
+      <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" icon="arrow-right" :busy="busy" :disabled="loading || error" @click="run"><text>{{ copy.open }}</text></NxButton>
+      <view v-else-if="action" class="event-primary" role="button" :tabindex="busy || loading || error ? -1 : 0" :aria-disabled="busy || loading || error" @click="run" @keydown.enter.prevent="activate($event, run)" @keydown.space.prevent="activate($event, run)"><text>{{ busy ? copy.busy : action === 'remind' ? reminderCopy.remind : copy[action] }}</text></view>
+      <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
+    </template>
+  </view></AppChassis>
+</template>
+<script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { computed, onUnmounted, ref, watch } from "vue";
+import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
+import { useT } from "@/i18n/use-t";
+import AppChassis from "@/components/app-chassis.vue";
+import SubPageHeader from "@/components/sub-page-header.vue";
+import NxButton from '@/components/ui/nx-button.vue';
+import { ApiError } from "@/api/errors";
+import { apiClient, eventsApi, remoteApiEnabled } from "@/api/runtime";
+import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { createEventDetailApi, type EventDetail } from "@/api/event-detail-api";
+import { useApp } from "@/store/app";
+import { useLocaleStore } from "@/store/locale";
+import { eventDetailCopy } from "@/i18n/event-detail";
+import { eventReminderCopy } from "@/i18n/event-detail";
+import { navTo, takeNavigationQuery } from "@/lib/route";
+import { displayDeadline } from "@/lib/promotion-display";
+import { formatAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
+import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref } from "./event-detail-display";
+import { uiLocale, serverLanguage } from "@/i18n";
+
+const app = useApp(), locale = useLocaleStore(), api = createEventDetailApi(apiClient);
+const language = computed(() => serverLanguage(locale.code));
+const copy = computed(() => eventDetailCopy[uiLocale(locale.code)]);
+const uiT = useT();
+const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
+const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
+const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
+const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);
+let code = "", visible = false, generation = 0;
+let unconfirmedAction: "join" | "claim" | "remind" | null = null;
+const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
+function reset() { generation += 1; detail.value = null; error.value = false; commandError.value = false; unconfirmedAction = null; busy.value = false; }
+async function load() {
+  if (!visible) return;
+  const request = ++generation, scope = identity();
+  loading.value = true; error.value = false;
+  const current = () => visible && generation === request && scope === identity();
+  try {
+    if (!remoteApiEnabled || !code) throw new Error("EVENT_UNAVAILABLE");
+    const value = await api.detail(code, language.value);
+    if (current()) {
+      detail.value = value;
+      if ((unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && value.userStatus === "CLAIMED") || (unconfirmedAction === "remind" && value.reminderSubscribed)) {
+        // A claim confirmed only by this read lost its receipt; a device it issued still has to reach the fleet.
+        if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
+        commandError.value = false; unconfirmedAction = null;
+      }
+    }
+  } catch (cause) { if (current()) { error.value = true; if (!(cause instanceof ApiError && cause.kind === "network")) detail.value = null; } }
+  finally { if (current()) loading.value = false; }
+}
+async function run() {
+  if (busy.value || loading.value || error.value || !detail.value || !action.value) return;
+  const selectedAction = action.value;
+  if (selectedAction === "open") { navTo(eventDetailHref(detail.value)); return; }
+  const scope = identity(), request = generation;
+  const current = () => visible && request === generation && scope === identity();
+  busy.value = true; commandError.value = false;
+  const fleetRequest = selectedAction === "claim" ? app.captureRemoteAccountRequest() : undefined;
+  const deviceClaim = selectedAction === "claim" && detail.value.rewards.some((reward) => reward.type === "DEVICE");
+  try {
+    if (selectedAction === "remind") await api.remind(code, `h4-event-reminder:${code}`);
+    else if (selectedAction === "claim") {
+      // A lost claim receipt can leave the warehouse refresh to onShow.
+      if (deviceClaim) app.invalidateRemoteFleet(fleetRequest);
+      const claim = await eventsApi.claim(code, eventClaimCommandKey(code, detail.value.claimKeys));
+      if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
+    } else await eventsApi.join(code, `h4-event-join:${code}`);
+    if (current()) { busy.value = false; await load(); }
+  } catch {
+    // The outcome is unknown even if this page is gone: a fleet read started during the claim may predate the device.
+    // Invalidate it, then read again so a warehouse already on screen does not keep the pre-claim fleet.
+    if (deviceClaim) { app.invalidateRemoteFleet(fleetRequest); void app.refreshRemoteFleet(fleetRequest, { coalesce: true }); }
+    if (current()) { busy.value = false; commandError.value = true; unconfirmedAction = selectedAction; await load(); }
+  }
+}
+function activate(event: KeyboardEvent, action: () => unknown) { if (!event.repeat) void action(); }
+onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/pages/events/detail")); code = String(options?.id ?? query.get("id") ?? "").trim(); reset(); if (visible) void load(); });
+let releaseActiveRefresh = () => {};
+onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value ? undefined : load(), "pages/events/detail"); void load(); });
+onHide(() => { visible = false; releaseActiveRefresh(); reset(); });
+watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { reset(); void load(); }, { flush: "sync" });
+const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });
+onUnmounted(() => { visible = false; releaseActiveRefresh(); reset(); unsubscribe(); });
+useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value && !busy.value, retry: load });
+</script>
+<style scoped>
+.event-detail { padding:0 16px 28px; color:var(--v5-ink); }
+.event-section { margin-top:12px; padding:16px; border-radius:var(--nx-glass-radius); background:var(--nx-glass-fill); box-shadow:var(--nx-glass-edge); }
+.event-section--plain { padding:var(--ui-space-inset) 0; border-radius:0; background:transparent; box-shadow:none; border-top:1px solid var(--v5-border); }
+.event-title { display:block; font-size:20px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+.event-heading { display:block; font-size:14px; font-weight:600; }
+.event-copy { display:block; margin-top:10px; font-size:var(--ui-type-list-subtitle); line-height:1.6; color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:anywhere; }
+.event-status { display:block; margin-top:12px; font-size:12px; color:var(--v5-brand); }
+.event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font-size:12px; line-height:1.5; }
+.event-row > text:last-child { overflow-wrap:anywhere; color:var(--v5-ink-2); }
+.event-progress { margin-top:12px; height:5px; border-radius:5px; overflow:hidden; background:var(--v5-brand-soft); }
+.event-progress > view { height:100%; background:var(--v5-brand); }
+.event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
+.event-primary { display:flex; justify-content:center; margin-top:16px; padding:13px 16px; border-radius:24px; font-size:13px; font-weight:600; color:var(--v5-brand); }
+.event-primary { background:var(--v5-brand); color:var(--v5-on-brand); }
+.event-navigate { margin-top:16px; width:100%; }
+.event-rule-paragraph { display:block; }
+.event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:anywhere; }
+.event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2); }
+</style>

@@ -1,12 +1,12 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import type { LocaleCode } from "@/i18n";
+import { LOCALES, type LocaleCode } from "@/i18n";
 
 export interface ProfileApi {
   profile(): Promise<ProfileProjection>;
   nicknameCandidates(): Promise<string[]>;
   updateNickname(expectedNickname: string, nickname: string, idempotencyKey: string): Promise<string>;
-  updateLanguage(language: string): Promise<string>;
+  updateLanguage(language: string): Promise<LocaleCode>;
   uploadAvatar(filePath: string, idempotencyKey: string): Promise<ProfileAvatar>;
 }
 
@@ -15,6 +15,11 @@ export interface ProfileProjection {
   avatarUrl: string;
   avatarRevision: string;
   language: LocaleCode;
+  /** Days between two nickname or two avatar changes. */
+  changeIntervalDays: number;
+  /** Epoch ms of the next allowed change; null when a change is allowed now. */
+  nicknameChangeAvailableAt: number | null;
+  avatarChangeAvailableAt: number | null;
 }
 
 export interface ProfileAvatar {
@@ -29,7 +34,7 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 function validNickname(value: unknown): value is string {
-  return typeof value === "string" && /^[A-Za-z]+ [A-Za-z]+ [1-9][0-9]$/.test(value);
+  return typeof value === "string" && /^[A-Za-z]+ [A-Za-z]+ (?=[A-Z2-9]*[A-Z])(?=[A-Z2-9]*[2-9])[A-HJ-NP-Z2-9]{2,3}$/.test(value);
 }
 
 function validExistingNickname(value: unknown): value is string {
@@ -42,7 +47,7 @@ function key(value: string): string {
   return normalized;
 }
 
-const PROFILE_LANGUAGES = new Set<LocaleCode>(["en", "vi", "zh", "ja", "ko", "ru", "es", "pt", "ar", "de", "fr"]);
+const PROFILE_LANGUAGES = new Set(LOCALES.map((locale) => locale.code));
 
 function isProfileLanguage(value: unknown): value is LocaleCode {
   return typeof value === "string" && PROFILE_LANGUAGES.has(value as LocaleCode);
@@ -55,12 +60,19 @@ function language(value: string): LocaleCode {
   return value;
 }
 
+function changeAvailableAt(value: unknown): value is number | null {
+  return value === null || (Number.isSafeInteger(value) && (value as number) > 0);
+}
+
 function parseProjection(value: unknown): ProfileProjection {
   const row = record(value);
   if (!row || !validExistingNickname(row.nickname)
       || typeof row.avatarUrl !== "string"
       || typeof row.avatarRevision !== "string"
       || !isProfileLanguage(row.language)
+      || !Number.isSafeInteger(row.profileChangeIntervalDays) || (row.profileChangeIntervalDays as number) <= 0
+      || !changeAvailableAt(row.nicknameChangeAvailableAt)
+      || !changeAvailableAt(row.avatarChangeAvailableAt)
       || (!!row.avatarUrl && !/^https?:\/\//i.test(row.avatarUrl))) {
     throw new ApiError({ kind: "protocol", message: "PROFILE_RESPONSE_INVALID" });
   }
@@ -69,6 +81,9 @@ function parseProjection(value: unknown): ProfileProjection {
     avatarUrl: row.avatarUrl,
     avatarRevision: row.avatarRevision,
     language: row.language,
+    changeIntervalDays: row.profileChangeIntervalDays as number,
+    nicknameChangeAvailableAt: row.nicknameChangeAvailableAt,
+    avatarChangeAvailableAt: row.avatarChangeAvailableAt,
   };
 }
 
@@ -107,16 +122,15 @@ export function createProfileApi(client: ApiClient): ProfileApi {
       return row.nickname;
     },
     updateLanguage: async (nextLanguage) => {
-      const expected = language(nextLanguage);
       const row = record(await client.request({
         method: "PUT",
         path: "/api/app/profile/language",
-        body: { language: expected },
+        body: { language: language(nextLanguage) },
       }));
-      if (!row || row.language !== expected || Object.keys(row).some((entry) => entry !== "language" && entry !== "status")) {
+      if (!row || !isProfileLanguage(row.language) || Object.keys(row).some((entry) => entry !== "language" && entry !== "status")) {
         throw new ApiError({ kind: "protocol", message: "PROFILE_LANGUAGE_RESPONSE_INVALID" });
       }
-      return expected;
+      return row.language;
     },
     uploadAvatar: async (filePath, idempotencyKey) => parseAvatar(await client.upload({
       path: "/api/app/profile/avatar",

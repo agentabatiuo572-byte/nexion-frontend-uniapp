@@ -1,24 +1,25 @@
+import { beginTabSnapshotBinding, acceptTabSnapshotBinding } from "@/lib/tab-first-screen-snapshot";
+import { useLocaleStore } from "@/store/locale";
 import { navReset } from "@/lib/route";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { readAccountSessionRecords, useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
-import { rebindAccountScopedStores, captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
-import { authApi, onboardingCalibrationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
-import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
-import { getDeviceId } from "@/lib/device-id";
+import { apiRuntimeConfig, authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
-import { afterLegalTermsAcknowledged, hasPendingLegalTermsRequirement, scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
+import { afterLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
 import type { LocaleCode } from "@/i18n";
 import { resolvePostSignInRoute } from "@/auth/post-sign-in-route";
 
 interface CompleteSignInOptions {
   identity: string;
+  snapshotReason?: "resume" | "new-login";
   returnTo?: string | null;
   sponsorCode?: string | null;
   idempotencyKey?: string | null;
@@ -29,8 +30,8 @@ interface CompleteSignInOptions {
   serverSessionRevision?: number;
   /** Registration needs to show its success interstitial before onboarding routing. */
   deferNavigation?: boolean;
-  /** Only a registration uses its form language to initialize the new profile. */
-  registrationLocale?: LocaleCode;
+  /** Initial display language captured only when OAuth creates an account. */
+  initialOAuthLocale?: LocaleCode;
 }
 
 interface CompletedSignIn {
@@ -141,6 +142,12 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     if (!auth.signIn(options.identity, onboardingComplete)) {
       return remoteApiEnabled ? failRemoteCompletion("sign_in_storage_unavailable") : { ok: false, error: "sign_in_storage_unavailable" };
     }
+    const confirmedSession = remoteApiEnabled ? sessionVault.read() : null;
+    if (confirmedSession?.accessToken && options.identity === `user:${confirmedSession.user.userId}`) {
+      beginTabSnapshotBinding(options.identity, options.snapshotReason ?? "new-login", confirmedSession, {
+        environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl, locale: useLocaleStore().code,
+      });
+    }
     app.bindAccount(options.identity);
     rebindAccountScopedStores(options.identity);
     if (completed) {
@@ -169,44 +176,30 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   if (remoteApiEnabled && options.serverProfile) {
     app.projectServerIdentity(options.serverProfile);
     useProfile().projectServerIdentity(options.serverProfile);
-    // Account language is hydrated before any server write. An explicit picker
-    // selection made during this read wins; a device default never overwrites
-    // the account preference merely because the user signed in.
-    hydrateCurrentProfileLocale(options.registrationLocale);
+    hydrateCurrentProfileLocale(options.initialOAuthLocale);
+    const confirmedSession = sessionVault.read();
+    if (confirmedSession?.accessToken && auth.isAuthenticated && auth.accountId === options.identity
+      && app.accountKey === options.identity && options.identity === `user:${confirmedSession.user.userId}`) {
+      acceptTabSnapshotBinding(options.snapshotReason === "resume");
+    }
     // Logout disarms the phone poll. A same-process login can reLaunch without
     // another App.onShow, so rearm only after this server session is accepted.
     app.setRemoteTaskForeground(true);
   }
-  // Login completion is a re-ack checkpoint. The helper fences its request to
-  // this exact bearer/account and only starts business reads after the server
-  // confirms the current version is acknowledged.
+  // Registration owns consent. Resume account reads without checking Terms again.
   if (remoteApiEnabled && options.serverProfile) {
     const expectedUserId = options.serverProfile.userId;
     afterLegalTermsAcknowledged(async () => {
       const current = sessionVault.read();
       if (!current || current.user.userId !== expectedUserId) return;
-      if (hasPendingLegalTermsRequirement()) return false;
-      if (hasNativeAndroidPhoneRuntime()) {
-        const phoneScope = captureAccountScope();
-        let phoneStatus = "UNAVAILABLE";
-        try { phoneStatus = await onboardingCalibrationApi.phoneLogin(getDeviceId()); } catch { /* The phone screen owns retry; other assets remain available. */ }
-        const latest = sessionVault.read();
-        if (!isCurrentAccountScope(phoneScope) || !latest || latest.user.userId !== expectedUserId) return;
-        if (hasPendingLegalTermsRequirement()) return false;
-        if (phoneStatus === "BOUND") session.markCalibrated(options.identity);
-        if (phoneStatus !== "BOUND" && !options.deferNavigation) {
-          void navReset({ url: "/pages/onboarding/connect?mode=login", fail: () => {} });
-        }
-      }
       // App.onShow is not guaranteed after an H5 reLaunch. Complete the
-      // canonical catalogue/fleet bootstrap only after the legal boundary.
+      // canonical catalogue/fleet bootstrap for this accepted session.
       void app.refreshHomeTruth();
       void refreshRemoteFleetAfterCatalog(options.identity);
       // A failed request leaves the snapshot unavailable and withdrawal still
       // fails closed at the server endpoint.
       void refreshEarningsReleaseStatus(options.identity).catch(() => {});
     });
-    void scheduleLegalTermsGate(options.returnTo ?? "/pages/index/index");
   }
   const dest = resolvePostSignInRoute({
     onboardingComplete: auth.onboardingComplete,

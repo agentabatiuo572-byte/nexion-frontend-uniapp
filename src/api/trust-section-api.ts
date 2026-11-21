@@ -92,13 +92,13 @@ function response(value: unknown, mode: ApiEnvironment): PublishedTrustSection[]
   const body = record(value);
   const expectedSource = "nx_trust_section_version:published";
   if (body.serverCanonical !== true || body.source !== expectedSource
-      || !Array.isArray(body.sections) || body.sections.length !== SECTION_KEYS.size) return invalid();
+      || !Array.isArray(body.sections) || body.sections.length > SECTION_KEYS.size) return invalid();
   if (mode === "prod" || mode === "dev") {
     if (body.sourceEnvironment !== "PRODUCTION" || body.runId !== "") return invalid();
   } else return invalid();
   const sections = body.sections.map(section);
   const sectionKeys = new Set(sections.map((item) => item.sectionKey));
-  if (sectionKeys.size !== sections.length || [...SECTION_KEYS].some((key) => !sectionKeys.has(key))) {
+  if (sectionKeys.size !== sections.length) {
     return invalid("TRUST_SECTION_DUPLICATE");
   }
   return sections;

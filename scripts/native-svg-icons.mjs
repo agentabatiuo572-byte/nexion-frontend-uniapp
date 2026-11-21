@@ -2,7 +2,9 @@ import { parse } from "@vue/compiler-sfc";
 
 // App-vue does not reliably render template SVG elements. Keep charts and
 // illustrations untouched; convert icon-sized SVGs to a component that writes
-// SVG markup through the App view layer's supported v-html path.
+// SVG markup through the App view layer's supported v-html path. A larger SVG
+// opts in with a `data-native-svg` attribute (its styles must then reach inner
+// nodes through :deep() on a real scoped wrapper).
 export function nativeSvgIcons() {
   return {
     name: "nexgrid-native-svg-icons",
@@ -17,7 +19,8 @@ export function nativeSvgIcons() {
       const visit = (node) => {
         if (node.type === 1 && node.tag === "svg" && !node.isSelfClosing) {
           const size = (name) => Number(node.props.find((prop) => prop.type === 6 && prop.name === name)?.value?.content);
-          if (size("width") > 0 && size("width") <= 80 && size("height") > 0 && size("height") <= 80) {
+          const optIn = node.props.some((prop) => prop.type === 6 && prop.name === "data-native-svg");
+          if (optIn || (size("width") > 0 && size("width") <= 80 && size("height") > 0 && size("height") <= 80)) {
             edits.push([node.loc.start.offset + 1, 3, "NxNativeSvg"]);
             edits.push([node.loc.end.offset - 4, 3, "NxNativeSvg"]);
           }

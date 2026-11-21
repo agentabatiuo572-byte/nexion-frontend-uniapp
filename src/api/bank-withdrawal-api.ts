@@ -210,7 +210,8 @@ export function createBankWithdrawalApi(client: ApiClient) {
       return forQuote(parseBankRecovery(await client.request({ path: `${base}/quotes/${encodeURIComponent(quoteNo)}/abandon`, method: "POST", authenticated: true })), quoteNo);
     },
     async get(orderNo: string): Promise<BankOrder> {
-      const r = parseBankRecovery(await client.request({ path: `${base}/orders/${encodeURIComponent(orderNo)}`, authenticated: true }));
+      const r = parseBankRecovery(await client.request({ method: "GET", path: `${base}/orders/${encodeURIComponent(orderNo)}`,
+        authenticated: true }));
       if (r.state !== "COMMITTED" || r.withdrawalNo !== orderNo) throw invalid(); return r;
     },
   };

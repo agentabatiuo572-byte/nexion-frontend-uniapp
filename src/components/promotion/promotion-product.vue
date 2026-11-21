@@ -1,12 +1,11 @@
 <template>
   <view v-if="rules.length" class="promotion promotion-product" data-testid="promotion-product">
-    <BusinessImage v-if="publicOnly" :src="activity.productImages?.[productNo]" class="promotion-image" />
     <text class="promotion-copy">{{ t.promotion.conditional }}</text>
     <view v-for="rule in rules" :key="rule.ruleId">
       <text class="promotion-copy">{{ t.promotion.rulePer }} · {{ rule.minBuyQty }} · {{ rule.repeatMode==='PER_GROUP'?t.promotion.perGroup:t.promotion.oncePerOrder }}</text>
       <text class="promotion-copy">{{ limits(rule) }}</text>
       <template v-if="publicOnly"><text v-for="reward in rule.inviterReward?[rule.buyerReward,rule.inviterReward]:[rule.buyerReward]" :key="reward.rewardRuleId" class="promotion-copy">{{ rewardSummary(reward) }}</text></template>
-      <RewardRows v-else :product-images="activity.productImages" :specs="rule.inviterReward ? [rule.buyerReward, rule.inviterReward] : [rule.buyerReward]" :product-no="expanded?productNo:undefined" />
+      <RewardRows v-else :specs="rule.inviterReward ? [rule.buyerReward, rule.inviterReward] : [rule.buyerReward]" :product-no="expanded?productNo:undefined" />
     </view>
     <text v-if="activity.eligibilityMessage" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code) }}</text>
     <text v-if="expanded" class="promotion-copy">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
@@ -18,12 +17,11 @@
   </view>
 </template>
 <script setup lang="ts">
-import BusinessImage from "@/components/business-image.vue";
 import { computed,ref } from 'vue';
-import type { PublicPromotion,PublicRewardSpec } from '@/api/promotion-api';
+import type { PublicPromotion,PublicRewardSpec } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
-import { localized,displayDeadline,rewardAmount } from '@/lib/promotion-display';
+import { localized,displayDeadline,rewardSummary as displayRewardSummary } from '@/lib/promotion-display';
 import { getProduct } from '@/mock/products';
 import { isPromotionActive,promotionDisclosures } from '@/lib/promotion-entry';
 import RewardRows from './reward-rows.vue';
@@ -34,7 +32,7 @@ const t=useT(),locale=useLocaleStore(),termsOpen=ref(false);
 const rules=computed(()=>isPromotionActive(props.activity)?props.activity.rewardRules.filter(rule=>rule.productNo===props.productNo):[]);
 const disclosures=computed(()=>promotionDisclosures(props.activity,props.productNo));
 const productName=(id:string)=>props.publicOnly?id:getProduct(id)?.name??id;
-const rewardSummary=(reward:PublicRewardSpec)=>`${reward.beneficiaryRole==='BUYER'?t.value.promotion.buyer:t.value.promotion.inviter} · ${reward.type==='DEVICE'?(reward.disclosure.deviceName || t.value.promotion.unknown)+' × '+rewardAmount(reward):rewardAmount(reward)+' '+reward.type}`;
+const rewardSummary=(reward:PublicRewardSpec)=>`${reward.beneficiaryRole==='BUYER'?t.value.promotion.buyer:t.value.promotion.inviter} · ${displayRewardSummary(reward,t.value.promotion,reward.disclosure.deviceName)}`;
 const limits=(rule:PublicPromotion['rewardRules'][number])=>`${t.value.promotion.orderGroupLimit} · ${rule.maxGroups.mode==='LIMITED'?rule.maxGroups.value:t.value.promotion.unlimitedGroups}\n${t.value.promotion.personGroupLimit} · ${rule.maxGroupsPerPerson.mode==='LIMITED'?rule.maxGroupsPerPerson.value:t.value.promotion.unlimitedGroups}`;
 const ruleTerms=computed(()=>[
   localized(props.activity.terms,locale.code),

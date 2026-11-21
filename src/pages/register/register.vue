@@ -16,13 +16,13 @@
       </view>
 
       <!-- Sponsor card (arrived via ?ref) -->
-      <view v-if="sponsorPreview" class="rg-sponsor">
+      <view v-if="sponsorPreview" class="rg-sponsor nx-tint">
         <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ displayNickname(sponsorPreview.displayName)[0] }}</text></view>
         <view class="rg-sponsor__body">
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ displayNickname(sponsorPreview.displayName) }}</text> {{ t.ref.invitedYou }}</text>
-          <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} NEX</text>
+          <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} UVT</text>
         </view>
-        <text class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
+        <text v-if="sponsorPreview.vRank" class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
       </view>
 
       <!-- Step dots -->
@@ -64,7 +64,6 @@
           </view>
           <text id="register-phone-format" data-testid="auth-phone-hint" class="rg-phone-hint" :class="{ 'rg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <view class="rg-invite">
-            <text class="rg-invite__lbl">{{ t.register.inviteLabel }} <text class="rg-invite__opt">{{ lockedRef ? t.register.inviteLockedLabel : t.register.inviteOptional }}</text></text>
             <!-- [FEAT-SHARE4] 链接来源码锁定置灰:不可修改不可删除(主人 2026-07-08 拍板);
                  无码自然进入才渲染可手输框。 -->
             <view v-if="lockedRef">
@@ -74,7 +73,8 @@
               </view>
               <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
             </view>
-            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" confirm-type="done" @input="onInvite" @confirm="onCta" />
+            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :disabled="verifying" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
+            <text v-if="inviteInvalid" id="register-invite-error" class="rg-invite__err" role="alert">{{ t.register.inviteInvalid }}</text>
           </view>
           <!-- 包 zm T3:仅开发构建,Java dev 后端网络级失联时亮工程横幅(生产构建整段剔除)
                i18n-en-ok: 工程话,指名端口与启动方式,受众是开发者不是用户 -->
@@ -145,7 +145,7 @@
       <text v-if="!ctaEnabled && !busy && (phoneTouched || submitAttempted)" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
-      <ThirdPartyAuth v-if="remoteApiEnabled && step === 1" :disabled="busy || authApi.pendingLogin()" :sponsor-code="lockedRef || invite" @busy="oauthBusy = $event" />
+      <ThirdPartyAuth v-if="remoteApiEnabled && step === 1" :disabled="busy || authApi.pendingLogin()" :sponsor-code="lockedRef || invite" :before-start="manualInviteAccepted" :sponsor-rejected="rejectSponsorCode" @busy="oauthBusy = $event" />
       <view v-if="step === 1 && !remoteApiEnabled" class="rg-oauth">
         <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
         <AuthProviderGrid :busy="busy" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
@@ -187,7 +187,7 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { apiClient, apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import type { OAuthProvider, RegistrationRequest } from "@/api/auth-api";
-import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
+import { createPublicSponsorPreviewApi } from "@/api/public-sponsor-preview-api";
 import { registerMockAuthCredential } from "@/api/mock-auth-api";
 import { registerAndLogin, requiresOriginalRegistrationRecovery } from "@/auth/registration-auto-login";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
@@ -221,21 +221,17 @@ const bills = useBills();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();
 const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
-// 礼包金额单源派生自 platform config(禁本地常量镜像)。
-const remotePreview = ref<PublicSponsorPreview | null>(null);
+// 礼包金额单源派生自 platform config(禁本地常量镜像)；远程模式已合并 /api/config/referral-rewards。
+// 新人礼包不再需要邀请人，无邀请码时同样读取。
 const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
-// H8 闸门或邀请预览未确认金额时，注册页不承诺新人奖励。
+// H8 闸门关闭或未配置金额时，注册页不承诺新人奖励。
 const rewardGateEnabled = computed(() => cfg.config.rewards.enabled);
 const newcomerSubtitle = computed(() => newcomerSubtitleKind(rewardGateEnabled.value, giftUsdt.value, giftNex.value));
-const giftUsdt = computed(() => remoteApiEnabled
-  ? remotePreview.value?.gift.usdtAmount ?? 0
-  : localGift.value.usdtAmount);
-const giftNex = computed(() => remoteApiEnabled
-  ? remotePreview.value?.gift.nexAmount ?? 0
-  : localGift.value.nexAmount);
+const giftUsdt = computed(() => localGift.value.usdtAmount);
+const giftNex = computed(() => localGift.value.nexAmount);
 const giftLabel = computed(() => [
-  giftUsdt.value > 0 ? `${formatAmount(giftUsdt.value)} USDT` : "",
-  giftNex.value > 0 ? `${formatAmount(giftNex.value)} NEX` : "",
+  giftUsdt.value > 0 ? `${formatAmount(giftUsdt.value)}\u00A0USDT` : "",
+  giftNex.value > 0 ? `${formatAmount(giftNex.value)}\u00A0UVT` : "",
 ].filter(Boolean).join(" + "));
 
 type Step = 1 | 2 | 3;
@@ -256,6 +252,9 @@ const phone = ref("");
 const code = ref<string[]>(["", "", "", "", "", ""]);
 const focusIdx = ref(0);
 const invite = ref("");
+// The server refused the typed or linked code; shown under the invite field until the user edits it.
+const inviteInvalid = ref(false);
+const checkingInvite = ref(false);
 const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
@@ -287,7 +286,7 @@ let sponsorPreviewLoadVersion = 0;
 // [FEAT-SHARE4] 链接来源码(?ref > pendingRefCode)合法即锁定;非法/缺失视同
 // 无码,回到可手输。锁定后无任何解锁入口(防截断归因/换码自荐)。
 const lockedRef = ref<string | null>(null);
-type SponsorPreview = { displayName: string; vRank: string };
+type SponsorPreview = { displayName: string; vRank: string | null };
 const sponsorPreview = ref<SponsorPreview | null>(null);
 
 onLoad(async (options) => {
@@ -296,7 +295,6 @@ onLoad(async (options) => {
   privacyHref.value = privacyPolicyHref("/pages/register/register", raw);
   if (remoteApiEnabled) {
     const previewLoadVersion = ++sponsorPreviewLoadVersion;
-    remotePreview.value = null;
     lockedRef.value = null;
     sponsorPreview.value = null;
     const norm = normalizeRegistrationSponsorCode(raw, true);
@@ -306,12 +304,10 @@ onLoad(async (options) => {
     try {
       const preview = await publicSponsorPreviewApi.preview(norm);
       if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
-      remotePreview.value = preview;
       lockedRef.value = preview.code;
       sponsorPreview.value = preview.sponsor;
     } catch (cause) {
       if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
-      remotePreview.value = null;
       sponsorPreview.value = null;
       if (cause instanceof ApiError && ["REFERRAL_PREVIEW_INVALID", "REFERRAL_PREVIEW_NOT_FOUND"].includes(cause.message))
         lockedRef.value = null;
@@ -347,7 +343,7 @@ const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
 const oauthBusy = ref(false);
-const busy = computed(() => verifying.value || completing.value || oauthBusy.value);
+const busy = computed(() => verifying.value || completing.value || oauthBusy.value || checkingInvite.value);
 const originalRegistrationRecoveryRequired = computed(() => requiresOriginalRegistrationRecovery(authApi,
   { countryCode: country.value, phone: phoneClean.value }));
 const ctaEnabled = computed(() => !registrationNeedsLogin.value && !originalRegistrationRecoveryRequired.value
@@ -459,7 +455,7 @@ function onPhone(e: Event) {
   otpRequestId.value = null;
   verifiedToken.value = null;
 }
-function onInvite(e: Event) { invite.value = inputVal(e); error.value = null; registrationRisk.value = null; }
+function onInvite(e: Event) { invite.value = inputVal(e); inviteInvalid.value = false; error.value = null; registrationRisk.value = null; }
 function onCode(i: number, e: Event) {
   const digits = inputVal(e).replace(/\D/g, "");
   const next = [...code.value];
@@ -494,14 +490,53 @@ function onCta() {
     error.value = ctaDisabledReason.value;
     return;
   }
-  if (step.value === 1) goSendCode();
+  if (step.value === 1) void goSendCode();
   else if (step.value === 2) verifyCode();
   else void finish();
 }
-function goSendCode() {
+async function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = t.value.register.errorInvalidPhone; return; }
+  const flowVersion = otpFlowVersion;
+  if (!(await manualInviteAccepted())) return;
+  // The phone or country changed while the code was being checked; the user sends again.
+  if (flowVersion !== otpFlowVersion || step.value !== 1 || !phoneOk.value) return;
   void requestCode();
+}
+// A typed code is checked before an OTP is sent or a third-party sign-up starts,
+// because the server consumes the OTP before it rejects the code. A link code
+// was already previewed when it was locked. Only an explicit not-found/invalid
+// answer blocks; a failed check is no verdict, and registration still validates the code.
+async function manualInviteAccepted(): Promise<boolean> {
+  const typed = invite.value;
+  if (!remoteApiEnabled || lockedRef.value || !typed.trim()) return true;
+  const sponsorCode = normalizeRegistrationSponsorCode(typed, true);
+  if (!sponsorCode) { inviteInvalid.value = true; return false; }
+  checkingInvite.value = true;
+  try {
+    await publicSponsorPreviewApi.preview(sponsorCode);
+  } catch (cause) {
+    if (cause instanceof ApiError && ["REFERRAL_PREVIEW_INVALID", "REFERRAL_PREVIEW_NOT_FOUND"].includes(cause.message)) {
+      if (mounted && invite.value === typed) inviteInvalid.value = true;
+      return false;
+    }
+  } finally {
+    checkingInvite.value = false;
+  }
+  // The user edited the code while it was being checked; let them submit again.
+  return mounted && invite.value === typed;
+}
+// The server refused the code at submit or third-party sign-up. It refused what was
+// sent, so the box is only marked if it still holds that code. A link code can stop
+// working after it was locked; reopen the field with it so the user can fix or clear it.
+function rejectSponsorCode(sent: string | null) {
+  if (normalizeRegistrationSponsorCode(sent, remoteApiEnabled) !== currentSponsorCode()) return;
+  if (lockedRef.value) {
+    invite.value = lockedRef.value;
+    lockedRef.value = null;
+    sponsorPreview.value = null;
+  }
+  inviteInvalid.value = true;
 }
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
 async function requestCode(captchaTicket?: string) {
@@ -603,12 +638,13 @@ function registrationErrorText(cause: unknown): string {
   return geoText(cause) ?? t.value.authOtp.errorServiceUnavailable;
 }
 
-function recoverRejectedRegistration(cause: unknown): boolean {
+function recoverRejectedRegistration(cause: unknown, sentSponsorCode: string | null): boolean {
   if (!(cause instanceof ApiError) || cause.kind !== "http") return false;
   const invalidOtp = cause.status === 422 && cause.message === "USER_REGISTRATION_OTP_INVALID";
   const signupLimited = cause.status === 409 && cause.message === "USER_REGISTRATION_K1_IP_LIMIT";
-  if (!invalidOtp && !signupLimited) return false;
-  // Both refusals leave no new account; the challenge cannot be reused.
+  const sponsorRejected = cause.message === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || cause.message === "USER_REGISTRATION_SPONSOR_INVALID";
+  if (!invalidOtp && !signupLimited && !sponsorRejected) return false;
+  // These refusals leave no new account; the challenge cannot be reused.
   // A user-requested resend must still pass the normal CAPTCHA and rate limits.
   invalidateOtpFlow();
   otpRequestId.value = null;
@@ -619,6 +655,10 @@ function recoverRejectedRegistration(cause: unknown): boolean {
   resendTimer = undefined;
   resendLeft.value = 0;
   step.value = invalidOtp ? 2 : 1;
+  if (sponsorRejected) {
+    rejectSponsorCode(sentSponsorCode);
+    return true;
+  }
   error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired : t.value.register.errorSignupLimited;
   return true;
 }
@@ -789,7 +829,7 @@ async function finish() {
     }
     if (registration.kind === "registration_error") {
       completing.value = false;
-      if (!recoverRejectedRegistration(registration.error)) {
+      if (!recoverRejectedRegistration(registration.error, registrationRequest.sponsorCode ?? null)) {
         error.value = registrationErrorText(registration.error);
       }
       return;
@@ -810,7 +850,6 @@ async function finish() {
       serverSessionRevision: registration.vaultRevision,
       deferNavigation: true,
       returnTo: registrationCompletionDestination(),
-      registrationLocale: useLocaleStore().code,
     });
     if (!completed.ok) {
       // Registration succeeded; its login attempt is complete. Require an explicit new sign-in.
@@ -910,11 +949,11 @@ async function finish() {
         const giftPosted = registration.giftRoute === "withdrawable";
         const giftMemo = giftPosted ? t.value.register.giftBillMemo : t.value.register.giftPendingBillMemo;
         const usdtBill = bills.addOnce({ type: "bonus", symbol: "USDT", amount: gift.usdt, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
-        const nexBill = bills.addOnce({ type: "bonus", symbol: "NEX", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
+        const nexBill = bills.addOnce({ type: "bonus", symbol: "UVT", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
         if (!usdtBill || !nexBill) throw new Error("gift_bill_unavailable");
         if (posted && giftPosted) {
           toast.success(
-            `+$${formatAmount(gift.usdt)} + ${formatAmount(gift.nex)} NEX`,
+            `+$${formatAmount(gift.usdt)} + ${formatAmount(gift.nex)} UVT`,
             sponsorPreview.value
               ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: displayNickname(sponsorPreview.value.displayName) })
               : t.value.register.giftCreditedToastSub,
@@ -1020,11 +1059,11 @@ onUnmounted(() => cleanup());
 .rg-iconbtn:active, .rg-phone__cc:active { opacity: 0.6; }
 .rg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .rg-top__sp { }
-.rg-sponsor { margin-top: 16px; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; background: radial-gradient(80% 60% at 0% 0%, rgba(198,255,58,0.12) 0%, transparent 65%), var(--v5-surface); }
+.rg-sponsor { --nx-tint: var(--v5-brand); margin-top: 16px; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; }
 .rg-sponsor__av { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: linear-gradient(135deg, var(--v5-brand), var(--v5-tech-cyan)); }
 .rg-sponsor__av-t { color: var(--v5-on-brand); font-family: var(--font-v5); font-weight: 600; font-size: 20px; }
 .rg-sponsor__body { flex: 1; min-width: 0; }
-.rg-sponsor__name { display: block; font-size: 13px; color: var(--v5-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rg-sponsor__name { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rg-sponsor__name-b { font-weight: 600; }
 .rg-sponsor__gift { display: block; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--v5-brand); margin-top: 2px; }
 .rg-sponsor__v { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 15%, transparent); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
@@ -1033,35 +1072,34 @@ onUnmounted(() => cleanup());
 .rg-dot--active { width: 32px; background: var(--v5-brand); }
 .rg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .rg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
-.rg-subtitle { display: block; margin-top: 8px; font-size: 13px; color: var(--v5-ink-3); }
+.rg-subtitle { display: block; margin-top: 8px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
 .rg-subtitle__hl { color: var(--v5-brand); font-weight: 600; }
 .rg-subtitle__ph { font-family: var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .rg-body { margin-top: 28px; }
 .rg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
 .rg-phone--err { border-color: color-mix(in srgb, var(--v5-brand-2) 55%, transparent); }
 .rg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
-.rg-phone__cc-t { font-size: 15px; color: var(--v5-ink); }
-.rg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
+.rg-phone__cc-t { font-size: var(--ui-type-body); color: var(--v5-ink); }
+.rg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); color: var(--v5-ink); }
 .rg-step2 { display: flex; flex-direction: column; gap: 20px; }
 .rg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .rg-development-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
 .rg-development-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
 .rg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
 .rg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
-.rg-resend { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.rg-resend { display: flex; align-items: center; justify-content: space-between; font-size: var(--ui-type-list-subtitle); }
 .rg-resend__change { color: var(--v5-ink-3); }
 .rg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
 .rg-resend__btn { color: var(--v5-brand); font-weight: 500; }
 .rg-invite { margin-top: 20px; }
-.rg-invite__lbl { display: block; font-size: 12px; color: var(--v5-ink-3); margin-bottom: 6px; padding: 0 4px; }
-.rg-invite__opt { color: var(--v5-ink-4); }
 /* [FEAT-SHARE4] 链接来源码锁定态:同 rg-field 形制但压暗 + 锁标,无输入交互。 */
 .rg-locked { display: flex; align-items: center; gap: 8px; background: #0A0A0A; border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; opacity: 0.9; }
 .rg-locked__code { flex: 1; font-size: 15px; color: var(--text-muted); font-family: var(--font-jet-mono), ui-monospace, monospace; letter-spacing: 0.04em; }
 .rg-locked__tag { display: block; margin-top: 8px; padding: 0 4px; font-size: 12px; color: var(--v5-brand); }
+.rg-invite__err { display: block; margin-top: 8px; padding: 0 4px; font-size: 12px; color: var(--v5-brand-2); }
 .rg-step3 { display: flex; flex-direction: column; gap: 12px; }
 /* 《03》§3 零 border:填充容器不描边(2026-08-15 zero-border 门抓获存量);错误态改 soft tint 表达。 */
-.rg-field { background: var(--v5-surface); border-radius: 16px; height: 56px; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
+.rg-field { background: var(--v5-surface); border-radius: 16px; height: 56px; padding: 0 16px; font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); color: var(--v5-ink); }
 .rg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border-radius: 16px; height: 56px; padding: 0 16px; }
 .rg-field-wrap--err { background: color-mix(in srgb, var(--v5-brand-2) 12%, var(--v5-surface)); }
 .rg-field--flex { flex: 1; background: transparent; border: none; height: 100%; padding: 0; }
@@ -1081,7 +1119,7 @@ onUnmounted(() => cleanup());
 .rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
 .rg-cta--on { background: var(--v5-brand); }
 .rg-cta--busy { opacity: 0.7; }
-.rg-cta__t { font-size: 15px; font-weight: 600; color: var(--v5-ink-4); }
+.rg-cta__t { font-size: var(--ui-type-button); font-weight: 600; color: var(--v5-ink-4); }
 .rg-cta__t--on { color: var(--v5-on-brand); }
 .rg-oauth { }
 .rg-divider { display: flex; align-items: center; margin: 24px 0; }
@@ -1090,7 +1128,7 @@ onUnmounted(() => cleanup());
 .rg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
 .rg-mode-badge__t { font-size: 12px; font-weight: 600; color: var(--v5-warning); }
 .rg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
-.rg-footer__acc { display: block; font-size: 13px; color: var(--v5-ink-3); }
+.rg-footer__acc { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
 /* 同 login:inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 扩热区不撑行高 */
 /* 水平也补 10px:"Sign in" 只有 25px 宽,纵向撑够了横向还是不够。负 margin 抵消布局,
    多出来的热区落在句子里的空白与标点上 —— 那本来就不可点,重叠反而符合 Fitts 定律。 */
@@ -1098,5 +1136,6 @@ onUnmounted(() => cleanup());
 .rg-footer__link:active { opacity: 0.6; }
 .rg-footer__terms { display: block; margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); }
 /* padding 15 而非 14:这行字比 footer__link 小(11.5px),14 只能撑到 43 —— 差 1px 也是差 */
-.rg-footer__terms-link { color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 2px; padding: 15px 0; }
+/* Each link stays on one line; when it does not fit it moves to the next line whole. */
+.rg-footer__terms-link { color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 2px; padding: 15px 0; white-space: nowrap; }
 </style>

@@ -29,10 +29,12 @@
       <text class="ks-cta__t">{{ t.session.kickedCta }}</text>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import ToastHost from "@/components/toast-host.vue";
 import { navReset } from "@/lib/route";
 import { computed } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -93,7 +95,7 @@ function reLogin() {
 .ks-body {
   display: block;
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   line-height: 1.5;
   color: var(--v5-ink-2);
 }
@@ -125,7 +127,7 @@ function reLogin() {
   transition: transform 0.15s ease;
 }
 .ks-cta__t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-on-brand);
 }

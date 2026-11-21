@@ -1,0 +1,248 @@
+// Isolated UI review data only. Never imported by production source.
+const BASE = process.env.DESIGN_BASE || 'http://127.0.0.1:5190';
+const now = Date.now(), iso = new Date(now).toISOString();
+const authority = { sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
+
+export function previewInterfaceLanguages(mode = 'all') {
+  const codes = ['zh','en','vi','id','ms','fil','ru','kk','uz'];
+  return mode === 'en-only' ? ['en'] : mode === 'default' ? codes.filter(code => code !== 'zh') : codes;
+}
+
+const platform = { interfaceLanguages: previewInterfaceLanguages(), featureFlags: { computeShareEnabled: true, homeNewcomerTasksEnabled: true, homeWeeklyPromoEnabled: false }, share: { baseUrl: "https://ui-probe.invalid/ref/", channels: [], appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "", version: "", releaseNotes: { zh: "", en: "" }, source: "unavailable" } }, publicStats: { version: 1, ...authority, source: "server:nx_config_item,nx_user", realUserCount: 4, networkPulse: {registeredUsers:12480} }, onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 }, computerCompute: { domain: "E6", flags: [{ key: "computeShareEnabled", enabled: true }], coefficients: [{ key: "h5BaseFactor", value: 0.6 }, { key: "continuityFullHours", value: 24 }], yieldEstimate: [{ key: "topsBaseline", value: 100 }, { key: "dailyUsdtPerBaseline", value: 0.24 }, { key: "nexPerUsdt", value: 10 }], gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, i) => ({ id, label: `UI ${id}`, tops: (i + 1) * 100, keywords: [{ slot: "keyword1", value: `UI ${id}` }] })), download: { url: "https://ui-probe.invalid/agent-fixture.zip", zhTitle: "测试下载入口", zhGuide: "前端验收数据，不下载或安装", enTitle: "UI fixture download", enGuide: "Frontend fixture; no installer download or native execution" }, sources: ["e6.compute_config"] }, updatedAt: iso };
+export const previewDefaultTrialSku = 'stellarbox-s1';
+export const previewDefaultTrialName = 'UVELBox S1';
+
+export function previewTrialProductConfig(product) {
+  return {
+    trialProductId: product.id,
+    trialProductName: product.name,
+    trialPriceUSD: String(product.price),
+    shadowDailyUSD: String(product.dailyEarn),
+    shadowDailyNEX: String(product.dailyEarnNEX),
+  };
+}
+
+const products = [
+  { id: previewDefaultTrialSku, name: previewDefaultTrialName, tier: 'Entry', imageUrl: '/static/img/products/uvel-pedestal/stellarbox-s1.webp', price: 1299, monthlyEstimateUsdt: 186, dailyEarn: 6.2, dailyEarnNEX: 3, gpu: 'NVIDIA RTX 4060', vram: '8 GB', power: '115 W' },
+  { id: 'stellarbox-pro', name: 'UVEL Box Pro', tier: 'Pro', imageUrl: '/static/img/products/uvel-pedestal/stellarbox-pro.webp', price: 4999, monthlyEstimateUsdt: 672, dailyEarn: 22.4, dailyEarnNEX: 12, gpu: 'NVIDIA RTX 4080', vram: '16 GB', power: '320 W' },
+].map(p => ({ ...p, imageUrl: new URL(p.imageUrl, BASE).href, tagline: '', badge: null, productType: 'DEVICE', inventoryMode: 'FINITE', datacenter: '', warranty: null, hashRate: null, sold: 7, stock: 60, features: [], ai: null, status: 'active', available: true, releaseState: null, releasePhaseId: null, unlocksAtPhase: null, purchaseGate: null }));
+const trial = { ...authority, authoritative: true, state: 'ELIGIBLE', canStart: true, serverNowEpochMs: now, version: 1, claimNo: null, startedAt: null, expiresAt: null, graceEndsAt: null, finishedAt: null, cooldownUntil: null, shadowUSD: 0, shadowNEX: 0, source: 'nx_trial_claim', provenance: { ...authority, source: 'nx_trial_claim' }, paymentRail: 'UVEL_USDT_WALLET', config: { trialDays: '3', graceDays: '7', discountRate: '0.15', discountCapUSD: '20', trialOffsetCapUSD: null, ...previewTrialProductConfig(products.find(product => product.id === previewDefaultTrialSku)), seatsLeftToday: '1', phaseOpen: true, autoPushEnabled: false, autoPushDelayMs: '1500', autoPushCooldownHours: '24', autoPushMaxPerSession: '1' } };
+const voucher = { voucherId: 'V-DESIGN', voucherName: 'Device voucher', voucherType: 'fixed', amountUsd: 50, percentValue: 0, minPurchaseUsd: 0, maxDiscountUsd: 50, applicableSkus: '[]', audience: 'all', claimSurfaces: '["home","store"]', startAt: 0, endAt: 0, popupEnabled: false, popupDelayMs: 300, popupCooldownHours: 1, popupMaxPerSession: 1, popupCadenceEnabled: false, popupLastSeenAt: 0, popupSessionCount: 0, nextEligibleAt: 0, stackWithTrial: false, stackWithOthers: false, splittable: false, definitionStatus: 'active', definitionDeleted: 0, grantStatus: 'UNCLAIMED', claimable: true, audienceEligible: true, popupEligible: false };
+
+const capacitySchedule = { stageEarlyEnd: '3', stageMidEnd: '8', capacityFloorPct: '22', capacitySubsidyDays: '30', capacityBand1DeltaPct: '-4', capacityBand2DeltaPct: '-6', capacityBand3DeltaPct: '-23.7', capacityApplyToPhone: 'false', capacityApplyToCloudShare: 'false', capacityApplyToPcGpu: 'false', capacityApplyToS1: 'true', capacityApplyToPro: 'true', capacityApplyToProV2: 'true', capacityApplyToRackP1: 'true', capacityApplyToRackP2: 'true' };
+
+const capacityKeys = { 'STELLARBOX-S1': 'capacityApplyToS1', 'STELLARBOX-PRO': 'capacityApplyToPro',
+    'STELLARBOX-PRO-V2': 'capacityApplyToProV2', 'STELLARRACK-P1': 'capacityApplyToRackP1',
+    'STELLARRACK-P2': 'capacityApplyToRackP2', 'CLOUD-SHARE': 'capacityApplyToCloudShare',
+    'MOBILE-CLOUD-SHARE': 'capacityApplyToCloudShare', 'PHONE': 'capacityApplyToPhone', 'MOBILE': 'capacityApplyToPhone',
+    'PHONE-BASIC': 'capacityApplyToPhone', 'IPHONE15': 'capacityApplyToPhone' };
+
+const upgradeLadder = [
+  'phone', 'stellarbox-s1', 'stellarbox-pro', 'stellarbox-pro-v2', 'stellarrack-p1', 'stellarrack-p2',
+];
+const upgradeKinds = {
+  capacityApplyToPhone: 'phone',
+  capacityApplyToS1: 'stellarbox-s1',
+  capacityApplyToPro: 'stellarbox-pro',
+  capacityApplyToProV2: 'stellarbox-pro-v2',
+  capacityApplyToRackP1: 'stellarrack-p1',
+  capacityApplyToRackP2: 'stellarrack-p2',
+};
+
+export function previewDoTheMath(devices, products, canPurchase) {
+  const current = devices
+    .filter(device => device.activatedAt != null && !device.pendingDeactivate && device.dailyUsdt > 0)
+    .sort((a, b) => b.dailyUsdt - a.dailyUsdt || a.id - b.id)[0];
+  if (!current) return null;
+  const baseKind = upgradeKinds[current.capacityConfigKey];
+  const baseRank = upgradeLadder.indexOf(baseKind);
+  if (baseRank < 0 || baseRank === upgradeLadder.length - 1) return null;
+
+  const next = products
+    .map(product => {
+      const kind = upgradeKinds[capacityKeys[product.id.toUpperCase()]];
+      return { product, kind, rank: upgradeLadder.indexOf(kind) };
+    })
+    .filter(({ product, rank }) => rank > baseRank && product.dailyEarn > current.dailyUsdt && product.price > 0)
+    .sort((a, b) => a.rank - b.rank || a.product.dailyEarn - b.product.dailyEarn || a.product.id.localeCompare(b.product.id))
+    .find(({ product }) => canPurchase(product));
+  if (!next) return null;
+
+  const ownedProduct = products.find(product => product.id.toUpperCase() === current.productCode);
+  return {
+    basis: 'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',
+    base: { kind: baseKind, productNo: ownedProduct?.id ?? current.productCode, name: current.name, imageUrl: ownedProduct?.imageUrl ?? null, dailyUsdt: current.dailyUsdt },
+    target: { kind: next.kind, productNo: next.product.id, name: next.product.name, imageUrl: next.product.imageUrl, dailyUsdt: next.product.dailyEarn, priceUsdt: next.product.price },
+    multiplier: Math.round(next.product.dailyEarn / current.dailyUsdt),
+    paybackDays: Math.round(next.product.price / next.product.dailyEarn),
+  };
+}
+
+export function previewCapacity(device, schedule, at) {
+  const anchor = device.purchasedAt ?? device.activatedAt;
+  // E3 uses whole calendar months in the business timezone (Asia/Shanghai).
+  const purchased = new Date(anchor + 8 * 3600000), current = new Date(at + 8 * 3600000);
+  let months = (current.getUTCFullYear() - purchased.getUTCFullYear()) * 12 + current.getUTCMonth() - purchased.getUTCMonth();
+  const anniversary = new Date(purchased);
+  anniversary.setUTCDate(1);
+  anniversary.setUTCMonth(purchased.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(anniversary.getUTCFullYear(), anniversary.getUTCMonth() + 1, 0)).getUTCDate();
+  anniversary.setUTCDate(Math.min(purchased.getUTCDate(), lastDay));
+  if (anniversary > current) months--;
+  const capacityAgeMonths = Math.max(0, months);
+  const capacityConfigKey = capacityKeys[device.productCode];
+  const early = Number(schedule.stageEarlyEnd), mid = Number(schedule.stageMidEnd);
+  const capacityPct = schedule[capacityConfigKey] === 'true'
+    ? Number(Math.max(Number(schedule.capacityFloorPct), 100
+      * (1 + Number(schedule.capacityBand1DeltaPct) / 100) ** Math.min(capacityAgeMonths, early)
+      * (1 + Number(schedule.capacityBand2DeltaPct) / 100) ** Math.max(0, Math.min(capacityAgeMonths, mid) - early)
+      * (1 + Number(schedule.capacityBand3DeltaPct) / 100) ** Math.max(0, capacityAgeMonths - mid)).toFixed(6))
+    : 100;
+  const capacitySubsidyDays = Number(schedule.capacitySubsidyDays);
+  const capacitySubsidyEndsAt = anchor + capacitySubsidyDays * 86400000;
+  return { capacityConfigKey, capacityAgeMonths, capacityPct, capacitySubsidyDays, capacitySubsidyEndsAt,
+    capacitySubsidized: at < capacitySubsidyEndsAt,
+    capacitySubsidyRemainingDays: Math.max(0, Math.ceil((capacitySubsidyEndsAt - at) / 86400000)) };
+}
+
+export function previewActiveJobsBase(state) {
+  return state.jobsBaseState === 'unpublished' ? null : 560;
+}
+
+const homeDisplayCacheMs = 60_000;
+const homeDisplayPlanSeconds = 120;
+
+function homeDisplayElapsed(state, at) {
+  const seconds = state.homeDisplayState === 'growth'
+    ? Math.max(0, Math.floor((at - (state.homeDisplayGrowthAt ?? now)) / 1000)) : 0;
+  return (state.homeDisplayElapsed ?? 0) + seconds;
+}
+
+export function updatePreviewHomeDisplay(state, update, at) {
+  const { homeDisplayState, jobsBaseState } = update;
+  if (homeDisplayState === 'growth' && state.homeDisplayState !== 'growth') {
+    state.homeDisplayGrowthAt = at;
+    state.homeDisplayPlanAt = at;
+    state.homeDisplayState = homeDisplayState;
+    state.homeDisplayChangeAt = at;
+  } else if (homeDisplayState === 'paused' && state.homeDisplayState === 'growth') {
+    const planAt = state.homeDisplayPlanAt ?? state.homeDisplayGrowthAt ?? now;
+    const cutoff = Math.min(at + homeDisplayCacheMs, planAt + homeDisplayPlanSeconds * 1000);
+    state.homeDisplayElapsed = homeDisplayElapsed(state, cutoff);
+    state.homeDisplayState = homeDisplayState;
+    state.homeDisplayChangeAt = at;
+  }
+  if ((jobsBaseState === 'published' || jobsBaseState === 'unpublished') && jobsBaseState !== state.jobsBaseState) {
+    state.jobsBaseState = jobsBaseState;
+    state.homeDisplayJobsAnchor = homeDisplayElapsed(state, at);
+    state.homeDisplayPlanAt = at;
+    state.homeDisplayChangeAt = at;
+  }
+}
+
+export function previewHomeDisplay(state, at = Date.now()) {
+  const enabled = state.homeDisplayState === 'growth';
+  const anchor = state.homeDisplayGrowthAt ?? now;
+  const changedAt = state.homeDisplayChangeAt ?? now;
+  const cacheAt = Math.max(changedAt, now + Math.floor((at - now) / homeDisplayCacheMs) * homeDisplayCacheMs);
+  const validUntil = cacheAt + homeDisplayCacheMs;
+  let startAt = enabled ? state.homeDisplayPlanAt ?? anchor : changedAt;
+  if (enabled) {
+    const renewal = at >= startAt + homeDisplayPlanSeconds * 1000 ? at : cacheAt;
+    if (renewal >= startAt + homeDisplayCacheMs) {
+      startAt = anchor + Math.floor((renewal - anchor) / 1000) * 1000;
+      state.homeDisplayPlanAt = startAt;
+    }
+  }
+  const elapsed = homeDisplayElapsed(state, startAt);
+  const samples = Array.from({ length: enabled ? homeDisplayPlanSeconds + 1 : 1 }, (_, offset) => elapsed + offset);
+  const jobsBase = previewActiveJobsBase(state);
+  return { enabled, startAt, serverNow: at, validUntil,
+    sequence: elapsed + 1, online: samples.map(t => 800 + t * 2), paidCents: samples.map(t => 300000 + t * 25),
+    activeJobs: samples.map(t => jobsBase === null ? null : jobsBase + (t - (state.homeDisplayJobsAnchor ?? 0)) * 2) };
+}
+
+export function previewHomeDisplaySample(state, at = Date.now()) {
+  const batch = previewHomeDisplay(state, at);
+  const i = batch.enabled ? Math.floor(Math.max(0, at - batch.startAt) / 1000) : 0;
+  return { online: batch.online[i], activeJobs: batch.activeJobs[i] };
+}
+
+function fixture(url, locale, state, request, onlineDevices=3206) {
+  if (url.pathname === '/api/quests/state') {
+    const mode = state.taskState || 'pending';
+    if (mode === 'error') return {};
+    const names = locale === 'zh' ? ['绑定手机', '查看设备', '了解收益', '阅读课程', '完善账户', '了解邀请'] : locale === 'vi' ? ['Kết nối điện thoại', 'Xem thiết bị', 'Tìm hiểu thu nhập', 'Đọc bài học', 'Hoàn tất tài khoản', 'Tìm hiểu lời mời'] : ['Connect a phone', 'View devices', 'Explore earnings', 'Read a course', 'Complete your account', 'Explore invitations'];
+    const quests = mode === 'empty' ? [] : names.map((name, i) => ({ questCode: `review-task-${i+1}`, name, layer:'DAY_ONE', rewardNex:0, status:mode === 'claimed' ? 'CLAIMED' : mode === 'expired' ? 'EXPIRED' : mode === 'complete' ? 'CLAIMABLE' : i < 3 ? 'COMPLETED' : 'PENDING', category:'explore', actionRoute:'/pages/learn/courses', instanceKey:'DAY_ONE:design-review', eligibleFrom:new Date(now-6*3600000).toISOString(), eligibleUntil:new Date(mode === 'expired' ? now-1000 : now+18*3600000).toISOString(), eligible:!['claimed','expired'].includes(mode) }));
+    return { ...authority, quests, dayOneRewardNex:500, dayOneRequiredTaskCount:mode === 'empty' ? 0 : mode === 'legacy' ? null : 6, dayOneSnapshotStatus:mode === 'empty' ? 'EMPTY' : mode === 'legacy' ? 'LEGACY_UNVERIFIED' : 'SNAPSHOT', promoBanner:null, questBonusMultiplier:1, rhythmMonth:1, source:'nx_mission + nx_user_mission' };
+  }
+  if (url.pathname === '/api/orders/quote' && request) {
+    const input = request.postDataJSON();
+    const items = input.items.map((item,index) => {
+      const price = products.find(product=>product.id===item.productNo)?.price;
+      if (!price) throw new Error('Unknown review product');
+      return {...item,lineId:`review-line-${index}`,unitPriceUsdt:price.toFixed(2),subtotalUsdt:(price*item.quantity).toFixed(2),discountUsdt:'0.00',payableUsdt:(price*item.quantity).toFixed(2)};
+    });
+    const subtotal = items.reduce((sum,item)=>sum+Number(item.subtotalUsdt),0).toFixed(2);
+    return {quoteId:`review-quote-${Date.now()}`,quoteHash:'review-quote-hash',serverTime:new Date().toISOString(),expiresAt:new Date(Date.now()+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:null,activityVersion:null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
+  }
+  const titles = locale === 'zh' ? ['认识算力作业', '设备与收益', '账户安全'] : locale === 'vi' ? ['Tìm hiểu tác vụ tính toán', 'Thiết bị và thu nhập', 'Bảo mật tài khoản'] : ['Understanding compute jobs', 'Devices and earnings', 'Account security'];
+  const courses = titles.map((title, index) => ({ ...authority, id: `review-course-${index + 1}`, title, body: locale === 'zh' ? '算力设备处理作业，收益以已完成的作业记录为准。你可以在设备详情查看运行状态和记录。' : locale === 'vi' ? 'Thiết bị xử lý tác vụ. Thu nhập được xác nhận từ các tác vụ đã hoàn thành.' : 'Compute devices process jobs. Earnings are confirmed from completed job records.', category: 'basics', format: 'article', level: 'beginner', duration: '3 min', rewardNex: 5, featured: index === 0, version: 'v1', progress: state.completed?.includes(index + 1) ? 100 : index === 1 ? 25 : 0, completed: !!state.completed?.includes(index + 1), rewardGranted: !!state.completed?.includes(index + 1), attempts: state.completed?.includes(index + 1) ? 1 : 0, lastScore: state.completed?.includes(index + 1) ? 100 : 0, source: 'provider', permanentLabel: 'PRODUCTION LEARNING FACTS', questions: [] }));
+  if (url.pathname === '/api/content/learning/courses') return { ...authority, courses, completedCourses: state.completed?.length || 0, totalCourses: courses.length, earnedNex: (state.completed?.length || 0) * 5, rewardTitles: {} };
+  const courseMatch = url.pathname.match(/^\/api\/content\/learning\/courses\/review-course-(\d)(?:\/(start|complete))?$/);
+  if (courseMatch) { const id = Number(courseMatch[1]); if (courseMatch[2] === 'complete') { state.completed ||= []; if (!state.completed.includes(id)) state.completed.push(id); return { ...authority, courseId: `review-course-${id}`, version: 'v1', score: 100, passed: true, completed: true, rewardGranted: true, rewardNex: 5, attempts: 1 }; } return { ...courses[id - 1], progress: courses[id - 1].completed ? 100 : Math.max(1, courses[id - 1].progress) }; }
+  if (url.pathname === '/api/points/state') return { ...authority, rewardAsset: 'UVT', serverDate: iso.slice(0,10), nextResetAtUtc: new Date(now + 86400000).toISOString(), streak: { currentStreak: state.checkedIn ? 3 : 2, longestStreak: 5, streakSavers: 0, lastCheckInDate: state.checkedIn ? iso.slice(0,10) : new Date(now - 86400000).toISOString().slice(0,10), checkedInToday: !!state.checkedIn }, dailyMilestones: [], earningMilestones: [], badgeAchievements: [], powerUps: [], rules: [{key:'baseline', value:'5'}], topStreakers: [], source: 'nx_daily_check_in' };
+  if (url.pathname === '/api/points/sign-in') { state.checkedIn = true; return { ...authority, checkInDate: iso.slice(0,10), baseNex: 5, rewardNex: 5, streakBonusNex: 0, multiplier: 1, streakDays: 3 }; }
+
+  if (url.pathname === '/api/content/trust/sections/current') return { ...authority, source: 'nx_trust_section_version:published', sections: ['financials', 'leadership', 'nexNarrative', 'complianceBadges', 'auditsReserves', 'listings'].map(sectionKey => ({ sectionKey, version: 'v1', description: 'UI review fixture', structure: 'Published resources', fields: [] })) };
+  if (/^\/api\/content\/trust\/sections\/[^/]+\/view$/.test(url.pathname)) return null;
+  if (url.pathname === '/api/app/network/device-rank') {
+    const source = 'SIMULATED_DEVICE_DISTRIBUTION';
+    if (state.deviceRankState === 'configured') {
+      return {...authority,source,currentRank:184,state:'ranked',population:onlineDevices,deviceTops:80,modelVersion:1,generatedAt:iso};
+    }
+    return {...authority,source,currentRank:null,state:'disabled',population:null,deviceTops:null,modelVersion:0,generatedAt:new Date(0).toISOString()};
+  }
+  if (url.pathname === '/api/app/support/conversation-categories') return [{type:'advisor',enabled:true},{type:'support',enabled:true},{type:'ai',enabled:false}];
+  if (url.pathname === '/api/promotions') {
+    const localized=(zh,en,vi)=>({zh,en,vi});
+    const terms=localized('购买完成后发放，退款按规则处理。','Issued after purchase; refund rules apply.','Nhận sau khi mua; áp dụng quy tắc hoàn tiền.');
+    const disclosure={title:localized('设备赠礼','Device gift','Quà thiết bị'),terms,refundTerms:terms,benefitDescription:localized('购 Pro，赠 S1','Buy Pro, receive S1','Mua Pro, nhận S1'),deviceRights:null,deviceName:'UVEL Box S1'};
+    const offer={activityId:'review-offer',version:1,template:'SKU_GIFT',state:'ACTIVE',startsAt:new Date(now-86400000).toISOString(),endsAt:new Date(now+604800000).toISOString(),serverTime:iso,title:localized('设备升级礼','Upgrade offer','Ưu đãi nâng cấp'),terms,placement:'home.purchase-promotion',target:'STORE',productNos:['stellarbox-pro'],minimumClientCapabilities:[],eligibility:'ESTIMATE_ELIGIBLE',eligibilityMessage:null,rewardRules:[{ruleId:'review-rule',productNo:'stellarbox-pro',minBuyQty:1,repeatMode:'ONCE_PER_ORDER',maxGroups:{mode:'LIMITED',value:1},maxGroupsPerPerson:{mode:'LIMITED',value:1},buyerReward:{rewardRuleId:'review-gift',beneficiaryRole:'BUYER',type:'DEVICE',giftProductNo:'stellarbox-s1',quantity:1,disclosure},inviterReward:null}]};
+    return {items:state.promotions?[offer,{...offer,activityId:'review-offer-2'}]:[],nextCursor:null,hasMore:false};
+  }
+  if (url.pathname === '/api/config/v-ranks') return { ...authority, source: 'nx_v_rank_config', prizeName: 'Ranks', capabilities: { peer: false, genesis: false }, ranks: Array.from({ length: 9 }, (_, v) => ({ v, title: `Level ${v}`, cnTitle: `等级 ${v}`, directBonus: .1, unilevelDepth: v + 1, peerBonus: 0, leadershipVotes: v, cultivationBonus: 0, selfComputePoints: v * 1000, directRefs: v, teamComputePoints: v * 10000, rewards: [{ type: 'UVT', amount: v * 10 }], visible: true })) };
+  if (url.pathname === '/api/team/rank') return { ...authority, source: 'nx_team_member + server VRankPerformanceRepository', rankCode: state.highestRank ? 'V8' : 'V2', progress: { selfComputePoints: 2500, directRefs: 2, teamComputePoints: 23000, vDownlineCounts: {} } };
+  if (url.pathname === '/api/app/profile') return { nickname: 'Alex', avatarUrl: '', avatarRevision: '', profileChangeIntervalDays: 7, nicknameChangeAvailableAt: null, avatarChangeAvailableAt: null, language: locale };
+  if (url.pathname === '/api/config/home-display') return previewHomeDisplay(state);
+  if (url.pathname === '/api/app/home/overview') return { ...authority, source: 'server:nx_compute_receipt,nx_compute_task,nx_user_device.dc_location,nx_product,nx_growth_promo_banner', generatedAt: iso, accountScope: 'authenticated-account', earnings: { todayVsYesterdayPct: 0, todayVsYesterdayUsdt: 0.812, ...Object.fromEntries(['today', 'week', 'month', 'all'].map(p => [p, { usdt: 16.24, nex: 3, jobCount: 10 }])) }, earningsLedgerMode: 'SETTLED', earningsLedger: [], marketBoard: { workloads: [], deviceRankings: [] }, doTheMath: null, weeklyPromo: null, onboarding: { cumulativePaidUsdt: 0, activeDevices: 0 }, onGrid: { clients: [], activeDevices: 0, activeJobs: previewHomeDisplaySample(state).activeJobs, perSecUsdt: 0 } };
+  if (url.pathname === '/api/config/referral-rewards') return {enabled:true,welcomeGift:{lockMode:'risk_bucket',usdtAmount:0,nexAmount:0},inviterReward:{nexAmount:10},rhythmMonth:1,newcomerMultiplier:1,inviterMultiplier:1,effectiveAt:iso,sources:['nx_user.sponsor_user_id']};
+  if (url.pathname === '/api/config/platform') {
+    const sample = previewHomeDisplaySample(state);
+    return { ...platform, publicStats: { ...platform.publicStats, activeJobsBase: previewActiveJobsBase(state),
+      networkPulse: { ...platform.publicStats.networkPulse, onlineDevices: sample.online, activeJobs: sample.activeJobs } } };
+  }
+  if (url.pathname === '/api/devices/earnings') {
+    const device = { id: 41, rowVersion: 1, instanceNo: 'REVIEW-S1', name: products[0].name, deviceType: 'BOX', productCode: 'STELLARBOX-S1', monthlyTargetActive: true, status: 'ACTIVE', pendingDeactivate: false, activatedAt: now - 86400000 * 40, purchasedAt: now - 86400000 * 40, dailyUsdt: 6.2, dailyNex: 3, todayEarningsUsdt: 2.34, todayEarningsNex: 1, gpuModel: 'GPU', vramTotalGb: 24, basePowerW: 150, location: 'Review', actualPaidUsdt: 1299, cumulativeOutputUsdt: 100 };
+    Object.assign(device, previewCapacity(device, capacitySchedule, now));
+    device.dailyUsdt = Number((products.find(product => product.id === 'stellarbox-s1').dailyEarn * device.capacityPct / 100).toFixed(6));
+    return { ...authority, source: 'nx_user_device + nx_compute_receipt + nx_compute_e3_config', dailyUsdt: device.dailyUsdt, dailyNex: device.dailyNex, realizedTodayUsdt: 16.24, realizedTodayNex: 3, walletUsdt: 0, walletNex: 0, userJoinedAt: now, serverNow: now, timezone: 'UTC', slotCap: 6, devices: [device], capacitySchedule };
+  }
+  if (url.pathname === '/api/trial/state' || url.pathname === '/api/trial/eligibility') return state.offers ? trial : { ...trial, state: 'REDEEMED', claimNo: 'TRIAL-REVIEW', claimedAtEpochMs: now - 5000, expiresAtEpochMs: now - 1000, canStart: false, eligibilityReason: 'converted' };
+  if (url.pathname === '/api/vouchers') return { vouchers: state.offers ? [voucher] : [], source: 'nx_growth_voucher + nx_growth_voucher_grant', serverCanonical: true, provenance: { ...authority, source: 'nx_growth_voucher' } };
+  if (url.pathname === '/api/store/catalog') return { ...authority, source: 'nx_product', revision: null, products };
+  if (url.pathname === '/api/store/purchase-eligibility') return { ...authority, runId: null, productNo: url.searchParams.get('productNo'), eligible: true, decisionCode: 'ELIGIBLE', policies: ['E1', 'F4B'].map(policy => ({ policy, eligible: true, decisionCode: 'ELIGIBLE', mode: 'ALL', conditions: [] })), evaluatedAt: now, source: 'nx_product + nx_admin_device_sku + nx_user' };
+  if (url.pathname === '/api/app/trade-in/eligibility') return {enabled:true,eligible:false,decisionCode:'NO_ELIGIBLE_SOURCE',targetProductId:1,targetProductNo:'stellarbox-s1',targetProductName:'UVEL Box S1',targetPriceUsdt:1299,requireHigherPrice:true,maxDevicesPerOrder:1,sources:[],decisionSource:'server'};
+  if (url.pathname === '/api/app/trade-in/capacity-quote') return {decision:'CAPACITY_AVAILABLE',activeDevices:1,maxActiveDevices:6,sourceDeviceId:null,sourceDeviceName:null,targetProductId:1,targetProductNo:'stellarbox-s1',targetProductName:'UVEL Box S1',targetPriceUsdt:1299,payableUsdt:1299,walletBalanceUsdt:0,sufficientFunds:false,decisionSource:'server'};
+  if (url.pathname === '/api/orders') return { ...authority, source: 'server', orders: [] };
+  if (url.pathname === '/api/notifications') return { items: state.messages ? [
+    { id: 901, kind: 'system', priority: 'normal', title: '设备维护提醒', body: '本次维护已完成。你可以继续查看设备运行状态。', ctaLabel: '', ctaHref: '', createdAt: now - 60000, readAt: state.read ? now : null },
+    { id: 902, kind: 'order', priority: 'high', title: '订单状态已更新', body: '查看当前订单和账户记录。', ctaLabel: '查看记录', ctaHref: '/pages/me/wallet', createdAt: now - 86400000, readAt: now },
+  ] : [], nextCursor: null, unread: state.messages && !state.read ? 1 : 0 };
+  if (url.pathname === '/api/notifications/901/read') { state.read = true; return null; }
+  if (url.pathname === '/api/notifications/902/actions') return { notificationId: 902, action: 'cta', route: '/pages/me/wallet', recorded: true };
+  return undefined;
+}
+
+
+export { fixture };

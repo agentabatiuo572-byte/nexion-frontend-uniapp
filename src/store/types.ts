@@ -1,5 +1,6 @@
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
 import type { EntrySurface } from "@/lib/entry-surface";
+import type { TaskExecutionMetadata } from "@/api/task-assignment-api";
 
 export type DeviceKind =
   | "phone"
@@ -9,7 +10,8 @@ export type DeviceKind =
   | "stellarbox-pro-v2"
   | "stellarrack-p1"
   | "stellarrack-p2"
-  | "cloud-share";
+  | "cloud-share"
+  | "unknown";
 
 // "paused" was removed when manual device pause was dropped (a node is either
 // running or involuntarily interrupted — no user opt-in pause). Involuntary
@@ -33,7 +35,7 @@ export const TASK_CATEGORY_LABEL: Record<TaskCategory, string> = {
   SP: "Speech",
 };
 
-export interface CurrentTask {
+export interface CurrentTask extends TaskExecutionMetadata {
   id: string;          // e.g. "IG-A78234"  ({category}-A{counter})
   category: TaskCategory;
   type: string;        // human label, e.g. "Image Gen"
@@ -41,12 +43,24 @@ export interface CurrentTask {
   client: string;      // e.g. "Mosaic Studios"
   location: string;    // e.g. "Berlin, DE"
   totalSec: number;
-  startedAt: number;   // epoch ms
+  startedAt: number | null;   // epoch ms; queued v2 tasks have not started
   reward: number;      // USDT
+  rewardAsset?: "USDT" | "UVT";
+  rewardAmount?: string;
   /** Server status is present only for the remote authority projection. */
-  status?: "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
+  status?: import("@/api/task-assignment-api").CanonicalTaskAssignment["status"];
+  protocolVersion?: 2 | 3;
+  queuedAt?: number | null;
+  actualDurationSec?: number | null;
+  settlementStatus?: import("@/api/task-assignment-api").CanonicalTaskAssignment["settlementStatus"];
+  settlementBatchNo?: string | null;
+  settledAt?: number | null;
+  configVersion?: string;
   /** Server-issued estimated completion time; it never certifies settlement. */
   completableAt?: number | null;
+  /** Server pause boundary and elapsed time from completed pause intervals. */
+  pausedAt?: number | null;
+  pausedSeconds?: number;
 }
 
 export interface CompletedTask extends CurrentTask {
@@ -57,7 +71,11 @@ export interface CompletedTask extends CurrentTask {
 
 export interface Device {
   id: string;
+  /** Exact owned SKU from the canonical fleet; retained separately from its display family. */
+  productCode?: string;
   imageUrl?: string;
+  /** Explicit device target fact; absent on legacy rows. */
+  monthlyTargetActive?: boolean;
   /** Server CAS version. Remote mutations must send this exact value. */
   rowVersion?: number;
   /** Independent server runtime fact; absent on local simulation rows. */
@@ -86,6 +104,8 @@ export interface Device {
   taskServerNow?: number | null;
   /** Monotonic receive anchor paired only with the task-state snapshot clock. */
   taskServerNowReceivedAt?: number | null;
+  phoneValidUntil?: number | null;
+  simulationState?: import("@/api/task-assignment-api").SimulationState;
   /** Monotonic receive anchor used to advance the signed server deadline while the card stays open. */
   capacitySnapshotReceivedAt?: number | null;
   // Lifecycle (Sprint 2): set on device creation; drives the monthly efficiency
@@ -125,6 +145,9 @@ export interface Device {
   gpuPower: number; // W
   vramUsed: number; // GB
   currentTask: CurrentTask | null;
+  /** Read-only unresolved legacy completion, including after its task lease expires. */
+  recoveryPending?: boolean;
+  recoveryReason?: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" | null;
   recentTasks: CompletedTask[]; // last 10
   /** Server-authoritative post-completion task lock. Remote clients only display this value. */
   taskLockUntil?: number | null;
@@ -300,17 +323,27 @@ export interface Withdrawal {
   address: string;
   fee: WithdrawalFeeSnapshot;
   status: WithdrawalStatus;
+  /** Server status evaluated with the payout-address mapper's account-wide unsettled rule. */
+  payoutAddressChangeBlocked?: boolean;
   riskRoute?: WithdrawalRiskRoute;
   riskReasons?: string[];
+  /** Original submission's compliance snapshot, never derived from current policy. */
+  complianceReviewRequired?: boolean;
+  complianceHoldApplies?: boolean;
+  complianceHoldDays?: number;
   /** FEAT-WD01a:本单是否命中小额免审快车道。 */
   fastLaneApplied?: boolean;
   /** FEAT-WD01a:被快车道免掉的闸名。必须随单落盘 —— 只算不存 = 事后审计与客服
    *  都还原不出「这单当时免了哪几道」,等于没做。与 riskReasons 同源同去处。 */
   waivedGates?: string[];
   submittedAt: number;
+  /** Read-only server creation time for display; absent legacy evidence stays unknown. */
+  displaySubmittedAt?: number | null;
   estimatedCompletion: number;
+  /** Server holdUntil; null explicitly clears an expired review window. */
+  reviewHoldUntil?: number | null;
   /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
-  confirmedAt?: number;
+  confirmedAt?: number | null;
   /** 终态原因(服务端 GET /api/withdrawals/:id 镜像回来,仅终态有值)。
    *  🔴 必须随单落盘,不能只在内存:客服要查的正是这个,而用户刷新一次页面就该还在。
    *  与 riskReasons / waivedGates 同源同去处(码不直出,渲染时经 lib/risk-reason-text 翻成话术)。 */
@@ -446,6 +479,8 @@ export interface AppState {
   visibleDevices: Device[];
   slotDevices: Device[];
   activeSlotCount: number;
+  remoteSlotsUsed?: number | null;
+  remoteSlotUsage?: { slotsUsed: number; reservedSlotCount?: number; trialSlotCount?: number } | null;
   earnings: EarningsState;
   global: GlobalStats;
   latestWithdrawal: Withdrawal | null;
@@ -464,11 +499,6 @@ export interface AppState {
   // activatedAt + zeroes runtime telemetry so the device exits earnings/quest
   // contribution while remaining in inventory.
   activateDevice: (id: string, reservedSlots?: number) => boolean;  // returns false on cap hit / not found / already active
-  connectComputeShareDevice: (gpuModel?: string, reservedSlots?: number) => {
-    ok: boolean;
-    deviceId?: string;
-    reason?: "disabled" | "slots-full" | "activation-failed";
-  };
   deactivateDevice: (id: string) => void;
   /** Marks device for deactivation after current task completes; tick() picks it up. */
   scheduleDeactivation: (id: string) => void;

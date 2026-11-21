@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { serverLanguage } from "@/i18n";
 
 export type CanonicalEventKind =
   | "discount"
@@ -8,7 +9,6 @@ export type CanonicalEventKind =
   | "regional"
   | "boost"
   | "seasonal"
-  | "holding"
   | "onboarding";
 export type CanonicalEventState = "ongoing" | "upcoming" | "ended";
 export type CanonicalEventUserStatus = "AVAILABLE" | "JOINED" | "CLAIMABLE" | "CLAIMED";
@@ -87,6 +87,7 @@ export interface EventSpinHistory {
 }
 
 export interface EventSpinState {
+  ended?: boolean;
   eventCode: string;
   eventId: string;
   serverDate: string;
@@ -108,7 +109,7 @@ export interface EventsApi {
 }
 
 const EVENT_KINDS: CanonicalEventKind[] = [
-  "discount", "referral", "wheel", "regional", "boost", "seasonal", "holding", "onboarding",
+  "discount", "referral", "wheel", "regional", "boost", "seasonal", "onboarding",
 ];
 const EVENT_STATES: CanonicalEventState[] = ["ongoing", "upcoming", "ended"];
 const USER_STATUSES: CanonicalEventUserStatus[] = ["AVAILABLE", "JOINED", "CLAIMABLE", "CLAIMED"];
@@ -158,10 +159,13 @@ export function isValidEventHref(href: string): boolean {
     && segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
-function parseEvent(value: unknown): CanonicalEvent {
+export function parseEvent(value: unknown): CanonicalEvent | null {
   const row = record(value);
   const eventCode = text(row?.eventCode);
   const kind = text(row?.kind)?.toLowerCase() as CanonicalEventKind;
+  if (!row || !kind) return invalid();
+  // Unsupported kinds are omitted from lists; supported events still require a valid payload.
+  if (!EVENT_KINDS.includes(kind)) return null;
   const state = text(row?.state)?.toLowerCase() as CanonicalEventState;
   const title = text(row?.title);
   const subtitle = typeof row?.subtitle === "string" ? row.subtitle : null;
@@ -175,7 +179,7 @@ function parseEvent(value: unknown): CanonicalEvent {
   const userStatus = text(row?.userStatus)?.toUpperCase() as CanonicalEventUserStatus;
   const geo = typeof row?.geo === "string" ? row.geo : null;
   const href = typeof row?.href === "string" ? row.href : null;
-  if (!row || !eventCode || !EVENT_KINDS.includes(kind) || !EVENT_STATES.includes(state)
+  if (!eventCode || !EVENT_STATES.includes(state)
       || !title || subtitle === null || !rewardName || !rewardType || rewardAmount === null
       || featured === null || trackable === null || targetValue === null || progressValue === null
       || !USER_STATUSES.includes(userStatus) || geo === null || href === null
@@ -211,7 +215,10 @@ function parseSnapshot(value: unknown): EventSnapshot {
       || Number.isNaN(Date.parse(serverTimeUtc))) {
     return invalid();
   }
-  const events = row.events.map(parseEvent);
+  const events = row.events.flatMap(value => {
+    const event = parseEvent(value);
+    return event ? [event] : [];
+  });
   const codes = new Set(events.map((event) => event.eventCode));
   if (codes.size !== events.length) return invalid("EVENT_CODE_DUPLICATED");
   if (events.filter((event) => event.featured && event.state === "ongoing").length > 1) {
@@ -271,6 +278,7 @@ function parseSpin(value: unknown): EventSpinResult {
 
 function parseSpinState(value: unknown): EventSpinState {
   const row = record(value);
+  const ended = row?.ended === undefined ? false : bool(row.ended);
   const eventCode = text(row?.eventCode);
   const eventId = text(row?.eventId);
   const serverDate = text(row?.serverDate);
@@ -279,7 +287,7 @@ function parseSpinState(value: unknown): EventSpinState {
   const bonusTickets = number(row?.bonusTickets);
   const availableSpins = number(row?.availableSpins);
   const source = text(row?.source);
-  if (!row || !eventCode || !eventId || !serverDate || !nextResetAtUtc
+  if (!row || ended === null || !eventCode || !eventId || !serverDate || !nextResetAtUtc
       || freeAvailable === null || bonusTickets === null || availableSpins === null
       || !source || !Array.isArray(row.segments) || !Array.isArray(row.history)) {
     return invalid("EVENT_SPIN_STATE_RESPONSE_INVALID");
@@ -321,7 +329,7 @@ function parseSpinState(value: unknown): EventSpinState {
     };
   });
   return {
-    eventCode, eventId, serverDate, nextResetAtUtc, freeAvailable,
+    eventCode, eventId, ended, serverDate, nextResetAtUtc, freeAvailable,
     bonusTickets, availableSpins, segments, history, source,
   };
 }
@@ -332,7 +340,7 @@ export function createEventsApi(client: ApiClient): EventsApi {
   return {
     state: async (locale = "en") => parseSnapshot(await client.request({
       method: "GET",
-      path: `/api/events?locale=${encodeURIComponent(["en", "zh", "vi"].includes(locale) ? locale : "en")}`,
+      path: `/api/events?locale=${encodeURIComponent(serverLanguage(locale))}`,
     })),
     spinState: async (eventCode) => parseSpinState(await client.request({
       method: "GET",

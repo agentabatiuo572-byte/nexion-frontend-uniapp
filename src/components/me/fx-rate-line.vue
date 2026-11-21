@@ -12,11 +12,11 @@
 -->
 <template>
   <view>
-    <view class="flex items-center" style="gap: 6px; padding: 0 4px; min-height: 28px">
+    <view class="flex flex-wrap items-center" style="gap: 0 6px; padding: 0 0 0 2px; min-height: 44px">
+      <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
       <template v-if="status === 'ready'">
         <text :style="capStyle">{{ t.fx.rateLabel }}</text>
         <text class="whitespace-nowrap" :style="valueStyle">{{ rateLine }}</text>
-        <text :style="capStyle">{{ lockLine }}</text>
       </template>
       <view v-else-if="status === 'loading'" class="nx-fx-skel" />
       <template v-else-if="status === 'empty'">
@@ -25,6 +25,9 @@
       </template>
       <text v-else :style="capStyle">{{ t.fx.updating }}</text>
 
+      <!-- The lock note and the info button wrap together onto a second line when the first is full. -->
+      <view class="flex items-center" :style="tailStyle">
+      <text v-if="status === 'ready'" :style="lockStyle">{{ lockLine }}</text>
       <!-- 信息 icon:视觉 28px 圆,点击热区 44×44(负 margin 不撑行高) -->
       <view
         class="shrink-0 grid place-items-center"
@@ -34,9 +37,8 @@
         :aria-label="t.fx.infoAria"
         @click="sheetOpen = true"
       >
-        <view class="grid place-items-center transition active:bg-[var(--v5-surface-3)]" :style="infoBtnStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-        </view>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9h.01" /></svg>
+      </view>
       </view>
     </view>
 
@@ -87,30 +89,28 @@ const sheetBody1 = computed(() =>
   fmt(t.value.fx.sheetBody1, { min: fx.lockWindowMin > 0 ? fx.lockWindowMin : "—" }),
 );
 
+// P-44: muted 13/18 caption with the rate itself in the mono metric face; a bare info glyph in a 44px target.
 const capStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12px",
+  fontSize: "13px",
+  lineHeight: "18px",
   color: "var(--v5-ink-3)",
 };
+// When the row is too narrow the lock note and info button move to their own line, so the button never leaves the screen.
+const tailStyle: CSSProperties = { flex: "1 0 auto", maxWidth: "100%", gap: "6px" };
+const lockStyle: CSSProperties = { ...capStyle, minWidth: "0" };
 const valueStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-metric)",
   fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink-2)",
+  lineHeight: "18px",
+  fontWeight: 500,
+  color: "var(--v5-ink)",
 };
 const infoHitStyle: CSSProperties = {
   width: "44px",
   height: "44px",
-  marginTop: "-8px",
-  marginBottom: "-8px",
-  marginRight: "-8px",
   marginLeft: "auto",
-};
-const infoBtnStyle: CSSProperties = {
-  width: "28px",
-  height: "28px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
+  marginRight: "-2px",
 };
 // 🔴 790/800 = 业务半屏带(理由同 device-deactivate-sheet.vue:原 79/80 低于庆祝 780,
 // 会被盖住并吞点击;写成 JS 样式对象所以此前逃过机器门,2026-08-17 补齐)。
@@ -121,30 +121,32 @@ const scrimStyle: CSSProperties = {
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
-const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0", boxShadow: "var(--nx-glass-edge)",
   position: "fixed",
   left: 0,
   right: 0,
   bottom: 0,
   zIndex: 800,
-  borderTopLeftRadius: "var(--nx-glass-radius)",
-  borderTopRightRadius: "var(--nx-glass-radius)",
   background: "var(--nx-glass-fill)",
   borderTop: "none",
-  padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
+  boxSizing: "border-box",
+  maxHeight: "calc(100vh - var(--nx-overlay-top))",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  padding: "18px 16px var(--nx-overlay-bottom)",
 };
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-hero-title)",
+  fontWeight: "var(--ui-type-hero-title-weight)",
   color: "var(--v5-ink)",
 };
 const bodyStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-long-form)",
   color: "var(--v5-ink-3)",
-  lineHeight: 1.55,
+  lineHeight: "var(--ui-type-long-form-lh)",
 };
 const okBtnStyle: CSSProperties = {
   marginTop: "16px",

@@ -2,8 +2,8 @@
   <view v-if="providers.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
     <text class="oauth-title">{{ intent === "LINK" ? t.thirdParty.linkTitle : t.thirdParty.signInTitle }}</text>
     <text v-if="intent === 'LINK' && !providers.length" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
-    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || disabled" @select="start" />
-    <view v-if="flow" class="oauth-panel" aria-live="polite">
+    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || disabled" :preserve-appearance="disabled && !flow && !submitting && !unavailableReason" :unavailable-reason="unavailableReason" @select="start" />
+    <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
       <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
       <input v-if="verified && intent === 'LINK'" v-model="password" password :maxlength="128"
@@ -21,7 +21,7 @@
         :aria-disabled="submitting" @click="cancelFromUser" @keydown.enter.prevent="cancelFromUser" @keydown.space.prevent="cancelFromUser">
         <text>{{ t.ui.cancel }}</text>
       </view>
-    </view>
+    </component>
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
     <ServerCaptchaSlider v-if="showCaptcha" scene="LOGIN" phone="" @success="captchaComplete" @close="showCaptcha = false" />
   </view>
@@ -29,6 +29,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
@@ -42,8 +43,10 @@ import { useLocaleStore } from "@/store/locale";
 import { ApiError } from "@/api/errors";
 import { listenForNativeOAuthReturn, validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth-browser-return";
 
-const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null }>(), {
-  intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null,
+// beforeStart lets the host page veto a start (e.g. an invalid typed invite code) before the provider opens.
+// sponsorRejected hands the refused invite code, as sent, back to the host page that owns the invite field.
+const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: ((sent: string | null) => void) | null; unavailableReason?: string }>(), {
+  intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null, beforeStart: null, sponsorRejected: null,
 });
 const t = useT();
 const emit = defineEmits<{ (event: "busy", busy: boolean): void }>();
@@ -76,6 +79,7 @@ let revision = 0;
 let expiresAt = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let popup: Window | null = null;
+let sentSponsorCode: string | null = null;
 function sameSession() {
   return sessionVault.revision() === revision
     || (props.intent === "LINK" && sessionVault.isRefreshContinuation(revision));
@@ -110,7 +114,10 @@ function cancelFromUser() {
 }
 function errorMessage(cause: unknown): string {
   const error = cause instanceof ApiError ? cause.message : "";
+  if (error === "USER_REGISTRATION_K1_IP_LIMIT") return t.value.register.errorSignupLimited;
+  if (error === "OAUTH_LOGIN_EXPIRED") return t.value.thirdParty.restartExpired;
   if (error === "OAUTH_ACCOUNT_LINK_REQUIRED") return t.value.thirdParty.linkRequired;
+  if (error === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || error === "USER_REGISTRATION_SPONSOR_INVALID") return t.value.register.inviteInvalid;
   if (error?.startsWith("USER_REGISTRATION_SPONSOR_")) return t.value.register.sponsorEnvironmentMismatch;
   if (error === "OAUTH_LINK_PASSWORD_INVALID") return t.value.thirdParty.passwordInvalid;
   if (error === "OAUTH_IDENTITY_ALREADY_LINKED" || error === "OAUTH_PROVIDER_ALREADY_LINKED")
@@ -118,6 +125,16 @@ function errorMessage(cause: unknown): string {
   if (error === "USER_TWO_FACTOR_CHALLENGE_INVALID") return t.value.thirdParty.codeInvalid;
   if (error === "USER_PASSWORD_RESET_REQUIRED") return t.value.thirdParty.passwordReset;
   return t.value.thirdParty.failed;
+}
+// A refused invite code ends this flow: retrying would send the same code. The host
+// page reopens its invite field with the prompt; without a host handler it shows here.
+function sponsorRefused(cause: unknown): boolean {
+  if (!(cause instanceof ApiError)
+      || !["USER_REGISTRATION_SPONSOR_NOT_FOUND", "USER_REGISTRATION_SPONSOR_INVALID"].includes(cause.message)) return false;
+  cancel();
+  if (props.sponsorRejected) props.sponsorRejected(sentSponsorCode);
+  else message.value = t.value.register.inviteInvalid;
+  return true;
 }
 async function start(name: string) {
   if (flow.value || submitting.value || props.disabled || disposed) return;
@@ -134,7 +151,10 @@ async function start(name: string) {
   if (!popup) { message.value = t.value.thirdParty.popupBlocked; submitting.value = false; emit("busy", false); return; }
   // #endif
   try {
-    const next = await api.start(provider, props.intent, props.sponsorCode);
+    // The popup above is only a blank reservation; a veto closes it before any provider page loads.
+    if (props.beforeStart && !(await props.beforeStart())) { cancel(); return; }
+    sentSponsorCode = props.sponsorCode;
+    const next = await api.start(provider, props.intent, sentSponsorCode);
     if (disposed || current !== generation || !sameSession()) { cancel(); return; }
     flow.value = next; expiresAt = Date.now() + next.expiresInSec * 1000;
     // #ifdef H5
@@ -146,7 +166,7 @@ async function start(name: string) {
     });
     // #endif
     void poll(current);
-  } catch (cause) { cancel(); message.value = errorMessage(cause); }
+  } catch (cause) { if (!sponsorRefused(cause)) { cancel(); message.value = errorMessage(cause); } }
   finally { submitting.value = false; }
 }
 async function poll(current: number) {
@@ -211,7 +231,7 @@ async function complete(captchaTicket?: string) {
         serverProfile: result.user, onboardingComplete: result.user.onboardingComplete,
         serverSessionRevision: result.vaultRevision,
         deferNavigation: !!result.registrationReceipt,
-        registrationLocale: result.registrationReceipt ? useLocaleStore().code : undefined,
+        initialOAuthLocale: result.registrationReceipt ? useLocaleStore().code : undefined,
       });
       if (!completed.ok) throw new Error("SIGN_IN_FAILED");
       if (result.registrationReceipt) {
@@ -232,8 +252,10 @@ async function complete(captchaTicket?: string) {
         // Leave the durable attempt intact. The shared login recovery UI owns
         // ambiguous completion, including recovery after this flow has expired.
         cancel(); message.value = t.value.login.unknownAttempt;
-      } else if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") showCaptcha.value = true;
-      else message.value = errorMessage(cause);
+      } else if (cause instanceof ApiError && cause.message === "OAUTH_LOGIN_EXPIRED") {
+        cancel(); message.value = errorMessage(cause);
+      } else if (cause instanceof ApiError && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) showCaptcha.value = true;
+      else if (!sponsorRefused(cause)) message.value = errorMessage(cause);
     }
   } finally { submitting.value = false; password.value = ""; }
 }
@@ -259,15 +281,19 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.third-party-auth { margin: 20px 0; color: var(--v5-ink); }
-.oauth-title { display: block; font-size: 15px; font-weight: 600; margin-bottom: 12px; }
-.oauth-copy { display: block; font-size: 13px; line-height: 1.6; color: var(--v5-ink-2); margin: 10px 0; overflow-wrap: anywhere; }
-.oauth-panel { padding: 14px; margin-top: 12px; border-radius: 16px; background: var(--v5-surface); }
-.oauth-identity { display: block; overflow-wrap: anywhere; font-weight: 600; margin: 12px 0; }
-.oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px; border-radius: 10px; color: var(--v5-ink); background: var(--v5-surface-2); margin: 12px 0; }
-.oauth-button { min-height: 44px; display: flex; align-items: center; justify-content: center; margin-top: 10px; border-radius: 12px; background: var(--v5-brand); color: white; font-size: 15px; }
+.third-party-auth { margin: var(--v5-space-5) 0; color: var(--v5-ink); }
+.oauth-title { display: block; font-size: var(--ui-type-subheading); font-weight: var(--ui-type-subheading-weight); margin-bottom: var(--v5-space-3); }
+.oauth-copy { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.6; color: var(--v5-ink-2); margin: 10px 0; overflow-wrap: anywhere; }
+.oauth-panel { padding: 14px; margin-top: var(--v5-space-3); border-radius:var(--v5-radius-m); background: var(--v5-surface); }
+.oauth-identity { display: block; overflow-wrap: anywhere; font-weight: 600; margin: var(--v5-space-3) 0; }
+.oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px; border-radius: 10px; color: var(--v5-ink); background: var(--v5-surface-2); margin: var(--v5-space-3) 0; }
+.oauth-button { min-height: 44px; display: flex; align-items: center; justify-content: center; margin-top: 10px; border-radius:var(--ui-radius-icon); background: var(--v5-brand); color: white; font-size: var(--ui-type-button); }
 .oauth-button:active { opacity: 0.8; }
 .oauth-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .oauth-button[aria-disabled="true"] { opacity: 0.5; }
 .oauth-secondary { background: var(--v5-surface-2); color: var(--v5-ink); }
+</style>
+
+<style scoped>
+.oauth-panel-sheet :deep(.nx-sheet) { min-height:50vh; }
 </style>

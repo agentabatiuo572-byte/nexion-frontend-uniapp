@@ -13,7 +13,7 @@ export interface AccountApi {
   revokeSession(sessionId: string): Promise<SecurityMutation>;
   revokeOtherSessions(): Promise<SecurityMutation>;
   accountDeletionStatus(): Promise<AccountDeletionStatus>;
-  requestAccountDeletion(currentPassword: string, idempotencyKey: string): Promise<AccountDeletionRequest>;
+  requestAccountDeletion(currentPassword: string, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
   cancelAccountDeletion(expectedVersion: number, idempotencyKey: string, reason?: string): Promise<AccountDeletionRequest>;
   phoneNumberPolicy(): Promise<PhoneNumberChangePolicy>;
   startPhoneNumberChange(currentPassword: string, countryCode: string, phone: string): Promise<PhoneNumberChangeChallenge>;
@@ -50,10 +50,25 @@ export interface AccountDeletionRequest {
   completedAt: string | null;
   reason: string | null;
   blockReason: string | null;
+  originalReason: string | null;
   cancelledAt: string | null;
 }
 
 export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
+
+export const ACCOUNT_DELETION_REASON_MAX_LENGTH = 255;
+export type AccountDeletionReasonValidation =
+  | { ok: true }
+  | { ok: false; code: "ACCOUNT_DELETION_REASON_INVALID" };
+
+export function validateAccountDeletionReason(reason: string): AccountDeletionReasonValidation {
+  // Match Java StringUtils.hasText and String.trim, which use different whitespace sets.
+  const hasText = /[^\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]/.test(reason);
+  const trimmed = hasText ? reason.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "") : "";
+  return trimmed.length <= ACCOUNT_DELETION_REASON_MAX_LENGTH
+    ? { ok: true }
+    : { ok: false, code: "ACCOUNT_DELETION_REASON_INVALID" };
+}
 
 let idempotencySequence = 0;
 
@@ -173,6 +188,7 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
     cancelledAt: null,
     reason: null,
     blockReason: null,
+    originalReason: null,
     ...raw,
   };
   const allowed = ["REQUESTED", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"];
@@ -185,12 +201,21 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
       || (source.cancelledAt !== null && !validDate(source.cancelledAt))
       || (source.reason !== null && typeof source.reason !== "string")
       || (source.blockReason !== null && typeof source.blockReason !== "string")
-      || Object.keys(source).some((key) => ![
-        "requestNo", "status", "version", "requestedAt", "reviewedAt", "completedAt", "reason", "blockReason", "cancelledAt",
-      ].includes(key))) {
+      || (source.originalReason !== null && typeof source.originalReason !== "string")) {
     throw new ApiError({ kind: "protocol", message: "ACCOUNT_DELETION_RESPONSE_INVALID" });
   }
-  return source as unknown as AccountDeletionRequest;
+  return {
+    requestNo: source.requestNo,
+    status: source.status as AccountDeletionRequest["status"],
+    requestedAt: source.requestedAt,
+    version: source.version,
+    reviewedAt: source.reviewedAt,
+    completedAt: source.completedAt,
+    cancelledAt: source.cancelledAt,
+    reason: source.reason,
+    blockReason: source.blockReason,
+    originalReason: source.originalReason,
+  };
 }
 
 function parseAccountDeletionStatus(value: unknown): AccountDeletionStatus {
@@ -223,10 +248,13 @@ export function createAccountApi(client: ApiClient): AccountApi {
       const result = await client.request({ method: "GET", path: `/api/app/security/password/commands/${encodeURIComponent(key)}` });
       return result === null ? null : parseMutation(result);
     },
-    securityOverview: async (cursor) => parseSecurityState(await client.request({
+    securityOverview: async (cursor) => {
+      invalidateBeforePassiveTabRead("security-overview");
+      return parseSecurityState(await client.request({
       method: "GET",
       path: cursor ? `/api/app/security?cursor=${encodeURIComponent(cursor)}` : "/api/app/security",
-    })),
+      }));
+    },
     changePassword: async (currentPassword, newPassword, idempotencyKey) => parseMutation(await client.request({
       method: "POST",
       path: "/api/app/security/password",
@@ -259,12 +287,16 @@ export function createAccountApi(client: ApiClient): AccountApi {
       method: "GET",
       path: "/api/app/security/account-deletion",
     })),
-    requestAccountDeletion: async (currentPassword, idempotencyKey) => parseAccountDeletion(await client.request({
-      method: "POST",
-      path: "/api/app/security/account-deletion",
-      body: { currentPassword, confirmation: "DELETE" },
-      idempotencyKey,
-    })),
+    requestAccountDeletion: async (currentPassword, idempotencyKey, reason) => {
+      const validation = validateAccountDeletionReason(reason ?? "");
+      if (!validation.ok) throw new ApiError({ kind: "business", message: validation.code, code: 422 });
+      return parseAccountDeletion(await client.request({
+        method: "POST",
+        path: "/api/app/security/account-deletion",
+        body: { currentPassword, confirmation: "DELETE", reason },
+        idempotencyKey,
+      }));
+    },
     cancelAccountDeletion: async (expectedVersion, idempotencyKey, reason = "USER_REQUESTED_CANCEL") => parseAccountDeletion(await client.request({
       method: "POST",
       path: "/api/app/security/account-deletion/cancel",
@@ -290,3 +322,4 @@ export function createAccountApi(client: ApiClient): AccountApi {
     },
   };
 }
+import { invalidateBeforePassiveTabRead } from "@/lib/passive-read-window";

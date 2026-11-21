@@ -21,7 +21,7 @@
                 <text :style="{ fontSize: '15px', fontWeight: 600, color: 'var(--v5-ink)' }">N</text>
               </view>
               <view>
-                <text class="block font-display" :style="nexPairStyle">NEX / USDT</text>
+                <text class="block font-display" :style="nexPairStyle">UVT / USDT</text>
                 <text class="block" :style="nexSubStyle">UVEL · #{{ nex.rank }}</text>
               </view>
             </view>
@@ -29,8 +29,8 @@
               <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ nexPriceText }}</text>
               <text v-if="marketAuthorityStatus === 'loading'" class="block" :style="nexChangeStyle" role="status" aria-live="polite">{{ t.marketPage.nexHero.loading }}</text>
               <text v-else-if="marketAuthorityStatus === 'unavailable'" class="block" :style="nexChangeStyle">{{ t.exchange.remoteNotProvided }}</text>
-              <text v-else class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
-                {{ market.change24hAvailable ? `${nexDirection} ${Math.abs(nex.change24h).toFixed(2)}%` : "—" }} (24h)
+              <text v-else class="block font-mono-tabular tabular-nums" :class="market.change24hAvailable ? nexDirection : undefined" :style="nexChangeStyle">
+                <text v-if="market.change24hAvailable && nexDirection" class="nx-sr-only">{{ nex.change24h > 0 ? "+" : "−" }}</text>{{ market.change24hAvailable ? `${Math.abs(nex.change24h).toFixed(2)}%` : "—" }} (24h)
               </text>
             </view>
           </view>
@@ -43,7 +43,7 @@
             <NexChart :data="nexChartData" :up="nexUp" />
           </view>
           <view v-else class="rounded-xl flex items-center justify-center" :style="chartBoxStyle">
-            <text class="active:opacity-70" :style="marketHoldBodyStyle" role="button" tabindex="0" :aria-label="market.remoteError ? t.ui.retry : historyUnavailableText" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : historyUnavailableText }}</text>
+            <text :style="marketHoldBodyStyle">{{ historyUnavailableText }}</text>
           </view>
 
           <!-- buy / sell CTAs -->
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, nextTick, type CSSProperties } from "vue";
@@ -98,6 +99,8 @@ import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 
 const t = useT();
 const market = useMarket();
+const marketReading = ref(false);
+useAutoRecovery({ failed: () => !market.isMockMode && !marketReading.value && market.remoteError !== null, retry: retryMarkets });
 const marketAuthorityStatus = computed(() => remoteAuthorityStatus({
   remoteApiEnabled,
   hasSnapshot: market.remoteReady,
@@ -120,7 +123,7 @@ const nex = computed(() => ({
   spark30d: market.klineDaily,
 }));
 const nexPriceText = computed(() => market.isMockMode || market.remoteReady ? fmtPrice(nex.value.priceUSD) : "—");
-onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
+onMounted(() => { if (!market.isMockMode) void retryMarkets(); });
 
 const tf = ref<Timeframe>("24H");
 
@@ -136,8 +139,10 @@ function cycleTimeframe(delta: number): void {
   });
 }
 
-function retryMarkets() {
-  void market.syncRemote();
+async function retryMarkets() {
+  if (marketReading.value) return;
+  marketReading.value = true;
+  try { return await market.syncRemote(); } finally { marketReading.value = false; }
 }
 
 const nexChartData = computed(() => {
@@ -147,7 +152,7 @@ const nexChartData = computed(() => {
 });
 const historyUnavailableText = computed(() => fmt(t.value.marketPage.nexHero.historyUnavailable, { range: tf.value }));
 const nexUp = computed(() => nex.value.change24h >= 0);
-const nexDirection = computed(() => nex.value.change24h > 0 ? "▲" : nex.value.change24h < 0 ? "▼" : "•");
+const nexDirection = computed(() => nex.value.change24h > 0 ? "nx-before-caret-up" : nex.value.change24h < 0 ? "nx-before-caret-down" : undefined);
 const athDeltaPct = computed(() => nex.value.ath > 0 ? ((nex.value.priceUSD - nex.value.ath) / nex.value.ath) * 100 : 0);
 
 function fmtPrice(n: number): string {
@@ -225,7 +230,7 @@ function segItemStyle(active: boolean): CSSProperties {
 function segLabelStyle(active: boolean): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",

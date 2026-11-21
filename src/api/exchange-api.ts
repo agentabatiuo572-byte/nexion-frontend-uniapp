@@ -4,8 +4,8 @@ import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { historySnapshotQuery, parseHistorySnapshotId } from "./history-snapshot";
 
-export type ExchangeDirection = "USDT_TO_NEX" | "NEX_TO_USDT";
-export type ExchangeAsset = "USDT" | "NEX";
+export type ExchangeDirection = "USDT_TO_UVT" | "UVT_TO_USDT";
+export type ExchangeAsset = "USDT" | "UVT";
 export type ExchangeOrderStatus =
   | "COMPLETED"
   | "SUCCESS"
@@ -39,6 +39,7 @@ export interface ExchangeOrder {
   toAmount: number;
   rate: number;
   status: ExchangeOrderStatus;
+  queueEstimate?: { hours: number; copy: string };
   createdAt?: number;
 }
 
@@ -138,7 +139,7 @@ function parseCaps(value: unknown, mode: ApiEnvironment): ExchangeCaps {
   const minUsdt = number(row?.minUsdt, Number.EPSILON);
   const minNex = number(row?.minNex, Number.EPSILON);
   const queueMode = text(row?.queueMode)?.toUpperCase();
-  if (!row || row.asset !== "NEX" || row.currency !== "USDT"
+  if (!row || row.asset !== "UVT" || row.currency !== "USDT"
       || !validAuthority(row, mode) || row.source !== "G2/G3 server configuration"
       || currentPrice === null || userDailyCapUsdt === null || userDailyCapUsdt > 10_000
       || platformDailyCapUsdt === null || platformDailyCapUsdt > 10_000_000
@@ -172,11 +173,17 @@ function parseOrder(value: unknown): ExchangeOrder {
   const rate = number(row?.rate, Number.EPSILON);
   const status = text(row?.status)?.toUpperCase() as ExchangeOrderStatus | undefined;
   if (!row || !exchangeNo || !/^EX-[A-Za-z0-9-]{8,90}$/.test(exchangeNo)
-      || !["USDT", "NEX"].includes(fromAsset ?? "") || !["USDT", "NEX"].includes(toAsset ?? "")
+      || !["USDT", "UVT"].includes(fromAsset ?? "") || !["USDT", "UVT"].includes(toAsset ?? "")
       || fromAsset === toAsset || fromAmount === null || toAmount === null || rate === null
       || !status || !ORDER_STATUSES.has(status)) {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
+  const estimate = record(row.queueEstimate);
+  const hours = estimate?.hours;
+  const copy = text(estimate?.copy);
+  const queueEstimate = status === "QUEUED" && typeof hours === "number"
+    && Number.isInteger(hours) && hours >= 1 && hours <= 999 && copy && !copy.includes("{hours}")
+    ? { hours, copy } : undefined;
   let createdAt: number | undefined;
   if ("createdAt" in row && row.createdAt !== null) {
     const parsed = parseServerTimestamp(row.createdAt);
@@ -191,6 +198,7 @@ function parseOrder(value: unknown): ExchangeOrder {
     toAmount,
     rate,
     status,
+    ...(queueEstimate ? { queueEstimate } : {}),
     createdAt,
   };
 }
@@ -198,7 +206,7 @@ function parseOrder(value: unknown): ExchangeOrder {
 function parseSnapshot(value: unknown, mode: ApiEnvironment): ExchangeSnapshot {
   const row = record(value);
   const wallet = record(row?.wallet);
-  const usdtAvailable = number(wallet?.usdtAvailable);
+  const usdtAvailable = number(wallet?.usdtAvailable, -Infinity);
   const nexAvailable = number(wallet?.nexAvailable);
   const todayUserUsedUsdt = number(row?.todayUserUsedUsdt);
   const todayPlatformUsedUsdt = number(row?.todayPlatformUsedUsdt);

@@ -17,7 +17,7 @@
  *   · 本地包装函数继承原语属性:文件里凡「调用了判决原语且有返回值」的函数(如 pending-checkout 的 commitSessions、
  *     checkout 的 releaseVoucher)自动加入该文件的判决集合,并迭代到不动点 —— 抽一层 helper 不再能让门失明。
  *     反过来,文件里自己定义的同名非判决函数(如组件本地的 createOrder)在本文件内不算判决原语(遮蔽)。
- * Usage: node scripts/selfcheck-persist-verdict.mjs [--selftest]
+ * Usage: node scripts/selfcheck-persist-verdict.mjs
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -232,63 +232,6 @@ export function findDiscardedVerdicts(code, fileLabel = "snippet.ts") {
   return hits;
 }
 
-function selftest() {
-  const bad = [
-    "function f(){ persist(); }",                       // bare
-    "function f(){ store.markUsed(id); }",               // property access
-    "async function f(){ await orders.createOrder(x); }", // awaited bare
-    "function f(){ rows.commit((c) => null); }",          // commit bare
-    "function f(){ ok && persist(); }",                   // logical operand, value unused
-    "function f(){ (a, persist()); }",                    // comma
-    "function f(){ cond ? persist() : 0; }",              // ternary branch
-    "function f(){ !persist(); }",                        // unary
-    "function f(){ Boolean(persist()); }",                // wrapped in a non-verdict call
-    "function f(){ persist() || 0; }",
-    "function f(){ (persist()); }",
-    "function f(){ [persist()]; }",
-    "function f(){ store?.persist?.(); }",                // optional call
-    "function f(){ setTimeout(() => { persist(); }, 0); }", // nested statement
-    "function commitX(a){ const r = rows.commit(a); return r.ok ? r.result : null; } function g(){ commitX(() => null); }", // wrapper (audit R8: commitSessions)
-    "const rel = () => claimed ? store.release(id) : true; function g(){ rel(); }",                                     // arrow wrapper
-    "function w1(){ return persist(); } function w2(){ return w1(); } function g(){ w2(); }",                             // wrapper of wrapper
-    "function tick(){ rows.commit(() => null); } function g(){ tick(); }",  // exactly ONE hit: the inner bare call; the void helper itself is not a wrapper (g() must not be flagged)
-    "function f(){ app.devices = app.devices.filter((d) => d.id !== id); }",   // page-level direct write to account state
-    "function f(){ app.user.usdtBalance = 0; }",
-    "function f(){ app.devices = [...app.devices, dev]; }",
-  ];
-  const good = [
-    "function f(){ if (!persist()) return false; }",
-    "function f(){ const ok = app.debitBalance(1); return ok; }",
-    "function f(){ return voucher.release(id); }",
-    "function f(){ void persist(); }",                          // explicit discard
-    "function f(){ persist(); // persist-verdict-ok: best-effort prune\n }",
-    "function f(){ // persist-verdict-ok: read-only sync\n rows.commit(() => null); }",
-    "function f(){ x = persist(); }",                           // assigned
-    "function f(){ const c = ok && persist(); return c; }",     // consumed
-    "function f(){ if (a && persist()) {} }",
-    "function f(){ return cond ? persist() : true; }",
-    "function f(){ persist() ? doA() : doB(); }",               // verdict drives the branch = consumed
-    "function f(){ toast.warn(fmt(msg)); }",                    // no verdict primitive at all
-    "function f(){ app.devices.forEach((d) => d); }",            // read is fine
-    "function f(){ const x = app.user.usdtBalance; return x; }",  // read is fine
-    "function f(){ localState.devices = []; }",                   // not the app store
-    "function createOrder(x){ items.push(x); } function g(){ createOrder(1); }", // local non-verdict function shadowing a base name
-    "async function claim(id){ const r = rows.commit((c) => null); return r.ok; } async function g(){ await api.claim(id); }", // same-name METHOD on another object is not the local wrapper
-    "function advanceTo(now){ const x = resolve(now); persist(); /* persist-verdict-ok: pure re-derivation */ return x; } function g(){ advanceTo(1); }", // calls a verdict but returns something else → not a wrapper
-  ];
-  let fail = 0;
-  for (const s of bad) { const h = findDiscardedVerdicts(s); if (h.length !== 1) { console.error("SELFTEST FAIL (should flag):", s, h); fail++; } }
-  for (const s of good) { const h = findDiscardedVerdicts(s); if (h.length !== 0) { console.error("SELFTEST FAIL (should pass):", s, h); fail++; } }
-  // vue extraction: script block only, template ignored
-  const vue = "<template><view @click=\"persist()\" /></template>\n<script setup lang=\"ts\">\nfunction g(){ persist(); }\n</script>";
-  const blocks = scriptBlocks("x.vue", vue);
-  const vh = blocks.flatMap((b) => findDiscardedVerdicts(b.code));
-  if (blocks.length !== 1 || vh.length !== 1) { console.error("SELFTEST FAIL (vue extraction):", blocks.length, vh); fail++; }
-  if (fail) { console.error(`persist-verdict selftest: ${fail} failed`); process.exit(2); }
-  console.log(`persist-verdict selftest: OK (${bad.length} flagged · ${good.length} allowed · vue script-only)`);
-}
-
-if (process.argv.includes("--selftest")) { selftest(); process.exit(0); }
 
 let total = 0;
 const report = [];

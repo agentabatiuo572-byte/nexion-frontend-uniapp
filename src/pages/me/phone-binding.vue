@@ -3,22 +3,22 @@
     <view class="phone-binding-page">
       <SubPageHeader back="/pages/me/security" :title="t.security.phoneBindingTitle" />
       <view class="phone-binding-card">
-        <text class="phone-binding-note" role="status">{{ bound ? t.security.phoneBindingDone : t.security.phoneBindingRequired }}</text>
-        <template v-if="!bound">
+        <text class="phone-binding-note" role="status">{{ bound === null ? t.security.phoneBindingLoading : bound ? t.security.phoneBindingDone : t.security.phoneBindingRequired }}</text>
+        <template v-if="bound === false">
           <view class="phone-binding-number">
             <view class="phone-binding-code" role="button" tabindex="0" :aria-label="t.countryCodes.title"
               :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true"
-              @keydown.space.prevent="showCountries = true">{{ countryCode }} ▾</view>
+              @keydown.space.prevent="showCountries = true"><text class="nx-after-chevron-down">{{ countryCode }}</text></view>
             <input v-model="phone" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :aria-label="t.register.phonePlaceholder" />
           </view>
-          <view class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validPhone || resendLeft > 0" @click="sendCode()" @keydown.enter.prevent="sendCode()">
+          <view class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validPhone || resendLeft > 0" @click="sendCode()" @keydown.enter.prevent="sendCode()" @keydown.space.prevent="sendCode()">
             {{ resendLeft > 0 ? `${t.security.phoneBindingResend} ${resendLeft}s` : t.addrRebind.otpSendCta }}
           </view>
           <input v-if="challengeNo" v-model="code" class="phone-binding-input" type="number" inputmode="numeric" maxlength="6" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" />
-          <view v-if="challengeNo" class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validCode" @click="submit" @keydown.enter.prevent="submit">{{ t.security.phoneBindingConfirm }}</view>
+          <view v-if="challengeNo" class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validCode" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit">{{ t.security.phoneBindingConfirm }}</view>
           <text v-if="error" class="phone-binding-error" role="alert">{{ error }}</text>
         </template>
-        <view v-else class="phone-binding-action" role="button" tabindex="0" @click="navTo('/pages/me/security')" @keydown.enter.prevent="navTo('/pages/me/security')">{{ t.security.back }}</view>
+        <view v-else-if="bound" class="phone-binding-action" role="button" tabindex="0" @click="navTo('/pages/me/security')" @keydown.enter.prevent="navTo('/pages/me/security')" @keydown.space.prevent="navTo('/pages/me/security')">{{ t.security.back }}</view>
       </view>
       <ServerCaptchaSlider v-if="showCaptcha" :phone="`${countryCode}${phone}`" scene="REGISTER" @success="onCaptchaSuccess" @close="showCaptcha = false" />
     </view>
@@ -47,7 +47,8 @@ const phone = ref("");
 const code = ref("");
 const challengeNo = ref("");
 const busy = ref(false);
-const bound = ref(false);
+// Unknown (null) until there is a session: after an H5 reload it is restored after the page shows.
+const bound = ref<boolean | null>(null);
 const error = ref("");
 const showCaptcha = ref(false);
 const resendLeft = ref(0);
@@ -55,8 +56,10 @@ const validPhone = computed(() => validateNationalPhone(countryCode.value, phone
 const validCode = computed(() => /^\d{6}$/.test(code.value));
 let timer: ReturnType<typeof setInterval> | null = null;
 
-onShow(() => { bound.value = !!sessionVault.read()?.user.phone; });
-onUnmounted(() => { if (timer) clearInterval(timer); });
+function readBinding() { const session = sessionVault.read(); bound.value = session ? !!session.user.phone : null; }
+onShow(readBinding);
+const unsubscribe = sessionVault.subscribe?.(readBinding);
+onUnmounted(() => { if (timer) clearInterval(timer); unsubscribe?.(); });
 watch([phone, countryCode], () => { challengeNo.value = ""; code.value = ""; });
 function startCooldown(seconds: number) {
   resendLeft.value = seconds;
@@ -119,12 +122,13 @@ async function submit() {
 
 <style scoped>
 .phone-binding-page { min-height: 100vh; padding-bottom: 32px; color: var(--v5-ink); }
-.phone-binding-card { margin: 20px 16px; padding: 20px; border-radius: 18px; background: var(--v5-surface-1); display: grid; gap: 16px; }
-.phone-binding-note { color: var(--v5-ink-2); line-height: 1.5; }
+.phone-binding-card { margin: 16px; padding: 16px; border-radius: 18px; background: var(--v5-surface); display: grid; gap: 16px; }
+.phone-binding-note { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.6; overflow-wrap: anywhere; }
 .phone-binding-number { display: flex; align-items: center; gap: 12px; }
-.phone-binding-code, .phone-binding-number input, .phone-binding-input { padding: 12px; border: 1px solid var(--v5-ink-4); border-radius: 10px; min-height: 48px; }
+.phone-binding-code, .phone-binding-number input, .phone-binding-input { box-sizing: border-box; padding: 12px; border: 1px solid var(--v5-border); background: var(--v5-surface-2); border-radius: 10px; min-height: 48px; font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); }
+.phone-binding-code { flex-shrink: 0; }
 .phone-binding-number input { flex: 1; min-width: 0; }
-.phone-binding-action { min-height: 48px; display: grid; place-items: center; border-radius: 10px; background: var(--v5-brand); color: var(--v5-on-brand); font-weight: 600; }
-.phone-binding-action[aria-disabled="true"] { opacity: .5; }
+.phone-binding-action { min-height: 48px; padding: 8px 12px; box-sizing: border-box; display: grid; place-items: center; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font-size: 14px; font-weight: 600; text-align: center; }
+.phone-binding-action[aria-disabled="true"] { background: var(--v5-surface-2); color: var(--v5-ink-4); }
 .phone-binding-error { color: var(--v5-danger); }
 </style>

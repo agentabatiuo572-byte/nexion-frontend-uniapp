@@ -8,6 +8,9 @@ import { isStaticReviewRoute, normalizeRoute } from "@/lib/static-review-routes"
  * `"constructor"` / `"toString"` 这类原型链上的键会被判成「在白名单里」。
  */
 const PUBLIC_ROUTES: Record<string, true> = {
+  // #ifdef APP-PLUS
+  "pages/me/app-update": true,
+  // #endif
   "pages/onboarding/intro": true,
   "pages/onboarding/terms": true,
   "pages/onboarding/privacy": true,

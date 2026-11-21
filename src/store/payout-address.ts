@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
-import { payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
+import { computed, onScopeDispose, ref } from "vue";
+import { apiRuntimeConfig, payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
+import type { ApiRuntimeConfig } from "@/api/runtime-config";
 import {
   payoutAddressEpochMs,
   type PayoutAddressNetwork,
@@ -17,7 +18,8 @@ import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
+import { subscribeRuntimeRevision } from "@/api/order-api";
+import { occupiesWithdrawalSlot } from "./withdrawal-arrival-core";
 import {
   applyAddAddress,
   applyChangeAddress,
@@ -59,6 +61,7 @@ export interface PayoutAddressServerClock {
 }
 
 export type PayoutAddressChangeBlockReason = PayoutChangeBlockReason | "time-unknown";
+export type PayoutAddressReadStatus = "idle" | "loading" | "error" | "ready";
 
 function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
   const result = emptyBook();
@@ -180,7 +183,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   const remoteServerClock = ref<PayoutAddressServerClock | null>(null);
   let remoteLoadVersion = 0;
 
-  function applyRemoteSnapshot(snapshot: PayoutAddressSnapshot) {
+  function applyRemoteSnapshot(snapshot: PayoutAddressSnapshot, scope: PayoutRemoteRequest) {
     book.value = remoteBook(snapshot);
     remoteProvenance.value = snapshot;
     remoteChangeCooldownDays.value = snapshot.changeCooldownDays;
@@ -189,6 +192,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     remoteServerClock.value = snapshot.serverNowEpochMs === null || receivedMonotonicAt === null
       ? null
       : { serverNowEpochMs: snapshot.serverNowEpochMs, receivedMonotonicAt };
+    remoteReadState.value = { scope, status: "ready" };
   }
 
   function persist(): boolean {
@@ -196,15 +200,36 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     return writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, boundKey, book.value);
   }
 
-  type PayoutRemoteRequest = RemoteAccountRequest & { commerceRun: RuntimeRevisionScope };
+  type PayoutRemoteRequest = RemoteAccountRequest & { apiOrigin: ApiRuntimeConfig };
+  const remoteReadState = ref<{ scope: PayoutRemoteRequest; status: PayoutAddressReadStatus } | null>(null);
+  let remoteReadInFlight: { scope: PayoutRemoteRequest; promise: Promise<boolean> } | null = null;
+
+  function clearRemoteSnapshot() {
+    book.value = emptyBook();
+    remoteChangeCooldownDays.value = null;
+    remoteEffectiveDelayHours.value = null;
+    remoteProvenance.value = null;
+    remoteServerClock.value = null;
+    remoteReadState.value = null;
+  }
 
   function requestScope(): PayoutRemoteRequest {
-    return { ...remoteAccountEpoch.snapshot(), commerceRun: captureRuntimeRevision() };
+    return { ...remoteAccountEpoch.snapshot(), apiOrigin: { ...apiRuntimeConfig } };
   }
 
   function scopeIsCurrent(request: PayoutRemoteRequest): boolean {
     return remoteAccountEpoch.isCurrent(request) && request.accountKey === boundKey
-      && isCurrentRuntimeRevision(request.commerceRun);
+      && request.apiOrigin.environment === apiRuntimeConfig.environment
+      && request.apiOrigin.baseUrl === apiRuntimeConfig.baseUrl;
+  }
+
+  // A superseded refresh returning true is not proof of a successful read.
+  // Consumers observe the latest read for their current account/API origin instead.
+  function readStatusFor(accountKey: string): PayoutAddressReadStatus {
+    if (!payoutAddressServerEnabled) return "ready";
+    const state = remoteReadState.value;
+    return state && state.scope.accountKey === normalizeAccountKey(accountKey) && scopeIsCurrent(state.scope)
+      ? state.status : "idle";
   }
 
   function scopeChangedError(): Error {
@@ -213,22 +238,47 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   /** Remote mode is fail-closed: only a validated server snapshot may populate the book.
    *  权威不可达自吞返 false(resilience 门);被更新调用顶替(superseded)不是失败事实,返 true。 */
-  async function refreshRemote(): Promise<boolean> {
-    if (!payoutAddressServerEnabled) return true;
+  function refreshRemote(): Promise<boolean> {
+    if (!payoutAddressServerEnabled) return Promise.resolve(true);
+    if (remoteReadState.value && !scopeIsCurrent(remoteReadState.value.scope)) clearRemoteSnapshot();
+    if (remoteReadInFlight && scopeIsCurrent(remoteReadInFlight.scope)) return remoteReadInFlight.promise;
     const version = ++remoteLoadVersion;
     const request = requestScope();
-    try {
-      const snapshot = await payoutAddressApi.list();
+    // Publish the shared promise before reactive loading updates can reenter.
+    const promise = Promise.resolve().then(async () => {
       if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
-      if (!runtimeProvenanceValid(snapshot)) return false;
-      applyRemoteSnapshot(snapshot);
-      return true;
-    } catch {
-      // A stale failure belongs to the previous account/request and must not
-      // surface an error or clear the current account's canonical state.
-      return !scopeIsCurrent(request);
-    }
+      try {
+        const snapshot = await payoutAddressApi.list();
+        if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
+        if (!runtimeProvenanceValid(snapshot)) {
+          remoteReadState.value = { scope: request, status: "error" };
+          return false;
+        }
+        applyRemoteSnapshot(snapshot, request);
+        return true;
+      } catch {
+        // A stale failure belongs to the previous account/request and must not
+        // surface an error or clear the current account's canonical state.
+        if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
+        remoteReadState.value = { scope: request, status: "error" };
+        return false;
+      }
+    }).finally(() => {
+      if (remoteReadInFlight?.promise === promise) remoteReadInFlight = null;
+    });
+    remoteReadInFlight = { scope: request, promise };
+    remoteReadState.value = { scope: request, status: "loading" };
+    return promise;
   }
+
+  // prepareProductCatalog also notifies API-origin changes through this channel.
+  // Catalog publications/failures do not change the address book's authority:
+  // keep both the snapshot and any in-flight read when its scope is still current.
+  onScopeDispose(subscribeRuntimeRevision(() => {
+    if (!payoutAddressServerEnabled || !remoteReadState.value || scopeIsCurrent(remoteReadState.value.scope)) return;
+    clearRemoteSnapshot();
+    void refreshRemote();
+  }));
 
   async function sendRemoteOtp() {
     if (!payoutAddressServerEnabled) throw new Error("PAYOUT_ADDRESS_SERVER_DISABLED_IN_SANDBOX");
@@ -284,7 +334,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     remoteLoadVersion += 1;
     if (!scopeIsCurrent(request)) throw scopeChangedError();
     if (!runtimeProvenanceValid(snapshot)) throw new Error("PAYOUT_ADDRESS_PROVENANCE_INVALID");
-    applyRemoteSnapshot(snapshot);
+    applyRemoteSnapshot(snapshot, request);
   }
 
   /** 账号切换重绑:装载该账号的地址簿(防跨账号继承地址与历史)。 */
@@ -293,11 +343,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     remoteAccountEpoch.bind(boundKey);
     remoteLoadVersion += 1;
     if (payoutAddressServerEnabled) {
-      book.value = emptyBook();
-      remoteChangeCooldownDays.value = null;
-      remoteEffectiveDelayHours.value = null;
-      remoteProvenance.value = null;
-      remoteServerClock.value = null;
+      clearRemoteSnapshot();
       void refreshRemote();
     } else {
       book.value = hydrate(boundKey);
@@ -324,23 +370,18 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   /** 任一网络已设地址(钱包面「管理」入口态)。 */
   const hasAnyAddress = computed(() => PAYOUT_NETWORKS.some((network) => book.value[network]?.current));
 
-  /**
-   * 该网络是否有在途提现单。
-   * 🔴 问**整张在途列表**(occupiesWithdrawalSlot 筛出的非终态集合)再按网络过滤,
-   * 不读 latestWithdrawal —— 只看最新一笔时,一张在途单 + 一张更新的已到账单
-   * 会把闸静默架空,收款地址能在放款前被换掉(2026-08-01 审计,资金安全级)。
-   */
-  function hasInFlightWithdrawalOn(network: ChainDepositChannel): boolean {
-    return useApp().inFlightWithdrawals.some((w) => w.network === CHAIN_TO_WITHDRAW_NETWORK[network]);
-  }
-
   /** 更换前的禁止动作判定(null = 可更换;页面与提交动作共用同一判据)。 */
   function changeBlockReason(
     network: ChainDepositChannel,
     serverNowEpochMs?: number | null,
   ): PayoutAddressChangeBlockReason | null {
+    // Backend checks every withdrawal of this account, including BANK-VND.
+    // Retain its raw-status verdict: display statuses can collapse a blocked
+    // REVIEW_REJECTED and a settled REJECTED into the same client status.
+    const hasInFlightWithdrawal = useApp().withdrawals.some((w) =>
+      w.payoutAddressChangeBlocked ?? occupiesWithdrawalSlot(w.status));
     if (payoutAddressServerEnabled) {
-      if (hasInFlightWithdrawalOn(network)) return "withdrawal-in-flight";
+      if (hasInFlightWithdrawal) return "withdrawal-in-flight";
       // A response from a pre-clock server is still safe to display, but may not
       // make a time-gated change appear available.
       if (!remoteServerClock.value || serverNowEpochMs == null
@@ -351,7 +392,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     }
     return payoutChangeBlockReason({
       now: serverNowEpochMs ?? mockServerNow(),
-      hasInFlightWithdrawal: hasInFlightWithdrawalOn(network),
+      hasInFlightWithdrawal,
       nextChangeAt: stateFor(network).nextChangeAt,
     });
   }
@@ -448,6 +489,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     effectiveDelayHours: computed(() => remoteEffectiveDelayHours.value),
     provenance: computed(() => remoteProvenance.value),
     serverClock: computed(() => remoteServerClock.value),
+    readStatusFor,
     hasAnyAddress,
     stateFor,
     currentFor,

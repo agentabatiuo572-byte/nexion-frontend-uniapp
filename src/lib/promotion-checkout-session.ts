@@ -1,9 +1,16 @@
-import type { OrderReceipt, Quote, PromotionApi, PromotionOperation } from '../api/promotion-api';
+import type { Quote } from '../api/promotion-contracts';
+import type { OrderReceipt, PromotionApi, PromotionOperation } from '../api/promotion-api';
+import { parsePromotedOrder } from '../api/promotion-api';
 
-export interface PromotionPendingCommand { key: string; operation: PromotionOperation; targetId: string }
-export interface PromotionCheckoutRecord { quote: Quote | null; order: OrderReceipt | null; pending: PromotionPendingCommand | null; voucherId?:string|null; leavePromptShown?:boolean }
-export function selectPromotionCheckoutRecord(records:Record<string,PromotionCheckoutRecord>,input:{activityId:string;items:{productNo:string;quantity:number}[];orderNo?:string}){
-  const requested=input.orderNo?JSON.stringify(['order',input.orderNo]):JSON.stringify([input.activityId,input.items]);
+export interface PromotionPendingCommand { key: string; operation: PromotionOperation; targetId: string; paymentMethod?: 'WALLET' | 'EXTERNAL' }
+export interface PromotionCheckoutRecord { quote: Quote | null; order: OrderReceipt | null; pending: PromotionPendingCommand | null; previousPayment?: PromotionPendingCommand; voucherId?:string|null; voucherMode?:'auto'|'manual'; leavePromptShown?:boolean; paymentIntentRevision?:number }
+export const PROMOTION_CHECKOUT_TABLE='nexgrid-promotion-checkout-v1';
+/** A record without the payment the server no longer holds: the next payment takes a new key, and only the user starts it. */
+export function withoutPromotionPayment(record:PromotionCheckoutRecord,key:string):PromotionCheckoutRecord{
+  return record.pending?.operation==='payOrder'&&record.pending.key===key?{...record,pending:null,paymentIntentRevision:(record.paymentIntentRevision??0)+1}:record;
+}
+export function selectPromotionCheckoutRecord(records:Record<string,PromotionCheckoutRecord>,input:{activityId:string;items:{productNo:string;quantity:number}[];orderNo?:string;voucherId?:string;upgradeActivityId?:string}){
+  const requested=input.orderNo?JSON.stringify(['order',input.orderNo]):JSON.stringify([input.activityId,input.items,...(input.voucherId?[input.voucherId,input.upgradeActivityId??'']:[])]);
   const entries=Object.entries(records),pending=entries.find(([,record])=>!!record.pending);
   const original=input.orderNo?entries.find(([intent,record])=>intent===requested&&record.order?.orderNo===input.orderNo)??entries.find(([,record])=>record.order?.orderNo===input.orderNo):undefined;
   const intent=pending?.[0]??original?.[0]??requested;
@@ -13,46 +20,115 @@ export function selectPromotionCheckoutRecord(records:Record<string,PromotionChe
   return {intent,record,openedOriginal:!!pending&&intent!==requested};
 }
 export interface PromotionSessionPorts {
-  api: Pick<PromotionApi, 'create' | 'pay' | 'cancel' | 'command' | 'findOrder'>;
+  api: Pick<PromotionApi, 'create' | 'pay' | 'cancel' | 'command' | 'paymentCommand' | 'findOrder'>;
+  read(): PromotionCheckoutRecord | null;
   save(record: PromotionCheckoutRecord): void;
   key(intent: string): string;
   current(): boolean;
+  isExternalPaymentRefused(key: string): boolean;
 }
 /** One durable original command. Querying never issues or retries a mutation. */
 export class PromotionCheckoutSession {
   record: PromotionCheckoutRecord;
   busy = false;
-  unknown = false;
+  private commandUnknown = false;
+  get externalPaymentRefused(): boolean {
+    const pending = this.record.pending;
+    return pending?.operation === 'payOrder' && pending.paymentMethod === 'EXTERNAL'
+      && this.ports.isExternalPaymentRefused(pending.key);
+  }
+  get unknown(): boolean { return this.commandUnknown && !this.externalPaymentRefused; }
   confirmed = false;
   retryOriginal = false;
+  private unseenPaymentKey: string | null = null;
   constructor(private ports: PromotionSessionPorts, record?: PromotionCheckoutRecord | null) {
     this.record = record ?? { quote: null, order: null, pending: null };
-    this.unknown = !!this.record.pending;
+    this.commandUnknown = !!this.record.pending;
   }
   setQuote(quote: Quote,voucherId:string|null=null): void {
     if (this.busy || this.record.pending || this.record.order) throw new Error('ORIGINAL_ORDER_UNRESOLVED');
-    this.persist({ quote, order: null, pending: null,voucherId,...(this.record.leavePromptShown?{leavePromptShown:true}:{}) });
+    this.persist({ ...this.record, quote, order: null, pending: null,voucherId,voucherMode:this.record.voucherMode??(this.record.voucherId!==undefined?'manual':'auto') });
     this.confirmed = false;
   }
-  invalidateQuote():void {if(this.busy||this.record.pending||this.record.order)throw new Error('ORIGINAL_ORDER_UNRESOLVED');this.persist({quote:null,order:null,pending:null,...(this.record.leavePromptShown?{leavePromptShown:true}:{})});this.confirmed=false;}
+  invalidateQuote():void {if(this.busy||this.record.pending||this.record.order)throw new Error('ORIGINAL_ORDER_UNRESOLVED');this.persist({...this.record,quote:null,order:null,pending:null});this.confirmed=false;}
+  selectVoucher(voucherId:string|null):void {
+    if(this.busy||this.record.pending||this.record.order)throw new Error('ORIGINAL_ORDER_UNRESOLVED');
+    this.persist({...this.record,quote:null,voucherId,voucherMode:'manual'});this.confirmed=false;
+  }
+  /** The live copy of withoutPromotionPayment: the stored row may already be released. */
+  releaseExternalPayment(key:string):boolean {
+    if(this.record.pending?.key!==key)return false;
+    if (!this.persist(withoutPromotionPayment(this.record,key))) return true;
+    this.commandUnknown=false;this.confirmed=!!this.record.order;this.retryOriginal=false;
+    return true;
+  }
   rememberLeavePrompt():void {this.persist({...this.record,leavePromptShown:true});}
-  private persist(record: PromotionCheckoutRecord): void {
+  /** Another page can release this key while the session still holds its old pending row. */
+  private adoptReleasedPayment(): boolean {
+    const pending = this.record.pending;
+    if (pending?.operation !== 'payOrder') return false;
+    const stored = this.ports.read();
+    if (stored?.pending?.key === pending.key) return false;
+    if (!stored || (stored.paymentIntentRevision ?? 0) <= (this.record.paymentIntentRevision ?? 0)) {
+      this.ports.save(this.record);
+      this.commandUnknown = true; this.confirmed = false; this.retryOriginal = false;
+      return false;
+    }
+    this.record = stored;
+    this.commandUnknown = !!this.record.pending;
+    this.confirmed = !!this.record.order && !this.unknown;
+    this.retryOriginal = false;
+    this.unseenPaymentKey = null;
+    return true;
+  }
+  private persist(record: PromotionCheckoutRecord): boolean {
     if (!this.ports.current()) throw new Error('ACCOUNT_SCOPE_CHANGED');
+    if (record.pending?.operation === 'payOrder' && record.pending.key === this.record.pending?.key && this.adoptReleasedPayment()) return false;
+    const stored = this.ports.read();
+    if (!record.pending) {
+      if (stored?.pending && stored.pending.key !== this.record.pending?.key) {
+        this.record = stored;
+        this.commandUnknown = true; this.confirmed = false; this.retryOriginal = false;
+        this.unseenPaymentKey = null;
+        return false;
+      }
+    }
+    record = { ...record, paymentIntentRevision: Math.max(stored?.paymentIntentRevision ?? 0, record.paymentIntentRevision ?? 0) };
     this.ports.save(record);
     this.record = record;
+    return true;
   }
   canExecute(operation:PromotionOperation):boolean {
-    return !this.busy&&!this.unknown&&(!this.record.pending||(this.retryOriginal&&this.record.pending.operation===operation));
+    const pending=this.record.pending;
+    return !this.busy&&!this.unknown&&(!pending||(operation==='payOrder'||operation==='cancelOrder')&&this.externalPaymentRefused||(this.retryOriginal&&(pending.operation===operation
+      ||operation==='cancelOrder'&&pending.operation==='payOrder'&&pending.key===this.unseenPaymentKey)));
   }
   async create(): Promise<void> {
     const q = this.record.quote;
     if (!q || q.eligibility !== 'ELIGIBLE' || this.record.order) throw new Error('QUOTE_NOT_CONFIRMABLE');
     await this.mutate(q.items.length > 1 ? 'createBundle' : 'createOrder', q.quoteId, key => this.ports.api.create(q, key,this.record.voucherId??null));
   }
-  async pay(): Promise<void> {
+  externalPaymentKey(): string {
+    const order = this.record.order;
+    if (!order || !this.confirmed || order.paymentStatus !== 'PENDING' || this.busy || this.unknown) throw new Error('ORDER_NOT_CONFIRMED');
+    const pending=this.record.pending;
+    if(pending&&(pending.operation!=='payOrder'||pending.targetId!==order.orderNo))throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
+    const revision = this.record.paymentIntentRevision ?? 0;
+    const key = pending?.key??this.ports.key(`payOrder:${order.orderNo}${revision ? `:payment-intent:${revision}` : ''}`);
+    if (!this.persist({ ...this.record, pending: { operation: 'payOrder', targetId: order.orderNo, key, paymentMethod: 'EXTERNAL' } })) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
+    this.commandUnknown = true;
+    this.unseenPaymentKey=null;
+    return key;
+  }
+  async acceptExternalPayment(raw: unknown): Promise<void> {
+    const order = parsePromotedOrder(raw);
+    if (order.paymentStatus !== 'PAID') throw new Error('EXTERNAL_PAYMENT_NOT_DELIVERED');
+    this.acceptOrder(order);
+  }
+  async pay(authorization?: import('@/api/payment-password-api').PaymentPasswordAuthorization): Promise<void> {
     const order = this.record.order;
     if (!order || !this.confirmed || order.paymentStatus !== 'PENDING') throw new Error('ORDER_NOT_CONFIRMED');
-    await this.mutate('payOrder', order.orderNo, key => this.ports.api.pay(order.orderNo, key));
+    await this.mutate('payOrder', order.orderNo, key => this.ports.api.pay(order.orderNo, key, authorization));
   }
   async cancel(): Promise<void> {
     const order = this.record.order;
@@ -60,26 +136,41 @@ export class PromotionCheckoutSession {
     await this.mutate('cancelOrder', order.orderNo, key => this.ports.api.cancel(order.orderNo, key));
   }
   private async mutate(operation: PromotionOperation, targetId: string, command: (key: string) => Promise<OrderReceipt>): Promise<void> {
-    if (this.busy || (this.record.pending && !this.retryOriginal)) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
     const previous = this.record.pending;
-    if (previous && (previous.operation !== operation || previous.targetId !== targetId)) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
-    const pending = previous ?? { operation, targetId, key: this.ports.key(`${operation}:${targetId}`) };
-    this.persist({ ...this.record, pending }); // Must succeed before the network write.
+    // A refused external payment created nothing, so the order can still be cancelled; its key stays on record.
+    const cancelRefused=operation==='cancelOrder'&&previous?.targetId===targetId&&this.externalPaymentRefused;
+    if (this.busy || (previous && !this.retryOriginal && !cancelRefused)) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
+    if(operation==='payOrder'&&previous?.paymentMethod==='EXTERNAL')throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
+    const cancelUnseen=cancelRefused||operation==='cancelOrder'&&previous?.operation==='payOrder'&&previous.key===this.unseenPaymentKey&&previous.targetId===targetId;
+    if (previous && !cancelUnseen && (previous.operation !== operation || previous.targetId !== targetId)) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
+    const revision=operation==='payOrder'?(this.record.paymentIntentRevision??0):0;
+    const identity = (cancelUnseen?null:previous) ?? { operation, targetId, key: this.ports.key(`${operation}:${targetId}${revision?`:payment-intent:${revision}`:''}`) };
+    const pending:PromotionPendingCommand=operation==='payOrder'?{...identity,paymentMethod:'WALLET'}:identity;
+    if (!this.persist({ ...this.record, pending, ...(cancelUnseen?{previousPayment:previous!}:{}) })) return; // Must succeed before the network write.
+    this.unseenPaymentKey=null;
     this.busy = true;
     this.retryOriginal = false;
     try {
       const order = await command(pending.key);
       if (!this.ports.current()) return;
-      this.acceptOrder(order);
+      if(operation==='cancelOrder'&&!['CANCELLED','EXPIRED'].includes(order.paymentStatus))throw new Error('ORDER_CANCELLATION_UNCONFIRMED');
+      this.acceptOrder(order, false, operation === 'createOrder' || operation === 'createBundle');
     } catch (error) {
-      if (this.ports.current()) { this.unknown = true; this.confirmed = false; }
+      if (operation === 'payOrder' && error instanceof Error && /^PAYMENT_PASSWORD_/.test(error.message)) {
+        if (this.ports.current()) {
+          this.commandUnknown = false;
+          this.confirmed = true;
+          this.retryOriginal = true;
+        }
+        throw error;
+      }
+      if (this.ports.current()) { this.commandUnknown = true; this.confirmed = false; }
       throw error;
     } finally { this.busy = false; }
   }
-  private validateOrder(order: OrderReceipt): void {
+  private validateOrder(order: OrderReceipt, q = this.record.quote): void {
     const previous = this.record.order;
     if (previous && previous.orderNo !== order.orderNo) throw new Error('ORIGINAL_ORDER_MISMATCH');
-    const q = this.record.quote;
     const decimal = (value: unknown) => String(value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
     if (q && (order.promotionQuoteId !== q.quoteId || order.quantity !== q.quantity || decimal(order.amountUsdt) !== decimal(q.amountUsdt))) throw new Error('ORDER_QUOTE_MISMATCH');
     if (!order.promotionQuoteId || !order.payBy || !Array.isArray(order.rewards)||!Array.isArray(order.items)||!order.items.length) throw new Error('ORDER_RECEIPT_INCOMPLETE');
@@ -104,11 +195,22 @@ export class PromotionCheckoutSession {
       if(stable(rewards(order.rewards,order.items,q))!==stable(rewards(q.expectedRewards,q.items)))throw new Error('ORDER_REWARDS_MISMATCH');
     }
   }
-  private acceptOrder(order: OrderReceipt): void {
-    this.validateOrder(order);
-    this.persist({ ...this.record, order, pending: null });
-    this.unknown = false;
+  private acceptOrder(order: OrderReceipt, retireRejectedPayment=false, createReceipt=false): void {
+    let quote = this.record.quote;
+    if (order.recoveredQuoteId !== undefined) {
+      const pending = this.record.pending;
+      if (!createReceipt || !quote || !order.promotionQuoteId || order.recoveredQuoteId !== quote.quoteId
+        || pending?.targetId !== quote.quoteId || pending.operation !== (quote.items.length > 1 ? 'createBundle' : 'createOrder')) {
+        throw new Error('ORDER_QUOTE_MISMATCH');
+      }
+      quote = { ...quote, quoteId: order.promotionQuoteId };
+    }
+    this.validateOrder(order, quote);
+    if (!this.persist({ ...this.record, quote, order, pending: null,
+      ...(retireRejectedPayment?{paymentIntentRevision:(this.record.paymentIntentRevision??0)+1}:{}) })) return;
+    this.commandUnknown = false;
     this.confirmed = true;
+    this.unseenPaymentKey=null;
   }
   resume(order:OrderReceipt):void {
     if(this.record.pending||this.record.order||this.busy)throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
@@ -119,36 +221,85 @@ export class PromotionCheckoutSession {
     this.persist({quote:null,order:null,pending:null});this.confirmed=false;this.retryOriginal=false;
   }
   async recover(): Promise<void> {
-    if (this.busy) return;
+    if (this.busy || !this.ports.current()) return;
+    this.adoptReleasedPayment();
+    this.unseenPaymentKey=null;
     this.busy = true;
     try {
       const pending = this.record.pending;
       if (pending) {
+        if (pending.operation === 'payOrder') {
+          if (this.externalPaymentRefused) {
+            const order = await this.ports.api.findOrder(pending.targetId);
+            if (!this.ports.current()) return;
+            if (!order) throw new Error('ORIGINAL_ORDER_NOT_FOUND');
+            // A finished order closes any intent under the refused key, so the key stops holding the checkout.
+            if (order.paymentStatus !== 'PENDING') { this.acceptOrder(order, true); return; }
+            this.validateOrder(order);
+            if (this.persist({ ...this.record, order })) this.confirmed = true;
+            return;
+          }
+          const payment = await this.ports.api.paymentCommand(pending.key);
+          if (!this.ports.current()) return;
+          this.retryOriginal = false;
+          if (payment.status === 'SUCCEEDED' && payment.order) this.acceptOrder(payment.order);
+          else if (payment.status === 'REJECTED') {
+            const order = await this.ports.api.findOrder(pending.targetId);
+            if (!this.ports.current()) return;
+            if (order) this.acceptOrder(order,true);
+            else { this.commandUnknown = true; this.confirmed = false; }
+          } else if (payment.status === 'NOT_SEEN' && payment.canResumeSameKey) {
+            const order = await this.ports.api.findOrder(pending.targetId);
+            if (!this.ports.current()) return;
+            if (order) {
+              if (order.paymentStatus!=='PENDING') {this.acceptOrder(order);return;}
+              this.validateOrder(order);
+              if (!this.persist({...this.record,order})) return;
+              const external=pending.paymentMethod==='EXTERNAL';
+              this.commandUnknown = external; this.confirmed = !external; this.retryOriginal = !external;
+              if(pending.paymentMethod==='WALLET')this.unseenPaymentKey=pending.key;
+            } else { this.commandUnknown = true; this.confirmed = false; }
+          } else { this.commandUnknown = true; this.confirmed = false; }
+          return;
+        }
         const result = await this.ports.api.command(pending.key, pending.operation, pending.targetId);
         if (!this.ports.current()) return;
-        if (result.status === 'SUCCEEDED' && result.order) this.acceptOrder(result.order);
-        else if(result.status==='FAILED'&&!result.order){
+        if (result.status === 'SUCCEEDED' && result.order) {
+          const creation = pending.operation === 'createOrder' || pending.operation === 'createBundle';
+          let order = result.order;
+          if (creation && order.paymentStatus === 'PENDING') {
+            // A recovered creation receipt can still carry the status at creation time.
+            const liveOrder = await this.ports.api.findOrder(order.orderNo);
+            if (!this.ports.current()) return;
+            if (!liveOrder) { this.commandUnknown = true; this.confirmed = false; return; }
+            order = { ...liveOrder, ...(order.recoveredQuoteId ? { recoveredQuoteId: order.recoveredQuoteId } : {}) };
+          }
+          this.acceptOrder(order, false, creation);
+        } else if(result.status==='FAILED'&&!result.order){
           if(this.record.order){
             const order=await this.ports.api.findOrder(this.record.order.orderNo);
             if(!this.ports.current())return;
-            if(!order){this.unknown=true;this.confirmed=false;return;}
+            if(!order){this.commandUnknown=true;this.confirmed=false;return;}
             this.acceptOrder(order);
-          }else{this.persist({quote:null,order:null,pending:null,...(this.record.leavePromptShown?{leavePromptShown:true}:{})});this.unknown=false;this.confirmed=false;}
+          }else{if(!this.persist({quote:null,order:null,pending:null,...(this.record.leavePromptShown?{leavePromptShown:true}:{})}))return;this.commandUnknown=false;this.confirmed=false;}
           this.retryOriginal=false;
         } else if (result.status === 'NOT_FOUND') {
-          this.unknown = false;
+          this.commandUnknown = false;
           this.retryOriginal = true; // Explicit retry keeps both the original target and key.
           if (this.record.order) {
             const order = await this.ports.api.findOrder(this.record.order.orderNo);
             if (!this.ports.current())return;
-            if(order){this.validateOrder(order);this.persist({...this.record,order});this.confirmed=true;}
-            else {this.unknown=true;this.confirmed=false;this.retryOriginal=false;}
+            if(order){
+              if(order.paymentStatus!=='PENDING'){this.acceptOrder(order);return;}
+              this.validateOrder(order);this.persist({...this.record,order});this.confirmed=true;
+            }
+            else {this.commandUnknown=true;this.confirmed=false;this.retryOriginal=false;}
           }
-        } else { this.unknown = true; this.confirmed = false; }
+        } else { this.commandUnknown = true; this.confirmed = false; }
       } else if (this.record.order) {
         const order = await this.ports.api.findOrder(this.record.order.orderNo);
         if (this.ports.current() && order) this.acceptOrder(order);
-        else if (this.ports.current()) { this.unknown = true; this.confirmed = false; }
+        else if (this.ports.current()) { this.commandUnknown = true; this.confirmed = false; }
       }
     } finally { this.busy = false; }
   }

@@ -11,33 +11,34 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet-withdraw" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
+      <SubPageHeader :back="withdrawReturnUrl" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
-      <!-- ── 网络切换(与提现页同语汇)── -->
-      <view class="mx-4" style="padding: 0 2px">
-        <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.networkLabel }}</text></view>
-        <view class="flex" style="gap: 8px; margin-top: 8px" role="radiogroup" :aria-label="t.addrRebind.networkLabel">
+      <!-- ── 网络:上下排列的单选行(选中 = 品牌描边 + 实心点),与充值页同语汇 ── -->
+      <view class="mx-4 rb-nets-wrap">
+        <text class="rb-k">{{ t.addrRebind.networkLabel }}</text>
+        <view class="rb-nets" role="radiogroup" :aria-label="t.addrRebind.networkLabel">
           <view
             v-for="nw in NETWORKS"
             :key="nw.id"
-            :class="['flex-1 flex flex-col items-center justify-center active:opacity-85 nx-rebind-network-radio', `nx-rebind-net-${nw.label.toLowerCase()}`]"
-            :style="netChipStyle(nw.id)"
+            :class="['nx-rebind-network-radio', `nx-rebind-net-${nw.label.toLowerCase()}`, 'rb-net', { 'rb-net--on': network === nw.id }]"
             role="radio" :tabindex="network === nw.id ? 0 : -1"
             :aria-checked="network === nw.id"
             @click="switchNetwork(nw.id)"
-
-
-
             @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
           >
-            <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
-            <text v-if="nw.id === 'usdt-trc20'" :style="netChipTagStyle">{{ t.topupChrome.netRecommended }}</text>
+            <view class="rb-net__nm"><text class="rb-net__name">{{ nw.label }}</text></view>
+            <view class="rb-net__ck" aria-hidden="true" />
           </view>
         </view>
       </view>
 
+      <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 2px">
+        <text class="block" :style="stateBodyStyle">{{ networkPolicyStatus === 'ready' && !NETWORKS.length ? t.wallet.withdrawalChannelsClosed : remoteReadFailed ? copy.addressUnavailable : copy.addressLoading }}</text>
+        <text v-if="otpError" class="block nx-rebind-refusal" :style="errorTextStyle">{{ otpError }}</text>
+        <view v-if="remoteReadFailed" class="nx-rebind-read-retry w-full grid place-items-center" :style="primaryCtaStyle" role="button" :aria-disabled="remoteRefreshPending" :tabindex="remoteRefreshPending ? -1 : 0" @click="retryRemoteSnapshot" @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"><text>{{ remoteRefreshPending ? copy.addressLoading : copy.retry }}</text></view>
+      </view>
       <!-- ── 成功态 ── -->
-      <view v-if="step === 'success'" class="mx-4 nx-step-in" style="padding: 0 2px">
+      <view v-else-if="step === 'success'" class="mx-4 nx-step-in" style="padding: 0 2px">
         <view class="flex flex-col items-center" style="padding: 32px 0 0">
           <view class="grid place-items-center" :style="successIconBoxStyle">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
@@ -104,53 +105,33 @@
         </view>
       </view>
 
-      <!-- ── 表单(添加 / 更换共用:新地址输入 + 安全提示)── -->
-      <view v-else-if="step === 'form'" class="mx-4" style="padding: 0 2px">
-        <view v-if="mode === 'add'" style="margin-top: 16px">
-          <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.addrRebind.emptyGuideTitle }}</text>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.5">{{ t.addrRebind.emptyGuideBody }}</text>
+      <!-- ── 表单(添加 / 更换共用:标题说明 + 地址井(可粘贴)+ 安全提示;主操作在底部栏)── -->
+      <view v-else-if="step === 'form'" class="mx-4 rb-form">
+        <text class="rb-title">{{ mode === 'add' ? t.addrRebind.emptyGuideTitle : t.addrRebind.newAddressLabel }}</text>
+        <text v-if="mode === 'add'" class="rb-desc">{{ t.addrRebind.emptyGuideBody }}</text>
+        <view class="rb-field">
+          <input
+            class="nx-rebind-address-input rb-field__input"
+            type="text"
+            :value="newAddress"
+            :placeholder="addressPlaceholder"
+            :aria-label="t.addrRebind.newAddressLabel"
+            aria-required="true"
+            :aria-invalid="addrError ? 'true' : 'false'"
+            :aria-describedby="addrError ? 'rebind-address-error' : undefined"
+            @input="onAddressInput"
+          />
+          <view class="rb-paste nx-frosted-button" role="button" tabindex="0" :aria-label="t.addrRebind.pasteCta" @click="pasteAddress" @keydown.enter.prevent="pasteAddress" @keydown.space.prevent="pasteAddress"><text>{{ t.addrRebind.pasteCta }}</text></view>
         </view>
-        <view style="margin-top: 16px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.newAddressLabel }}</text></view>
-        <input
-          class="nx-rebind-address-input mt-2 w-full font-mono"
-          :style="addressInputStyle"
-          type="text"
-          :value="newAddress"
-          :placeholder="addressPlaceholder"
-          :aria-label="t.addrRebind.newAddressLabel"
-          aria-required="true"
-          :aria-invalid="addrError ? 'true' : 'false'"
-          :aria-describedby="addrError ? 'rebind-address-error' : undefined"
-          @input="onAddressInput"
-        />
         <view v-if="addrError"><text id="rebind-address-error" class="block" :style="errorTextStyle">{{ addrError }}</text></view>
 
-        <!-- 安全提示:添加/更换均冻结 24h;每 7 天最多设置一次。 -->
-        <view v-if="mode === 'change'" class="flex" :style="warnlineStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ safetyNoteText }}</text></view>
+        <!-- 安全提示:添加/更换均冻结 24h;每 7 天最多设置一次(纯文字,不加底色)。 -->
+        <view class="rb-lock">
+          <svg v-if="mode === 'change'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+          <text>{{ mode === 'change' ? safetyNoteText : holdNoteText }}</text>
         </view>
-        <view v-else class="flex" :style="warnlineStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
-        </view>
-
-        <view
-          class="nx-rebind-start-cta w-full grid place-items-center"
-          :class="{ 'active:opacity-90 transition-opacity': canProceed && !otpSending }"
-          role="button" tabindex="0"
-          :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
-          :style="startCtaStyle"
-          @click="proceedToOtp"
-        >
-          <text :style="ctaTextStyle">{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
-        </view>
-        <view v-if="mode === 'change'" class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="backToBase">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
-        <view v-else class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="leave">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
+        <view class="rb-bar-space" />
       </view>
 
       <!-- ── 默认态:当前地址 + 更换入口 + 历史(规格 ⑤)── -->
@@ -186,7 +167,7 @@
           <view class="flex-1 min-w-0">
             <text class="block" :style="warnTextStyle">{{ t.addrRebind.inFlightBlocked }}</text>
             <view class="nx-rebind-goto-tracking inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" tabindex="0" @click="goTracking">
-              <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.addrRebind.inFlightGoCta }} →</text>
+              <text class="nx-after-arrow" style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.addrRebind.inFlightGoCta }}</text>
             </view>
           </view>
         </view>
@@ -241,33 +222,56 @@
       </view>
     </view>
     <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
+    <template #pageFixed>
+      <view v-if="step === 'form'" class="rb-bar nx-glass-bar">
+        <view class="nx-rebind-cancel-link rb-bar__btn rb-bar__btn--ghost nx-tray-text" role="button" tabindex="0" @click="cancelForm" @keydown.enter.prevent="cancelForm" @keydown.space.prevent="cancelForm">
+          <text>{{ t.addrRebind.cancelCta }}</text>
+        </view>
+        <view
+          class="nx-rebind-start-cta rb-bar__btn"
+          :class="{ 'rb-bar__btn--on': canProceed && !otpSending }"
+          role="button" tabindex="0"
+          :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
+          @click="proceedToOtp"
+          @keydown.enter.prevent="proceedToOtp" @keydown.space.prevent="proceedToOtp"
+        >
+          <text>{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
+        </view>
+      </view>
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { formatDisplayDateTime } from "@/lib/display-date";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
-import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import { asApiError } from "@/api/errors";
-import { payoutAddressServerEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, payoutAddressServerEnabled, withdrawalApi } from "@/api/runtime";
+import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
-import { navBack, navTo } from "@/lib/route";
+import { dateLocale, fmt } from "@/i18n/format";
+import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { requireAccountPhone } from "@/lib/require-account-phone";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { usePayoutAddress } from "@/store/payout-address";
+import { productCatalogState } from "@/store/product-catalog";
 import { mockServerNow } from "@/store/server-time";
 import { otpSend, otpVerify } from "@/store/auth-otp";
-import { formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
+import { CHAIN_TO_WITHDRAW_NETWORK, formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
 import { advanceMonotonicHighWater, deadlineRemainingMs, projectServerNow, readTrustedMonotonicNowMs } from "@/lib/server-deadline-clock";
 import type { ChainDepositChannel } from "@/store/types";
+import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 
 const t = useT();
+const copy = useFinanceReviewCopy();
 const app = useApp();
 const payout = usePayoutAddress();
 const cfg = useConfig();
@@ -275,15 +279,24 @@ const ui = useUI();
 const confirmationOwner = `payout-address-${getCurrentInstance()?.uid}`;
 
 // ── 网络选择(标签为链名专有名词,非文案)──
-const NETWORKS: { id: ChainDepositChannel; label: string }[] = [
+const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
   { id: "usdt-trc20", label: "TRC20" },
   { id: "usdt-bep20", label: "BEP20" },
   { id: "usdt-erc20", label: "ERC20" },
 ];
+const networkPolicy = ref<WithdrawalPolicy | null>(null);
+const networkPolicyStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
+const NETWORKS = computed(() => payoutAddressServerEnabled
+  ? ALL_NETWORKS.filter((nw) => networkPolicy.value?.withdrawalEnabled === true
+    && networkPolicy.value.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
+  : ALL_NETWORKS);
 const network = ref<ChainDepositChannel>("usdt-trc20");
+const withdrawReturnUrl = computed(() => `/pages/me/wallet-withdraw?network=${CHAIN_TO_WITHDRAW_NETWORK[network.value]}`);
+const networkAvailable = computed(() => !payoutAddressServerEnabled
+  || (networkPolicyStatus.value === "ready" && NETWORKS.value.some((nw) => nw.id === network.value)));
 
 onLoad((options) => {
-  const q = (options as Record<string, string> | undefined)?.network;
+  const q = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-address-rebind")).get("network");
   if (q === "usdt-trc20" || q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
 });
 
@@ -297,7 +310,8 @@ const current = computed(() => payout.currentFor(network.value));
 const history = computed(() => payout.stateFor(network.value).history);
 const historyDesc = computed(() => [...history.value].reverse());
 const historyOpen = ref(false);
-const step = computed<"view" | "form" | "otp" | "success">(() => {
+const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
+  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance || !networkAvailable.value)) return "unknown";
   if (explicitStep.value === "otp") return "otp";
   if (explicitStep.value === "success") return "success";
   if (explicitStep.value === "form") return "form";
@@ -305,7 +319,7 @@ const step = computed<"view" | "form" | "otp" | "success">(() => {
 });
 // base 态推导 mode:空槽 = add;显式进入更换 = change。
 function switchNetwork(id: ChainDepositChannel) {
-  if (network.value === id) return;
+  if (network.value === id || !NETWORKS.value.some((nw) => nw.id === id)) return;
   invalidatePageCommand();
   network.value = id;
   explicitStep.value = "base";
@@ -316,8 +330,8 @@ function switchNetwork(id: ChainDepositChannel) {
   historyOpen.value = false;
 }
 function moveNetwork(delta: number) {
-  const index = NETWORKS.findIndex((item) => item.id === network.value);
-  const next = NETWORKS[(index + delta + NETWORKS.length) % NETWORKS.length];
+  const index = NETWORKS.value.findIndex((item) => item.id === network.value);
+  const next = NETWORKS.value[(index + delta + NETWORKS.value.length) % NETWORKS.value.length];
   if (!next) return;
   switchNetwork(next.id);
   void nextTick(() => {
@@ -329,13 +343,20 @@ function moveNetwork(delta: number) {
 const newAddress = ref("");
 const addrError = ref("");
 const addressPlaceholder = computed(() => (network.value === "usdt-trc20" ? "TR7NHq..." : "0x..."));
-const canProceed = computed(() => newAddress.value.trim().length > 0);
+const canProceed = computed(() => networkAvailable.value && newAddress.value.trim().length > 0);
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
+// Paste from the clipboard into the address well; validation runs on proceed exactly as for typed input.
+function pasteAddress() {
+  uni.getClipboardData({ success: (result) => { newAddress.value = String(result.data ?? "").trim(); addrError.value = ""; clearOtpError(); }, fail: () => {} });
+}
+// Cancel in the fixed bar: back to the current address when changing, otherwise leave the page.
+function cancelForm() { if (mode.value === "change") backToBase(); else leave(); }
 function onAddressInput(e: Event) {
   newAddress.value = detailVal(e);
   addrError.value = "";
+  clearOtpError();
 }
 const effectiveMode = computed<"add" | "change">(() => (current.value ? mode.value : "add"));
 
@@ -345,7 +366,7 @@ const changeBlock = computed(() => {
 });
 function startChange() {
   // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
-  if (changeBlock.value) return;
+  if (!networkAvailable.value || changeBlock.value) return;
   mode.value = "change";
   explicitStep.value = "form";
 }
@@ -371,6 +392,7 @@ const otpBodyText = computed(() =>
 const otpRequestId = ref<string | null>(null);
 const otpCode = ref("");
 const otpError = ref("");
+const cooldownRefused = ref(false);
 const otpSending = ref(false);
 const otpVerifying = ref(false);
 // 码已核验但事务未落(用户取消了二次确认弹窗)→ 再次点确认不重复消费验证码。
@@ -382,10 +404,16 @@ const resendLabelParts = computed(() => t.value.addrRebind.otpResendIn.split("{s
 const resendDigits = ref(2);
 const showCaptcha = ref(false);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
-const otpReady = computed(() => otpCode.value.trim().length === 6 && !!otpRequestId.value);
+const otpReady = computed(() => networkAvailable.value && !cooldownRefused.value
+  && (!payoutAddressServerEnabled || remoteReadStatus.value === "ready")
+  && otpCode.value.trim().length === 6 && !!otpRequestId.value);
+function clearOtpError() {
+  otpError.value = "";
+  cooldownRefused.value = false;
+}
 function onOtpInput(e: Event) {
   otpCode.value = detailVal(e).replace(/[^0-9]/g, "").slice(0, 6);
-  otpError.value = "";
+  clearOtpError();
 }
 function startResendCountdown(sec: number) {
   resendDigits.value = Math.max(2, String(Math.ceil(sec)).length);
@@ -399,7 +427,7 @@ function startResendCountdown(sec: number) {
 function resetOtp() {
   otpRequestId.value = null;
   otpCode.value = "";
-  otpError.value = "";
+  clearOtpError();
   otpVerifiedOnce.value = false;
   otpCommandKey.value = null;
   resendLeft.value = 0;
@@ -407,6 +435,11 @@ function resetOtp() {
 }
 async function sendCode(captchaTicket?: string) {
   if (otpSending.value) return;
+  if (changeBlock.value === "withdrawal-in-flight") {
+    if (step.value === "otp") otpError.value = t.value.addrRebind.inFlightBlocked;
+    else addrError.value = t.value.addrRebind.inFlightBlocked;
+    return;
+  }
   if (!requireAccountPhone()) return;
   const scope = captureCommandScope();
   if (!commandIsCurrent(scope)) return;
@@ -547,10 +580,17 @@ async function applyAfterOtp(scope = captureCommandScope()) {
       if (!draftIsCurrent()) return;
       const error = asApiError(cause);
       if (error.message === "PAYOUT_ADDRESS_OTP_INVALID") otpError.value = t.value.addrRebind.startFailed;
-      else if (error.message === "PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL") toast.error(t.value.addrRebind.inFlightBlocked);
-      else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") toast.error(cooldownUntilText.value);
-      else if (error.message === "PAYOUT_ADDRESS_FORMAT_INVALID") addrError.value = t.value.addrRebind.invalidAddress;
-      else toast.error(t.value.addrRebind.startFailed);
+      else if (error.message === "PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL") otpError.value = t.value.addrRebind.inFlightBlocked;
+      else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") {
+        cooldownRefused.value = true;
+        otpError.value = t.value.addrRebind.cooldownActive;
+        await payout.refreshRemote();
+        if (!draftIsCurrent()) return;
+        otpError.value = remoteReadStatus.value === "ready" ? cooldownUntilText.value : t.value.addrRebind.cooldownActive;
+      }
+      else if (error.message === "PAYOUT_ADDRESS_FORMAT_INVALID") otpError.value = t.value.addrRebind.invalidAddress;
+      else if (error.message === "PAYOUT_ADDRESS_NETWORK_INVALID" || error.message === "WITHDRAWAL_NETWORK_DISABLED") otpError.value = t.value.bankWithdrawal.networkUnavailable;
+      else otpError.value = t.value.addrRebind.startFailed;
     }
     return;
   }
@@ -600,20 +640,35 @@ function backToBase() {
 const mockNow = ref(mockServerNow());
 const monotonicNow = ref<number | null>(readTrustedMonotonicNowMs());
 const clockFault = ref(false);
-const remoteRefreshPending = ref(false);
+const readApiOrigin = ref({ ...apiRuntimeConfig });
+const remoteReadStatus = computed(() => payout.readStatusFor(app.accountKey));
+watch([() => step.value !== "unknown", () => payout.stateFor(network.value).nextChangeAt], ([displayReady, at]) => {
+  // Use the page's display gate: address and policy must both be ready, so the
+  // recorded refusal and the normal overview swap in the same render.
+  if (!displayReady || !cooldownRefused.value || at === null) return;
+  backToBase();
+}, { flush: "sync" });
+const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
+const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
+watch(() => [networkPolicyStatus.value, remoteReadStatus.value] as const, ([policyStatus, addressStatus]) => {
+  if (policyStatus !== "ready" || addressStatus !== "ready" || networkAvailable.value) return;
+  const fallback = NETWORKS.value.find((nw) => payout.currentFor(nw.id)) ?? NETWORKS.value[0];
+  if (fallback) switchNetwork(fallback.id);
+});
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 let pageVisible = true;
-let refreshGeneration = 0;
 let commandGeneration = 0;
+let policyGeneration = 0;
 
 function captureCommandScope() {
   return { accountKey: app.accountKey, bindingEpoch: app.accountBindingEpoch,
-    generation: commandGeneration, runtime: captureRuntimeRevision() };
+    generation: commandGeneration, apiOrigin: { ...apiRuntimeConfig } };
 }
 function commandIsCurrent(scope: ReturnType<typeof captureCommandScope>) {
-  return pageVisible && scope.generation === commandGeneration
+  return pageVisible && networkAvailable.value && scope.generation === commandGeneration
     && scope.accountKey === app.accountKey && scope.bindingEpoch === app.accountBindingEpoch
-    && isCurrentRuntimeRevision(scope.runtime);
+    && scope.apiOrigin.environment === apiRuntimeConfig.environment
+    && scope.apiOrigin.baseUrl === apiRuntimeConfig.baseUrl;
 }
 function invalidatePageCommand() {
   commandGeneration += 1;
@@ -628,40 +683,80 @@ watch(() => payout.serverClock, (anchor) => {
   clockFault.value = now === null || !anchor || now < anchor.receivedMonotonicAt;
 }, { immediate: true, flush: "sync" });
 
+useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
+let withdrawalListEntryPending = true;
+function refreshWithdrawalListOnEntry() {
+  // Keep one read per entry after the existing cold-session catalogue read.
+  if (!payoutAddressServerEnabled || !pageVisible || !withdrawalListEntryPending
+    || productCatalogState.status === "loading") return;
+  withdrawalListEntryPending = false;
+  void app.refreshRemoteWithdrawalList(app.accountKey);
+}
+watch(() => productCatalogState.status, refreshWithdrawalListOnEntry, { flush: "post" });
 async function retryRemoteSnapshot() {
-  if (!payoutAddressServerEnabled || !pageVisible || remoteRefreshPending.value) return;
-  const generation = ++refreshGeneration;
+  if (!payoutAddressServerEnabled || !pageVisible) return;
+  // Account binding clears list state synchronously. Dispatch after that batch
+  // so entry hooks share one read; a slow/failed read never holds the form.
+  void nextTick(refreshWithdrawalListOnEntry);
+  // Store-owned account/API-origin/version guards decide the final read status,
+  // including reads started by account hydration rather than by this page.
+  await Promise.all([
+    remoteReadStatus.value === "loading" ? Promise.resolve() : payout.refreshRemote(),
+    networkPolicyStatus.value === "loading" ? Promise.resolve() : refreshNetworkPolicy(),
+  ]);
+}
+async function refreshNetworkPolicy() {
+  const generation = ++policyGeneration;
   const accountKey = app.accountKey;
-  const accountEpoch = app.accountBindingEpoch;
-  const runtime = captureRuntimeRevision();
-  const isCurrent = () => pageVisible && generation === refreshGeneration
-    && accountKey === app.accountKey && accountEpoch === app.accountBindingEpoch
-    && isCurrentRuntimeRevision(runtime);
-  remoteRefreshPending.value = true;
+  const bindingEpoch = app.accountBindingEpoch;
+  const apiOrigin = { ...apiRuntimeConfig };
+  const isCurrent = () => generation === policyGeneration && pageVisible
+    && accountKey === app.accountKey && bindingEpoch === app.accountBindingEpoch
+    && apiOrigin.environment === apiRuntimeConfig.environment && apiOrigin.baseUrl === apiRuntimeConfig.baseUrl;
+  networkPolicyStatus.value = "loading";
   try {
-    if (!await payout.refreshRemote() && isCurrent()) toast.error(t.value.addrRebind.startFailed);
+    const policy = await withdrawalApi.policy();
+    if (!isCurrent()) return;
+    networkPolicy.value = policy;
+    networkPolicyStatus.value = "ready";
   } catch {
-    if (isCurrent()) toast.error(t.value.addrRebind.startFailed);
-  } finally {
-    if (generation === refreshGeneration) remoteRefreshPending.value = false;
+    if (!isCurrent()) return;
+    networkPolicy.value = null;
+    networkPolicyStatus.value = "error";
   }
 }
-function invalidatePageRefresh() {
-  refreshGeneration += 1;
-  remoteRefreshPending.value = false;
+function clearNetworkPolicy() {
+  policyGeneration++;
+  networkPolicy.value = null;
+  networkPolicyStatus.value = "idle";
 }
+const stopRuntimeRead = subscribeRuntimeRevision(() => {
+  // This channel also reports API-origin changes. Catalog events leave the
+  // address/policy/command scope intact, including a pending OTP or save.
+  if (readApiOrigin.value.environment === apiRuntimeConfig.environment
+      && readApiOrigin.value.baseUrl === apiRuntimeConfig.baseUrl) return;
+  readApiOrigin.value = { ...apiRuntimeConfig };
+});
 onShow(() => {
   pageVisible = true;
+  withdrawalListEntryPending = true;
   void retryRemoteSnapshot();
 });
 onHide(() => {
   pageVisible = false;
+  if (otpError.value) backToBase();
   invalidatePageCommand();
-  invalidatePageRefresh();
+  clearNetworkPolicy();
 });
-watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
+watch(() => [app.accountKey, app.accountBindingEpoch, readApiOrigin.value] as const, () => {
+  withdrawalListEntryPending = true;
   invalidatePageCommand();
-  invalidatePageRefresh();
+  clearNetworkPolicy();
+  explicitStep.value = "base";
+  mode.value = "add";
+  newAddress.value = "";
+  addrError.value = "";
+  resetOtp();
   void retryRemoteSnapshot();
 }, { flush: "sync" });
 onMounted(() => {
@@ -680,7 +775,8 @@ onMounted(() => {
 onUnmounted(() => {
   pageVisible = false;
   invalidatePageCommand();
-  invalidatePageRefresh();
+  clearNetworkPolicy();
+  stopRuntimeRead();
   if (tickTimer) clearInterval(tickTimer);
   if (resendTimer) clearInterval(resendTimer);
 });
@@ -706,14 +802,13 @@ const freezeBannerText = computed(() =>
 );
 const cooldownDays = computed(() => payout.changeCooldownDays ?? cfg.config.withdrawRules.rebindCooldownDays);
 function fmtStamp(ts: number): string {
-  const d = new Date(ts);
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  return formatDisplayDateTime(ts, dateLocale());
 }
 // 频控拦截给绝对时刻(平台口径,不说「明天」;规格 ② 异常3)
 const cooldownUntilText = computed(() => {
   const at = payout.stateFor(network.value).nextChangeAt;
-  return fmt(t.value.addrRebind.cooldownUntil, { time: at ? fmtStamp(at) : "" });
+  return at === null ? t.value.addrRebind.cooldownActive
+    : fmt(t.value.addrRebind.cooldownUntil, { time: fmtStamp(at) });
 });
 const safetyNoteText = computed(() => fmt(t.value.addrRebind.safetyNote, { days: cooldownDays.value }));
 // 新地址保护期标记:时长取后台配置(newAddressHoldHours),判定输入与风控信号同源
@@ -729,11 +824,11 @@ const holdActive = computed(() => {
 // ── 动作 ──
 function leave() {
   invalidatePageCommand();
-  navBack("/pages/me/wallet-withdraw");
+  navBack(withdrawReturnUrl.value);
 }
 function finish() {
   invalidatePageCommand();
-  navBack("/pages/me/wallet-withdraw"); // 完成后返回提现页,地址由响应式 store 即时回填
+  navBack(withdrawReturnUrl.value); // 无页面栈时保留当前网络,地址由响应式 store 即时回填
 }
 
 // ── styles ──
@@ -752,7 +847,8 @@ const addressInputStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px",
   boxSizing: "border-box",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-input)",
+  lineHeight: "var(--ui-type-input-lh)",
   color: "var(--v5-ink)",
 };
 const errorTextStyle: CSSProperties = {
@@ -760,30 +856,6 @@ const errorTextStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-danger)",
   lineHeight: 1.4,
-};
-function netChipStyle(id: ChainDepositChannel): CSSProperties {
-  const on = network.value === id;
-  return {
-    minHeight: "56px",
-    borderRadius: "16px",
-    gap: "2px",
-    padding: "8px 6px",
-    background: on ? "var(--v5-brand-soft)" : "var(--v5-surface)",
-  };
-}
-function netChipLabelStyle(id: ChainDepositChannel): CSSProperties {
-  return {
-    fontSize: "13px",
-    fontWeight: 600,
-    color: network.value === id ? "var(--v5-brand)" : "var(--v5-ink-2)",
-  };
-}
-const netChipTagStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "var(--v5-brand)",
-  textAlign: "center",
-  lineHeight: 1.3,
 };
 const warnlineStyle: CSSProperties = {
   marginTop: "16px",
@@ -818,13 +890,6 @@ const historyRowStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
 };
-const startCtaStyle = computed<CSSProperties>(() => ({
-  marginTop: "20px",
-  height: "48px",
-  borderRadius: "999px",
-  background: canProceed.value && !otpSending.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: canProceed.value && !otpSending.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-}));
 const otpConfirmStyle = computed<CSSProperties>(() => ({
   marginTop: "20px",
   height: "48px",
@@ -834,7 +899,7 @@ const otpConfirmStyle = computed<CSSProperties>(() => ({
 }));
 const ctaTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 600,
 };
 const primaryCtaStyle: CSSProperties = {
@@ -850,7 +915,7 @@ const ghostBtnStyle: CSSProperties = {
   borderRadius: "999px",
 };
 const ghostTextStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
@@ -895,7 +960,7 @@ const successRowLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const successRowValStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink)",
 };
 
@@ -903,13 +968,43 @@ const successRowValStyle: CSSProperties = {
 </script>
 
 <style scoped>
+/* P-45 address: network radio rows, address well with paste, plain safety note, fixed actions. */
+.rb-nets-wrap { margin-top: 15px; }
+.rb-k { display: block; margin: 0 4px 8px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.rb-nets { display: flex; flex-direction: column; gap: 8px; }
+.rb-net { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 16px; box-sizing: border-box; border-radius: var(--v5-radius-m); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+.rb-net:active { transform: scale(.97); }
+.rb-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.rb-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
+.rb-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.rb-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.rb-net--on .rb-net__name { color: var(--v5-brand); }
+.rb-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
+.rb-net--on .rb-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
+.rb-net--on .rb-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
+.rb-form { margin-top: 24px; }
+.rb-title { display: block; padding: 0 4px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.rb-desc { display: block; margin-top: 4px; padding: 0 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.rb-field { display: flex; align-items: center; gap: 10px; min-height: 56px; margin-top: 8px; padding: 8px 8px 8px 14px; box-sizing: border-box; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .rb-field { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.rb-field__input { flex: 1; min-width: 0; height: 40px; min-height: 40px; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); }
+.rb-paste { position: relative; flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.rb-paste::after { content: ""; position: absolute; inset: -6px -2px; }
+.rb-lock { display: flex; align-items: center; gap: 8px; margin: 12px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
+.rb-lock > svg { flex: none; }
+.rb-bar-space { height: 110px; }
+.rb-bar { position: absolute; z-index: 36; display: flex; }
+.rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
+.rb-bar__btn--on, .rb-bar__btn--ghost { cursor: pointer; }
+.rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .rb-net { transition: none; } .rb-net:active, .rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: none; } }
 .nx-rebind-resend-label { display: flex; align-items: center; white-space: pre; font-size: 12px; }
 .nx-rebind-resend-seconds { display: inline-block; flex-shrink: 0; text-align: center; font-family: monospace; font-variant-numeric: tabular-nums; }
 
 :deep(.nx-rebind-address-input .uni-input-input),
 :deep(.nx-rebind-otp-input .uni-input-input) {
-  min-height: 22px;
-  height: 22px;
-  line-height: 22px;
+  min-height: var(--ui-type-input-lh);
+  height: var(--ui-type-input-lh);
+  line-height: var(--ui-type-input-lh);
 }
 </style>

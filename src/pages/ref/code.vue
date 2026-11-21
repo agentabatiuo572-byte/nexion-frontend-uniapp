@@ -8,12 +8,10 @@
 -->
 <template>
   <StandalonePageShell class="ref-root" :style="rootStyle">
-    <view :style="cornerGlowStyle" />
-
     <view class="relative" style="padding: 16px">
       <!-- Brand -->
       <view class="flex items-center" style="gap: 8px; margin-bottom: 16px">
-        <BrandLockup :height="40" />
+        <BrandLockup :height="32" />
         <text v-if="hasCode" :style="refChipStyle">REF/{{ codeUpper }}</text>
       </view>
 
@@ -34,31 +32,30 @@
               <text :style="sponsorNameStyle">{{ sponsor?.name }} </text>
               <text :style="sponsorTagStyle">· {{ t.ref.invitedYou }}</text>
             </view>
-            <view class="flex items-center" style="gap: 6px; margin-top: 4px; flex-wrap: wrap">
-              <text :style="vRankChipStyle">V{{ sponsor?.vRank }}</text>
+            <view v-if="sponsor?.vRank" class="flex items-center" style="gap: 6px; margin-top: 4px; flex-wrap: wrap">
+              <text :style="vRankChipStyle">V{{ sponsor.vRank }}</text>
             </view>
           </view>
         </view>
       </view>
 
-      <!-- Gift hero: remote promotion is rendered only after the server preview succeeds. -->
+      <!-- Gift hero: every new account gets the newcomer gift, so it follows the gated reward config with or without a code. -->
       <view v-if="rewardEnabled" class="nx-glass-card text-center relative overflow-hidden" :style="giftCardStyle">
         <text class="block" :style="giftLabelStyle">{{ t.ref.welcomeGift }}</text>
         <view class="flex items-baseline justify-center" style="gap: 6px; margin-top: 8px">
           <text :style="giftAmountStyle">${{ formatAmount(giftUsdt) }}</text>
-          <text :style="giftNexStyle">+ {{ formatAmount(giftNex) }} NEX</text>
+          <text :style="giftNexStyle">+ {{ formatAmount(giftNex) }} UVT</text>
         </view>
-        <text class="block" :style="giftSubStyle">{{ t.ref.welcomeGiftSub }}</text>
+        <text class="ref-gift-sub block" :style="giftSubStyle">{{ t.ref.welcomeGiftSub }}</text>
       </view>
 
       <!-- What you get -->
-      <view v-if="!remoteApiEnabled || remotePreview" class="nx-glass-card" :style="perksCardStyle">
+      <view class="nx-glass-card" :style="perksCardStyle">
         <view v-for="(p, i) in perks" :key="p.key" class="flex items-center" :style="perkRowStyle(i !== perks.length - 1)">
           <view class="grid place-items-center shrink-0" :style="perkIconBoxStyle(p.tint)">
             <view v-html="p.icon" />
           </view>
           <text :style="perkTextStyle" style="flex: 1">{{ perkLabel(p.key) }}</text>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
         </view>
       </view>
 
@@ -72,15 +69,14 @@
         <text style="margin: 0 8px">{{ t.register.create }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
-      <view v-if="remoteApiEnabled && remotePreviewState === 'unavailable'" class="text-center" style="padding: 28px 12px">
-        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.ref.previewUnavailable }}</text>
-      </view>
+      <view v-if="remoteApiEnabled && remotePreviewState === 'unavailable' && !requestedCode" class="ref-preview-status" role="status"><text>{{ recoveryCopy.referralInvalid }}</text></view>
+      <view v-else-if="remoteApiEnabled && (remotePreviewState === 'unavailable' || remotePreviewState === 'loading')" class="ref-preview-status" role="status" :aria-busy="remotePreviewState === 'loading'"><text>{{ remotePreviewState === 'loading' ? recoveryCopy.referralLoading : '—' }}</text></view>
       <view v-if="authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp"  @keydown.enter.prevent="enterApp" @keydown.space.prevent="enterApp">
         <text style="margin: 0 8px">{{ t.ref.enterApp }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
 
-      <view v-if="!authed" class="text-center" style="margin-top: 8px">
+      <view v-if="!authed" class="ref-signin-row" style="margin-top: 8px">
         <text :style="signinStyle">{{ t.ref.signinInstead }} </text>
         <text
           :style="signinLinkStyle"
@@ -94,16 +90,16 @@
       </view>
 
       <!-- Network social proof -->
-      <view class="nx-glass-card" :style="proofCardStyle">
+      <view :style="proofCardStyle">
         <view class="flex items-center" :style="proofHeadStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text>{{ t.ref.platformTotals }}</text>
+          <text>{{ t.home.networkPulseTitle }}</text>
         </view>
-        <view class="grid grid-cols-2 text-center" style="gap: 8px">
-          <Stat :label="t.ref.newJoiners" :value="joinersText" tint="var(--v5-brand)" />
-          <Stat :label="t.ref.paidOut" :value="paidOutText" tint="var(--v5-warning)" />
+        <view class="grid grid-cols-2 text-center" style="gap: 12px 8px">
+          <Stat :label="t.home.networkMembers" :value="published.registered.value" tint="var(--v5-brand)" />
+          <Stat :label="t.home.networkDevices" :value="published.online.value" tint="var(--v5-tech-cyan-ink)" />
+          <Stat :label="t.home.networkPaidOut" :value="published.paidOut.value" tint="var(--v5-warning)" style="grid-column: span 2" />
         </view>
-        <text v-if="!verified" class="block" :style="proofScopeStyle">{{ t.ref.unavailableScope }}</text>
       </view>
 
       <!-- Footer -->
@@ -111,7 +107,7 @@
            role="link" takes Enter only (Space stays with page scrolling); the shared
            activation layer supplies the key handling, so no keydown is hand-written. -->
       <view class="text-center" :style="footerStyle">
-        <text>{{ t.ref.legalLine }} </text>
+        <text v-if="!authed">{{ t.ref.legalLine }} </text>
         <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.terms" @click="goTerms">{{ t.ref.terms }}</text>
         <text aria-hidden="true"> · </text>
         <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.privacy" @click="goPrivacy">{{ t.ref.privacy }}</text>
@@ -119,10 +115,13 @@
         <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.trustCenter" @click="goTrust">{{ t.ref.trustCenter }}</text>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import ToastHost from "@/components/toast-host.vue";
 import { displayNickname } from "@/lib/brand-copy";
 import { formatAmount } from "@/lib/amount-display";
 import { privacyPolicyHref } from "@/lib/privacy-return";
@@ -132,6 +131,7 @@ import { onLoad, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
+import { useEntryRecoveryCopy } from "@/i18n/entry-recovery";
 import { fmt } from "@/i18n/format";
 import Stat from "@/components/trust/trust-stat.vue";
 import { pickSponsor } from "@/mock/sponsors";
@@ -140,6 +140,7 @@ import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/
 import { ApiError } from "@/api/errors";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { useConfig } from "@/store/config";
+import { usePublishedNetworkStats } from "@/composables/use-published-network-stats";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 import { visibleReferralGift } from "@/lib/referral-reward-gate";
@@ -147,46 +148,23 @@ import { referralCtaMode, resolveReferralAttributionCode, type ReferralPreviewSt
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
 const t = useT();
+const recoveryCopy = useEntryRecoveryCopy();
 const code = ref("");
 const requestedCode = ref<string | null>(null);
 const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 const remotePreview = ref<PublicSponsorPreview | null>(null);
 const remotePreviewState = ref<ReferralPreviewState>("idle");
-const proofScopeStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.4, color: "var(--v5-ink-4)" };
-// 🔴 对外财务事实只能来自可核验聚合(zentao #59)。
-//   此前「已付」= 运营配置的设备数 × 公布档位 × 30,「本月新增」= 配置基数 × 配置增速 ——
-//   两者都是把人工配置当实测对外发布。现在:
-//     · 有 verified 聚合时,读真实提现完成额与真实注册账号数,并标注来源与统计时刻;
-//     · 没有(沙箱/旧后端)时显示「—」,不再用配置值编造一个看起来像事实的数字。
-const verified = computed(() => cfg.syncFailed ? null : cfg.config.verifiedStats);
-const paidOutText = computed(() => {
-  const v = verified.value;
-  if (cfg.syncFailed || !v) return "—";
-  const amount = v.completedPayoutUsdt.value;
-  return amount >= 1_000_000
-    ? `${formatAmount(amount / 1_000_000)}M`
-    : formatAmount(amount);
-});
-const joinersText = computed(() => {
-  const v = verified.value;
-  if (cfg.syncFailed || !v) return "—";
-  return v.registeredAccounts.value.toLocaleString("en-US");
-});
+// Social proof uses the published figures of the home network snapshot card, never real aggregates.
+const published = usePublishedNetworkStats();
 const auth = useAuth();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();
-const rewardEnabled = computed(() => remoteApiEnabled
-  ? !!remotePreview.value && remotePreview.value.gift.status !== "DISABLED"
-  : cfg.config.rewards.enabled);
+const rewardEnabled = computed(() => cfg.config.rewards.enabled);
 const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
-// 礼包金额单源派生自服务端预览或已过 H8 闸门的 platform config。
-const giftUsdt = computed(() => remoteApiEnabled
-  ? (rewardEnabled.value ? remotePreview.value?.gift.usdtAmount ?? 0 : 0)
-  : localGift.value.usdtAmount);
-const giftNex = computed(() => remoteApiEnabled
-  ? (rewardEnabled.value ? remotePreview.value?.gift.nexAmount ?? 0 : 0)
-  : localGift.value.nexAmount);
-const referralCta = computed(() => referralCtaMode(remoteApiEnabled, remotePreviewState.value));
+// 新人礼包不再需要邀请人：金额单源派生自已过 H8 闸门的 platform config（远程模式已合并 /api/config/referral-rewards）。
+const giftUsdt = computed(() => localGift.value.usdtAmount);
+const giftNex = computed(() => localGift.value.nexAmount);
+const referralCta = computed(() => remotePreviewState.value === "loading" ? "ordinary" : referralCtaMode(remoteApiEnabled, remotePreviewState.value));
 const referralAttribution = computed(() => resolveReferralAttributionCode(
   remoteApiEnabled,
   remotePreviewState.value,
@@ -203,7 +181,7 @@ onLoad(async (options) => {
   const incomingCode = options?.code ?? forwarded.get("code") ?? undefined;
   privacyHref.value = privacyPolicyHref("/pages/ref/code", incomingCode);
   referralMounted = true;
-  const loadVersion = ++referralLoadVersion;
+  referralLoadVersion += 1;
   if (remoteApiEnabled) {
     code.value = "";
     remotePreview.value = null;
@@ -215,27 +193,35 @@ onLoad(async (options) => {
       remotePreviewState.value = rawCode ? "unavailable" : "idle";
       return;
     }
-    remotePreviewState.value = "loading";
-    try {
-      const preview = await publicSponsorPreviewApi.preview(norm);
-      if (!isCurrentReferralLoad(loadVersion)) return;
-      remotePreview.value = preview;
-      code.value = preview.code;
-      remotePreviewState.value = "ready";
-    } catch (cause) {
-      if (!isCurrentReferralLoad(loadVersion)) return;
-      code.value = "";
-      remotePreview.value = null;
-      remotePreviewState.value = "unavailable";
-      if (cause instanceof ApiError && ["REFERRAL_PREVIEW_INVALID", "REFERRAL_PREVIEW_NOT_FOUND"].includes(cause.message))
-        requestedCode.value = null;
-    }
+    await loadRemotePreview();
     return;
   }
   const norm = normalizeRefCode(options?.code ?? "");
   code.value = norm ?? "";
   if (norm) sponsorship?.capturePending(norm);
 });
+async function loadRemotePreview() {
+  if (!remoteApiEnabled || !referralMounted || !requestedCode.value || remotePreviewState.value === "loading") return;
+  const loadVersion = ++referralLoadVersion;
+  const requested = requestedCode.value;
+  remotePreviewState.value = "loading";
+  remotePreview.value = null;
+  code.value = "";
+  try {
+    const preview = await publicSponsorPreviewApi.preview(requested);
+    if (!isCurrentReferralLoad(loadVersion)) return;
+    // A response for another code must not replace this invitation.
+    if (preview.code !== requested) throw new Error("REFERRAL_PREVIEW_CODE_MISMATCH");
+    remotePreview.value = preview;
+    code.value = preview.code;
+    remotePreviewState.value = "ready";
+  } catch (cause) {
+    if (!isCurrentReferralLoad(loadVersion)) return;
+    remotePreviewState.value = "unavailable";
+    if (cause instanceof ApiError && ["REFERRAL_PREVIEW_INVALID", "REFERRAL_PREVIEW_NOT_FOUND"].includes(cause.message)) requestedCode.value = null;
+  }
+}
+useAutoRecovery({ failed: () => remoteApiEnabled && !!requestedCode.value && remotePreviewState.value === "unavailable", retry: loadRemotePreview });
 function cleanupReferralLoad() {
   referralMounted = false;
   referralLoadVersion += 1;
@@ -249,7 +235,7 @@ const codeUpper = computed(() => code.value.toUpperCase());
 const sponsor = computed(() => {
   if (remoteApiEnabled) {
     const value = remotePreview.value?.sponsor;
-    return value ? { name: displayNickname(value.displayName), vRank: value.vRank.replace(/^V/i, "") } : null;
+    return value ? { name: displayNickname(value.displayName), vRank: value.vRank?.replace(/^V/i, "") ?? null } : null;
   }
   return code.value ? pickSponsor(code.value) : null;
 });
@@ -267,7 +253,9 @@ const ALL_PERKS: { key: PerkKey; icon: string; tint: string }[] = [
   { key: "always", icon: ZAP_SVG, tint: "var(--v5-warning)" },
   { key: "sponsor", icon: USERS_SVG, tint: "var(--v5-tech-cyan)" },
 ];
-const perks = computed(() => ALL_PERKS.filter((perk) => rewardEnabled.value || perk.key !== "gift"));
+// The inviter perk is a promise about a friend inviter, so it needs a confirmed friend code.
+const perks = computed(() => ALL_PERKS.filter((perk) => (rewardEnabled.value || perk.key !== "gift")
+  && (perk.key !== "sponsor" || remotePreview.value?.kind === "USER")));
 function perkLabel(k: PerkKey): string {
   const s = t.value.ref.perks[k];
   return k === "gift" ? fmt(s, { usd: formatAmount(giftUsdt.value), nex: formatAmount(giftNex.value) }) : s;
@@ -296,23 +284,9 @@ function goTerms() {
 }
 
 const rootStyle: CSSProperties = { position: "relative", minHeight: "100vh", background: "var(--v5-bg)" };
-const cornerGlowStyle: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  top: 0,
-  height: "260px",
-  pointerEvents: "none",
-  // Source glow is lemon-purple (rgba(124,92,255) + rgba(198,255,58)). In v5
-  // dark the purple accent token is --v5-tech-cyan (#8E72FF), not --brand-2
-  // (orange) — fixed the prior orange drift so the glow reads purple as in the
-  // prototype.
-  background:
-    "radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent) 0%, transparent 70%), radial-gradient(80% 60% at 50% 100%, color-mix(in srgb, var(--v5-brand) 10%, transparent) 0%, transparent 70%)",
-};
 const refChipStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
+  fontSize: "10px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.05em",
   padding: "2px 6px",
@@ -322,7 +296,7 @@ const refChipStyle: CSSProperties = {
 const sponsorCardStyle: CSSProperties = { padding: "16px", marginBottom: "12px" };
 const alreadyBarStyle: CSSProperties = {
   borderRadius: "12px",
-  padding: "10px 12px",
+  padding: "8px 10px",
   marginBottom: "12px",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
   fontSize: "12px",
@@ -358,31 +332,35 @@ const giftNexStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "2
 const giftSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "8px", lineHeight: 1.625 };
 const perksCardStyle: CSSProperties = { marginBottom: "12px", overflow: "hidden" };
 function perkRowStyle(divider: boolean): CSSProperties {
-  return { gap: "12px", padding: "12px 16px", borderBottom: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none" };
+  return { gap: "10px", padding: "10px 12px", borderBottom: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none" };
 }
 function perkIconBoxStyle(tint: string): CSSProperties {
-  return { width: "36px", height: "36px", borderRadius: "12px", background: `color-mix(in srgb, ${tint} 18%, transparent)` };
+  return { width: "28px", height: "28px", borderRadius: "9px", background: `color-mix(in srgb, ${tint} 18%, transparent)` };
 }
-const perkTextStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.375 };
+const perkTextStyle: CSSProperties = { minWidth: 0, fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.45 };
 const ctaStyle: CSSProperties = {
-  width: "100%",
-  height: "56px",
+  width: "fit-content",
+  maxWidth: "100%",
+  minHeight: "44px",
+  boxSizing: "border-box",
+  padding: "8px 12px",
+  marginLeft: "auto",
   borderRadius: "999px",
-  background: "linear-gradient(90deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 80%, var(--v5-warning)))",
+  background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "15px",
-  boxShadow: "var(--v5-spotlight-brand)",
+  fontSize: "13px",
+  lineHeight: 1.4,
 };
 const signinStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
-const signinLinkStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)" };
-const proofCardStyle: CSSProperties = { marginTop: "20px", padding: "16px" };
+const signinLinkStyle: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "44px", minHeight: "44px", fontSize: "12px", color: "var(--v5-brand)" };
+const proofCardStyle: CSSProperties = { marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--v5-border)" };
 const proofHeadStyle: CSSProperties = {
-  marginBottom: "12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  marginBottom: "8px",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
-  letterSpacing: "0.16em",
+  letterSpacing: "0.02em",
   color: "var(--v5-ink-3)",
 };
 const partnerCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
@@ -403,14 +381,21 @@ const partnerChipStyle: CSSProperties = {
   color: "color-mix(in srgb, var(--v5-ink) 85%, transparent)",
 };
 const badgeRowStyle: CSSProperties = { marginTop: "12px", flexWrap: "wrap", gap: "4px 12px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const footerStyle: CSSProperties = { marginTop: "24px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625, padding: "0 16px" };
+const footerStyle: CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "0 6px", marginTop: "12px", fontSize: "11.5px", color: "var(--v5-ink-4)", lineHeight: 1.5 };
 // inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 只扩热区不撑行高(原 61×14)
-const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", padding: "15px 10px", margin: "0 -10px" };
+const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", display: "inline-flex", alignItems: "center", minHeight: "44px", padding: "0 2px" };
 
 
 </script>
 
 <style scoped>
+/* Balanced so a narrow screen never leaves one word alone on the last line of the gift note. */
+.ref-gift-sub { text-wrap: balance; }
+.ref-signin-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 6px; }
+.ref-preview-status { display: flex; align-items: center; gap: 12px; padding: 16px 0; font-size: 13px; line-height: 1.55; color: var(--v5-ink-3); }
+.ref-preview-status > text { flex: 1; }
+.ref-preview-retry[aria-disabled="true"] { opacity: 0.5; }
+.ref-preview-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 /* 《08》§2:footer 的两个法务链接是 inline style 对象驱动的,加不了 :active,故走 class。
    纵向 padding 已在 footerLinkStyle 里扩过热区(inline 元素纵向 padding 不撑行高)。 */
 .nx-ref-footer-link {

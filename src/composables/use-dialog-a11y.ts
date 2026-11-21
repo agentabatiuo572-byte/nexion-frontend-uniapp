@@ -1,4 +1,88 @@
-import { watch, nextTick, onBeforeUnmount, type Ref } from "vue";
+import { watch, nextTick, onBeforeUnmount, inject, ref, type Ref, type InjectionKey } from "vue";
+import { TAB_LIFECYCLE, onShow as onTabShow, onHide as onTabHide } from "./use-tab-page-lifecycle";
+// #ifdef APP-PLUS
+import { getCurrentInstance } from "vue";
+import { onBackPress, onShow as onPageShow, onHide as onPageHide } from "@dcloudio/uni-app";
+
+type Dialog = { close?: () => void; priority: number };
+type DialogPage = { stack: Dialog[]; visible: boolean; backRegistered: boolean };
+const dialogPages = new WeakMap<object, DialogPage>();
+
+export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
+  // Uni invokes page hooks on the page root, not on a nested sheet component.
+  const owner = getCurrentInstance()?.root;
+  if (!owner) return;
+  let page = dialogPages.get(owner);
+  if (!page) {
+    page = { stack: [], visible: true, backRegistered: false };
+    dialogPages.set(owner, page);
+  }
+  const dialogs = page;
+  const entry: Dialog = { close, priority };
+  const tab = inject(TAB_LIFECYCLE, null);
+  const shown = ref(!tab);
+  if (tab) {
+    onTabShow(() => { shown.value = true; });
+    onTabHide(() => { shown.value = false; });
+  }
+  const remove = () => {
+    const index = dialogs.stack.indexOf(entry);
+    if (index >= 0) dialogs.stack.splice(index, 1);
+  };
+  watch([open, shown], ([isOpen, isShown]) => {
+    remove();
+    if (isOpen && isShown) dialogs.stack.push(entry);
+  }, { immediate: true, flush: "sync" });
+  onBeforeUnmount(remove);
+
+  // NxSheet opts in by default; each close callback retains its submission guards.
+  // One handler per page avoids Uni invoking several sheet callbacks on one press.
+  if (nativeBack && !dialogs.backRegistered) {
+    dialogs.backRegistered = true;
+    onPageShow(() => { dialogs.visible = true; }, owner);
+    onPageHide(() => { dialogs.visible = false; }, owner);
+    onBackPress(event => {
+      if (event.from !== "backbutton" || !dialogs.visible) return false;
+      // Global masks stay above page sheets even after a retained tab reappears.
+      // Equal visual layers retain their ordinary last-opened-first ordering.
+      const top = dialogs.stack.reduce<Dialog | undefined>((current, entry) =>
+        !current || entry.priority >= current.priority ? entry : current, undefined);
+      if (!top) return false;
+      // A retry-only overlay has no cancel action; never close a lower dialog.
+      top.close?.();
+      return true;
+    }, owner);
+  }
+}
+// #endif
+
+/**
+ * AppChassis provides this. Dialogs render inside the page's own scroller, so without it a drag on
+ * the mask or sheet scrolled the page underneath and could start a pull-to-refresh, whose content
+ * transform then dragged the fixed sheet along with the page. Each open dialog holds a lock; the
+ * call returns its release.
+ */
+export const DIALOG_SCROLL_LOCK: InjectionKey<() => () => void> = Symbol("nx-dialog-scroll-lock");
+
+/** Holds the chassis scroll lock while `open` is true. Dialogs that manage focus themselves call this alone. */
+export function useDialogScrollLock(open: Ref<boolean>): void {
+  const acquireScrollLock = inject(DIALOG_SCROLL_LOCK, null);
+  if (!acquireScrollLock) return;
+  // The native tab host shares one chassis across tabs: a dialog left open in a hidden tab
+  // must not lock the tab on screen.
+  const inTab = !!inject(TAB_LIFECYCLE, null);
+  const shown = ref(!inTab);
+  if (inTab) {
+    onTabShow(() => { shown.value = true; });
+    onTabHide(() => { shown.value = false; });
+  }
+  let release: (() => void) | null = null;
+  watch([open, shown], ([isOpen, isShown]) => {
+    release?.();
+    release = isOpen && isShown ? acquireScrollLock() : null;
+  }, { immediate: true, flush: "sync" });
+  onBeforeUnmount(() => { release?.(); release = null; });
+}
 
 /**
  * 弹层的键盘可用性:焦点移入 → Tab 只在层内循环 → Esc 关闭 → 关闭后焦点归还。
@@ -27,12 +111,20 @@ import { watch, nextTick, onBeforeUnmount, type Ref } from "vue";
  *              (断网遮罩只有「重试」一条路),给它接上 Esc 等于凭空造出一个
  *              用户以为处理了、其实什么都没处理的出口。不传则 Esc 不做任何事,
  *              但 Tab 陷阱与焦点归还照常。
+ * @param nativeBack 在当前原生页面启用 Android 返回键,仅取消最上层可见弹层。
+ * @param nativePriority 全局遮罩的既有视觉层级;同级弹层按打开顺序处理。
  */
 export function useDialogA11y(
   open: Ref<boolean>,
   root: string | (() => HTMLElement | null | undefined),
   close?: () => void,
+  nativeBack = false,
+  nativePriority = 0,
 ): void {
+  // #ifdef APP-PLUS
+  registerNativeDialog(open, close, nativeBack, nativePriority);
+  // #endif
+  useDialogScrollLock(open);
   let previousFocus: HTMLElement | SVGElement | null = null;
 
   const rootEl = (): HTMLElement | null | undefined =>

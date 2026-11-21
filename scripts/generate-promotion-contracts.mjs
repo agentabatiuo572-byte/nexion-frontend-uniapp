@@ -13,6 +13,7 @@ function type(s){
   if(s.enum)return s.enum.map(v=>JSON.stringify(v)).join(' | ');
   if(s.oneOf||s.anyOf)return '('+(s.oneOf||s.anyOf).map(type).join(' | ')+')';
   if(Array.isArray(s.type))return s.type.map(t=>type({...s,type:t})).join(' | ');
+  if(s.type==='object'&&typeof s.additionalProperties==='object'&&!s.properties)return 'Record<string, '+type(s.additionalProperties)+'>';
   if(s.type==='object')return '{ '+Object.entries(s.properties||{}).map(([k,v])=>JSON.stringify(k)+(s.required?.includes(k)?'': '?')+': '+type(v)).join('; ')+' }';
   if(s.type==='array')return 'Array<'+type(s.items)+'>';
   return ({integer:'number',number:'number',boolean:'boolean',string:'string',null:'null'})[s.type]||'unknown';

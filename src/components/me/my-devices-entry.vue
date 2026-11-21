@@ -52,7 +52,7 @@ const app = useApp();
 
 const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const slotsUsed = computed(() => activeCount.value + trialSlot.value);
+const slotsUsed = computed(() => app.remoteSlotsUsed ?? activeCount.value + trialSlot.value);
 const emptySlots = computed(() => Math.max(0, app.slotCap - slotsUsed.value));
 const sectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: app.slotCap }));
 const activatedLabel = computed(() => fmt(t.value.myDevices.activatedLabel, { n: activeCount.value }));
@@ -84,7 +84,7 @@ const iconBoxStyle: CSSProperties = {
 const fleetTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-2)",
   letterSpacing: "-0.006em",
   lineHeight: 1.25,

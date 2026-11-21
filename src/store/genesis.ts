@@ -1,9 +1,13 @@
+import { invalidateBeforePassiveTabRead, passiveTabReadScope, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import {
   useGenesisConfig,
+  ensureGenesisPublicSummary,
+  readGenesisPublicSummary,
+  readGenesisAccountSummary,
   tierForSold,
   genesisPurchaseBlock,
   genesisSecondaryBlock,
@@ -16,6 +20,7 @@ import { hasGenesisAuthorityForAccount } from "@/lib/genesis-auth-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { resolveRemoteGenesisPurchase } from "@/lib/genesis-remote-purchase";
 import { readGenesisRemoteFacts } from "@/lib/genesis-remote-sync";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { genesisHoldingId } from "@/lib/genesis-holding-id";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { parseGenesisListingPrice } from "@/lib/genesis-listing-price";
@@ -307,10 +312,19 @@ export const useGenesis = defineStore("genesis", () => {
   const remoteSecondaryCommandProtocol = ref(0);
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
   let remoteReadGeneration = 0;
+  let remotePending: { scope: string; promise: Promise<boolean> } | null = null;
+  let summaryReadGeneration = 0;
+  // Read-only success evidence for consumers; never a command capability.
+  const remotePublicSuccessRevision = ref(0);
+  const remoteAccountSuccessRevision = ref(0);
+  const remotePublicSuccessScope = ref<RemoteAccountRequest | null>(null);
+  const remoteAccountSuccessScope = ref<RemoteAccountRequest | null>(null);
 
   const tokenIdFor = genesisHoldingId;
 
   function applyPublicState(state: GenesisPublicState): void {
+    remotePublicSuccessRevision.value++;
+    remotePublicSuccessScope.value = remoteAccountEpoch.snapshot();
     remotePublicError.value = null;
     remoteSecondaryCommandProtocol.value = state.secondaryCommandProtocol === 2 ? 2 : 0;
     remotePublicReadState.value = "ready";
@@ -332,6 +346,8 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function applyAccountState(state: GenesisAccountState): void {
+    remoteAccountSuccessRevision.value++;
+    remoteAccountSuccessScope.value = remoteAccountEpoch.snapshot();
     remoteAccountReadState.value = "ready";
     // Account responses are canonical development/production facts. Supply is
     // still owned by GET /api/genesis/state; account reads cannot replace it.
@@ -373,7 +389,7 @@ export const useGenesis = defineStore("genesis", () => {
     const generation = ++remoteReadGeneration;
     applyAccountState(state);
     remotePublicReadState.value = "loading";
-    void genesisApi.state().then((publicState) => {
+    void genesisApi.state(readGenesisPublicSummary).then((publicState) => {
       if (generation === remoteReadGeneration && remoteScopeCurrent(request, runScope)) applyPublicState(publicState);
     }).catch(() => {
       if (generation === remoteReadGeneration && remoteScopeCurrent(request, runScope)) clearRemotePublicFacts();
@@ -422,12 +438,17 @@ export const useGenesis = defineStore("genesis", () => {
     return remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
   }
 
-  async function syncRemote(
+  function syncRemote(
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
     runScope: RuntimeRevisionScope = captureRuntimeRevision(),
   ): Promise<boolean> {
-    if (!remoteApiEnabled) return true;
-    if (!remoteScopeCurrent(request, runScope)) return false;
+    if (!remoteApiEnabled) return Promise.resolve(true);
+    if (!remoteScopeCurrent(request, runScope)) return Promise.resolve(false);
+    const readScope = passiveTabReadScope();
+    const owner = JSON.stringify([readScope, request.accountKey, request.epoch, runScope.epoch]);
+    if (remotePending?.scope === owner) return remotePending.promise;
+    invalidateBeforePassiveTabRead("genesis-state");
+    summaryReadGeneration++;
     const readGeneration = ++remoteReadGeneration;
     remotePublicReadState.value = "loading";
     remoteAccountReadState.value = "loading";
@@ -437,9 +458,13 @@ export const useGenesis = defineStore("genesis", () => {
     // Public supply/market facts are readable without a user session. The
     // orchestrator independently fences protected account/eligibility reads
     // by bearer authority and account/RunID epoch.
-    const loaded = await readGenesisRemoteFacts(genesisApi, {
+    const promise = readGenesisRemoteFacts({
+      ...genesisApi,
+      state: () => genesisApi.state(readGenesisPublicSummary),
+      account: () => genesisApi.account(readGenesisAccountSummary),
+    }, {
       hasAuthority: () => hasGenesisAuthorityForAccount(sessionVault.read(), boundKey),
-      isCurrent: () => readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope),
+      isCurrent: () => readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope) && readScope === passiveTabReadScope(),
       clear: clearRemoteFacts,
       clearPublic: clearRemotePublicFacts,
       clearAccount: clearRemoteAccountFacts,
@@ -456,12 +481,43 @@ export const useGenesis = defineStore("genesis", () => {
         remoteEligibility.value = eligibility;
         remoteEligibilityError.value = null;
       },
-    });
-    if (readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope)) {
-      if (remotePublicReadState.value === "loading") remotePublicReadState.value = "unavailable";
-      if (remoteAccountReadState.value === "loading") remoteAccountReadState.value = "unavailable";
-    }
-    return loaded;
+    }).then(loaded => {
+      if (readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope) && readScope === passiveTabReadScope()) {
+        if (remotePublicReadState.value === "loading") remotePublicReadState.value = "unavailable";
+        if (remoteAccountReadState.value === "loading") remoteAccountReadState.value = "unavailable";
+      }
+      return loaded;
+    }).finally(() => { if (remotePending?.promise === promise) remotePending = null; });
+    remotePending = { scope: owner, promise };
+    return promise;
+  }
+
+  function ensureSummary(): Promise<boolean> {
+    return runPassiveTabRead("genesis-summary", async () => {
+      if (!remoteApiEnabled) return true;
+      const request = remoteAccountEpoch.snapshot();
+      const runScope = captureRuntimeRevision();
+      const readScope = passiveTabReadScope();
+      const owner = JSON.stringify([readScope, request.accountKey, request.epoch, runScope.epoch]);
+      if (remotePending?.scope === owner) return remotePending.promise;
+      const generation = ++summaryReadGeneration;
+      const hasAccount = hasGenesisAuthorityForAccount(sessionVault.read(), boundKey);
+      const [publicResult, accountResult] = await Promise.allSettled([
+        ensureGenesisPublicSummary(),
+        hasAccount ? runPassiveTabRead("genesis-account-summary", readGenesisAccountSummary, runScope) : Promise.resolve(null),
+      ]);
+      if (generation !== summaryReadGeneration || !remoteScopeCurrent(request, runScope) || readScope !== passiveTabReadScope()) return false;
+      // These are display summaries only. Full read states, success evidence,
+      // qualification and every history page remain owned by syncRemote.
+      if (publicResult.status === "fulfilled") {
+        totalSlots.value = publicResult.value.series.totalSupply;
+        soldSlots.value = publicResult.value.series.soldSupply;
+        remoteSupplyKnown.value = true;
+      } else if (!isTransientReadFailure(publicResult.reason)) remoteSupplyKnown.value = false;
+      if (accountResult.status === "fulfilled") myOwned.value = accountResult.value?.holdings.length ?? 0;
+      else if (!isTransientReadFailure(accountResult.reason)) myOwned.value = 0;
+      return publicResult.status === "fulfilled" && accountResult.status === "fulfilled";
+    }, captureRuntimeRevision());
   }
 
   let commandStorageOwned = false;
@@ -531,7 +587,7 @@ export const useGenesis = defineStore("genesis", () => {
         marketCommands.value = {};
       }
       clearRemoteFacts();
-      void syncRemote(remoteAccountEpoch.snapshot());
+      void ensureSummary();
       return;
     }
     const g = hydrateGlobal();
@@ -934,11 +990,12 @@ export const useGenesis = defineStore("genesis", () => {
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
     remoteListings, remoteTransactions, remoteMarketStats, remoteRoyaltyPct, remoteEligibility, remoteEligibilityError, remotePublicError,
-    remotePublicReadState, remoteAccountReadState, remoteHalted,
+    remotePublicReadState, remoteAccountReadState, remotePublicSuccessRevision, remoteAccountSuccessRevision, remotePublicSuccessScope, remoteAccountSuccessScope,
+    captureRemoteReadBinding: remoteAccountEpoch.snapshot, remoteHalted,
     activityPage: activityPager.state, loadMoreActivity: activityPager.more,
     orderPage: orderPager.state, loadMoreGenesisOrders: orderPager.more,
     emissionPage: emissionPager.state, loadMoreEmissions: emissionPager.more, remoteEmissionTotals,
-    remoteHoldings, remoteEmissions, remoteOrders, syncRemote,
+    remoteHoldings, remoteEmissions, remoteOrders, syncRemote, ensureSummary,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

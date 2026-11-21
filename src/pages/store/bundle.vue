@@ -36,13 +36,7 @@
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
       </view>
-      <view v-else-if="catalogStatus === 'error' || policyStatus === 'error'" data-testid="bundle-catalog-error" class="nx-glass-card mx-4" :style="catalogStateStyle">
-        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
-        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
-        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog" @keydown="activate($event, retryCatalog)">
-          <text>{{ t.store.catalogRetry }}</text>
-        </view>
-      </view>
+      <EmptyState v-else-if="catalogStatus === 'error' || policyStatus === 'error'" kind="recoverable-error" page :title="t.store.catalogErrorTitle" :desc="t.store.catalogErrorBody" :cta-label="t.ui.reload" @cta="retryCatalog" />
       <template v-else>
 
       <view v-if="receiptWriteFailure" class="nx-glass-card mx-4 rounded-2xl text-center" :style="receiptFailureCardStyle">
@@ -54,10 +48,9 @@
       </view>
       <template v-else>
 
-      <!-- Hero — filled commercial spotlight (border dropped; aurora stays clipped
-           inside the surface + overflow-hidden, so it's not a page-floor glow). -->
-      <view class="nx-glass-card mx-4 relative overflow-hidden" :style="heroStyle">
-        <view aria-hidden :style="heroAuroraStyle" />
+      <!-- Hero — the page's focal card, tinted brand (its colour used to come from an aurora wash);
+           the total card below takes a brand-2 tint from its old corner glow. -->
+      <view class="nx-tint mx-4 relative overflow-hidden" style="--nx-tint: var(--v5-brand); padding: 18px; border-radius: 20px">
         <view class="relative">
           <view class="flex items-center" style="gap: 6px; margin-bottom: 8px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
@@ -92,15 +85,16 @@
           :style="{ borderBottom: i === products.length - 1 ? 'none' : '1px solid var(--v5-border)' }"
         >
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="itemNameStyle">{{ nexGridBrandText(p.name) }}</text>
+            <text class="block truncate" :style="itemNameStyle">{{ (p.name) }}</text>
             <text class="block" :style="itemMetaStyle">
               <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
             </text>
             <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
+            <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
             <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
           </view>
-          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: nexGridBrandText(p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
+          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: (p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-surface-2)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             </view>
@@ -120,17 +114,18 @@
             role="button"
             tabindex="0"
             :aria-label="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
-              ? `${nexGridBrandText(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: nexGridBrandText(p.name) })"
+              ? `${(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: (p.name) })"
             @click.stop="onAddSuggestion(p)"
             @keydown="activate($event, () => onAddSuggestion(p))"
           >
             <view class="flex-1 min-w-0 text-left">
-              <text class="block truncate" :style="suggestionNameStyle">{{ nexGridBrandText(p.name) }}</text>
+              <text class="block truncate" :style="suggestionNameStyle">{{ (p.name) }}</text>
               <text class="block" :style="itemMetaStyle">
-                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${formatAmount(p.dailyEarn)}` }) }}</text>
+                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
               </text>
               <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
               <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.gateBlockedToast }}</text>
+              <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             </view>
             <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
               <svg v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
@@ -141,8 +136,7 @@
       </view>
 
       <!-- Total summary -->
-      <view v-if="products.length > 0" class="nx-glass-card mx-4 mt-3 relative overflow-hidden" :style="heroStyle">
-        <view aria-hidden :style="totalAuroraStyle" />
+      <view v-if="products.length > 0" class="nx-glass-card nx-tint mx-4 mt-3 relative overflow-hidden" :style="heroStyle">
         <view class="relative">
           <!-- Subtotal -->
           <view class="flex items-center justify-between" style="min-height: 24px">
@@ -163,8 +157,8 @@
           </view>
           <!-- Combined daily -->
           <view class="flex items-center justify-between" style="min-height: 24px">
-            <text :style="rowLabelStyle(false)">{{ t.bundle.combinedDaily }}</text>
-            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">+${{ formatAmount(cumulativeDailyEarn) }}/d</text>
+            <text :style="rowLabelStyle(false)">{{ t.bundle.estimatedDaily }}</text>
+            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">${{ cumulativeDailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
           <!-- Checkout CTA — 结算不可用时置灰 + 换文案(禁用原因),下一步走 CTA 下方那句 hint。
                箭头 / 上传图标一并撤掉:禁用态上留着「向前」的箭头是反语义的。 -->
@@ -195,7 +189,14 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { promotionCheckoutHref } from "@/lib/promotion-entry";
+function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
+  return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
+}
+import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+import { productDailyEstimateRange } from "@/lib/product-estimates";
+import { productTaskLevelsText } from "@/lib/product-copy";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -204,13 +205,13 @@ import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { nexGridBrandText } from "@/lib/brand-copy";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
 import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
 // 🔴 zentao #244:线上模式必须问**服务端**资格,本地门仅 mock 用 —— 与 detail.vue 同一口径。
 import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { isProductAvailable } from "@/store/product-availability";
+import { useLocaleStore } from "@/store/locale";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
@@ -230,7 +231,13 @@ import { navTo,takeNavigationQuery } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { PROMOTION_CHECKOUT_TABLE, selectPromotionCheckoutRecord, type PromotionCheckoutRecord } from "@/lib/promotion-checkout-session";
+import { readCapacityPending } from "@/lib/capacity-command-recovery";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
+import { paidOrderReceipt } from "@/api/order-api";
+import { orderPaymentRejection } from "@/lib/order-payment-rejection";
+import { beginOrderAction, readOrderAction, clearOrderAction, markOrderActionPaid } from "@/lib/order-command-fence";
 
 const t = useT();
 const cart = useCart();
@@ -298,13 +305,28 @@ const bundleQuote = computed(() => quoteBundleAmountUsdt(
 const subtotal = computed(() => bundleQuote.value?.subtotalUsdt ?? Number.NaN);
 const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN);
 const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
-const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + (p.productType === "SHARE" ? 0 : p.dailyEarn), 0));
+const cumulativeDailyEarnText = computed(() => {
+  let low = 0, high = 0, hasShareEstimate = false;
+  for (const product of products.value) {
+    const estimate = productDailyEstimateRange(product);
+    if (!estimate) continue;
+    low += estimate.low;
+    high += estimate.high;
+    hasShareEstimate ||= product.productType === "SHARE";
+  }
+  const lowText = hasShareEstimate ? formatPlainAmount(low, 6) : formatAmount(low);
+  const highText = hasShareEstimate ? formatPlainAmount(high, 6) : formatAmount(high);
+  return lowText === highText ? lowText : `${lowText}–${highText}`;
+});
 function bundleProductYieldText(p: Product): string {
-  if (p.productType !== "SHARE") return fmt(t.value.uiChrome.earnsPerDay, { amount: `+${formatAmount(p.dailyEarn)}` });
-  const range = p.shareYieldMin != null && p.shareYieldMax != null
-    ? `${p.shareYieldMin}%–${p.shareYieldMax}%`
-    : t.value.store.shareAnnualUnavailable;
-  return `${t.value.store.shareReferenceAnnual}: ${range}`;
+  const estimate = productDailyEstimateRange(p);
+  if (estimate) {
+    const low = p.productType === "SHARE" ? formatPlainAmount(estimate.low, 6) : formatAmount(estimate.low);
+    const high = p.productType === "SHARE" ? formatPlainAmount(estimate.high, 6) : formatAmount(estimate.high);
+    return `${t.value.bundle.estimatedDaily} · $${low === high ? low : `${low}–${high}`}`;
+  }
+  // No server estimate: "—", never an annual rate or a figure derived from one.
+  return `${t.value.bundle.estimatedDaily} · —`;
 }
 
 // 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。
@@ -324,11 +346,10 @@ watch([() => products.value.map((p) => p.id).join("|"),
     .map((p) => purchaseEligibilityStore.ensure(p.id, true)));
 }, { immediate: true });
 
-function retryCatalog() {
-  void refreshProductCatalog(true);
-  void refreshServerProductPhase(true);
-  void refreshBundlePolicy();
+async function retryCatalog() {
+  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
 }
+useAutoRecovery({ failed: () => catalogStatus.value !== "loading" && policyStatus.value !== "loading" && (catalogStatus.value === "error" || policyStatus.value === "error"), retry: retryCatalog });
 
 function retryReceiptWrite() {
   const failure = receiptWriteFailure.value;
@@ -366,7 +387,7 @@ function formatBundleUsdt(value: number): string {
 }
 const totalText = computed(() => formatBundleUsdt(total.value));
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
-const checkoutCtaText = computed(() => fmt(t.value.bundle.checkoutCta, { total: totalText.value }));
+const checkoutCtaText = computed(() => t.value.promotion.continue);
 const submitting = ref(false);
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
@@ -467,7 +488,7 @@ async function onAddSuggestion(p: Product) {
   }
   if (!catalogReady.value || !isProductAvailable(p, phase.value) || cart.has(p.id)) return;
   cart.add(p.id);
-  toast.success(fmt(t.value.bundle.addedToBundle, { name: nexGridBrandText(p.name) }));
+  toast.success(fmt(t.value.bundle.addedToBundle, { name: (p.name) }));
 }
 interface PendingBundleCommands { commands: Record<string, PendingBundleCommand | string> }
 const BUNDLE_COMMAND_KEY = "nexgrid-bundle-order-command-v1";
@@ -529,10 +550,53 @@ async function offerBundleWalletTopup(requiredUsdt: number): Promise<void> {
   if (accepted && isCurrentAccountScope(accountScope)) navTo("/pages/me/wallet-topup");
 }
 
+// Existing durable commands stay in their original recovery path. New bundles
+// use the shared items review, legal terms and explicit payment confirmation.
+async function openBundleReview(list:Product[]):Promise<boolean> {
+  if(receiptWriteFailure.value)return true;
+  submitting.value=true;
+  try {
+    const rows=readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY,orders.currentAccountKey(),true);
+    const commands=rows?.commands??{};
+    if(Object.keys(commands).length){
+      if(commands[bundleFingerprint(list)])return false;
+      toast.warn(t.value.bundle.checkoutOutcomeUnknown);void navTo('/pages/store/orders');return true;
+    }
+    const items=list.map(product=>({productNo:product.id,quantity:1}));
+    // Unresolved originals (a checkout command, an unpaid original order, a
+    // capacity KEEP/REPLACE command) resume in the checkout before any
+    // new-purchase gate. If they cannot be read, the checkout shows that state.
+    let original=true;
+    try{
+      const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:'',items});
+      original=!!record?.pending||record?.order?.paymentStatus==='PENDING'
+        ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
+    }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
+    // Every device and Cloud Share takes one slot; the server refuses a bundle
+    // larger than the free slots, so say so before the review page.
+    const used=app.remoteSlotsUsed;
+    if(!original&&used!==null&&list.length>app.slotCap-used){
+      const scope=captureAccountScope();
+      const manage=await confirm({
+        title:t.value.bundle.slotsShortTitle,
+        message:fmt(t.value.bundle.slotsShortBody,{count:list.length,free:Math.max(0,app.slotCap-used)}),
+        confirmLabel:t.value.bundle.slotsShortManage,
+        cancelLabel:t.value.bundle.slotsShortAdjust,
+        icon:'warn',
+      });
+      if(manage&&isCurrentAccountScope(scope))void navTo('/pages/me/devices');
+      return true;
+    }
+    await navTo(promotionCheckoutHref(items));
+  }catch{toast.warn(t.value.bundle.checkoutOutcomeUnknown);}
+  finally{submitting.value=false;}
+  return true;
+}
 async function onCheckout() {
   const list = products.value;
   if (list.length < 2 || submitting.value || walletRefreshing.value) return;
   if (remoteApiEnabled) {
+    if(await openBundleReview(list))return;
     const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();
     const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)
@@ -562,10 +626,6 @@ async function onCheckout() {
         return;
       }
       const command = acquireBundleCommand(list, accountKey, quotedTotal);
-      if (app.user.usdtBalance + 0.000001 < command.expectedAmountUsdt) {
-        await offerBundleWalletTopup(command.expectedAmountUsdt);
-        return;
-      }
       let canonicalOrderCommitted = false;
       let paymentConfirmed = false;
       let confirmedOrderNo = "";
@@ -579,12 +639,41 @@ async function onCheckout() {
         if (!matchesBundleQuote(created, command.productNos, command.expectedAmountUsdt)) {
           throw new ApiError({ kind: "protocol", message: "BUNDLE_QUOTE_RECEIPT_MISMATCH" });
         }
-        const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
+        if (readOrderAction(accountKey,created.orderNo)) {
+          navTo(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`);
+          return;
+        }
+        const persisted=await orders.ensureRemoteOrder(created.orderNo);
         if (!scopeIsCurrent()) return;
-        if (paid.orderNo !== created.orderNo
-            || (paid.paymentMethod === "WALLET"
+        if (!persisted || persisted.total!==created.amountUsdt) throw new Error('BUNDLE_WALLET_PAYMENT_READBACK_MISMATCH');
+        if (persisted.status!=='placed') {
+          navTo(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`);
+          return;
+        }
+        let paymentKey:string|null=null;
+        const paymentCurrent=()=>scopeIsCurrent()&&bundleFingerprint(products.value)===bundleFingerprint(list)
+          &&normalizeBundleExpectedAmountUsdt(total.value)===command.expectedAmountUsdt
+          &&policy.value?.policyVersion===latestPolicy.policyVersion;
+        const paid = await executeSelectedPurchase({amount:command.expectedAmountUsdt,currency:'USDT',summary:list.map(product=>product.name).join(', ')},
+          async authorization=>{
+            if(!paymentCurrent())return null;
+            const action=beginOrderAction(accountKey,'pay',created.orderNo,command.expectedAmountUsdt,'WALLET');paymentKey=action.key;
+            try{return await orderApi.pay(created.orderNo,action.key,authorization);}
+            catch(error){
+              if (/^PAYMENT_PASSWORD_(INCORRECT|LOCKED|VERSION_CONFLICT|NOT_CONFIGURED|REQUIRED)$/.test(asApiError(error).message))
+                clearOrderAction(accountKey,created.orderNo,action.key);
+              throw error;
+            }
+          },paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},orderNo:created.orderNo,deadlineAt:persisted.expiresAt,
+            reorder:()=>void navTo('/pages/store/bundle'),
+            commandKey:()=>{const action=beginOrderAction(accountKey,'pay',created.orderNo,command.expectedAmountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
+        if (!paid) return;
+        if (!scopeIsCurrent()) return;
+        if (paid.orderNo !== created.orderNo) throw new Error("BUNDLE_WALLET_PAYMENT_RECEIPT_INVALID");
+        markOrderActionPaid(accountKey,created.orderNo);
+        if (paid.paymentMethod === "WALLET"
               && (paid.walletBalanceAfterUsdt === null
-                || !app.adoptCommerceWallet(paid.walletBalanceAfterUsdt, walletReceiptScope)))) {
+                || !app.adoptCommerceWallet(paid.walletBalanceAfterUsdt, walletReceiptScope))) {
           throw new Error("BUNDLE_WALLET_PAYMENT_RECEIPT_INVALID");
         }
         paymentConfirmed = true;
@@ -597,13 +686,12 @@ async function onCheckout() {
         if (!settled || settled.status !== "activated") {
           throw new Error("BUNDLE_WALLET_PAYMENT_READBACK_MISMATCH");
         }
+        if(paymentKey)clearOrderAction(accountKey,created.orderNo,paymentKey);
         // Order + wallet receipt are already canonical. Fleet projection is
         // best effort and must never cause a second payment submission.
         void app.refreshRemoteFleet(walletReceiptScope);
-        const successBody = t.value.bundle.checkoutSuccessBody;
-        toast.success(t.value.bundle.checkoutSuccessTitle,
-          fmt(successBody, { count: created.itemCount }));
-        navTo("/pages/store/orders");
+        toast.success(t.value.orders.statusActivated);
+        navTo(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`);
       } catch (error) {
         const policyStale = error instanceof ApiError && error.message === "BUNDLE_DISCOUNT_POLICY_STALE";
         const quoteStale = error instanceof ApiError && error.message === "BUNDLE_QUOTE_STALE";
@@ -614,6 +702,14 @@ async function onCheckout() {
           retireBundleKey(list, accountKey, command.key);
         }
         if (!scopeIsCurrent()) return;
+        // A definitive refusal leaves the order unpaid; its detail page reads the
+        // rejected command back and offers cancel or a fresh payment.
+        const rejection = createdOrderNo && !paymentConfirmed ? orderPaymentRejection(error, useLocaleStore().code) : null;
+        if (rejection) {
+          toast.warn(rejection);
+          navTo(`/pages/store/order-detail?id=${encodeURIComponent(createdOrderNo)}`);
+          return;
+        }
         if (paymentConfirmed) {
           toast.warn(t.value.orders.walletPaymentConfirmedRefreshPending);
           if (confirmedOrderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(confirmedOrderNo)}`);
@@ -668,7 +764,7 @@ async function onCheckout() {
   const gateCtx = {
     rank: vRank.myRank,
     activeDirect: network.members.filter((m) => m.layer === 1 && m.status === "active").length,
-    teamVolumeUSD: vRank.teamVolumeUSD,
+    teamComputePoints: vRank.teamComputePoints ?? 0,
   };
   const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
   if (blocked) {
@@ -747,8 +843,8 @@ const catalogStateStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
 };
 const catalogStateTitleStyle: CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 const catalogStateBodyStyle: CSSProperties = {
@@ -770,32 +866,11 @@ const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-r
   padding: "24px 20px",
   background: "var(--nx-glass-fill)",
 };
-const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+const heroStyle: CSSProperties = {
+  "--nx-tint": "var(--v5-brand-2)",
   padding: "18px",
   borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-};
-const heroAuroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 80% 20%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 80%, var(--v5-success-soft) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
-};
-const totalAuroraStyle: CSSProperties = {
-  position: "absolute",
-  top: "-40px",
-  left: "-40px",
-  width: "140px",
-  height: "140px",
-  borderRadius: "50%",
-  background: "radial-gradient(circle, var(--v5-brand-2-soft), transparent 70%)",
-  opacity: 0.6,
-  pointerEvents: "none",
-};
+} as CSSProperties;
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
@@ -901,7 +976,7 @@ const suggestionNameStyle: CSSProperties = {
 function rowLabelStyle(big: boolean): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: big ? 600 : 500,
     color: big ? "var(--v5-ink)" : "var(--v5-ink-3)",
   };
@@ -929,7 +1004,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
 const ctaLabelStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   letterSpacing: "-0.005em",
   color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
 }));

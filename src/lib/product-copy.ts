@@ -13,19 +13,18 @@
 import { en, type Messages } from "@/i18n/messages/en";
 import { vi } from "@/i18n/messages/vi";
 import { zh } from "@/i18n/messages/zh";
-import type { LocaleCode } from "@/i18n";
-import type { Product } from "@/mock/products";
+import { uiLocale, type LocaleCode } from "@/i18n";
+import type { Product, ProductTaskLevel } from "@/mock/products";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { fmt } from "@/i18n/format";
 
 export interface ProductCopy {
   tagline: string;
   badge: string;
-  /** AI pool this SKU books tasks from (product.ai.unlocks). "" when the SKU has none. */
-  unlocks: string;
+  taskLevels: string;
 }
 
-type CatalogEntry = { tagline: string; badge: string; unlocks: string };
+type CatalogEntry = { tagline: string; badge: string };
 
 const badgeSources = [en.store, vi.store, zh.store];
 
@@ -44,13 +43,16 @@ function normalizedPublishedTagline(value: string): string {
   return value.normalize("NFKC").trim().replace(/\s*[·・]\s*/gu, "·");
 }
 
-const PRO_PUBLISHED_TAGLINE = "中端主力·AI 推理 + 挖掘";
+const PRO_PUBLISHED_TAGLINE = "全托管设备";
 const VIRGINIA_DATACENTER = "美国·弗吉尼亚";
+// zh keeps the published value itself; the zh slots only show translators the source.
+const VIRGINIA_DATACENTER_LABEL = { zh: "美国·弗吉尼亚", en: "United States · Virginia", vi: "Hoa Kỳ · Virginia", id: "Amerika Serikat · Virginia", ms: "Amerika Syarikat · Virginia", fil: "United States · Virginia", ru: "США · Вирджиния", kk: "АҚШ · Вирджиния", uz: "AQSh · Virjiniya" };
+const PRO_TAGLINE_LABEL = {"zh":"全托管设备","en":"Fully managed device","vi":"Thiết bị được quản lý toàn diện","ru":"Устройство с полным обслуживанием","kk":"Толық қызмет көрсетілетін құрылғы","uz":"Toʻliq xizmat koʻrsatiladigan qurilma","id":"Perangkat yang dikelola penuh","ms":"Peranti diurus sepenuhnya","fil":"Device na ganap na pinamamahalaan"};
 
 /** Translate only this published place label; a SKU's actual datacenter remains server-owned. */
 export function localizedDatacenterValue(value: string | null | undefined, locale: LocaleCode): string | null | undefined {
   if (!value || normalizedPublishedTagline(value) !== VIRGINIA_DATACENTER || locale === "zh") return value;
-  return locale === "vi" ? "Hoa Kỳ · Virginia" : "United States · Virginia";
+  return VIRGINIA_DATACENTER_LABEL[uiLocale(locale)];
 }
 
 function serverTagline(t: Messages, p: Product, locale?: LocaleCode): string {
@@ -58,22 +60,28 @@ function serverTagline(t: Messages, p: Product, locale?: LocaleCode): string {
     return t.store.cloudShareLowBarrierTagline;
   }
   if (p.id === "stellarbox-pro" && normalizedPublishedTagline(p.tagline) === PRO_PUBLISHED_TAGLINE && locale && locale !== "zh") {
-    return locale === "vi" ? "Dòng chủ lực tầm trung · Suy luận AI + khai thác" : "Midrange mainstay · AI inference + mining";
+    return PRO_TAGLINE_LABEL[uiLocale(locale)];
   }
   return p.tagline;
+}
+
+export function productTaskLevelsText(t: Messages, levels: readonly ProductTaskLevel[]): string {
+  return levels.length ? fmt(t.store.taskLevelsLine, {
+    levels: levels.map((level) => t.store.taskLevelLabels[level]).join(" / "),
+  }) : "";
 }
 
 export function productCopy(t: Messages, p: Product, serverCatalog = false, locale?: LocaleCode): ProductCopy {
   if (serverCatalog) return {
     tagline: serverTagline(t, p, locale),
     badge: serverBadge(t, p.badge),
-    unlocks: "",
+    taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];
   return {
     tagline: entry?.tagline ?? p.tagline,
     badge: entry?.badge ?? p.badge ?? "",
-    unlocks: entry?.unlocks ?? p.ai?.unlocks ?? "",
+    taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
 }
 
@@ -86,7 +94,21 @@ export function productCopy(t: Messages, p: Product, serverCatalog = false, loca
  * Every render of those fields goes through here; `spec-sentinel-render-gate.mjs`
  * fails the build on any unwrapped read in the store render face.
  */
-export function specText(t: Messages, value: string | null | undefined, fallback = t.store.specValueUnavailable): string {
+export function specText(
+  t: Messages,
+  value: string | null | undefined,
+  fallback = t.store.specValueUnavailable,
+  field?: "vram" | "power",
+): string {
+  if (value === "not_applicable") {
+    if (field === "vram") return t.store.specShareVramNotApplicable;
+    if (field === "power") return t.store.specSharePowerNotApplicable;
+    return fallback;
+  }
+  if (value === "不适用（虚拟算力份额）") return t.store.specShareVramNotApplicable;
+  if (value === "不适用（非独立设备）") return t.store.specSharePowerNotApplicable;
+  const target = value?.match(/^目标\s*(\d+(?:\.\d+)?%)$/);
+  if (target) return fmt(t.store.specTarget, { n: target[1] });
   return !value || value === SPEC_UNAVAILABLE ? fallback : value;
 }
 

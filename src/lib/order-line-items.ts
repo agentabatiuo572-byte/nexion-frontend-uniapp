@@ -1,8 +1,8 @@
 import { productMediaUrl } from "@/api/product-catalog-contract";
 
 export interface OrderLineItem {
-  sku: string;
   imageUrl?: string;
+  sku: string;
   name: string;
   quantity: number;
   unitPriceUsdt: number;

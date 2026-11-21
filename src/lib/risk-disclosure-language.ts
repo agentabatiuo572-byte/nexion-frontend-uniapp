@@ -3,19 +3,15 @@ import type { RiskDisclosureChapter, RiskDisclosureCurrent } from "@/api/risk-di
 export type RiskDisclosureDisplayLanguage = "zh" | "vi" | "en";
 
 /**
- * Server disclosures always publish Chinese and Vietnamese. English is shown
- * only when the authoritative language scope explicitly includes it; otherwise
- * the page must show a real published source language and say that it did so.
+ * Server disclosures always publish Chinese and Vietnamese. Other interfaces
+ * can read the current publication only when its scope includes English.
  */
 export function resolveRiskDisclosureDisplayLanguage(
   localeCode: string,
   languageScope: RiskDisclosureCurrent["languageScope"],
-): { language: RiskDisclosureDisplayLanguage; fallback: boolean } {
-  if (localeCode === "vi") return { language: "vi", fallback: false };
-  if (localeCode === "en" && languageScope === "zh+vi+en") {
-    return { language: "en", fallback: false };
-  }
-  return { language: "zh", fallback: localeCode === "en" };
+): RiskDisclosureDisplayLanguage | null {
+  if (localeCode === "zh" || localeCode === "vi") return localeCode;
+  return languageScope.split("+").includes("en") ? "en" : null;
 }
 
 export function riskDisclosureChapterCopy(

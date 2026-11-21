@@ -2,10 +2,16 @@ import { computed } from "vue";
 import { en, type Messages } from "./messages/en";
 import { vi } from "./messages/vi";
 import { zh } from "./messages/zh";
+import { id } from "./messages/id";
+import { ms } from "./messages/ms";
+import { fil } from "./messages/fil";
+import { ru } from "./messages/ru";
+import { kk } from "./messages/kk";
+import { uz } from "./messages/uz";
 import type { LocaleCode } from "./index";
 import { useLocaleStore } from "@/store/locale";
 import { useI18nRuntime } from "@/store/i18n-runtime";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { platformDisplayText } from "@/lib/brand-copy";
 
 // Ported from Nexion-prototype/lib/i18n/use-t.ts (zustand → Pinia).
 // Only locales with real dictionaries are listed; everything else falls back
@@ -14,6 +20,12 @@ export const DICTS: Partial<Record<LocaleCode, Messages>> = {
   en,
   vi,
   zh,
+  id,
+  ms,
+  fil,
+  ru,
+  kk,
+  uz,
 };
 
 function applyRuntimeMessages<T>(bundled: T, runtime: Readonly<Record<string, string>>, path = ""): T {
@@ -23,10 +35,8 @@ function applyRuntimeMessages<T>(bundled: T, runtime: Readonly<Record<string, st
       if (typeof key !== "string") return Reflect.get(target, key, receiver);
       const currentPath = path ? `${path}.${key}` : key;
       const remote = runtime[currentPath];
-      // Server-published copy is a display boundary: retired brand names stored
-      // in older rows are normalized on the way out (see lib/brand-copy.ts), the
-      // same way product/device copy is. The stored value is never rewritten.
-      if (typeof remote === "string") return nexGridBrandText(remote);
+      // Published runtime copy is authoritative, including historical wording.
+      if (typeof remote === "string") return platformDisplayText(remote);
       const value = Reflect.get(target, key, receiver);
       return value && typeof value === "object" ? applyRuntimeMessages(value, runtime, currentPath) : value;
     },

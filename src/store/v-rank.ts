@@ -1,32 +1,37 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
+import { teamRankProgress } from "@/lib/team-rank-progress";
+import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
-import { ref } from "vue";
-import { remoteApiEnabled, vRankApi } from "@/api/runtime";
+import { onScopeDispose, ref, watch } from "vue";
+import { apiRuntimeConfig, remoteApiEnabled, vRankApi } from "@/api/runtime";
 import type { CanonicalVRankLadder, CanonicalVRankState } from "@/api/v-rank-api";
 import { asApiError } from "@/api/errors";
+import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
-import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 
 /**
  * Ported from Nexion-prototype/lib/v3/v-rank.ts (zustand persist → Pinia + uni storage).
- * ⚠️ MOCK-ONLY V_RANKS table (13-tier ladder, conditions + bonuses + prizes).
+ * ⚠️ MOCK-ONLY V_RANKS table (9-tier preview ladder, conditions + bonuses + prizes).
  * Production: GET /api/config/v-ranks returns server-authoritative ladder.
  * Promotion judging (nextRankProgress / nextRankGap) is preview-only; server is
  * the sole canonical authority for V-rank promotion (PRD §13.2).
  *
- * V0→V12 13 阶,每升一阶解锁 unilevel 深度 +1 / 平级奖(V3+) / 领导池权重 / 培育奖 NEX。
- * 心理设计:V0→V3 易("上钩"),V3→V6 拼命,V7+ 画大饼,V12 永远没人到。
+ * V0→V8 9 阶,每升一阶解锁 unilevel 深度 +1 / 平级奖(V3+) / 领导池权重 / 培育奖 NEX。
+ * 晋级条件、权益与奖励应完整展示；正式等级以服务端发布的阶梯为准。
  * 奖励为可配 NEX(cultivationBonus);实物奖品已删(与运营后台 F1 同步,2026-06)。
  */
 
-export type VRank = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+/** Rank IDs are validated at the API boundary; never clamp an existing account rank. */
+export type VRank = number;
 
 export interface VRankConditions {
-  selfBuyUSD?: number;        // 自买设备累计
+  selfComputePoints?: number; // 自购算力点
+  teamComputePoints?: number; // 团队算力点
   directRefs?: number;        // 直推数
-  teamVolumeUSD?: number;     // 团队总业绩
-  vDownlines?: Partial<Record<VRank, number>>; // 下面需要 N 个 V 级
+  vDownlines?: Record<VRank, number>; // 下面需要 N 个 V 级
 }
 
 export interface VRankDef {
@@ -43,7 +48,7 @@ export interface VRankDef {
 }
 
 export interface MonetaryVRankReward {
-  type: "USDT" | "NEX";
+  type: "USDT" | "UVT";
   amount: number;
   voucherId?: string;
   skuId?: string;
@@ -70,88 +75,61 @@ export const V_RANKS: VRankDef[] = [
   },
   {
     v: 1, title: "Pilot", cnTitle: "飞行员",
-    conditions: { selfBuyUSD: 299, directRefs: 3 },
+    conditions: { selfComputePoints: 2990, directRefs: 3 },
     directBonus: 0.10, unilevelDepth: 2,
     peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 500, rewards: [],
   },
   {
     v: 2, title: "Operator", cnTitle: "操作员",
-    conditions: { teamVolumeUSD: 5000 },
+    conditions: { teamComputePoints: 50_000 },
     directBonus: 0.10, unilevelDepth: 3,
     peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 2000, rewards: [],
   },
   {
     v: 3, title: "Captain", cnTitle: "舰长",
-    conditions: { teamVolumeUSD: 20_000, vDownlines: { 1: 2 } },
+    conditions: { teamComputePoints: 200_000, vDownlines: { 1: 2 } },
     directBonus: 0.10, unilevelDepth: 4,
     peerBonus: 0.05, leadershipVotes: 1,
     cultivationBonus: 10_000, rewards: [],
   },
   {
     v: 4, title: "Commander", cnTitle: "指挥官",
-    conditions: { teamVolumeUSD: 50_000, vDownlines: { 2: 3 } },
+    conditions: { teamComputePoints: 500_000, vDownlines: { 2: 3 } },
     directBonus: 0.10, unilevelDepth: 5,
     peerBonus: 0.05, leadershipVotes: 2,
     cultivationBonus: 50_000, rewards: [],
   },
   {
     v: 5, title: "Wing Leader", cnTitle: "翼领",
-    conditions: { teamVolumeUSD: 150_000, vDownlines: { 3: 4 } },
+    conditions: { teamComputePoints: 1_500_000, vDownlines: { 3: 4 } },
     directBonus: 0.10, unilevelDepth: 6,
     peerBonus: 0.05, leadershipVotes: 4,
     cultivationBonus: 200_000, rewards: [],
   },
   {
     v: 6, title: "Squadron", cnTitle: "中队长",
-    conditions: { teamVolumeUSD: 500_000, vDownlines: { 4: 5 } },
+    conditions: { teamComputePoints: 5_000_000, vDownlines: { 4: 5 } },
     directBonus: 0.10, unilevelDepth: 7,
     peerBonus: 0.05, leadershipVotes: 8,
     cultivationBonus: 800_000, rewards: [],
   },
   {
     v: 7, title: "Fleet Cmdr", cnTitle: "舰队司令",
-    conditions: { teamVolumeUSD: 1_000_000, vDownlines: { 5: 6 } },
+    conditions: { teamComputePoints: 10_000_000, vDownlines: { 5: 6 } },
     directBonus: 0.10, unilevelDepth: 8,
     peerBonus: 0.05, leadershipVotes: 16,
     cultivationBonus: 3_200_000, rewards: [],
   },
   {
     v: 8, title: "Star Admiral", cnTitle: "星上将",
-    conditions: { teamVolumeUSD: 3_000_000, vDownlines: { 6: 7 } },
+    conditions: { teamComputePoints: 30_000_000, vDownlines: { 6: 7 } },
     directBonus: 0.10, unilevelDepth: 9,
     peerBonus: 0.05, leadershipVotes: 32,
     cultivationBonus: 10_000_000, rewards: [],
   },
-  {
-    v: 9, title: "Galaxy Lord", cnTitle: "星河领主",
-    conditions: { teamVolumeUSD: 10_000_000 },
-    directBonus: 0.10, unilevelDepth: 10,
-    peerBonus: 0.05, leadershipVotes: 64,
-    cultivationBonus: 0, rewards: [],
-  },
-  {
-    v: 10, title: "UVEL Founder", cnTitle: "联合创始",
-    conditions: { teamVolumeUSD: 30_000_000 },
-    directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 128,
-    cultivationBonus: 0, rewards: [],
-  },
-  {
-    v: 11, title: "Cosmic Sovereign", cnTitle: "宇宙至尊",
-    conditions: { teamVolumeUSD: 100_000_000 },
-    directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 256,
-    cultivationBonus: 0, rewards: [],
-  },
-  {
-    v: 12, title: "Singularity", cnTitle: "奇点",
-    conditions: { teamVolumeUSD: 500_000_000 },
-    directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 512,
-    cultivationBonus: 0, rewards: [],
-  },
+
 ];
 
 /**
@@ -161,10 +139,10 @@ export const V_RANKS: VRankDef[] = [
  */
 export interface VRankData {
   myRank: VRank;
-  selfBuyUSD: number;
+  selfComputePoints?: number;
+  teamComputePoints?: number;
   directRefs: number;
-  teamVolumeUSD: number;
-  vDownlineCounts: Partial<Record<VRank, number>>;
+  vDownlineCounts: Record<VRank, number>;
 }
 
 export type VRankProgressPatch = Partial<Omit<VRankData, "myRank">>;
@@ -176,9 +154,9 @@ const EMPTY_V_RANK: VRankDef = {
 
 function canonicalRank(row: Awaited<ReturnType<typeof vRankApi.ladder>>["ranks"][number]): VRankDef {
   const conditions: VRankConditions = {};
-  if (row.selfBuyUSD !== undefined) conditions.selfBuyUSD = row.selfBuyUSD;
+  if (row.selfComputePoints !== undefined) conditions.selfComputePoints = row.selfComputePoints;
+  if (row.teamComputePoints !== undefined) conditions.teamComputePoints = row.teamComputePoints;
   if (row.directRefs !== undefined) conditions.directRefs = row.directRefs;
-  if (row.teamVolumeUSD !== undefined) conditions.teamVolumeUSD = row.teamVolumeUSD;
   if (row.requiredDownlineRank !== undefined && row.requiredDownlineCount !== undefined) {
     conditions.vDownlines = { [row.requiredDownlineRank as VRank]: row.requiredDownlineCount };
   }
@@ -197,9 +175,9 @@ const DEFAULT_V_RANK: VRankData = {
   // 新账号 seed 人设:V2 Operator(刚到,正冲 V3)—— 与 account-cloud
   // createSeedSnapshot 的统一 seed 口径一致。
   myRank: 2,
-  selfBuyUSD: 1198,        // S1 + Pro 已买
+  selfComputePoints: 11_980, // S1 + Pro 已买
   directRefs: 5,
-  teamVolumeUSD: 5_240,    // 刚过 V2 门槛
+  teamComputePoints: 52_400, // 刚过 V2 门槛
   vDownlineCounts: { 1: 3 }, // 下面有 3 个 V1
 };
 
@@ -221,12 +199,12 @@ export const useVRank = defineStore("vRank", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const init = remoteApiEnabled ? { myRank: 0 as VRank, selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {} } : hydrate(boundKey);
+  const init: VRankData = remoteApiEnabled ? { myRank: 0 as VRank, directRefs: 0, vDownlineCounts: {} } : hydrate(boundKey);
   const myRank = ref<VRank>(init.myRank);
-  const selfBuyUSD = ref(init.selfBuyUSD);
+  const selfComputePoints = ref<number | undefined>(init.selfComputePoints);
+  const teamComputePoints = ref<number | undefined>(init.teamComputePoints);
   const directRefs = ref(init.directRefs);
-  const teamVolumeUSD = ref(init.teamVolumeUSD);
-  const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
+  const vDownlineCounts = ref<Record<VRank, number>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
   // 服务端能力位:某类收益今天是否真的会派发(与佣金指南同源)。等级阶梯里的
   // peerBonus 是「配置比例」,不是「已生效权益」—— 渲染时必须靠这个位区分(#79)。
@@ -235,13 +213,18 @@ export const useVRank = defineStore("vRank", () => {
   const prizeName = ref(remoteApiEnabled ? "" : "UVEL V-Rank");
   const remoteReady = ref(!remoteApiEnabled);
   const remoteError = ref<string | null>(null);
+  const remoteRateLimited = ref(false);
+  const remoteTransientFailure = ref(false);
+  let retryAt = 0;
+  let environmentInvalidated = false;
+  let inFlight: { account: VRankRemoteRequest; runtime: RuntimeRevisionScope; promise: Promise<void> } | null = null;
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
 
   function clearRemoteFacts(): void {
     myRank.value = 0;
-    selfBuyUSD.value = 0;
+    selfComputePoints.value = undefined;
+    teamComputePoints.value = undefined;
     directRefs.value = 0;
-    teamVolumeUSD.value = 0;
     vDownlineCounts.value = {};
     ladder.value = [];
     capabilities.value = { peer: false, genesis: false };
@@ -253,9 +236,9 @@ export const useVRank = defineStore("vRank", () => {
     if (remoteApiEnabled) return;
     writeAccountRow<VRankData>(ACCOUNTS_KEY, boundKey, {
       myRank: myRank.value,
-      selfBuyUSD: selfBuyUSD.value,
+      selfComputePoints: selfComputePoints.value,
+      teamComputePoints: teamComputePoints.value,
       directRefs: directRefs.value,
-      teamVolumeUSD: teamVolumeUSD.value,
       vDownlineCounts: vDownlineCounts.value,
     });
   }
@@ -265,30 +248,51 @@ export const useVRank = defineStore("vRank", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
       remoteAccountEpoch.bind(boundKey);
+      inFlight = null; retryAt = 0; remoteRateLimited.value = false; remoteTransientFailure.value = false;
       clearRemoteFacts();
       void refreshCanonicalVRank(captureVRankRequest(remoteAccountEpoch));
       return;
     }
     const next = hydrate(boundKey);
     myRank.value = next.myRank;
-    selfBuyUSD.value = next.selfBuyUSD;
+    selfComputePoints.value = next.selfComputePoints;
+    teamComputePoints.value = next.teamComputePoints;
     directRefs.value = next.directRefs;
-    teamVolumeUSD.value = next.teamVolumeUSD;
     vDownlineCounts.value = next.vDownlineCounts;
   }
 
   let refreshGeneration = 0;
-  // H5 cold restore enters the page before the bearer is bound to this account.
-  // That local precondition must not surface as a server-unavailable error the
-  // user has to clear by hand: wait (bounded) for the session to match, then
-  // read, and retry once when the first attempt fails transiently.
+  // H5 may read before local session binding. Retry that precondition once;
+  // server authorization failures and rate limits do not use this timer.
   const SESSION_BIND_RETRY_MILLISECONDS = 500;
-  async function refreshCanonicalVRank(
+  function ensureCanonicalVRank(): Promise<void> {
+    if (Date.now() < retryAt) return Promise.resolve();
+    return runPassiveTabRead("v-rank", () => inFlight && remoteAccountEpoch.isCurrent(inFlight.account) && isCurrentRuntimeRevision(inFlight.runtime)
+      ? inFlight.promise : refreshCanonicalVRank(), [remoteAccountEpoch.snapshot(), captureRuntimeRevision()], () => remoteReady.value);
+  }
+
+  function refreshCanonicalVRank(
+    request: VRankRemoteRequest = captureVRankRequest(remoteAccountEpoch),
+    runScope: RuntimeRevisionScope = captureRuntimeRevision(),
+  ): Promise<void> {
+    invalidateBeforePassiveTabRead("v-rank");
+    if (environmentInvalidated || Date.now() < retryAt || !remoteAccountEpoch.isCurrent(request)
+      || !isCurrentRuntimeRevision(runScope)) return Promise.resolve();
+    const promise = readCanonicalVRank(request, runScope);
+    rememberPassiveTabRead("v-rank", promise, [request, runScope], undefined, () => remoteReady.value);
+    inFlight = { account: request, runtime: runScope, promise };
+    const clear = () => { if (inFlight?.promise === promise) inFlight = null; };
+    void promise.then(clear, clear);
+    return promise;
+  }
+
+  async function readCanonicalVRank(
     request: VRankRemoteRequest = captureVRankRequest(remoteAccountEpoch),
     runScope: RuntimeRevisionScope = captureRuntimeRevision(),
   ) {
     if (!remoteApiEnabled) return;
     const generation = ++refreshGeneration;
+    const snapshotWrite = captureTabSnapshotWrite();
     const isCurrent = () => generation === refreshGeneration
       && remoteAccountEpoch.isCurrent(request)
       && isCurrentRuntimeRevision(runScope);
@@ -301,41 +305,85 @@ export const useVRank = defineStore("vRank", () => {
       prizeName.value = remoteLadder.prizeName;
       capabilities.value = remoteLadder.capabilities;
       myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
-      selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
+      selfComputePoints.value = remoteCurrent.progress.selfComputePoints;
+      teamComputePoints.value = remoteCurrent.progress.teamComputePoints;
       directRefs.value = remoteCurrent.progress.directRefs;
-      teamVolumeUSD.value = remoteCurrent.progress.teamVolumeUSD;
       vDownlineCounts.value = Object.fromEntries(
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
-      ) as Partial<Record<VRank, number>>;
+      ) as Record<VRank, number>;
       remoteReady.value = true;
-      remoteError.value = null;
+      remoteError.value = null; retryAt = 0; remoteRateLimited.value = false; remoteTransientFailure.value = false;
+      const progress = teamRankProgress({ myRank: myRank.value, selfComputePoints: selfComputePoints.value, directRefs: directRefs.value, teamComputePoints: teamComputePoints.value, vDownlineCounts: vDownlineCounts.value }, ladder.value);
+      saveTabSnapshot(snapshotWrite, "rank", { rank: myRank.value, next: progress.next?.v ?? null, missing: progress.missing.length,
+        bars: progress.rows.filter(row => row.tier === progress.next?.v).map(row => ({ key: row.key, kind: row.kind, vLevel: row.vLevel ?? null, percent: row.status === "unknown" ? null : row.required === 0 ? 100 : Math.min(100, Math.round(row.current! / row.required * 100)) })) }, null);
+    };
+    let strictFailure = false, failureRecorded = false, pairGeneration = 0;
+    const isLocalSessionPending = (cause: ReturnType<typeof asApiError>) => cause.kind === "auth"
+      && cause.message === "AUTH_SESSION_REQUIRED" && cause.status === undefined && cause.code === undefined;
+    const fail = (failure: unknown) => {
+      if (!isCurrent()) return;
+      const transient = isTransientReadFailure(failure), limited = isHttpReadRateLimit(failure);
+      if (isHttpReadRateLimit(failure)) retryAt = Math.max(retryAt, Date.now() + (failure.retryAfterMs ?? 30_000));
+      if (!transient) { strictFailure = true; invalidateTabSnapshots(["rank"], snapshotWrite); }
+      remoteRateLimited.value = limited && !strictFailure;
+      remoteTransientFailure.value = transient && !strictFailure;
+      clearRemoteFacts(); remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";
+      failureRecorded = true;
+    };
+    const readPair = () => {
+      const pair = ++pairGeneration; failureRecorded = false;
+      const observe = <T>(reading: Promise<T>): Promise<T> => reading.catch(error => {
+        // A late strict denial must revoke this pair even if its other GET
+        // already reported 429. A replaced retry pair cannot revoke newer facts.
+        if (isCurrent() && pair === pairGeneration && !isLocalSessionPending(asApiError(error))) fail(error);
+        throw error;
+      });
+      return Promise.all([observe(vRankApi.ladder()), observe(vRankApi.current())]);
     };
     try {
-      const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+      const [remoteLadder, remoteCurrent] = await readPair();
       if (!isCurrent()) return;
       apply(remoteLadder, remoteCurrent);
     } catch (error) {
       if (!isCurrent()) return;
-      // H5 cold restore enters this page before the bearer is bound to the
-      // account; the request layer reports that local precondition as an auth
-      // failure. One bounded retry keeps a recoverable first-request failure
-      // from being shown as a server error the user must clear by hand.
-      if (asApiError(error).kind === "auth") {
+      let failure = error;
+      if (isLocalSessionPending(asApiError(error)) && !strictFailure && Date.now() >= retryAt) {
         await new Promise<void>((resolve) => setTimeout(resolve, SESSION_BIND_RETRY_MILLISECONDS));
-        if (!isCurrent()) return;
+        if (!isCurrent() || strictFailure || Date.now() < retryAt) return;
         try {
-          const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+          const [remoteLadder, remoteCurrent] = await readPair();
           if (!isCurrent()) return;
           apply(remoteLadder, remoteCurrent);
           return;
-        } catch {
+        } catch (retryError) {
           if (!isCurrent()) return;
+          failure = retryError;
         }
       }
-      clearRemoteFacts();
-      remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";
+      if (!failureRecorded) fail(failure);
     }
   }
+
+  // A catalogue refresh invalidates in-flight rank reads too. Start a read in
+  // the new revision so discarding the old response cannot strand the loading
+  // state. Keep the account/revision/generation fences on both success and error.
+  const unsubscribeRuntime = subscribeRuntimeRevision(() => {
+    if (remoteApiEnabled) void refreshCanonicalVRank();
+  });
+  onScopeDispose(unsubscribeRuntime);
+
+  function invalidateReadOwner(): void {
+    invalidatePassiveTabRead("v-rank");
+
+    remoteTransientFailure.value = false;
+    refreshGeneration += 1; remoteAccountEpoch.bind(boundKey); inFlight = null;
+    clearRemoteFacts();
+    remoteError.value = Date.now() < retryAt ? "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE" : null;
+  }
+
+  watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
+    environmentInvalidated = true; retryAt = 0; remoteRateLimited.value = false; invalidateReadOwner();
+  }, { flush: "sync" });
 
   function setMyRank(v: VRank) {
     if (remoteApiEnabled) return;
@@ -344,18 +392,19 @@ export const useVRank = defineStore("vRank", () => {
   }
   function setProgress(p: VRankProgressPatch) {
     if (remoteApiEnabled) return;
-    if (p.selfBuyUSD !== undefined) selfBuyUSD.value = p.selfBuyUSD;
+    if ("selfComputePoints" in p) selfComputePoints.value = p.selfComputePoints;
+    if ("teamComputePoints" in p) teamComputePoints.value = p.teamComputePoints;
     if (p.directRefs !== undefined) directRefs.value = p.directRefs;
-    if (p.teamVolumeUSD !== undefined) teamVolumeUSD.value = p.teamVolumeUSD;
     if (p.vDownlineCounts !== undefined) vDownlineCounts.value = p.vDownlineCounts;
     persist();
   }
 
   return {
-    myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder, prizeName,
+    selfComputePoints, teamComputePoints,
+    myRank, directRefs, vDownlineCounts, ladder, prizeName,
     capabilities,
-    remoteReady, remoteError,
-    setMyRank, setProgress, bindAccount, refreshCanonicalVRank,
+    remoteReady, remoteError, remoteRateLimited, remoteTransientFailure,
+    setMyRank, setProgress, bindAccount, refreshCanonicalVRank, ensureCanonicalVRank, invalidateReadOwner,
   };
 });
 
@@ -368,9 +417,8 @@ export const useVRank = defineStore("vRank", () => {
  * (`src/lib/v-rank-copy.ts` 的 `rankGapText`),store 只给事实。
  */
 export type RankGap =
-  | { kind: "selfBuy"; amount: number }
+  | { kind: "selfComputePoints" | "teamComputePoints"; amount: number | undefined }
   | { kind: "directRefs"; n: number }
-  | { kind: "teamVolume"; amount: number }
   // 只给档位号,头衔名由 copy 层按语言解析(`lib/v-rank-copy` 的 rankTitle)——
   // store 存一份英文 title 就等于把「中文界面显示什么」定死在数据层。
   | { kind: "vDownlines"; n: number; vLevel: number };
@@ -379,49 +427,22 @@ export type RankGap =
 export function nextRankProgress(state: VRankData, ladder: VRankDef[] = []): {
   next: VRankDef | null;
   progressPct: number;
+  progressKnown: boolean;
   missing: RankGap[];
 } {
   const next = ladder[state.myRank + 1];
-  if (!next) return { next: null, progressPct: 1, missing: [] };
-  const c = next.conditions;
-  const missing: RankGap[] = [];
-  const checks: number[] = [];
-
-  if (c.selfBuyUSD) {
-    checks.push(Math.min(1, state.selfBuyUSD / c.selfBuyUSD));
-    if (state.selfBuyUSD < c.selfBuyUSD) {
-      missing.push({ kind: "selfBuy", amount: c.selfBuyUSD - state.selfBuyUSD });
-    }
-  }
-  if (c.directRefs) {
-    checks.push(Math.min(1, state.directRefs / c.directRefs));
-    if (state.directRefs < c.directRefs) {
-      missing.push({ kind: "directRefs", n: c.directRefs - state.directRefs });
-    }
-  }
-  if (c.teamVolumeUSD) {
-    checks.push(Math.min(1, state.teamVolumeUSD / c.teamVolumeUSD));
-    if (state.teamVolumeUSD < c.teamVolumeUSD) {
-      missing.push({ kind: "teamVolume", amount: c.teamVolumeUSD - state.teamVolumeUSD });
-    }
-  }
-  if (c.vDownlines) {
-    for (const [v, n] of Object.entries(c.vDownlines)) {
-      const have = state.vDownlineCounts[Number(v) as VRank] ?? 0;
-      checks.push(Math.min(1, have / n));
-      if (have < n) missing.push({ kind: "vDownlines", n: n - have, vLevel: Number(v) });
-    }
-  }
-
-  const progressPct = checks.length
-    ? checks.reduce((a, b) => a + b, 0) / checks.length
-    : 1;
-  return { next, progressPct, missing };
+  if (!next) return { next: null, progressPct: 1, progressKnown: true, missing: [] };
+  const { progressPct, progressKnown, gaps } = rankConditionChecks(state, next.conditions);
+  const missing: RankGap[] = gaps.map((gap): RankGap => {
+    if (gap.kind === "directRefs") return { kind: gap.kind, n: gap.remaining };
+    if (gap.kind === "vDownlines") return { kind: gap.kind, n: gap.remaining, vLevel: gap.vLevel };
+    return { kind: gap.kind, amount: gap.remaining };
+  });
+  return { next, progressPct, progressKnown, missing };
 }
 
 export type PrimaryGap =
-  | { kind: "teamVolume"; remaining: number; progress: number }
-  | { kind: "selfBuy"; remaining: number; progress: number }
+  | { kind: "selfComputePoints" | "teamComputePoints"; remaining: number | undefined; progress: number }
   | { kind: "directRefs"; remaining: number; progress: number }
   | { kind: "vDownlines"; remaining: number; progress: number; vLevel: VRank };
 
@@ -435,6 +456,7 @@ export type PerkUnlock =
 export interface NextRankGapInfo {
   next: VRankDef | null;
   progressPct: number;
+  progressKnown: boolean;
   primaryGap: PrimaryGap | null;
   unmetCount: number;
   topUnlocks: PerkUnlock[];
@@ -451,6 +473,38 @@ const PERK_WEIGHT: Record<PerkUnlock["kind"], number> = {
 
 const TOP_UNLOCKS_CAP = 2; // UI keeps perk line single-line at 414w mobile
 
+/** Display-only estimates; never changes the server-authoritative myRank. */
+
+function rankConditionChecks(state: VRankData, c: VRankConditions) {
+  const gaps: PrimaryGap[] = [];
+  const checks: number[] = [];
+  let progressKnown = true;
+  const points = (kind: "selfComputePoints" | "teamComputePoints", required: number | undefined) => {
+    const have = state[kind];
+    const known = required !== undefined && have !== undefined;
+    const progress = known ? required === 0 ? 1 : Math.min(1, Math.max(0, have / required)) : 0;
+    checks.push(progress);
+    if (!known || progress < 1) gaps.push({ kind, remaining: known ? Math.max(0, required - have) : undefined, progress });
+    if (!known) progressKnown = false;
+  };
+  if (c.selfComputePoints !== undefined) points("selfComputePoints", c.selfComputePoints);
+  if (c.directRefs) {
+    const progress = Math.min(1, state.directRefs / c.directRefs);
+    checks.push(progress);
+    if (progress < 1) gaps.push({ kind: "directRefs", remaining: c.directRefs - state.directRefs, progress });
+  }
+  if (c.teamComputePoints !== undefined) points("teamComputePoints", c.teamComputePoints);
+  for (const [rank, required] of Object.entries(c.vDownlines ?? {})) {
+    if (!required) continue;
+    const vLevel = Number(rank);
+    const have = state.vDownlineCounts[vLevel] ?? 0;
+    const progress = Math.min(1, have / required);
+    checks.push(progress);
+    if (progress < 1) gaps.push({ kind: "vDownlines", remaining: required - have, progress, vLevel });
+  }
+  return { gaps, progressKnown, progressPct: checks.length ? checks.reduce((sum, value) => sum + value, 0) / checks.length : 1 };
+}
+
 export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRankGapInfo {
   const current = ladder[state.myRank] ?? EMPTY_V_RANK;
   const next = ladder[state.myRank + 1];
@@ -458,52 +512,14 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
     return {
       next: null,
       progressPct: 1,
+      progressKnown: true,
       primaryGap: null,
       unmetCount: 0,
       topUnlocks: [],
     };
   }
 
-  const c = next.conditions;
-  const gaps: PrimaryGap[] = [];
-  const checks: number[] = [];
-
-  if (c.selfBuyUSD) {
-    const progress = Math.min(1, state.selfBuyUSD / c.selfBuyUSD);
-    checks.push(progress);
-    if (state.selfBuyUSD < c.selfBuyUSD) {
-      gaps.push({ kind: "selfBuy", remaining: c.selfBuyUSD - state.selfBuyUSD, progress });
-    }
-  }
-  if (c.directRefs) {
-    const progress = Math.min(1, state.directRefs / c.directRefs);
-    checks.push(progress);
-    if (state.directRefs < c.directRefs) {
-      gaps.push({ kind: "directRefs", remaining: c.directRefs - state.directRefs, progress });
-    }
-  }
-  if (c.teamVolumeUSD) {
-    const progress = Math.min(1, state.teamVolumeUSD / c.teamVolumeUSD);
-    checks.push(progress);
-    if (state.teamVolumeUSD < c.teamVolumeUSD) {
-      gaps.push({ kind: "teamVolume", remaining: c.teamVolumeUSD - state.teamVolumeUSD, progress });
-    }
-  }
-  if (c.vDownlines) {
-    for (const [v, n] of Object.entries(c.vDownlines)) {
-      const vLevel = Number(v) as VRank;
-      const have = state.vDownlineCounts[vLevel] ?? 0;
-      const progress = Math.min(1, have / n);
-      checks.push(progress);
-      if (have < n) {
-        gaps.push({ kind: "vDownlines", remaining: n - have, progress, vLevel });
-      }
-    }
-  }
-
-  const progressPct = checks.length
-    ? checks.reduce((a, b) => a + b, 0) / checks.length
-    : 1;
+  const { gaps, progressPct, progressKnown } = rankConditionChecks(state, next.conditions);
 
   const primaryGap = gaps.length
     ? gaps.reduce((worst, g) => (g.progress < worst.progress ? g : worst))
@@ -533,5 +549,5 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
     .sort((a, b) => PERK_WEIGHT[b.kind] - PERK_WEIGHT[a.kind])
     .slice(0, TOP_UNLOCKS_CAP);
 
-  return { next, progressPct, primaryGap, unmetCount: gaps.length, topUnlocks };
+  return { next, progressPct, progressKnown, primaryGap, unmetCount: gaps.length, topUnlocks };
 }

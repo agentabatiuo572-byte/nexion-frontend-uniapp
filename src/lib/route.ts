@@ -1,4 +1,4 @@
-// Map a prototype-style LOGICAL path (the web routes baked into nova /
+// Map a prototype-style LOGICAL path (the web routes baked into support /
 // notification CTA data, e.g. "/team/commissions", "/genesis",
 // "/me/wallet/exchange", "/store") to the actual uni-app route, then navigate.
 //
@@ -9,7 +9,7 @@
 //   /store /team /earn /me / -> tab roots, reLaunch to /pages/x/x
 //
 // Without this, navigating raw logical hrefs (message-drawer did) or naive
-// `/pages${href}` prefixing (nova-drawer did) hits non-existent routes and
+// `/pages${href}` prefixing (the retired chat drawer did) hits non-existent routes and
 // uni's navigateTo silently fails → "点击无跳转". (P-046)
 
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -18,6 +18,7 @@ import { toast } from "@/store/ui";
 import { getT } from "@/i18n/use-t";
 import { requestCheckoutLeave, hasCheckoutLeaveGuard, clearCheckoutLeaveForReset } from "@/lib/promotion-leave-guard";
 import { useConfig } from "@/store/config";
+import { nativeTabUrl, switchNativeTab } from "@/lib/native-tab-navigation";
 
 const TAB_ROOT: Record<string, string> = {
   "/": "/pages/index/index",
@@ -29,15 +30,7 @@ const TAB_ROOT: Record<string, string> = {
 };
 
 function reportNavigationFailure(): void {
-  // Bare Intro/Terms/session-ended pages do not mount GlobalUi. Native feedback
-  // must be first even when Pinia is active, for every kind of navigation.
-  let title = "Unable to open this page. Please try again.";
-  try { title = getT().ui.navigationFailed; } catch { /* i18n is not mounted yet */ }
-  try {
-    uni.showToast({ title, icon: "none" });
-  } catch {
-    try { toast.error(title); } catch { /* Neither renderer is mounted yet. */ }
-  }
+  toast.error(getT().ui.navigationFailed);
 }
 
 function closeTransientNavigationSheets(): void {
@@ -55,6 +48,10 @@ export function toUniRoute(href: string): { url: string; tab: boolean } {
   const qi = href.indexOf("?");
   const path = qi >= 0 ? href.slice(0, qi) : href;
   const query = qi >= 0 ? href.slice(qi) : "";
+  if (path === "/me/payment-password") return { url: "/pages/me/payment-password" + query, tab: false };
+  if (["/me/wallet", "/pages/me/wallet", "/me/wallet/repurchase", "/me/wallet-repurchase", "/pages/me/wallet-repurchase", "/me/wallet/repurchase/how", "/me/wallet-repurchase-how", "/pages/me/wallet-repurchase-how"].includes(path)) {
+    return { url: "/pages/me/me" + query, tab: true };
+  }
   // Already a uni route → pass through, while still recognizing real tab roots.
   // Calling navigateTo for a tabBar page fails on App/mini-program runtimes.
   if (path.startsWith("/pages/")) {
@@ -89,7 +86,12 @@ function forceNavigation(target: string | ForcedNavigationOptions, replace: bool
     reportNavigationFailure();
     return Promise.resolve(false);
   }
-  const { url } = toUniRoute(options.url.trim());
+  let { url } = toUniRoute(options.url.trim());
+  // A reset/replacement still opens a fresh page and clears the old account scope.
+  // #ifdef APP-PLUS
+  try { url = nativeTabUrl(url); }
+  catch { reportNavigationFailure(); return Promise.resolve(false); }
+  // #endif
   return new Promise((resolve) => {
     let settled = false;
     const invoke = (callback: Function | undefined, result: unknown) => {
@@ -167,13 +169,17 @@ function performNavBack(fallbackHref?: string): void {
     return;
   }
   if (fallbackHref) {
-    const { url } = toUniRoute(fallbackHref);
+    let { url } = toUniRoute(fallbackHref);
+    // #ifdef APP-PLUS
+    try { url = nativeTabUrl(url); }
+    catch { reportNavigationFailure(); return; }
+    // #endif
     uni.reLaunch({ url, fail: () => void navReplace(fallbackHref) });
     return;
   }
   // No declared back target on a singleton stack — never leave the back button a
   // dead end; fall back to home so a cold-opened caller without a backHref still moves.
-  uni.reLaunch({ url: "/pages/index/index", fail: reportNavigationFailure });
+  void navReset("/pages/index/index");
 }
 
 type NavigationAttempt = (
@@ -256,11 +262,22 @@ function performNavTo(href: string): Promise<boolean> {
     reportNavigationFailure();
     return Promise.resolve(false);
   }
-  const { url, tab } = toUniRoute(href);
+  let { url, tab } = toUniRoute(href);
   if (isStakingVisibilityRoute(url) && !useConfig().isEnabled("stakingVisible")) return Promise.resolve(false);
   const question = url.indexOf("?");
   pendingNavigationQuery = question < 0 ? null : { path: url.slice(0, question), query: url.slice(question) };
   const queryForThisNavigation = pendingNavigationQuery;
+  // Keep tab taps inside the visible native shell. Child-page returns and
+  // external entries open a shell normally, with the same business query.
+  // #ifdef APP-PLUS
+  try {
+    if (tab && switchNativeTab(url)) return Promise.resolve(true);
+    if (tab) url = nativeTabUrl(url);
+  } catch {
+    pendingNavigationQuery = null;
+    reportNavigationFailure(); return Promise.resolve(false);
+  }
+  // #endif
   const result = tab
     ? runNavigationChain([
       (success, fail) => uni.reLaunch({ url, success, fail }),

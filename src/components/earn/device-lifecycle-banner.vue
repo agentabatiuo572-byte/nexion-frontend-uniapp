@@ -15,7 +15,6 @@
 <template>
   <view v-if="summaries.length > 0" class="mx-4">
     <view class="nx-glass-card block relative overflow-hidden rounded-2xl" :style="rootStyle" @click="goDevices">
-      <view class="absolute inset-0 pointer-events-none" :style="glowStyle" />
 
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="accent" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
@@ -23,18 +22,18 @@
       </view>
 
       <view class="relative mt-2 flex items-baseline gap-2">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; letter-spacing: -0.014em" :style="{ color: accent }">{{ (avgEfficiency * 100).toFixed(1) }}%</text>
+        <text class="tabular-nums" style="font-family: var(--font-metric); font-size: 34px; font-weight: 600; line-height: 1; letter-spacing: -0.014em" :style="{ color: accent }">{{ visibility.mask((avgEfficiency * 100).toFixed(1)) }}%</text>
         <text class="text-[12px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ subtitleText }}</text>
       </view>
 
       <view class="relative mt-3 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
-        <view class="h-full rounded-full" :style="barStyle" />
+        <view v-if="!visibility.hidden" class="h-full rounded-full" :style="barStyle" />
       </view>
 
       <view class="relative mt-4 flex items-center justify-between gap-3">
         <view class="min-w-0" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.35">
           <text class="block">{{ t.earn.lifecycleMonthlyLoss }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; margin-top: 2px" :style="{ color: accent }">−${{ formatAmount(totalMonthlyLossUSD) }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ monthsLabel }}</text></text>
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; margin-top: 2px" :style="{ color: accent }">−${{ visibility.mask(formatAmount(totalMonthlyLossUSD)) }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ monthsLabel }}</text></text>
         </view>
         <view class="shrink-0 inline-flex items-center gap-1.5 active:scale-[0.97]" :style="ctaStyle">
           <text :style="ctaLabelStyle">{{ t.earn.lifecycleCta }}</text>
@@ -46,6 +45,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
@@ -54,6 +54,7 @@ import { getLifecycleSummary, getNetworkMonthlyLoss, hasServerLifecycleProjectio
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
+const visibility = useDataVisibility();
 const ONE_MIN_MS = 60_000;
 
 const app = useApp();
@@ -98,7 +99,7 @@ const accent = computed(() =>
       : "var(--v5-brand-2)",
 );
 
-const subtitleText = computed(() => fmt(t.value.earn.lifecycleSubtitle, { n: summaries.value.length }));
+const subtitleText = computed(() => fmt(t.value.earn.lifecycleSubtitle, { n: visibility.mask(summaries.value.length) }));
 const monthsLabel = computed(() => {
   const o = oldest.value;
   if (!o) return "";
@@ -111,9 +112,6 @@ const rootStyle = computed<CSSProperties>(() => ({ borderRadius: "var(--nx-glass
   border: "none",
   background: "var(--nx-glass-fill)",
   padding: "16px",
-}));
-const glowStyle = computed<CSSProperties>(() => ({
-  background: `radial-gradient(60% 80% at 95% 50%, color-mix(in srgb, ${accent.value} 14%, transparent), transparent 70%)`,
 }));
 const labelStyle: CSSProperties = {
   fontSize: "12px",
@@ -134,7 +132,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
 }));
 const ctaLabelStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 600,
 };
 

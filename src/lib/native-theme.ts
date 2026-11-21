@@ -1,4 +1,7 @@
 import type { ResolvedTheme } from "@/store/theme";
+// #ifdef APP-PLUS
+import { setNavigationBarTheme } from "@/uni_modules/uvel-system-bars";
+// #endif
 
 type AppPage = { $getAppWebview?: () => { evalJS: (script: string) => void } };
 
@@ -15,8 +18,15 @@ export function syncNativeTheme(theme: ResolvedTheme): void {
   } catch {
     // Status-bar support must not prevent page CSS synchronization.
   }
+  // Android draws a black bar under the gesture handle unless the app paints it.
+  try {
+    if (typeof plus !== "undefined" && plus.os.name === "Android") setNavigationBarTheme(theme === "dark");
+  } catch {
+    // Native bases built before this plugin keep the system default bar.
+  }
   if (typeof getCurrentPages !== "function") return;
-  const script = `document.documentElement.setAttribute("data-theme", "${theme}")`;
+  // Keep browser color adjustment aligned with the app theme when a page resumes.
+  const script = `document.documentElement.setAttribute("data-theme", "${theme}");document.documentElement.style.colorScheme = "only ${theme}"`;
   for (const page of getCurrentPages() as AppPage[]) {
     try {
       page.$getAppWebview?.().evalJS(script);

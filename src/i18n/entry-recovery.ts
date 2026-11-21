@@ -1,0 +1,111 @@
+import { computed } from "vue";
+import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
+
+// Copy scoped to the audited entry pages, separate from shared dictionaries.
+export const entryRecoveryCopy = {
+  zh: {
+    referralLoading: "正在加载邀请信息…",
+    referralUnavailable: "邀请信息加载失败。可重试或继续创建账号。",
+    referralInvalid: "此邀请码暂不可用，你仍可创建账号。",
+    txMissingTitle: "缺少交易信息",
+    txMissingBody: "未提供交易哈希。请返回账单，选择需要查看的交易记录。",
+    txInvalidTitle: "交易信息无效",
+    txInvalidBody: "交易哈希格式无效。请返回账单重新打开交易记录。",
+    txHashLabel: "交易哈希",
+    viewBills: "查看账单",
+  },
+  en: {
+    referralLoading: "Loading invitation details…",
+    referralUnavailable: "Invitation details could not be loaded. Retry or continue creating an account.",
+    referralInvalid: "This invite code is unavailable. You can still create an account.",
+    txMissingTitle: "Missing transaction information",
+    txMissingBody: "No transaction hash was provided. Return to Bills and select the transaction you want to view.",
+    txInvalidTitle: "Invalid transaction information",
+    txInvalidBody: "The transaction hash has an invalid format. Return to Bills and reopen the transaction record.",
+    txHashLabel: "Transaction hash",
+    viewBills: "View bills",
+  },
+  vi: {
+    referralLoading: "Đang tải thông tin lời mời…",
+    referralUnavailable: "Không tải được thông tin lời mời. Hãy thử lại hoặc tiếp tục tạo tài khoản.",
+    referralInvalid: "Mã mời này hiện không khả dụng. Bạn vẫn có thể tạo tài khoản.",
+    txMissingTitle: "Thiếu thông tin giao dịch",
+    txMissingBody: "Chưa có mã băm giao dịch. Hãy quay lại lịch sử và chọn giao dịch cần xem.",
+    txInvalidTitle: "Thông tin giao dịch không hợp lệ",
+    txInvalidBody: "Mã băm giao dịch không đúng định dạng. Hãy quay lại lịch sử và mở lại giao dịch.",
+    txHashLabel: "Mã băm giao dịch",
+    viewBills: "Xem lịch sử giao dịch",
+  },
+  id: {
+    referralLoading: "Memuat detail undangan…",
+    referralUnavailable: "Detail undangan gagal dimuat. Coba lagi atau lanjutkan membuat akun.",
+    referralInvalid: "Kode undangan ini tidak tersedia. Anda tetap bisa membuat akun.",
+    txMissingTitle: "Informasi transaksi tidak ada",
+    txMissingBody: "Hash transaksi tidak tersedia. Kembali ke Riwayat transaksi dan pilih transaksi yang ingin dilihat.",
+    txInvalidTitle: "Informasi transaksi tidak valid",
+    txInvalidBody: "Format hash transaksi tidak valid. Kembali ke Riwayat transaksi dan buka lagi transaksinya.",
+    txHashLabel: "Hash transaksi",
+    viewBills: "Lihat riwayat",
+  },
+  ms: {
+    referralLoading: "Memuatkan butiran jemputan…",
+    referralUnavailable: "Butiran jemputan gagal dimuatkan. Cuba lagi atau teruskan mencipta akaun.",
+    referralInvalid: "Kod jemputan ini tidak tersedia. Anda masih boleh mencipta akaun.",
+    txMissingTitle: "Maklumat transaksi tiada",
+    txMissingBody: "Tiada hash transaksi diberikan. Kembali ke Transaksi dan pilih transaksi yang ingin dilihat.",
+    txInvalidTitle: "Maklumat transaksi tidak sah",
+    txInvalidBody: "Format hash transaksi tidak sah. Kembali ke Transaksi dan buka semula rekod transaksi.",
+    txHashLabel: "Hash transaksi",
+    viewBills: "Lihat transaksi",
+  },
+  fil: {
+    referralLoading: "Nilo-load ang detalye ng imbitasyon…",
+    referralUnavailable: "Hindi ma-load ang detalye ng imbitasyon. Subukan ulit o ituloy ang paggawa ng account.",
+    referralInvalid: "Hindi available ang code ng imbita na ito. Puwede ka pa ring gumawa ng account.",
+    txMissingTitle: "Kulang ang impormasyon ng transaksyon",
+    txMissingBody: "Walang hash ng transaksyon. Bumalik sa Talaan at piliin ang transaksyong gusto mong tingnan.",
+    txInvalidTitle: "Invalid ang impormasyon ng transaksyon",
+    txInvalidBody: "Invalid ang format ng hash ng transaksyon. Bumalik sa Talaan at buksan ulit ang record ng transaksyon.",
+    txHashLabel: "Hash ng transaksyon",
+    viewBills: "Buksan ang talaan",
+  },
+  ru: {
+    referralLoading: "Загружаем приглашение…",
+    referralUnavailable: "Не удалось загрузить приглашение. Повторите или продолжите регистрацию.",
+    referralInvalid: "Этот код приглашения недоступен. Зарегистрироваться всё равно можно.",
+    txMissingTitle: "Нет данных операции",
+    txMissingBody: "Хеш транзакции не передан. Вернитесь в «Операции» и выберите нужную запись.",
+    txInvalidTitle: "Неверные данные операции",
+    txInvalidBody: "Неверный формат хеша транзакции. Вернитесь в «Операции» и откройте запись снова.",
+    txHashLabel: "Хеш транзакции",
+    viewBills: "Операции",
+  },
+  kk: {
+    referralLoading: "Шақыру мәліметі жүктелуде…",
+    referralUnavailable: "Шақыру мәліметі жүктелмеді. Қайталаңыз немесе аккаунт жасауды жалғастырыңыз.",
+    referralInvalid: "Бұл шақыру коды қолжетімсіз. Аккаунтты бәрібір жасай аласыз.",
+    txMissingTitle: "Транзакция ақпараты жоқ",
+    txMissingBody: "Транзакция хэші берілмеді. «Операциялар» бөліміне оралып, қажетті транзакцияны таңдаңыз.",
+    txInvalidTitle: "Транзакция ақпараты жарамсыз",
+    txInvalidBody: "Транзакция хэшінің пішімі жарамсыз. «Операциялар» бөліміне оралып, транзакцияны қайта ашыңыз.",
+    txHashLabel: "Транзакция хэші",
+    viewBills: "Операцияларды қарау",
+  },
+  uz: {
+    referralLoading: "Taklif maʼlumotlari yuklanmoqda…",
+    referralUnavailable: "Taklif maʼlumotlarini yuklab boʻlmadi. Qayta urining yoki akkaunt yaratishni davom ettiring.",
+    referralInvalid: "Bu taklif kodi ishlamaydi. Baribir akkaunt yaratishingiz mumkin.",
+    txMissingTitle: "Tranzaksiya maʼlumoti yoʻq",
+    txMissingBody: "Tranzaksiya xeshi berilmagan. Tarixga qaytib, kerakli tranzaksiyani tanlang.",
+    txInvalidTitle: "Tranzaksiya maʼlumoti notoʻgʻri",
+    txInvalidBody: "Tranzaksiya xeshi formati notoʻgʻri. Tarixga qaytib, tranzaksiyani qayta oching.",
+    txHashLabel: "Tranzaksiya xeshi",
+    viewBills: "Tarixni koʻrish",
+  },
+};
+
+export function useEntryRecoveryCopy() {
+  const locale = useLocaleStore();
+  return computed(() => entryRecoveryCopy[uiLocale(locale.code)]);
+}

@@ -31,8 +31,8 @@ export function referralShareText(
  * 🔴 zentao #227:闸门关闭时 `visibleReferralGift` 会把金额归零,但文案若只按
  *   「金额是否 > 0」分档,就会落进「新人奖励已备好,连接设备即刻到账」那一支 ——
  *   在奖励停用期间照样承诺一份不会到账的奖励。所以:
- *     gated  → 闸门关闭或邀请预览没有可核实金额，不承诺奖励
- *     amount → 闸门开启且邀请预览有金额，可报出金额和结算条件
+ *     gated  → 闸门关闭或公开奖励配置没有金额，不承诺奖励
+ *     amount → 闸门开启且公开奖励配置有金额，可报出金额和结算条件
  */
 export type NewcomerSubtitleKind = "gated" | "amount";
 

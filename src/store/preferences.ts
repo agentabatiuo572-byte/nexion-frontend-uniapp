@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { notificationPreferencesApi, remoteApiEnabled } from "@/api/runtime";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { accountErrorMessageKey, type AccountErrorMessageKey } from "@/lib/account-error-message";
@@ -7,7 +7,7 @@ import { accountErrorMessageKey, type AccountErrorMessageKey } from "@/lib/accou
 /**
  * User preferences. Ported from Nexion-prototype/lib/store/preferences.ts
  * (zustand persist → Pinia + uni storage). Lightweight toggles persisted
- * across sessions: sound, haptics, and per-kind notification mute flags.
+ * across sessions: sound and per-kind notification mute flags.
  *
  * NotifKind mirrors lib/v3/notifications NotifKind (kept local to avoid a
  * store→store import; backend-replaceable shape).
@@ -42,7 +42,6 @@ function defaultNotifPrefs(): NotifPrefs {
 
 interface PrefsData {
   soundEnabled: boolean;
-  hapticsEnabled: boolean;
   notifPrefs: NotifPrefs;
 }
 
@@ -58,25 +57,26 @@ function hydrate(): PrefsData {
         }
       }
       return {
-        soundEnabled: typeof s.soundEnabled === "boolean" ? s.soundEnabled : false,
-        hapticsEnabled: typeof s.hapticsEnabled === "boolean" ? s.hapticsEnabled : true,
+        soundEnabled: typeof s.soundEnabled === "boolean" ? s.soundEnabled : true,
         notifPrefs: merged,
       };
     }
   } catch {
     // first run
   }
-  return { soundEnabled: false, hapticsEnabled: true, notifPrefs: defaultNotifPrefs() };
+  return { soundEnabled: true, notifPrefs: defaultNotifPrefs() };
 }
 
 export const usePreferences = defineStore("preferences", () => {
   const init = hydrate();
   const soundEnabled = ref<boolean>(init.soundEnabled);
-  const hapticsEnabled = ref<boolean>(init.hapticsEnabled);
   const notifPrefs = ref<NotifPrefs>(init.notifPrefs);
   const loading = ref(false);
   const remoteReady = ref(!remoteApiEnabled);
-  const error = ref<AccountErrorMessageKey | null>(null);
+  const readError = ref<AccountErrorMessageKey | null>(null);
+  const mutationError = ref<AccountErrorMessageKey | null>(null);
+  const error = computed(() => mutationError.value ?? readError.value);
+  const readFailedWithoutData = computed(() => !!readError.value && !remoteReady.value);
   const remoteAccountEpoch = createRemoteAccountEpoch("default");
   let generation = 0;
   let canonicalNotifPrefs = init.notifPrefs;
@@ -99,7 +99,6 @@ export const usePreferences = defineStore("preferences", () => {
     try {
       uni.setStorageSync(STORAGE_KEY, {
         soundEnabled: soundEnabled.value,
-        hapticsEnabled: hapticsEnabled.value,
         ...(remoteApiEnabled ? {} : { notifPrefs: notifPrefs.value }),
       });
     } catch {
@@ -121,7 +120,7 @@ export const usePreferences = defineStore("preferences", () => {
   function syncMutationError() {
     let latest: AccountErrorMessageKey | null = null;
     for (const message of failedNotifMutations.values()) latest = message;
-    error.value = latest;
+    mutationError.value = latest;
   }
 
   function toggleSound() {
@@ -129,18 +128,13 @@ export const usePreferences = defineStore("preferences", () => {
     persist();
   }
 
-  function toggleHaptics() {
-    hapticsEnabled.value = !hapticsEnabled.value;
-    persist();
-  }
-
-  async function toggleNotifKind(k: NotifKind) {
+  async function toggleNotifKind(k: NotifKind): Promise<"saved" | "failed" | "superseded"> {
     // 简报 #214:强制类只能保持开启 —— 页脚声明「关键合规通知不可禁用」,这里让它成为事实。
-    if (isMandatoryNotifKind(k) && notifPrefs.value[k]) return;
+    if (isMandatoryNotifKind(k) && notifPrefs.value[k]) return "superseded";
     if (!remoteApiEnabled) {
       notifPrefs.value = { ...notifPrefs.value, [k]: !notifPrefs.value[k] };
       persist();
-      return;
+      return "saved";
     }
 
     const request = remoteAccountEpoch.snapshot();
@@ -156,11 +150,11 @@ export const usePreferences = defineStore("preferences", () => {
     // response is intentionally discarded by the generation guard.
     loading.value = false;
 
-    const run = async () => {
-      if (!remoteAccountEpoch.isCurrent(request)) return;
+    const run = async (): Promise<"saved" | "failed" | "superseded"> => {
+      if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
       try {
         const canonical = await notificationPreferencesApi.patch({ [k]: value });
-        if (!remoteAccountEpoch.isCurrent(request)) return;
+        if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
         generation += 1;
         canonicalNotifPrefs = canonical;
         remoteReady.value = true;
@@ -168,18 +162,21 @@ export const usePreferences = defineStore("preferences", () => {
         failedNotifMutations.delete(k);
         applyVisibleNotifPrefs();
         syncMutationError();
+        return "saved";
       } catch (cause) {
-        if (!remoteAccountEpoch.isCurrent(request)) return;
+        if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
         generation += 1;
-        if (pendingNotifMutations.get(k)?.id === mutationId) pendingNotifMutations.delete(k);
+        if (pendingNotifMutations.get(k)?.id !== mutationId) return "superseded";
+        pendingNotifMutations.delete(k);
         failedNotifMutations.set(k, accountErrorMessageKey(cause instanceof Error ? cause : "NOTIFICATION_PREFERENCES_UPDATE_FAILED"));
         applyVisibleNotifPrefs();
         syncMutationError();
+        return "failed";
       }
     };
     const operation = mutationTail.then(run, run);
-    mutationTail = operation.catch(() => undefined);
-    await operation;
+    mutationTail = operation.then(() => undefined, () => undefined);
+    return operation;
   }
 
   async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
@@ -188,17 +185,16 @@ export const usePreferences = defineStore("preferences", () => {
     const readRequestId = ++nextReadRequestId;
     activeReadRequestId = readRequestId;
     loading.value = true;
-    error.value = null;
     try {
       const canonical = await notificationPreferencesApi.get();
       if (!isCurrentRead(request, expectedGeneration, readRequestId)) return;
       canonicalNotifPrefs = canonical;
       remoteReady.value = true;
-      failedNotifMutations.clear();
+      readError.value = null;
       applyVisibleNotifPrefs();
     } catch (cause) {
       if (isCurrentRead(request, expectedGeneration, readRequestId)) {
-        error.value = accountErrorMessageKey(cause);
+        readError.value = accountErrorMessageKey(cause);
       }
     } finally {
       if (remoteAccountEpoch.isCurrent(request) && activeReadRequestId === readRequestId) loading.value = false;
@@ -216,16 +212,16 @@ export const usePreferences = defineStore("preferences", () => {
       mutationTail = Promise.resolve();
       applyVisibleNotifPrefs();
       loading.value = false;
-      error.value = null;
+      readError.value = null;
+      mutationError.value = null;
       void refreshRemote();
       return;
     }
     const local = hydrate();
     soundEnabled.value = local.soundEnabled;
-    hapticsEnabled.value = local.hapticsEnabled;
     canonicalNotifPrefs = local.notifPrefs;
     notifPrefs.value = local.notifPrefs;
   }
 
-  return { soundEnabled, hapticsEnabled, notifPrefs, loading, remoteReady, error, toggleSound, toggleHaptics, toggleNotifKind, bindAccount, refreshRemote };
+  return { soundEnabled, notifPrefs, loading, remoteReady, error, readError, mutationError, readFailedWithoutData, toggleSound, toggleNotifKind, bindAccount, refreshRemote };
 });

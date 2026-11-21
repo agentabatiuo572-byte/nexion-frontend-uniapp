@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
-import { parseTrialBooleanConfig } from "@/lib/trial-config-enum";
 import { productMediaUrl } from "@/api/product-catalog-contract";
+import { ref } from "vue";
+import { formatAmount } from "@/lib/amount-display";
+import { parseTrialBooleanConfig } from "@/lib/trial-config-enum";
 import type { TrialConfigValue } from "@/api/trial-api";
 
 /**
@@ -16,21 +17,22 @@ export interface TrialConfig {
   graceDays: number;
   /** Active-purchase discount rate (applies during trial + grace) */
   discountRate: number;
-  /** Active-purchase discount hard cap, USD */
-  discountCapUSD: number;
+  /** Active-purchase discount hard cap, USD; null = the operator left it empty (no cap). */
+  discountCapUSD: number | null;
   /** Trial-earnings offset cap, USD (offsets device price at purchase; remainder
-   *  credited to balance AFTER purchase; before purchase only offsets). 后台可调。 */
+   *  credited to balance AFTER purchase; before purchase only offsets). 后台可调；
+   *  null = left empty (no cap, the default since 2026-11-01). */
   trialOffsetCapUSD: number | null;
   /** Trial product id selected by the authoritative product policy. */
   trialProductId: TrialProductId;
-  imageUrl?: string;
   /** Server-owned E1 display name for the selected product. */
   trialProductName: string;
+  imageUrl?: string;
   /** Trial product price (conversion checkout subtotal) */
   trialPriceUSD: number;
-  /** Shadow accrual rates (S1 baseline per spec §3.1) */
-  shadowDailyUSD: number;
-  shadowDailyNEX: number;
+  /** Null when the selected SKU has no confirmed daily earnings. */
+  shadowDailyUSD: number | null;
+  shadowDailyNEX: number | null;
   /** Remaining free-trial offers displayed on the Earn hero card. */
   seatsLeftToday: number;
   /** Whether trial is open in the current product phase */
@@ -42,11 +44,7 @@ export interface TrialConfig {
   autoPushMaxPerSession: number;
 }
 
-/**
- * The API owns the selected product; the client only recognizes contractually
- * supported product-to-display-device mappings.  An unrecognized remote id is
- * deliberately rejected instead of being guessed or silently falling back.
- */
+/** Display-name compatibility for older responses with no name. */
 export const TRIAL_PRODUCT_DEVICE_NAMES = {
   "stellarbox-s1": "UVELBox S1",
   "device-trial-standard": "UVELBox S1",
@@ -60,28 +58,20 @@ export type TrialProductId = string;
  * Keep that translation explicit so an alias can never be sent to checkout as
  * a dangling product id.
  */
-const TRIAL_CHECKOUT_PRODUCT_IDS: Record<string, string> = {
-  "stellarbox-s1": "stellarbox-s1",
-  "device-trial-standard": "stellarbox-s1",
-};
-
 export function resolveTrialCheckoutProductId(productId: unknown): string | null {
   if (typeof productId !== "string") return null;
   const normalized = productId.trim();
   if (!/^[A-Za-z0-9._-]{2,64}$/.test(normalized)) return null;
-  return TRIAL_CHECKOUT_PRODUCT_IDS[normalized] ?? normalized;
+  return normalized === "device-trial-standard" ? "stellarbox-s1" : normalized;
 }
 
 export function resolveTrialDeviceName(productId: unknown, serverName?: unknown): string | null {
   const productNo = resolveTrialCheckoutProductId(productId);
   if (!productNo) return null;
-  const rawProductId = typeof productId === "string" ? productId.trim() : "";
-  if (Object.prototype.hasOwnProperty.call(TRIAL_PRODUCT_DEVICE_NAMES, rawProductId)) {
-    return TRIAL_PRODUCT_DEVICE_NAMES[rawProductId as keyof typeof TRIAL_PRODUCT_DEVICE_NAMES];
-  }
-  if (typeof serverName !== "string") return null;
-  const normalizedName = serverName.trim();
-  return normalizedName && normalizedName.length <= 128 ? normalizedName : null;
+  if (serverName != null && typeof serverName !== "string") return null;
+  const normalizedName = serverName?.trim();
+  if (normalizedName) return normalizedName.length <= 128 ? normalizedName : null;
+  return productNo === "stellarbox-s1" ? TRIAL_PRODUCT_DEVICE_NAMES[productNo] : null;
 }
 
 export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
@@ -147,27 +137,31 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       if (!Number.isInteger(value) || value > max) throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
       return value;
     };
+    // An empty cap is the operator's "no cap", not zero.
+    const cap = (key: string) => (String(raw[key] ?? "").trim() === "" ? null : number(key));
     const bool = (key: string) => {
       return parseTrialBooleanConfig(raw[key]);
     };
     const discountRate = number("discountRate");
-    const trialProductId = String(raw.trialProductId ?? "").trim();
-    const trialProductName = String(raw.trialProductName ?? "").trim();
-    if (discountRate > 100 || !resolveTrialDeviceName(trialProductId, trialProductName)) {
+    const shadowDailyUSD = raw.shadowDailyUSD === null ? null : number("shadowDailyUSD");
+    const shadowDailyNEX = raw.shadowDailyNEX === null ? null : number("shadowDailyNEX");
+    const trialProductId = typeof raw.trialProductId === "string" ? raw.trialProductId.trim() : "";
+    const trialProductName = resolveTrialDeviceName(trialProductId, raw.trialProductName);
+    if (discountRate > 100 || !trialProductName) {
       throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
     }
     config.value = {
       trialDays: integer("trialDays", 1),
       graceDays: integer("graceDays"),
       discountRate: discountRate > 1 ? discountRate / 100 : discountRate,
-      discountCapUSD: number("discountCapUSD"),
-      trialOffsetCapUSD: raw.trialOffsetCapUSD === null ? null : number("trialOffsetCapUSD"),
+      discountCapUSD: cap("discountCapUSD"),
+      trialOffsetCapUSD: cap("trialOffsetCapUSD"),
       trialProductId,
-      imageUrl: productMediaUrl(raw.imageUrl),
       trialProductName,
+      imageUrl: productMediaUrl(raw.imageUrl),
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
-      shadowDailyUSD: number("shadowDailyUSD"),
-      shadowDailyNEX: number("shadowDailyNEX"),
+      shadowDailyUSD,
+      shadowDailyNEX,
       seatsLeftToday: integer("seatsLeftToday", 0, 1_000_000),
       phaseOpen: bool("phaseOpen"),
       autoPushEnabled: bool("autoPushEnabled"),
@@ -186,13 +180,18 @@ export const useTrialConfig = defineStore("trialConfig", () => {
 });
 
 /** Compute discounted price for a conversion purchase during trial/grace. */
+export function formatTrialDiscountPercent(rate: number): string {
+  const [mantissa, exponent = "0"] = String(rate).split("e");
+  return formatAmount(`${mantissa}e${Number(exponent) + 2}`, "full");
+}
+
 export function computeDiscountedPrice(config: TrialConfig): {
   subtotal: number;
   discount: number;
   total: number;
 } {
   const subtotal = config.trialPriceUSD;
-  const discount = Math.min(subtotal * config.discountRate, config.discountCapUSD);
+  const discount = Math.min(subtotal * config.discountRate, config.discountCapUSD ?? Infinity);
   return { subtotal, discount: +discount.toFixed(2), total: +(subtotal - discount).toFixed(2) };
 }
 

@@ -1,3 +1,4 @@
+import { reactive } from "vue";
 import { createAccountApi } from "./account-api";
 import { createUniHttpTransport } from "./api-client";
 import { createAuthApi } from "./auth-api";
@@ -18,7 +19,6 @@ import { createStakingApi } from "./staking-api";
 import { createExchangeApi } from "./exchange-api";
 import { createMarketApi } from "./market-api";
 import { createGenesisApi } from "./genesis-api";
-import { createRepurchaseApi } from "./repurchase-api";
 import { createRiskDisclosureApi } from "./risk-disclosure-api";
 import { createLegalTermsApi } from "./legal-terms-api";
 import { createPrivacyPolicyApi } from "./privacy-policy-api";
@@ -33,8 +33,8 @@ import { createContentCopyApi } from "./content-copy-api";
 import { createNotificationApi } from "./notification-api";
 import { createNotificationPreferencesApi } from "./notification-preferences-api";
 import { createTrustSectionApi } from "./trust-section-api";
+import { createTrustDocumentApi } from "./trust-document-api";
 import { createI18nApi } from "./i18n-api";
-import { createJanusApi } from "./janus-api";
 import { createBehaviorAnalyticsApi } from "./behavior-analytics-api";
 import { createEarningsReleaseApi } from "./earnings-release-api";
 import { createTaskAssignmentApi } from "./task-assignment-api";
@@ -42,8 +42,6 @@ import { createReferralRewardApi } from "./referral-reward-api";
 import { createSupportApi } from "./support-api";
 import { withConversationRealtime } from "./app-conversation-realtime";
 import { createProfileApi } from "./profile-api";
-import { createNovaAiApi } from "./nova-ai-api";
-import { createComputeShareApi } from "./compute-share-api";
 import { createNetworkRegionsApi } from "./network-regions-api";
 import { createTeamNetworkApi } from "./team-network-api";
 import { createDeveloperAccessApi } from "./developer-access-api";
@@ -53,6 +51,7 @@ import { createBundleDiscountApi } from "./bundle-discount-api";
 import { createAmbassadorApplicationApi } from "./ambassador-application-api";
 import { createTeamInsightsApi } from "./team-insights-api";
 import { createWalletBillsApi } from "./wallet-bills-api";
+import { createBusinessCalendarApi } from "./business-calendar-api";
 import { createStorefrontActivityApi } from "./storefront-activity-api";
 import { createGenesisPointsApi } from "./genesis-points-api";
 import { createNetworkRankApi } from "./network-rank-api";
@@ -72,9 +71,12 @@ import { createRuntimeSessionVault } from "./session-vault";
 import type { RefreshCredentialMode } from "./session-vault";
 import { createNativeSessionStorage, type NativeSessionStorage } from "./native-session-storage";
 import { getDeviceId } from "@/lib/device-id";
-import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
+import { revokeNativePush, resumeNativePush } from "@/services/native-push";
 
-export const apiRuntimeConfig = readApiRuntimeConfig();
+export const apiRuntimeConfig = reactive(readApiRuntimeConfig());
+/** Immutable identity of the client constructed below; mutable UI config cannot rebind it. */
+export const apiRuntimeClientOrigin = Object.freeze({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl });
 export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
 export const remoteApiEnabled = true;
 // The formal App uses the Java service's canonical development contract in
@@ -131,8 +133,12 @@ export const apiClient = createRuntimeApiClient({
 // Authentication is server-backed in both dev and prod; Java active profile
 // selects the development challenge or production provider flow.
 export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface,
+  beforeSessionEnd: async context => {
+    await revokeNativePush(context);
+  },
+  sessionEndCancelled: resumeNativePush,
   installationId: () => clientSurface === "APP" ? getDeviceId() : "",
-  executionSupported: () => clientSurface === "APP" && hasNativeAndroidPhoneRuntime(),
+  executionSupported: () => clientSurface === "APP" && hasNativePhoneRuntime(),
   attemptStorage: nativeAttemptStorage ?? (typeof sessionStorage !== "undefined" ? {
     get: () => { const value = sessionStorage.getItem("uvel-login-attempt"); return value ? JSON.parse(value) : null; },
     set: value => sessionStorage.setItem("uvel-login-attempt", JSON.stringify(value)),
@@ -159,7 +165,6 @@ export const stakingApi = createStakingApi(apiClient, expectedApiEnvironment);
 export const exchangeApi = createExchangeApi(apiClient, expectedApiEnvironment);
 export const marketApi = createMarketApi(apiClient, expectedApiEnvironment);
 export const genesisApi = createGenesisApi(apiClient, expectedApiEnvironment);
-export const repurchaseApi = createRepurchaseApi(apiClient, expectedApiEnvironment);
 export const riskDisclosureApi = createRiskDisclosureApi(apiClient);
 export const legalTermsApi = createLegalTermsApi(apiClient);
 export const payoutAddressApi = createPayoutAddressApi(apiClient, expectedApiEnvironment);
@@ -173,16 +178,14 @@ export const contentCopyApi = createContentCopyApi(apiClient);
 export const notificationApi = createNotificationApi(apiClient);
 export const notificationPreferencesApi = createNotificationPreferencesApi(apiClient);
 export const trustSectionApi = createTrustSectionApi(apiClient, expectedApiEnvironment);
+export const trustDocumentApi = createTrustDocumentApi(apiClient, apiRuntimeConfig.baseUrl);
 export const i18nApi = createI18nApi(apiClient);
-export const janusApi = createJanusApi(apiClient);
 export const behaviorAnalyticsApi = createBehaviorAnalyticsApi(apiClient);
 export const earningsReleaseApi = createEarningsReleaseApi(apiClient);
 export const taskAssignmentApi = createTaskAssignmentApi(apiClient, expectedApiEnvironment);
 export const referralRewardApi = createReferralRewardApi(apiClient, expectedApiEnvironment);
 export const supportApi = createSupportApi(withConversationRealtime(apiClient));
 export const profileApi = createProfileApi(apiClient);
-export const novaAiApi = createNovaAiApi(apiClient);
-export const computeShareApi = createComputeShareApi(apiClient);
 export const networkRegionsApi = createNetworkRegionsApi(apiClient);
 export const teamNetworkApi = createTeamNetworkApi(apiClient, expectedApiEnvironment);
 export const developerAccessApi = createDeveloperAccessApi(apiClient, expectedApiEnvironment);
@@ -195,6 +198,7 @@ export const ambassadorApplicationApi = createAmbassadorApplicationApi(
 );
 export const teamInsightsApi = createTeamInsightsApi(apiClient, expectedApiEnvironment);
 export const walletBillsApi = createWalletBillsApi(apiClient);
+export const businessCalendarApi = createBusinessCalendarApi(apiClient);
 export const storefrontActivityApi = createStorefrontActivityApi(apiClient, expectedApiEnvironment);
 export const genesisPointsApi = createGenesisPointsApi(apiClient, expectedApiEnvironment);
 export const networkRankApi = createNetworkRankApi(apiClient, expectedApiEnvironment);

@@ -2,24 +2,15 @@
   Terms of Service — onboarding legal page reached from intro's "Terms" link.
   Chassis-less top-level page (like intro / login / register): fixed full-screen
   scrollable dark surface, own sticky back header (no tab chrome). Content is a
-  10-section numbered agreement, fully i18n-driven (terms namespace, en/zh
+  7-section numbered agreement, fully i18n-driven (terms namespace, en/zh
   mirror), believable real-platform tone (no meta / reverse-education copy).
   Opened via navigateTo from intro, Me, or the post-login terms gate; back is
   stack-aware and preserves a validated internal return destination.
 -->
 <template>
   <StandalonePageShell class="tos-root" :reserve-bottom="false">
-    <!-- Sticky back header + brand -->
-    <view class="tos-top">
-      <view class="tos-back active:opacity-60" :class="{ 'tos-back--blocked': exitBlocked }" role="button" tabindex="0" :aria-disabled="exitBlocked ? 'true' : 'false'" :aria-label="t.login.back" @click="goBack" @keydown.enter.prevent="goBack($event)" @keydown.space.prevent="goBack($event)">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-      </view>
-      <view class="tos-brand">
-        <BrandLockup variant="mark" :height="32" />
-        <text class="tos-brand__name">{{ t.terms.navTitle }}</text>
-      </view>
-      <view class="tos-top__spacer" />
-    </view>
+    <SubPageHeader :back="returnTo" :back-action="goBack" :title="t.terms.navTitle" plain design
+      class="tos-header" :class="{ 'tos-header--blocked': exitBlocked }" role="group" :aria-disabled="exitBlocked" />
 
     <view class="tos-wrap">
       <!-- Hero -->
@@ -27,9 +18,9 @@
         <text class="tos-eyebrow">{{ loadError ?? t.terms.loading }}</text>
       </view>
       <view v-else-if="serverTerms" class="tos-hero">
-        <text class="tos-eyebrow">{{ `${serverTerms.effectiveAt} · ${serverTerms.version}` }}</text>
-        <text class="tos-title">{{ serverTerms.title }}</text>
-        <text class="tos-sub">{{ serverTerms.summary }}</text>
+        <text class="tos-eyebrow">{{ `${effectiveDate} · ${serverTerms.version}` }}</text>
+        <text class="tos-title">{{ platformDisplayText(serverTerms.title) }}</text>
+        <text class="tos-sub">{{ platformDisplayText(serverTerms.summary) }}</text>
       </view>
       <view v-else class="tos-hero">
         <text class="tos-eyebrow">{{ t.terms.effectiveLabel }}</text>
@@ -46,7 +37,7 @@
              当 toggle button,读屏按复选框朗读(zentao #94)。改 radiogroup/radio + aria-checked。 -->
         <view class="tos-language__choices" role="radiogroup" :aria-label="t.terms.languageLabel">
           <view
-            v-for="(language, li) in LOCALES"
+            v-for="(language, li) in platformConfig.offeredLocales"
             :key="language.code"
             class="tos-language__choice active:opacity-70"
             :class="{ 'tos-language__choice--active': language.code === locale.code }"
@@ -67,17 +58,17 @@
       <!-- Numbered sections -->
       <view v-if="loadError" class="tos-fail" role="alert">
         <text class="tos-fail__message">{{ loadError }}</text>
-        <view class="tos-fail__retry active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
-          <text>{{ loadingTerms ? "…" : t.ui.retry }}</text>
+        <view class="tos-fail__retry nx-card-recovery-action active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
+          <text :class="{ 'tos-fail__retry-label': !loadingTerms }">{{ loadingTerms ? "…" : t.ui.retry }}</text>
         </view>
       </view>
       <view v-else-if="loaded" class="tos-sections">
         <view v-for="b in blocks" :key="b.n" class="tos-block">
           <view class="tos-block__head">
             <text class="tos-block__num">{{ pad(b.n) }}</text>
-            <text class="tos-block__title">{{ b.title }}</text>
+            <text class="tos-block__title">{{ platformDisplayText(b.title) }}</text>
           </view>
-          <text class="tos-block__body">{{ b.body }}</text>
+          <text class="tos-block__body">{{ platformDisplayText(b.body) }}</text>
         </view>
       </view>
       <view v-else class="tos-fail"><text>{{ t.terms.loading }}</text></view>
@@ -91,25 +82,31 @@
 
       <!-- Acknowledge & return -->
       <view v-if="!loadError && loaded" class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="confirmTerms" @keydown.enter.prevent="confirmTerms($event)" @keydown.space.prevent="confirmTerms($event)">
-        <text class="tos-cta__t">{{ confirming ? "…" : (serverTerms?.acknowledged ? t.terms.gotIt : t.terms.confirmContinue) }}</text>
+        <text class="tos-cta__t">{{ t.terms.gotIt }}</text>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import { toast } from "@/store/ui";
+import ToastHost from "@/components/toast-host.vue";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBackPress, onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
-import BrandLockup from "@/components/brand-lockup.vue";
+import SubPageHeader from "@/components/sub-page-header.vue";
+import { dateLocale } from "@/i18n/format";
+import { formatLegalEffectiveDate } from "@/lib/legal-effective-date";
+import { platformDisplayText } from "@/lib/brand-copy";
 import { useT } from "@/i18n/use-t";
 import { navBack, navTo } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
-import { LOCALES, type LocaleCode } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
+import { useConfig } from "@/store/config";
 import type { LegalTermsCurrent } from "@/api/legal-terms-api";
 import {
-  buildLegalTermsLoginRoute,
   buildLegalTermsRoute,
   sameLegalTermsSession,
   sameLegalTermsRun,
@@ -117,7 +114,6 @@ import {
   shouldBlockLegalTermsExit,
   type LegalTermsSessionFence,
 } from "@/lib/legal-terms-gate";
-import { recordLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
 import { pendingProfileLocaleHydration, isProfileLocaleHydrationError } from "@/lib/locale-profile-hydration";
 import { retryCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { captureRuntimeRevision } from "@/api/order-api";
@@ -125,7 +121,9 @@ import { createLegalTermsRequestFence } from "@/lib/legal-terms-request-fence";
 
 const t = useT();
 const locale = useLocaleStore();
+const platformConfig = useConfig();
 const serverTerms = ref<LegalTermsCurrent | null>(null);
+const effectiveDate = computed(() => formatLegalEffectiveDate(serverTerms.value?.effectiveAt, dateLocale()));
 type TermsErrorKey = "loadFailed" | "sessionChanged" | "runChanged" | "loginRequired" | "ackFailed" | "languageSyncFailed";
 const loadErrorKey = ref<TermsErrorKey | null>(null);
 const loadError = computed(() => loadErrorKey.value ? t.value.terms[loadErrorKey.value] : null);
@@ -151,9 +149,6 @@ const blocks = computed(() => {
     { n: 5, title: w.s5Title, body: w.s5Body },
     { n: 6, title: w.s6Title, body: w.s6Body },
     { n: 7, title: w.s7Title, body: w.s7Body },
-    { n: 8, title: w.s8Title, body: w.s8Body },
-    { n: 9, title: w.s9Title, body: w.s9Body },
-    { n: 10, title: w.s10Title, body: w.s10Body },
   ];
 });
 
@@ -201,11 +196,12 @@ async function loadTerms(retryRotation = true) {
   if (!remoteApiEnabled || !termsPageVisible) return;
   // A duplicate retry for the same language must share the in-flight read. A
   // language switch intentionally starts a fresh request so the new gate can
-  // replace the previous locale without waiting for it to settle.
-  if (loadingTerms.value && termsRequests.isLatestLocale(locale.code)) return;
+  // replace the previous locale without waiting for it to settle. Terms are
+  // published in zh/en/vi; other interface languages read the English document.
+  if (loadingTerms.value && termsRequests.isLatestLocale(serverLanguage(locale.code))) return;
   confirmationGeneration += 1;
   confirming.value = false;
-  const request = termsRequests.start(locale.code);
+  const request = termsRequests.start(serverLanguage(locale.code));
   loadingTerms.value = true;
   loaded.value = false;
   loadErrorKey.value = null;
@@ -219,14 +215,14 @@ async function loadTerms(retryRotation = true) {
     if (requestFence) {
       const hydration = pendingProfileLocaleHydration({ accountId: `user:${requestFence.userId}`, revision: requestFence.sessionRevision ?? 0 });
       if (hydration) await hydration;
-      if (!termsRequests.isCurrent(request, locale.code) || !termsPageVisible) return;
+      if (!termsRequests.isCurrent(request, serverLanguage(locale.code)) || !termsPageVisible) return;
       if (!sameLegalTermsSession(requestFence, currentSessionFence())) throw new Error("LEGAL_TERMS_SESSION_CHANGED");
     }
     const snapshot = await legalTermsApi.current(request.locale, "GLOBAL", authenticated);
-    if (!termsRequests.isCurrent(request, locale.code, snapshot.requestedLocale)) {
+    if (!termsRequests.isCurrent(request, serverLanguage(locale.code), snapshot.requestedLocale)) {
       // A current response that claims a different requested locale is not an
       // acknowledgement for this screen. Keep the gate closed and retryable.
-      if (termsRequests.isCurrent(request, locale.code)) loadErrorKey.value = "loadFailed";
+      if (termsRequests.isCurrent(request, serverLanguage(locale.code))) loadErrorKey.value = "loadFailed";
       return;
     }
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
@@ -245,9 +241,8 @@ async function loadTerms(retryRotation = true) {
       return;
     }
     serverTerms.value = snapshot;
-    if (snapshot.acknowledged) recordLegalTermsAcknowledged(snapshot);
   } catch (error) {
-    if (!termsRequests.isCurrent(request, locale.code)) return;
+    if (!termsRequests.isCurrent(request, serverLanguage(locale.code))) return;
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
       if (retryRotation && isCurrentRefreshContinuation(requestFence)) {
         loadingTerms.value = false;
@@ -261,7 +256,7 @@ async function loadTerms(retryRotation = true) {
     serverTerms.value = null;
     loadErrorKey.value = isProfileLocaleHydrationError(error) ? "languageSyncFailed" : "loadFailed";
   } finally {
-    if (termsRequests.isCurrent(request, locale.code)) {
+    if (termsRequests.isCurrent(request, serverLanguage(locale.code))) {
       loaded.value = true;
       loadingTerms.value = false;
     }
@@ -274,11 +269,12 @@ function isCurrentRefreshContinuation(expected: LegalTermsSessionFence | null): 
     && sessionVault.isRefreshContinuation(expected.sessionRevision ?? -1);
 }
 function switchTermsLanguage(next: LocaleCode) {
-  if (next !== locale.code) locale.setLocale(next);
+  locale.setLocale(next);
 }
 /** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
 function moveTermsLanguage(index: number, delta: number): void {
-  const next = LOCALES[(index + delta + LOCALES.length) % LOCALES.length];
+  const offered = platformConfig.offeredLocales;
+  const next = offered[(index + delta + offered.length) % offered.length];
   if (!next) return;
   switchTermsLanguage(next.code);
   void nextTick(() => {
@@ -307,7 +303,7 @@ function blockRequiredExit(): boolean {
   const now = Date.now();
   if (now - lastRequiredExitNotice >= 3_000) {
     lastRequiredExitNotice = now;
-    uni.showToast({ title: t.value.terms.confirmRequired, icon: "none" });
+    toast.info(t.value.terms.confirmRequired);
   }
   return true;
 }
@@ -326,54 +322,8 @@ function goRisk(event?: Event) {
   if (repeatedKeyboardActivation(event)) return;
   navTo(`/pages/me/risk-disclosure?return=${encodeURIComponent(buildLegalTermsRoute(returnTo.value))}&country=VN`);
 }
-async function confirmTerms(event?: Event) {
-  if (repeatedKeyboardActivation(event) || confirming.value) return;
-  if (!remoteApiEnabled || !serverTerms.value || serverTerms.value.acknowledged) { goBack(); return; }
-  if (!currentSessionFence()) {
-    loadErrorKey.value = "loginRequired";
-    navTo(buildLegalTermsLoginRoute(buildLegalTermsRoute(returnTo.value)));
-    return;
-  }
-  const requestFence = currentSessionFence();
-  const snapshot = serverTerms.value;
-  const snapshotLocale = locale.code;
-  const confirmation = ++confirmationGeneration;
-  // A language change or a fresh document read replaces this screen's consent
-  // target. Its earlier command may finish, but cannot decide the new gate.
-  const ownsSnapshot = () => confirmation === confirmationGeneration && termsPageVisible
-    && locale.code === snapshotLocale && serverTerms.value === snapshot;
-  if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
-    loadErrorKey.value = "runChanged";
-    return;
-  }
-  confirming.value = true;
-  try {
-    const acknowledged = await legalTermsApi.acknowledge(snapshot);
-    if (!ownsSnapshot()) return;
-    if (!sameLegalTermsSession(requestFence, currentSessionFence()) && isCurrentRefreshContinuation(requestFence)) {
-      confirming.value = false;
-      await loadTerms();
-      return;
-    }
-    if (!sameLegalTermsSession(requestFence, currentSessionFence())
-      || acknowledged.version !== snapshot.version
-      || acknowledged.resolvedLocale !== snapshot.resolvedLocale
-      || acknowledged.resolvedJurisdiction !== snapshot.resolvedJurisdiction
-      || acknowledged.runId !== snapshot.runId
-      || !sameLegalTermsRun(acknowledged, captureRuntimeRevision().runId)) {
-      loadErrorKey.value = "sessionChanged";
-      return;
-    }
-    serverTerms.value = acknowledged;
-    if (acknowledged.acknowledged) {
-      recordLegalTermsAcknowledged(acknowledged, snapshotLocale);
-      goBack();
-    }
-  } catch {
-    if (ownsSnapshot()) loadErrorKey.value = sameLegalTermsSession(requestFence, currentSessionFence())
-      ? "ackFailed" : "sessionChanged";
-  }
-  finally { if (confirmation === confirmationGeneration) confirming.value = false; }
+function confirmTerms(event?: Event) {
+  goBack(event);
 }
 </script>
 
@@ -385,52 +335,13 @@ async function confirmTerms(event?: Event) {
   overflow-y: auto;
 }
 
-/* Top bar */
-.tos-top {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 10px 16px;
-  background: color-mix(in srgb, var(--v5-bg) 86%, transparent);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--v5-border);
-}
-.tos-back {
-  width: 44px;
-  height: 44px;
-  margin-left: -8px;
-  border-radius: 9999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  justify-self: start;
-}
-.tos-back--blocked {
-  opacity: 0.35;
-}
-.tos-brand {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: center;
-}
-.tos-brand__name {
-  color: var(--v5-ink);
-  font-weight: 600;
-  font-family: var(--font-v5);
-  font-size: 15px;
-  letter-spacing: -0.02em;
-}
-.tos-top__spacer {
-  justify-self: end;
-}
+/* This page is its own padded scrollport; the shell already reserves the status bar. */
+.tos-header { top: 0 !important; }
+.tos-header--blocked :deep(.spv-back) { opacity: 0.35; }
 
 /* Body */
 .tos-wrap {
-  padding: 16px 20px calc(env(safe-area-inset-bottom, 0px) + 40px);
+  padding: 0 20px var(--nx-overlay-safe-bottom);
 }
 .tos-hero {
   margin-bottom: 18px;
@@ -466,16 +377,14 @@ async function confirmTerms(event?: Event) {
 .tos-sub {
   display: block;
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   line-height: 1.65;
   color: var(--v5-ink-3);
 }
 
 /* Numbered sections */
 .tos-sections {
-  border-radius: 16px;
-  background: var(--v5-surface);
-  padding: 2px 18px;
+  padding: 2px 0;
   display: flex;
   flex-direction: column;
 }
@@ -489,16 +398,6 @@ async function confirmTerms(event?: Event) {
 .tos-fail__message {
   display: block;
   line-height: 1.55;
-}
-.tos-fail__retry {
-  width: fit-content;
-  margin-top: 12px;
-  padding: 8px 14px;
-  border-radius: 9999px;
-  color: var(--v5-on-brand);
-  background: var(--v5-brand);
-  font-size: 13px;
-  font-weight: 600;
 }
 .tos-block {
   padding: 14px 0;
@@ -518,16 +417,16 @@ async function confirmTerms(event?: Event) {
   color: var(--v5-brand);
 }
 .tos-block__title {
-  font-size: 15px;
+  font-size: var(--ui-type-section);
   font-weight: 600;
   color: var(--v5-ink);
   letter-spacing: -0.01em;
 }
 .tos-block__body {
   display: block;
-  font-size: 13px;
+  font-size: var(--ui-type-long-form);
   color: var(--v5-ink-2);
-  line-height: 1.65;
+  line-height: var(--ui-type-long-form-lh);
 }
 
 /* Risk cross-link */
@@ -567,8 +466,12 @@ async function confirmTerms(event?: Event) {
   transition: transform 0.15s ease;
 }
 .tos-cta__t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-on-brand);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tos-cta { transition: none; }
+  .tos-cta:active { transform: none; }
 }
 </style>

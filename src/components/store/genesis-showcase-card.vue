@@ -14,9 +14,7 @@
 -->
 <template>
   <view>
-    <view class="nx-glass-card relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
-      <!-- Gold aurora wash（装饰,卡内合法光晕:bg+overflow-hidden）-->
-      <view aria-hidden :style="auroraStyle" />
+    <view class="nx-glass-card nx-tint relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
 
       <view class="relative" style="z-index: 1">
         <GenesisArtwork style="border-radius: 12px; margin-bottom: 14px" />
@@ -203,20 +201,12 @@ async function onCardTap() {
 }
 
 // ── styles（金色 = genesis 域例外,见文件头;其余走 --v5-* token,零 border 卡）──
-const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
+// Tinted solid in genesis gold (its colour used to come from a corner aurora).
+const cardStyle: CSSProperties = {
+  "--nx-tint": "var(--v5-genesis-gold)",
   borderRadius: "var(--nx-glass-radius)",
   padding: "18px 16px 16px",
-};
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  top: "-46px",
-  right: "-36px",
-  width: "220px",
-  height: "170px",
-  background: "radial-gradient(closest-side, color-mix(in srgb, var(--v5-genesis-gold) 16%, transparent), transparent 72%)",
-  pointerEvents: "none",
-};
+} as CSSProperties;
 const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   letterSpacing: "0.08em",
@@ -241,7 +231,7 @@ const titleStyle: CSSProperties = {
 };
 const perksStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
   lineHeight: 1.45,
   textWrap: "pretty" as CSSProperties["textWrap"],
@@ -256,7 +246,7 @@ const priceStyle: CSSProperties = {
   lineHeight: 1.05,
 };
 const soldOutStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
   lineHeight: 1.4,
   textWrap: "pretty" as CSSProperties["textWrap"],
@@ -267,7 +257,7 @@ const ctaStyle: CSSProperties = {
   padding: "0 16px",
   borderRadius: "999px",
   gap: "5px",
-  background: "linear-gradient(135deg, color-mix(in srgb, var(--v5-genesis-gold) 22%, transparent), color-mix(in srgb, var(--v5-genesis-gold) 10%, transparent))",
+  background: "color-mix(in srgb, var(--v5-genesis-gold) 16%, transparent)",
   color: "var(--v5-genesis-gold)",
 };
 const ctaTextStyle: CSSProperties = {

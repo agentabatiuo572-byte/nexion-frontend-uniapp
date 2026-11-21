@@ -200,8 +200,8 @@ export interface ShareConfig {
   baseUrl: string;
   // 顺序即渠道面板展示序(越南盘默认 Zalo 首位)。
   channels: ShareChannelDef[];
-  // 注册成功页 H5 官网下载引导;officialUrl 为空 = 显示不可用占位。
-  // 旧平台直链字段保留兼容历史配置,成功页不再直接消费。
+  // 官方安装链接为 HTTPS 落地页，可包含 #download 等页面锚点。
+  // iOS / Android 下载入口直接使用各自的服务器配置地址。
   appDownload: {
     officialUrl: string;
     iosUrl: string;
@@ -222,18 +222,29 @@ export interface ShareConfig {
  *  🔴 `virtualUserCount` 与 `hashratePercentileTable` 只用于**排名分母与百分位映射**,
  *  **永不**以任何形式出现在用户可见文案、字段名或接口响应的展示字段里(产品内 0 元层)。 */
 export interface PublicStatsConfig {
+  globeDisplay?: import("@/lib/globe-simulation").GlobeDisplayConfig;
   /** 平台舰队规模锚。合法域 [1000, 1000000]。 */
   fleetDevices: number;
   /** 在线率(%)。在线设备 = 舰队规模 × 该比例。合法域 [50, 100]。 */
   onlineRatePct: number;
   /** 在线数展示抖动幅度(台)。**只影响视觉呼吸感,不参与任何金额派生**。[0, 500]。 */
   onlineJitter: number;
+  /** Boundary presence: false only when the entire public member-estimate input group is absent. */
+  registeredUsersEstimateProvided?: boolean;
   /** 注册用户展示基数。[0, 100000000]。 */
   registeredUsersBase: number;
-  /** 注册用户月增速(%)。前端按时间锚派生当前值 —— **推算不累加**,故刷新不回退。[0, 50]。 */
+  /** 兼容旧本地配置；正式公开投影不下发月增速，不能以它判断公开人数是否可用。 */
   registeredUsersMonthlyGrowthPct: number;
   /** 派生起点(ms epoch)。运营改基数即重置锚点。 */
   registeredUsersAnchorAt: number;
+  /** 注册用户跳动间隔(秒)。与基数、锚点和每次增加人数范围成组下发；整组缺省时采用服务端公布人数。[1, 86400]。 */
+  registeredUsersTickIntervalSec?: number;
+  /** 每次跳动最少增加的注册用户数。[0, 100000000]。 */
+  registeredUsersTickStepMin?: number;
+  /** 每次跳动最多增加的注册用户数,不小于最少值;每跳在两者之间按服务端同一规则取值。[0, 100000000]。 */
+  registeredUsersTickStepMax?: number;
+  /** 全球作业展示基数(H9 运营发布,仅展示)。赚钱页任务中心显示「真实进行中作业 + 基数」;null = 未发布,只显示真实数。[0, 100000000]。 */
+  activeJobsBase: number | null;
   /** 服务端真实注册账号数，仅用于排名分母，不用于营销展示。 */
   realUserCount: number;
   /** 虚拟人口规模。真实人口 + 它 = 排名分母。[0, 10000000]。 */
@@ -271,6 +282,8 @@ export interface PlatformVerifiedStats {
 export interface PlatformConfig {
   featureFlags: FeatureFlags;
   publicStats: PublicStatsConfig;
+  /** H9 home display snapshot; separate from measured aggregates and ranking. */
+  networkPulse: { registeredUsers: number | null; onlineDevices: number | null } | null;
   /**
    * 服务端可核验聚合(zentao #59)。与 `publicStats` 的区别是**数据性质**:
    * `publicStats` 是运营手填的展示配置,`verifiedStats` 是真实表聚合。
@@ -303,7 +316,7 @@ type RuntimeWithdrawRuleKey =
  * Runtime consumers always receive a complete `PlatformConfig`; the config
  * store supplies newly required fields outside the Mock dataset boundary.
  */
-export type PlatformConfigSeed = Omit<PlatformConfig, "publicStats" | "verifiedStats" | "withdrawRules" | "otpGate"> & {
+export type PlatformConfigSeed = Omit<PlatformConfig, "publicStats" | "networkPulse" | "verifiedStats" | "withdrawRules" | "otpGate"> & {
   publicStats?: PublicStatsConfig;
   /** 本地 mock 没有可核验聚合;compat 会补 null。 */
   verifiedStats?: PlatformVerifiedStats | null;

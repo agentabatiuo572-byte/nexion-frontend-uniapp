@@ -10,8 +10,14 @@
       <SubPageHeader back="/pages/me/wallet-bills" />
 
       <view v-if="remoteApiEnabled" class="nx-glass-card mx-4" data-testid="tx-detail-hold" :style="holdStyle">
-        <text class="block" :style="holdTitleStyle">{{ w.detailUnavailableTitle }}</text>
-        <text class="block" :style="holdBodyStyle">{{ w.detailUnavailableBody }}</text>
+        <text class="block" :style="holdTitleStyle">{{ hash ? w.detailUnavailableTitle : hashProvided ? recoveryCopy.txInvalidTitle : recoveryCopy.txMissingTitle }}</text>
+        <text class="block" :style="holdBodyStyle">{{ hash ? w.detailUnavailableBody : hashProvided ? recoveryCopy.txInvalidBody : recoveryCopy.txMissingBody }}</text>
+        <view v-if="hash" style="margin-top: 16px">
+          <text class="block" :style="holdBodyStyle">{{ recoveryCopy.txHashLabel }}</text>
+          <NxCodeValue class="tx-retained-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
+          <view :style="copyBtnStyle" role="button" :tabindex="copyBusy ? -1 : 0" :aria-disabled="copyBusy" :aria-busy="copyBusy" @click="copyHash" @keydown.enter.prevent="copyHash" @keydown.space.prevent="copyHash"><text>{{ copyButtonText }}</text></view>
+        </view>
+        <view class="tx-bills-link" role="link" tabindex="0" :style="copyBtnStyle" @click="viewBills" @keydown.enter.prevent="viewBills"><text>{{ recoveryCopy.viewBills }}</text></view>
       </view>
 
       <template v-else>
@@ -59,7 +65,6 @@
         </view>
       </view>
 
-      <text class="block mx-4 text-center" :style="footerStyle">{{ w.footer }}</text>
       </template>
     </view>
   </AppChassis>
@@ -71,16 +76,24 @@ import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import Stat from "@/components/tx/tx-stat.vue";
 import Row from "@/components/tx/tx-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
+import { navTo } from "@/lib/route";
+import { validatedTransactionHash } from "@/lib/transaction-hash-input";
+import { useEntryRecoveryCopy } from "@/i18n/entry-recovery";
 
 const t = useT();
+const recoveryCopy = useEntryRecoveryCopy();
 const w = computed(() => t.value.tx);
 const hash = ref("");
+const hashProvided = ref(false);
+const copyBusy = ref(false);
+let copyVersion = 0;
 const copyState = ref<"idle" | "copied" | "failed">("idle");
 let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -91,16 +104,21 @@ const NET_LINES: Record<string, string> = {
   BEP20: "BNB Smart Chain (BEP20)",
   ERC20: "Ethereum Mainnet (ERC20)",
 };
-const qAmount = ref<number | null>(null);
+const qAmount = ref<string | null>(null);
 const qConfs = ref<number | null>(null);
 const qNet = ref<string | null>(null);
 const qTo = ref<string | null>(null);
 const qAgeMin = ref<number | null>(null);
 
 onLoad((options) => {
-  hash.value = options?.hash ?? "";
-  const amt = parseFloat(String(options?.amount ?? ""));
-  qAmount.value = Number.isFinite(amt) && amt > 0 && amt <= 1e9 ? amt : null;
+  copyVersion += 1;
+  copyState.value = "idle";
+  copyBusy.value = false;
+  if (copyResetTimer) clearTimeout(copyResetTimer);
+  hashProvided.value = typeof options?.hash === "string" && !!options.hash.trim();
+  hash.value = validatedTransactionHash(options?.hash);
+  const amt = String(options?.amount ?? "");
+  qAmount.value = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(amt) && Number(amt) > 0 ? amt : null;
   const confs = parseInt(String(options?.confs ?? ""), 10);
   qConfs.value = Number.isFinite(confs) && confs >= 0 && confs <= 10_000 ? confs : null;
   qNet.value = typeof options?.net === "string" && options.net in NET_LINES ? options.net : null;
@@ -159,7 +177,7 @@ const derived = computed(() => {
 
 const blockNumber = computed(() => derived.value.blockNumber);
 const gasUsedGwei = computed(() => derived.value.gasUsedGwei);
-const valueUSDT = computed(() => formatAmount(qAmount.value ?? derived.value.valueUSDT));
+const valueUSDT = computed(() => formatAmount(qAmount.value ?? derived.value.valueUSDT, 6));
 const fromAddr = computed(() => derived.value.fromAddr);
 const toAddr = computed(() => qTo.value ?? derived.value.toAddr);
 const contract = computed(() => derived.value.contract);
@@ -212,14 +230,22 @@ function resetCopyStateSoon() {
 }
 
 async function copyHash() {
+  if (!hash.value || copyBusy.value) return;
+  const version = copyVersion;
+  copyBusy.value = true;
   const ok = await writeClipboard(hash.value);
+  if (version !== copyVersion) return;
+  copyBusy.value = false;
   copyState.value = ok ? "copied" : "failed";
   if (ok) toast.success(w.value.hashCopied);
   else toast.error(w.value.hashCopyFailed);
   resetCopyStateSoon();
 }
 
+function viewBills() { navTo("/pages/me/wallet-bills"); }
+
 onUnmounted(() => {
+  copyVersion += 1;
   if (copyResetTimer) clearTimeout(copyResetTimer);
 });
 
@@ -232,7 +258,7 @@ const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "16px",
   background: "var(--nx-glass-fill)",
 };
-const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-success)" };
+const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-success-ink)" };
 const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
 // Nested copy chip — soft surface-2 fill lifts it off the surface hero, no border.
 const copyBtnStyle: CSSProperties = {
@@ -265,10 +291,17 @@ const extBtnStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-2)",
 };
-const footerStyle: CSSProperties = { marginTop: "16px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
 const holdStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", padding: "16px", borderRadius: "var(--nx-glass-radius)", background: "var(--nx-glass-fill)" };
-const holdTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
-const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "13px", lineHeight: "19px", color: "var(--v5-ink-3)" };
+const holdTitleStyle: CSSProperties = { fontSize: "var(--ui-type-card-title)", fontWeight: 600, color: "var(--v5-ink)" };
+const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-type-list-subtitle)", lineHeight: "19px", color: "var(--v5-ink-3)" };
 
 
 </script>
+
+<style scoped>
+/* The retained hash stays fully visible: its own full-width monospace block, wrapping evenly (NxCodeValue full); the copy button below copies it. */
+.tx-retained-hash { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); user-select: text; }
+.tx-bills-link { display: flex !important; justify-content: center; }
+[role="button"][aria-disabled="true"] { opacity: 0.5; }
+[tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+</style>

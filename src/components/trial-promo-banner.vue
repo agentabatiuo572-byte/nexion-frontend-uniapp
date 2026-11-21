@@ -83,15 +83,15 @@ const bannerBodyStyle: CSSProperties = {
 };
 const headlineStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "15px",
+  fontWeight: "var(--ui-type-card-title-weight)",
+  fontSize: "var(--ui-type-card-title)",
   color: "var(--v5-ink)",
   letterSpacing: "-0.01em",
   lineHeight: 1.35,
 };
 const subStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
   lineHeight: 1.35,
 };

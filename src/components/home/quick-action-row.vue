@@ -49,7 +49,7 @@
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
 import { computed, onMounted, ref, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { onShow } from "@/composables/use-tab-page-lifecycle";
 import { useNow } from "@/composables/use-now";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -119,7 +119,7 @@ const dailySubtitle = computed(() => factSubtitle(
 ));
 const genesisSubtitle = computed(() => {
   const supply = quickNumericFact(remoteApiEnabled,
-    genesis.remoteSupplyKnown ? genesis.remotePublicReadState
+    genesis.remoteSupplyKnown ? "ready"
       : genesis.remotePublicReadState === "ready" ? "unavailable" : genesis.remotePublicReadState,
     genesis.totalSlots - genesis.soldSlots);
   if (supply.state !== "ready") return factSubtitle(supply, n => fmt(t.value.home.quickGenesisLeft, { n }));

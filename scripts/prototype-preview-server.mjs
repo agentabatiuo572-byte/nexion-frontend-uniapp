@@ -1,0 +1,370 @@
+// Loopback-only presentation server. No request is proxied to a real backend.
+import http from 'node:http';
+import path from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
+import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
+import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
+import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
+import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
+import { demoLongContentAvailable, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
+import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
+import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
+import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
+import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
+import { setTransferSampleOutcome } from './lib/prototype-demo-support.mjs';
+import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
+import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
+import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.mjs';
+import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
+import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
+const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
+const port=Number(process.env.DEMO_PORT||5190);
+const state=structuredClone(demoDefaults),routes=[],init=[];
+const authDemo=createAuthDemo(state);
+// An optional local handoff preserves demo conversations across a preview rebuild.
+if(process.env.DEMO_STATE_FILE){
+  const saved=JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state;
+  Object.assign(state,saved,{walletLegacySeed:saved.walletLegacySeed??!saved.walletMovements});
+  for(const assignment of Object.values(saved.cancelledReplacementAssignments??{})){
+    for(const task of assignment.recentTasks){
+      if(task.status==='CANCELLED')recordDemoTaskCancellation(state,assignment,task);
+    }
+  }
+  delete state.cancelledReplacementAssignments;
+}
+const startedAt=Date.now();
+normalizeDemoLongContent(state);
+const unreservedBankQuote=removeUnreservedLongBankOrder(state);
+if(process.env.DEMO_STATE_FILE){
+  restoreDemoWithdrawalOrders(state);
+  restoreDemoBankWithdrawals(state,startedAt);
+  initializeDemoH4State(state,startedAt);
+  initializeLegacyStreakSavers(state);
+}else state.catalogAvailableAt=startedAt;
+initializeDemoPreviewAccount(state,startedAt);
+initializeDemoWalletHistory(state,state.previewFactsAt);
+seedLongBankOrder(state,startedAt,unreservedBankQuote);
+let locale='zh';
+// Purchases need the payment PIN and order commands, so the preview models them
+// unless DEMO_CHECKOUT_FLOW=0.
+// Continue from an imported epoch, so the first scenario change never reuses it.
+let scenarioEpoch=state.scenarioEpoch??0;
+const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
+const fixtureFor=(url,request)=>{
+  if(['/api/app/team/quota','/api/store/purchase-eligibility'].includes(url.pathname))checkoutFlow?.observePayments();
+  return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,request),state);
+};
+const messages=createPrototypeMessages({state,fixtureFor});
+const realtime=createPrototypeRealtime({state,messages,fixtureFor});
+await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor});
+const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{explicitChoice:'zh'}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
+// Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
+// trade-in and trial commands, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
+// account and stay.
+const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-convert-accounts-v1'];
+const serverRun=Date.now().toString(36);
+// The scenario a page or a reply belongs to: this server run and its scenario epoch.
+const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
+// Runs in every App page before the App starts (design rule at demoSeedFleet). It drops the records of another
+// scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
+// another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
+function previewScenarioPage(scenario,keys,purchaseCashierPrefix){
+  // Keep the bank top-up placeholder on its current page.
+  window.navigation?.addEventListener('navigate',event=>{if(event.destination.url==='https://api.hdpayadmin.com/pay/demo-preview-only')event.preventDefault();});
+  // The app validates the hosted address first. Rewrite it before assigning the iframe's source.
+  const iframeSrc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src');
+  Object.defineProperty(HTMLIFrameElement.prototype,'src',{...iframeSrc,set(value){
+    const local=typeof value==='string'&&value.startsWith(purchaseCashierPrefix)?new URL(value).pathname:value;
+    iframeSrc.set.call(this,local);
+  }});
+  if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
+  const follow=value=>{if(value&&value!==scenario)location.reload();};
+  // Once another page has entered a new scenario the shared records are that scenario's: this page may neither write nor
+  // remove them. A page still alone in the old scenario writes freely, and the next load of the new one clears its records.
+  const {setItem,removeItem}=Storage.prototype,stale=(storage,key)=>storage===localStorage&&keys.includes(key)&&localStorage.getItem('uvel-preview-scenario')!==scenario;
+  Storage.prototype.setItem=function(key,value){if(stale(this,key)){location.reload();return;}return setItem.call(this,key,value);};
+  Storage.prototype.removeItem=function(key){if(stale(this,key)){location.reload();return;}return removeItem.call(this,key);};
+  addEventListener('storage',event=>{if(event.key==='uvel-preview-scenario')follow(event.newValue);});
+  const localPath=target=>{try{const url=new URL(target,location.href);return url.origin===location.origin?url.pathname:null;}catch{return null;}};
+  const {open,send}=XMLHttpRequest.prototype;
+  XMLHttpRequest.prototype.open=function(method,target,...rest){this.previewPath=localPath(target);return open.call(this,method,target,...rest);};
+  XMLHttpRequest.prototype.send=function(body){
+    if(this.previewPath){this.setRequestHeader('X-Preview-Scenario',scenario);this.addEventListener('loadend',()=>follow(this.getResponseHeader('X-Preview-Scenario')));}
+    if(this.previewPath==='/api/points/state') this.setRequestHeader('X-Preview-Locale',document.documentElement.lang);
+    return send.call(this,body);
+  };
+  const nativeFetch=window.fetch;
+  window.fetch=function(input,init){
+    const pathname=localPath(input instanceof Request?input.url:String(input));
+    if(!pathname)return nativeFetch.call(this,input,init);
+    const headers=new Headers(init?.headers??(input instanceof Request?input.headers:undefined));headers.set('X-Preview-Scenario',scenario);
+    if(pathname==='/api/points/state') headers.set('X-Preview-Locale',document.documentElement.lang);
+    return nativeFetch.call(this,input,{...init,headers}).then(response=>{follow(response.headers.get('X-Preview-Scenario'));return response;});
+  };
+}
+function previewTransferOutbox(run,sample) {
+  const marker='uvel-preview-support-transfer', previous=JSON.parse(sessionStorage.getItem(marker)||'null');
+  if(previous?.run===run&&previous?.key===sample?.key||!previous&&!sample)return;
+  const outboxKey='support-human-outbox:user:900001', pendingKey='support-pending-commands:user:900001:canonical-v1:conversations';
+  const outbox=JSON.parse(sessionStorage.getItem(outboxKey)||'{}'), pending=JSON.parse(localStorage.getItem(pendingKey)||'{}');
+  if(previous) {
+    delete outbox['conversation:'+previous.conversationNo];
+    localStorage.removeItem('support-human-send:user:900001:'+previous.key);
+    localStorage.removeItem('support-human-send:user:900001:'+previous.slot);
+    const retainedKey='support-human-pending:user:900001';
+    const retained=JSON.parse(localStorage.getItem(retainedKey)||'{}');
+    delete retained['conversation:'+previous.conversationNo];
+    if(Object.keys(retained).length)localStorage.setItem(retainedKey,JSON.stringify(retained));
+    else localStorage.removeItem(retainedKey);
+    if(pending[previous.slot]===previous.key)delete pending[previous.slot];
+  }
+  if(sample&&!sample.committed&&!sample.rejected) {
+    outbox['conversation:'+sample.conversationNo]={text:'',failedSend:{text:sample.text,kind:'unknown',settled:false,retryable:true,attempts:1}};
+    pending[sample.slot]=sample.key;
+  }
+  sessionStorage.setItem(outboxKey,JSON.stringify(outbox));
+  localStorage.setItem(pendingKey,JSON.stringify(pending));
+  sessionStorage.setItem(marker,JSON.stringify(sample?{run,key:sample.key,conversationNo:sample.conversationNo,slot:sample.slot}:null));
+}
+const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+');'
+  +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(state.supportTransferSample??null)+');</script>';
+const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
+const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
+const recoveryReads = new Set(['/api/me/notification-preferences', '/api/vouchers', '/api/app/wallet/bills/summary']);
+const modeledWrite=/^\/(auth\/users\/(refresh|logout|login)|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|devices\/activate|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/security\/(?:account-deletion(?:\/cancel)?|password)|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
+const server=http.createServer(async(req,res)=>{
+  // A write belongs to the scenario it started in: one whose body arrives after a scenario change is refused, and so
+  // is any request from a page of another scenario (checked below).
+  const startedIn=state.scenarioEpoch;
+  const staleWrite=()=>req.method!=='GET'&&state.scenarioEpoch!==startedIn;
+  const refuseStale=()=>sendJson(res,{code:409,message:'演示场景已切换，此操作未执行，请刷新页面',data:null},409);
+  try {
+    const url=new URL(req.url,'http://127.0.0.1:'+server.address().port);
+    res.setHeader('Cache-Control','no-store');
+    if(req.method==='GET'&&url.pathname.startsWith(previewPurchaseCashier.pathname)){
+      const intentNo=url.pathname.slice(previewPurchaseCashier.pathname.length);
+      if(!/^PPI-PREVIEW-\d+$/.test(intentNo)){res.writeHead(404);return res.end();}
+      res.setHeader('Content-Type',mime['.html']);
+      return res.end(`<!doctype html><html lang="zh"><meta charset="utf-8"><title>模拟银行卡收银台</title><h1>模拟银行卡收银台</h1><p>${intentNo}</p></html>`);
+    }
+    if(checkoutFlow&&url.pathname==='/__checkout/state'){
+      if(req.method==='POST'){
+        let raw='';for await(const chunk of req)raw+=chunk;const update=JSON.parse(raw||'{}');
+        if(update.resetPin){checkoutFlow.pin.state.password=null;checkoutFlow.pin.state.version=0;checkoutFlow.pin.state.attempts=5;checkoutFlow.pin.state.lockedUntil=null;}
+        if(typeof update.dropNextPayment==='boolean')checkoutFlow.pin.state.dropNextPayment=update.dropNextPayment;
+      }
+      return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
+    }
+    if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
+    if(url.pathname==='/__demo/state') {
+      let withdrawalRecoverySeed, longContentUnavailable;
+      if(req.method==='POST') {
+        let body='';for await(const chunk of req)body+=chunk;
+        const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
+        const paymentMode=()=>state.paymentState==='read-error'?state.paymentBeforeReadError:state.paymentState;
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,wasPaymentMode=paymentMode(),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
+        if(update.reset){
+          const accountCreatedAt=state.accountCreatedAt;
+          for(const key of Object.keys(state))delete state[key];
+          Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
+        }
+        state.previewFactsAt??=startedAt;
+        updatePreviewHomeDisplay(state,update,Date.now());
+        // A live trial conversion policy change keeps existing quotes and payment intents.
+        if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
+        // Physical stock can run out while a payment quote is open, independently of E1.
+        if(update.outOfStockProductNo===null)delete state.outOfStockProductNo;
+        else if(typeof update.outOfStockProductNo==='string'&&demoProducts(state).some(product=>
+          product.id===update.outOfStockProductNo&&product.inventoryMode==='FINITE')){
+          state.outOfStockProductNo=update.outOfStockProductNo;
+        }
+        // API-only preview controls for live quota changes and pre-hold compatibility.
+        if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
+        if(typeof update.quotaPaused==='boolean')state.quotaPaused=update.quotaPaused;
+        if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
+        if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
+        if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
+        if(['none','overview','deletion','phone-policy','next-page'].includes(update.securityReadFailure))state.securityReadFailure=update.securityReadFailure;
+        if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        if(update.reset||update.savedAttemptState)authDemo.reset();
+        if(update.savedAttemptState&&state.savedAttemptState!=='none')state.sessionState='signed-out';
+        if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
+        else delete state.paymentBeforeReadError;
+        longContentUnavailable=normalizeDemoLongContent(state);
+        // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
+        // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
+        // account (dataState=empty), the low-balance account or a near-deadline sample (paymentState=low-balance, urgent,
+        // late) is one too. Presentation knobs keep them.
+        // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
+        const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
+        const scenarioChange=state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode())!==accountPayment(wasPaymentMode);
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
+        // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
+        if(update.topupState)delete state.bankTopupDemo;
+        // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
+        // checks, not only numbers on screen.
+        // Saved payout addresses and their OTP belong to the account scenario too.
+        if(scenarioChange&&state.bankDemo){Object.assign(state.bankDemo,{quotes:{},orders:{},commands:{},addresses:{}});delete state.bankDemo.addressOtp;}
+        if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
+        else if(scenarioChange&&state.paymentState==='low-balance')state.walletBalance=820.64;
+        else if((update.reset||scenarioChange)&&state.dataState!=='empty'&&state.paymentState==='reward-clawback-debt')seedDemoRewardClawback(state,Date.now());
+        const recoverySelection = demoOptions.withdrawRecoveryState.find(([value]) => value === update.withdrawRecoveryState);
+        if (recoverySelection || update.reset || scenarioChange) {
+          state.withdrawRecoveryState = recoverySelection?.[0] ?? 'off';
+          withdrawalRecoverySeed = seedWithdrawalRecovery(state, state.withdrawRecoveryState);
+        }
+        if(update.reset||scenarioChange){
+          state.scenarioEpoch=++scenarioEpoch;
+          checkoutFlow?.syncScenario();
+        }
+        if(update.paymentState==='intent-missing')checkoutFlow?.removeUnpaidIntents();
+        if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
+        if(update.riskState)delete state.riskDemo;
+        // Install a different opening streak before the user records a streak or milestone command.
+        const replaceStreak=wasStreak!==state.streakState&&!state.walletLegacySeed
+          &&!state.walletMovements?.some(row=>row.bizType==='DAILY_CHECK_IN'||row.bizType==='DAILY_MILESTONE')
+          &&!state.milestoneClaimReceipts?.some(({result})=>result)&&!state.saverUsed;
+        if(update.reset||scenarioChange||replaceStreak){
+          for(const key of ['saverUsed','saverUsedAt','saverRestoredStreak','walletOpeningStreak','walletOpeningMilestoneAt',
+            'streakSaverBalance','powerUps'])delete state[key];
+          state.streakSeedAt=Date.now();
+          state.checkedIn=false;
+          state.milestoneClaims=[];
+          initializeDemoWalletHistory(state,state.previewFactsAt??startedAt);
+        }
+        if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}
+        if(update.ambassadorState)delete state.ambassadorDemo;
+        if(update.eventState)delete state.raffleEntries;
+        if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
+        const now=Date.now();
+        if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
+          state.catalogAvailableAt=now;
+        if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
+        if(update.eventState||scenarioChange)setDemoH4Scene(state,now);
+        const rewardSelection=demoOptions.promotionRewardState.find(([value])=>value===update.promotionRewardState);
+        if(rewardSelection||update.reset||scenarioChange){
+          if(!setDemoPromotionReward(url,locale,state,now,rewardSelection?.[0]??state.promotionRewardState))
+            return sendJson(res,{state,options:demoOptions,simulation:true,message:'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE'},409);
+        }
+        if((update.eventState||scenarioChange)&&state.eventState==='claimed'&&state.dataState!=='empty'){
+          const {slotCap,slotsUsed}=demoFleetFacts(url,locale,state);
+          seedDemoH4Gift(state,now,slotCap-slotsUsed,demoProducts(state,url.origin));
+        }
+        if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
+        if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
+        if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
+        if ('bankState' in update) updateDemoBankWithdrawals(state, Date.now());
+        if (update.reset || scenarioChange) seedLongBankOrder(state, now);
+        realtime.stateChanged(update);
+        if('supportReadbackState' in update)setTransferSampleOutcome(state);
+        if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
+          const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
+          if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
+        }
+      }
+      return sendJson(res,{state,options:demoOptions,simulation:true,withdrawalRecoverySeed,
+        ...(demoLongContentAvailable(state)?{}:{longContentAvailable:false}),
+        ...(longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})});
+    }
+    if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
+    if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}
+    const trustFile=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(incorporation|msb|ein)\/file$/);
+    if(trustFile&&process.env.DEMO_TRUST_DOCUMENTS_DIR){
+      const entry=fixtureFor(new URL('/api/content/trust/documents',url.origin),{method:()=>'GET',postDataJSON:()=>({}),headers:()=>req.headers}).documents.find(item=>item.slot===trustFile[1]);
+      res.setHeader('Content-Type','application/pdf');return res.end(await readFile(path.join(process.env.DEMO_TRUST_DOCUMENTS_DIR,entry.fileName)));
+    }
+    const trustPage=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(whitepaper|incorporation|msb|ein)\/pages\/([1-9][0-9]?)$/);
+    if(trustPage&&process.env.DEMO_TRUST_DOCUMENTS_DIR){res.setHeader('Content-Type','image/jpeg');return res.end(await readFile(path.join(process.env.DEMO_TRUST_DOCUMENTS_DIR,'pages',trustPage[1],`${trustPage[2]}.jpg`)));}
+    if(url.pathname==='/api/app/support/advisor/avatar/1'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(import.meta.dirname,'fixtures/demo-advisor-photo.webp')));}
+    if(url.pathname==='/api/app/support/attachments/demo-image/content'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(root,'static/img/home-glass-20260928/s1.webp')));}
+    if(/^\/(api|auth)\//.test(url.pathname)) {
+      const page=req.headers['x-preview-scenario'];
+      if(page&&page!==scenarioId())return refuseStale();
+      if(checkoutFlow?.handles(url.pathname)){
+        let raw='';for await(const chunk of req)raw+=chunk;
+        if(staleWrite())return refuseStale();
+        const response=checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
+        if(response.drop){res.destroy();return;}
+        const data=response.status===200?demoPromotionResponse(url,req.method,response.data,state):response.data;
+        return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data},response.status);
+      }
+      if(req.method==='POST'&&authDemo.handles(url.pathname)){
+        let raw='';for await(const chunk of req)raw+=chunk;
+        if(staleWrite())return refuseStale();
+        const response=authDemo.handle(url.pathname,req.headers,raw?JSON.parse(raw):{});
+        return sendJson(res,response.body,response.status);
+      }
+      const withdrawalRequest = handlesWithdrawalRequest(url.pathname, req.method);
+      const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
+      const modeledBankTopup=req.method==='POST'&&/^\/api\/app\/deposits\/vietqr\/intents(?:\/[^/]+\/cancel)?$/.test(url.pathname);
+      const bankTopupEndpoint=/^\/api\/app\/(payments\/(config|fx-quote)|deposits\/vietqr\/(receipts|intents(?:\/[^/]+(?:\/cancel)?)?))$/.test(url.pathname);
+      if(bankTopupEndpoint&&!(req.method==='GET'&&!url.pathname.endsWith('/cancel'))&&!modeledBankTopup)return sendJson(res,{code:405,message:'METHOD_NOT_ALLOWED',data:null});
+      const realtimeTicket=req.method==='POST'&&url.pathname==='/api/app/support/realtime-ticket';
+      const trialWrite=req.method==='POST'&&/^\/api\/trial\/(start|cancel|convert)$/.test(url.pathname);
+      // AppStakingService.open refuses an unacknowledged risk disclosure before recording the command.
+      if(req.method==='POST'&&url.pathname==='/api/stakes'&&state.stakingOpenState==='disclosure')return sendJson(res,{code:409,message:'RISK_DISCLOSURE_ACK_REQUIRED',data:null});
+      const conversationDelete=req.method==='DELETE'&&/^\/api\/app\/support\/conversations\/DEMO-SUPPORT-\d+$/.test(url.pathname);
+      if(req.method!=='GET'&&!realtimeTicket&&!trialWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
+      if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='error')
+        return sendJson(res,{code:503,message:'TRIAL_STATE_UNAVAILABLE',data:null},503);
+      if(req.method==='GET'&&url.pathname==='/api/notifications'&&url.searchParams.has('cursor')&&state.notificationPageState==='error')
+        return sendJson(res,{code:503,message:'NOTIFICATION_PAGE_UNAVAILABLE',data:null},503);
+      const businessRead=req.method==='GET'&&(recoveryReads.has(url.pathname)||/^\/api\/(config\/(platform|v-rank|exchange|repurchase|staking|commission)|store\/(catalog|purchase-eligibility)|team\/(rank|binary)|app\/(team|payments|deposits|home\/overview|proof|network|security|support|developer)|content\/(learning|trust|how-it-works|i18n)|quests\/state|events|points\/state|devices\/earnings|exchange|repurchase|withdrawals|payout-addresses|deposits|notifications|goals|promotions|promotion-rewards|tasks|payment-methods|developer|public\/referrals|legal\/(privacy|risk)|staking|stakes)/.test(url.pathname));
+      if(bankTopupEndpoint&&state.dataState==='error')return sendJson(res,{code:503,message:url.pathname.endsWith('/config')?'PAYMENT_CONFIG_UNAVAILABLE':url.pathname.endsWith('/fx-quote')?'FX_QUOTE_UNAVAILABLE':'VIETQR_RUNTIME_PROFILE_INVALID',data:null},503);
+      const walletBillsRead=req.method==='GET'&&url.pathname==='/api/app/wallet/bills';
+      if((businessRead||walletBillsRead)&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
+      if(businessRead&&state.dataState==='loading')await new Promise(resolve=>setTimeout(resolve,5000));
+      // A material read that answers late with the facts it saw when it arrived (simulates a GET overtaken by a POST).
+      if(req.method==='GET'&&state.ambassadorIoState==='late-read-once'&&/^\/api\/app\/team\/ambassador-applications\/\d+\/materials$/.test(url.pathname)){
+        state.ambassadorIoState='normal';
+        const data=fixtureFor(url,{method:()=>'GET',postDataJSON:()=>({}),headers:()=>req.headers});
+        await new Promise(resolve=>setTimeout(resolve,4000));
+        return sendJson(res,{code:0,message:'OK',data});
+      }
+      // Material uploads (multipart) and private material files carry raw bytes.
+      const ambassadorBinary=ambassadorBinaryRoute(url.pathname,req.method);
+      if(ambassadorBinary){
+        const chunks=[];for await(const chunk of req)chunks.push(chunk);
+        if(staleWrite())return refuseStale();
+        const result=await ambassadorBinaryResponse(url,state,{method:req.method,headers:req.headers,body:Buffer.concat(chunks)},locale);
+        if(result.file){res.writeHead(200,{'Content-Type':result.file.contentType,'Content-Disposition':"inline; filename*=UTF-8''"+encodeURIComponent(result.file.name),'X-Content-Type-Options':'nosniff','X-Preview-Scenario':scenarioId()});return res.end(result.file.bytes);}
+        return sendJson(res,{code:0,message:'OK',data:result.data});
+      }
+      let body='';for await(const chunk of req)body+=chunk;
+      if(staleWrite())return refuseStale();
+      if (withdrawalRequest) {
+        const response = withdrawalRecoveryResponse(state, url.pathname, req.method, req.headers, JSON.parse(body || '{}'));
+        return sendJson(res, response.body, response.status);
+      }
+      if(conversationDelete) {
+        const data=fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers});
+        return sendJson(res,{code:0,message:'OK',data});
+      }
+      if(messages.matches(url,req.method)) {
+        const result=await messages.request(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers});
+        return sendJson(res,result.body,result.status);
+      }
+      if(bankTopupEndpoint)return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
+      if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
+      for(const route of [...routes].reverse()) {
+        if(route.matcher!=='**/*'&&!route.matcher(url))continue;
+        await route.handler({request:()=>({url:()=>url.href,method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>JSON.parse(body||'{}')}),fulfill:async response=>{res.writeHead(response.status||200,{'Content-Type':response.contentType||mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(response.body);},continue:async()=>{}});
+        if(res.writableEnded)return;
+      }
+      return sendJson(res,{code:404,message:'暂无演示内容',data:null},404);
+    }
+    let file=path.resolve(root,'.'+decodeURIComponent(url.pathname));
+    if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);return res.end();}
+    if(url.pathname==='/'||(await stat(file).catch(()=>null))?.isDirectory())file=path.join(file,'index.html');
+    const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
+    const savedAttempt=path.extname(file)==='.html'?authDemo.savedAttempt():null;
+    const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
+    const clearAuth=state.sessionState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'';
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed()+seed+attemptSeed+clearAuth):bytes);
+  }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
+});
+realtime.attach(server);
+server.listen(port,'127.0.0.1',()=>console.log('UVEL simulation: http://127.0.0.1:'+server.address().port+'/preview'));

@@ -4,6 +4,7 @@
       "path": "pages/index/index",
       "style": { "navigationStyle": "custom" }
     },
+    { "path": "pages/tabs/tabs", "style": { "navigationStyle": "custom" } },
     {
       "path": "pages/entry-surfaces/index",
       "style": { "navigationStyle": "custom" }
@@ -97,10 +98,6 @@
       "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/me/wallet",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
       "path": "pages/me/wallet-topup",
       "style": { "navigationStyle": "custom" }
     },
@@ -114,6 +111,10 @@
     },
     {
       "path": "pages/me/wallet-withdraw-method",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-withdraw-network",
       "style": { "navigationStyle": "custom" }
     },
     {
@@ -134,6 +135,10 @@
     },
     {
       "path": "pages/me/security",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/payment-password",
       "style": { "navigationStyle": "custom" }
     },
     {
@@ -198,6 +203,14 @@
     },
     {
       "path": "pages/team/agent",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/agent-applications",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/agent-application",
       "style": { "navigationStyle": "custom" }
     },
     {
@@ -283,6 +296,9 @@
     {
       "path": "pages/events/promotion-rewards", "style":{"navigationStyle":"custom"}},
     {"path":"pages/events/promotion-reward-detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/events/detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/events/promotion-detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/events/genesis-raffle","style":{"navigationStyle":"custom"}},
     {"path": "pages/events/events",
       "style": { "navigationStyle": "custom" }
     },
@@ -311,10 +327,6 @@
       "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/me/support-tickets",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
       "path": "pages/support/messages",
       "style": { "navigationStyle": "custom" }
     },
@@ -334,6 +346,12 @@
       "path": "pages/me/preferences",
       "style": { "navigationStyle": "custom" }
     },
+    // #ifdef APP-PLUS
+    {
+      "path": "pages/me/app-update",
+      "style": { "navigationStyle": "custom", "app-plus": { "popGesture": "none" } }
+    },
+    // #endif
     {
       "path": "pages/me/risk-disclosure",
       "style": { "navigationStyle": "custom" }
@@ -348,14 +366,6 @@
     },
     {
       "path": "pages/me/trial",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/me/wallet-repurchase",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/me/wallet-repurchase-how",
       "style": { "navigationStyle": "custom" }
     },
     {
@@ -375,6 +385,14 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/trust/whitepaper",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/trust/document",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/ref/code",
       "style": { "navigationStyle": "custom" }
     },
@@ -387,7 +405,8 @@
     "navigationStyle": "custom",
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "UVEL",
-    "backgroundColor": "#000000",
-    "backgroundColorContent": "#000000"
+    "backgroundColor": "#0A0A0A",
+    "backgroundColorContent": "#0A0A0A",
+    "app-plus": { "bounce": "none" }
   }
 }

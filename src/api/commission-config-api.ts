@@ -45,6 +45,8 @@ export interface CanonicalBinaryState {
   trackB: number;
   trackAMembers: number;
   trackBMembers: number;
+  trackATotalMembers?: number;
+  trackBTotalMembers?: number;
   autoPlacedMembers: number;
   matchRate: number;
   threshold: number;
@@ -206,7 +208,7 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
       || !["monthlyClear", "perPairClear", "carryForward"].includes(residualPolicy)) return invalid();
   const trackA = number(source.trackA);
   const trackB = number(source.trackB);
-  const matchRate = number(source.matchRate, 0.0000001, 1);
+  const matchRate = number(source.matchRate, Number.MIN_VALUE, 1);
   const threshold = number(source.threshold, 0.0000001);
   const dailyCap = number(source.dailyCap, 0.0000001);
   const periodCap = number(source.periodCap, dailyCap);
@@ -224,6 +226,11 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
       unlockAt,
     };
   });
+  const [trackATotalMembers, trackBTotalMembers] = [source.trackATotalMembers, source.trackBTotalMembers].map((total) => {
+    if (total === undefined) return undefined;
+    if (typeof total === "string" && !/^\d+$/.test(total.trim())) return invalid();
+    return integer(total);
+  });
   return {
     source: text(source.source),
     serverCanonical: true,
@@ -234,6 +241,8 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
     trackB,
     trackAMembers: integer(source.trackAMembers),
     trackBMembers: integer(source.trackBMembers),
+    trackATotalMembers,
+    trackBTotalMembers,
     autoPlacedMembers: integer(source.autoPlacedMembers),
     matchRate,
     threshold,

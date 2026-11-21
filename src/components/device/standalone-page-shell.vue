@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
   topInset: 0,
   reserveBottom: true,
 });
-const BOTTOM_SAFE_PADDING = "calc(env(safe-area-inset-bottom, 0px) + 38px)";
+const BOTTOM_SAFE_PADDING = "var(--nx-overlay-safe-bottom)";
 
 const statusBarHeight = computed(() => {
   try {
@@ -55,5 +55,8 @@ const shellStyle = computed<CSSProperties>(() => ({
 .nx-standalone-page :deep(.nx-statusbar) {
   position: fixed;
   z-index: 10050;
+}
+.nx-standalone-page :deep(.nx-statusbar-material) {
+  position: fixed;
 }
 </style>

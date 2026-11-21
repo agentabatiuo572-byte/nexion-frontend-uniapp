@@ -17,13 +17,14 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 
-type Accent = "lemon" | "purple" | "amber" | "violet" | "nex";
+type Accent = "lemon" | "purple" | "amber" | "violet" | "nex" | "neutral";
 
 const props = withDefaults(defineProps<{ n: number; title: string; body: string; accent?: Accent }>(), {
   accent: "lemon",
 });
 
 const ACCENT_TEXT: Record<Accent, string> = {
+  neutral: "var(--v5-ink-2)",
   nex: "var(--v5-nex)",
   lemon: "var(--v5-success)",
   purple: "var(--v5-brand)",
@@ -31,6 +32,7 @@ const ACCENT_TEXT: Record<Accent, string> = {
   violet: "var(--v5-brand-2)",
 };
 const ACCENT_SOFT: Record<Accent, string> = {
+  neutral: "var(--v5-surface-2)",
   nex: "var(--v5-nex-soft)",
   lemon: "var(--v5-success-soft)",
   purple: "var(--v5-brand-soft)",
@@ -68,9 +70,9 @@ const titleStyle: CSSProperties = {
 const bodyStyle: CSSProperties = {
   marginTop: "6px",
   marginLeft: "40px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-long-form)",
   color: "var(--v5-ink-2)",
-  lineHeight: 1.62,
+  lineHeight: "var(--ui-type-long-form-lh)",
 };
 </script>
 

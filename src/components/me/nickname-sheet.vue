@@ -9,7 +9,7 @@
 <template>
   <view v-if="open" class="nx-nickname-sheet-root" role="dialog" aria-modal="true" :aria-label="t.profile.nicknameSheetTitle">
     <view class="nx-sheet-fade-in" :style="scrimStyle" @click="emit('close')">
-      <view class="nx-glass-sheet nx-sheet-fade-in" :style="panelStyle" @click.stop>
+      <view class="nx-glass-sheet nx-dialog-pop-in" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="gap: 12px">
           <text class="block" :style="titleStyle">{{ t.profile.nicknameSheetTitle }}</text>
@@ -120,11 +120,16 @@ const scrimStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  padding: "24px",
+  boxSizing: "border-box",
+  padding: "max(24px, var(--nx-overlay-top)) 24px var(--nx-overlay-bottom)",
 };
 const panelStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   width: "100%",
   maxWidth: "320px",
+  boxSizing: "border-box",
+  maxHeight: "calc(100vh - max(24px, var(--nx-overlay-top)) - var(--nx-overlay-bottom))",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
   zIndex: 800,
   borderRadius: "var(--nx-glass-radius)",
   background: "var(--nx-glass-fill)",
@@ -133,15 +138,18 @@ const panelStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
 };
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-hero-title)",
+  fontWeight: "var(--ui-type-hero-title-weight)",
   color: "var(--v5-ink)",
 };
 const closeBtnStyle: CSSProperties = {
-  width: "32px",
-  height: "32px",
+  width: "44px",
+  height: "44px",
+  boxSizing: "border-box",
+  padding: "6px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
+  backgroundClip: "content-box",
 };
 const hintStyle: CSSProperties = {
   marginTop: "4px",
@@ -165,7 +173,7 @@ function candidateTextStyle(c: string): CSSProperties {
   const on = picked.value === c;
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: on ? 600 : 500,
     color: on ? "var(--v5-ink)" : "var(--v5-ink-2)",
   };
@@ -178,7 +186,7 @@ const rerollBtnStyle: CSSProperties = {
 };
 const rerollTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "var(--v5-ink-2)",
 };

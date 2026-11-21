@@ -16,21 +16,6 @@ export interface EarnTaskClass {
   dailyPotential: number;
 }
 
-export interface EarnTeaser {
-  deviceClass: "cloud-share" | "phone" | "S1" | "Pro" | "Rack";
-  vram: number;
-  lockedTasks: string[];
-  dailyPotential: number;
-}
-
-export interface EarnTaskPricing {
-  taskClasses: EarnTaskClass[];
-  queueSaturation: number;
-  teaser: EarnTeaser[];
-  effectiveAt: string;
-  sources: string[];
-}
-
 export interface EarnPhoneTier {
   tier: number;
   name: string;
@@ -55,13 +40,11 @@ export interface EarnTaskRoute {
 }
 
 export interface EarnConfigApi {
-  taskPricing(): Promise<EarnTaskPricing>;
   phoneTiers(): Promise<EarnPhoneTiers>;
   route(deviceVramGb: number): Promise<EarnTaskRoute>;
 }
 
 const TASK_CLASSES = new Set<TaskClass>(["IG", "VG", "LL", "FT", "EM", "SP"]);
-const DEVICE_CLASSES = new Set<EarnTeaser["deviceClass"]>(["cloud-share", "phone", "S1", "Pro", "Rack"]);
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? value as Record<string, unknown> : null;
@@ -103,40 +86,6 @@ function parseTaskClass(value: unknown, errorMessage: string): EarnTaskClass {
   }
   return { taskId, taskClass: taskClass as TaskClass, taskName, models, minReward, maxReward,
     minVRAM, enabled: row.enabled, avgSec, dailyPotential };
-}
-
-export function parseEarnTaskPricing(value: unknown): EarnTaskPricing {
-  const source = record(value);
-  if (!source) {
-    throw new ApiError({ kind: "protocol", message: "E2_TASK_PRICING_RESPONSE_INVALID" });
-  }
-  const rawClasses = Array.isArray(source.taskClasses) ? source.taskClasses : null;
-  const rawTeaser = Array.isArray(source.teaser) ? source.teaser : null;
-  const queueSaturation = number(source.queueSaturation);
-  const effectiveAt = text(source.effectiveAt);
-  const sources = stringArray(source.sources);
-  if (!rawClasses || !rawTeaser || queueSaturation === null || queueSaturation > 1 || !effectiveAt || !sources) {
-    throw new ApiError({ kind: "protocol", message: "E2_TASK_PRICING_RESPONSE_INVALID" });
-  }
-  const taskClasses = rawClasses.map((raw) => parseTaskClass(raw, "E2_TASK_PRICING_RESPONSE_INVALID"));
-  if (taskClasses.length !== 6 || new Set(taskClasses.map((row) => row.taskClass)).size !== 6) {
-    throw new ApiError({ kind: "protocol", message: "E2_TASK_PRICING_RESPONSE_INVALID" });
-  }
-  const teaser = rawTeaser.map((raw): EarnTeaser => {
-    const row = record(raw);
-    const deviceClass = text(row?.deviceClass);
-    const vram = number(row?.vram);
-    const lockedTasks = stringArray(row?.lockedTasks);
-    const dailyPotential = number(row?.dailyPotential);
-    if (
-      !row || !deviceClass || !DEVICE_CLASSES.has(deviceClass as EarnTeaser["deviceClass"])
-      || vram === null || !Number.isInteger(vram) || !lockedTasks || dailyPotential === null
-    ) {
-      throw new ApiError({ kind: "protocol", message: "E2_TASK_PRICING_RESPONSE_INVALID" });
-    }
-    return { deviceClass: deviceClass as EarnTeaser["deviceClass"], vram, lockedTasks, dailyPotential };
-  });
-  return { taskClasses, queueSaturation, teaser, effectiveAt, sources };
 }
 
 export function parseEarnPhoneTiers(value: unknown): EarnPhoneTiers {
@@ -209,11 +158,6 @@ export function parseEarnTaskRoute(value: unknown): EarnTaskRoute {
 
 export function createEarnConfigApi(client: ApiClient): EarnConfigApi {
   return {
-    taskPricing: async () => parseEarnTaskPricing(await client.request({
-      method: "GET",
-      path: "/api/config/task-pricing",
-      authenticated: false,
-    })),
     phoneTiers: async () => parseEarnPhoneTiers(await client.request({
       method: "GET",
       path: "/api/config/phone-tiers",

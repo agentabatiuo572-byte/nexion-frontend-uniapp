@@ -5,7 +5,7 @@
   Wrapped in <AppChassis active="store">. Top→bottom:
     in-page header (back + product name) → Hero (ProductRender + ribbon +
     LiveSocialProof + name/tagline/mult + trust chips) → Vs-phone strip →
-    ROI (qty stepper + 4-cell grid) → Hardware spec → AI perf spec →
+    ROI (qty stepper + 4-cell grid) → Hardware spec →
     Trust badges → FAQ accordion → sticky bottom Buy CTA.
 
   Phase-gated products (unlocksAtPhase not yet reached) render the shared
@@ -14,7 +14,7 @@
   disclosures; unavailable material is shown as unavailable.
 -->
 <template>
-  <AppChassis active="store">
+  <AppChassis active="store" class="product-detail-page">
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
@@ -24,27 +24,27 @@
 
       <view v-if="publicOnly" class="promotion promotion-main" data-testid="promotion-public-detail">
         <text class="promotion-title">{{ activity?localized(activity.title,locale.code):promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
-        <text v-if="promotionStatus==='loading'||promotionStatus==='idle'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-        <view v-else-if="promotionStatus==='error'" role="alert"><text class="promotion-copy">{{ t.promotion.errorNote }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
-        <text v-else-if="activity&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
+        <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
+        <text v-else-if="promotionStatus === 'error'" class="promotion-copy">—</text>
+        <text v-else-if="activity&&promotionStatus==='ready'&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
         <PromotionProduct v-if="activity" :activity="activity" :product-no="id" expanded public-only />
-        <view v-if="activity" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionDetailHref(id,activityId)))"><text>{{ t.promotion.signIn }}</text></view>
+        <view v-if="activity||voucherContext.voucherId" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionDetailHref(id,activityId,voucherContext)))"><text>{{ t.promotion.signIn }}</text></view>
         <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text></view>
       </view>
-      <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: 40px 16px">
-        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.catalogLoadingTitle }}</text>
+      <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-10) var(--v5-space-4)">
+        <text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
 
-      <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: 40px 16px">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogErrorTitle }}</text>
+      <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: var(--v5-space-10) var(--v5-space-4)">
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogErrorTitle }}</text>
         <view data-testid="detail-catalog-retry" class="inline-flex items-center justify-center active:opacity-90" :style="catalogRetryStyle" role="button" tabindex="0" :aria-disabled="catalogRetrying" @click.stop="retryCatalog">
           <text>{{ catalogRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
         </view>
       </view>
 
       <!-- Product not found — plain floor text (matches checkout / order-detail). -->
-      <view v-else-if="!product" class="text-center" style="padding: 40px 16px">
-        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coProductNotFound }}</text>
+      <view v-else-if="!product" class="text-center" style="padding: var(--v5-space-10) var(--v5-space-4)">
+        <text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ t.store.coProductNotFound }}</text>
       </view>
 
       <!-- Phase-gated → coming-soon lock card -->
@@ -56,49 +56,21 @@
       <!-- The server has not certified the managed-service specification. Keep
            the detail readable, but never expose a purchase CTA for it. -->
       <template v-else-if="purchaseUnavailable">
-        <view class="mx-4 rounded-2xl border" style="padding: 24px; border-color: var(--v5-border); background: var(--v5-surface)">
-          <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ nexGridBrandText(product.name) }}</text>
-          <text class="block" style="margin-top: 8px; font-size: 13px; line-height: 1.6; color: var(--v5-ink-3)">{{ t.store.specUnavailable }}</text>
+        <view class="mx-4 rounded-2xl border" style="padding: var(--v5-space-6); border-color: var(--v5-border); background: var(--v5-surface)">
+          <text class="block" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ (product.name) }}</text>
+          <text class="block" style="margin-top: var(--v5-space-2); font-size: var(--ui-type-list-subtitle); line-height: 1.6; color: var(--v5-ink-3)">{{ t.store.specUnavailable }}</text>
         </view>
         <view aria-hidden style="height: 32px" />
       </template>
 
       <!-- Full detail -->
       <template v-else>
-        <!-- Remote purchase qualification is server-owned. Keep the detail
-             readable, but never imply that a loading/error response is a buy
-             decision. Error state has an explicit retry and remains blocked. -->
-        <view v-if="remoteApiEnabled && eligibility.status !== 'ready'" data-testid="detail-purchase-eligibility" class="mx-4 mb-3 rounded-2xl" :style="purchaseEligibilityCardStyle">
-          <text class="block" :style="purchaseEligibilityTitleStyle">{{ eligibility.status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
-          <text class="block" style="margin-top: 5px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityFailClosed }}</text>
-          <view v-if="eligibility.status === 'error'" class="inline-flex items-center justify-center active:opacity-90" :style="catalogRetryStyle" role="button" tabindex="0" @click.stop="retryEligibility">
-            <text>{{ t.store.purchaseEligibilityRetry }}</text>
-          </view>
-        </view>
-        <view v-else-if="remoteApiEnabled && !eligibility.eligible" data-testid="detail-purchase-ineligible" class="mx-4 mb-3 rounded-2xl" :style="purchaseEligibilityCardStyle">
-          <text class="block" :style="purchaseEligibilityTitleStyle">{{ eligibilityDenyTitle }}</text>
-          <text class="block" style="margin-top: 5px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityDenyBody }}</text>
-          <view v-if="purchaseEligibilityMessage === 'error'" class="inline-flex items-center justify-center active:opacity-90" :style="catalogRetryStyle" role="button" tabindex="0" @click.stop="retryEligibility">
-            <text>{{ t.store.purchaseEligibilityRetry }}</text>
-          </view>
-        </view>
-        <view v-if="remoteApiEnabled && eligibility.status === 'ready' && eligibility.snapshot" data-testid="detail-purchase-policy-facts" class="mx-4 mb-3 rounded-2xl" :style="purchaseEligibilityCardStyle">
-          <view v-for="(policy, policyIndex) in eligibility.snapshot.policies" :key="`${policy.policy}-${policyIndex}`" style="padding: 4px 0">
-            <text class="block" :style="purchaseEligibilityTitleStyle">{{ eligibilityPolicyTitle(policy) }}</text>
-            <text v-if="eligibilityQualificationConditions(policy).length > 1" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityPolicyMode(policy) }}</text>
-            <text v-for="condition in eligibilityQualificationConditions(policy)" :key="condition.kind" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(condition) }}</text>
-            <text v-if="eligibilityMonthlyStockCondition(policy)" class="block font-mono-tabular" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ eligibilityConditionText(eligibilityMonthlyStockCondition(policy)!) }}</text>
-            <text v-if="eligibilityPolicyHasFacts(policy)" class="block" style="margin-top: 3px; font-size: 12px" :style="eligibilityPolicyResultStyle(policy)">{{ policy.eligible ? t.store.purchaseEligibilityPolicyMet : t.store.purchaseEligibilityPolicyUnmet }}</text>
-            <text v-else-if="eligibilityPolicyHasNoRestriction(policy)" class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoExtraRestriction }}</text>
-            <text v-else class="block" style="margin-top: 3px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.purchaseEligibilityNoFacts }}</text>
-          </view>
-        </view>
         <!-- === Section 1: Hero === -->
-        <view class="mx-4 nx-glass-card overflow-hidden relative">
-          <view aria-hidden :style="auroraStyle" />
+        <!-- Tinted brand: the hero's colour used to come from a three-layer aurora wash. -->
+        <view class="mx-4 nx-glass-card nx-tint overflow-hidden relative detail-hero" style="--nx-tint: var(--v5-brand)">
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
-            <ProductRender :product-id="product.id" :tier="product.tier" :image-url="activityId ? activity?.productImages?.[product.id] : product.imageUrl" :video-url="product.videoUrl" />
+            <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <!-- Folded-corner ribbon -->
             <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
               <text>{{ copy.badge }}</text>
@@ -107,54 +79,67 @@
             <LiveSocialProof :product="product" />
           </view>
 
-          <view class="relative" style="padding: 20px">
-            <!-- name + tagline + mult-badge -->
-            <view class="flex items-start justify-between" style="gap: 12px">
-              <view class="min-w-0">
-                <text class="block truncate" :style="nameStyle">{{ nexGridBrandText(product.name) }}</text>
-                <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ copy.tagline }}</text>
-              </view>
-              <text v-if="!isShare && speedup > 0" class="shrink-0 tabular-nums" :style="multBadgeStyle">{{ speedup }}×</text>
-            </view>
+          <view class="detail-summary relative">
+            <text class="detail-summary__name" :style="nameStyle">{{ product.name }}</text>
+            <text class="detail-summary__tagline">{{ copy.tagline }}</text>
 
-            <!-- trust chips -->
-            <view class="flex flex-wrap" style="margin-top: 14px; gap: 8px">
-              <text class="font-mono-tabular" :style="codeChip('success')">✓ {{ soldText }} {{ t.store.liveProof.cumulativeSalesLabel }}</text>
-              <text v-if="stockUnavailable" class="font-mono-tabular" :style="codeChip('amber')">{{ t.store.temporarilyOutOfStock }}</text>
-              <text v-if="stockLow" class="font-mono-tabular" :style="codeChip('amber')">🔥 {{ product.stock }} {{ t.store.onlyXLeft }}</text>
+            <view class="detail-sales-proof">
+              <view class="detail-sales-stat detail-sales-stat--sold">
+                <view class="detail-sales-stat__value-row">
+                  <text class="detail-sales-stat__value font-mono-tabular">{{ soldText }}</text>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+                </view>
+                <text class="detail-sales-stat__label">{{ t.store.liveProof.cumulativeSalesLabel }}</text>
+              </view>
+              <view v-if="stockUnavailable || (!isShare && product.stock != null && product.stock > 0)" class="detail-sales-stat detail-sales-stat--stock">
+                <text v-if="stockUnavailable" class="detail-sales-stat__status">{{ t.store.temporarilyOutOfStock }}</text>
+                <template v-else>
+                  <text class="detail-sales-stat__value font-mono-tabular">{{ product.stock }}</text>
+                  <text class="detail-sales-stat__label">{{ t.store.weeklyStockLabel }}</text>
+                </template>
+              </view>
+            </view>
+            <view v-if="computePointsLine" class="detail-compute-points">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.6" /><circle cx="5" cy="19" r="2.6" /><circle cx="19" cy="19" r="2.6" /><path d="M12 7.6v4.4M12 12l-5.2 5M12 12l5.2 5" /></svg>
+              <text>{{ computePointsLine.before }}<text class="detail-compute-points__value">{{ computePointsLine.value }}</text>{{ computePointsLine.after }}</text>
             </view>
           </view>
         </view>
 
+        <view v-if="voucherContext.voucherId" class="mx-4 mt-3 promotion promotion-flat"><text class="promotion-title">{{ t.promotion.eventVoucher }}</text><text class="promotion-copy">{{ t.promotion.eventVoucherTerms }}</text></view>
         <view v-if="activityId" class="mx-4 mt-3 promotion promotion-flat" data-testid="detail-promotion">
           <text class="promotion-title">{{ activity?t.promotion.gift:promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
-          <text v-if="promotionStatus==='loading'||promotionStatus==='idle'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-          <view v-else-if="promotionStatus==='error'" role="alert"><text class="promotion-copy">{{ t.promotion.errorNote }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
-          <text v-else-if="activity&&(!promotionAvailable||!activity.productNos.includes(product.id))" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
+          <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
+          <text v-else-if="promotionStatus === 'error'" class="promotion-copy">—</text>
+          <text v-else-if="activity&&promotionStatus==='ready'&&(!promotionAvailable||!activity.productNos.includes(product.id))" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
           <PromotionProduct v-if="activity" :activity="activity" :product-no="product.id" expanded />
-          <view v-if="activity" class="promotion-summary" style="align-items:center;margin-top:16px">
-            <text>{{ t.promotion.quantity }}</text>
-            <view class="promotion-quantity-stepper">
-              <view role="button" :tabindex="qty<=1?-1:0" :aria-disabled="qty<=1" :aria-label="t.uiChrome.decreaseQty" @click="dec">−</view>
-              <text aria-live="polite">{{ qty }}</text>
-              <view role="button" :aria-label="t.uiChrome.increaseQty" :tabindex="qty>=100?-1:0" :aria-disabled="qty>=100" @click="inc">+</view>
-            </view>
-          </view>
-          <view v-if="activity" class="promotion-link" role="button" tabindex="0" @click="navTo(promotionBundleHref(activityId,[{productNo:product.id,quantity:qty}]))"><text>{{ t.promotion.bundle }}</text></view>
+          <view v-if="bundleActivityVisible" :aria-disabled="!canBundleActivity" class="promotion-link" role="button" tabindex="0" @click="canBundleActivity && navTo(promotionBundleHref(activityId,[{productNo:product.id,quantity:qty}]))"><text>{{ t.promotion.bundle }}</text></view>
           <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionDetailHref(id))"><text>{{ t.promotion.ordinary }}</text></view>
         </view>
 
-        <!-- === Cloud Share E1 annual reference and NEX allocation === -->
-        <view v-if="isShare" class="mx-4 mt-3 nx-glass-card" style="padding: 16px 18px">
-          <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-warning)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-            <text>{{ t.store.shareReferenceAnnual }}</text>
+        <!-- Cloud Share daily estimates follow the selected quantity. -->
+        <view v-if="isShare" class="mx-4 mt-3 nx-glass-card share-returns">
+          <text class="share-returns__title">{{ t.bundle.estimatedDaily }}</text>
+          <text class="share-returns__description">{{ t.store.shareFlexibleDescription }}</text>
+          <view class="share-returns__metrics">
+            <view class="share-returns__row">
+              <text class="share-returns__currency">USDT</text>
+              <view v-if="shareDailyUsdt" class="share-returns__value font-mono-tabular">
+                <text>{{ shareDailyUsdt.min }}</text>
+                <text v-if="shareDailyUsdt.min !== shareDailyUsdt.max">– {{ shareDailyUsdt.max }}</text>
+              </view>
+              <text v-else class="share-returns__unavailable">—</text>
+            </view>
+            <view class="share-returns__row">
+              <text class="share-returns__currency">UVT</text>
+              <text class="share-returns__value font-mono-tabular">{{ shareDailyUvtText }}</text>
+            </view>
+            <view v-if="shareDailyEstimate && product.monthlyEstimateUsdt != null" class="share-returns__row">
+              <text class="share-returns__currency">{{ t.store.detMonthly }}</text>
+              <text class="share-returns__value font-mono-tabular">{{ monthlyYieldText }} USDT</text>
+            </view>
           </view>
-          <view class="flex items-baseline flex-wrap" style="margin-top: 6px; gap: 8px">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 34px; color: var(--v5-warning); letter-spacing: -0.022em; line-height: 1">{{ shareYieldText }}</text>
-            <text class="font-mono-tabular tabular-nums" style="margin-left: auto; font-size: 13px; color: var(--v5-warning); font-weight: 500">{{ fmt(t.store.cardNexPerDay, { n: product.dailyEarnNEX }) }}{{ t.store.cardPerDaySuffix }}</text>
-          </view>
-          <text class="block" style="margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--v5-ink-4)">{{ t.store.shareYieldDisclaimer }}</text>
+          <text class="share-returns__note">{{ t.store.shareDailyEstimateNote }}</text>
         </view>
 
         <!-- === Section 2: Vs phone strip === -->
@@ -162,39 +147,24 @@
           <view class="flex items-center min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <text class="truncate">{{ t.store.detYourPhone }}</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-warning)">{{ phoneDailyEarnText }}</text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">{{ phoneDailyEarnText }}</text>
           </view>
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-4)">↔</text>
-          <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-warning)">
+          <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-brand)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}/d</text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
-          <text v-if="speedup > 0" class="shrink-0" :style="vsMultChipStyle">{{ speedup }}×</text>
+          <text v-if="speedup > 0" class="shrink-0" :style="vsMultChipStyle">{{ estimateLabel }} {{ speedup }}×</text>
         </view>
 
         <!-- === Section 4: ROI calc — qty stepper + 4-cell grid === -->
         <template v-if="!isShare&&!activityId">
           <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detEstReturns" :count="t.store.detEstReturnsMeta" /></view>
           <view class="mx-4 nx-glass-card" :style="roiCardStyle">
-            <!-- qty stepper -->
-            <view class="flex items-center justify-between">
-              <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detQuantity }}</text>
-              <view class="flex items-center" :style="stepperStyle">
-                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty <= 1)" role="button" :tabindex="qty <= 1 ? -1 : 0" :aria-disabled="qty <= 1" :aria-label="t.uiChrome.decreaseQty" @click.stop="dec">
-                  <text>−</text>
-                </view>
-                <text class="tabular-nums text-center" :style="qtyNumStyle">{{ qty }}</text>
-                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty >= 6)" role="button" :tabindex="qty >= 6 ? -1 : 0" :aria-disabled="qty >= 6" :aria-label="t.uiChrome.increaseQty" @click.stop="inc">
-                  <text>+</text>
-                </view>
-              </view>
-            </view>
-
-            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 8px">{{ t.store.detQuantityHint }}</text>
-            <!-- Daily and monthly estimates from the current catalog; no hardware payback promise. -->
-            <view class="grid" style="margin-top: 16px; grid-template-columns: 1fr 1fr">
+            <!-- Daily and monthly estimates from the current catalog; no cost-recovery estimate. -->
+            <view class="grid" style="grid-template-columns: 1fr 1fr">
               <view :style="roiCellStyle(0)">
-                <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detDaily }}</text>
+                <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.bundle.estimatedDaily }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('success')">${{ dailyYieldText }}</text>
                 <text v-if="phoneDailyEarnValue > 0" class="block" :style="roiSubStyle">{{ vsPhoneSubText }}</text>
               </view>
@@ -209,64 +179,71 @@
         <!-- === Section 5: Hardware spec === -->
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detHardware" /></view>
         <SpecTable :rows="hardwareSpecs" />
+        <view v-if="copy.taskLevels" class="mx-4" style="padding: 12px 16px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; color: var(--v5-ink-3)"><text>{{ copy.taskLevels }}</text></view>
 
-        <!-- === Section 6: AI performance spec === -->
-        <template v-if="aiPerfRows.length > 0">
-          <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detAiPerf" /></view>
-          <SpecTable :rows="aiPerfRows" brand-value />
-        </template>
 
         <!-- === Section 7: Trust material === -->
         <template v-if="!remoteApiEnabled">
           <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detTrustedBy" /></view>
           <view class="mx-4 nx-glass-card" :style="trustCardStyle">
-            <text class="block" :style="trustBodyStyle">{{ t.trust.errorUnavailable }}</text>
+            <text class="block" :style="trustBodyStyle">{{ t.store.relatedMaterialsEmpty }}</text>
           </view>
         </template>
         <template v-else>
           <view style="padding: 22px 16px 4px"><SectionHeader :title="productTrustTitle" /></view>
           <view class="mx-4 nx-glass-card" :style="trustCardStyle" data-testid="product-trust-material">
-            <text v-if="trustStatus === 'loading' || trustStatus === 'idle'" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
-            <template v-else-if="trustStatus === 'ready' && productAuditRows.length">
+            <view v-if="productSpecDocument" class="active:opacity-70" :style="trustDisclosureRowStyle"
+              role="link" tabindex="0" :aria-label="productSpecDocument.title"
+              @click="openTrustUrl(productSpecDocument.url)" @keydown.enter.prevent="openTrustUrl(productSpecDocument.url)">
+              <text class="block" :style="trustDisclosureTitleStyle">{{ productSpecDocument.title }}</text>
+              <text class="block nx-after-external" :style="trustLinkStyle">{{ t.store.viewRelatedMaterial }}</text>
+            </view>
+            <text v-else-if="!hasTrustSnapshot && (trustStatus === 'loading' || trustStatus === 'idle')" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
+            <template v-else-if="hasTrustSnapshot && productAuditRows.length">
               <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle"
                 role="link" tabindex="0" :aria-label="row.Primary"
                 @click="openTrustUrl(row.Url)" @keydown.enter.prevent="openTrustUrl(row.Url)">
                 <text class="block" :style="trustDisclosureTitleStyle">{{ row.Primary }}</text>
                 <text class="block" :style="trustBodyStyle">{{ row.Secondary }}</text>
-                <text class="block" :style="trustLinkStyle">{{ t.trust.latest }} ↗</text>
+                <text class="block nx-after-external" :style="trustLinkStyle">{{ t.trust.latest }}</text>
               </view>
             </template>
             <template v-else>
-              <text class="block" :style="trustBodyStyle">{{ t.trust.errorUnavailable }}</text>
-              <text class="block active:opacity-70" :style="trustRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="refreshTrustMaterial">{{ t.ui.retry }}</text>
+              <text class="block" :style="trustBodyStyle">{{ !hasTrustSnapshot && trustStatus === 'error' ? '—' : t.store.relatedMaterialsEmpty }}</text>
+
             </template>
           </view>
         </template>
 
         <!-- === Section 8: FAQ accordion === -->
-        <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detFaq" /></view>
-        <view class="mx-4" :style="faqCardStyle">
+        <view class="detail-faq mx-4" :style="faqCardStyle">
+          <text class="block" style="padding-top: 14px; font-size: 13px; font-weight: 400; color: var(--v5-ink-2)">{{ t.store.detFaq }}</text>
           <view v-for="(f, i) in faqs" :key="i" :style="faqItemStyle(i)">
             <view class="w-full flex items-center justify-between text-left active:opacity-80" :style="faqQStyle" role="button" tabindex="0" :aria-label="f.q" :aria-expanded="openFaq === i" @click.stop="toggleFaq(i)">
               <text class="flex-1" style="padding-right: 8px">{{ f.q }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" :style="{ transform: openFaq === i ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }"><path d="m9 18 6-6-6-6" /></svg>
             </view>
             <view v-if="openFaq === i" style="padding-bottom: 12px; padding-right: 24px; margin-top: -4px">
-              <text style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.625">{{ f.a }}</text>
+              <text style="font-size: 12px; font-weight: 400; color: var(--v5-ink-2); line-height: 1.625; white-space: pre-line">{{ f.a }}</text>
             </view>
           </view>
         </view>
 
         <!-- Bottom spacer — clears the chassis-level <StickyCtaBar> (driven by
              useStickyCTA below; renders inside the bezel, absolute not fixed). -->
-        <view aria-hidden style="height: 96px" />
+        <view aria-hidden data-testid="detail-cta-clearance" style="height: calc(180px + env(safe-area-inset-bottom)); flex-shrink: 0" />
       </template>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
+  return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
+}
+import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
@@ -275,22 +252,23 @@ import SectionHeader from "@/components/store/section-header.vue";
 import ProductRender from "@/components/store/product-render.vue";
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
 import { usePromotionContext } from '@/composables/use-promotion-context';
-import { promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionStoreHref } from '@/lib/promotion-entry';
+import { promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionStoreHref,canPreviewPromotion,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
 import { localized } from '@/lib/promotion-display';
 import LiveSocialProof from "@/components/store/live-social-proof.vue";
 import SpecTable from "@/components/store/spec-table.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
+import { useEarnConfig } from "@/store/earn-config";
 import { useLocaleStore } from "@/store/locale";
-import { fmt } from "@/i18n/format";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { fmt, fmtMoney } from "@/i18n/format";
+import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { localizedDatacenterValue, productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
-import { estimatePaybackDays } from "@/lib/product-payback";
+import { warrantyMonths } from "@/lib/warranty-months";
+import { productCopy, specRow, specText, type SpecRow } from "@/lib/product-copy";
 import { getPhoneTierYields } from "@/mock/phone-tiers";
 import { activePhoneDailyRate, storeYieldMultiplier } from "@/lib/store-upgrade";
 import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
@@ -303,23 +281,28 @@ import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-o
 import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
-import type { PurchaseEligibilityCondition, PurchaseEligibilityPolicy } from "@/api/purchase-eligibility-api";
-import { purchaseEligibilityPolicyHasNoRestriction as eligibilityPolicyHasNoRestriction, purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
+import { purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import type { TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
-import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
+import { usePublishedTrust } from "@/composables/use-published-trust";
+import { uiLocale, serverLanguage } from "@/i18n";
 
 const t = useT();
 const locale = useLocaleStore();
+const estimateLabel = computed(() => ({ zh: '预估', en: 'Est.', vi: 'Ước tính', id: 'Est.', ms: 'Angg.', fil: 'Tantiya', ru: '≈', kk: 'Болж.', uz: 'Taxm.' })[uiLocale(locale.code)]);
 const phase = useProductPhase();
-const trustLanguage = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
-const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = usePublishedTrust();
+const trustLanguage = computed<TrustLocale>(() => serverLanguage(locale.code));
+const { sections: trustSections, status: trustStatus, hasSnapshot: hasTrustSnapshot, refresh: refreshTrust } = usePublishedTrust();
+function refreshTrustMaterial() { if (trustStatus.value === 'error') void refreshTrust(true); }
+useAutoRecovery({ failed: () => trustStatus.value === "error", retry: () => refreshTrust(true) });
 
 const app = useApp();
 const id = ref("");
 const activityId=ref('');
+const voucherContext=ref<VoucherEntryContext>({});
 const publicOnly=computed(()=>{void app.accountKey;void app.accountBindingEpoch;return !sessionVault.read();});
-const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId);
+const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId, true);
+useAutoRecovery({ failed: () => promotionStatus.value === "error", retry: () => refreshPromotion() });
 const catalogRetrying = ref(false);
 let detailPageVisible = false;
 let detailObservationEpoch = 0;
@@ -337,8 +320,15 @@ async function refreshDetailFacts(): Promise<void> {
   // failure. Trust must begin after that boundary or its valid public response
   // is discarded by the Trust generation fence.
   await refreshProductCatalog(true);
+  await nextTick();
   if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
+  if (remoteApiEnabled && (eligibility.value.status === "error"
+    || eligibility.value.status === "ready" && purchaseEligibilityMessage.value === "error")) {
+    void retryEligibility();
+  }
   await Promise.all([
+    remoteApiEnabled ? app.refreshRemoteFleet(app.captureRemoteAccountRequest(), { coalesce: true }) : Promise.resolve(true),
+    earnConfig.refresh(),
     refreshServerProductPhase(true),
     remoteApiEnabled ? refreshTrust(true) : Promise.resolve(true),
   ]);
@@ -351,6 +341,8 @@ onLoad(async (options) => {
   const fallback = new URLSearchParams(takeNavigationQuery("/pages/store/detail"));
   id.value = (o.id || fallback.get('id') || "").trim();
   activityId.value=(o.activityId||fallback.get('activityId')||'').trim();
+  voucherContext.value=voucherEntryContext({voucherId:o.voucherId||fallback.get('voucherId')||undefined,upgradeActivityId:o.upgradeActivityId||fallback.get('upgradeActivityId')||undefined});
+  if(voucherContext.value.voucherId)activityId.value='';
   await refreshDetailFacts();
 });
 
@@ -421,6 +413,7 @@ watch([catalogStatus, () => product.value?.id], () => {
 });
 
 const isShare = computed(() => product.value?.productType === "SHARE");
+const earnConfig = useEarnConfig();
 const stockUnavailable = computed(() => product.value?.inventoryMode === "FINITE"
   && product.value.stock === 0);
 // Localized SKU copy (tagline / ribbon badge). Empty strings until `id` resolves —
@@ -430,7 +423,7 @@ const copy = computed(() =>
     ? remoteApiEnabled
       ? productCopy(t.value, product.value, true, locale.code)
       : productCopy(t.value, product.value, false, locale.code)
-    : { tagline: "", badge: "", unlocks: "" },
+    : { tagline: "", badge: "", taskLevels: "" },
 );
 
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
@@ -451,14 +444,6 @@ const purchaseEligibilityMessage = computed(() => resolvePurchaseEligibilityMess
   eligibility.value.status,
   eligibility.value.snapshot,
 ));
-const eligibilityDenyTitle = computed(() => purchaseEligibilityMessage.value === "quotaDepleted"
-  ? t.value.store.purchaseEligibilityQuotaDepleted
-  : purchaseEligibilityMessage.value === "ineligible"
-    ? t.value.store.purchaseEligibilityIneligible
-    : t.value.store.purchaseEligibilityError);
-const eligibilityDenyBody = computed(() => purchaseEligibilityMessage.value === "error"
-  ? t.value.store.purchaseEligibilityFailClosed
-  : t.value.store.purchaseEligibilityConditionsUnmet);
 const purchaseGate = computed(() => remoteApiEnabled
   ? {
       gated: true,
@@ -480,11 +465,15 @@ useSetPageHeader(() => ({
     : catalogStatus.value === "loading" ? t.value.store.catalogLoadingTitle
     : catalogStatus.value === "error" ? t.value.store.catalogErrorTitle
       : product.value?.name ?? t.value.store.coProductNotFound,
-  backHref: activityId.value ? '/pages/store/store?activityId='+encodeURIComponent(activityId.value) : "/store",
+  subtitle: undefined,
+  backHref: activityId.value||voucherContext.value.voucherId ? promotionStoreHref(activityId.value,voucherContext.value) : "/store",
 }));
 
 // ── derived ROI math (mirrors page.tsx + _client.tsx) ──
 const qty = ref(1);
+const maxQuantity = computed(() => Math.min(activityId.value ? 100 : 6,
+  remoteApiEnabled && app.remoteSlotsUsed != null ? Math.max(0, app.slotCap - app.remoteSlotsUsed) : Infinity));
+watch(maxQuantity, max => { if (max > 0 && qty.value > max) qty.value = max; });
 const openFaq = ref(0);
 
 // "Your phone" uses the same activated fleet rate as the Store overview.
@@ -500,69 +489,39 @@ const speedup = computed(() =>
     : 0,
 );
 const dailyYield = computed(() => (product.value?.dailyEarn ?? 0) * qty.value);
-const monthlyYield = computed(() => dailyYield.value * 30);
+const monthlyYield = computed(() => (product.value?.monthlyEstimateUsdt ?? (product.value?.dailyEarn ?? 0) * 30) * qty.value);
 const annualYield = computed(() => dailyYield.value * 365);
 const totalPrice = computed(() => (product.value?.price ?? 0) * qty.value);
-const paybackDays = computed(() => product.value && !isShare.value
-  ? estimatePaybackDays(totalPrice.value, dailyYield.value)
-  : null);
-const paybackLabel = computed(() => {
-  const days = paybackDays.value;
-  if (days === null) return product.value && !isShare.value ? t.value.store.detPaybackUnavailable : "";
-  return days >= 60
-    ? fmt(t.value.store.detPaybackMonths, { n: (days / 30).toFixed(1) })
-    : fmt(t.value.store.detPaybackDays, { n: days });
-});
 
-// Hardware spec rows — per-SKU values are server-owned and optional, so labels
-// localise while values render as authored upstream, and a row with nothing to
-// say is dropped rather than filled with a placeholder. Uptime is a platform-wide
-// promise. Warranty is server-authored per SKU and is rendered without changing
-// its unit or terms.
+// Preserve the prototype's four spec slots while taking values from E1.
+// An operator-authored uptime is displayed as online rate, not an SLA guarantee.
 const hardwareSpecs = computed<SpecRow[]>(() => {
   const p = product.value;
   if (!p) return [];
   const s = t.value.store;
+  const months = warrantyMonths(p.warranty);
   return [
-    specRow(s.specGpu, p.gpu),
-    specRow(s.specVram, p.vram),
-    specRow(s.specPower, p.power),
-    specRow(s.specDatacenter, localizedDatacenterValue(p.datacenter, locale.code) ?? undefined),
-    // 在线率不是商品字段:服务端只有 nx_admin_device_sku.uptime 这一列自由文本,
-    // 没有口径/统计周期/例外/补偿条款,也没有适用 SKU 的已发布 SLA。没有权威条款时
-    // 不得对购买决策作出量化服务承诺(zentao #207),整行不出现 —— 与质保同一判据:
-    // 「没得说就不说」,而不是填一个占位符。
-    specRow(s.specWarranty, p.warranty),
+    { k: s.specGpu, v: specText(t.value, p.gpu, "-") },
+    { k: s.specVram, v: specText(t.value, p.vram, "-", "vram") },
+    { k: s.specPower, v: specText(t.value, p.power, "-", "power") },
+    { k: s.specOnlineRate, v: specText(t.value, p.uptime, "-") },
+    months === undefined ? specRow(s.specWarranty, p.warranty) : { k: s.specWarrantyDuration, v: months },
   ].filter((r): r is SpecRow => r !== null);
 });
 
-// AI perf rows from product.ai. `unlocks` is per-SKU marketing copy → resolved
-// through productCopy() alongside tagline/badge, not read raw off the mock.
-const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
-  const ai = remoteApiEnabled ? null : product.value?.ai;
-  if (!ai) return [];
-  const s = t.value.store;
-  const rows: { k: string; v: string }[] = [];
-  if (ai.imageGenPerMin) rows.push({ k: s.aiRowImageGen, v: `${ai.imageGenPerMin} ${s.aiUnitImgMin}` });
-  if (ai.llmTokensPerSec) rows.push({ k: s.aiRowLlm, v: `${(ai.llmTokensPerSec / 1000).toFixed(1)}${s.aiUnitTokSec}` });
-  if (ai.videoMinPerHour) rows.push({ k: s.aiRowVideo, v: `${ai.videoMinPerHour} ${s.aiUnitMinHour}` });
-  if (ai.fineTuneMins) rows.push({ k: s.aiRowFineTune, v: `~${ai.fineTuneMins} ${s.aiUnitMin}` });
-  if (copy.value.unlocks) rows.push({ k: s.aiRowUnlocks, v: copy.value.unlocks });
-  return rows;
-});
+const bundleActivityVisible = computed(()=>(productCatalogPresentation.value?.products??[]).filter(p=>p.productType!=='SHARE'&&activity.value?.productNos.includes(p.id)&&isProductAvailable(p,phase.value)).length>=2);
+const canBundleActivity = computed(() => promotionAvailable.value && bundleActivityVisible.value);
 
-// Trust marks are proper nouns — publications and certification schemes keep
-// their registered names in every locale.
-const featuredMedia = ["Forbes", "CoinDesk", "TechCrunch", "The Block"];
-const compliance = ["SOC 2 Type II", "ISO 27001", "CE / FCC"];
 const productAuditSection = computed(() => trustSections.value.find((section) => section.sectionKey === "auditsReserves"));
-const productTrustTitle = computed(() => t.value.store.detEvidenceDocuments);
+const productTrustTitle = computed(() => t.value.store.detTrustedBy);
 const productAuditRows = computed(() => trustNumberedRows(productAuditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, trustLanguage.value)
   .filter((row) => safeTrustUrl(row.Url)));
 
-async function refreshTrustMaterial() {
-  if (await refreshTrust(true)) recordPublishedTrustViews(["auditsReserves"], trustLanguage.value);
-}
+const productSpecDocument = computed(() => {
+  const title = product.value?.specDocumentTitle?.trim();
+  const url = safeTrustUrl(product.value?.specDocumentUrl ?? "");
+  return title && url ? { title, url } : null;
+});
 
 function safeTrustUrl(raw: string): string | null {
   const value = raw.trim();
@@ -588,8 +547,7 @@ function openTrustUrl(raw: string) {
 }
 const faqs = computed(() => {
   const f = t.value.store.faq;
-  const datacenter = specText(t.value, localizedDatacenterValue(product.value?.datacenter, locale.code));
-  return [{ ...f.location, a: datacenter }, f.withdraw, f.demand, f.refund];
+  return [f.location, f.withdraw, f.demand, ...(!isShare.value ? [f.refund] : [])];
 });
 
 // ── text helpers (toFixed / toLocaleString / fmt out of template) ──
@@ -597,6 +555,13 @@ const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock > 0 && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
+// Per-unit team compute points: a quiet product fact, not personal data, so the hide-stats eye does not mask it.
+const computePointsLine = computed(() => {
+  const points = product.value?.computePoints;
+  if (!points) return null;
+  const [before, after] = (isShare.value ? t.value.store.computePointsPerShare : t.value.store.computePointsPerUnit).split("{n}");
+  return { before, value: formatComputePoints(points, locale.code).split(" ")[0], after };
+});
 const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
   ? formatAmount(phoneDailyEarnValue.value)
   : t.value.store.specValueUnavailable));
@@ -605,9 +570,16 @@ const phoneDailyEarnText = computed(() => (phoneDailyEarnValue.value > 0
 // or said nothing at all (strip degraded, this line still claimed $0.06).
 const vsPhoneSubText = computed(() => fmt(t.value.store.detVsPhone, { n: phoneDailyEarnText.value }));
 const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0));
-const shareYieldText = computed(() => product.value?.shareYieldMin != null && product.value?.shareYieldMax != null
-  ? `${product.value.shareYieldMin}%–${product.value.shareYieldMax}%`
-  : t.value.store.shareAnnualUnavailable);
+const shareDailyEstimate = computed(() => product.value && isShare.value ? productDailyEstimateRange(product.value) : null);
+const shareDailyUsdt = computed(() => {
+  // Only the server's daily estimate; without one the row shows "—", never a figure derived from an annual rate.
+  const estimate = shareDailyEstimate.value;
+  return estimate ? {
+    min: formatPlainAmount(estimate.low * qty.value, 6),
+    max: formatPlainAmount(estimate.high * qty.value, 6),
+  } : null;
+});
+const shareDailyUvtText = computed(() => formatPlainAmount((product.value?.dailyEarnNEX ?? 0) * qty.value, 6));
 const dailyYieldText = computed(() => formatAmount(dailyYield.value));
 const monthlyYieldText = computed(() => formatAmount(monthlyYield.value));
 const annualYieldText = computed(() => formatAmount(annualYield.value));
@@ -617,65 +589,13 @@ const monthlyPctText = computed(() =>
 const annualPctText = computed(() =>
   totalPrice.value > 0 ? ((annualYield.value / totalPrice.value) * 100).toFixed(0) : "0",
 );
-const priceText = computed(() => formatAmount((product.value?.price ?? 0)));
-
-function eligibilityPolicyTitle(policy: PurchaseEligibilityPolicy): string {
-  return policy.policy === "F4B"
-    ? t.value.store.purchaseEligibilityQuotaPolicy
-    : t.value.store.purchaseEligibilityProductPolicy;
-}
-function eligibilityPolicyMode(policy: PurchaseEligibilityPolicy): string {
-  if (policy.policy === "F4B") {
-    return policy.mode === "EITHER"
-      ? t.value.store.purchaseEligibilityQuotaEitherAndStock
-      : t.value.store.purchaseEligibilityQuotaAllAndStock;
-  }
-  return policy.mode === "EITHER"
-    ? t.value.store.purchaseEligibilityModeEither
-    : t.value.store.purchaseEligibilityModeAll;
-}
-function eligibilityQualificationConditions(policy: PurchaseEligibilityPolicy): PurchaseEligibilityCondition[] {
-  return policy.conditions.filter((condition) => condition.kind !== "monthlyQuota");
-}
-function eligibilityMonthlyStockCondition(policy: PurchaseEligibilityPolicy): PurchaseEligibilityCondition | undefined {
-  return policy.conditions.find((condition) => condition.kind === "monthlyQuota");
-}
-function eligibilityPolicyHasFacts(policy: PurchaseEligibilityPolicy): boolean {
-  return policy.conditions.length > 0;
-}
-function eligibilityPolicyResultStyle(policy: PurchaseEligibilityPolicy): CSSProperties {
-  return { color: policy.eligible ? "var(--v5-success)" : "var(--v5-warning)" };
-}
-function eligibilityNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
-}
-function eligibilityConditionText(condition: PurchaseEligibilityCondition): string {
-  const numberLabel = condition.kind === "teamVolumeUsd" ? formatAmount : eligibilityNumber;
-  const values = {
-    current: numberLabel(condition.current),
-    required: numberLabel(condition.required),
-    gap: numberLabel(condition.gap),
-  };
-  const copy = condition.kind === "rank"
-    ? fmt(t.value.store.purchaseEligibilityRank, values)
-    : condition.kind === "activeDirect"
-      ? fmt(t.value.store.purchaseEligibilityActiveDirect, values)
-      : condition.kind === "teamVolumeUsd"
-        ? fmt(t.value.store.purchaseEligibilityTeamVolume, values)
-        : condition.kind === "lifetimeQuota"
-          ? fmt(t.value.store.purchaseEligibilityLifetimeQuota, values)
-          : fmt(t.value.store.purchaseEligibilityMonthlyQuota, values);
-  if (condition.kind === "monthlyQuota" || condition.kind === "lifetimeQuota") return copy;
-  return `${copy} · ${condition.met
-    ? t.value.store.purchaseEligibilityConditionMet
-    : fmt(t.value.store.purchaseEligibilityConditionGap, values)}`;
-}
+const priceText = computed(() => fmtMoney(product.value ? product.value.price * qty.value : null));
 
 function dec() {
   if (qty.value > 1) qty.value -= 1;
 }
 function inc() {
-  if (qty.value < (activityId.value?100:6)) qty.value += 1;
+  if (qty.value < maxQuantity.value) qty.value += 1;
 }
 function toggleFaq(i: number) {
   openFaq.value = openFaq.value === i ? -1 : i;
@@ -711,7 +631,9 @@ function publishStickyCTA() {
     if(activityId.value){
       const allowed=promotionAvailable.value&&activity.value?.productNos.includes(product.value.id);
       if(!allowed){
-        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:t.value.promotion.disabledNote,buttonLabel:t.value.promotion.unavailable,disabled:true,showTabBar:false},stickyOwner);
+        const warming = promotionStatus.value === 'loading' && canPreviewPromotion(activity.value) && !!activity.value?.productNos.includes(product.value.id);
+        const label = warming ? activity.value?.eligibility === 'SIGN_IN_REQUIRED' ? t.value.promotion.signIn : t.value.store.cardBuyNow : t.value.promotion.unavailable;
+        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:warming ? isShare.value ? undefined : `${t.value.bundle.estimatedDaily}: $${dailyYieldText.value}` : t.value.promotion.disabledNote,buttonLabel:label,disabled:true,showTabBar:false},stickyOwner);
         return;
       }
       if(activity.value?.eligibility==='SIGN_IN_REQUIRED'){
@@ -719,8 +641,16 @@ function publishStickyCTA() {
         return;
       }
     }
-    if (remoteApiEnabled && eligibility.value.status !== "ready") {
-      sticky.hide(stickyOwner);
+    if (remoteApiEnabled && (eligibility.value.status !== "ready" || purchaseEligibilityMessage.value === "error")) {
+      sticky.show({
+        href: `/pages/store/detail?id=${product.value.id}`,
+        amount: `${priceText.value}`,
+        buttonLabel: eligibility.value.status === "loading" || eligibility.value.status === "idle"
+          ? t.value.store.purchaseEligibilityLoading
+          : t.value.store.cardBuyNow,
+        disabled: true,
+        showTabBar: false,
+      }, stickyOwner);
       return;
     }
     if (remoteApiEnabled && !eligibility.value.eligible) {
@@ -755,17 +685,30 @@ function publishStickyCTA() {
       }, stickyOwner);
       return;
     }
+    if (maxQuantity.value === 0) {
+      sticky.show({ href: '/pages/me/devices', amount: priceText.value,
+        amountSubtext: t.value.promotion.capacityUnavailable, buttonLabel: t.value.home.fleetManage, showTabBar: false }, stickyOwner);
+      return;
+    }
     sticky.show({
-      href: activityId.value ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value) : `/pages/store/checkout?product=${product.value.id}`,
+      href: isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1 ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value,voucherContext.value) : `/pages/store/checkout?product=${product.value.id}`,
+      quantity: { value:qty.value,min:1,max:maxQuantity.value,decrease:dec,increase:inc },
       amount: `${priceText.value}`,
-      amountSubtext: isShare.value ? undefined : `${t.value.store.detDaily}: ${dailyEarnText.value}`,
+      amountSubtext: isShare.value ? undefined : `${t.value.bundle.estimatedDaily}: $${dailyYieldText.value}`,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
 }
 watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext],
   publishStickyCTA,
+  { immediate: true },
+);
+watch(
+  () => remoteApiEnabled && stickyPageVisible.value
+    && (eligibility.value.status === "error"
+      || eligibility.value.status === "ready" && purchaseEligibilityMessage.value === "error"),
+  (failed, wasFailed) => { if (failed && !wasFailed) toast.error(t.value.store.purchaseEligibilityError); },
   { immediate: true },
 );
 function showDetailStickyCTA() {
@@ -798,31 +741,9 @@ const catalogRetryStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
 };
-const purchaseEligibilityCardStyle: CSSProperties = {
-  padding: "14px 16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-};
-const purchaseEligibilityTitleStyle: CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
 const heroCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderColor: "var(--v5-border)",
-};
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 80% 20%, var(--v5-tech-cyan-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 80%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.18) 0%, transparent 60%)",
-  filter: "blur(10px)",
-  pointerEvents: "none",
-  opacity: 0.7,
-  animation: "v5-aurora-drift 14s ease-in-out infinite",
 };
 const ribbonStyle: CSSProperties = {
   top: 0,
@@ -854,30 +775,14 @@ const multBadgeStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
   whiteSpace: "nowrap",
 };
-function codeChip(tone: "success" | "amber"): CSSProperties {
-  const palette =
-    tone === "success"
-      ? { bg: "var(--v5-success-soft)", color: "var(--v5-success)" }
-      : { bg: "var(--v5-brand-2-soft)", color: "var(--v5-brand-2)" };
-  return {
-    padding: "3px 9px",
-    borderRadius: "4px",
-    background: palette.bg,
-    color: palette.color,
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "12px",
-    fontWeight: 500,
-    letterSpacing: "-0.005em",
-  };
-}
 // De-carded to a filled tile (no border) — keeps the phone-vs-device commercial
 // comparison punch without the boxed weight.
 const vsStripStyle: CSSProperties = {
-  padding: "12px 14px",
-  gap: "12px",
+  padding: "var(--v5-space-3) 14px",
+  gap: "var(--v5-space-3)",
 };
 const vsMultChipStyle: CSSProperties = {
-  padding: "4px 10px",
+  padding: "var(--v5-space-1) 10px",
   borderRadius: "999px",
   background: "var(--v5-brand-soft)",
   fontFamily: "var(--font-v5)",
@@ -888,7 +793,8 @@ const vsMultChipStyle: CSSProperties = {
   lineHeight: 1,
 };
 const roiCardStyle: CSSProperties = {
-  padding: "16px",
+  padding: "var(--v5-space-4)",
+  background: "var(--v5-surface)",
 };
 const stepperStyle: CSSProperties = {
   borderRadius: "999px",
@@ -919,13 +825,12 @@ function roiCellStyle(index: number): CSSProperties {
   return {
     padding: "14px 16px",
     borderRight: index % 2 === 0 ? "1px solid color-mix(in srgb, var(--v5-border) 50%, transparent)" : "none",
-    borderBottom: index < 2 ? "1px solid color-mix(in srgb, var(--v5-border) 50%, transparent)" : "none",
   };
 }
 const roiLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
 function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   const color =
-    tone === "success" ? "var(--v5-warning)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
+    tone === "success" ? "var(--v5-brand)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
   return {
     fontFamily: "var(--font-v5)",
     fontSize: "20px",
@@ -939,15 +844,15 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
 // textWrap pretty: the vs-phone subline now carries a server-sized figure, so it
 // can wrap in the half-width cell — keep the last line from stranding one char.
 const roiSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", textWrap: "pretty" };
-const trustCardStyle: CSSProperties = { padding: "16px" };
+const trustCardStyle: CSSProperties = { padding: "var(--v5-space-4)" };
 const mediaStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-2)",
 };
 const complianceChipStyle: CSSProperties = {
-  padding: "4px 10px",
+  padding: "var(--v5-space-1) 10px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
   fontFamily: "var(--font-v5)",
@@ -956,26 +861,27 @@ const complianceChipStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
   letterSpacing: "-0.005em",
 };
-const trustDisclosureRowStyle: CSSProperties = { padding: "12px 0", borderBottom: "1px solid var(--v5-border)" };
+const trustDisclosureRowStyle: CSSProperties = { padding: "var(--v5-space-3) 0", borderBottom: "1px solid var(--v5-border)" };
 const trustDisclosureTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const trustBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
 const trustLinkStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "var(--v5-brand)" };
-const trustRetryStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", fontWeight: 600, color: "var(--v5-brand)" };
-// FAQ de-carded to a transparent hairline group (spec: FAQ → floor). The
-// container border-top opens the group; each item keeps its own row hairline.
 const faqCardStyle: CSSProperties = {
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
+  marginTop: "20px",
+  padding: "0 16px",
+  borderRadius: "var(--ui-radius-surface)",
+  background: "var(--v5-surface)",
 };
 function faqItemStyle(i: number): CSSProperties {
   return { borderBottom: i < faqs.value.length - 1 ? "1px solid var(--v5-border)" : "none" };
 }
 const faqQStyle: CSSProperties = {
-  padding: "14px 0",
+  padding: "var(--v5-space-3) 0",
+  minHeight: "44px",
+  boxSizing: "border-box",
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 500,
-  color: "var(--v5-ink)",
+  fontSize: "12px",
+  fontWeight: 400,
+  color: "var(--v5-ink-2)",
   letterSpacing: "-0.005em",
 };
 
@@ -983,6 +889,45 @@ const faqQStyle: CSSProperties = {
 </script>
 <style src="@/components/promotion/promotion.css"></style>
 <style scoped>
+.detail-summary { padding: var(--v5-space-5); }
+.detail-summary__name { display: block; overflow-wrap: anywhere; }
+.detail-summary__tagline { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-list-subtitle); line-height: var(--v5-type-body-s-lh); color: var(--v5-ink-3); }
+.detail-sales-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--v5-space-6); margin-top: var(--v5-space-5); }
+.detail-sales-stat { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }
+.detail-sales-stat--sold { color: var(--v5-success); }
+.detail-sales-stat--stock { align-items: flex-end; color: var(--v5-brand-2); text-align: right; }
+.detail-sales-stat__value-row { display: flex; align-items: center; gap: var(--v5-space-2); min-width: 0; }
+.detail-sales-stat__value-row svg { flex: none; }
+.detail-sales-stat__value { font-size: var(--v5-type-h3); font-weight: 600; line-height: var(--v5-type-h3-lh); overflow-wrap: anywhere; }
+.detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--v5-type-body-s-lh) var(--font-v5); overflow-wrap: anywhere; }
+.detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--v5-type-h3-lh) var(--font-v5); overflow-wrap: anywhere; }
+.detail-sales-stat:only-child { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+.detail-compute-points { display: flex; align-items: flex-start; gap: 5px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.detail-compute-points svg { flex: none; margin-top: 2px; }
+.detail-compute-points__value { margin: 0 2px; color: var(--v5-ink-2); font-family: var(--font-metric); font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.share-returns { padding: var(--v5-space-5); }
+.share-returns__title { display: block; font: 600 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
+.share-returns__description { display: block; margin-top: var(--v5-space-1); font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }
+.share-returns__metrics { display: flex; flex-direction: column; gap: var(--v5-space-3); margin: var(--v5-space-5) 0; }
+.share-returns__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--v5-space-3); }
+.share-returns__currency { flex: none; font: 500 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-2); }
+.share-returns__value { display: flex; flex-wrap: wrap; justify-content: flex-end; column-gap: var(--v5-space-1); min-width: 0; font-size: var(--v5-type-card-title); font-weight: 600; line-height: var(--v5-type-card-title-lh); color: var(--v5-brand); text-align: right; }
+.share-returns__value text { white-space: nowrap; }
+.share-returns__unavailable { font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }
+.share-returns__note { display: block; padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); font: 400 var(--v5-type-caption)/var(--v5-type-caption-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* One outer corner clip; the catalog image and its pedestal keep their full size. */
+.detail-hero :deep(.detail-product-render) { border-radius:0 !important; }
+.detail-hero :deep(.detail-product-render > [aria-hidden]:not(:first-child)) {
+  background:linear-gradient(to top, var(--v5-content-surface) 0%, color-mix(in srgb, var(--v5-content-surface) 60%, transparent) 50%, transparent 100%) !important;
+}
+.detail-hero :deep(.detail-product-render .text-right > :last-child) { color:var(--v5-ink-2) !important; }
+.detail-hero :deep(.detail-product-render :is(image, uni-image)) { animation:detail-machine-float 5s ease-in-out infinite; }
+@keyframes detail-machine-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+.product-detail-page[data-page-visible="false"] :deep(.detail-product-render :is(image, uni-image)),
+.product-detail-page[data-scrolling="true"] :deep(.detail-product-render :is(image, uni-image)) { animation-play-state:paused; }
+@media (prefers-reduced-motion:reduce) {
+  .detail-hero :deep(.detail-product-render :is(image, uni-image)) { animation:none; transform:none; }
+}
 .promotion-quantity-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;overflow:hidden; }
 .promotion-quantity-stepper view { min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--v5-surface-2); }
 .promotion-quantity-stepper text { min-width:36px;text-align:center;font-variant-numeric:tabular-nums; }
