@@ -974,7 +974,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!order) return {};
     const replay=order.paymentStatus==='PAID',amount=Number(order.amountUsdt);
     if(action==='cancel'){
-      if(replay)refuse('ORDER_NOT_CANCELLABLE');
+      // Same rule as the backend: an already cancelled order replays its receipt; any other settled order cannot be cancelled.
+      if(order.paymentStatus==='CANCELLED'&&order.orderStatus==='CANCELLED')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
+        orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:true},order);
+      if(order.paymentStatus!=='PENDING')refuse('ORDER_NOT_CANCELLABLE');
       (state.orderStatuses??={})[orderNo]='cancelled';
       if(state.createdOrders?.includes(order)){
         Object.assign(order,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
