@@ -110,6 +110,12 @@
              the entrance so no transform lingers. -->
         <view class="nx-page-enter" :class="{ 'nx-page-enter--tab': isTabRoute }" :style="{ paddingTop: (contentTop + pendingBarInset) + 'px', paddingBottom: contentBottom }">
           <slot name="pageTop" />
+          <!-- #ifdef APP-PLUS -->
+          <view v-if="isTabRoute && pageVisible && hostVisible && noticeKey" class="nx-update-notice" role="status">
+            <view><text class="block">{{ words.available }}</text><text class="nx-update-version">{{ current?.policy?.versionName }}</text></view>
+            <button @click="viewUpdate">{{ words.view }}</button><button class="nx-update-close" :aria-label="words.close" @click="noticeKey = ''">×</button>
+          </view>
+          <!-- #endif -->
           <!-- Voucher fallback banner — chassis-injected at content top so the
                5 protected tab pages stay untouched (ALIGNMENT red-line). Self-
                hides unless a claimable voucher targets the current surface. -->
@@ -183,6 +189,9 @@ import DeviceHomeIndicator from "@/components/device/device-home-indicator.vue";
 import DeviceStatusBar from "@/components/device/device-status-bar.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
+// #ifdef APP-PLUS
+import { current, noticeKey, updateRoute, words } from "@/services/native-update";
+// #endif
 import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { formatUnreadBadge } from "@/lib/unread-badge";
@@ -207,6 +216,13 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, onAcceptanceObservationModalOpened } from "@/services/behavior-analytics";
+
+// #ifdef APP-PLUS
+function viewUpdate() {
+  noticeKey.value = "";
+  navTo(updateRoute);
+}
+// #endif
 
 // Uni forwards query parameters such as product `id` through the page root.
 // Bind fallthrough attrs explicitly so they cannot replace the view adapter's ID.
@@ -884,6 +900,12 @@ export default chassisView;
   z-index: 30;
   /* transparent wrapper — the pill's own backdrop blurs content behind it */
 }
+.nx-update-notice { display: flex; align-items: center; gap: 10px; margin: 8px 16px 12px; padding: 12px 14px; border-radius: 16px; background: var(--v5-surface-2); color: var(--v5-ink); box-shadow: var(--nx-glass-edge); }
+.nx-update-notice > view { flex: 1; font-weight: 600; }
+.nx-update-version { font-size: 12px; color: var(--v5-ink-3); }
+.nx-update-notice button { margin: 0; padding: 4px; min-height: 36px; line-height: 28px; font-size: 14px; color: var(--v5-brand); background: transparent; }
+.nx-update-notice button::after { border: none; }
+.nx-update-notice .nx-update-close { min-width: 34px; font-size: 23px; color: var(--v5-ink-3); }
 .nx-tabbar-pill {
   margin: 0 12px;
 }
