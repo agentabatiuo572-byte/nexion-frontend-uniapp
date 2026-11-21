@@ -99,6 +99,7 @@ export interface Product {
 export const PRODUCTS: Product[] = [
   {
     id: "stellarbox-s1",
+    productType: "DEVICE",
     name: "UVELBox S1",
     tier: "Entry",
     tagline: "Fully managed device",
@@ -124,6 +125,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarbox-pro",
+    productType: "DEVICE",
     name: "UVELBox Pro",
     tier: "Pro",
     tagline: "Double the GPUs, double the earning power.",
@@ -151,6 +153,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarbox-pro-v2",
+    productType: "DEVICE",
     name: "UVELBox Pro v2",
     tier: "Pro",
     tagline: "2.5× S1 throughput",
@@ -178,6 +181,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarrack-p1",
+    productType: "DEVICE",
     name: "UVELRack P1",
     tier: "Flagship",
     tagline: "Datacenter-grade A100 rack for serious operators.",
@@ -206,6 +210,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarrack-p2",
+    productType: "DEVICE",
     name: "UVELRack P2",
     tier: "Flagship",
     tagline: "Datacenter H100 rack — the top compute tier.",

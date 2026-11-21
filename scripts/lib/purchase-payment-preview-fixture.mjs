@@ -387,8 +387,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (amount != null && Number(amount).toFixed(6) !== source.quote.businessAmountUsdt)
         return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       const products = demoProducts(state, url.origin), items = quotaItems(subject, source.payload, order);
-      requireDemoExternalPaymentQuota(state, products, items, Date.now());
-      if (order) requireDemoExternalOrderGate(products, items);
+      const now = Date.now();
+      requireDemoExternalPaymentQuota(state, products, items, now);
+      if (order) requireDemoExternalOrderGate(state, products, items, now);
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intentNo = suspended?.intentNo ?? `PPI-PREVIEW-${++sequence}`;
       const intent = suspended ?? {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
