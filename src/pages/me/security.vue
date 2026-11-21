@@ -154,7 +154,7 @@
 
         </view><template #footer><view class="flex" style="gap: var(--v5-space-2); margin-top: 4px">
             <NxButton variant="secondary" class="flex-1 flex items-center justify-center" :disabled="securityBusy" @click="cancelPwd"><text>{{ t.ui.cancel }}</text></NxButton>
-            <NxButton variant="primary" class="flex-1 flex items-center justify-center" :disabled="securityBusy || !!overviewReadback" @click="submitPasswordChange"><text>{{ t.ui.save }}</text></NxButton>
+            <NxButton variant="primary" class="flex-1 flex items-center justify-center" :disabled="passwordSubmitDisabled" @click="submitPasswordChange"><text>{{ t.ui.save }}</text></NxButton>
           </view></template></NxSheet>
     <NxSheet :open="twoFactorSheetOpen" :title="t.security.twoFactorTitle" @close="closeTwoFactorSheet" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.twoFactorCurrentPassword" :aria-invalid="twoFactorPasswordError ? 'true' : 'false'" :aria-describedby="twoFactorPasswordError ? 'security-2fa-password-error' : undefined" :focus="twoFactorPasswordFocus" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
@@ -275,6 +275,7 @@ import { accountErrorMessageKey } from "@/lib/account-error-message";
 import { acquireAccountCommand, acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, type AccountCommandRow } from "@/store/account-scoped-storage";
 
 const SECURITY_COMMAND_TABLE = "nexgrid-security-command-accounts-v1";
+const PASSWORD_CHANGE_INTENT = "password-change";
 const DELETION_REQUEST_INTENT = "account-deletion-request";
 
 const t = useT();
@@ -394,6 +395,9 @@ type ConfirmedSecurityReadback = {
 };
 const overviewReadback = shallowRef<ConfirmedSecurityReadback | null>(null);
 const deletionReadback = shallowRef<ConfirmedSecurityReadback | null>(null);
+let securityCommandToastId: string | undefined;
+const restoredPasswordReceipt = shallowRef<{ key: string; state: "checking" | "failed" | "confirmed" } | null>(null);
+const passwordSubmitDisabled = computed(() => securityBusy.value || !!overviewReadback.value || !!restoredPasswordReceipt.value);
 const sessionWriteUnavailableReason = computed(() => remoteApiEnabled && !remoteSecurity.value ? "overview-unavailable" : undefined);
 const sessionWriteDisabled = computed(() => securityBusy.value || !!sessionWriteUnavailableReason.value || !!overviewReadback.value);
 const deletionWriteUnavailableReason = computed(() => {
@@ -512,6 +516,10 @@ function isCurrentSecurityRequest(
 }
 
 function clearSecurityAccountState(keepPresentation = false) {
+  if (!securityPageVisible && securityCommandToastId) {
+    ui.dismissToast(securityCommandToastId);
+    securityCommandToastId = undefined;
+  }
   if (!keepPresentation) {
     securityPresentation.value = null;
     deletionStatus.value = null;
@@ -529,6 +537,7 @@ function clearSecurityAccountState(keepPresentation = false) {
   remoteSecurityReadFailed.value = false;
   sessionPageLoading.value = false;
   remoteSecurity.value = null;
+  restoredPasswordReceipt.value = null;
   deletionStatusCurrent.value = false;
   deletionStatusLoading.value = false;
   deletionStatusReadFailed.value = false;
@@ -564,6 +573,10 @@ function refreshSecurityForCurrentAccount() {
     void loadRemoteSecurity();
     void loadRemoteDeletionStatus();
     void loadPhonePolicy();
+    if (!overviewReadback.value && !restoredPasswordReceipt.value) {
+      const key = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, auth.accountId)?.commands?.[PASSWORD_CHANGE_INTENT];
+      if (key) void checkRestoredPasswordReceipt(key);
+    }
   }
 }
 
@@ -728,8 +741,7 @@ async function readBackConfirmedSecurityCommand(
 ) {
   const { pending, read, restartBackoff } = securityReadbacks[section];
   pending.value = confirmation;
-  if (confirmation.tone === "warn") toast.warn(confirmation.message());
-  else toast.success(confirmation.message());
+  securityCommandToastId = confirmation.tone === "warn" ? toast.warn(confirmation.message()) : toast.success(confirmation.message());
   if (!(await read()) && pending.value === confirmation && securityPageVisible) {
     restartBackoff();
   }
@@ -741,6 +753,38 @@ function settleSecurityReadback(pending: ShallowRef<ConfirmedSecurityReadback | 
   pending.value = null;
   confirmation.releaseReceipt?.();
 }
+
+function settleRestoredPasswordReceipt(accountKey: string) {
+  const receipt = restoredPasswordReceipt.value;
+  if (receipt?.state !== "confirmed" || !remoteSecurity.value) return;
+  const released = releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, PASSWORD_CHANGE_INTENT, receipt.key);
+  if (released || readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey)?.commands?.[PASSWORD_CHANGE_INTENT] !== receipt.key) {
+    restoredPasswordReceipt.value = null;
+  }
+}
+
+async function checkRestoredPasswordReceipt(key = restoredPasswordReceipt.value?.key) {
+  if (!key) return;
+  const pageScope = securityPageFence.capture("password-receipt");
+  const accountScope = captureAccountScope();
+  const accountKey = auth.accountId;
+  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  restoredPasswordReceipt.value = { key, state: "checking" };
+  try {
+    const receipt = await accountApi.passwordCommandReceipt(key);
+    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    // A missing receipt leaves the original key available for an explicit command retry.
+    restoredPasswordReceipt.value = receipt ? { key, state: "confirmed" } : null;
+    settleRestoredPasswordReceipt(accountKey);
+  } catch {
+    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) restoredPasswordReceipt.value = { key, state: "failed" };
+  }
+}
+
+useAutoRecovery({
+  failed: () => remoteApiEnabled && restoredPasswordReceipt.value?.state === "failed",
+  retry: checkRestoredPasswordReceipt,
+});
 
 async function loadRemoteSecurity(): Promise<boolean> {
   const pageScope = securityPageFence.capture("security-overview");
@@ -757,6 +801,7 @@ async function loadRemoteSecurity(): Promise<boolean> {
     securityPresentation.value = { ...securityState, sessions: [...securityState.sessions] };
     remoteSecurityReadFailed.value = false;
     settleSecurityReadback(overviewReadback);
+    settleRestoredPasswordReceipt(accountKey);
     return true;
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
@@ -923,8 +968,8 @@ function cancelPwd() {
 }
 
 async function submitPasswordChange() {
-  if (securityBusy.value || overviewReadback.value) return;
-  const pageScope = securityPageFence.capture("password-change");
+  if (passwordSubmitDisabled.value) return;
+  const pageScope = securityPageFence.capture(PASSWORD_CHANGE_INTENT);
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
@@ -953,7 +998,7 @@ async function submitPasswordChange() {
   securityBusy.value = true;
   try {
     if (remoteApiEnabled) {
-      const commandKey = acquireAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", "password");
+      const commandKey = acquireAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, PASSWORD_CHANGE_INTENT, "password");
       const priorReceipt = await accountApi.passwordCommandReceipt(commandKey);
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       if (!priorReceipt) await accountApi.changePassword(currentPassword, newPassword, commandKey);
@@ -961,7 +1006,7 @@ async function submitPasswordChange() {
       clearPasswordForm();
       await readBackConfirmedSecurityCommand("overview", {
         message: () => priorReceipt ? t.value.security.passwordRecovered : t.value.security.passwordSaved,
-        releaseReceipt: () => { releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "password-change", commandKey); },
+        releaseReceipt: () => { releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, PASSWORD_CHANGE_INTENT, commandKey); },
       });
     } else {
       security.changePassword(currentPassword, newPassword);
