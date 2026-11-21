@@ -2178,6 +2178,7 @@ export const fil: Messages = {
     inventoryPendingDeactivateChip: "Auto-deactivate pagkatapos ng task",
     inventoryRowActivate: "I-activate",
     inventoryRowDeactivate: "I-deactivate",
+    inventoryMoreActions: "Iba pang aksyon",
     inventoryEarnedLabel: "Kita",
     inventoryTodayLabel: "Ngayon",
     inventoryRowSlotsFull: "Puno ang slot",

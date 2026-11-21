@@ -22,6 +22,7 @@ const ICONS = {
   check: { d: ["m5 12.5 4.5 4.5L19 7"] },
   "caret-up": { d: ["M12 7.5 18.5 16h-13z"], fill: true },
   "caret-down": { d: ["M12 16.5 5.5 8h13z"], fill: true },
+  more: { d: ["M3.2 12a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0", "M10.2 12a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0", "M17.2 12a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0"], fill: true },
   sparkle: { d: ["M12 3c.6 4.6 3.4 7.4 8 8-4.6.6-7.4 3.4-8 8-.6-4.6-3.4-7.4-8-8 4.6-.6 7.4-3.4 8-8z"], fill: true },
 } as const satisfies Record<string, { d: readonly string[]; fill?: boolean }>;
 export type NxIconName = keyof typeof ICONS;

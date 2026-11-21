@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
-import { ApiError, asApiError, isApiRefusal } from '@/api/errors';
+import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
 import { useApp } from './app';
@@ -19,7 +19,11 @@ import { toast } from './ui';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
+  scopeCurrent?: () => boolean;
+  /** Recheck order facts after any read already in flight. */
+  checkCurrent?: () => Promise<PurchaseContextCheck>;
   refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
+export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
@@ -71,7 +75,7 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   pausedPaymentMethod: null as ExternalPaymentMethod | null,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
   originalRecovery: null as { intentNo: string; kind: PurchaseKind; fingerprint: string; summary: string } | null,
-  loading: false, retrying: false, reading: false, busy: false, disconnected: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
+  loading: false, retrying: false, reading: false, busy: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
 let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void } | null = null;
@@ -125,11 +129,10 @@ function retire(pending: PendingExternal, accountKey: string) {
   state.revision++;
 }
 /** Ends this intent's record and, when it was the order's payment key, renews that key. */
-function release(pending: PendingExternal) {
-  const orderNo = state.orderNo;
-  const orderKey = pending.kind === 'ORDER_PAY' && !!orderNo && readOrderAction(state.accountKey, orderNo)?.key === pending.commandKey;
-  retire(pending, state.accountKey);
-  if (orderKey) clearOrderAction(state.accountKey, orderNo, pending.commandKey, true);
+function release(pending: PendingExternal, accountKey: string, orderNo: string) {
+  const orderKey = pending.kind === 'ORDER_PAY' && !!orderNo && readOrderAction(accountKey, orderNo)?.key === pending.commandKey;
+  retire(pending, accountKey);
+  if (orderKey) clearOrderAction(accountKey, orderNo, pending.commandKey, true);
   return orderKey;
 }
 function fingerprint(value: PurchasePaymentContext): string {
@@ -139,9 +142,6 @@ function fingerprint(value: PurchasePaymentContext): string {
   return JSON.stringify([value.kind, stable(value.payload)]);
 }
 function owns(version: number, accountKey: string) { return state.open && requestVersion === version && account() === accountKey && state.accountKey === accountKey; }
-function isDisconnected(error: unknown): boolean {
-  return error instanceof ApiError && error.kind === 'network' && error.message === 'NETWORK_DISCONNECTED';
-}
 function matches(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (intent.commandKey !== pending.commandKey || intent.kind !== pending.kind || intent.paymentQuoteId !== pending.paymentQuoteId
     || pending.paymentMethod !== undefined && intent.paymentMethod !== pending.paymentMethod
@@ -190,7 +190,15 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
   if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(pendingPayments().map(async pending => {
     const intent = await readIntent(pending);
-    if (!intent || intent.status === pending.lastStatus || !current() || account() !== accountKey || state.open) return;
+    if (!current() || account() !== accountKey || state.open) return;
+    if (!intent) {
+      if (pending.intentNo) {
+        const orderNo = pending.kind === 'ORDER_PAY' ? JSON.parse(pending.fingerprint)[1].orderNo : '';
+        releaseMissingPayment(pending, accountKey, orderNo);
+      }
+      return;
+    }
+    if (intent.status === pending.lastStatus) return;
     matches(intent, pending);
     if (intent.status === 'EXPIRED') { saveExpiry(accountKey, pending.commandKey, pending.kind); return; }
     if (!settled(intent)) return;
@@ -238,21 +246,24 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (conclusion) state.notice = conclusion;
 }
 /** The server holds no payment for this command: release it and its fences. Only the user may start another one, from the order. */
+function releaseMissingPayment(pending: PendingExternal, accountKey: string, orderNo: string) {
+  release(pending, accountKey, orderNo);
+  releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+  releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+}
 function gone(pending: PendingExternal, accountKey: string) {
   try {
-    release(pending);
-    releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-    releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+    releaseMissingPayment(pending, accountKey, state.orderNo);
   } catch {
     // Local cleanup can fail after the server has already answered definitively.
   }
-  Object.assign(state, { pending: null, intent: null, quote: null, disconnected: false });
+  Object.assign(state, { pending: null, intent: null, quote: null });
   conclude('gone');
 }
 function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
   releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
   releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
-  release(pending);
+  release(pending, accountKey, state.orderNo);
   Object.assign(state, { pending: null, quote: null, intent: null });
 }
 /** The payment ended with an answer: nothing of it stays behind the notice and no further read or write runs. */
@@ -398,23 +409,31 @@ function reconcileChannel() {
   if (other && available(other)) void select(other);
   else choose('WALLET');
 }
+function acceptQuoteContext(check: PurchaseContextCheck): boolean {
+  if (check === 'changed') throw new Error('PURCHASE_CONTEXT_CHANGED');
+  if (check === 'abandoned') { finish(null); return false; }
+  return true;
+}
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || state.originalRecovery || state.concluded || !context) return;
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
   if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; state.retryNotice = ''; }
-  state.method = method; state.quote = null; state.disconnected = false; state.retrying = false; state.canResubmit = false;
+  state.method = method; state.quote = null; state.retrying = false; state.canResubmit = false;
   clearTimeout(quoteTimer);
   const version = ++requestVersion, accountKey = state.accountKey, expected = context;
   if (method === 'WALLET' || !available(method)) { state.loading = false; return; }
   state.loading = true;
   try {
-    if (!expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
+    const before = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
+    if (!owns(version, accountKey) || !acceptQuoteContext(before)) return;
     const quote = await api.quote(expected.kind, method, expected.payload);
     if (!owns(version, accountKey)) return;
+    const after = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
+    if (!owns(version, accountKey) || !acceptQuoteContext(after)) return;
     // A trial's offset grows with accrual under one quote version, so only its rise needs a new confirmation.
     const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
-    if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged || !expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
+    if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged) throw new Error('PURCHASE_CONTEXT_CHANGED');
     state.quote = quote; quoteFailures = 0; state.retryNotice = '';
     const reviewed = confirmedQuote ?? reviewedQuote;
     if (reviewed && !samePaymentTerms(reviewed, quote)) {
@@ -426,6 +445,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     quoteTimer = setTimeout(() => { if (owns(version, accountKey)) void select(method); }, Math.min(2147483647, Math.max(1000, Date.parse(quote.expiresAt) - Date.now() - 30000)));
   } catch (error) {
     if (!owns(version, accountKey)) return;
+    if (expected.scopeCurrent?.() === false) { finish(null); return; }
     const cause = asApiError(error);
     if (cause.purchaseIntentNo && expected.kind !== 'ORDER_PAY') {
       state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: expected.kind, fingerprint: fingerprint(expected), summary: expected.summary };
@@ -506,7 +526,7 @@ async function query() {
         throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
       }
       if (pending && pending.commandKey !== intent?.commandKey) releaseUncreatedPayment(pending, accountKey);
-      state.disconnected = false; state.retrying = false;
+      state.retrying = false;
       if (intent) {
         const payload = JSON.parse(recovery.fingerprint)[1] as Record<string, unknown>;
         if (intent.kind === 'TRIAL_CONVERT') payload.expectedAmountUsdt = intent.subtotalUsdt;
@@ -529,7 +549,6 @@ async function query() {
     if (!pending) return;
     const result = await readIntent(pending);
     if (!owns(version, accountKey) || state.concluded) return;
-    state.disconnected = false;
     if (result) {
       state.canResubmit = false;
       accept(result, pending);
@@ -540,12 +559,9 @@ async function query() {
     }
     else if (pending.intentNo || pending.lookupOnly) gone(pending, accountKey);
     else state.canResubmit = true;
-  } catch (error) {
+  } catch {
     failed = true;
-    if (owns(version, accountKey) && !state.concluded) {
-      if (pending?.quotaRefusal) conclude(pending.quotaRefusal);
-      else state.disconnected = isDisconnected(error);
-    }
+    if (owns(version, accountKey) && !state.concluded && pending?.quotaRefusal) conclude(pending.quotaRefusal);
   }
   finally { if (owns(version, accountKey)) { state.reading = false; schedule(version, accountKey, failed); } }
 }
@@ -559,10 +575,10 @@ async function submitOriginal() {
   if (state.originalRecovery || pending.intentNo || pending.lookupOnly || pending.quotaRefusal) return query();
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false, lookup = false;
-  Object.assign(state, { busy: true, canResubmit: false, disconnected: false, retryNotice: '' });
+  Object.assign(state, { busy: true, canResubmit: false, retryNotice: '' });
   try {
     const intent = await api.create(pending.paymentQuoteId, pending.commandKey);
-    if (owns(version, accountKey) && !state.concluded) { state.disconnected = false; state.retryNotice = ''; accept(intent, pending); }
+    if (owns(version, accountKey) && !state.concluded) { state.retryNotice = ''; accept(intent, pending); }
   } catch (error) {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
@@ -571,7 +587,7 @@ async function submitOriginal() {
       const cause = asApiError(error);
       if (cause.purchaseIntentNo && pending.kind !== 'ORDER_PAY') {
         state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: pending.kind, fingerprint: pending.fingerprint, summary: pending.summary };
-        Object.assign(state, { disconnected: false, retrying: false, retryNotice: '' });
+        Object.assign(state, { retrying: false, retryNotice: '' });
         lookup = true;
         return;
       }
@@ -586,9 +602,9 @@ async function submitOriginal() {
       if (replacementRefusal) {
         // An existing intent is returned before the replacement precheck. This response ends the saved create attempt.
         releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-        release(pending);
+        release(pending, accountKey, state.orderNo);
         releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
-        Object.assign(state, { pending: null, quote: null, intent: null, disconnected: false });
+        Object.assign(state, { pending: null, quote: null, intent: null });
         context?.onReplacementRefused?.(replacementRefusal);
         conclude(replacementRefusal);
         return;
@@ -609,7 +625,6 @@ async function submitOriginal() {
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
           || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND');
       const definiteRefusal = !pending.intentNo && (paymentRefusal || rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
-      state.disconnected = isDisconnected(error);
       if (definiteRefusal) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
         // Another open payment ends every kind of purchase here; it must not fall back to quoting again.
@@ -631,7 +646,6 @@ async function submitOriginal() {
           return;
         }
         if (!owns(version, accountKey)) return;
-        state.disconnected = false;
         if (existing) accept(existing, pending);
         else {
           // A definite refusal plus a successful empty lookup releases the caller's matching unknown command too.
@@ -659,8 +673,20 @@ async function submitOriginal() {
   }
 }
 async function confirm() {
-  if (!context || state.loading || state.busy || state.pending || state.originalRecovery || account() !== state.accountKey) return;
-  if (!context.current()) { state.notice = 'changed'; return; }
+  const expected = context, accountKey = state.accountKey;
+  if (!expected || state.loading || state.busy || state.pending || state.originalRecovery || account() !== accountKey) return;
+  if (expected.checkCurrent) {
+    const version = requestVersion, notice = state.notice;
+    state.loading = true;
+    try {
+      const check = await expected.checkCurrent();
+      if (!owns(version, accountKey) || state.notice !== notice) return;
+      if (check === 'abandoned') { finish(null); return; }
+      if (check === 'changed') { state.notice = 'changed'; return; }
+    } finally {
+      if (owns(version, accountKey)) state.loading = false;
+    }
+  } else if (!expected.current()) { state.notice = 'changed'; return; }
   if (state.method === 'WALLET') { finish({ method: 'WALLET' }); return; }
   const quote = state.quote;
   if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { deadlinePassed(); return; }
@@ -670,14 +696,14 @@ async function confirm() {
     confirmedQuote = null; state.notice = 'quoteChanged'; return;
   }
   state.notice = ''; confirmedQuote = null;
-  const scope = fingerprint(context);
-  const commandKey = context.commandKey?.() ?? acquireAccountCommandKey(KEYS, state.accountKey, scope, 'purchase');
+  const scope = fingerprint(expected);
+  const commandKey = expected.commandKey?.() ?? acquireAccountCommandKey(KEYS, state.accountKey, scope, 'purchase');
   openCashierOnReady = quote.paymentMethod === 'HDPAY_BANK';
   clearTimeout(quoteTimer);
   const original = rows(state.accountKey).records[commandKey];
   if (original) { state.pending = original; await query(); return; }
-  const pending = { fingerprint: scope, kind: context.kind, commandKey, paymentQuoteId: quote.paymentQuoteId,
-    paymentMethod: quote.paymentMethod, network: quote.network, summary: context.summary };
+  const pending = { fingerprint: scope, kind: expected.kind, commandKey, paymentQuoteId: quote.paymentQuoteId,
+    paymentMethod: quote.paymentMethod, network: quote.network, summary: expected.summary };
   save(pending); state.pending = pending;
   await submitOriginal();
 }
@@ -690,7 +716,7 @@ function restart(step: 'bank' | 'methods') {
   if (!pending || state.busy || state.intent?.status !== 'EXPIRED') return;
   const orderNo = state.orderNo;
   if (!context && !orderNo) { finish(null); return; }
-  const orderKey = release(pending);
+  const orderKey = release(pending, state.accountKey, orderNo);
   // A reloaded dialog has no business callback. Re-read the original order and
   // its command before it may offer another payment, including promoted orders.
   if (!context) {
@@ -716,7 +742,7 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload'
     orderNo: value.orderNo ?? '', productNo: typeof productNo === 'string' ? productNo.trim() : '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null,
     policy: null, notice: '', retryNotice: '', cashier: false,
     pausedPaymentMethod: null, quote: null, intent: null, pending, originalRecovery: null,
-    loading: false, retrying: false, reading: false, busy: false, disconnected: false, canResubmit: false, concluded: false });
+    loading: false, retrying: false, reading: false, busy: false, canResubmit: false, concluded: false });
 }
 export function requestPurchasePayment(value: PurchasePaymentContext): Promise<PurchaseChoice | null> {
   if (state.open) throw new Error('PURCHASE_PAYMENT_ALREADY_OPEN');

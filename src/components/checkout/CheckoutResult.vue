@@ -14,9 +14,9 @@
         <view class="checkout-result__track" aria-hidden="true"><view class="checkout-result__fill" :class="'is-' + phase" /></view>
         <text class="checkout-result__progress-note">{{ phase === 'confirmed' ? copy.activationNext : phase === 'activating' ? copy.activationProgress : copy.activationComplete }}</text>
       </view>
-      <view v-if="productName || amount !== undefined" class="checkout-result__summary">
+      <view v-if="productName || showPaidAmount" class="checkout-result__summary">
         <text v-if="productName" class="checkout-result__product">{{ productName }}</text>
-        <view v-if="amount !== undefined" class="checkout-result__amount"><text>{{ state === 'activated' ? copy.paidAmount : copy.orderAmount }}</text><CheckoutAmount :value="amount" :currency="currency ?? 'USDT'" /></view>
+        <view v-if="showPaidAmount" class="checkout-result__amount"><text>{{ copy.paidAmount }}</text><CheckoutAmount :value="amount" :currency="currency ?? 'USDT'" /></view>
       </view>
       <slot />
     </view>
@@ -36,10 +36,11 @@ import { useLocaleStore } from '@/store/locale';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import NxButton from '@/components/ui/nx-button.vue';
 import CheckoutAmount from './CheckoutAmount.vue';
-const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error'; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
+const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
 const emit = defineEmits<{ (event: 'devices'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));
+const showPaidAmount = computed(() => props.paymentConfirmed && props.amount !== undefined);
 const phase = ref<'confirmed' | 'activating' | 'complete'>('complete');
 // Confetti for the purchase itself; a check pop and halo when activation completes.
 const celebrating = ref(false);

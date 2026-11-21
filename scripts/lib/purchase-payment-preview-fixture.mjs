@@ -7,6 +7,8 @@ import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
+export const previewPurchaseCashier = new URL('/__demo/purchase-cashier/', 'https://api.hdpayadmin.com');
+
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
 const money = value => (value / 100).toFixed(2);
@@ -219,7 +221,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       paymentRail: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
     }});
   }
-  const noProviderSuccess = ['waiting', 'urgent', 'late', 'remote-in-progress', 'expired', 'mismatch'];
+  const waitingModes = ['waiting', 'urgent', 'late', 'remote-in-progress', 'intent-missing'];
+  const noProviderSuccess = [...waitingModes, 'expired', 'mismatch'];
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
     const now = Date.now(), age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
@@ -233,7 +236,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status)) return intent;
     if (intent.status === 'AWAITING_PAYMENT') {
-      if (['waiting', 'urgent', 'late', 'remote-in-progress'].includes(scenario)) {
+      if (waitingModes.includes(scenario)) {
         if (!graceOver) return intent;
         closeUnpaidOrder(intent);
         expire(intent, 'PAYMENT_TIMEOUT');
@@ -419,7 +422,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intentNo = suspended?.intentNo ?? `PPI-PREVIEW-${++sequence}`;
       const intent = suspended ?? {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
-        paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
+        paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? new URL(intentNo, previewPurchaseCashier).href : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
         createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin};
       if (suspended) {

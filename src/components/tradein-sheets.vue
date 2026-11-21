@@ -314,13 +314,13 @@ import { CAPACITY_RECOVERY_TABLE, capacityIntent, readCapacityPending, type Capa
 import { CAPACITY_COMMAND_TABLE, readPendingKeepCommand, type PendingKeepCommand } from "@/lib/keep-command-recovery";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
+// Each step renders exactly one .tis-title; the dialog takes its accessible name from whichever one is on screen.
+const titleId = `tis-title-${getCurrentInstance()?.uid}`;
 const sheet = useTradeinSheet();
 const app = useApp();
 const pending = usePendingCheckout();
 const orders = useOrders();
 const t = useT();
-// Dialog name follows whichever single branch title is visible.
-const titleId = `tis-title-${getCurrentInstance()?.uid}`;
 const locale = useLocaleStore();
 const recoveryCopy = computed(()=>purchaseRecoveryCopy(locale.code));
 // 上架节奏门(FEAT-DEV02b):置换目标必须已正式上架,或处于抢先购窗口(开关默认关)。
@@ -390,6 +390,10 @@ const stopCapacityRelease = onPurchaseRecordReleased((accountKey, key) => {
   refreshKeepRecovery();
 });
 onUnmounted(stopCapacityRelease);
+// Once the original payment is confirmed gone, a keep-recovery sheet has nothing left to show or resume: close it
+// instead of leaving an empty dialog.
+watch(() => props.active && state.value.kind === 'keep-recovery' && !capacityRecovery.value && !capacityRecoveryUnavailable.value && !keepRecoveryError.value,
+  empty => { if (empty) hide(); });
 watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,state,
   ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl],()=>{
   capacityRecoveryGeneration++;
