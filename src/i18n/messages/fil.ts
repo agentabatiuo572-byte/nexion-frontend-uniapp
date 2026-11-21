@@ -4903,6 +4903,7 @@ export const fil: Messages = {
     availableDevices: "Available na device",
     buy: "Bilhin",
     stockUnavailable: "Wala munang slot ngayong period",
+    updatingNote: "Ina-update ang slot",
     focusedTierMissing: "Walang limit ng quota ang produktong ito. Tingnan ang page ng produkto para sa requirement sa pagbili.",
     pageTitle: "Quota ng hardware",
     yourInvites: "Na-activate na kaibigan",

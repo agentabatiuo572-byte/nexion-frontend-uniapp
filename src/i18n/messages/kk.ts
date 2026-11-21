@@ -4903,6 +4903,7 @@ export const kk: Messages = {
     availableDevices: "Құрылғылар",
     buy: "Сатып алу",
     stockUnavailable: "Бұл кезеңде орын әзірге жоқ",
+    updatingNote: "Орындар жаңартылуда",
     focusedTierMissing: "Бұл тауарда квота шегі жоқ. Сатып алу талаптарын тауар бетінен қараңыз.",
     pageTitle: "Жабдық квотасы",
     yourInvites: "Белсенді достар",

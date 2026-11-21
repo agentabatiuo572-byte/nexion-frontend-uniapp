@@ -4903,6 +4903,7 @@ export const uz: Messages = {
     availableDevices: "Mavjud qurilmalar",
     buy: "Olish",
     stockUnavailable: "Bu davrda hozircha joy yoʻq",
+    updatingNote: "Joylar yangilanmoqda",
     focusedTierMissing: "Bu mahsulotda kvota cheklovi yoʻq. Xarid shartlarini mahsulot sahifasida koʻring.",
     pageTitle: "Qurilma kvotasi",
     yourInvites: "Faol doʻstlar",
