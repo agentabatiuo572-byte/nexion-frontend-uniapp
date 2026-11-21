@@ -18,6 +18,11 @@ export function clearPreviewAccessToken(state) {
   sessions.delete(state);
 }
 
+export function previewSelectedAccountId(state) {
+  if (state.sessionState === 'signed-out' || state.authState === 'signed-out') return null;
+  return sessions.get(state)?.accountId ?? String(state.authUser?.userId ?? demoAccountId);
+}
+
 export function previewAccountId(state, headers) {
   if (state.sessionState === 'signed-out' || state.authState === 'signed-out') return null;
   const session = sessions.get(state);
