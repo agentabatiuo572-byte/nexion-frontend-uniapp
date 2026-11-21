@@ -123,11 +123,10 @@ function retire(pending: PendingExternal, accountKey: string) {
   state.revision++;
 }
 /** Ends this intent's record and, when it was the order's payment key, renews that key. */
-function release(pending: PendingExternal) {
-  const orderNo = state.orderNo;
-  const orderKey = pending.kind === 'ORDER_PAY' && !!orderNo && readOrderAction(state.accountKey, orderNo)?.key === pending.commandKey;
-  retire(pending, state.accountKey);
-  if (orderKey) clearOrderAction(state.accountKey, orderNo, pending.commandKey, true);
+function release(pending: PendingExternal, accountKey: string, orderNo: string) {
+  const orderKey = pending.kind === 'ORDER_PAY' && !!orderNo && readOrderAction(accountKey, orderNo)?.key === pending.commandKey;
+  retire(pending, accountKey);
+  if (orderKey) clearOrderAction(accountKey, orderNo, pending.commandKey, true);
   return orderKey;
 }
 function fingerprint(value: PurchasePaymentContext): string {
@@ -184,7 +183,15 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
   if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(pendingPayments().map(async pending => {
     const intent = await readIntent(pending);
-    if (!intent || intent.status === pending.lastStatus || !current() || account() !== accountKey || state.open) return;
+    if (!current() || account() !== accountKey || state.open) return;
+    if (!intent) {
+      if (pending.intentNo) {
+        const orderNo = pending.kind === 'ORDER_PAY' ? JSON.parse(pending.fingerprint)[1].orderNo : '';
+        releaseMissingPayment(pending, accountKey, orderNo);
+      }
+      return;
+    }
+    if (intent.status === pending.lastStatus) return;
     matches(intent, pending);
     if (intent.status === 'EXPIRED') { saveExpiry(accountKey, pending.commandKey, pending.kind); return; }
     if (!settled(intent)) return;
@@ -232,11 +239,14 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (conclusion) state.notice = conclusion;
 }
 /** The server holds no payment for this command: release it and its fences. Only the user may start another one, from the order. */
+function releaseMissingPayment(pending: PendingExternal, accountKey: string, orderNo: string) {
+  release(pending, accountKey, orderNo);
+  releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+  releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+}
 function gone(pending: PendingExternal, accountKey: string) {
   try {
-    release(pending);
-    releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-    releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+    releaseMissingPayment(pending, accountKey, state.orderNo);
   } catch {
     // Local cleanup can fail after the server has already answered definitively.
   }
@@ -246,7 +256,7 @@ function gone(pending: PendingExternal, accountKey: string) {
 function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
   releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
   releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
-  release(pending);
+  release(pending, accountKey, state.orderNo);
   Object.assign(state, { pending: null, quote: null, intent: null });
 }
 /** The payment ended with an answer: nothing of it stays behind the notice and no further read or write runs. */
@@ -529,7 +539,7 @@ async function submitOriginal() {
       if (replacementRefusal) {
         // An existing intent is returned before the replacement precheck. This response ends the saved create attempt.
         releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-        release(pending);
+        release(pending, accountKey, state.orderNo);
         releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
         Object.assign(state, { pending: null, quote: null, intent: null, error: false });
         context?.onReplacementRefused?.(replacementRefusal);
@@ -636,7 +646,7 @@ function restart(step: 'bank' | 'methods') {
   if (!pending || state.busy || state.intent?.status !== 'EXPIRED') return;
   const orderNo = state.orderNo;
   if (!context && !orderNo) { finish(null); return; }
-  const orderKey = release(pending);
+  const orderKey = release(pending, state.accountKey, orderNo);
   // A reloaded dialog has no business callback. Re-read the original order and
   // its command before it may offer another payment, including promoted orders.
   if (!context) {

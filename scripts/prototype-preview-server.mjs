@@ -16,6 +16,7 @@ import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { setTransferSampleOutcome } from './lib/prototype-demo-support.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
+import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.mjs';
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
@@ -69,9 +70,15 @@ const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
 // Runs in every App page before the App starts (design rule at demoSeedFleet). It drops the records of another
 // scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
-function previewScenarioPage(scenario,keys){
-  // The fixture's hosted URL is a placeholder. Keep the App on its current intent page.
+function previewScenarioPage(scenario,keys,purchaseCashierPrefix){
+  // Keep the bank top-up placeholder on its current page.
   window.navigation?.addEventListener('navigate',event=>{if(event.destination.url==='https://api.hdpayadmin.com/pay/demo-preview-only')event.preventDefault();});
+  // The app validates the hosted address first. Rewrite it before assigning the iframe's source.
+  const iframeSrc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src');
+  Object.defineProperty(HTMLIFrameElement.prototype,'src',{...iframeSrc,set(value){
+    const local=typeof value==='string'&&value.startsWith(purchaseCashierPrefix)?new URL(value).pathname:value;
+    iframeSrc.set.call(this,local);
+  }});
   if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
   const follow=value=>{if(value&&value!==scenario)location.reload();};
   // Once another page has entered a new scenario the shared records are that scenario's: this page may neither write nor
@@ -121,7 +128,7 @@ function previewTransferOutbox(run,sample) {
   localStorage.setItem(pendingKey,JSON.stringify(pending));
   sessionStorage.setItem(marker,JSON.stringify(sample?{run,key:sample.key,conversationNo:sample.conversationNo,slot:sample.slot}:null));
 }
-const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');'
+const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+');'
   +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(state.supportTransferSample??null)+');</script>';
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
@@ -135,6 +142,12 @@ const server=http.createServer(async(req,res)=>{
   try {
     const url=new URL(req.url,'http://127.0.0.1:'+server.address().port);
     res.setHeader('Cache-Control','no-store');
+    if(req.method==='GET'&&url.pathname.startsWith(previewPurchaseCashier.pathname)){
+      const intentNo=url.pathname.slice(previewPurchaseCashier.pathname.length);
+      if(!/^PPI-PREVIEW-\d+$/.test(intentNo)){res.writeHead(404);return res.end();}
+      res.setHeader('Content-Type',mime['.html']);
+      return res.end(`<!doctype html><html lang="zh"><meta charset="utf-8"><title>模拟银行卡收银台</title><h1>模拟银行卡收银台</h1><p>${intentNo}</p></html>`);
+    }
     if(checkoutFlow&&url.pathname==='/__checkout/state'){
       if(req.method==='POST'){
         let raw='';for await(const chunk of req)raw+=chunk;const update=JSON.parse(raw||'{}');
@@ -204,6 +217,7 @@ const server=http.createServer(async(req,res)=>{
           state.scenarioEpoch=++scenarioEpoch;
           checkoutFlow?.syncScenario();
         }
+        if(update.paymentState==='intent-missing')checkoutFlow?.markUnpaidIntentsMissing();
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.
