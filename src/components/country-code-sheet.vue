@@ -1,20 +1,19 @@
 <template>
   <view v-if="open" class="cc-layer">
-    <view class="cc-mask" @click="emit('close')" />
-    <view class="nx-glass-sheet cc-sheet" role="dialog" aria-modal="true" :aria-label="t.countryCodes.title" @click.stop @keydown.esc="emit('close')">
+    <view class="cc-mask" aria-hidden="true" @click="emit('close')" />
+    <view :id="id" class="nx-glass-sheet cc-sheet" role="dialog" aria-modal="true" :aria-label="t.countryCodes.title" @click.stop>
       <view class="cc-grab" />
       <view class="cc-head">
         <text class="cc-head__title">{{ t.countryCodes.title }}</text>
-        <view ref="closeRef" class="cc-head__close active:opacity-70" role="button" tabindex="0" :aria-label="t.countryCodes.close" @click="emit('close')" @keydown="onCloseKeydown">
+        <view class="cc-head__close active:opacity-70" role="button" tabindex="0" :aria-label="t.countryCodes.close" @click="emit('close')" @keydown="onCloseKeydown">
           <LiquidGlass :radius="22" tone="control" />
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
       <scroll-view class="cc-list" scroll-y :show-scrollbar="false" role="listbox" :aria-label="t.countryCodes.title">
         <view
-          v-for="(item, index) in COUNTRIES"
+          v-for="item in COUNTRIES"
           :key="item.code"
-          ref="rowRefs"
           class="cc-row"
           :class="{ 'cc-row--selected': item.code === modelValue, 'cc-row--disabled': !item.selectable }"
           role="option"
@@ -22,7 +21,7 @@
           :aria-selected="item.code === modelValue"
           :aria-disabled="!item.selectable"
           @click="select(item)"
-          @keydown="onRowKeydown($event, item, index)"
+          @keydown="onRowKeydown($event, item)"
         >
           <view class="cc-row__identity">
             <text class="cc-row__iso">{{ item.iso }}</text>
@@ -42,64 +41,32 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, getCurrentInstance } from "vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import { useT } from "@/i18n/use-t";
-import { useDialogScrollLock } from "@/composables/use-dialog-a11y";
-// #ifdef APP-PLUS
-import { registerNativeDialog } from "@/composables/use-dialog-a11y";
-// #endif
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { PHONE_COUNTRIES, type PhoneCountryProfile } from "@/auth/phone-number";
 
 const props = defineProps<{ open: boolean; modelValue: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "select", code: string): void }>();
-// #ifdef APP-PLUS
-// Above page sheets (0), below global masks (10/11). Keep this sheet's existing focus/keyboard handling.
-registerNativeDialog(computed(() => props.open), () => emit("close"), true, 1);
-// #endif
-useDialogScrollLock(computed(() => props.open));
+const id = `cc-sheet-${getCurrentInstance()?.uid}`;
+// One registered layer (03 §3.5): opened over the phone-change sheet it is the top layer, so Esc, Tab and the
+// screen reader stay in it, and closing hands focus back to the Country / region control. Native back priority 1:
+// above page sheets (0), below global masks (10/11).
+useDialogA11y(computed(() => props.open), `#${id}`, () => emit("close"), true, 1);
 const t = useT();
-type FocusableRef = { $el?: HTMLElement; focus?: () => void };
-const closeRef = ref<FocusableRef | null>(null);
-const rowRefs = ref<FocusableRef[]>([]);
-let previousFocus: HTMLElement | null = null;
-
-watch(() => props.open, (open) => {
-  void nextTick(() => {
-    if (open) {
-      previousFocus = typeof document !== "undefined" && document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-      focusElement(closeRef.value);
-      return;
-    }
-    previousFocus?.focus();
-    previousFocus = null;
-  });
-});
-
-function focusElement(target: FocusableRef | null | undefined) {
-  const element = target?.$el ?? target;
-  element?.focus?.();
-}
 
 function onCloseKeydown(e: KeyboardEvent) {
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
     emit("close");
-  } else if (e.key === "Tab" && e.shiftKey) {
-    e.preventDefault();
-    focusElement(rowRefs.value[lastSelectableIndex.value]);
   }
 }
 
-function onRowKeydown(e: KeyboardEvent, item: CountryRow, index: number) {
+function onRowKeydown(e: KeyboardEvent, item: CountryRow) {
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
     select(item);
-  } else if (e.key === "Tab" && !e.shiftKey && index === lastSelectableIndex.value) {
-    e.preventDefault();
-    focusElement(closeRef.value);
   }
 }
 
@@ -132,10 +99,6 @@ const COUNTRIES = computed<CountryRow[]>(() => PHONE_COUNTRIES.map((item) => ({
   name: countryName(item.iso),
   selectable: item.selectable,
 })));
-const lastSelectableIndex = computed(() => COUNTRIES.value.reduce(
-  (last, item, index) => item.selectable ? index : last,
-  -1,
-));
 
 function select(item: CountryRow) {
   if (!item.selectable) return;
@@ -169,7 +132,7 @@ function select(item: CountryRow) {
 .cc-row--selected + .cc-row { border-top-color: transparent; }
 .cc-row--disabled { cursor: not-allowed; opacity: 0.38; }
 .cc-row__identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
-.cc-row__iso { flex: 0 0 30px; height: 24px; border-radius: 7px; background: var(--v5-surface-2); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-v5); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--v5-ink-3); }
+.cc-row__iso { flex: 0 0 30px; height: 24px; border-radius: 7px; background: var(--v5-surface-2); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-v5); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: var(--v5-ink-3); }
 .cc-row__name { font-size: var(--ui-type-list-title); font-weight: 500; color: var(--v5-ink-2); }
 .cc-row__end { display: flex; align-items: center; gap: 10px; }
 .cc-row__code { min-width: 42px; text-align: right; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--v5-ink-3); }
