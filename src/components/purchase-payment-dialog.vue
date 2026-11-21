@@ -557,6 +557,8 @@ watch(visibleCashierUrl, url => {
   const view = plus.webview.create('', `uvel-purchase-cashier-${Date.now()}`, {
     // Match the existing cashier frame: status bar + 56px header row + 26px secure row.
     top: `${statusBar + 82}px`, bottom: `${CASHIER_FOOT}px`, plusrequire: 'none',
+    // Android leaves accelerated canvas out of view.draw(); the hosted QR is a canvas, so render this view in software.
+    hardwareAccelerated: false,
   });
   cashierView = view;
   // The hosted URL was validated at entry. The cashier may then navigate to any HTTPS page.
