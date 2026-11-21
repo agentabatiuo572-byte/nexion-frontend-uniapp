@@ -491,15 +491,11 @@ function demoLiveActivity(product,now) {
 // Read the effective task projection used by the preview before changing the source or payment.
 export function demoReplacementSourceCheck(source, state, external, read) {
   if(source?.activatedAt==null)return {assignment:null,refusal:null};
-  const explicitV2=state.computeState!=null&&!['app','cycles'].includes(state.computeState);
-  let projection=read('/api/tasks/assignments');
-  if(explicitV2||(projection.protocolVersion!==3&&projection.devices.length)){
-    try { projection=read('/api/tasks/v2/assignments'); }
-    catch(error) { if(error.status!==404&&error.status!==501)throw error; }
-  }
+  const explicitV2=!['app','cycles'].includes(state.computeState??'app');
+  const projection=read(explicitV2?'/api/tasks/v2/assignments':'/api/tasks/assignments');
   const assignment=projection.devices.find(row=>row.deviceId===source.id);
   const task=assignment?.currentTask;
-  if(projection.protocolVersion===2){
+  if(explicitV2){
     if(assignment?.recoveryPending)return {assignment,refusal:'COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED'};
     const drained=!task||(task.startedAt==null?task.status==='FAILED':['COMPLETED','FAILED','CANCELLED'].includes(task.status));
     return {assignment,refusal:drained?null:'COMPUTE_V2_DEVICE_BUSY'};
@@ -807,9 +803,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   };
   if(pathname==='/api/app/trade-in/quote'){
     const input=request.postDataJSON();
-    const quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo);
-    checkWalletSource(quote.sourceDeviceId);
-    return quote;
+    return tradeinQuote(input.sourceDeviceId,input.targetProductNo);
   }
   if(pathname==='/api/app/trade-in/submit'||pathname==='/api/app/trade-in/capacity-replace'){
     const replacingCapacity=pathname.endsWith('/capacity-replace');
@@ -874,11 +868,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
     return data;
   }
-  if(pathname==='/api/app/trade-in/capacity-quote'){
-    const quote=capacityQuote();
-    if(quote.decision==='REPLACE_REQUIRED')checkWalletSource(quote.sourceDeviceId);
-    return quote;
-  }
+  if(pathname==='/api/app/trade-in/capacity-quote')return capacityQuote();
   if(pathname==='/api/orders/quote') {
     const input=request.postDataJSON();
     requireDemoPurchase(state,products,input.items,now);
