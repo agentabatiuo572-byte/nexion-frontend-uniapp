@@ -10,7 +10,7 @@
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
       <view v-if="(originalOrderNavigationFailed || (pendingCheckoutCreate && !createdCheckoutOrder)) && !paymentFlowBusy" class="checkout-original-open nx-step-in" role="status">
-        <view class="checkout-original-open-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h4" /></svg></view><text class="checkout-original-open-title">{{ originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle }}</text><text class="checkout-original-open-body">{{ originalOrderNavigationFailed ? t.store.coOriginalOrderOpenHint : t.store.coRecoverOriginalOrder }}</text>
+        <view class="checkout-original-open-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h4" /></svg></view><text class="checkout-original-open-title">{{ originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle }}</text><text class="checkout-original-open-body">{{ originalOrderNavigationFailed ? t.store.coOriginalOrderOpenHint : t.store.coPendingCreateHint }}</text>
       </view>
       <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : purchaseRecoveryCopy(locale.code).original }}</text>
@@ -1873,7 +1873,7 @@ async function retryOriginalCheckout() {
     pendingCheckoutCreate.value = null;
     await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`, scope);
   } catch {
-    if (isCurrentCheckoutRoute(scope)) toast.warn(t.value.store.coRecoverOriginalOrder);
+    if (isCurrentCheckoutRoute(scope)) toast.warn(t.value.store.coPendingCreateHint);
   } finally {
     if (attempt === checkoutLeaveAttempt) checkoutLeaving.value = false;
   }
