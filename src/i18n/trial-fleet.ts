@@ -52,7 +52,7 @@ export const trialFleetCopy = {
     slotsUnknown: "Hindi available ang capacity ng device. Mag-refresh at subukan ulit.", slotsChecking: "Sinusuri ang capacity ng device. Sandali lang.", cancelBusy: "Kinakansela ang trial", cancel: "I-cancel ang trial",
   },
   ru: {
-    imageBadge: "Пробный период", statusUnknown: "Статус неизвестен",
+    imageBadge: "Пробный", statusUnknown: "Статус неизвестен",
     longRemaining: '{days} дн. {hours} ч',
     grace: "Пробный период окончен · бонус доступен", remaining: "Осталось", creditRemaining: "Бонус сгорит через",
     availableCredit: "Доступный бонус", estimate: "≈ пробный бонус", details: "О пробном периоде", detailsAction: "Детали", buyEarly: "Купить раньше", buy: "Купить с бонусом",

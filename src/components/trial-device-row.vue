@@ -3,7 +3,7 @@
     <view class="trial-device-row__heading" :role="variant === 'inventory' ? undefined : 'button'" :tabindex="variant === 'inventory' ? undefined : '0'" :aria-label="`${copy.details}: ${presentation.deviceName.value || '—'} · ${statusText} · ${presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining} ${remainingText}`" :aria-expanded="variant === 'earn' ? isExpanded : undefined" :aria-controls="variant === 'earn' ? `trial-device-details-${variant}` : undefined" @click="onRowClick" @keydown.enter.stop.prevent="onRowClick" @keydown.space.stop.prevent="onRowClick">
       <view class="trial-device-row__main">
         <view class="trial-device-row__art" aria-hidden="true"><image v-if="presentation.imageUrl.value" class="trial-device-row__image" :src="presentation.imageUrl.value" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view>
-        <view class="trial-device-row__identity"><text class="trial-device-row__name">{{ presentation.deviceName.value || '—' }}</text><text v-if="variant === 'inventory'" class="trial-device-row__tag">{{ copy.imageBadge }}</text><text class="trial-device-row__status" :class="{ 'trial-device-row__status--online': isOnline }">{{ statusText }}</text></view>
+        <view class="trial-device-row__identity"><text class="trial-device-row__name">{{ presentation.deviceName.value || '—' }}</text><NxTag v-if="variant === 'inventory'" class="trial-device-row__tag" tone="brand">{{ copy.imageBadge }}</NxTag><text class="trial-device-row__status" :class="{ 'trial-device-row__status--online': isOnline }">{{ statusText }}</text></view>
       </view>
       <view class="trial-device-row__summary">
         <view class="trial-device-row__time"><text>{{ presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining }}</text><text class="trial-device-row__remaining">{{ remainingText }}</text></view>
@@ -29,6 +29,7 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useFreeTrial } from "@/store/free-trial";
@@ -135,21 +136,29 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__heading:active { opacity:1; }
 .trial-device-row--inventory .trial-device-row__chevron { display:none; }
 .trial-device-row--inventory .trial-device-row__image-badge { display:none; }
-.trial-device-row--inventory .trial-device-row__identity { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; column-gap:8px; }
-.trial-device-row--inventory .trial-device-row__identity > .trial-device-row__status { grid-column:1 / -1; }
-.trial-device-row__tag { justify-self:start; height:24px; padding:0 8px; border-radius:var(--v5-radius-full); background:var(--v5-brand-soft); color:var(--v5-brand); font:500 12px/24px var(--font-v5); white-space:nowrap; }
+/* Name and trial tag (NxTag, 03 §3.8) share a line while they fit; otherwise the whole tag moves under the name, so it
+   never runs into the remaining time on the right in any language (03 §3.6.1). */
+.trial-device-row--inventory .trial-device-row__identity { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.trial-device-row--inventory .trial-device-row__identity > .trial-device-row__name { min-width:0; max-width:100%; overflow-wrap:break-word; }
+.trial-device-row--inventory .trial-device-row__identity > .trial-device-row__status { flex-basis:100%; margin-top:0; }
+.trial-device-row--inventory .trial-device-row__time > text { overflow-wrap:break-word; }
 .trial-device-row--inventory .trial-device-row__art { width:84px; height:72px; overflow:visible; }
 .trial-device-row--inventory .trial-device-row__image { width:78px; height:64px; margin-top:-4px; }
 .trial-device-row--inventory .trial-device-row__name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__remaining { font:500 15px/20px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__body { padding:0; }
+/* The warehouse card already states the grace status under the name; the body does not repeat it (copy-rules). */
+.trial-device-row--inventory .trial-device-row__state { display:none; }
 .trial-device-row--inventory .trial-device-row__credit-block { margin-top:12px; padding:12px; border-radius:var(--v5-radius-s); background:var(--v5-surface-2); }
 .trial-device-row--inventory .trial-device-row__credit { margin-top:0; }
 .trial-device-row--inventory .trial-device-row__amount { font-family:var(--font-amount); font-size:22px; line-height:28px; font-weight:500; letter-spacing:-.02em; }
 .trial-device-row--inventory .trial-device-row__progress { height:6px; }
 .trial-device-row__progress > view { animation:nx-viz-grow 1400ms cubic-bezier(.16,1,.3,1) both; }
-.trial-device-row--inventory .trial-device-row__actions { margin-top:12px; }
-.trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; padding:0; color:var(--v5-ink-3); font:500 13px/18px var(--font-v5); }
+/* Actions sit right (03 §3.1); 取消试用 keeps the left edge, and a button that no longer fits wraps whole to the right of the next line (03 §3.6.1). */
+.trial-device-row--inventory .trial-device-row__actions { margin-top:12px; justify-content:flex-end; }
+/* Cancelling the trial is destructive: a neutral glass S like 详情, with only its text in the error colour (03 §3.1). */
+.trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; color:var(--v5-danger); }
+.trial-device-row--inventory .trial-device-row__actions > view { font:var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); white-space:nowrap; }
 .trial-device-row--inventory .trial-device-row__main { gap:12px; }
 .trial-device-row--inventory .trial-device-row__status { font:400 13px/18px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__note { font:400 12px/18px var(--font-v5); }
@@ -159,10 +168,10 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 /* Compact actions are glass pills: neutral for details, brand-tinted for buying early. */
 .trial-device-row--inventory .trial-device-row__details { color:var(--v5-ink); }
 .trial-device-row--inventory .trial-device-row__buy { gap:4px; }
-.trial-device-row--inventory .trial-device-row__details::before,.trial-device-row--inventory .trial-device-row__buy::before { border:0;
+.trial-device-row--inventory .trial-device-row__details::before,.trial-device-row--inventory .trial-device-row__buy::before,.trial-device-row--inventory .trial-device-row__cancel--inline::before { border:0;
   background:linear-gradient(145deg,rgba(255,255,255,.06),transparent 38%,transparent 66%,rgba(255,255,255,.06)),var(--trial-pill-fill,color-mix(in srgb,var(--v5-ink) 7%,transparent));
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.10),inset 0 3px 6px -2px rgba(255,255,255,.24),inset 2px 0 8px -4px rgba(255,255,255,.24),inset 0 -4px 9px -4px rgba(0,0,0,.28); }
-[data-theme="light"] .trial-device-row--inventory .trial-device-row__details::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__buy::before {
+[data-theme="light"] .trial-device-row--inventory .trial-device-row__details::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__buy::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__cancel--inline::before {
   background:linear-gradient(145deg,rgba(255,255,255,.30),transparent 38%,transparent 66%,rgba(255,255,255,.30)),var(--trial-pill-fill,color-mix(in srgb,var(--v5-ink) 7%,transparent));
   box-shadow:inset 0 0 0 1px rgba(73,94,125,.12),inset 0 3px 6px -2px rgba(255,255,255,.85),inset 2px 0 8px -4px rgba(255,255,255,.85),inset 0 -4px 9px -4px rgba(87,115,155,.18); }
 .trial-device-row--inventory .trial-device-row__buy { --trial-pill-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent); }
