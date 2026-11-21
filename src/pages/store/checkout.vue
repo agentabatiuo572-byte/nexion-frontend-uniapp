@@ -2626,7 +2626,7 @@ function refreshVisibleCheckout(retryCatalog = false) {
   } else void resumeReadyCheckout(captureCheckoutRoute(), settleProductCatalogRefresh(refreshProductCatalog(true)));
 }
 
-onShow(() => {
+function showCheckout() {
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
   void freeTrial.refreshVisible();
@@ -2646,8 +2646,34 @@ onShow(() => {
   void refreshServerProductPhase(true);
   void refreshCheckoutWallet();
   restoreReceiptRecovery();
+}
+
+// #ifdef H5
+let checkoutHistoryEntry: { href: string; position: number | undefined } | null = null;
+let checkoutShownFromHistory = false;
+function restoreCheckoutFromHistory() {
+  if (!pageAlive || pageVisible || promotionRoute.value || !checkoutHistoryEntry
+      || window.location.href !== checkoutHistoryEntry.href
+      || window.history.state?.position !== checkoutHistoryEntry.position
+      || !isTopCheckoutPage()) return;
+  checkoutShownFromHistory = true;
+  showCheckout();
+}
+onMounted(() => window.addEventListener("popstate", restoreCheckoutFromHistory));
+// #endif
+
+onShow(() => {
+  // #ifdef H5
+  checkoutHistoryEntry = { href: window.location.href, position: window.history.state?.position };
+  if (checkoutShownFromHistory) return;
+  // #endif
+  showCheckout();
 });
+
 onHide(() => {
+  // #ifdef H5
+  checkoutShownFromHistory = false;
+  // #endif
   closePaymentSheet();
   purchasePolicyOpen.value = false;
   tradein.hide();
@@ -3060,6 +3086,9 @@ function goTrack() {
 // 任何全局层都是在动别人的东西。
 function cleanup() {
   if (!pageAlive) return;
+  // #ifdef H5
+  window.removeEventListener("popstate", restoreCheckoutFromHistory);
+  // #endif
   closePaymentSheet();
   clearAdvance();
   pageVisible = false;
