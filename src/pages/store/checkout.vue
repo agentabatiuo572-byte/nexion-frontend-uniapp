@@ -1049,6 +1049,7 @@ let interceptFired = false;
 let checkoutCapacityRead: Promise<boolean | undefined> | null = null;
 const remoteCapacityGate = reactive(new RemoteCapacityGate());
 const checkoutCapacityRefusal = ref<"product-unavailable" | "purchase-conditions" | null>(null);
+const checkoutCapacityTradeinRejection = ref<ReturnType<typeof tradeinPaymentRejection>>();
 const checkoutOnboardingRequired = ref(false);
 const checkoutCapacityReadFailed = ref(false);
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
@@ -1057,6 +1058,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   checkoutCapacityReadFailed.value = false;
   remoteCapacityGate.reset();
   checkoutCapacityRefusal.value = null;
+  checkoutCapacityTradeinRejection.value = undefined;
   checkoutOnboardingRequired.value = false;
   checkoutCapacityRead = null;
   checkoutWalletRefreshSequence += 1;
@@ -1119,6 +1121,7 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): 
     if (remoteCapacityGate.pending) return checkoutCapacityRead ?? undefined;
     const requestScope = captureCheckoutRoute();
     checkoutCapacityRefusal.value = null;
+    checkoutCapacityTradeinRejection.value = undefined;
     // Capacity is the mandatory server safety gate; trade-in eligibility is an
     // optional enhancement. A transient eligibility failure must not reject an
     // otherwise ordinary purchase, matching the prototype's local flow where
@@ -1182,10 +1185,10 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' = 'review'): 
       } else if (isApiRefusal(failure, 403, "PURCHASE_GATE_NOT_MET", "PURCHASE_GATE_SOLD_OUT")) {
         checkoutCapacityRefusal.value = "purchase-conditions";
       }
-      const rejection = tradeinPaymentRejection(failure);
-      checkoutCapacityReadFailed.value = !checkoutOnboardingRequired.value && !checkoutCapacityRefusal.value && !rejection;
+      checkoutCapacityTradeinRejection.value = tradeinPaymentRejection(failure);
+      checkoutCapacityReadFailed.value = !checkoutOnboardingRequired.value && !checkoutCapacityRefusal.value
+        && !checkoutCapacityTradeinRejection.value;
       tradeinAvailable.value = false;
-      if (rejection) toast.warn(flowCopy.value.cannotPay, flowCopy.value[rejection]);
     });
     return checkoutCapacityRead;
   }
@@ -1337,9 +1340,11 @@ const checkoutCapacityMessage = computed(() => remoteCapacityGate.pending || !qu
   : checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : checkoutCapacityRefusal.value === "product-unavailable" ? t.value.store.coCapacityProductUnavailable
   : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
+  : checkoutCapacityTradeinRejection.value ? flowCopy.value[checkoutCapacityTradeinRejection.value]
   : remoteCapacityGate.decision === "REPLACE_REQUIRED" ? slotsFullText.value
   : remoteCapacityGate.decision === "NO_ACTIVE_DEVICE" ? t.value.tradein.errNoActiveDevice
-  : t.value.store.coCapacityUnavailable);
+  : checkoutCapacityReadFailed.value ? t.value.store.coCapacityUnavailable
+  : t.value.store.coCapacityChecking);
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
@@ -1442,7 +1447,7 @@ function goConfirm() {
   if (step.value !== "select-payment") return;
   const hasCanonicalTradein = Boolean(appliedTradeinView.value?.canonicalQuote);
   if (checkoutCapacityRequired.value && !remoteCapacityGate.canConfirm(hasCanonicalTradein)) {
-    toast.warn(checkoutCapacityMessage.value);
+    if (!checkoutCapacityTradeinRejection.value && !checkoutCapacityReadFailed.value) toast.warn(checkoutCapacityMessage.value);
     return;
   }
   step.value = "confirm";
@@ -1650,7 +1655,7 @@ async function onConfirmPay() {
     // fresh purchase, including a confirmation retained across page hide/show.
     if (!createdCheckoutOrder.value && checkoutCapacityRequired.value && !remoteCapacityGate.canConfirm(Boolean(appliedTradeinView.value?.canonicalQuote))) {
       confirming = false;
-      toast.warn(checkoutCapacityMessage.value);
+      if (!checkoutCapacityTradeinRejection.value && !checkoutCapacityReadFailed.value) toast.warn(checkoutCapacityMessage.value);
       step.value = "select-payment";
       return;
     }
@@ -2668,6 +2673,7 @@ onHide(() => {
   checkoutCapacityReadFailed.value = false;
   remoteCapacityGate.reset();
   checkoutCapacityRefusal.value = null;
+  checkoutCapacityTradeinRejection.value = undefined;
   checkoutOnboardingRequired.value = false;
   checkoutCapacityRead = null;
   if (dialogsOpen > 0) useUI().clearConfirmsBy(dialogOwner);
