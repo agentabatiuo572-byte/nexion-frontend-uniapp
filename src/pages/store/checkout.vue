@@ -282,7 +282,8 @@ import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
-import { readCapacityPending } from '@/lib/capacity-command-recovery';
+import { CAPACITY_RECOVERY_TABLE, readCapacityPending } from '@/lib/capacity-command-recovery';
+import { CHECKOUT_FLEET_TABLE } from '@/lib/checkout-fleet-change';
 import { checkoutQuoteBlock, validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
 import { takeNavigationQuery } from '@/lib/route';
 import { promotionCheckoutHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
@@ -306,9 +307,9 @@ import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
-import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
-import { rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
-import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
+import { acquireAccountCommandKey, readAccountRow, readAccountStorageEventRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { CHECKOUT_ORDER_TABLE, rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
+import { CHECKOUT_CREATE_TABLE, readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
 import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
@@ -2847,6 +2848,83 @@ function showCheckout() {
 // #ifdef H5
 let checkoutHistoryEntry: { href: string; position: number | undefined } | null = null;
 let checkoutShownFromHistory = false;
+type CheckoutSync = { scope: CheckoutRouteScope; orderNo?: string; recovery?: boolean; capacity?: boolean };
+type CheckoutOrderEventRow = { orders?: Record<string, Partial<CheckoutTradeinRecovery>> };
+type CheckoutCreateEventRow = { creates?: Record<string, unknown> };
+const checkoutSync = shallowRef<CheckoutSync | null>(null);
+let checkoutSyncInFlight = false;
+
+function onCheckoutStorage(event: StorageEvent) {
+  if (!remoteApiEnabled || !pageVisible || !checkoutRouteInitialized || promotionRoute.value
+      || event.storageArea !== window.localStorage || event.oldValue === event.newValue) return;
+  const scope = captureCheckoutRoute();
+  const change: CheckoutSync = { scope };
+  switch (event.key) {
+    case CHECKOUT_ORDER_TABLE: {
+      const before = readAccountStorageEventRow<CheckoutOrderEventRow>(event.oldValue, scope.accountKey)?.orders?.[scope.productNo];
+      const after = readAccountStorageEventRow<CheckoutOrderEventRow>(event.newValue, scope.accountKey)?.orders?.[scope.productNo];
+      if (JSON.stringify(before) === JSON.stringify(after)) return;
+      const pointer = after ?? before;
+      const orderNo = pointer?.tradeinQuote ? pointer.tradeinResult?.orderNo : pointer?.orderNo;
+      if (typeof orderNo === "string" && orderNo) change.orderNo = orderNo;
+      else change.recovery = true;
+      break;
+    }
+    case CHECKOUT_CREATE_TABLE: {
+      const before = readAccountStorageEventRow<CheckoutCreateEventRow>(event.oldValue, scope.accountKey)?.creates?.[scope.productNo];
+      const after = readAccountStorageEventRow<CheckoutCreateEventRow>(event.newValue, scope.accountKey)?.creates?.[scope.productNo];
+      if (JSON.stringify(before) === JSON.stringify(after)) return;
+      change.recovery = true;
+      break;
+    }
+    case CAPACITY_RECOVERY_TABLE:
+    case CHECKOUT_FLEET_TABLE:
+      if (JSON.stringify(readAccountStorageEventRow(event.oldValue, scope.accountKey))
+          === JSON.stringify(readAccountStorageEventRow(event.newValue, scope.accountKey))) return;
+      change.capacity = true;
+      break;
+    default:
+      return;
+  }
+  const queued = checkoutSync.value;
+  checkoutSync.value = queued && isCurrentCheckoutRoute(queued.scope) ? { ...queued, ...change } : change;
+}
+
+async function syncCheckoutFromOtherTab() {
+  const change = checkoutSync.value;
+  if (!change || checkoutSyncInFlight || activeCheckoutLoad || paymentFlowBusy.value || purchasePayment.state.open
+      || checkoutLeaving.value || remoteCapacityGate.pending || !foregroundReadAllowed() || !isTopCheckoutPage()) return;
+  checkoutSync.value = null;
+  if (!isCurrentCheckoutRoute(change.scope) || createdCheckoutOrder.value || settledResultReplay.value) return;
+  checkoutSyncInFlight = true;
+  try {
+    if (change.orderNo) {
+      await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(change.orderNo)}`, change.scope);
+      return;
+    }
+    if (change.recovery) {
+      pendingCheckoutCreate.value = readCheckoutCreate(change.scope.accountKey, change.scope.productNo);
+      if (pendingCheckoutCreate.value || await resumePendingRemoteTradein(change.scope, { navigate: true, readOnly: true })) return;
+    }
+    if (change.capacity && isCurrentCheckoutRoute(change.scope)) {
+      const oldRecovery = keepCheckoutRecovery.value;
+      if (recoverCapacityBeforePurchase([change.scope.productNo])) return;
+      if (oldRecovery && tradein.state.kind === "keep-recovery") tradein.hide();
+      if (checkoutCapacityRequired.value) await retryCheckoutCapacity();
+    }
+  } catch {
+    // Existing checkout recovery owns unreadable records.
+  } finally {
+    checkoutSyncInFlight = false;
+    if (checkoutSync.value) void syncCheckoutFromOtherTab();
+  }
+}
+
+watch([checkoutSync, foregroundReadAllowed, quantityReady, ordinaryCheckoutInitialized, paymentFlowBusy, checkoutLeaving,
+  () => purchasePayment.state.open, () => remoteCapacityGate.pending], () => {
+  void syncCheckoutFromOtherTab();
+});
+
 function restoreCheckoutFromHistory() {
   if (!pageAlive || pageVisible || !checkoutHistoryEntry
       || window.location.href !== checkoutHistoryEntry.href
@@ -2855,11 +2933,16 @@ function restoreCheckoutFromHistory() {
   checkoutShownFromHistory = true;
   showCheckout();
 }
-onMounted(() => window.addEventListener("popstate", restoreCheckoutFromHistory));
+onMounted(() => {
+  window.addEventListener("popstate", restoreCheckoutFromHistory);
+  window.addEventListener("storage", onCheckoutStorage);
+});
 // #endif
 
 onShow(() => {
   // #ifdef H5
+  // uni-app also calls page onShow when the browser tab becomes visible.
+  if (remoteApiEnabled && !promotionRoute.value && pageVisible && checkoutHistoryEntry) return;
   checkoutHistoryEntry = { href: window.location.href, position: window.history.state?.position };
   if (checkoutShownFromHistory) return;
   // #endif
@@ -2873,6 +2956,11 @@ onHide(() => {
   closePaymentSheet();
   purchasePolicyOpen.value = false;
   tradein.hide();
+  // #ifdef H5
+  // A hidden document pauses background reads through foregroundReadAllowed.
+  // Keep the checkout route and its confirmed quote for the same page.
+  if (remoteApiEnabled && !promotionRoute.value && document.hidden) return;
+  // #endif
   pageVisible = false;
   if(promotionRoute.value){promotionCheckout.value?.hide();return;}
   invalidateCheckoutRoute(true);
@@ -3285,6 +3373,7 @@ function cleanup() {
   if (!pageAlive) return;
   // #ifdef H5
   window.removeEventListener("popstate", restoreCheckoutFromHistory);
+  window.removeEventListener("storage", onCheckoutStorage);
   // #endif
   stopCheckoutCapacityRelease();
   closePaymentSheet();

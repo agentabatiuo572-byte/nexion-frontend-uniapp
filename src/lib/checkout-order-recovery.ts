@@ -2,7 +2,8 @@ import type { CanonicalTradeinQuote, CanonicalTradeinResult } from "@/api/device
 import type { CanonicalOrder, CanonicalOrderList, OrderApi } from "@/api/order-api";
 import { readAccountRow, writeAccountRow, releaseAccountCommandKey } from "@/store/account-scoped-storage";
 
-const KEY = "nexgrid-checkout-server-order-recovery-v1";
+export const CHECKOUT_ORDER_TABLE = "nexgrid-checkout-server-order-recovery-v1";
+const KEY = CHECKOUT_ORDER_TABLE;
 const COMMANDS_KEY = "nexgrid-remote-checkout-commands-v1";
 type Pointer = { productNo: string; orderNo: string; intent: string; commandKey: string;
   tradeinQuote?: CanonicalTradeinQuote; tradeinResult?: CanonicalTradeinResult; tradeinCommandSubmitted?: boolean };

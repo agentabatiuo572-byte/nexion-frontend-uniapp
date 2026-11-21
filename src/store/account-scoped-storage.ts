@@ -24,13 +24,27 @@ export function readAccountRow<T>(tableKey: string, accountKey: string, throwOnR
 export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T): boolean {
   try {
     const raw = uni.getStorageSync(tableKey) as Record<string, T> | "";
+    const key = normalizeAccountKey(accountKey);
+    // #ifdef H5
+    if (raw && typeof raw === "object" && JSON.stringify(raw[key]) === JSON.stringify(row)) return true;
+    // #endif
     const table = raw && typeof raw === "object" ? { ...raw } : ({} as Record<string, T>);
-    table[normalizeAccountKey(accountKey)] = row;
+    table[key] = row;
     uni.setStorageSync(tableKey, table);
     return true;
   } catch {
     // storage unavailable
     return false;
+  }
+}
+
+/** uni-app wraps H5 storage records in {type, data}. Compare only the current account's data. */
+export function readAccountStorageEventRow<T = unknown>(raw: string | null, accountKey: string): T | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw)?.data?.[normalizeAccountKey(accountKey)];
+  } catch {
+    return undefined;
   }
 }
 

@@ -187,13 +187,13 @@ import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
-import { ref, computed, watch, nextTick, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { discoverOrderPayment, pendingOrderPayment, refusedPurchasePayment, usePurchasePayment, onPurchaseRecordReleased, type PurchaseContextCheck } from "@/store/purchase-payment";
+import { discoverOrderPayment, isOrderDeliveredStorageChange, pendingOrderPayment, refusedPurchasePayment, usePurchasePayment, onPurchaseRecordReleased, type PurchaseContextCheck } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue";
@@ -221,11 +221,12 @@ import { asApiError } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { paidOrderReceipt, type PaidOrderReceipt } from "@/api/order-api";
 import { readPaymentCommand } from '@/api/payment-command-api';
-import { beginOrderAction,readOrderAction,markOrderActionPaid,clearOrderAction,type PendingOrderAction } from '@/lib/order-command-fence';
+import { beginOrderAction,isOrderPaidStorageChange,readOrderAction,markOrderActionPaid,clearOrderAction,type PendingOrderAction } from '@/lib/order-command-fence';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import EmptyState from "@/components/empty-state.vue";
 
 const t = useT();
@@ -619,6 +620,28 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
 const purchaseReadBusy = () => remoteOrderRefreshing.value || orderCommandReading.value || orderCommandQuerying.value
   || payingFromWallet.value || cancellingOrder.value || pendingPaymentChecking.value || autoPayRequested.value
   || paymentSheetOpen.value || walletRefreshing.value;
+
+// #ifdef H5
+const peerOrderPayment = ref<{ account: ReturnType<typeof captureAccountScope>; orderNo: string } | null>(null);
+function onOrderPaymentStorage(event: StorageEvent) {
+  if (!remoteApiEnabled || !id.value || event.storageArea !== window.localStorage || event.oldValue === event.newValue) return;
+  const account = captureAccountScope();
+  if (isOrderPaidStorageChange(event, account.accountKey, id.value)
+      || isOrderDeliveredStorageChange(event, account.accountKey, id.value)) {
+    peerOrderPayment.value = { account, orderNo: id.value };
+  }
+}
+watch([peerOrderPayment, foregroundReadAllowed, purchaseReadBusy, remoteOrderBoundAccount], () => {
+  const change = peerOrderPayment.value;
+  if (!change || !detailVisible || !foregroundReadAllowed() || purchaseReadBusy() || !remoteOrderBoundAccount.value) return;
+  peerOrderPayment.value = null;
+  // The saved result only signals a read. Render the server's order projection.
+  if (change.orderNo === id.value && isCurrentAccountScope(change.account)
+      && (!resultOrder.value || resultOrder.value.status === 'placed')) void refreshOrder(false);
+});
+onMounted(() => window.addEventListener("storage", onOrderPaymentStorage));
+// #endif
+
 useAutoRecovery({
   failed: () => remoteApiEnabled && !!remoteOrderBoundAccount.value && !purchaseReadBusy() && !resumePaymentAllowed.value
     && !orderAction.value && !orderCommandUnavailable.value
@@ -1168,6 +1191,9 @@ const resultRunningText = computed(() => {
 });
 
 function cleanup() {
+  // #ifdef H5
+  window.removeEventListener("storage", onOrderPaymentStorage);
+  // #endif
   detailMounted = false;
   detailVisible = false;
   detailEpoch += 1;

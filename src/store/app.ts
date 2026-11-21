@@ -17,6 +17,7 @@ import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { getDeviceId } from "@/lib/device-id";
 import { accountTotalHashrate } from "@/lib/account-hashrate";
 import { isActiveSlotDevice } from "@/lib/device-slot-policy";
+import { publishCheckoutFleet } from "@/lib/checkout-fleet-change";
 import { getCarrier, type Carrier } from "@/lib/carrier";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
@@ -1231,6 +1232,9 @@ export const useApp = defineStore("app", () => {
         remoteRealizedToday.value = { usdt: fleet.realizedTodayUsdt, nex: fleet.realizedTodayNex };
         remoteWalletReceiptHasSnapshot.value = false;
         remoteFleetStatus.value = "ready";
+        // #ifdef H5
+        publishCheckoutFleet(request.accountKey, fleet);
+        // #endif
         saveTabSnapshot(snapshotWrite, "wallet", { usdt: fleet.walletUsdt, nex: fleet.walletNex, today: { usdt: fleet.realizedTodayUsdt, nex: fleet.realizedTodayNex } }, new Date(fleet.serverNow).toISOString());
         return true;
       } catch (cause) {
