@@ -261,13 +261,14 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
-import { ref, reactive, shallowRef, nextTick, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, reactive, shallowRef, nextTick, computed, watch, provide, onMounted, onUnmounted, type CSSProperties } from "vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
+import { checkoutKeepResumeKey, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute } from '@/lib/advisor-chat-route';
 import { useConversations } from '@/store/conversations';
@@ -410,6 +411,15 @@ const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:stri
 const keepCheckoutRecovery = shallowRef<{ target: string; accountKey: string; commandKey: string | null } | null>(null);
 const keepCheckoutTarget = computed(() => keepCheckoutRecovery.value?.target ?? null);
 const keepCheckoutReadError = computed(() => keepCheckoutRecovery.value?.commandKey === null);
+const checkoutKeepResume = shallowRef<CheckoutKeepResume | null>(null);
+provide(checkoutKeepResumeKey, checkoutKeepResume);
+const keepResumeAllowed = computed(() => {
+  const resume = checkoutKeepResume.value;
+  const recovery = keepCheckoutRecovery.value;
+  return !!resume && recovery?.accountKey === app.accountKey
+    && resume.target === recovery.target && resume.commandKey === recovery.commandKey;
+});
+defineExpose({ keepResumeAllowed, openKeepResume });
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
@@ -581,9 +591,16 @@ function purchaseEligibilityFailureCopy(): string {
 }
 
 let refusedCapacityTarget: string | null = null;
-function recoverCapacityBeforePurchase(targets: string[], explicit = false): boolean {
-  refusedCapacityTarget = null;
-  keepCheckoutRecovery.value = null;
+function openKeepResume(): boolean {
+  const resume = checkoutKeepResume.value;
+  if (!resume || !keepResumeAllowed.value || !auth.isAuthenticated || !isCurrentCheckoutRoute(captureCheckoutRoute())) return false;
+  return recoverCapacityBeforePurchase([resume.target], false, resume);
+}
+function recoverCapacityBeforePurchase(targets: string[], explicit = false, resume?: CheckoutKeepResume): boolean {
+  if (!resume) {
+    refusedCapacityTarget = null;
+    keepCheckoutRecovery.value = null;
+  }
   if (!remoteApiEnabled) return false;
   const accountKey = app.accountKey;
   for (const target of targets) {
@@ -591,7 +608,9 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false): boo
     try {
       const pending = readCapacityPending(accountKey, target);
       if (!pending) continue;
+      if (resume && (pending.operation !== "keep" || pending.key !== resume.commandKey)) return false;
       if (refusedPurchasePayment(accountKey, pending.key)) {
+        if (resume) return false;
         refusedCapacityTarget = target;
         if (!explicit || !pending.quote) continue;
         tradein.showCanonicalReplace(target as DeviceKind, pending.quote.payableUsdt, pending.quote);
@@ -599,7 +618,10 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false): boo
       }
       commandKey = pending.key;
     }
-    catch { /* A failed read still blocks a new purchase. */ }
+    catch {
+      if (resume) return false;
+      // A failed read still blocks a new purchase.
+    }
     keepCheckoutRecovery.value = { target, accountKey, commandKey };
     productId.value = target;
     tradein.showKeepRecovery(target as DeviceKind);

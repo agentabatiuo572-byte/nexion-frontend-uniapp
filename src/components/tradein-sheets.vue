@@ -266,7 +266,8 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { reportCheckoutKeepResumeKey, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
@@ -378,32 +379,48 @@ const capacityRecoveryBusy = ref(false);
 const capacityReadBusy = ref(false);
 const capacityPageShown = ref(true);
 let capacityRecoveryGeneration = 0;
+const capacityResumeKey = ref<string | null>(null);
+const capacityResumeAllowed = computed(() => capacityResumeKey.value !== null && capacityRecovery.value?.key === capacityResumeKey.value);
+const reportCheckoutKeepResume = inject(reportCheckoutKeepResumeKey, null);
+function invalidateCapacityRecovery() {
+  capacityRecoveryGeneration++;
+  capacityResumeKey.value = null;
+}
 onShow(() => { capacityPageShown.value=true; });
-onHide(() => { capacityPageShown.value=false;capacityRecoveryGeneration++; });
-const capacityResumeAllowed = ref(false);
+onHide(() => { capacityPageShown.value=false; invalidateCapacityRecovery(); });
 const capacityRecoveryUnavailable = ref(false);
 const stopCapacityRelease = onPurchaseRecordReleased((accountKey, key) => {
   if (accountKey !== app.accountKey || savedCapacity.value?.key !== key) return;
   savedCapacity.value = null;
-  capacityResumeAllowed.value = false;
+  capacityResumeKey.value = null;
   refreshKeepRecovery();
 });
-onUnmounted(() => { capacityRecoveryGeneration++; stopCapacityRelease(); });
+onUnmounted(() => { invalidateCapacityRecovery(); reportCheckoutKeepResume?.(null); stopCapacityRelease(); });
 // Once the original payment is confirmed gone, a keep-recovery sheet has nothing left to show or resume: close it
 // instead of leaving an empty dialog.
 watch(() => props.active && state.value.kind === 'keep-recovery' && !capacityRecovery.value && !capacityRecoveryUnavailable.value && !keepRecoveryError.value,
   empty => { if (empty) hide(); });
-// A checkout owns the read for the whole visible visit, including after its sheet closes.
-watch([()=>props.active,()=>props.checkoutCapacityTarget,()=>props.checkoutCapacityTarget ? null : state.value,
-  ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl],()=>{
-  capacityRecoveryGeneration++;
-},{flush:'sync'});
+// The checkout visit owns the permission for this original key across sheet dismissal.
+watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,
+  ()=>props.checkoutCapacityTarget,()=>props.checkoutCapacityTarget ? null : state.value,
+  ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl,
+  ()=>!props.checkoutCapacityTarget || foregroundReadAllowed()], invalidateCapacityRecovery, {flush:'sync'});
 watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,()=>props.checkoutCapacityTarget,state,
   ()=>apiRuntimeConfig.environment,()=>apiRuntimeConfig.baseUrl],()=>{
-  capacityResumeAllowed.value=false;
   try { savedCapacity.value=remoteApiEnabled?readCapacityPending(app.accountKey):null;capacityRecoveryUnavailable.value=false; }
   catch { capacityRecoveryUnavailable.value=true; }
+  if (capacityRecoveryUnavailable.value || savedCapacity.value?.key !== capacityResumeKey.value) capacityResumeKey.value = null;
 },{immediate:true,flush:'sync'});
+if (reportCheckoutKeepResume) {
+  watch((): CheckoutKeepResume | null => {
+    const target = props.checkoutCapacityTarget;
+    const pending = capacityRecovery.value;
+    if (!target || !props.active || !capacityPageShown.value || !foregroundReadAllowed()
+        || !capacityResumeAllowed.value || pending?.operation !== "keep") return null;
+    const productNo = pending.quote ? pending.quote.targetProductNo : pending.targetProductNo;
+    return productNo === target ? { target, commandKey: pending.key } : null;
+  }, reportCheckoutKeepResume, { flush: "sync" });
+}
 useAutoRecovery({
   failed: () => remoteApiEnabled && props.active && capacityPageShown.value
     && !capacityReadBusy.value && !capacityRecoveryBusy.value && !confirming.value && !capacityResumeAllowed.value
@@ -1104,7 +1121,7 @@ function writeCapacityPending(accountKey:string,pending:CapacityPending|null):vo
   if (!writeAccountRow(CAPACITY_RECOVERY_TABLE,accountKey,{pending})
       || readCapacityPending(accountKey)?.key!==(pending?.key)) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
   savedCapacity.value=pending;
-  capacityResumeAllowed.value=false;
+  capacityResumeKey.value=null;
 }
 
 function rejectCapacityPurchase(accountKey: string, original: CapacityPending, message?: string) {
@@ -1153,15 +1170,13 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
       savedCapacity.value=original;
       const result=await readPaymentCommand(apiClient,original.operation==='replace'?'capacity-replace':'capacity-keep',original.key);
       if (!current()) return;
+      capacityResumeKey.value = result.status === 'NOT_SEEN' && result.canResumeSameKey ? original.key : null;
       if (result.status==='SUCCEEDED') receipt=original.operation==='replace'
         ?parseCanonicalTradeinResult(result.receipt):parseCanonicalCapacityKeepResult(result.receipt);
       else if (result.status==='REJECTED') {
         rejectCapacityPurchase(scope.accountKey, original, result.message);
         return "rejected";
-      } else {
-        capacityResumeAllowed.value=result.status==='NOT_SEEN'&&result.canResumeSameKey;
-        if (!capacityResumeAllowed.value || !allowOriginalResume) return;
-      }
+      } else if (!capacityResumeAllowed.value || !allowOriginalResume) return;
     }
     if (!original&&(!requestedQuote||requestedQuote.decision!==(operation==='keep'?'CAPACITY_AVAILABLE':'REPLACE_REQUIRED')
         ||requestedQuote.targetProductNo!==newKind||requestedQuote.decisionSource!=='server')) throw new Error('CAPACITY_PURCHASE_QUOTE_INVALID');
@@ -1201,7 +1216,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
           if (!current() || !props.active) return;
           capacityCommandKey.value = null;
           savedCapacity.value = null;
-          capacityResumeAllowed.value = false;
+          capacityResumeKey.value = null;
           hide();
           if (reason === 'rejectCapacitySourceChanged') void refreshCapacityReplacement(target as DeviceKind);
         },
@@ -1235,7 +1250,7 @@ async function recoverCapacityPurchase(resume=false):Promise<void> {
     const pending=readCapacityPending(scope.accountKey, target ?? undefined);
     if (!pending || (target && !resume && refusedPurchasePayment(scope.accountKey, pending.key))) {
       savedCapacity.value = null;
-      capacityResumeAllowed.value = false;
+      capacityResumeKey.value = null;
       capacityRecoveryUnavailable.value = false;
       refreshKeepRecovery();
       if (target) emit("checkout-capacity-cleared", target);
