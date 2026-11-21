@@ -3284,7 +3284,7 @@ export const id: Messages = {
     deleteAccountToast: "Permintaan penghapusan terkirim — Anda sudah keluar",
     deleteAccountCancelledReplay: "Permintaan penghapusan akun sebelumnya telah dibatalkan. Silakan ajukan permintaan baru.",
     cancelDeletionRequest: "Batalkan permintaan penghapusan",
-    keepDeletionRequest: "Tetap ajukan",
+    keepDeletionRequest: "Pertahankan permintaan",
     cancelDeletionMessage: "Hanya permintaan penghapusan saat ini yang dibatalkan. Anda bisa mengajukan lagi nanti.",
     cancelDeletionSuccess: "Permintaan penghapusan dibatalkan",
     deleteAccountBlocked: "Penghapusan tertahan: {reason}",
