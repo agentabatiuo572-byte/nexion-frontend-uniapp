@@ -29,7 +29,7 @@
       <!-- #endif -->
       <view v-if="prefs.error" class="mx-4 nx-inline-recovery" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
         <text class="nx-inline-recovery__copy">{{ preferenceError }}</text>
-        <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
+        <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryPreferences()">
           <text>{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -84,14 +84,17 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
 import { useT } from "@/i18n/use-t";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
+import { onHide, onShow } from "@dcloudio/uni-app";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 // #ifdef APP-PLUS
-import { onShow } from "@dcloudio/uni-app";
 import { nativePushPermission, nativePushRegistrationUnavailable, openNativePushSettings, requestNativePushPermission, refreshNativePush } from "@/services/native-push";
 import { nativePushCopy } from "@/i18n/native-push";
 import { useLocaleStore } from "@/store/locale";
@@ -112,6 +115,25 @@ function managePushPermission() {
 const t = useT();
 const w = computed(() => t.value.preferences);
 const prefs = usePreferences();
+const recovery = useAutoRecovery({
+  failed: () => remoteApiEnabled && !!prefs.readError,
+  retry: () => prefs.refreshRemote(),
+});
+function refreshHealthyPreferences() {
+  if (remoteApiEnabled && !prefs.readError && !prefs.loading) return prefs.refreshRemote();
+}
+function retryPreferences() {
+  if (prefs.loading) return;
+  return prefs.readError ? recovery.retry() : refreshHealthyPreferences();
+}
+let releaseActiveRefresh = () => {};
+onShow(() => {
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshHealthyPreferences, "pages/me/preferences");
+  void refreshHealthyPreferences();
+});
+onHide(() => releaseActiveRefresh());
+onUnmounted(() => releaseActiveRefresh());
 // #ifdef APP-PLUS
 onShow(() => refreshNativePush());
 // #endif

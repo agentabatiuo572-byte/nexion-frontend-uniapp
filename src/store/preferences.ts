@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { notificationPreferencesApi, remoteApiEnabled } from "@/api/runtime";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { accountErrorMessageKey, type AccountErrorMessageKey } from "@/lib/account-error-message";
@@ -73,7 +73,10 @@ export const usePreferences = defineStore("preferences", () => {
   const notifPrefs = ref<NotifPrefs>(init.notifPrefs);
   const loading = ref(false);
   const remoteReady = ref(!remoteApiEnabled);
-  const error = ref<AccountErrorMessageKey | null>(null);
+  const readError = ref<AccountErrorMessageKey | null>(null);
+  const mutationError = ref<AccountErrorMessageKey | null>(null);
+  const error = computed(() => mutationError.value ?? readError.value);
+  const readFailedWithoutData = computed(() => !!readError.value && !remoteReady.value);
   const remoteAccountEpoch = createRemoteAccountEpoch("default");
   let generation = 0;
   let canonicalNotifPrefs = init.notifPrefs;
@@ -117,7 +120,7 @@ export const usePreferences = defineStore("preferences", () => {
   function syncMutationError() {
     let latest: AccountErrorMessageKey | null = null;
     for (const message of failedNotifMutations.values()) latest = message;
-    error.value = latest;
+    mutationError.value = latest;
   }
 
   function toggleSound() {
@@ -179,17 +182,16 @@ export const usePreferences = defineStore("preferences", () => {
     const readRequestId = ++nextReadRequestId;
     activeReadRequestId = readRequestId;
     loading.value = true;
-    error.value = null;
     try {
       const canonical = await notificationPreferencesApi.get();
       if (!isCurrentRead(request, expectedGeneration, readRequestId)) return;
       canonicalNotifPrefs = canonical;
       remoteReady.value = true;
-      failedNotifMutations.clear();
+      readError.value = null;
       applyVisibleNotifPrefs();
     } catch (cause) {
       if (isCurrentRead(request, expectedGeneration, readRequestId)) {
-        error.value = accountErrorMessageKey(cause);
+        readError.value = accountErrorMessageKey(cause);
       }
     } finally {
       if (remoteAccountEpoch.isCurrent(request) && activeReadRequestId === readRequestId) loading.value = false;
@@ -207,7 +209,8 @@ export const usePreferences = defineStore("preferences", () => {
       mutationTail = Promise.resolve();
       applyVisibleNotifPrefs();
       loading.value = false;
-      error.value = null;
+      readError.value = null;
+      mutationError.value = null;
       void refreshRemote();
       return;
     }
@@ -217,5 +220,5 @@ export const usePreferences = defineStore("preferences", () => {
     notifPrefs.value = local.notifPrefs;
   }
 
-  return { soundEnabled, notifPrefs, loading, remoteReady, error, toggleSound, toggleNotifKind, bindAccount, refreshRemote };
+  return { soundEnabled, notifPrefs, loading, remoteReady, error, readError, mutationError, readFailedWithoutData, toggleSound, toggleNotifKind, bindAccount, refreshRemote };
 });
