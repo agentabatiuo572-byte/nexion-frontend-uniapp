@@ -185,7 +185,7 @@
       <NxButton :label="copy.viewOrder" variant="primary" @click="payment.openOrder" />
     </view>
     <view v-if="networkPaused && s.orderNo" class="pp-bar nx-glass-bar">
-      <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
+      <NxButton :label="copy.viewOrder" variant="primary" @click="payment.openOrder" />
     </view>
   </view>
 
@@ -238,7 +238,7 @@ import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
 import { useTrialLifecycleCopy } from '@/i18n/trial-lifecycle';
-import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
+import { purchasePaymentCopy, paymentRowStatus, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
@@ -407,7 +407,7 @@ const conclusion = computed(() => networkPaused.value
   : noticeFor(purchaseConclusion(s.intent)));
 
 type ResumeRow = ReturnType<typeof payment.records>[number];
-function rowLabel(row: ResumeRow) { return row.lastStatus === 'MANUAL_REVIEW' ? copy.value.review : row.lastStatus === 'EXPIRED' ? copy.value.ended : row.businessDelivered ? copy.value.delivered : copy.value.resume; }
+function rowLabel(row: ResumeRow) { return paymentRowStatus(copy.value, row); }
 // Footer rule (as in referral-progress): the note stays beside its action while it fits in two lines. Its basis is
 // about half its one-line width (CJK about 1em, other scripts about 0.55em per character) plus 2.5em for word breaks,
 // so the row wraps, putting the action at the bottom-right, only when the note would need a third line.
@@ -608,7 +608,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__t { font: 600 var(--ui-type-nav-title)/var(--ui-type-nav-title-lh) var(--font-v5); }
 .pp-cashier__cd { display: inline-flex; align-items: center; gap: var(--v5-space-1); color: var(--v5-warning-ink); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-cashier__cd.is-urgent { color: var(--v5-danger); }
-.pp-cashier__lock { position: relative; z-index: 120; height: 26px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-1); color: var(--v5-ink-3); font: 400 11px/14px var(--font-v5); }
+.pp-cashier__lock { position: relative; z-index: 120; height: 26px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-cashier__frame { flex: 1; min-height: 0; background: #fff; }
 .pp-cashier__frame iframe { display: block; width: 100%; height: 100%; border: 0; }
 .pp-cashier__foot { flex: none; padding-top: var(--v5-space-3); min-height: 20px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); background: var(--v5-surface); box-shadow: 0 -1px 0 var(--v5-border); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
