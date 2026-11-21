@@ -214,12 +214,12 @@
           </view>
           <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :aria-label="t.security.deletionPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
         </template></view><template #footer>
-          <view v-if="deletionReadBlocked" class="security-policy-blocked security-deletion-blocked">
-            <text class="security-policy-blocked__copy">{{ t.wallet.syncFailedTitle }}</text>
-            <view class="nx-card-recovery-action nx-card-recovery-action--inline" :class="deletionReadsLoading ? 'opacity-50' : 'active:opacity-70'"
+          <view v-if="deletionReadBlocked || deletionPrerequisitesLoading" class="security-policy-blocked security-deletion-blocked">
+            <text class="security-policy-blocked__copy">{{ deletionReadBlocked ? t.wallet.syncFailedTitle : unknownMark(false) }}</text>
+            <view v-if="deletionReadBlocked" class="nx-card-recovery-action nx-card-recovery-action--inline" :class="deletionReadsLoading ? 'opacity-50' : 'active:opacity-70'"
               role="button" :tabindex="deletionReadsLoading ? -1 : 0" :aria-disabled="deletionReadsLoading" @click="retryDeletionReads"><text>{{ t.ui.retry }}</text></view>
           </view>
-          <NxButton variant="primary" :busy="securityBusy" :disabled="(deletionSubmittedReason === null && !deletionReasonValidation.ok) || deletionReadBlocked" @click="handleDeleteAccount">{{ t.security.deleteAccount }}</NxButton>
+          <NxButton variant="primary" :busy="securityBusy || deletionPrerequisitesLoading" :disabled="deletionSubmitDisabled" @click="handleDeleteAccount">{{ t.security.deleteAccount }}</NxButton>
         </template></NxSheet>
     <!-- Wallet debt blocks deletion: top up is the way forward, support stays one tap away, cancel only closes. -->
     <NxNoticeDialog :open="deletionDebtOpen" :title="t.security.deleteAccount" :body="fmt(t.security.deleteAccountBlockedByDebt, { usdt: formatAmount(-app.user.usdtBalance, 'full') })"
@@ -861,6 +861,9 @@ const deletionRecovery = useAutoRecovery({
 const deletionReadBlocked = computed(() => remoteApiEnabled && !!deletionWriteUnavailableReason.value
   && (remoteSecurityReadFailed.value || deletionStatusReadFailed.value));
 const deletionReadsLoading = computed(() => remoteSecurityLoading.value || deletionStatusLoading.value);
+const deletionPrerequisitesLoading = computed(() => !!deletionWriteUnavailableReason.value && deletionReadsLoading.value);
+const deletionSubmitDisabled = computed(() => !!deletionWriteUnavailableReason.value || deletionPending.value
+  || (deletionSubmittedReason.value === null && !deletionReasonValidation.value.ok));
 function retryDeletionReads() {
   if (deletionReadsLoading.value) return;
   if (remoteSecurityReadFailed.value) void overviewRecovery.retry();
@@ -1190,19 +1193,11 @@ async function handleDeleteAccount() {
   // 🔴 重入闸(审计 P2):本函数在「刷新权威面」处有一次真网络往返 —— 没有这道闸,
   //   双击会各推一个确认弹窗进队列(confirm 是队列不是单例),确认完第一个立刻露出
   //   第二个一模一样的,极易连着点两次。同文件另外两个操作(改密 / 2FA)都有同款闸。
-  if (securityBusy.value) return;
+  if (securityBusy.value || deletionSubmitDisabled.value) return;
   const pageScope = securityPageFence.capture("account-deletion");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-  if (deletionWriteUnavailableReason.value) {
-    notifySecurityReadUnavailable();
-    return;
-  }
-  if (deletionPending.value) {
-    toast.info(t.value.security.deleteAccountPending);
-    return;
-  }
   if (remoteApiEnabled && !deletionPassword.value) {
     toast.error(t.value.login.errorInvalidPassword);
     return;
@@ -1285,10 +1280,7 @@ async function handleDeleteAccount() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (ok) {
       if (remoteApiEnabled) {
-        if (deletionWriteUnavailableReason.value) {
-          notifySecurityReadUnavailable();
-          return;
-        }
+        if (deletionSubmitDisabled.value) return;
         let command: ReturnType<typeof acquireAccountCommand> | undefined;
         try {
           const retainedKey = readAccountRow<AccountCommandRow>(SECURITY_COMMAND_TABLE, accountKey, true)
