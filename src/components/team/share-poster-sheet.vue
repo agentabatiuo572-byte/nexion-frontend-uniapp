@@ -116,6 +116,7 @@ import { toast } from "@/store/ui";
 import { activateChannel, buildShareLink, copyText, currentShareReferralCode, notifyUnavailableShareLink, visibleChannels } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { canvasFontStack, canvasFontsReady } from "@/lib/canvas-font";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -322,6 +323,8 @@ function ts(): string {
 
 function paint(link: string, myToken: number) {
   const ctx = uni.createCanvasContext("sharePosterCv", inst?.proxy);
+  // The family stays for the whole poster; fitText / wrapText only change the size.
+  ctx.font = `normal 400 10px ${canvasFontStack()}`;
   const bg = ctx.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, "#242629"); bg.addColorStop(1, "#101113");
   ctx.setFillStyle(bg); ctx.fillRect(0, 0, W, H);
@@ -408,7 +411,9 @@ function regenerate() {
       if (myToken !== genToken || !props.open) return;
       // 标先备好再画:paint 是同步的,中途插异步会打乱绘制顺序。
       // 异步回来要重新核 token —— 这期间用户可能已经切模板/关面板(沿用既有防竞态口径)。
-      void Promise.all([ensureBrandLogo(), ensureInviteArt()]).then(() => {
+      // The faces this language's poster text needs (e.g. Inter Vietnamese) load before drawing.
+      const fontText = `${JSON.stringify(t.value.share)} ${logicCopy.value.posterYieldCap} ${copy.value.inviteFriends} ${profile.displayName ?? ""} 0123456789`;
+      void Promise.all([ensureBrandLogo(), ensureInviteArt(), canvasFontsReady(fontText)]).then(() => {
         if (myToken !== genToken || !props.open || link !== buildShareLink()) return;
         try {
           paint(link, myToken);
