@@ -1818,7 +1818,7 @@ export const ms: Messages = {
     purchaseQuotaDepleted: "Kuota jualan telah habis",
     purchaseQuotaRequired: "Kuota jualan juga mesti masih ada",
     purchaseViewConditions: "Lihat syarat membuka",
-    purchaseResume: "Sahkan keputusan naik taraf sebelumnya",
+    purchaseResume: "Sahkan keputusan tukar beli sebelumnya",
     purchaseGap: "Masih perlu: {amount}",
     purchaseRemaining: "Baki: {amount}",
     purchasePeople: "{n} orang",

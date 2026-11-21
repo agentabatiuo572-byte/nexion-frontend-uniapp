@@ -1818,7 +1818,7 @@ export const ru: Messages = {
     purchaseQuotaDepleted: "Квота продаж исчерпана",
     purchaseQuotaRequired: "Также нужна свободная квота продаж",
     purchaseViewConditions: "Условия открытия",
-    purchaseResume: "Подтвердить результат прошлого улучшения",
+    purchaseResume: "Подтвердить прошлый трейд-ин",
     purchaseGap: "Не хватает: {amount}",
     purchaseRemaining: "Осталось: {amount}",
     purchasePeople: "Человек: {n}",

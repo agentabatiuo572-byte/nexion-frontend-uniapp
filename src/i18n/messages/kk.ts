@@ -1818,7 +1818,7 @@ export const kk: Messages = {
     purchaseQuotaDepleted: "Сату квотасы қалмады",
     purchaseQuotaRequired: "Сату квотасы да қалған болуы керек",
     purchaseViewConditions: "Ашылу шарттарын қарау",
-    purchaseResume: "Алдыңғы жақсарту нәтижесін растау",
+    purchaseResume: "Алдыңғы Trade-in нәтижесін растау",
     purchaseGap: "Жетпейді: {amount}",
     purchaseRemaining: "Қалды: {amount}",
     purchasePeople: "{n} адам",
