@@ -19,7 +19,7 @@
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);white-space:pre-line;text-wrap:pretty">{{ t.tradein.recoveryChecking }}</text>
       </view>
-      <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" payment-confirmed :state="checkoutResultState" :product-name="completedOrder?.productName" :product-image="completedOrder?.imageUrl" :amount="completedOrder?.paidTotal ?? completedOrder?.total" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" />
+      <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" payment-confirmed :state="checkoutResultState" :product-name="completedOrder?.productName" :product-image="completedOrder?.imageUrl" :amount="completedOrder?.paidTotal ?? completedOrder?.total" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @support="contactResultSupport" />
       <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
@@ -270,6 +270,8 @@ import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
+import { advisorChatRoute } from '@/lib/advisor-chat-route';
+import { useConversations } from '@/store/conversations';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
@@ -1266,7 +1268,14 @@ function presentSettledPurchase(firstHardwareOrder: boolean, onResultShown: (() 
   void nextTick(() => { if (pageAlive && settledResultReplay.value) { forgetSettledOrder?.(); forgetSettledOrder = null; } });
 }
 const checkoutResultState = computed(() => completedOrder.value?.status === 'activated' ? 'activated'
-  : completedOrder.value?.status === 'inventory' ? 'inventory' : 'processing');
+  : completedOrder.value?.status === 'inventory' ? 'inventory' : completedOrder.value?.status === 'provisioning_failed' ? 'failed' : 'processing');
+// The failed result's exit, as on the order detail: copy the order number, then open support.
+const conversations = useConversations();
+function contactResultSupport() {
+  const orderNo = completedOrder.value?.id;
+  if (!orderNo) return;
+  uni.setClipboardData({ data: orderNo, success: async () => { if (!pageAlive) return; const route = await advisorChatRoute(conversations); if (pageAlive) void navTo(route); } });
+}
 const checkoutResultReading = ref(false);
 async function refreshCheckoutResult() {
   if (!orderId.value || !pageAlive || !pageVisible || checkoutResultReading.value) return;
@@ -2448,7 +2457,8 @@ async function submitRemoteOrder(): Promise<void> {
     await orders.refreshRemote();
     if (!scopeIsCurrent()) return;
     const settled = orders.orders.find((order) => order.id === created.orderNo);
-    if (!settled || settled.status !== "activated") {
+    // A server-confirmed provisioning failure is a settled result shown as such, not a read-back mismatch (03 §3.5.2).
+    if (!settled || (settled.status !== "activated" && settled.status !== "provisioning_failed")) {
       throw new Error("WALLET_PAYMENT_ORDER_READBACK_MISMATCH");
     }
     if (paymentKey) clearOrderAction(submissionScope.accountKey,created.orderNo,paymentKey);
