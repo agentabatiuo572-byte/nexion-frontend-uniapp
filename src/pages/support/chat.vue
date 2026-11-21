@@ -78,7 +78,7 @@
       :failed-send-label="failedHumanLabel"
       :can-discard-send="failedHumanSend?.settled"
       :can-retry-send="isReplyAllowed && supportSessionReady && failedHumanSend?.retryable !== false && !humanSendBusy"
-      :can-check-send="canCheckHumanSend"
+      :can-check-send="canCheckHumanSend()"
       :send-blocked="!supportSessionReady || !!failedHumanSend || humanSendBusy"
       @send="onSend"
       @draft-change="draftText = $event"
@@ -396,6 +396,7 @@ async function retryHumanSend() {
       originalKey = await convStore.pendingHumanSendKey(key, failed);
       if (!current()) return;
       if (!originalKey) {
+        pendingIndexRevision.value++;
         if (cid.value) await checkHumanSend(threadMessages.value.find(message => message.localSend));
         else toast.warn(t.value.conversations.delivery.unknown);
         return;
@@ -412,7 +413,7 @@ let checkingHumanSend = false;
 async function checkHumanSend(message?: ThreadMsg) {
   const failed = failedHumanSend.value;
   const page = humanRealtime.capture(cid.value);
-  if ((!canCheckHumanSend.value && !isReplyAllowed.value) || !page || !failed || failed.settled
+  if ((!canCheckHumanSend() && !isReplyAllowed.value) || !page || !failed || failed.settled
       || checkingHumanSend || humanSendBusy.value) return;
   const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated;
   const composerKey = humanComposerKey.value, clearThrough = convStore.clearedComposerThrough[composerKey];
@@ -778,13 +779,13 @@ function onPendingIndexStorage(event: StorageEvent) {
 }
 onMounted(() => { if (typeof window !== "undefined") window.addEventListener("storage", onPendingIndexStorage); });
 onUnmounted(() => { if (typeof window !== "undefined") window.removeEventListener("storage", onPendingIndexStorage); });
-const canCheckHumanSend = computed(() => {
+function canCheckHumanSend(): boolean {
   const failed = failedHumanSend.value;
   if (!supportSessionReady.value || !cid.value || failed?.settled !== false || humanSendBusy.value) return false;
   if (isClosedSession.value) return conv.value?.writeState?.canReply === false;
   void pendingIndexRevision.value; void humanShowRevision.value;
   return isReplyAllowed.value && failed.retryable && !convStore.hasIndexedHumanSend(humanComposerKey.value, failed);
-});
+}
 // Account advisor identity belongs to new composition. Existing conversation
 // headers and waiting state use the server's owner for that exact conversation id.
 const advisorApplies = computed(() => !isClosedSession.value && !cid.value && !!startType.value);
