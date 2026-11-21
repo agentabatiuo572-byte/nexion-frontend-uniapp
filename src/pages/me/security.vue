@@ -848,15 +848,6 @@ async function loadRemoteDeletionStatus(): Promise<boolean> {
   }
 }
 
-const overviewRecovery = useAutoRecovery({
-  failed: () => remoteApiEnabled && remoteSecurityReadFailed.value && !remoteSecurityLoading.value,
-  retry: loadRemoteSecurity,
-});
-const deletionRecovery = useAutoRecovery({
-  failed: () => remoteApiEnabled && deletionStatusReadFailed.value && !deletionStatusLoading.value,
-  retry: loadRemoteDeletionStatus,
-});
-
 // The deletion sheet blocks pull-to-refresh, so a failed read that blocks its submit keeps an in-place retry (03 §3.5.2).
 const deletionReadBlocked = computed(() => remoteApiEnabled && !!deletionWriteUnavailableReason.value
   && (remoteSecurityReadFailed.value || deletionStatusReadFailed.value));
@@ -864,6 +855,20 @@ const deletionReadsLoading = computed(() => remoteSecurityLoading.value || delet
 const deletionPrerequisitesLoading = computed(() => !!deletionWriteUnavailableReason.value && deletionReadsLoading.value);
 const deletionSubmitDisabled = computed(() => !!deletionWriteUnavailableReason.value || deletionPending.value
   || (deletionSubmittedReason.value === null && !deletionReasonValidation.value.ok));
+const repeatBlockedDeletionReads = () => deletionSheetOpen.value && deletionReadBlocked.value;
+const overviewRecovery = useAutoRecovery({
+  failed: () => remoteApiEnabled && remoteSecurityReadFailed.value && !remoteSecurityLoading.value,
+  retry: loadRemoteSecurity,
+  repeatMs: 30_000,
+  repeatWhile: repeatBlockedDeletionReads,
+});
+const deletionRecovery = useAutoRecovery({
+  failed: () => remoteApiEnabled && deletionStatusReadFailed.value && !deletionStatusLoading.value,
+  retry: loadRemoteDeletionStatus,
+  repeatMs: 30_000,
+  repeatWhile: repeatBlockedDeletionReads,
+});
+
 function retryDeletionReads() {
   if (deletionReadsLoading.value) return;
   if (remoteSecurityReadFailed.value) void overviewRecovery.retry();
