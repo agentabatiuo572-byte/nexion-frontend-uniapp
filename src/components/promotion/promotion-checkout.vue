@@ -220,7 +220,9 @@ function itemSubtotal(item:{productNo:string;quantity:number;subtotalUsdt?:strin
   if(item.subtotalUsdt!==undefined)return item.subtotalUsdt;
   return (order.value?receiptQuote.value:displayQuote.value)?.items.find(line=>line.productNo===item.productNo&&line.quantity===item.quantity)?.subtotalUsdt;
 }
-const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=ref(false),error=ref(''),activityConflict=ref(false),termsOpen=ref(false);
+const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),writeBusy=ref(false),error=ref(''),activityConflict=ref(false),termsOpen=ref(false);
+const quoteRead=ref<number|null>(null);
+const busy=computed(()=>writeBusy.value||quoteRead.value!==null);
 const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
 const paymentSheetOpen=ref(false),paymentConfirming=ref(false),leaving=ref(false);
 const paymentEntryChecking=ref(false);
@@ -332,28 +334,34 @@ const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!bu
 const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
-async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';activityConflict.value=false;try{await action();}catch(cause){if(current()){
+function showOperationError(cause:unknown){
   const rejection=orderPaymentRejection(cause,locale.code);
   if(rejection)error.value=rejection;
   else{const message=asApiError(cause).message;activityConflict.value=message==='PROMOTION_EXCLUSIVE_ACTIVITY_CONFLICT';error.value=activityConflict.value?p.value.activityConflictNote:message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'?p.value.disabledNote:message.includes('CAPACITY_UNAVAILABLE')?p.value.capacityUnavailable:message==='PROMOTION_ACCOUNT_UNAVAILABLE'?p.value.accountUnavailable:message.includes('QUOTE_EXPIRED')||message.includes('QUOTE_INPUT_CHANGED')?p.value.quoteExpired:message.includes('INSUFFICIENT')?p.value.balanceInsufficient:p.value.errorNote;}
-}}finally{if(current()){busy.value=false;revision.value++;updateClock();}}}
+}
+async function run(action:()=>Promise<void>){
+  if(busy.value||!current())return;
+  writeBusy.value=true;error.value='';activityConflict.value=false;
+  try{await action();}catch(cause){if(current())showOperationError(cause);}
+  finally{if(current()){writeBusy.value=false;revision.value++;updateClock();}}
+}
 async function loadQuote(){
   if((quoteBlock.value&&quoteBlock.value!=='unavailable')||busy.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
   if(recoverKeepBeforeNewPurchase())return;
   // A failed later read invalidates the successful catalog promise saved at mount.
   if(productCatalogState.status==='error')catalogRefresh=null;
   const generation=++readGeneration,inputKey=quotePresentationKey();
+  quoteRead.value=generation;error.value='';activityConflict.value=false;
   if(quotePresentation.value?.key!==inputKey){quotePresentation.value=null;promotion.value=null;}
   voucherOpen.value=false;freshQuoteReady.value=false;promotionReceivedAt=null;termsOpen.value=false;receivedAt=null;quoteFresh.value=false;
-  await run(async()=>{
+  try{
     try{session.invalidateQuote();revision.value++;}catch(cause){quotePresentation.value=null;throw cause;}
     // Publishing the catalog invalidates voucher reads. Quote only after this
     // checkout's catalog refresh has finished, as with its wallet read.
     catalogRefresh??=refreshProductCatalog(true);
     const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
-    if(!catalogReady)catalogRefresh=null;
     if(!readCurrent(generation))return;
-    if(!catalogReady){quotePresentation.value=null;promotion.value=null;throw new Error('PRODUCT_CATALOG_UNAVAILABLE');}
+    if(!catalogReady){catalogRefresh=null;quotePresentation.value=null;promotion.value=null;throw new Error('PRODUCT_CATALOG_UNAVAILABLE');}
     const sampledAt=readTrustedMonotonicNowMs();
     if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
       if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?value:null;promotionReceivedAt=sampledAt;updateClock();}
@@ -417,7 +425,11 @@ async function loadQuote(){
       if(quoteBlock.value)return;
       throw cause;
     }
-  });
+  }catch(cause){
+    if(readCurrent(generation))showOperationError(cause);
+  }finally{
+    if(quoteRead.value===generation)quoteRead.value=null;
+  }
 }
 useAutoRecovery({
   active:()=>visible.value&&current()&&auth.isAuthenticated,
@@ -660,8 +672,8 @@ async function requestLeave():Promise<boolean>{
   if(nativeBackApproved||paymentLeaveApproved)return true;
   // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
   const pending=session.record.pending;
-  if(pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)return !busy.value&&!paymentConfirming.value;
-  if(!current()||!visible.value||busy.value||paymentConfirming.value||leaving.value)return false;
+  if(pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)return !writeBusy.value&&!paymentConfirming.value;
+  if(!current()||!visible.value||writeBusy.value||paymentConfirming.value||leaving.value)return false;
   if(!session.record.order&&!session.record.pending)return true;
   leaving.value=true;paymentSheetOpen.value=false;
   try{
@@ -679,7 +691,7 @@ async function requestLeave():Promise<boolean>{
 }
 function allowAuxiliaryNavigation():Promise<boolean>{
   // Recharge and legal links are auxiliary navigation, not checkout cancel.
-  return Promise.resolve(!busy.value&&!paymentConfirming.value&&!leaving.value);
+  return Promise.resolve(!writeBusy.value&&!paymentConfirming.value&&!leaving.value);
 }
 function routeLeavesPurchase(path:string):boolean{
   return /\/(?:pages\/)?store(?:\/store|\/detail|\/bundle)?(?:\?|$)/.test(path);
@@ -696,6 +708,7 @@ function back():boolean{
 function hide(){
   if(walletTimer){clearInterval(walletTimer);walletTimer=undefined;}
   visible.value=false;quotePresentation.value=null;readGeneration++;walletGeneration++;resultGeneration++;resultReading.value=false;paymentSheetOpen.value=false;walletState.value='idle';refreshOnIdle=false;termsOpen.value=false;voucherOpen.value=false;promotion.value=null;promotionReceivedAt=null;
+  quoteRead.value=null;
   useUI().clearConfirmsBy(paymentDialogOwner);
   if(current()&&!session.record.pending&&!session.record.order){
     freshQuoteReady.value=false;receivedAt=null;quoteFresh.value=false;
@@ -720,7 +733,7 @@ const footer = computed(() => {
   if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder, note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
   return null;
 });
-const backDisabled=computed(()=>busy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
+const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
 const resultVisible = computed(() => order.value?.paymentStatus === 'PAID');
 defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible});
 function startWalletTimer(){

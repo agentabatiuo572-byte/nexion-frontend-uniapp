@@ -322,7 +322,7 @@ async function refreshOrderWallet(): Promise<boolean> {
     if (sequence === walletRefreshSequence) walletRefreshing.value = false;
   }
 }
-async function refreshOrder() {
+async function refreshOrder(discoverPayment = true) {
   if (!remoteApiEnabled || !detailVisible || !id.value.trim() || !remoteOrderBoundAccount.value) return;
   if (remoteOrderRefreshing.value && activeRemoteOrderScope
     && isCurrentDetailScope(activeRemoteOrderScope)) return remoteOrderRead;
@@ -339,7 +339,7 @@ async function refreshOrder() {
       if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
         orderPresentation.value = result ?? null;
         remoteOrderError.value = false;
-        if (result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
+        if (discoverPayment && result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
             && !refusedPayment.value && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
           paymentLookupScope = scope;
           await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, result.productName,
@@ -543,8 +543,13 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
     const action=readOrderAction(accountKey,id.value);orderAction.value=action;orderCommandUnavailable.value=false;
     if (!action || refusedPayment.value) { resumePaymentAllowed.value=false;return; }
     if (action.kind==='cancel') {
-      if (retryCancel) await orders.cancelOrderRemote(action.orderNo);
+      const outcome = retryCancel ? await orders.cancelOrderRemoteResult(action.orderNo) : null;
       if (!isCurrentDetailScope(scope)) return;
+      if (outcome === 'payment-in-progress') {
+        restoreOrderAction();
+        showCancelPaymentRefusal();
+        return;
+      }
       await refreshOrder();
       if (!isCurrentDetailScope(scope)) return;
       if (!remoteOrderError.value&&liveOrder.value&&liveOrder.value.status!=='placed') clearOrderAction(accountKey,action.orderNo,action.key);
@@ -799,19 +804,16 @@ async function handleCancel() {
       icon: "warn",
     });
     if (!ok || !sameOrder()) return;
-    // A catalogue refresh invalidates the order projection, but the user still confirmed this order.
-    if (remoteApiEnabled && (!isCurrentRuntimeRevision(scope.runtimeScope) || remoteOrderRefreshing.value)) {
-      await refreshOrder();
-    }
+    if (remoteApiEnabled && !await recheckOrderBeforeCancel(sameOrder)) return;
     if (!sameOrder()) return;
     if (externalPayment.value) { cancelBlocked.value = true; return; }
     if (!canCancelCurrentOrder()) return;
-    const cancelled = remoteApiEnabled
-      ? await orders.cancelOrderRemote(scope.orderNo)
-      : orders.cancelOrder(scope.orderNo);
+    const outcome = await orders.cancelOrderRemoteResult(scope.orderNo);
     if (!sameOrder()) return;
     restoreOrderAction();
-    if (cancelled) {
+    if (outcome === 'payment-in-progress') {
+      showCancelPaymentRefusal();
+    } else if (outcome === 'cancelled') {
       toast.warn(t.value.orders.cancelDoneToast);
     } else {
       toast.warn(t.value.orders.cancelPendingServer);
@@ -820,6 +822,42 @@ async function handleCancel() {
     if (sameOrder()) { restoreOrderAction(); toast.warn(recoveryCopy.value.cancelPending); }
   } finally {
     if (cancelAttempt === cancelAttemptSequence) cancellingOrder.value = false;
+  }
+}
+
+async function recheckOrderBeforeCancel(sameOrder: () => boolean): Promise<boolean> {
+  // Get an order projection initiated after confirmation, then check this order's current intent.
+  if (remoteOrderRefreshing.value) await remoteOrderRead;
+  if (!sameOrder()) return false;
+  await refreshOrder(false);
+  const order = liveOrder.value;
+  if (!sameOrder() || order?.status !== 'placed' || remoteOrderError.value) return false;
+  const scope = captureDetailScope();
+  const current = () => sameOrder() && isCurrentDetailScope(scope) && liveOrder.value?.status === 'placed';
+  const payment = await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, order.productName, current);
+  if (!current()) return false;
+  if (payment === 'active' || externalPayment.value) {
+    paymentNotice.value = '';
+    cancelBlocked.value = true;
+    return false;
+  }
+  if (payment === 'unavailable') {
+    paymentLookupScope = null;
+    remoteOrderError.value = true;
+    return false;
+  }
+  return true;
+}
+
+function showCancelPaymentRefusal(): void {
+  paymentNotice.value = '';
+  cancelBlocked.value = true;
+  // A second device can start a payment between the fresh check and the cancel POST.
+  const scope = captureDetailScope();
+  const order = liveOrder.value;
+  if (order?.status === 'placed' && !externalPayment.value) {
+    void discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, order.productName,
+      () => isCurrentDetailScope(scope) && liveOrder.value?.status === 'placed');
   }
 }
 
@@ -945,7 +983,7 @@ async function runPaymentNoticeAction(): Promise<void> {
   noticeCancelFailed.value = false;
   if (orderAction.value?.kind === 'cancel') {
     await recoverOrderAction(true);
-    if (!isCurrentDetailScope(scope)) return;
+    if (!isCurrentDetailScope(scope) || !paymentNotice.value) return;
     if (liveOrder.value?.status === 'cancelled') paymentNotice.value = '';
     else noticeCancelFailed.value = true;
     return;
@@ -953,10 +991,12 @@ async function runPaymentNoticeAction(): Promise<void> {
   if (!canCancelCurrentOrder()) { paymentNotice.value = ''; return; }
   cancellingOrder.value = true;
   try {
-    const cancelled = await orders.cancelOrderRemote(id.value);
+    if (!await recheckOrderBeforeCancel(() => isCurrentDetailScope(scope)) || !canCancelCurrentOrder()) return;
+    const outcome = await orders.cancelOrderRemoteResult(id.value);
     if (!isCurrentDetailScope(scope)) return;
     restoreOrderAction();
-    if (cancelled) paymentNotice.value = '';
+    if (outcome === 'payment-in-progress') showCancelPaymentRefusal();
+    else if (outcome === 'cancelled') paymentNotice.value = '';
     else noticeCancelFailed.value = true;
   } catch {
     if (isCurrentDetailScope(scope)) { restoreOrderAction(); noticeCancelFailed.value = true; }

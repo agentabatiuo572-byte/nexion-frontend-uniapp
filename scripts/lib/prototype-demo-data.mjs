@@ -1051,15 +1051,18 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:demoAccountOrders(url,locale,state,now),nextCursor:null};
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
-    const lines=quote?.items||input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))||[{productNo:input.productNo,quantity:input.quantity}];
-    const lineProducts=lines.map(line=>products.find(p=>p.id===line.productNo)),[product]=lineProducts;
     const bundle=pathname==='/api/orders/bundle';
+    const lines=quote?.items||(bundle&&(input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))))
+      ||[{productNo:input.productNo,quantity:input.quantity??1}];
+    const lineProducts=lines.map(line=>products.find(p=>p.id===line.productNo)),[product]=lineProducts;
     if(bundle&&(empty||lineProducts.some(p=>!p)))refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
     if(lineProducts.some(p=>!p)||lines.some(line=>!Number.isInteger(line.quantity)||line.quantity<1))throw new Error('Invalid demo order items');
     if(bundle){
       if(input.policyVersion!==1)refuse('BUNDLE_DISCOUNT_POLICY_STALE');
       if(lineProducts.some((p,i)=>p.inventoryMode==='FINITE'&&p.stock<lines[i].quantity))refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
     }else{
+      if(lineProducts.some(p=>!p.available))refuse('PRODUCT_NOT_RELEASED');
+      if(lineProducts.some((p,i)=>p.inventoryMode==='FINITE'&&p.stock<lines[i].quantity))refuse('PRODUCT_OUT_OF_STOCK');
       requireDemoPurchase(state,products,lines,now);
       if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
     }

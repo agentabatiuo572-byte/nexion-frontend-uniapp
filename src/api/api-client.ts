@@ -687,10 +687,14 @@ export function createUniHttpTransport(): HttpTransport {
             data: response.data,
             headers: response.header as Record<string, string>,
           }),
-          fail: (error) => rejectOnce(request.signal?.aborted
-            ? new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false })
-            : new ApiError({ kind: "network", message: /timeout/i.test(error.errMsg ?? "")
-              ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE", retryable: true })),
+          fail: (error) => {
+            const detail = error.errMsg ?? "";
+            const aborted = request.signal?.aborted;
+            const message = aborted ? "REQUEST_ABORTED"
+              : /\b(?:ERR_INTERNET_DISCONNECTED|NSURLErrorNotConnectedToInternet)\b/.test(detail) ? "NETWORK_DISCONNECTED"
+              : /timeout/i.test(detail) ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE";
+            rejectOnce(new ApiError({ kind: "network", message, retryable: !aborted }));
+          },
         });
       });
     },

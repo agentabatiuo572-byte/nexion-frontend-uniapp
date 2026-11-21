@@ -21,7 +21,7 @@ import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { beginOrderAction,clearOrderAction,readOrderAction } from '@/lib/order-command-fence';
-import { asApiError,isSettledRejection } from '@/api/errors';
+import { asApiError,isApiRefusal,isSettledRejection } from '@/api/errors';
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalOrder, CanonicalOrderStatus, OrderCloseReasonCode, OrderRefundReasonCode } from "@/api/order-api";
 import type { OrderLineItem } from "@/lib/order-line-items";
@@ -335,35 +335,45 @@ export const useOrders = defineStore("orders", () => {
     return found;
   }
 
-  async function cancelOrderRemote(id: string): Promise<boolean> {
-    if (!remoteApiEnabled) return cancelOrder(id);
+  async function cancelOrderRemoteResult(id: string): Promise<'cancelled' | 'payment-in-progress' | 'unconfirmed'> {
+    if (!remoteApiEnabled) return cancelOrder(id) ? 'cancelled' : 'unconfirmed';
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
     const requestRunScope = captureRuntimeRevision();
-    const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
-      && isCurrentRuntimeRevision(requestRunScope);
+    const sameAccount = () => boundKey === requestBoundKey && boundEpoch === requestEpoch;
+    const isCurrent = () => sameAccount() && isCurrentRuntimeRevision(requestRunScope);
+    const result = () => orders.value.some(item => item.id === id && item.status === 'cancelled') ? 'cancelled' : 'unconfirmed';
     const prior=readOrderAction(requestBoundKey,id);
-    if (prior?.kind==='pay') return false;
+    if (prior?.kind==='pay') return 'unconfirmed';
     try {
       const action=beginOrderAction(requestBoundKey,'cancel',id,null);
       await orderApi.cancel(id, action.key);
-      if (!isCurrent()) return false;
+      if (!isCurrent()) return 'unconfirmed';
       await ensureRemoteOrder(id);
-      if (!isCurrent()) return false;
+      if (!isCurrent()) return 'unconfirmed';
       if (orders.value.some(item=>item.id===id&&item.status!=='placed')) clearOrderAction(requestBoundKey,id,action.key);
-      return orders.value.some((item) => item.id === id && item.status === "cancelled");
+      return result();
     } catch (error) {
-      if (!isCurrent()) return false;
+      if (!sameAccount()) return 'unconfirmed';
+      if (isApiRefusal(error, 409, 'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS')) {
+        clearOrderAction(requestBoundKey, id, `order-cancel:${id}`);
+        return 'payment-in-progress';
+      }
+      if (!isCurrent()) return 'unconfirmed';
       // The command may have committed before the response was lost. Read-back is
       // the only safe result for the UI; never project a local cancellation.
-      try { await ensureRemoteOrder(id); } catch { return false; }
-      if (!isCurrent()) return false;
+      try { await ensureRemoteOrder(id); } catch { return 'unconfirmed'; }
+      if (!isCurrent()) return 'unconfirmed';
       const latest=orders.value.find(item=>item.id===id),failure=asApiError(error);
       if (latest && (latest.status!=='placed' || (isSettledRejection(error)
           && !failure.message.startsWith('IDEMPOTENCY_') && (failure.status??0)<500)))
         clearOrderAction(requestBoundKey,id,`order-cancel:${id}`);
-      return orders.value.some((item) => item.id === id && item.status === "cancelled");
+      return result();
     }
+  }
+
+  async function cancelOrderRemote(id: string): Promise<boolean> {
+    return await cancelOrderRemoteResult(id) === 'cancelled';
   }
 
   /**
@@ -561,6 +571,7 @@ export const useOrders = defineStore("orders", () => {
     markActivated,
     cancelOrder,
     cancelOrderRemote,
+    cancelOrderRemoteResult,
     getById,
     bindAccount,
     currentAccountKey,
