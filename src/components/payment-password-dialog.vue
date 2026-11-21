@@ -144,7 +144,7 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-primary:not(.nx-button)[aria-disabled="true"] { opacity: .45; }
 .payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
 .payment-pin-link--muted { color: var(--v5-ink-2); }
-.payment-pin-link[aria-disabled="true"] { opacity: .45; }
+.payment-pin-link[aria-disabled="true"] { opacity: .5; }
 /* While the PIN is submitting the exits are held: say so to assistive tech and show it (03 §3.1 disabled 50%). */
 .payment-pin-close[aria-disabled="true"] { opacity: .5; }
 .payment-pin-phone { display: block; font-weight: 600; margin-top: var(--v5-space-2); }
