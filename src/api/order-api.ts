@@ -156,7 +156,7 @@ export interface CreateOrderRequest {
 }
 
 export type OrderCreateCommand =
-  | { status: "PROCESSING" | "NOT_FOUND" | "UNAVAILABLE" }
+  | { status: "PROCESSING" | "NOT_FOUND" | "UNKNOWN" | "FAILED" | "UNAVAILABLE" }
   | { status: "SUCCEEDED"; orderNo: string };
 
 export interface OrderApi {
@@ -536,21 +536,35 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
     },
 
     async createCommand(idempotencyKey): Promise<OrderCreateCommand> {
-      const key = idempotencyKey.trim();
+      // Match the write endpoint's Java String.trim() key rules.
+      const key = idempotencyKey.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, "");
       if (!key || key.length > 128) return invalid();
       const notFound = { status: 404, code: 404, message: "ORDER_CREATE_COMMAND_NOT_FOUND" };
       try {
         return await client.request<OrderCreateCommand>({
-          path: "/api/orders/create-command",
+          path: "/api/orders/commands",
           idempotencyKey: key,
           acceptedResponses: [notFound],
           parseResponseData(value, status): OrderCreateCommand {
             const payload = record(value);
-            if (status === 404 && payload.status === "NOT_FOUND") return { status: "NOT_FOUND" };
-            if (status === 200 && payload.status === "PROCESSING") return { status: "PROCESSING" };
-            if (status === 200 && payload.status === "SUCCEEDED") {
-              nonEmptyString(payload.orderStatus);
-              return { status: "SUCCEEDED", orderNo: nonEmptyString(payload.orderNo) };
+            if (payload.idempotencyKey !== key) return invalid();
+            if (status === 404 && payload.status === "NOT_FOUND" && payload.canRetrySameKey === true) {
+              return { status: "NOT_FOUND" };
+            }
+            if (status !== 200 || payload.operation !== "ORDER_CREATE" || payload.canRetrySameKey !== false) return invalid();
+            if ((payload.status === "PROCESSING" || payload.status === "UNKNOWN") && payload.order === null && payload.error === null) {
+              return { status: payload.status };
+            }
+            if (payload.status === "FAILED" && payload.order === null) {
+              const failure = record(payload.error);
+              if (integer(failure.code, 400) > 599) return invalid();
+              nonEmptyString(failure.message);
+              return { status: "FAILED" };
+            }
+            if (payload.status === "SUCCEEDED" && payload.error === null) {
+              const order = record(payload.order);
+              nonEmptyString(order.orderStatus);
+              return { status: "SUCCEEDED", orderNo: nonEmptyString(order.orderNo) };
             }
             return invalid();
           },

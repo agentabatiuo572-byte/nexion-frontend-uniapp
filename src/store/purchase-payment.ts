@@ -69,7 +69,7 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   retryNotice: '' as '' | EligibilityRetry,
   pausedPaymentMethod: null as ExternalPaymentMethod | null,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
-  originalRecovery: null as { intentNo: string; commandKey?: string; kind: PurchaseKind; fingerprint: string; summary: string } | null,
+  originalRecovery: null as { intentNo: string; kind: PurchaseKind; fingerprint: string; summary: string } | null,
   loading: false, retrying: false, reading: false, busy: false, error: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
@@ -145,7 +145,8 @@ function matches(intent: PurchasePaymentIntent, pending: PendingExternal) {
     || pending.intentNo && intent.intentNo !== pending.intentNo) throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
 }
 function readIntent(pending: PendingExternal) {
-  return pending.intentNo ? api.get(pending.intentNo) : api.find(pending.kind, pending.commandKey);
+  if (!pending.intentNo) return api.find(pending.kind, pending.commandKey);
+  return pending.lookupOnly ? api.snapshot(pending.intentNo) : api.get(pending.intentNo);
 }
 function displayRecords() {
   state.revision;
@@ -399,8 +400,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     const cause = asApiError(error);
     if (cause.purchaseIntentNo && expected.kind !== 'ORDER_PAY') {
-      state.originalRecovery = { intentNo: cause.purchaseIntentNo, commandKey: cause.purchaseIntentCommandKey,
-        kind: expected.kind, fingerprint: fingerprint(expected), summary: expected.summary };
+      state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: expected.kind, fingerprint: fingerprint(expected), summary: expected.summary };
       await query();
       return;
     }
@@ -464,9 +464,14 @@ async function query() {
   state.reading = true;
   try {
     if (recovery) {
-      let intent = await api.get(recovery.intentNo);
+      let intent = await api.snapshot(recovery.intentNo);
       if (!owns(version, accountKey) || state.concluded) return;
-      if (!intent && recovery.commandKey) intent = await api.find(recovery.kind, recovery.commandKey);
+      if (!intent) {
+        // The 409 only names the intent. A locally known key is usable only for that same intent.
+        const original = Object.values(rows(accountKey).records)
+          .find(row => row.intentNo === recovery.intentNo && row.kind === recovery.kind);
+        if (original) intent = await api.find(original.kind, original.commandKey);
+      }
       if (!owns(version, accountKey) || state.concluded) return;
       if (intent && (intent.intentNo !== recovery.intentNo || intent.kind !== recovery.kind)) {
         throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
@@ -533,8 +538,7 @@ async function submitOriginal() {
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
       if (cause.purchaseIntentNo && pending.kind !== 'ORDER_PAY') {
-        state.originalRecovery = { intentNo: cause.purchaseIntentNo, commandKey: cause.purchaseIntentCommandKey,
-          kind: pending.kind, fingerprint: pending.fingerprint, summary: pending.summary };
+        state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: pending.kind, fingerprint: pending.fingerprint, summary: pending.summary };
         Object.assign(state, { error: false, retrying: false, retryNotice: '' });
         lookup = true;
         return;

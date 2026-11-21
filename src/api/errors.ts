@@ -38,7 +38,6 @@ interface ApiErrorOptions {
   retryAfterMs?: number;
   providerReason?: string;
   purchaseIntentNo?: string;
-  purchaseIntentCommandKey?: string;
   sessionEndedReason?: string;
 }
 
@@ -58,7 +57,6 @@ export class ApiError extends Error {
   readonly retryAfterMs?: number;
   readonly providerReason?: string;
   readonly purchaseIntentNo?: string;
-  readonly purchaseIntentCommandKey?: string;
   readonly sessionEndedReason?: string;
 
   constructor(options: ApiErrorOptions) {
@@ -71,7 +69,6 @@ export class ApiError extends Error {
     this.retryAfterMs = validRetryAfterMs(options.retryAfterMs) ? options.retryAfterMs : undefined;
     this.providerReason = readProviderReason(options.providerReason);
     this.purchaseIntentNo = options.purchaseIntentNo;
-    this.purchaseIntentCommandKey = options.purchaseIntentCommandKey;
     this.sessionEndedReason = options.sessionEndedReason;
   }
 }

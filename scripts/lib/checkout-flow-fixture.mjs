@@ -1,4 +1,5 @@
 // Local frontend acceptance only. Never imported by src or deployed as a payment service.
+import {createHash} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoFixture,demoOrderTimedOut,demoTimedOutOrder} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
@@ -9,6 +10,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   pin.state.loggedIn = true;
   const receipts = new Map();
   const orderCreates = new Map();
+  const commandKeys = new Intl.Collator("en", {sensitivity:"base"});
   let delayCreate;
   const configureCreateDelay = () => { delayCreate = { scenario: state.scenarioEpoch }; };
   const ok = data => ({status:200,message:'OK',data});
@@ -28,7 +30,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
-    if (path === '/api/orders/create-command' || (path === '/api/orders' && method === 'POST')) {
+    if (path === '/api/orders/commands' || (path === '/api/orders' && method === 'POST')) {
       const headers = request.headers();
       const owner = previewAccountId(state, headers);
       if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
@@ -37,22 +39,26 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       if (!trimmed) return {status:422,message:'IDEMPOTENCY_KEY_REQUIRED',data:null};
       if (trimmed.length > 128) return {status:422,message:'IDEMPOTENCY_KEY_INVALID',data:null};
       const command = JSON.stringify([owner, trimmed]);
-      const entry = orderCreates.get(command);
-      if (path === '/api/orders/create-command') {
+      // Like the write endpoint, the read endpoint looks up the command within the owner's scope.
+      const entry = [...orderCreates.values()].find(row => row.owner === owner && commandKeys.compare(row.key, trimmed) === 0);
+      if (path === '/api/orders/commands') {
         if (method !== 'GET') return {status:405,message:'METHOD_NOT_ALLOWED',data:null};
-        if (!entry) return {status:404,message:'ORDER_CREATE_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND'}};
-        if (entry.receipt) {
-          const order = state.createdOrders?.find(row => row.orderNo === entry.receipt.orderNo);
-          if (order) {
-            const orderStatus = demoOrderTimedOut(order,state,Date.now()) ? demoTimedOutOrder.orderStatus : order.orderStatus;
-            return ok({status:'SUCCEEDED',orderNo:order.orderNo,orderStatus});
-          }
-        }
-        return ok({status:'PROCESSING'});
+        if (!entry) return {status:404,message:'ORDER_CREATE_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND',idempotencyKey:trimmed,canRetrySameKey:true}};
+        const data = {commandId:'OQC-'+createHash('sha256').update('APP:ORDER_CREATE:USER:'+owner+':'+trimmed).digest('hex'),
+          operation:'ORDER_CREATE',idempotencyKey:trimmed,canRetrySameKey:false,order:null,error:null,
+          createdAt:entry.createdAt,updatedAt:entry.updatedAt};
+        if (!entry.receipt) return ok({...data,status:'PROCESSING'});
+        const order = state.createdOrders?.find(row => row.orderNo === entry.receipt.orderNo);
+        if (!order) return ok({...data,status:'UNKNOWN'});
+        const current = demoOrderTimedOut(order,state,Date.now()) ? {...order,...demoTimedOutOrder} : order;
+        const {orderNo,canonicalStatus,paymentStatus,orderStatus,activationStatus,amountUsdt,placedAt} = current;
+        return ok({...data,status:'SUCCEEDED',order:{orderNo,status:canonicalStatus,canonicalStatus,
+          paymentStatus,orderStatus,activationStatus,amountUsdt,placedAt}});
       }
       if (entry) return entry.receipt ? ok(entry.receipt) : {status:409,message:'IDEMPOTENCY_RESULT_UNKNOWN',data:null};
       const originalEpoch = epoch;
-      const creating = {receipt:null};
+      const createdAt = new Date().toISOString();
+      const creating = {owner,key:trimmed,receipt:null,createdAt,updatedAt:createdAt};
       orderCreates.set(command, creating);
       try {
         if (delayCreate && delayCreate.scenario === state.scenarioEpoch) {
@@ -63,6 +69,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
           return {status:409,message:'PREVIEW_CREATE_SCOPE_CHANGED',data:null};
         }
         creating.receipt = demoFixture(url,locale(),state,{...request,tracksOrderCreate:true});
+        creating.updatedAt = new Date().toISOString();
         return ok(creating.receipt);
       } finally {
         if (!creating.receipt && orderCreates.get(command) === creating) orderCreates.delete(command);
