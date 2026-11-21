@@ -168,6 +168,12 @@ const server=http.createServer(async(req,res)=>{
         updatePreviewHomeDisplay(state,update,Date.now());
         // A live trial conversion policy change keeps existing quotes and payment intents.
         if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
+        // Physical stock can run out while a payment quote is open, independently of E1.
+        if(update.outOfStockProductNo===null)delete state.outOfStockProductNo;
+        else if(typeof update.outOfStockProductNo==='string'&&demoProducts(state).some(product=>
+          product.id===update.outOfStockProductNo&&product.inventoryMode==='FINITE')){
+          state.outOfStockProductNo=update.outOfStockProductNo;
+        }
         // API-only preview controls for live quota changes and pre-hold compatibility.
         if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
         if(typeof update.quotaPaused==='boolean')state.quotaPaused=update.quotaPaused;

@@ -146,7 +146,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
       .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
     const dailyEarn=monthlyEstimateUsdt/30,b=.1;
-    const stock=share?null:state.catalogState==='soldout'&&index===0?0:
+    const stock=share?null:state.outOfStockProductNo===id?0:
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
@@ -203,14 +203,17 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available&&remaining>0};
 }
 
-function demoE1PurchaseRule(product) {
-  return {policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+function demoE1PurchaseRule(state,product,checkQuota=true) {
+  const soldOut=checkQuota&&state.catalogState==='soldout'&&product.id==='stellarbox-s1';
+  const decisionCode=!product.available?'PRODUCT_NOT_RELEASED':soldOut?'PURCHASE_GATE_SOLD_OUT':'ELIGIBLE';
+  return {policy:'E1',eligible:decisionCode==='ELIGIBLE',decisionCode,mode:'ALL',
+    conditions:soldOut?[{kind:'lifetimeQuota',required:product.sold,current:product.sold,gap:0,met:false}]:[]};
 }
 
-function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkMonthlyQuota=true) {
-  const e1=demoE1PurchaseRule(product);
+function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota=true) {
+  const e1=demoE1PurchaseRule(state,product,checkLiveQuota);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
-  if(checkMonthlyQuota&&state.quotaState==='approved'&&product.id===approvedQuotaSku){
+  if(checkLiveQuota&&state.quotaState==='approved'&&product.id===approvedQuotaSku){
     const quota=demoHardwareQuota(product,state,points,now);
     const [condition]=quota.conditions;
     const gap=condition?Math.max(0,condition.required-condition.current):0;
@@ -852,18 +855,30 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   };
   const tradeinTargetReason=product=>{
     if(!product||product.productType!=='DEVICE')return 'TARGET_NOT_ACTIVE';
-    if(product.stock<1){
-      if(request.externalPurchasePricing)throw Object.assign(new Error('PURCHASE_GATE_SOLD_OUT'),{status:403});
-      return 'TARGET_OUT_OF_STOCK';
-    }
+    if(product.stock<1)return 'TARGET_OUT_OF_STOCK';
     if(!product.available)return 'TARGET_NOT_RELEASED';
     return null;
+  };
+  const requireTradeinPurchase=(product,capacity=false)=>{
+    if(request.verifiedPayment)return;
+    // External pricing checks F4B separately, after pricing and before reserving a hold.
+    const purchase=request.externalPurchasePricing?demoE1PurchaseRule(state,product):
+      demoSkuPurchaseRules(state,product,demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0),now);
+    if(purchase.eligible)return;
+    if(purchase.decisionCode==='PURCHASE_GATE_SOLD_OUT')throw Object.assign(new Error(purchase.decisionCode),{status:403});
+    if(!capacity)refuse(purchase.decisionCode);
+    const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
+    throw Object.assign(new Error(code),{status:403});
   };
   if(pathname==='/api/app/trade-in/eligibility'){
     const {targetProductNo}=request.postDataJSON();
     const refused=empty?'TRADEIN_DISABLED':!tradeinRankAllowed()?'TRADEIN_ELIGIBILITY_NOT_MET':null;
     const product=refused?null:products.find(p=>p.id===targetProductNo);
-    const targetReason=refused??tradeinTargetReason(product);
+    let targetReason=refused??tradeinTargetReason(product);
+    if(!targetReason){
+      const e1=demoE1PurchaseRule(state,product);
+      if(!e1.eligible)targetReason=e1.decisionCode;
+    }
     const sources=targetReason?[]:demoFleetFacts(url,locale,state).devices.filter(isTradeinSource).map(device=>{
       const reasonCode=tradeinSourceReason(device,product);
       return {sourceDeviceId:device.id,sourceProductName:device.name,eligible:reasonCode==='OK',reasonCode};
@@ -882,9 +897,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const device=demoFleetFacts(url,locale,state).devices.find(d=>d.id===sourceDeviceId&&isTradeinSource(d));
     if(!device)refuse('TRADEIN_SOURCE_NOT_ACTIVE_OR_NOT_OWNED');
     const reason=tradeinSourceReason(device,product);
-    if(reason!=='OK')refuse('TRADEIN_'+reason);
-    // External pricing has already checked the target and checks monthly quota separately.
-    if(!request.externalPurchasePricing&&!request.verifiedPayment)requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now);
+    if(reason!=='OK'&&reason!=='HIGHER_PRICE_REQUIRED')refuse('TRADEIN_'+reason);
+    requireTradeinPurchase(product);
+    if(reason==='HIGHER_PRICE_REQUIRED')refuse('TRADEIN_'+reason);
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
     return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
@@ -959,14 +974,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
     const reason=tradeinTargetReason(product);
     if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
-    if(!request.externalPurchasePricing&&!request.verifiedPayment){
-      const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
-      const purchase=demoSkuPurchaseRules(state,product,points,now);
-      if(!purchase.eligible){
-        const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
-        throw Object.assign(new Error(code),{status:403});
-      }
-    }
+    requireTradeinPurchase(product,true);
     const data=structuredClone(base('/api/app/trade-in/capacity-quote'));
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
     if(state.checkoutState==='capacity-error')throw Object.assign(new Error('CAPACITY_UNAVAILABLE'),{status:503});
