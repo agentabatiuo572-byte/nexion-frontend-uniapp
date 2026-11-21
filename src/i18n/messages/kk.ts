@@ -3671,7 +3671,7 @@ export const kk: Messages = {
     statusPaid: "Төленді",
     statusProvisioning: "Дайындалуда",
     statusInventory: "Қоймада",
-    inventoryToast: "Trade-in аяқталды. Жаңа құрылғыңыз қоймада, оны құрылғы қоймасынан белсендіруге болады.",
+    inventoryToast: "Құрылғыңыз қоймада, оны құрылғы қоймасынан белсендіруге болады.",
     statusActivated: "Белсендірілді",
     statusPaymentFailed: "Төлем сәтсіз",
     statusExpired: "Төлем мерзімі өтті",

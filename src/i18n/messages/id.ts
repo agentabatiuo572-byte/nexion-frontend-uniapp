@@ -3671,7 +3671,7 @@ export const id: Messages = {
     statusPaid: "Dibayar",
     statusProvisioning: "Disiapkan",
     statusInventory: "Di inventaris",
-    inventoryToast: "Tukar tambah selesai. Perangkat baru Anda ada di inventaris dan dapat diaktifkan dari Inventaris perangkat.",
+    inventoryToast: "Perangkat Anda ada di inventaris dan dapat diaktifkan dari Inventaris perangkat.",
     statusActivated: "Aktif",
     statusPaymentFailed: "Pembayaran gagal",
     statusExpired: "Pembayaran kedaluwarsa",
