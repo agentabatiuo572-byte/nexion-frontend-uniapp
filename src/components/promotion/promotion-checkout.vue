@@ -131,7 +131,7 @@ import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import { computed,inject,ref,shallowRef,watch,onMounted,onBeforeUnmount } from 'vue';
-import { checkoutKeepResumeKey, type CheckoutKeepResume } from '@/components/checkout/checkout-keep-resume';
+import { checkoutKeepResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume } from '@/components/checkout/checkout-keep-resume';
 // #ifdef H5
 import { onBeforeRouteLeave } from 'vue-router';
 // #endif
@@ -253,12 +253,18 @@ function voucherCondition(def:VoucherDef):string {
   return [scope,fmt(p.value.voucherMinimum,{amount:formatAmount(def.minPurchaseUSD??0)}),def.endAt?p.value.deadline+' · '+displayDeadline(new Date(def.endAt).toISOString(),locale.code):''].filter(Boolean).join(' · ');
 }
 const selection=ref(props.items.map(({productNo,quantity})=>({productNo,quantity})));
-const keepRecoveryTarget=ref<string|null>(null),keepRecoveryReadError=ref(false),tradein=useTradeinSheet();
+const tradein=useTradeinSheet();
+const keepRecovery=shallowRef<CheckoutCapacityRecovery|null>(null);
+const keepRecoveryTarget=computed(() => keepRecovery.value?.target ?? null);
+const keepRecoveryReadError=computed(() => keepRecovery.value?.commandKey === null);
+const keepRecoveryOperation=computed(() => keepRecovery.value?.operation ?? null);
+const resolvingOriginalCapacity=computed(() => loading.value && !props.orderNo && !session.record.order && !session.record.pending);
 const checkoutKeepResume = inject(checkoutKeepResumeKey, null);
 const keepResumeAllowed = computed(() => {
   const resume = checkoutKeepResume?.value;
+  const recovery = keepRecovery.value;
   return !!resume && current() && visible.value && auth.isAuthenticated
-    && resume.target === keepRecoveryTarget.value && !keepRecoveryReadError.value;
+    && resume.target === recovery?.target && resume.commandKey === recovery.commandKey && resume.operation === recovery.operation;
 });
 function openKeepResume(): boolean {
   const resume = checkoutKeepResume?.value;
@@ -268,35 +274,35 @@ function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume)
   // Original orders and commands always recover before any new purchase gate.
   if(props.orderNo||session.record.order||session.record.pending)return false;
   const previous=keepRecoveryTarget.value;
-  if (!resume) { keepRecoveryTarget.value=null;keepRecoveryReadError.value=false; }
+  // Keep the current owner until the synchronous recheck determines the next one.
   for(const {productNo} of selection.value){
     if (resume && productNo !== resume.target) continue;
+    let recovery: CheckoutCapacityRecovery = { target: productNo, commandKey: null, operation: null };
     try{
       const pending=readCapacityPending(account,productNo);
       if(!pending)continue;
-      if (resume && (pending.operation !== 'keep' || pending.key !== resume.commandKey)) return false;
+      if (resume && (pending.operation !== resume.operation || pending.key !== resume.commandKey)) return false;
       if(refusedPurchasePayment(account,pending.key)){
         if (resume) return false;
         if(!reopen||!pending.quote)continue;
+        keepRecovery.value = null;
         tradein.showCanonicalReplace(productNo as DeviceKind,pending.quote.payableUsdt,pending.quote);
         return true;
       }
+      recovery = { target: productNo, commandKey: pending.key, operation: pending.operation };
     }
-    catch{
-      if (resume) return false;
-      keepRecoveryReadError.value=true;
-    }
-    keepRecoveryTarget.value=productNo;
+    catch{if (resume) return false;}
+    keepRecovery.value=recovery;
     freshQuoteReady.value=false;quoteFresh.value=false;quotePresentation.value=null;
     if(reopen||previous!==productNo)tradein.showKeepRecovery(productNo as DeviceKind);
     return true;
   }
+  if (!resume) keepRecovery.value = null;
   return false;
 }
 function resumeAfterCapacityRecovery(target: string) {
   if (!current() || !visible.value || keepRecoveryTarget.value !== target) return;
-  keepRecoveryTarget.value = null;
-  keepRecoveryReadError.value = false;
+  keepRecovery.value = null;
   if (tradein.state.kind === 'keep-recovery' && tradein.state.targetKind === target) tradein.hide();
   void loadQuote();
 }
@@ -740,7 +746,7 @@ const footer = computed(() => {
 });
 const backDisabled=computed(()=>busy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
 const resultVisible = computed(() => order.value?.paymentStatus === 'PAID');
-defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,keepRecoveryTarget,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
+defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{
