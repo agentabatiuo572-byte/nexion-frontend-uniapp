@@ -41,7 +41,7 @@
     <view class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.expected }}</text>
       <text v-if="quoteStatus==='loading'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-      <text v-else-if="quoteStatus==='error'" class="promotion-copy" role="alert">{{ t.promotion.errorNote }}</text>
+      <text v-else-if="quoteStatus==='error'||quoteStatus==='outOfStock'" class="promotion-copy" role="alert">{{ quoteStatus==='outOfStock' ? t.store.temporarilyOutOfStock : t.promotion.errorNote }}</text>
       <text v-else-if="!quote" class="promotion-copy">{{ t.promotion.awaitingQuote }}</text>
       <template v-if="quote">
         <RewardRows :expected="quote.expectedRewards" :lines="quote.items" />
@@ -72,6 +72,7 @@ import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
 import { commerceCopy } from '@/lib/commerce-review';
 import { promotionApi,sessionVault } from '@/api/runtime';
+import { isCheckoutQuoteOutOfStock } from '@/api/promotion-api';
 import type { Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
 import { useApp } from '@/store/app';
@@ -94,7 +95,7 @@ const props=defineProps<{activityId:string;initialItems:EntryItem[]}>();
 const app=useApp(),locale=useLocaleStore(),t=useT(),phase=useProductPhase();
 const scopeId=ref(props.activityId),selection=ref<EntryItem[]>([]),termsOpen=ref(false);
 const {activity,status:contextStatus,available,refresh:refreshContext}=usePromotionContext(scopeId);
-const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'>('idle');
+const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'|'outOfStock'>('idle');
 const fence=createPromotionReadFence();let visible=true;
 const clockNow=()=>typeof performance!=='undefined'?performance.now():Date.now();
 let quoteReceivedAt=0;let expiryTimer:ReturnType<typeof setInterval>|null=null;
@@ -147,10 +148,10 @@ async function refreshQuote(){
     const result=await promotionApi.quote(chosen,scopeId.value||null);
     if(!visible||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
     quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
-  }catch{if(visible&&fence.current(ticket))quoteStatus.value='error';}
+  }catch(cause){if(visible&&fence.current(ticket)&&identity===`${app.accountKey}:${app.accountBindingEpoch}`)quoteStatus.value=isCheckoutQuoteOutOfStock(cause)?'outOfStock':'error';}
 }
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
-function continueCheckout(){if(!freshQuote()){invalidate();return;}if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));}
+function continueCheckout(){if(!quote.value)return;if(!freshQuote()){invalidate();return;}if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));}
 onMounted(()=>{expiryTimer=setInterval(()=>{if(quote.value&&!freshQuote())invalidate();},1000);});
 onHide(()=>{visible=false;invalidate();termsOpen.value=false;});
 onShow(()=>{visible=true;invalidate();});
