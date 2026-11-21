@@ -4584,6 +4584,7 @@ timeHoursAgo: "{n}小时前",
     condRank: "升至 V{v}",
     // #221:年化与美元日收益、目录价和目录版本同一显示条件;UVT/天独立列示。
     buyCta: "购买 {name}",
+    unconfirmedNote: "暂时无法确认名额",
     inviteFriendsTitle: "邀请更多朋友",
     inviteFriendsHint: "你得 +{inviterNex}\u00A0UVT 邀请奖励,朋友注册得 +{nex}\u00A0UVT 礼包",
   },
