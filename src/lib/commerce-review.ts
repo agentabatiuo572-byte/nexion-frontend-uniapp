@@ -1,5 +1,6 @@
 import { formatAmount } from '@/lib/amount-display';
 import { uiLocale } from '@/i18n';
+import type { Order } from '@/store/orders';
 
 const copy = {
   zh: { provisioningLocationPending:'正在配置设备，部署地点待确认。', activatedLocationPending:'设备已激活，部署地点待确认。', walletLoading:'正在更新可用余额…', walletError:'余额暂未更新，请重试。', walletRefresh:'刷新余额', automaticVoucher:'自动使用最优可用券', releasedRewards:'本单已取消或结束，未发放的奖励不再发放。', bundleTitle:'组合订单 · {kinds} 款 / {units} 台', singleActivity:'此活动仅支持单款购买', singlePurchase:'查看商品并购买' },
@@ -14,6 +15,15 @@ const copy = {
 };
 export function commerceCopy(locale:string) { return copy[uiLocale(locale)]; }
 export function commerceAmount(value:Parameters<typeof formatAmount>[0]) { return formatAmount(value).replace(/\B(?=(\d{3})+\.)/g, ','); }
+export function commerceOrderHasPayment(order: Pick<Order, 'paidTotal' | 'paidAt'>): boolean {
+  return order.paidTotal != null || order.paidAt != null;
+}
+export function commerceOrderAmount(order: Pick<Order, 'total' | 'paidTotal' | 'paidAt' | 'paymentMethod'>): { value: Order['total']; currency: 'USD' | 'USDT' } {
+  return {
+    value: order.paidTotal ?? order.total,
+    currency: commerceOrderHasPayment(order) && order.paymentMethod !== 'HDPAY_BANK' ? 'USDT' : 'USD',
+  };
+}
 export function commerceOrderTitle(order:{productName:string;quantity:number;lineItems?:{sku:string;quantity:number}[]},locale:string) {
   const lines=order.lineItems??[];
   const kinds=new Set(lines.map(line=>line.sku)).size;

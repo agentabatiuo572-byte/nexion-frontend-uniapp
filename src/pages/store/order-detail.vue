@@ -35,7 +35,7 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
+        <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices">
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -43,7 +43,7 @@
           <view v-if="resultOrder.trialReward.nex > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUvt }}</text><text class="trial-result-uvt">+{{ formatAmount(resultOrder.trialReward.nex) }} UVT</text></view>
         </view>
         <view v-if="showTrialResult && orderSaved > 0" class="trial-result-summary">
-          <view class="trial-result-line"><text>{{ purchaseCopy.resultSaved }}</text><text class="trial-result-saved">{{ formatAmount(orderSaved) }} USDT</text></view>
+          <view class="trial-result-line"><text>{{ purchaseCopy.resultSaved }}</text><text class="trial-result-saved">{{ resultSavings }}</text></view>
         </view>
         <view class="trial-result-actions">
           <view class="trial-result-secondary active:opacity-85" role="button" tabindex="0" :aria-label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false"><text>{{ purchaseCopy.resultOrder }}</text></view>
@@ -96,12 +96,12 @@
           </view>
         </view>
 
-        <!-- Order summary: the total leads, then only the lines that explain it, then the record. -->
+        <!-- The settlement and the calculation of the original amount due are separate. -->
         <view class="order-summary order-block">
           <text class="order-summary__title">{{ t.orders.orderSummary }}</text>
           <view class="order-summary__total">
-            <text class="order-summary__total-label">{{ order.trialReward ? purchaseCopy.orderPaid : t.orders.total }}</text>
-            <CheckoutAmount class="order-summary__amount" :value="order.total" :currency="order.paidAt == null ? 'USD' : 'USDT'" />
+            <text class="order-summary__total-label">{{ summaryPaid ? purchaseCopy.orderPaid : paymentCopy.payable }}</text>
+            <CheckoutAmount class="order-summary__amount" v-bind="commerceOrderAmount(order)" />
           </view>
           <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
           <view v-if="order.lineItems?.length" class="order-summary__lines">
@@ -116,10 +116,12 @@
           <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
           <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
           <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`−${summaryMoney(order.discount)}`" brand />
+          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="`−${summaryMoney(order.tradeInCredit ?? 0)}`" brand />
           <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
           <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="`−${summaryMoney(order.promoDiscountUSD ?? 0)}`" brand />
           <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`−${summaryMoney(order.trialOffsetUSD ?? 0)}`" brand />
           <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="`−${summaryMoney(order.earlyDiscountUSD ?? 0)}`" brand />
+          <DetailRow v-if="summaryPaid" :label="paymentCopy.payable" :value="summaryMoney(order.total, true)" />
           <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" brand />
           <template v-if="order.status === 'refunded'">
             <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="usdt(order.refundAmountUsdt)" brand />
@@ -179,7 +181,8 @@
 <script setup lang="ts">
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { dateLocale } from "@/i18n/format";
-import { commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
+import { commerceOrderAmount, commerceOrderHasPayment, commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
+import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
@@ -217,7 +220,7 @@ import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import { asApiError } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { paidOrderReceipt } from "@/api/order-api";
+import { paidOrderReceipt, type PaidOrderReceipt } from "@/api/order-api";
 import { readPaymentCommand } from '@/api/payment-command-api';
 import { beginOrderAction,readOrderAction,markOrderActionPaid,clearOrderAction,type PendingOrderAction } from '@/lib/order-command-fence';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
@@ -389,8 +392,9 @@ const orderPresentation = ref<Order | null>(null);
 const orderEnvironmentInvalidated = ref(false);
 watch(() => apiRuntimeConfig?.environment, () => { orderEnvironmentInvalidated.value = true; orderPresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, locale.code], () => { orderPresentation.value = null; }, { flush: 'sync' });
-watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value], () => {
+watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, apiRuntimeConfig?.environment], () => {
   paymentResultOrder.value = null; paymentResultVisible.value = false;
+  paymentResultReceipt.value = null;
   paymentSheetOpen.value = false; paymentNotice.value = '';
   pendingPaymentChecking.value = false;
 }, { flush: 'sync' });
@@ -399,6 +403,8 @@ watch(liveOrder, value => {
 }, { immediate: true, flush: 'sync' });
 // Runtime invalidation still clears the shared store and every command uses liveOrder.
 const order = computed(() => orderEnvironmentInvalidated.value ? undefined : liveOrder.value ?? orderPresentation.value ?? undefined);
+const summaryPaid = computed(() => !!order.value && commerceOrderHasPayment(order.value));
+const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
 const orderQuantity = computed(() => order.value?.lineItems?.reduce((total, item) => total + item.quantity, 0) ?? order.value?.quantity ?? 0);
 const refundChannelLabel = computed(() => order.value?.refundChannel === "WALLET"
   ? t.value.promotion.wallet : t.value.orders.refundDetailsUnavailable);
@@ -416,10 +422,10 @@ const remoteOrderBinding = computed(() => {
 const remoteOrderBoundAccount = computed(() => remoteOrderBinding.value.accountKey);
 const showRemoteOrderLoading = computed(() => remoteApiEnabled
   && hasOrderId.value
-  && !order.value
+  && !resultOrder.value
   && !remoteOrderError.value
   && (!remoteOrderBoundAccount.value || !remoteOrderAttempted.value || remoteOrderRefreshing.value));
-const showOrderNotFound = computed(() => !order.value && (!remoteApiEnabled
+const showOrderNotFound = computed(() => !resultOrder.value && (!remoteApiEnabled
   || !hasOrderId.value
   || (remoteOrderBoundAccount.value && remoteOrderAttempted.value
     && !remoteOrderRefreshing.value && !remoteOrderError.value)));
@@ -480,7 +486,17 @@ const cancelBlocked = ref(false);
 const paymentNoticeReason = ref('');
 const noticeCancelFailed = ref(false);
 const paymentResultOrder = ref<Order|null>(null);
+const paymentResultReceipt = ref<PaidOrderReceipt|null>(null);
 const resultOrder = computed(() => order.value ?? paymentResultOrder.value);
+const paymentResultAmount = computed<{ value: Order['total']; currency: 'USD' | 'USDT' } | undefined>(() => {
+  const receipt = paymentResultReceipt.value;
+  if (receipt) return {
+    value: receipt.paidTotalUsdt ?? receipt.amountUsdt,
+    currency: receipt.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT',
+  };
+  const current = resultOrder.value;
+  if (current && commerceOrderHasPayment(current)) return commerceOrderAmount(current);
+});
 // Same branch as the template's result view: the header drops back and retitles only while that view is on screen.
 const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value && (showTrialResult.value || paymentResultVisible.value));
 
@@ -962,6 +978,7 @@ async function handleWalletPayment() {
   }
   if (typeof liveOrder.value.total !== 'number') return; // Promoted orders resume through their original-command checkout above.
   const scope = captureDetailScope();
+  const originalOrder = liveOrder.value;
   const requestOrderNo = liveOrder.value.id;
   const requestAmountUsdt = liveOrder.value.total;
   const requestItems = liveOrder.value.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
@@ -1014,7 +1031,8 @@ async function handleWalletPayment() {
       throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");
     }
     paymentConfirmed = true;
-    paymentResultOrder.value = liveOrder.value ?? null;
+    paymentResultOrder.value = originalOrder;
+    paymentResultReceipt.value = receipt;
     paymentResultVisible.value = true;
     markOrderActionPaid(scope.accountScope.accountKey,requestOrderNo);
     orderAction.value=readOrderAction(scope.accountScope.accountKey,requestOrderNo);
@@ -1024,11 +1042,9 @@ async function handleWalletPayment() {
           || !app.adoptCommerceWallet(receipt.walletBalanceAfterUsdt, receiptScope))) {
       throw new Error("WALLET_PAYMENT_RECEIPT_ACCOUNT_MISMATCH");
     }
-    await orders.ensureRemoteOrder(requestOrderNo);
+    await refreshOrder();
     if (!isCurrentDetailScope(scope)) return;
-    if (liveOrder.value?.status !== "activated") {
-      throw new Error("WALLET_PAYMENT_ORDER_READBACK_MISMATCH");
-    }
+    if (remoteOrderError.value || !liveOrder.value || !['activated', 'inventory'].includes(liveOrder.value.status)) return;
     if(orderAction.value)clearOrderAction(scope.accountScope.accountKey,requestOrderNo,orderAction.value.key);orderAction.value=null;
     void app.refreshRemoteFleet(receiptScope);
   } catch (error) {
@@ -1074,11 +1090,10 @@ function goDevices() {
   void navReset("/pages/me/devices");
 }
 const usdt = (value: number | string) => `${formatAmount(value)} USDT`;
-// Unpaid orders read in dollars (1 USD = 1 USDT); a settled wallet payment reads in USDT.
 // Only subtotal and total rows carry the unit.
 function summaryMoney(value: number | string, unit = false): string {
   if (!unit) return formatAmount(value);
-  return order.value?.paidAt == null ? `$${formatAmount(value)}` : usdt(value);
+  return order.value && commerceOrderAmount(order.value).currency === 'USDT' ? usdt(value) : `$${formatAmount(value)}`;
 }
 const trialRewardText = computed(() => {
   const reward = order.value?.trialReward;
@@ -1092,6 +1107,8 @@ const orderSaved = computed(() => {
   const saved = Number(current.subtotal) - Number(current.total);
   return Number.isFinite(saved) && saved > 0 ? +saved.toFixed(2) : 0;
 });
+const resultSavings = computed(() => paymentResultAmount.value?.currency === 'USD'
+  ? `$${formatAmount(orderSaved.value)}` : usdt(orderSaved.value));
 const resultRunningText = computed(() => {
   const current = order.value;
   const device = current ? commerceOrderTitle(current, locale.code) : "";

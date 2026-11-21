@@ -56,7 +56,7 @@
               <text v-if="o.meta" class="order-card__meta">{{ o.meta }}</text>
               <view class="order-card__bottom">
                 <text class="order-card__date">{{ dateText(o.placedAt) }}</text>
-                <CheckoutAmount class="order-card__amount" :value="o.total" :currency="o.kind === 'commerce' && o.paidAt == null ? 'USD' : 'USDT'" />
+                <CheckoutAmount class="order-card__amount" v-bind="o.kind === 'commerce' ? commerceOrderAmount(o) : { value: o.total, currency: 'USDT' }" />
               </view>
             </view>
           </view>
@@ -100,7 +100,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { toast } from "@/store/ui";
 import { dateLocale, fmt } from "@/i18n/format";
-import { commerceOrderTitle } from "@/lib/commerce-review";
+import { commerceOrderAmount, commerceOrderTitle } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { commerceAmount as formatAmount } from "@/lib/commerce-review";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";

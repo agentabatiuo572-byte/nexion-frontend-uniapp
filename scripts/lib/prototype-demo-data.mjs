@@ -329,7 +329,8 @@ function demoOrders(products,state,now,device41) {
     const placedAt=original==='provisioning_failed'&&repurchaseDays!==undefined
       ? at-repurchaseDays*day-samplePaidAfter
       : device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
-    return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?(longRef?'E4-REFUND-'+orderNo:'DEMO-REFUND-1'):null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
+    const settled=paymentStatus==='PAID'||paymentStatus==='REFUNDED';
+    return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paidTotalUsdt:settled?unitPrice.toFixed(2):null,paymentMethod:settled||paymentStatus==='CHARGEBACK'?'UVEL_WALLET':'PENDING',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?(longRef?'E4-REFUND-'+orderNo:'DEMO-REFUND-1'):null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:unitPrice,lineAmountUsdt:unitPrice}]};
   }).filter(order=>!accountDeletionWallet(state)||(['COMPLETED','CANCELLED','CLOSED','FAILED','REFUNDED'].includes(order.orderStatus)&&['PAID','FAILED','CANCELLED','REFUNDED','EXPIRED'].includes(order.paymentStatus)));
 }
@@ -660,8 +661,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
+  // History uses PENDING for orders without a payment record. Command receipts have no selected rail.
+  const orderReceiptProjection=order=>order?.paymentMethod==='PENDING'?{...order,paymentMethod:null}:order;
   const remember=(operation,targetId,response,order)=>{
-    if(commandKey){state.commands??={};state.commands[commandKey]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(order),response:structuredClone(response)};}
+    if(commandKey){state.commands??={};state.commands[commandKey]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(orderReceiptProjection(order)),response:structuredClone(response)};}
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
@@ -1069,13 +1072,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:quote?amount.toFixed(2):amount,placedAt:now,
       computePoints:lines.reduce((total,line)=>total+products.find(p=>p.id===line.productNo).computePoints*line.quantity,0),orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
     if(quote)Object.assign(order,{promotionQuoteId:quote.quoteId,payBy:new Date(now+paymentWindow).toISOString(),items:quote.items.map(l=>({...l,productName:products.find(p=>p.id===l.productNo).name})),rewards:quote.expectedRewards});
-    Object.assign(order,{paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',expiresAt:now+paymentWindow,paidAt:null,activatedAt:null,targetDeviceId:null,targetDeviceInstanceNo:null});
+    Object.assign(order,{paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',expiresAt:now+paymentWindow,paidAt:null,activatedAt:null,targetDeviceId:null,targetDeviceInstanceNo:null});
     if(voucher){
       if(voucher.voucherId==='V-DESIGN')state.voucherUsed=true;
       Object.assign(order,{voucherId:voucher.voucherId,voucherRedemption:voucher});
     }
     state.createdOrders||=[];state.createdOrders.unshift(order);
-    const response=quote?order:input.productNos?{orderNo:order.orderNo,orderType:'BUNDLE',itemCount:lines.length,productNos:input.productNos,subtotalUsdt:subtotal,discountRate,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server',policyVersion:1}:{orderNo:order.orderNo,subtotalUsdt:subtotal,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,voucherId:order.voucherId||null,voucherRedemption:order.voucherRedemption??null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server'};
+    const response=quote?orderReceiptProjection(order):input.productNos?{orderNo:order.orderNo,orderType:'BUNDLE',itemCount:lines.length,productNos:input.productNos,subtotalUsdt:subtotal,discountRate,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server',policyVersion:1}:{orderNo:order.orderNo,subtotalUsdt:subtotal,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,voucherId:order.voucherId||null,voucherRedemption:order.voucherRedemption??null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server'};
     return remember(lines.length>1?'createBundle':'createOrder',quote?.quoteId||order.orderNo,response,order);
   }
   const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
@@ -1085,7 +1088,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const replay=order.paymentStatus==='PAID',amount=Number(order.amountUsdt);
     if(action==='cancel'){
       // Same rule as the backend: an already cancelled order replays its receipt; any other settled order cannot be cancelled.
-      if(order.paymentStatus==='CANCELLED'&&order.orderStatus==='CANCELLED')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
+      if(order.paymentStatus==='CANCELLED'&&order.orderStatus==='CANCELLED')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?orderReceiptProjection(order):{}),...authority,source:'server',
         orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:true},order);
       if(order.paymentStatus!=='PENDING')refuse('ORDER_NOT_CANCELLABLE');
       (state.orderStatuses??={})[orderNo]='cancelled';
@@ -1093,10 +1096,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         Object.assign(order,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
           activationStatus:'WAITING_PAYMENT',paidAt:null,activatedAt:null});
       }
-      return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
+      return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?orderReceiptProjection(order):{}),...authority,source:'server',
         orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:false},order);
     }
-    const paymentNo='DEMO-PAY-'+orderNo,paymentMethod=amount===0?'VOUCHER':'WALLET';
+    const paymentNo='DEMO-PAY-'+orderNo,paymentMethod=amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt=amount.toFixed(2);
     if(replay){
       if(order.orderStatus!=='COMPLETED'||order.activationStatus!=='ACTIVATED')refuse('ORDER_NOT_PAYABLE');
       if(order.paymentNo!==paymentNo)refuse('ORDER_PAYMENT_STATE_CONFLICT');
@@ -1113,13 +1116,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       (state.orderStatuses??={})[orderNo]='activated';
       if(state.createdOrders?.includes(order)){
         Object.assign(order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
-          activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
+          activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod,paidTotalUsdt});
       }
     }
     const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,
       paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',
-      amountUsdt:order.promotionQuoteId?amount.toFixed(2):amount,paymentMethod,
+      amountUsdt:order.promotionQuoteId?paidTotalUsdt:amount,paidTotalUsdt,paymentMethod,
       walletBalanceAfterUsdt:amount===0?null:balanceAfter,idempotent:replay};
     return remember('payOrder',orderNo,response,order);
   }
