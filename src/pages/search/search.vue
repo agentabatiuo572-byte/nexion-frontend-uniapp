@@ -119,17 +119,18 @@ import { PRODUCTS } from "@/mock/products";
 import type { Product } from "@/mock/products";
 import { productCopy, specRow, specText } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
-import { remoteApiEnabled } from "@/api/runtime";
+import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import type { SupportFaq } from "@/domain/support";
 import { readPublishedFaqs } from "@/store/published-content";
 import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
+import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { searchStakingRateSummary } from "@/lib/search-staking-rate";
 import { resolveSearchResultState, type SearchRemoteStatus } from "@/lib/search-source-state";
 import { beginNavigationAttempt, completeNavigationAttempt } from "@/lib/navigation-attempt";
 import { fmt } from "@/i18n/format";
 import { searchCopyFor } from "./search-copy";
-import { serverLanguage } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
 
 type Group = "route" | "device" | "product" | "member" | "faq" | "help";
 interface Hit {
@@ -153,6 +154,7 @@ const q = ref("");
 let searchSourceReadEpoch = 0;
 const publishedFaqs = ref<SupportFaq[]>([]);
 const publishedFaqStatus = ref<SearchRemoteStatus>("idle");
+const tradeinSearchEnabled = ref(false);
 const searchReading = ref(false);
 useAutoRecovery({ failed: () => remoteApiEnabled && !searchReading.value && [productCatalogState.status, network.remoteStatus, app.remoteFleetStatus, publishedFaqStatus.value].includes("error"), retry: retrySearchSources });
 let publishedFaqReadEpoch = 0;
@@ -176,22 +178,33 @@ async function refreshPublishedFaqs(force = false): Promise<void> {
   }
 }
 
+async function refreshTradeinSearchAvailability(isCurrent: () => boolean): Promise<void> {
+  try {
+    const tradeinConfig = await runPassiveTabRead("tradein-config", () => deviceE3Api.tradeinConfig());
+    if (isCurrent()) tradeinSearchEnabled.value = tradeinConfig.enabled;
+  } catch {
+    if (isCurrent()) tradeinSearchEnabled.value = false;
+  }
+}
+
 async function refreshSearchSources(force = false, forceFaqs = false): Promise<void> {
   if (!remoteApiEnabled) return;
   const readEpoch = ++searchSourceReadEpoch;
+  tradeinSearchEnabled.value = false;
   searchReading.value = true;
   try {
     const accountKey = app.accountKey;
     const accountEpoch = app.accountBindingEpoch;
+    const isCurrent = () => readEpoch === searchSourceReadEpoch
+      && accountKey === app.accountKey && accountEpoch === app.accountBindingEpoch;
     // A successful catalogue read advances the runtime revision. Do not start
     // E3 fleet work under the revision it is about to invalidate.
     await refreshProductCatalog(force);
-    if (readEpoch !== searchSourceReadEpoch
-      || accountKey !== app.accountKey
-      || accountEpoch !== app.accountBindingEpoch) return;
+    if (!isCurrent()) return;
     await Promise.allSettled([
       refreshPublishedFaqs(forceFaqs), network.refreshCanonicalNetwork(),
       force ? app.refreshRemoteFleet() : app.ensureRemoteFleet(), staking.syncRemote(),
+      refreshTradeinSearchAvailability(isCurrent),
     ]);
   } finally { if (readEpoch === searchSourceReadEpoch) searchReading.value = false; }
 }
@@ -227,8 +240,7 @@ function productSearchDetail(p: Product): string {
     .filter(Boolean).join(" · ");
 }
 
-// Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
-// only the key→href binding stays here.
+// Static route/FAQ catalog. Display copy comes from search.routes / search.faqEntries.
 type RouteKey = keyof typeof t.value.search.routes;
 type FaqKey = keyof typeof t.value.search.faqEntries;
 
@@ -272,15 +284,21 @@ const FAQ: ReadonlyArray<{ key: FaqKey; href: string }> = [
   { key: "nex", href: "/pages/me/wallet-nex" },
 ];
 
+const TRADEIN_SEARCH_ALIASES: Partial<Record<LocaleCode, readonly string[]>> = {
+  zh: ["退役", "抵扣升级"],
+  vi: ["thu cũ đổi mới", "thu cũ"],
+};
+
 const results = computed<Hit[]>(() => {
   const query = q.value.trim().toLowerCase();
   if (!query) return [];
   const out: Hit[] = [];
-  // 过滤跑在当前语言的译文上,不是英文字面量 —— 换语言后搜索词跟着换语言可搜。
+  // 搜索当前语言的译文，升级置换也匹配该语言的旧称。
   const routeCopy = t.value.search.routes;
   const faqCopy = t.value.search.faqEntries;
   for (const r of ROUTES) {
     if (r.key === "staking" && !config.isEnabled("stakingVisible")) continue;
+    if (r.key === "tradeIn" && !tradeinSearchEnabled.value) continue;
     const c = routeCopy[r.key];
     const sublabel = r.key === "staking"
       ? searchStakingRateSummary({
@@ -290,7 +308,9 @@ const results = computed<Hit[]>(() => {
         formatApy: (apy) => fmt(t.value.home.quickStakeApyFormat, { n: apy }),
       })
       : c.sub;
-    if (c.label.toLowerCase().includes(query) || sublabel.toLowerCase().includes(query)) {
+    const matchesTradeinAlias = r.key === "tradeIn"
+      && TRADEIN_SEARCH_ALIASES[locale.code]?.some((alias) => alias.includes(query));
+    if (c.label.toLowerCase().includes(query) || sublabel.toLowerCase().includes(query) || matchesTradeinAlias) {
       out.push({ group: "route", label: c.label, sublabel, href: r.href });
     }
   }
