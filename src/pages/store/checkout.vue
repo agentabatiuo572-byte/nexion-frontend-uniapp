@@ -856,8 +856,9 @@ const trialEarlyDiscountText = computed(() => formatAmount(trialOffsetView.value
 const trialCreditText = computed(() => {
   const quote = remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote : null;
   if (!quote) return "";
-  const nex = `${formatGroupedAmount(quote.rewardNEX)} UVT`;
-  return quote.remainderUSD > 0 ? `${formatGroupedAmount(quote.remainderUSD)} USDT · ${nex}` : nex;
+  // Number and unit never split (03 §3.6.1): U+00A0 between them.
+  const nex = `${formatGroupedAmount(quote.rewardNEX)}\u00A0UVT`;
+  return quote.remainderUSD > 0 ? `${formatGroupedAmount(quote.remainderUSD)}\u00A0USDT · ${nex}` : nex;
 });
 // An empty trial discount cap means no cap: drop the "up to" clause instead of printing "0".
 const promoRowLabel = computed(() => {
