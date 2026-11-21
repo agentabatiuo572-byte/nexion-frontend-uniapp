@@ -51,9 +51,9 @@
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
           <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="product.tagline" class="checkout-product-meta">{{ product.tagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
           <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><view class="checkout-quantity-controls">
-            <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" /></button>
+            <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" :size="20" /></button>
             <text class="checkout-quantity-value" aria-live="polite">1</text>
-            <view class="checkout-quantity-button" data-testid="checkout-quantity-increase" role="button" :tabindex="canIncreaseCheckoutQuantity() ? 0 : -1" :aria-disabled="!canIncreaseCheckoutQuantity()" :aria-label="t.uiChrome.increaseQty" @click.stop="increaseCheckoutQuantity" @keydown.enter.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)" @keydown.space.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)"><NxIcon name="plus" /></view>
+            <view class="checkout-quantity-button" data-testid="checkout-quantity-increase" role="button" :tabindex="canIncreaseCheckoutQuantity() ? 0 : -1" :aria-disabled="!canIncreaseCheckoutQuantity()" :aria-label="t.uiChrome.increaseQty" @click.stop="increaseCheckoutQuantity" @keydown.enter.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)" @keydown.space.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)"><NxIcon name="plus" :size="20" /></view>
           </view></view>
         </view>
 
@@ -3247,24 +3247,33 @@ const doneBtnStyle: CSSProperties = {
 .checkout-step-label { display:block; margin-top:var(--v5-space-2); font:400 12.5px/18px var(--font-v5); color:var(--v5-ink-3); }
 .checkout-step-label--active { color:var(--v5-brand); font-weight:600; }
 .checkout-group { position:relative; overflow:hidden; border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); }
-.checkout-product { display:flex; align-items:center; gap:var(--v5-space-3); min-height:90px; margin:var(--v5-space-5) var(--v5-space-4) 0; padding:10px 16px; }
-.checkout-product-art { display:grid; place-items:center; flex:none; width:68px; height:68px; border-radius:16px; overflow:hidden; }
-.checkout-product-art image { width:74px; height:74px; }
-.checkout-product-copy { flex:1; min-width:0; }
-.checkout-product-name { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
+/* Product summary: the device image is the card's main visual, copy beside it; quantity is its own full-width row
+   (label left, stepper right) so long languages and narrow widths never leave the stepper stranded under the copy. */
+.checkout-product { --checkout-art:120px; --checkout-art-h:76px; --checkout-art-image:128px; display:grid; grid-template-columns:var(--checkout-art) minmax(0,1fr); align-items:center; column-gap:var(--v5-space-3); margin:var(--v5-space-5) var(--v5-space-4) 0; padding:var(--ui-space-inset-hero) var(--ui-space-inset-hero) var(--v5-space-1); }
+/* The pedestal art is square with wide transparent margins (device + disc ≈ 0.31–0.83 of its height): the box is
+   only as tall as the device, and the image overflows it, centred on the device rather than on the canvas. */
+.checkout-product-art { position:relative; width:var(--checkout-art); height:var(--checkout-art-h); }
+.checkout-product-art image { position:absolute; left:50%; top:50%; width:var(--checkout-art-image); height:var(--checkout-art-image); transform:translate(-50%, -57%); pointer-events:none; }
+.checkout-product:has(> .checkout-product-art:empty) { grid-template-columns:minmax(0,1fr); }
+.checkout-product-art:empty { display:none; }
+.checkout-product-copy { min-width:0; }
+.checkout-product-name { display:block; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .checkout-product-meta { display:block; margin-top:2px; font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); }
-.checkout-product-price { display:block; margin-top:var(--v5-space-1); font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
-.checkout-quantity { flex:none; text-align:center; }
-.checkout-quantity-controls { display:flex; align-items:center; margin-top:var(--v5-space-1); border:1px solid var(--v5-border); border-radius:999px; background:var(--ui-content-surface-2); }
-.checkout-quantity-button { display:grid; place-items:center; width:44px; min-height:44px; border-radius:999px; font:400 18px/20px var(--font-v5); cursor:pointer; }
-.checkout-quantity-button[aria-disabled="true"],.checkout-quantity-button[disabled] { opacity:.35; cursor:default; }
-button.checkout-quantity-button {margin:0;padding:0;background:transparent;color:inherit;border:0;}
+.checkout-product .checkout-product-meta { margin-top:var(--v5-space-1); line-height:var(--ui-type-list-subtitle-lh); overflow-wrap:break-word; }
+.checkout-product-price { display:block; margin-top:var(--v5-space-2); font-size:var(--ui-type-list-title); line-height:var(--ui-type-list-title-lh); }
+.checkout-product-price :deep(.checkout-amount__symbol) { font-size:max(12px, .55em); }
+.checkout-quantity { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:52px; margin-top:var(--v5-space-4); border-top:1px solid var(--v5-border); }
+.checkout-product .checkout-quantity > .checkout-product-meta { margin-top:0; }
+/* 20px glyphs in 44px targets: pull the row right so the + stroke, not its hit area, meets the divider end. */
+.checkout-quantity-controls { display:flex; flex:none; align-items:center; margin-right:-16px; }
+.checkout-quantity-button { display:grid; place-items:center; width:44px; min-height:44px; border-radius:999px; color:var(--v5-ink); cursor:pointer; }
+.checkout-quantity-button[aria-disabled="true"],.checkout-quantity-button[disabled] { opacity:.5; cursor:default; }
+button.checkout-quantity-button {margin:0;padding:0;background:transparent;color:var(--v5-ink);border:0;}
 button.checkout-quantity-button::after {border:0;}
 .checkout-quantity-button:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
-.checkout-quantity-value { display:block; min-width:20px; font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
-@media(max-width:389px) {
-  .checkout-product { display:grid;grid-template-columns:68px minmax(0,1fr);gap:10px 12px; }
-  .checkout-quantity { grid-column:2;justify-self:start;text-align:left; }
+.checkout-quantity-value { display:block; min-width:24px; text-align:center; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); font-variant-numeric:tabular-nums; }
+@media(max-width:374px) {
+  .checkout-product { --checkout-art:104px; --checkout-art-h:66px; --checkout-art-image:112px; }
 }
 .checkout-section { margin:var(--v5-space-5) var(--v5-space-4) 0; }
 .checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); letter-spacing:-.012em; }
@@ -3347,7 +3356,6 @@ button.checkout-policy-link::after { border:0; }
 .checkout-promotion :deep(.promotion-flat) { border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); padding:var(--v5-space-4); }
 .checkout-promotion :deep(.promotion-summary) { min-height:40px; font-size:14px; }
 .checkout-promotion :deep(.promotion-summary.total) { min-height:55px; font-size:18px; }
-.checkout-promotion :deep(.promotion-image) { width:74px; height:74px; border-radius:16px; flex:none; }
 .checkout-promotion :deep(.promotion-price) { font-size:15px; font-weight:600; }
 .checkout-voucher:focus-visible,.checkout-payment:focus-visible,.checkout-cancel:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
 .checkout-voucher:active,.checkout-payment:active,.checkout-cancel:active { opacity:.8; }
