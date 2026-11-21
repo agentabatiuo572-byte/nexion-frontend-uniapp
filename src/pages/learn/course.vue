@@ -668,7 +668,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-quiz-result__meta { font:400 var(--ui-type-list-subtitle)/20px var(--font-v5);color:var(--v5-ink-2); }
 .course-quiz-result__retry { width:100%;margin-top:var(--v5-space-2); }
 .course-next-state { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); padding: 18px; text-align: center; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); }
-.learning-course .course-result__back { display: flex; box-sizing: border-box; width: 100%; margin-top: var(--v5-space-3); font-size: 14px; font-weight: 400; color: var(--v5-ink-2); }
+.learning-course .course-result__back { display: flex; box-sizing: border-box; width: 100%; margin-top: var(--v5-space-3); }
 .course-next-state.nx-inline-recovery { display: grid; align-items: center; gap: var(--v5-space-3); text-align: start; }
 [role="radio"] { display: flex; align-items: center; gap: var(--v5-space-3); min-height: 48px; padding: var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: 14px; font: 400 14px/1.5 var(--font-v5); }
 [role="radio"][aria-checked="true"] { border-color: var(--v5-brand); background: color-mix(in srgb,var(--v5-brand) 6%,transparent); }

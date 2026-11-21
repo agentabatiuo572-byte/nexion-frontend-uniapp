@@ -996,7 +996,7 @@ body {
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .nx-home-art-float { animation-play-state: paused; }
 .nx-home-arrow { display: grid; place-items: center; border-radius: var(--v5-radius-full); background: var(--v5-surface-2); color: var(--v5-ink-2); box-shadow:var(--ui-glass-edge-shadow); }
 /* Shared capsule material: soft rim and broad inner refraction, like the wallet edge. */
-.nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow, .nx-glass-bar, .nx-tray-float, .nx-soft-glass, .nx-glass-sheet, .nx-tint {
+.nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow, .nx-glass-bar, .nx-tray-float, .nx-float-panel, .nx-soft-glass, .nx-glass-sheet, .nx-tint {
   --ui-button-rim: rgba(255,255,255,.10);
   --ui-button-highlight: rgba(255,255,255,.24);
   --ui-button-bottom: rgba(0,0,0,.28);
@@ -1011,7 +1011,7 @@ body {
   backdrop-filter: blur(12px) saturate(125%);
   -webkit-backdrop-filter: blur(12px) saturate(125%);
 }
-[data-theme="light"] .nx-frosted-button, [data-theme="light"] .promotion-action, [data-theme="light"] .reward-cta, [data-theme="light"] .nx-liquid-glass, [data-theme="light"] .nx-home-arrow, [data-theme="light"] .nx-glass-bar, [data-theme="light"] .nx-tray-float, [data-theme="light"] .nx-soft-glass, [data-theme="light"] .nx-tint, [data-theme="light"] .nx-glass-sheet {
+[data-theme="light"] .nx-frosted-button, [data-theme="light"] .promotion-action, [data-theme="light"] .reward-cta, [data-theme="light"] .nx-liquid-glass, [data-theme="light"] .nx-home-arrow, [data-theme="light"] .nx-glass-bar, [data-theme="light"] .nx-tray-float, [data-theme="light"] .nx-float-panel, [data-theme="light"] .nx-soft-glass, [data-theme="light"] .nx-tint, [data-theme="light"] .nx-glass-sheet {
   --ui-button-rim: rgba(73,94,125,.12);
   --ui-button-highlight: rgba(255,255,255,.85);
   --ui-button-bottom: rgba(87,115,155,.18);
@@ -1064,6 +1064,12 @@ body {
 }
 [data-theme="light"] .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .nx-glass-bar .nx-tray-copy { padding-inline: 12px; }
+/* A panel that floats above the bottom chrome (the payment-in-progress bar) uses the tray's material: same fill, blur,
+   soft rim and light shadow. Only the material; the panel sets its own position, size and radius. */
+.nx-float-panel { background: var(--v5-sticky-bar-bg); box-shadow: var(--ui-glass-edge-shadow); backdrop-filter: blur(12px) saturate(125%); -webkit-backdrop-filter: blur(12px) saturate(125%); }
+[data-theme="light"] .nx-float-panel { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .nx-float-panel { background: var(--v5-surface-2); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+@media (forced-colors: active) { .nx-float-panel { background: Canvas; box-shadow: none; outline: 1px solid CanvasText; outline-offset: -1px; backdrop-filter: none; -webkit-backdrop-filter: none; } }
 .nx-glass-bar .nx-tray-note { display: block; padding: 4px 12px 0; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: anywhere; text-wrap: pretty; }
 .nx-glass-bar .nx-button--primary.nx-button--disabled, .nx-tray-float.nx-button--primary.nx-button--disabled { opacity: 1; }
 .nx-glass-bar:not(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) .nx-button--primary.nx-button--disabled > .nx-button__surface, .nx-glass-bar:not(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) [role="button"][aria-disabled="true"]:not(.nx-button, .nx-tray-text), .nx-glass-bar:not(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) .nx-tray-status, .nx-tray-float.nx-button--primary.nx-button--disabled > .nx-button__surface {
