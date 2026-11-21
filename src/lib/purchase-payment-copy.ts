@@ -1,18 +1,11 @@
 import { uiLocale, type UiLocale } from '@/i18n';
 
-const enCashierImageCopy = {
-  cashierSaveQr: 'Save QR code to Photos',
-  cashierImageSaved: 'Saved to Photos',
-  cashierImageSaveFailed: 'Couldn’t save the payment QR code',
-  cashierAlbumPermissionDenied: 'Allow photo access in Settings to save the QR code',
-};
-
 // Purchase payment copy. Never name a payment provider or its domain in the App.
 const zh = {
-  cashierSaveQr: '保存二维码到相册',
+  cashierSaveQr: '保存二维码',
   cashierImageSaved: '已保存到相册',
-  cashierImageSaveFailed: '无法保存付款二维码',
-  cashierAlbumPermissionDenied: '请在系统设置中允许相册权限后再保存',
+  cashierImageSaveFailed: '二维码保存失败，请截屏保存',
+  cashierAlbumPermissionDenied: '请在系统设置中允许访问相册后重试',
   checkingOriginalPayment: "正在确认原付款单…",
   originalPaymentNotFoundRetry: "原付款请求未送达。点「重新付款」按原请求重新发送。",
   originalPaymentUnavailableTitle: "查不到原付款记录",
@@ -65,7 +58,10 @@ const zh = {
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
 const en: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'Save QR code',
+  cashierImageSaved: 'Saved to your photos',
+  cashierImageSaveFailed: 'Couldn’t save the QR code. Take a screenshot instead.',
+  cashierAlbumPermissionDenied: 'Allow photo access in Settings, then try again',
   checkingOriginalPayment: "Confirming the original payment…",
   originalPaymentNotFoundRetry: "The original request did not arrive. Tap Pay again to resend it.",
   originalPaymentUnavailableTitle: "Original payment not found",
@@ -118,7 +114,10 @@ const en: typeof zh = {
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'Lưu mã QR',
+  cashierImageSaved: 'Đã lưu vào thư viện ảnh',
+  cashierImageSaveFailed: 'Không lưu được mã QR. Hãy chụp màn hình để lưu.',
+  cashierAlbumPermissionDenied: 'Hãy cho phép truy cập ảnh trong Cài đặt rồi thử lại',
   checkingOriginalPayment: "Đang xác nhận khoản thanh toán ban đầu…",
   originalPaymentNotFoundRetry: "Yêu cầu ban đầu chưa đến được hệ thống. Nhấn “Thanh toán lại” để gửi lại.",
   originalPaymentUnavailableTitle: "Không tìm thấy khoản thanh toán ban đầu",
@@ -171,7 +170,10 @@ const vi: typeof zh = {
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'Simpan kode QR',
+  cashierImageSaved: 'Tersimpan di galeri',
+  cashierImageSaveFailed: 'Kode QR gagal disimpan. Ambil tangkapan layar saja.',
+  cashierAlbumPermissionDenied: 'Izinkan akses foto di Pengaturan, lalu coba lagi',
   checkingOriginalPayment: "Mengonfirmasi pembayaran awal…",
   originalPaymentNotFoundRetry: "Permintaan awal tidak terkirim. Ketuk “Bayar lagi” untuk mengirim ulang.",
   originalPaymentUnavailableTitle: "Pembayaran awal tidak ditemukan",
@@ -224,7 +226,10 @@ const id: typeof zh = {
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'Simpan kod QR',
+  cashierImageSaved: 'Disimpan ke galeri',
+  cashierImageSaveFailed: 'Kod QR gagal disimpan. Ambil tangkapan skrin sahaja.',
+  cashierAlbumPermissionDenied: 'Benarkan akses foto dalam Tetapan, kemudian cuba lagi',
   checkingOriginalPayment: "Mengesahkan pembayaran asal…",
   originalPaymentNotFoundRetry: "Permintaan asal tidak sampai. Ketik “Bayar semula” untuk menghantarnya semula.",
   originalPaymentUnavailableTitle: "Pembayaran asal tidak ditemui",
@@ -277,7 +282,10 @@ const ms: typeof zh = {
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'I-save ang QR',
+  cashierImageSaved: 'Na-save sa gallery',
+  cashierImageSaveFailed: 'Hindi na-save ang QR code. Mag-screenshot na lang.',
+  cashierAlbumPermissionDenied: 'Payagan ang access sa photos sa Settings, saka subukan ulit',
   checkingOriginalPayment: "Kinukumpirma ang orihinal na bayad…",
   originalPaymentNotFoundRetry: "Hindi dumating ang orihinal na request. I-tap ang “Magbayad ulit” para ipadala ito ulit.",
   originalPaymentUnavailableTitle: "Hindi makita ang orihinal na bayad",
@@ -330,7 +338,10 @@ const fil: typeof zh = {
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'Сохранить QR',
+  cashierImageSaved: 'Сохранено в галерею',
+  cashierImageSaveFailed: 'Не удалось сохранить QR-код. Сделайте снимок экрана.',
+  cashierAlbumPermissionDenied: 'Разрешите доступ к фото в настройках и повторите',
   checkingOriginalPayment: "Подтверждаем исходный платёж…",
   originalPaymentNotFoundRetry: "Исходный запрос не дошёл. Нажмите «Оплатить снова», чтобы отправить его повторно.",
   originalPaymentUnavailableTitle: "Исходный платёж не найден",
@@ -383,7 +394,10 @@ const ru: typeof zh = {
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
 const kk: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'QR кодты сақтау',
+  cashierImageSaved: 'Галереяға сақталды',
+  cashierImageSaveFailed: 'QR код сақталмады. Скриншот жасаңыз.',
+  cashierAlbumPermissionDenied: 'Баптауларда фотоға рұқсат беріп, қайталап көріңіз',
   checkingOriginalPayment: "Бастапқы төлем расталуда…",
   originalPaymentNotFoundRetry: "Бастапқы сұраныс жетпеді. Қайта жіберу үшін «Қайта төлеу» түймесін басыңыз.",
   originalPaymentUnavailableTitle: "Бастапқы төлем табылмады",
@@ -436,7 +450,10 @@ const kk: typeof zh = {
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
-  ...enCashierImageCopy,
+  cashierSaveQr: 'QR kodni saqlash',
+  cashierImageSaved: 'Galereyaga saqlandi',
+  cashierImageSaveFailed: 'QR kod saqlanmadi. Skrinshot oling.',
+  cashierAlbumPermissionDenied: 'Sozlamalarda rasmlarga ruxsat bering va qayta urining',
   checkingOriginalPayment: "Asl toʻlov tasdiqlanmoqda…",
   originalPaymentNotFoundRetry: "Asl soʻrov yetib bormadi. Qayta yuborish uchun «Qayta toʻlash» tugmasini bosing.",
   originalPaymentUnavailableTitle: "Asl toʻlov topilmadi",

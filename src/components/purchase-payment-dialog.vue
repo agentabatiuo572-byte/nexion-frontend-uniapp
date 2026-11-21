@@ -219,11 +219,17 @@
       <iframe :src="cashierUrl" :title="copy.bankPage" referrerpolicy="no-referrer" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox" />
       <!-- #endif -->
     </view>
-    <!-- Docked under the bank page, never over it (its QR code stays clear): a note above the action, as in a tray (04 §4.0).
-         The bank page does not close itself; returning keeps the automatic checks running. -->
-    <view class="pp-cashier__foot" :style="{ paddingBottom: cashierFootPad + 'px' }">
-      <text class="pp-cashier__note">{{ copy.autoReturn }}</text>
-      <NxButton class="pp-cashier__done" :label="copy.paidReturn" variant="primary" @click="payment.closeCashier" />
+    <!-- The shared bottom tray (04 §4.0): note above, the save action as a plain text button, the primary on its right.
+         The bank page ends above the tray's reserved space, so its QR code is never covered (CASHIER_FOOT).
+         The bank page does not close itself; returning keeps the automatic checks running.
+         Saving exists only in the native App, once the bank page has loaded. -->
+    <view class="pp-cashier__foot" aria-hidden="true" />
+    <view class="pp-cashier__tray nx-glass-bar">
+      <text class="pp-cashier__note nx-tray-note">{{ copy.autoReturn }}</text>
+      <view class="pp-cashier__row2">
+        <NxButton v-if="canSaveCashierImage" variant="secondary" :label="copy.cashierSaveQr" :busy="savingQr" @click="saveQr" />
+        <NxButton class="pp-cashier__done" :label="copy.paidReturn" variant="primary" @click="payment.closeCashier" />
+      </view>
     </view>
   </view>
 
@@ -259,8 +265,9 @@ const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale 
 // The order detail shows its own payment state in the hero, so it hides the floating bar.
 withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
 const URGENT_MS = 5 * 60000;
-// Height of the bank page footer above the safe area: 12 top + 32 note (two lines) + 8 gap + 48 button.
-const CASHIER_FOOT = 100;
+// Space the bank page leaves for the tray: 22 off the screen bottom (04 §4.0) + tray 108 (8 + note 4 + 32 for two lines
+// + gap 8 + button 48 + 8) + 8 above it. Fixed whether or not the save button shows, so the native view never resizes.
+const CASHIER_FOOT = 138;
 const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
@@ -270,7 +277,6 @@ const pending = computed(() => { app.accountKey; s.revision; return payment.pend
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
 const records = computed(() => { app.accountKey; s.revision; return payment.records().filter(row => !row.validated); });
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
-const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().safeAreaInsets?.bottom ?? 0, 30); } catch { return 30; } })();
 
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
 const walletEnough = computed(() => Number(s.amount) === 0 || balanceKnown.value && app.user.usdtBalance >= Number(s.amount));
@@ -491,6 +497,20 @@ async function saveCashierImage(): Promise<CashierImageResult> {
 
 defineExpose({ canSaveCashierImage, saveCashierImage });
 
+// Save result feedback (03 §3.5.1 toast). 'unavailable' (not loaded yet, or a repeat tap) needs no message.
+const savingQr = ref(false);
+async function saveQr() {
+  savingQr.value = true;
+  try {
+    const result = await saveCashierImage();
+    if (result === 'saved') toast.success(copy.value.cashierImageSaved);
+    else if (result === 'permission-denied') toast.warn(copy.value.cashierAlbumPermissionDenied);
+    else if (result === 'failed') toast.error(copy.value.cashierImageSaveFailed);
+  } finally {
+    savingQr.value = false;
+  }
+}
+
 // #ifdef APP-PLUS
 const cashierHttpsPattern = '^[Hh][Tt][Tt][Pp][Ss]://.*$';
 const cashierHttps = new RegExp(cashierHttpsPattern);
@@ -516,7 +536,7 @@ watch(visibleCashierUrl, url => {
   closeNativeCashier();
   if (!url) return;
   const view = plus.webview.create('', `uvel-purchase-cashier-${Date.now()}`, {
-    top: `${statusBar + 82}px`, bottom: `${cashierFootPad + CASHIER_FOOT}px`, plusrequire: 'none',
+    top: `${statusBar + 82}px`, bottom: `${CASHIER_FOOT}px`, plusrequire: 'none',
   });
   cashierView = view;
   // The hosted URL was validated at entry. The cashier may then navigate to any HTTPS page.
@@ -697,10 +717,13 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__lock { position: relative; z-index: 120; height: 26px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-cashier__frame { flex: 1; min-height: 0; background: #fff; }
 .pp-cashier__frame iframe { display: block; width: 100%; height: 100%; border: 0; }
-/* Fixed height (CASHIER_FOOT + safe area): the native bank webview ends where it starts. The note keeps two lines. */
-.pp-cashier__foot { flex: none; box-sizing: content-box; height: 88px; padding: var(--v5-space-3) var(--v5-space-4) 0; display: flex; flex-direction: column; align-items: stretch; gap: var(--v5-space-2); background: var(--v5-surface); box-shadow: 0 -1px 0 var(--v5-border); }
-.pp-cashier__note { display: flex; align-items: center; justify-content: center; height: 32px; text-align: center; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-wrap: pretty; overflow-wrap: break-word; }
-.pp-cashier__done { display: flex; width: 100%; }
+/* Reserved space under the bank page (CASHIER_FOOT); the native bank webview ends where it starts. */
+.pp-cashier__foot { flex: none; height: 138px; }
+.pp-cashier__tray { position: fixed; z-index: 1; display: flex; flex-direction: column; }
+/* The note keeps two lines in every language so the tray height never changes. */
+.pp-cashier__note { box-sizing: content-box; height: 32px; display: flex; align-items: center; justify-content: center; overflow-wrap: break-word; }
+.pp-cashier__row2 { display: flex; gap: 8px; }
+.pp-cashier__done { flex: 1; }
 
 .purchase-payment__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .purchase-payment__row > text { flex: 1; min-width: 0; }
