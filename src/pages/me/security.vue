@@ -831,7 +831,11 @@ async function loadRemoteDeletionStatus(): Promise<boolean> {
     deletionStatus.value = status;
     deletionStatusCurrent.value = true;
     deletionStatusReadFailed.value = false;
-    if (status.status === "CANCELLED" && status.requestNo === deletionReadback.value?.cancelledRequestNo) {
+    // The acknowledged request reads back CANCELLED, or a newer application has replaced it (one active
+    // application at a time, PRD §4.5.3): either way the old cancellation is over and its own keys are released.
+    const cancelledRequestNo = deletionReadback.value?.cancelledRequestNo;
+    if (cancelledRequestNo && ((status.status === "CANCELLED" && status.requestNo === cancelledRequestNo)
+        || (status.status !== "NONE" && status.requestNo !== cancelledRequestNo))) {
       settleSecurityReadback(deletionReadback);
     }
     return true;
