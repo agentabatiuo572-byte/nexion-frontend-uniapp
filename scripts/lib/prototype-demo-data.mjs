@@ -80,7 +80,7 @@ export const demoOptions = {
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
-  catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro']],
+  catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 E1 名额售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全'],['lite-filtered','冻结组：网页已完成 / 手机未完成'],['web-complete','纯网页冻结组：全部完成']],
   wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
@@ -139,37 +139,40 @@ function promotionDeviceReward(giftName) {
         countsForRank:false,transferable:false,exchangeable:false,revocationMode:'MANUAL_IF_USED'}}};
 }
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
+  const inventory=(id,index,share)=>{
+    const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
+      .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
+    const outOfStock=state.outOfStockProductNo===id||(state.catalogState==='outofstock'&&id==='stellarbox-s1');
+    const stock=share?null:outOfStock?0:
+      Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
+    return {stock,sold:42+index*13+bought,purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null};
+  };
   const products=skuDefinitions.map(([id,name,tier,listPrice,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const price=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
-    const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
-      .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
     const dailyEarn=monthlyEstimateUsdt/30,b=.1;
-    const stock=share?null:state.outOfStockProductNo===id?0:
-      Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
     return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
       vram:share?'not_applicable':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'not_applicable',hashRate:null,
       tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',badge:index===0?'Recommended':index===1?'Best seller':null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
-      productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
+      productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',...inventory(id,index,share),
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
       releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,purchaseGate:null,
-      purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
       dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
       shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
     };
   }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
   // Lite scope scenarios change the catalog itself, so purchase validation, orders and fleet devices all read the
   // same list: mixed adds a phone SKU, review renames the Pro and adds Mobile Cloud Share and iPhone15.
-  if(state.scopeState==='mixed') products.push({...products[0],id:'phone-basic',name:'Phone compute device',price:99,monthlyEstimateUsdt:undefined});
+  if(state.scopeState==='mixed') products.push({...products[0],...inventory('phone-basic',0,false),id:'phone-basic',name:'Phone compute device',price:99,monthlyEstimateUsdt:undefined});
   if(state.scopeState==='review') {
     products.find(p=>p.id==='stellarbox-pro').name='Mobile GPU Server';
     products.push(
       {...products.find(p=>p.productType==='SHARE'),id:'mobile-cloud-share',name:'Mobile Cloud Share'},
-      {...products[0],id:'iphone15',name:'iPhone15',price:99,monthlyEstimateUsdt:undefined});
+      {...products[0],...inventory('iphone15',0,false),id:'iphone15',name:'iPhone15',price:99,monthlyEstimateUsdt:undefined});
   }
   return products;
 }
@@ -822,7 +825,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(pathname==='/api/store/purchase-eligibility'){
       const productNo=url.searchParams.get('productNo');
       const product=products.find(item=>item.id===productNo);
-      if(empty||!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+      if(empty||!product||(product.inventoryMode==='FINITE'&&product.stock<1))throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
       return {...authority,runId:null,productNo,...demoSkuPurchaseRules(state,product,teamComputePoints,now),
         evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
     }
@@ -859,16 +862,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!product.available)return 'TARGET_NOT_RELEASED';
     return null;
   };
-  const requireTradeinPurchase=(product,capacity=false)=>{
+  const requireTradeinE1=product=>{
     if(request.verifiedPayment)return;
-    // External pricing checks F4B separately, after pricing and before reserving a hold.
-    const purchase=request.externalPurchasePricing?demoE1PurchaseRule(state,product):
-      demoSkuPurchaseRules(state,product,demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0),now);
-    if(purchase.eligible)return;
-    if(purchase.decisionCode==='PURCHASE_GATE_SOLD_OUT')throw Object.assign(new Error(purchase.decisionCode),{status:403});
-    if(!capacity)refuse(purchase.decisionCode);
-    const code=purchase.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED'?'PURCHASE_GATE_SOLD_OUT':'PURCHASE_GATE_NOT_MET';
-    throw Object.assign(new Error(code),{status:403});
+    const e1=demoE1PurchaseRule(state,product);
+    if(!e1.eligible)throw Object.assign(new Error(e1.decisionCode),{status:403});
   };
   if(pathname==='/api/app/trade-in/eligibility'){
     const {targetProductNo}=request.postDataJSON();
@@ -898,7 +895,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!device)refuse('TRADEIN_SOURCE_NOT_ACTIVE_OR_NOT_OWNED');
     const reason=tradeinSourceReason(device,product);
     if(reason!=='OK'&&reason!=='HIGHER_PRICE_REQUIRED')refuse('TRADEIN_'+reason);
-    requireTradeinPurchase(product);
+    requireTradeinE1(product);
     if(reason==='HIGHER_PRICE_REQUIRED')refuse('TRADEIN_'+reason);
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
@@ -974,7 +971,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(empty||!product||product.inventoryMode!=='FINITE'||!(product.price>0))refuse('TRADEIN_TARGET_NOT_ACTIVE');
     const reason=tradeinTargetReason(product);
     if(reason)refuse(reason==='TARGET_NOT_RELEASED'?'TRADEIN_TARGET_NOT_RELEASED':'TRADEIN_TARGET_NOT_ACTIVE');
-    requireTradeinPurchase(product,true);
+    requireTradeinE1(product);
     const data=structuredClone(base('/api/app/trade-in/capacity-quote'));
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
     if(state.checkoutState==='capacity-error')throw Object.assign(new Error('CAPACITY_UNAVAILABLE'),{status:503});
@@ -1049,15 +1046,28 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:demoAccountOrders(url,locale,state,now),nextCursor:null};
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
-    const lines=quote?.items||input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))||[{productNo:input.productNo,quantity:input.quantity}],product=products.find(p=>p.id===lines[0].productNo);
-    if(lines.some(line=>!products.some(p=>p.id===line.productNo)||!Number.isInteger(line.quantity)||line.quantity<1))throw new Error('Invalid demo order items');
-    requireDemoPurchase(state,products,lines,now);
-    if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
+    const lines=quote?.items||input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))||[{productNo:input.productNo,quantity:input.quantity}];
+    const lineProducts=lines.map(line=>products.find(p=>p.id===line.productNo)),[product]=lineProducts;
+    const bundle=pathname==='/api/orders/bundle';
+    if(bundle&&(empty||lineProducts.some(p=>!p)))refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
+    if(lineProducts.some(p=>!p)||lines.some(line=>!Number.isInteger(line.quantity)||line.quantity<1))throw new Error('Invalid demo order items');
+    if(bundle){
+      if(input.policyVersion!==1)refuse('BUNDLE_DISCOUNT_POLICY_STALE');
+      if(lineProducts.some((p,i)=>p.inventoryMode==='FINITE'&&p.stock<lines[i].quantity))refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
+    }else{
+      requireDemoPurchase(state,products,lines,now);
+      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
+    }
     const quantity=lines.reduce((s,l)=>s+l.quantity,0),subtotal=lines.reduce((s,l)=>s+products.find(p=>p.id===l.productNo).price*l.quantity,0),discountRate=bundleRate(lines.length),bundleDiscount=Number((subtotal*discountRate).toFixed(2));
     const voucher=demoVoucherRedemption(state,quote?quote.voucherId:input.voucherId,lines,subtotal,now);
     if(quote&&quote.voucherGrantId!==voucher?.grantId)refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
     const amount=Number(quote?.amountUsdt??(subtotal-bundleDiscount-(voucher?.discountUsdt??0)).toFixed(2));
-    if(input.productNos&&(input.policyVersion!==1||Math.abs(input.expectedAmountUsdt-amount)>0.000001))throw new Error('Demo bundle quote changed');
+    if(bundle){
+      if(!(Math.abs(input.expectedAmountUsdt-amount)<=0.000001))refuse('BUNDLE_QUOTE_STALE');
+      if(lineProducts.some(p=>!p.available))refuse('BUNDLE_PRODUCT_NOT_RELEASED');
+      if(lineProducts.some(p=>!demoE1PurchaseRule(state,p).eligible))refuse('PURCHASE_GATE_BLOCKED');
+      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('CAPACITY_REPLACEMENT_REQUIRED');
+    }
     const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:quote?amount.toFixed(2):amount,placedAt:now,
       computePoints:lines.reduce((total,line)=>total+products.find(p=>p.id===line.productNo).computePoints*line.quantity,0),orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
     if(quote)Object.assign(order,{promotionQuoteId:quote.quoteId,payBy:new Date(now+paymentWindow).toISOString(),items:quote.items.map(l=>({...l,productName:products.find(p=>p.id===l.productNo).name})),rewards:quote.expectedRewards});

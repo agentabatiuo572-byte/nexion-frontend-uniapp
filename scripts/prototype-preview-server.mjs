@@ -168,12 +168,6 @@ const server=http.createServer(async(req,res)=>{
         updatePreviewHomeDisplay(state,update,Date.now());
         // A live trial conversion policy change keeps existing quotes and payment intents.
         if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
-        // Physical stock can run out while a payment quote is open, independently of E1.
-        if(update.outOfStockProductNo===null)delete state.outOfStockProductNo;
-        else if(typeof update.outOfStockProductNo==='string'&&demoProducts(state).some(product=>
-          product.id===update.outOfStockProductNo&&product.inventoryMode==='FINITE')){
-          state.outOfStockProductNo=update.outOfStockProductNo;
-        }
         // API-only preview controls for live quota changes and pre-hold compatibility.
         if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
         if(typeof update.quotaPaused==='boolean')state.quotaPaused=update.quotaPaused;
@@ -181,6 +175,12 @@ const server=http.createServer(async(req,res)=>{
         if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
         if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        // Physical stock can run out while a payment quote is open, independently of E1.
+        if(update.outOfStockProductNo===null)delete state.outOfStockProductNo;
+        else if(typeof update.outOfStockProductNo==='string'&&demoProducts(state).some(product=>
+          product.id===update.outOfStockProductNo&&product.inventoryMode==='FINITE')){
+          state.outOfStockProductNo=update.outOfStockProductNo;
+        }
         if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
         else delete state.paymentBeforeReadError;
         if(state.dataState==='empty')state.withdrawLimitState='open';

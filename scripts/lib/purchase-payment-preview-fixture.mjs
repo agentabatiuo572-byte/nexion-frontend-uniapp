@@ -52,7 +52,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const tradein = kind === 'TRADE_IN';
     const endpoint = tradein ? '/api/app/trade-in/quote' : '/api/app/trade-in/capacity-quote';
     const quote = demoFixture(new URL(endpoint, url.origin), locale(), state, {...request,
-      externalPurchasePricing: true, method: () => 'POST', postDataJSON: () => ({sourceDeviceId, targetProductNo})});
+      method: () => 'POST', postDataJSON: () => ({sourceDeviceId, targetProductNo})});
     if (tradein) {
       if (payload.expectedSourceVersion == null || Number(payload.expectedSourceVersion) !== quote.sourceRowVersion) reject('TRADEIN_SOURCE_VERSION_CONFLICT');
     } else if (kind === 'CAPACITY_REPLACE'
