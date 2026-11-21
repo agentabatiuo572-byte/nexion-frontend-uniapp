@@ -60,6 +60,7 @@
         :tabindex="d.kind ? 0 : undefined"
         v-on="d.kind ? { click: () => d.kind && goDetail(d.kind) } : {}"
       >
+        <BusinessImage :src="d.imageUrl" style="width: 32px; height: 32px; flex: none" />
         <view class="flex-1 min-w-0">
           <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name ?? t.market.yourPhone }}</text>
           <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">#{{ d.rank }}<template v-if="d.bestFor"> · {{ d.bestFor }}</template></text>
@@ -73,6 +74,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import BusinessImage from "@/components/business-image.vue";
 import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import type { CSSProperties } from "vue";
@@ -94,6 +96,7 @@ interface WorkloadPrice {
 }
 
 interface DeviceRanking {
+  imageUrl?: string;
   rank: number;
   /** 商品品牌名(不翻译);手机档没有商品名,走 t.market.yourPhone。 */
   name?: string;
@@ -130,7 +133,7 @@ const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   : PRICE_INDEX);
 const workloadCopy = (row: WorkloadPrice) => marketWorkloadCopy(t.value, row.code, row.name, row.unit);
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, imageUrl: row.imageUrl, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
 
 function arrow(w: WorkloadPrice): string {

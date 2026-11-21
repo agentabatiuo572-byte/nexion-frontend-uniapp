@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import { onHide, onShow } from '@dcloudio/uni-app';
 import { promotionApi, remoteApiEnabled, sessionVault } from '@/api/runtime';
-import type { PublicPromotion } from '@/api/promotion-contracts';
+import type { PublicPromotion } from '@/api/promotion-api';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { canPreviewPromotion, createPromotionReadFence, isPromotionActive } from '@/lib/promotion-entry';

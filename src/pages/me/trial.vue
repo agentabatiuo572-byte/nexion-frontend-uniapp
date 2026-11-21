@@ -81,7 +81,9 @@
         <!-- ═══ none — claim intro ═══ -->
         <view v-else-if="status === 'none'" :style="idleCardStyle">
           <view class="grid place-items-center" :style="idleIconBoxStyle">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
+            <BusinessImage :src="cfg.imageUrl" style="width: 32px; height: 32px">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
+            </BusinessImage>
           </view>
           <text class="block" :style="idleTitleStyle">{{ t.trial.idleTitleNew }}</text>
           <text v-if="idleBody" class="block" :style="idleBodyStyle">{{ idleBody }}</text>
@@ -161,6 +163,7 @@
 </template>
 
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";

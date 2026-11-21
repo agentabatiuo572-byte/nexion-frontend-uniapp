@@ -1,3 +1,4 @@
+import { productMediaUrl } from "./product-catalog-contract";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
@@ -7,7 +8,7 @@ export type TeamQuotaEnvironment = "PRODUCTION";
 export interface TeamQuotaFacts { rank: number; directRefs: number; directInvites: number | null; activeDirect: number; teamVolumeUSD: number }
 export interface TeamQuotaCondition { kind: "rank" | "directRefs" | "teamVolume"; required: number; current: number }
 export interface TeamQuotaTier {
-  productId: string; quotaCode: string; name: string; price: number; monthlyStock: number; soldThisMonth: number;
+  productId: string; imageUrl?: string; quotaCode: string; name: string; price: number; monthlyStock: number; soldThisMonth: number;
   unlockKind: "ALL" | "EITHER"; conditions: TeamQuotaCondition[]; perks: string[]; available: boolean;
 }
 export interface TeamQuotaSnapshot {
@@ -37,7 +38,7 @@ function parse(value: unknown, mode: ApiEnvironment): TeamQuotaSnapshot {
       if (kind !== "rank" && kind !== "directRefs" && kind !== "teamVolume") return invalid();
       return { kind, required: num(condition.required), current: num(condition.current) };
     });
-    return { productId: text(item.productId), quotaCode: text(item.quotaCode), name: text(item.name), price: num(item.price),
+    return { productId: text(item.productId), imageUrl: productMediaUrl(item.imageUrl), quotaCode: text(item.quotaCode), name: text(item.name), price: num(item.price),
       monthlyStock: num(item.monthlyStock, true), soldThisMonth: num(item.soldThisMonth, true), unlockKind,
       conditions, perks: item.perks.map((perk) => text(perk)), available: item.available };
   });

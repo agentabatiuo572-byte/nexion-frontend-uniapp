@@ -288,7 +288,7 @@ const focusedTiers = computed(() => focusedProductId.value
 const tiers = computed<QuotaTier[]>(() =>
   remoteApiEnabled
     ? (productCatalogState.status !== "ready" ? [] : remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
-      productId: tier.productId, name: catalogProductName(tier.productId, tier.name), price: catalogProduct(tier.productId)?.price ?? tier.price,
+      productId: tier.productId, imageUrl: tier.imageUrl, name: catalogProductName(tier.productId, tier.name), price: catalogProduct(tier.productId)?.price ?? tier.price,
       monthlyStock: tier.monthlyStock, soldThisMonth: tier.soldThisMonth,
       available: tier.available,
       unlockKind: tier.unlockKind === "EITHER" ? "either" : "all",

@@ -1,7 +1,12 @@
 import type { ApiClient } from './api-client';
+import { productMediaUrl } from './product-catalog-contract';
 import { ApiError } from './errors';
-import type { PublicPromotion, PublicPromotionPage, Quote, QuoteInput, Reward, RewardPage, ReferralProgress, OrderReceipt, CommandReceipt } from './promotion-contracts';
-export type { PublicPromotion, Quote, Reward, ExpectedReward, PublicRewardSpec, RewardSpec, RewardState, OrderReceipt } from './promotion-contracts';
+import type { PublicPromotion as PromotionContract, PublicPromotionPage, Quote as QuoteContract, QuoteInput, Reward, RewardPage, ReferralProgress, OrderReceipt as ReceiptContract, CommandReceipt } from './promotion-contracts';
+export type { Reward, ExpectedReward, PublicRewardSpec, RewardSpec, RewardState, ReferralProgress } from './promotion-contracts';
+type ItemImage = { imageUrl?: string | null };
+export type PublicPromotion = PromotionContract & { productImages?: Record<string, string> };
+export type Quote = Omit<QuoteContract, 'items'> & { items: Array<QuoteContract['items'][number] & ItemImage> };
+export type OrderReceipt = Omit<ReceiptContract, 'items'> & { items?: Array<NonNullable<ReceiptContract['items']>[number] & ItemImage> };
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
 export type PromotionOperation='createOrder'|'createBundle'|'payOrder'|'cancelOrder';
@@ -26,12 +31,21 @@ function bannerImage(p:Record<string,unknown>):void {
   if(typeof p.bannerImageUrl!=='string'||!/^\/api\/promotions\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/banner\/[1-9][0-9]*$/.test(p.bannerImageUrl)
     ||p.bannerImageUrl!==`/api/promotions/${p.activityId}/banner/${p.version}`||p.state!=='ACTIVE')return invalid();
 }
-function promotion(value:unknown):PublicPromotion{const p=object(value);bannerImage(p);string(p.activityId);if(typeof p.version!=='number'||!Number.isSafeInteger(p.version)||p.version<1)return invalid();if(!['SKU_GIFT','FIRST_PURCHASE','DIRECT_REFERRAL','MULTI_PRODUCT','REPURCHASE'].includes(string(p.template))||!['DRAFT','SCHEDULED','ACTIVE','PAUSED','ENDED','ARCHIVED'].includes(string(p.state))||!['SIGN_IN_REQUIRED','ESTIMATE_ELIGIBLE','INELIGIBLE','UNKNOWN'].includes(string(p.eligibility)))return invalid();array(p.minimumClientCapabilities).forEach(c=>{if(!PROMOTION_CAPABILITIES.includes(c as typeof PROMOTION_CAPABILITIES[number]))return invalid();});time(p.serverTime);time(p.startsAt);time(p.endsAt);for(const key of ['title','terms']){const l=object(p[key]);['zh','en','vi'].forEach(lang=>string(l[lang]));}array(p.productNos).forEach(string);array(p.rewardRules).forEach(v=>{const r=object(v);string(r.ruleId);string(r.productNo);quantity(r.minBuyQty);if(!['PER_GROUP','ONCE_PER_ORDER'].includes(string(r.repeatMode)))return invalid();for(const key of ['maxGroups','maxGroupsPerPerson']){const limit=object(r[key]);if(limit.mode!=='UNLIMITED'&&(limit.mode!=='LIMITED'||typeof limit.value!=='number'||!Number.isSafeInteger(limit.value)||limit.value<1))return invalid();}rewardSpec(r.buyerReward);disclosure(object(r.buyerReward).disclosure,object(r.buyerReward).type==='DEVICE');if(r.inviterReward){rewardSpec(r.inviterReward);disclosure(object(r.inviterReward).disclosure,object(r.inviterReward).type==='DEVICE');}});return p as PublicPromotion;}
+function readProductImages(p: Record<string, unknown>) {
+  if (!p.productImages) return;
+  const images: Record<string, string> = Object.create(null);
+  for (const [sku, value] of Object.entries(object(p.productImages))) {
+    const url = productMediaUrl(value);
+    if (url) images[sku] = url;
+  }
+  p.productImages = images;
+}
+function promotion(value:unknown):PublicPromotion{const p=object(value);bannerImage(p);readProductImages(p);string(p.activityId);if(typeof p.version!=='number'||!Number.isSafeInteger(p.version)||p.version<1)return invalid();if(!['SKU_GIFT','FIRST_PURCHASE','DIRECT_REFERRAL','MULTI_PRODUCT','REPURCHASE'].includes(string(p.template))||!['DRAFT','SCHEDULED','ACTIVE','PAUSED','ENDED','ARCHIVED'].includes(string(p.state))||!['SIGN_IN_REQUIRED','ESTIMATE_ELIGIBLE','INELIGIBLE','UNKNOWN'].includes(string(p.eligibility)))return invalid();array(p.minimumClientCapabilities).forEach(c=>{if(!PROMOTION_CAPABILITIES.includes(c as typeof PROMOTION_CAPABILITIES[number]))return invalid();});time(p.serverTime);time(p.startsAt);time(p.endsAt);for(const key of ['title','terms']){const l=object(p[key]);['zh','en','vi'].forEach(lang=>string(l[lang]));}array(p.productNos).forEach(string);array(p.rewardRules).forEach(v=>{const r=object(v);string(r.ruleId);string(r.productNo);quantity(r.minBuyQty);if(!['PER_GROUP','ONCE_PER_ORDER'].includes(string(r.repeatMode)))return invalid();for(const key of ['maxGroups','maxGroupsPerPerson']){const limit=object(r[key]);if(limit.mode!=='UNLIMITED'&&(limit.mode!=='LIMITED'||typeof limit.value!=='number'||!Number.isSafeInteger(limit.value)||limit.value<1))return invalid();}rewardSpec(r.buyerReward);disclosure(object(r.buyerReward).disclosure,object(r.buyerReward).type==='DEVICE');if(r.inviterReward){rewardSpec(r.inviterReward);disclosure(object(r.inviterReward).disclosure,object(r.inviterReward).type==='DEVICE');}});return p as PublicPromotion;}
 function quote(value:unknown):Quote{
   const p=object(value);string(p.quoteId);string(p.quoteHash);time(p.serverTime);time(p.expiresAt);
   ['subtotalUsdt','discountUsdt','amountUsdt'].forEach(k=>amount(p[k]));
   if(p.reserved!==false||!['ELIGIBLE','INELIGIBLE','UNKNOWN'].includes(string(p.eligibility)))return invalid();
-  const lines=array(p.items).map(v=>{const r=object(v);string(r.lineId);['unitPriceUsdt','subtotalUsdt','discountUsdt','payableUsdt'].forEach(k=>amount(r[k]));return {lineId:string(r.lineId),productNo:string(r.productNo),quantity:quantity(r.quantity)};});
+  const lines=array(p.items).map(v=>{const r=object(v);r.imageUrl=productMediaUrl(r.imageUrl)??null;string(r.lineId);['unitPriceUsdt','subtotalUsdt','discountUsdt','payableUsdt'].forEach(k=>amount(r[k]));return {lineId:string(r.lineId),productNo:string(r.productNo),quantity:quantity(r.quantity)};});
   validatePromotionItems(lines);
   if(p.itemCount!==lines.length||p.quantity!==lines.reduce((sum,line)=>sum+line.quantity,0)||new Set(lines.map(line=>line.lineId)).size!==lines.length)return invalid();
   positiveInteger(p.bundlePolicyVersion);if(p.activityId!==null)string(p.activityId);if(p.activityVersion!==null)positiveInteger(p.activityVersion);
@@ -49,7 +63,7 @@ export function parsePromotedOrder(value:unknown):OrderReceipt{
   // Legacy non-promotion receipts retain their existing transport shape.
   if(r.promotionQuoteId){
     string(r.promotionQuoteId);time(r.payBy);quantity(r.quantity);amount(r.amountUsdt);
-    const items=array(r.items).map(value=>{const item=object(value);return {lineId:string(item.lineId),productNo:string(item.productNo),productName:string(item.productName),quantity:quantity(item.quantity)};});
+    const items=array(r.items).map(value=>{const item=object(value);item.imageUrl=productMediaUrl(item.imageUrl)??null;return {lineId:string(item.lineId),productNo:string(item.productNo),productName:string(item.productName),quantity:quantity(item.quantity)};});
     validatePromotionItems(items);if(new Set(items.map(item=>item.lineId)).size!==items.length||r.quantity!==items.reduce((sum,item)=>sum+item.quantity,0))return invalid();
     array(r.rewards).forEach(value=>{expected(value);if(!items.some(item=>item.lineId===object(value).lineId))return invalid();});
     if(!['PENDING','PAID','CANCELLED','EXPIRED','REFUNDED'].includes(string(r.paymentStatus))||!['PENDING_PAYMENT','COMPLETED','CANCELLED','EXPIRED','REFUNDED'].includes(string(r.orderStatus)))return invalid();
@@ -60,7 +74,7 @@ export function parsePromotedOrder(value:unknown):OrderReceipt{
 function page<T>(value:unknown,parse:(value:unknown)=>T):{items:T[];nextCursor:string|null;hasMore:boolean}{const p=object(value);if(typeof p.hasMore!=='boolean'||(p.nextCursor!==null&&typeof p.nextCursor!=='string'))return invalid();return {items:array(p.items).map(parse),nextCursor:p.nextCursor as string|null,hasMore:p.hasMore};}
 function query(fields:Record<string,unknown>):string{return Object.entries(fields).filter(([,v])=>v!==null&&v!==undefined&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&');}
 export function createPromotionApi(client:ApiClient){return {
-  async list(filters:{cursor?:string|null;limit?:number;activityId?:string;placement?:'home.purchase-promotion'}={},authenticated=false):Promise<PublicPromotionPage>{return page(await client.request({path:'/api/promotions?'+query(filters),authenticated}),promotion);},
+  async list(filters:{cursor?:string|null;limit?:number;activityId?:string;placement?:'home.purchase-promotion'}={},authenticated=false):Promise<Omit<PublicPromotionPage, 'items'> & { items: PublicPromotion[] }>{return page(await client.request({path:'/api/promotions?'+query(filters),authenticated}),promotion);},
   async get(activityId:string,authenticated=false):Promise<PublicPromotion>{return promotion(await client.request({path:'/api/promotions/'+encodeURIComponent(activityId),authenticated}));},
   async quote(items:PromotionItem[],activityId:string|null,voucherId:string|null=null):Promise<Quote>{validatePromotionItems(items);return quote(await client.request({method:'POST',path:'/api/orders/quote',idempotencyKey:quoteRequestKey(),body:{items,activityId,voucherId,clientCapabilities:PROMOTION_CAPABILITIES}}));},
   async create(quote:Quote,key:string,voucherId:string|null=null):Promise<OrderReceipt>{const items=quote.items.map(({productNo,quantity})=>({productNo,quantity}));validatePromotionItems(items);const bundle=items.length>1;return parsePromotedOrder(await client.request({method:'POST',path:bundle?'/api/orders/bundle':'/api/orders',idempotencyKey:key,body:bundle?{items,policyVersion:quote.bundlePolicyVersion,expectedAmountUsdt:quote.amountUsdt,promotionQuoteId:quote.quoteId}:{...items[0],voucherId,promotionQuoteId:quote.quoteId}}));},

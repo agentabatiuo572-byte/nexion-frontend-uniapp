@@ -82,6 +82,7 @@ function statusLabel(status: string): string {
     paid: t.value.orders.statusPaid,
     provisioning: t.value.orders.statusProvisioning,
     activated: t.value.orders.statusActivated,
+    inventory: t.value.myDevices.inventorySectionInventory,
     payment_failed: t.value.orders.statusPaymentFailed,
     expired: t.value.orders.statusExpired,
     provisioning_failed: t.value.orders.statusProvisioningFailed,

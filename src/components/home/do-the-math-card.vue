@@ -23,7 +23,10 @@
           <!-- base rate bar -->
           <view>
             <view class="flex justify-between items-baseline font-mono-tabular mb-1" style="font-size: 12px; color: var(--v5-ink-3)">
-              <text style="color: var(--v5-ink-3)">{{ baseShort }}</text>
+              <view class="flex items-center gap-1.5">
+                <BusinessImage :src="calculator.base.imageUrl" style="width: 22px; height: 22px" />
+                <text style="color: var(--v5-ink-3)">{{ baseShort }}</text>
+              </view>
               <text class="tabular-nums" style="color: var(--v5-ink); font-weight: 500">{{ baseRate }}</text>
             </view>
             <view class="rounded-full overflow-hidden" style="height: 3px; background: var(--v5-surface-3)">
@@ -33,7 +36,10 @@
           <!-- target rate bar -->
           <view>
             <view class="flex justify-between items-baseline font-mono-tabular mb-1" style="font-size: 12px; color: var(--v5-ink-3)">
-              <text style="color: var(--v5-brand)">{{ targetLabel }}</text>
+              <view class="flex items-center gap-1.5">
+                <BusinessImage :src="calculator.target.imageUrl" style="width: 22px; height: 22px" />
+                <text style="color: var(--v5-brand)">{{ targetLabel }}</text>
+              </view>
               <text class="tabular-nums" style="color: var(--v5-ink); font-weight: 500">{{ targetRate }}</text>
             </view>
             <view class="rounded-full overflow-hidden" style="height: 3px; background: var(--v5-surface-3)">
@@ -65,6 +71,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import BusinessImage from "@/components/business-image.vue";
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";

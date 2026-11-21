@@ -1,4 +1,5 @@
 import type { ApiClient } from "./api-client";
+import { productMediaUrl } from "./product-catalog-contract";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { parseOrderLineItems, type OrderLineItem } from "@/lib/order-line-items";
@@ -8,6 +9,7 @@ export const ORDER_STATUSES = [
   "paid",
   "provisioning",
   "activated",
+  "inventory",
   "payment_failed",
   "expired",
   "provisioning_failed",
@@ -22,6 +24,7 @@ export interface CanonicalOrder {
   orderNo: string;
   productId: number;
   productNo: string;
+  imageUrl?: string;
   productName: string;
   quantity: number;
   subtotalUsdt: number;
@@ -176,13 +179,13 @@ function finiteNumber(value: unknown, minimum = 0): number {
   return value;
 }
 
-function historyAmount(source: Record<string, unknown>): number | string {
-  if (typeof source.promotionQuoteId === 'string' && source.promotionQuoteId.trim()) {
-    const value=source.amountUsdt;
-    if(typeof value!=='string'||!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(value))return invalid();
-    return value;
-  }
-  return finiteNumber(source.amountUsdt);
+function promotionDecimal(value: unknown): string {
+  if (typeof value !== "string" || !/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(value)) return invalid();
+  return value;
+}
+
+function historyNumber(value: unknown, promoted: boolean): number {
+  return promoted && typeof value === "string" ? Number(promotionDecimal(value)) : finiteNumber(value);
 }
 
 function integer(value: unknown, minimum = 0): number {
@@ -206,6 +209,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
   const status = nonEmptyString(source.canonicalStatus);
   if (!STATUS_SET.has(status)) return invalid();
   const orderType = nonEmptyString(source.orderType);
+  const promotionQuoteId = nullableString(source.promotionQuoteId);
   let lineItems: OrderLineItem[] | null = null;
   if (orderType.toUpperCase() === "BUNDLE") {
     try {
@@ -218,13 +222,14 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     orderNo: nonEmptyString(source.orderNo),
     productId: integer(source.productId, 1),
     productNo: nonEmptyString(source.productNo),
+    imageUrl: productMediaUrl(source.imageUrl),
     productName: nonEmptyString(source.productName),
     quantity: integer(source.quantity, 1),
-    subtotalUsdt: finiteNumber(source.subtotalUsdt),
+    subtotalUsdt: historyNumber(source.subtotalUsdt, !!promotionQuoteId),
     unitPriceUsdt: finiteNumber(source.unitPriceUsdt),
-    discountUsdt: finiteNumber(source.discountUsdt),
-    amountUsdt: historyAmount(source),
-    ...(source.promotionQuoteId ? { promotionQuoteId: nonEmptyString(source.promotionQuoteId) } : {}),
+    discountUsdt: historyNumber(source.discountUsdt, !!promotionQuoteId),
+    amountUsdt: promotionQuoteId ? promotionDecimal(source.amountUsdt) : finiteNumber(source.amountUsdt),
+    ...(promotionQuoteId && { promotionQuoteId }),
     paymentMethod: nullableString(source.paymentMethod),
     paymentStatus: nonEmptyString(source.paymentStatus),
     orderStatus: nonEmptyString(source.orderStatus),
@@ -275,7 +280,12 @@ function canonicalOrder(value: unknown): CanonicalOrder {
           && parsed.activatedAt === null;
       case "activated":
         return paymentStatus === "PAID" && orderStatus === "COMPLETED"
-          && activationStatus === "ACTIVATED" && parsed.paidAt !== null && parsed.activatedAt !== null;
+          && activationStatus === "ACTIVATED" && parsed.paidAt !== null;
+      case "inventory":
+        return orderType.toUpperCase() === "TRADE_IN" && parsed.tradeinNo !== null
+          && parsed.sourceDeviceId !== null && parsed.targetDeviceId !== null
+          && paymentStatus === "PAID" && orderStatus === "COMPLETED"
+          && activationStatus === "INVENTORY" && parsed.paidAt !== null && parsed.activatedAt === null;
       case "payment_failed":
         return paymentStatus === "FAILED" && orderStatus === "PAYMENT_FAILED"
           && activationStatus === "WAITING_PAYMENT";

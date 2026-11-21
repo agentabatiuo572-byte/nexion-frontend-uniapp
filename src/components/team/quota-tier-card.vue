@@ -17,8 +17,10 @@
     <view class="flex items-start justify-between">
       <view class="flex items-center" style="gap: 8px">
         <view class="rounded-xl grid place-items-center" :style="iconBoxStyle">
-          <svg v-if="unlocked" width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="tier.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+          <BusinessImage :src="tier.imageUrl" style="width: 36px; height: 36px">
+            <svg v-if="unlocked" width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="tier.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+          </BusinessImage>
         </view>
         <view>
           <text class="block font-display" :style="nameStyle">{{ displayName }}</text>
@@ -54,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, type CSSProperties } from "vue";
 import QuotaConditionBar from "./quota-condition-bar.vue";
@@ -71,6 +74,7 @@ export interface QuotaCondition {
 export interface QuotaTier {
   available?: boolean;
   productId: string;
+  imageUrl?: string;
   name: string;
   price: number;
   monthlyStock: number;

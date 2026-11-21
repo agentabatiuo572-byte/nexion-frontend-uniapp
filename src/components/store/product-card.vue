@@ -132,7 +132,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { productCatalogState } from "@/store/product-catalog";
-import type { PublicPromotion } from '@/api/promotion-contracts';
+import type { PublicPromotion } from '@/api/promotion-api';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
 import LiquidGlass from '@/components/liquid-glass.vue';
 import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDetailHref } from '@/lib/promotion-entry';
@@ -152,15 +152,16 @@ const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.val
 const stockUnavailable = computed(() => props.product.inventoryMode === "FINITE"
   && props.product.stock === 0);
 const failedImageUrl = ref("");
-watch(() => props.product.imageUrl, () => { failedImageUrl.value = ""; }, { immediate: true });
+const displayImageUrl = computed(() => props.activityId ? marketingPromotion.value?.productImages?.[props.product.id] : props.product.imageUrl);
+watch(displayImageUrl, () => { failedImageUrl.value = ""; }, { immediate: true });
 // Product videos stay detail-only: listing cards use the catalog image
 // so browsing never triggers downloads or playback before the user chooses it.
 const photo = computed(() => {
-  const imageUrl = catalogProductImageUrl(props.product.imageUrl, failedImageUrl.value);
+  const imageUrl = catalogProductImageUrl(displayImageUrl.value, failedImageUrl.value);
   return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.product.id, props.product.tier) } : null;
 });
 function fallbackProductImage() {
-  failedImageUrl.value = props.product.imageUrl ?? "";
+  failedImageUrl.value = displayImageUrl.value ?? "";
 }
 
 const stockLow = computed(

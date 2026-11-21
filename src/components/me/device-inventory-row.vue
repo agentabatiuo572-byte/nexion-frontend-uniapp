@@ -9,10 +9,10 @@
   <view class="nx-glass-card overflow-hidden" :style="cardStyle">
     <view class="flex items-center" style="gap: 12px; padding: 12px 16px">
       <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
-        <!-- Smartphone -->
-        <svg v-if="isPhone" width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
-        <!-- Server -->
-        <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
+        <BusinessImage :src="device.imageUrl" style="width: 36px; height: 36px">
+          <svg v-if="isPhone" width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
+        </BusinessImage>
       </view>
       <view class="flex-1 min-w-0">
         <text class="block truncate" :style="nameStyle">{{ deviceName(t, device) }}</text>
@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import BusinessImage from "@/components/business-image.vue";
 import { computed, type CSSProperties } from "vue";
 import type { Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";

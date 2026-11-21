@@ -1,7 +1,7 @@
 <template>
   <view class="promotion">
     <view v-for="entry in entries" :key="entry.key" class="promotion-row">
-      <view class="promotion-symbol" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v4H3z M5 12v9h14v-9 M12 8v13 M12 8C6 8 5 5 7 3c2-2 5 2 5 5 M12 8c6 0 7-3 5-5-2-2-5 2-5 5" /></svg></view>
+      <view class="promotion-symbol" aria-hidden="true"><BusinessImage :src="entry.reward.type==='DEVICE'?productImages?.[entry.reward.giftProductNo]:undefined" style="width: 36px; height: 36px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v4H3z M5 12v9h14v-9 M12 8v13 M12 8C6 8 5 5 7 3c2-2 5 2 5 5 M12 8c6 0 7-3 5-5-2-2-5 2-5 5" /></svg></BusinessImage></view>
       <view class="promotion-grow">
         <text v-if="entry.productNo" class="promotion-copy">{{ t.promotion.buyLine }} · {{ (entry.productName || productName(entry.productNo)) }}<template v-if="entry.quantity"> × {{ entry.quantity }}</template></text>
         <text style="display:block;font-size:15px;font-weight:600">{{ entry.reward.type==='DEVICE' ? (entry.deviceName || t.promotion.unknown)+' × '+rewardAmount(entry.reward,entry.groups) : rewardAmount(entry.reward,entry.groups)+' '+entry.reward.type }}</text>
@@ -15,6 +15,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { computed } from 'vue';
 import type { ExpectedReward, Reward, PublicRewardSpec } from '@/api/promotion-api';
 import { useT } from '@/i18n/use-t';
@@ -23,7 +24,7 @@ import { getProduct } from '@/mock/products';
 import { productCatalogState } from '@/store/product-catalog';
 import { localized,rewardAmount,rewardStateKey } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
-const props=withDefaults(defineProps<{ expected?:ExpectedReward[]; rewards?:Reward[]; specs?:PublicRewardSpec[]; productNo?:string; lines?:{lineId:string;productNo:string;productName?:string;quantity?:number}[];linkDetails?:boolean }>(),{linkDetails:true});
+const props=withDefaults(defineProps<{ expected?:ExpectedReward[]; rewards?:Reward[]; specs?:PublicRewardSpec[]; productImages?:Record<string,string>; productNo?:string; lines?:{lineId:string;productNo:string;productName?:string;quantity?:number}[];linkDetails?:boolean }>(),{linkDetails:true});
 const t=useT();const locale=useLocaleStore();
 function displayState(state:Reward['state'],hold:boolean){return hold&&!['CANCELLED','REVERSED'].includes(state)?t.value.promotion.rewardHold:t.value.promotion[rewardStateKey(state)];}
 const productName=(id:string)=>{void productCatalogState.status;return getProduct(id)?.name ?? t.value.promotion.devices;};

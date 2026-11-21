@@ -57,6 +57,7 @@ export interface CompletedTask extends CurrentTask {
 
 export interface Device {
   id: string;
+  imageUrl?: string;
   /** Server CAS version. Remote mutations must send this exact value. */
   rowVersion?: number;
   /** Independent server runtime fact; absent on local simulation rows. */

@@ -13,7 +13,7 @@
       <text v-if="!selection.length" class="promotion-copy">{{ t.promotion.selectTwo }}</text>
       <view v-for="item in selection" :key="item.productNo" class="bundle-item">
         <view class="promotion-row">
-          <image v-if="imageFor(item.productNo)" class="promotion-image" :src="imageFor(item.productNo)" mode="aspectFill" :alt="nameFor(item.productNo)" />
+          <BusinessImage class="promotion-image" :src="imageFor(item.productNo)" mode="aspectFill" :alt="nameFor(item.productNo)" />
           <view class="promotion-grow">
             <text class="bundle-name">{{ nameFor(item.productNo) }}</text>
             <text v-if="!productFor(item.productNo)" class="promotion-copy">{{ t.promotion.noMatchingProducts }}</text>
@@ -31,7 +31,7 @@
     <view v-if="suggestions.length" class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.buyMore }}</text>
       <view v-for="product in suggestions" :key="product.id" class="promotion-row">
-        <image v-if="imageFor(product.id)" class="promotion-image" :src="imageFor(product.id)" mode="aspectFill" :alt="product.name" />
+        <BusinessImage class="promotion-image" :src="imageFor(product.id)" mode="aspectFill" :alt="product.name" />
         <view class="promotion-grow"><text class="bundle-name">{{ product.name }}</text><view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionDetailHref(product.id,scopeId))"><text>{{ t.promotion.detail }}</text></view></view>
         <view class="bundle-add" role="button" :aria-label="fmt(t.uiChrome.addItem,{name:product.name})" :tabindex="selection.length>=8||totalUnits>=100?-1:0" :aria-disabled="selection.length>=8||totalUnits>=100" @click="add(product.id)">+</view>
       </view>
@@ -42,7 +42,7 @@
       <text v-else-if="quoteStatus==='error'" class="promotion-copy" role="alert">{{ t.promotion.errorNote }}</text>
       <text v-else-if="!quote" class="promotion-copy">{{ t.promotion.awaitingQuote }}</text>
       <template v-if="quote">
-        <RewardRows :expected="quote.expectedRewards" :lines="quote.items" />
+        <RewardRows :product-images="activity?.productImages" :expected="quote.expectedRewards" :lines="quote.items" />
         <text v-for="(warning,index) in quote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text>
         <text v-if="quote.eligibility!=='ELIGIBLE'" class="promotion-notice">{{ t.promotion.disabledNote }}</text>
         <view class="promotion-summary"><text>{{ t.promotion.subtotal }}</text><text>{{ formatAmount(quote.subtotalUsdt) }} USDT</text></view>
@@ -63,6 +63,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
@@ -76,7 +77,6 @@ import { useProductPhase } from '@/composables/use-product-phase';
 import { isProductAvailable } from '@/store/product-availability';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
-import { catalogProductImageUrl } from '@/lib/product-image';
 import { localized,displayDeadline,rewardAmount } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
@@ -102,7 +102,7 @@ const catalogStatus=computed(()=>productCatalogState.status);
 const catalog=computed(()=>productCatalogPresentation.value?.products??[]);
 const productFor=(id:string)=>catalog.value.find(product=>product.id===id);
 const nameFor=(id:string)=>productFor(id)?.name??t.value.uiChrome.unavailable;
-const imageFor=(id:string)=>catalogProductImageUrl(productFor(id)?.imageUrl,'')??'';
+const imageFor=(id:string)=>scopeId.value?activity.value?.productImages?.[id]:productFor(id)?.imageUrl;
 const ruleTerms=computed(()=>activity.value?[
   localized(activity.value.terms,locale.code),
   ...activity.value.rewardRules.map(rule=>[

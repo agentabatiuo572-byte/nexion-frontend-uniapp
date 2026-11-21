@@ -422,6 +422,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       confirmedPromoVisible.value = false;
       confirmedPromoKnown.value = false;
       confirmedHeroVisible.value = false;
+      useTrialConfig().config.imageUrl = undefined;
       pendingExpiryClaim = null;
       sampledServerTime = 0;
       serverClockOffsetMs.value = 0;

@@ -14,7 +14,9 @@
       <view class="tcs-head">
         <view class="tcs-head-l">
           <view class="tcs-spark-box">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z" /></svg>
+            <BusinessImage :src="cfg.imageUrl" style="width: 32px; height: 32px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z" /></svg>
+            </BusinessImage>
           </view>
           <view class="tcs-head-meta">
             <text class="tcs-cap">{{ t.trial.sheetCapLabel }}</text>
@@ -91,6 +93,7 @@
 </template>
 
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { navTo } from "@/lib/route";

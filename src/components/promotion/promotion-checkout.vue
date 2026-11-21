@@ -10,14 +10,14 @@
       <view v-if="items.length" class="promotion-flat">
         <text class="promotion-title">{{ p.selected }}</text>
         <view v-for="item in items" :key="item.productNo" class="promotion-row">
-          <image v-if="getProduct(item.productNo)?.imageUrl" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFill" />
+          <BusinessImage :src="item.imageUrl" class="promotion-image" mode="aspectFill" />
           <view class="promotion-grow"><text style="display:block;font-weight:600">{{ selectedItemName(item) }}</text><text class="promotion-copy">{{ p.quantity }} · {{ item.quantity }}</text></view>
           <text v-if="quote" class="promotion-price">{{ formatAmount(quote.items.find(l=>l.productNo===item.productNo)?.subtotalUsdt) }} USDT</text>
         </view>
       </view>
       <view v-if="rewards.length" class="promotion-flat">
         <text class="promotion-title">{{ order ? (order.paymentStatus==='PENDING'?p.locked:p.orderRewards) : p.expected }}</text><text class="promotion-copy" style="margin-top:10px">{{ p.rewardNote }}</text>
-        <RewardRows :expected="rewards" :lines="order?.items??quote?.items" />
+        <RewardRows :product-images="promotion?.productImages" :expected="rewards" :lines="order?.items??quote?.items" />
         <view class="promotion-link" role="button" tabindex="0" @click="termsOpen=true"><text>{{ p.rulesLink }}</text></view>
       </view>
       <view v-if="quote || order" class="promotion-flat">
@@ -59,6 +59,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { formatAmount } from "@/lib/amount-display";
 import PromotionAction from '@/components/promotion/promotion-action.vue';
 import LiquidGlass from '@/components/liquid-glass.vue';
@@ -98,7 +99,7 @@ const session=new PromotionCheckoutSession({api:promotionApi,current,key:key=>ac
 const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.value;return session.record.pending||session.record.order||freshQuoteReady.value?session.record.quote:null;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
 const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=ref(false),error=ref(''),termsOpen=ref(false),leaveOpen=ref(false);
 const voucherId=ref(session.record.voucherId??null);const selectedVoucherName=computed(()=>voucher.catalog.find(v=>v.id===voucherId.value)?.name??p.value.noVoucher);
-const items=computed(()=>order.value?.items??quote.value?.items??props.items);const rewards=computed(()=>order.value?.rewards??quote.value?.expectedRewards??[]);
+const items=computed(()=>order.value?.items??quote.value?.items??props.items.map(item=>({...item,imageUrl:promotion.value?.productImages?.[item.productNo]})));const rewards=computed(()=>order.value?.rewards??quote.value?.expectedRewards??[]);
 function disclosure(r:ExpectedReward):RewardDisclosure|null {const d=r.disclosure;return d&&[d.title,d.terms,d.refundTerms,d.benefitDescription].every(x=>x&&['zh','en','vi'].every(l=>typeof x[l as keyof LocalizedText]==='string'&&x[l as keyof LocalizedText].trim()))?d:null;}
 const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is RewardDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
 let receivedAt:number|null=null,promotionReceivedAt:number|null=null,orderClock:{serverNow:number;at:number}|null=null,clockGeneration=0;const quoteFresh=ref(false),payWindow=ref<boolean|null>(null);let timer:ReturnType<typeof setInterval>|undefined;

@@ -650,6 +650,17 @@ export const useApp = defineStore("app", () => {
     if (raw.includes("pro-v2") || raw.includes("pro_v2")) return "stellarbox-pro-v2";
     if (raw.includes("pro")) return "stellarbox-pro";
     if (raw.includes("s1")) return "stellarbox-s1";
+    // Custom SKUs may have no family in their code. E3 supplies their assigned series here.
+    switch (device.capacityConfigKey) {
+      case "capacityApplyToPhone": return "phone";
+      case "capacityApplyToPcGpu": return "pc-gpu";
+      case "capacityApplyToCloudShare": return "cloud-share";
+      case "capacityApplyToS1": return "stellarbox-s1";
+      case "capacityApplyToPro": return "stellarbox-pro";
+      case "capacityApplyToProV2": return "stellarbox-pro-v2";
+      case "capacityApplyToRackP1": return "stellarrack-p1";
+      case "capacityApplyToRackP2": return "stellarrack-p2";
+    }
     throw new Error("E3_DEVICE_KIND_UNSUPPORTED");
   }
 
@@ -668,6 +679,7 @@ export const useApp = defineStore("app", () => {
       id: String(device.id),
       rowVersion: device.rowVersion,
       kind: canonicalKind(device),
+      imageUrl: device.imageUrl,
       name: device.name,
       gpu: device.gpuModel,
       gpuModel: device.gpuModel,
@@ -931,8 +943,10 @@ export const useApp = defineStore("app", () => {
   async function refreshRemoteFleet(
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
     options: RemoteFleetRefreshOptions = {},
+    retryRevisionChange = true,
   ): Promise<boolean> {
     if (!remoteApiEnabled) return true;
+    if (!remoteAccountEpoch.isCurrent(request)) return false;
     const expectedAccountKey = request.accountKey;
     const runScope = captureRuntimeRevision();
     const scope = {
@@ -1014,10 +1028,13 @@ export const useApp = defineStore("app", () => {
         return true;
       } catch (cause) {
         if (remoteAccountEpoch.isCurrent(request)
-          && isCurrentRuntimeRevision(runScope)
           && remoteFleetRefreshCoordinator.isCurrent(lease)
           && refreshSequence != null
           && refreshSequence === remoteFleetRefreshSequence) {
+          // The catalog can finish while the first fleet read is in flight.
+          if (retryRevisionChange && !isCurrentRuntimeRevision(runScope)) {
+            return refreshRemoteFleet(request, options, false);
+          }
           remoteFleetStatus.value = "error";
           remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
         }

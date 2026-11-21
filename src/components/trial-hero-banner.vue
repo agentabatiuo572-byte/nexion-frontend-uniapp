@@ -5,7 +5,7 @@
     @click="onClick"  @keydown.enter.prevent="onClick" @keydown.space.prevent="onClick">
     <view class="nx-home-glass-panel" aria-hidden="true" />
     <view class="trial-aura" aria-hidden="true" />
-    <view class="trial-art nx-home-art-float" aria-hidden="true"><view class="nx-home-art" /></view>
+    <view class="trial-art nx-home-art-float" aria-hidden="true"><BusinessImage :src="trialCfg.config.imageUrl" style="width: 100%; height: 100%"><view class="nx-home-art" /></BusinessImage></view>
     <view class="trial-meta">
       <text class="trial-badge">{{ t.trial.heroBadge }}</text>
       <text class="trial-title">{{ t.trial.heroDeviceName }}</text>
@@ -28,6 +28,7 @@
 </template>
 
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { useFreeTrial } from "@/store/free-trial";

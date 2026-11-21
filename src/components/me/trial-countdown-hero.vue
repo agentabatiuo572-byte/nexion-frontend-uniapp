@@ -9,7 +9,10 @@
   <view class="nx-glass-card relative overflow-hidden" :style="cardStyle">
     <view class="flex items-center justify-between">
       <text :style="ribbonStyle">{{ ribbon }}</text>
-      <text :style="boxNameStyle">UVELBox S1</text>
+      <view class="inline-flex items-center" style="gap: 6px">
+        <BusinessImage :src="cfg.imageUrl" style="width: 24px; height: 24px" />
+        <text :style="boxNameStyle">UVELBox S1</text>
+      </view>
     </view>
 
     <!-- Shadow earnings -->
@@ -40,6 +43,7 @@
 </template>
 
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, type CSSProperties } from "vue";
 import Cell from "@/components/me/trial-time-cell.vue";

@@ -43,7 +43,9 @@
         >
           <view class="flex items-start" style="gap: 12px">
             <view class="grid place-items-center shrink-0" :style="iconBoxStyle(o.status)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="badge(o.status).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in badge(o.status).icon" :key="di" :d="d" /></svg>
+              <BusinessImage :src="o.kind === 'commerce' ? o.imageUrl : undefined" style="width: 40px; height: 40px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="badge(o.status).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in badge(o.status).icon" :key="di" :d="d" /></svg>
+              </BusinessImage>
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center justify-between" style="gap: 8px">
@@ -85,6 +87,7 @@
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import BusinessImage from "@/components/business-image.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";
@@ -294,8 +297,9 @@ function badge(status: OrderStatus): Badge {
   switch (status) {
     case "placed":
       return { label: t.value.orders.statusPlaced, color: "var(--v5-ink-3)", bg: "var(--v5-surface-2)", icon: ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"] };
+    case "inventory":
     case "paid":
-      return { label: t.value.orders.statusPaid, color: "var(--v5-brand)", bg: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", icon: ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "m9 11 3 3L22 4"] };
+      return { label: status === "inventory" ? t.value.myDevices.inventorySectionInventory : t.value.orders.statusPaid, color: "var(--v5-brand)", bg: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", icon: ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "m9 11 3 3L22 4"] };
     case "provisioning":
       return { label: t.value.orders.statusProvisioning, color: "var(--v5-warning)", bg: "color-mix(in srgb, var(--v5-warning) 15%, transparent)", icon: ["M5 2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", "M5 14h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M6 6h.01", "M6 18h.01"] };
     case "activated":

@@ -1,11 +1,12 @@
 <template>
   <view v-if="rules.length" class="promotion promotion-product" data-testid="promotion-product">
+    <BusinessImage v-if="publicOnly" :src="activity.productImages?.[productNo]" class="promotion-image" />
     <text class="promotion-copy">{{ t.promotion.conditional }}</text>
     <view v-for="rule in rules" :key="rule.ruleId">
       <text class="promotion-copy">{{ t.promotion.rulePer }} · {{ rule.minBuyQty }} · {{ rule.repeatMode==='PER_GROUP'?t.promotion.perGroup:t.promotion.oncePerOrder }}</text>
       <text class="promotion-copy">{{ limits(rule) }}</text>
       <template v-if="publicOnly"><text v-for="reward in rule.inviterReward?[rule.buyerReward,rule.inviterReward]:[rule.buyerReward]" :key="reward.rewardRuleId" class="promotion-copy">{{ rewardSummary(reward) }}</text></template>
-      <RewardRows v-else :specs="rule.inviterReward ? [rule.buyerReward, rule.inviterReward] : [rule.buyerReward]" :product-no="expanded?productNo:undefined" />
+      <RewardRows v-else :product-images="activity.productImages" :specs="rule.inviterReward ? [rule.buyerReward, rule.inviterReward] : [rule.buyerReward]" :product-no="expanded?productNo:undefined" />
     </view>
     <text v-if="activity.eligibilityMessage" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code) }}</text>
     <text v-if="expanded" class="promotion-copy">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
@@ -17,8 +18,9 @@
   </view>
 </template>
 <script setup lang="ts">
+import BusinessImage from "@/components/business-image.vue";
 import { computed,ref } from 'vue';
-import type { PublicPromotion,PublicRewardSpec } from '@/api/promotion-contracts';
+import type { PublicPromotion,PublicRewardSpec } from '@/api/promotion-api';
 import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
 import { localized,displayDeadline,rewardAmount } from '@/lib/promotion-display';

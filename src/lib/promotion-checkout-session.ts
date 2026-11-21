@@ -1,5 +1,4 @@
-import type { OrderReceipt, Quote } from '../api/promotion-contracts';
-import type { PromotionApi, PromotionOperation } from '../api/promotion-api';
+import type { OrderReceipt, Quote, PromotionApi, PromotionOperation } from '../api/promotion-api';
 
 export interface PromotionPendingCommand { key: string; operation: PromotionOperation; targetId: string }
 export interface PromotionCheckoutRecord { quote: Quote | null; order: OrderReceipt | null; pending: PromotionPendingCommand | null; voucherId?:string|null; leavePromptShown?:boolean }

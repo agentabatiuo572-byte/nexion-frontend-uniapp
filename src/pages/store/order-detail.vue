@@ -45,8 +45,10 @@
         <view class="mx-4 rounded-2xl" :style="heroStyle">
           <view class="flex items-center" style="gap: 12px">
             <view class="grid place-items-center" :style="heroIconStyle">
-              <svg v-if="isProvisioning" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nx-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-              <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" :stroke="statusColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in statusIcon" :key="di" :d="d" /></svg>
+              <BusinessImage :src="order.imageUrl" style="width: 48px; height: 48px">
+                <svg v-if="isProvisioning" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nx-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" :stroke="statusColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in statusIcon" :key="di" :d="d" /></svg>
+              </BusinessImage>
             </view>
             <view class="flex-1 min-w-0">
               <text class="block" :style="heroLabelStyle">{{ statusLabel(order.status) }}</text>
@@ -82,7 +84,7 @@
         <view class="nx-glass-card mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
           <text class="block" :style="sectionLabelStyle">{{ t.orders.orderSummary }}</text>
           <DetailRow :label="t.orders.orderIdLabel" :value="order.id" mono />
-          <DetailRow :label="t.orders.quantity" :value="`${order.itemCount ?? order.quantity}`" />
+          <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
           <view v-if="order.lineItems?.length" style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border)">
             <view v-for="item in order.lineItems" :key="item.sku" class="flex items-center justify-between" style="padding: 4px 0; gap: 12px">
               <view class="flex-1 min-w-0">
@@ -191,6 +193,7 @@ import OrderRewards from '@/components/promotion/order-rewards.vue';
 import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import BusinessImage from "@/components/business-image.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDateTime } from "@/lib/trial-date";
@@ -392,7 +395,9 @@ function startTick() {
 }
 startTick();
 
-const stages = computed(() => (order.value ? timelineFor(order.value.productId) : []));
+const orderQuantity = computed(() => order.value?.lineItems?.reduce((sum, item) => sum + item.quantity, 0) ?? order.value?.quantity);
+const stages = computed<OrderStatus[]>(() => order.value?.status === "inventory"
+  ? ["placed", "paid", "inventory"] : order.value ? timelineFor(order.value.productId) : []);
 const currentIdx = computed(() => (order.value ? stages.value.indexOf(order.value.status) : -1));
 // Cancellable ONLY before payment settles ("placed"). Checkout settles to
 // "paid", so in practice no order rests at "placed" — kept faithful to source.
@@ -418,6 +423,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   paid: "var(--v5-brand)",
   provisioning: "var(--v5-warning)",
   activated: "var(--v5-brand)",
+  inventory: "var(--v5-brand)",
   cancelled: "var(--v5-brand-2)",
   payment_failed: "var(--v5-danger)",
   expired: "var(--v5-warning)",
@@ -431,6 +437,7 @@ const statusColor = computed(() => (order.value ? STATUS_COLORS[order.value.stat
 function iconFor(status: OrderStatus): string[] {
   switch (status) {
     case "placed": return ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"];
+    case "inventory":
     case "paid": return ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "m9 11 3 3L22 4"];
     case "provisioning": return ["M5 2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", "M5 14h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M6 6h.01", "M6 18h.01"];
     case "activated": return ["M12 20v2", "M12 2v2", "M17 20v2", "M17 2v2", "M2 12h2", "M2 17h2", "M2 7h2", "M20 12h2", "M20 17h2", "M20 7h2", "M7 20v2", "M7 2v2", "M4 8h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M8 12h8"];
@@ -453,6 +460,7 @@ function statusLabel(s: OrderStatus): string {
     case "paid": return t.value.orders.statusPaid;
     case "provisioning": return t.value.orders.statusProvisioning;
     case "activated": return t.value.orders.statusActivated;
+    case "inventory": return t.value.myDevices.inventorySectionInventory;
     case "cancelled": return t.value.orders.cancelStatus;
     case "payment_failed": return t.value.orders.statusPaymentFailed;
     case "expired": return t.value.orders.statusExpired;

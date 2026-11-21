@@ -29,11 +29,11 @@
            (useSetPageHeader below) so they pin on scroll, mirroring the
            prototype's <SetPageHeader>. -->
 
-      <view v-if="catalogStatus === 'loading'" class="text-center" style="padding: 20px">
+      <view v-if="!settledOrder && catalogStatus === 'loading'" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogLoadingTitle }}</text>
       </view>
 
-      <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: 20px">
+      <view v-else-if="!settledOrder && catalogStatus === 'error'" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogErrorTitle }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text>{{ t.store.coBackToStore }}</text>
@@ -41,7 +41,7 @@
       </view>
 
       <!-- Product not found -->
-      <view v-else-if="!product" class="text-center" style="padding: 20px">
+      <view v-else-if="!settledOrder && !product" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text>{{ t.store.coBackToStore }}</text>
@@ -148,7 +148,7 @@
         </view>
 
         <!-- === confirm === -->
-        <view v-else-if="step === 'confirm'" class="nx-glass-card mx-4 rounded-2xl nx-step-in" :style="confirmCardStyle">
+        <view v-else-if="step === 'confirm' && product" class="nx-glass-card mx-4 rounded-2xl nx-step-in" :style="confirmCardStyle">
           <text class="block font-mono-tabular" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coReviewOrder }}</text>
           <view style="margin-top: 12px">
             <CheckoutRow :label="t.store.coRowProduct" :value="nexGridBrandText(product.name)" />
@@ -238,7 +238,9 @@
         <!-- === live === -->
         <view v-else-if="step === 'live'" class="nx-glass-card mx-4 rounded-2xl text-center nx-pop-in" :style="liveCardStyle">
           <view class="mx-auto grid place-items-center" :style="liveSpinnerWrapStyle">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
+            <BusinessImage :src="settledOrder?.imageUrl" style="width: 56px; height: 56px">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
+            </BusinessImage>
           </view>
           <text class="block" :style="liveTitleStyle">{{ t.store.coOrderPlaced }}</text>
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; padding: 0 4px">{{ orderPlacedBody }}</text>
@@ -265,6 +267,7 @@ import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
 import { validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
 import { takeNavigationQuery } from '@/lib/route';
 import AppChassis from "@/components/app-chassis.vue";
+import BusinessImage from "@/components/business-image.vue";
 import CheckoutRow from "@/components/store/checkout-row.vue";
 import ChainPayment from "@/components/store/chain-payment.vue";
 import CardPayment from "@/components/store/card-payment.vue";
@@ -929,6 +932,8 @@ useSetPageHeader(() => ({
 const step = ref<Step>("select-payment");
 const payment = ref<string>(remoteApiEnabled ? "nexgrid-wallet" : "usdt-trc20");
 const orderId = ref<string | null>(null);
+const settledOrder = computed(() => remoteApiEnabled && step.value === "live" && orderId.value
+  ? orders.getById(orderId.value) : undefined);
 const remoteOrderFailure = ref<string | null>(null);
 const CHECKOUT_RECEIPT_RECOVERY_KEY = "nexgrid-checkout-receipt-recovery-v1";
 type CheckoutReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderId: string; productId?: string };
@@ -1026,7 +1031,7 @@ const activatingSubText = computed(() => {
   const dc = p?.tier === "Flagship" ? t.value.store.coDcFrankfurt : t.value.store.coDcSingapore;
   return fmt(t.value.store.coActivatingSub, { dc });
 });
-const orderPlacedBody = computed(() => fmt(t.value.store.coOrderPlacedBody, { name: product.value?.name ?? "" }));
+const orderPlacedBody = computed(() => fmt(t.value.store.coOrderPlacedBody, { name: settledOrder.value?.productName ?? product.value?.name ?? "" }));
 
 // ── stepper ──
 const stepLabels = computed(() => [
