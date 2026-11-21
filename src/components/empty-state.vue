@@ -132,4 +132,3 @@ const ctaTextStyle = computed<CSSProperties>(() => isReadRetry.value ? {} : ({
   color: props.emphasis ? "var(--v5-on-brand)" : "var(--v5-ink-2)",
 }));
 </script>
-

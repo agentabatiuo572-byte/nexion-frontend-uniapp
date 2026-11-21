@@ -10,7 +10,7 @@
           :kind="commission.eventsStatus === 'error' ? 'recoverable-error' : 'empty-list'"
           :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionLoadingTitle"
           :cta-label="commission.eventsStatus === 'error' ? t.ui.reload : undefined"
-          page
+          :page="commission.eventsStatus === 'error'"
           @cta="commission.refreshCanonicalEvents()"
         />
         <template v-if="!remoteApiEnabled || ledger !== null">
