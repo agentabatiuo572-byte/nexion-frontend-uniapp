@@ -32,14 +32,14 @@
       </view>
     </scroll-view>
     <view class="update-actions">
-      <button class="update-primary" :disabled="checking || opening" @click="act">{{ actionLabel }}</button>
+      <button class="update-primary" :disabled="checking || opening || resourceInstalling" @click="act">{{ actionLabel }}</button>
     </view>
     <view v-if="confirming && !required" class="update-overlay" @click.self="confirming = false">
       <view class="update-sheet" role="dialog" :aria-label="words.available">
         <text class="update-heading">{{ words.available }} · {{ policy?.versionName }}</text>
         <text class="update-description">{{ policy?.notes[language] }}</text>
-        <text class="update-description">{{ words.guide }}</text>
-        <button class="update-primary" @click="handoff">{{ words.install }}</button>
+        <text class="update-description">{{ resource ? words.resourceGuide : words.guide }}</text>
+        <button class="update-primary" @click="handoff">{{ resource ? words.download : words.install }}</button>
         <button class="update-later" @click="confirming = false">{{ words.later }}</button>
       </view>
     </view>
@@ -51,11 +51,12 @@ import { computed, ref } from "vue";
 import { onBackPress, onShow } from "@dcloudio/uni-app";
 import DeviceStatusBar from "@/components/device/device-status-bar.vue";
 import { navBack } from "@/lib/route";
-import { current, checkFailed, checking, checkUpdate, installed, language, openInstaller, words } from "@/services/native-update";
+import { current, checkFailed, checking, checkUpdate, installed, language, openInstaller, resourceInstalling, restartPending, words } from "@/services/native-update";
 
 const required = computed(() => current.value?.decision === "required");
 const upgrade = computed(() => required.value || current.value?.decision === "optional");
 const policy = computed(() => current.value?.policy);
+const resource = computed(() => policy.value?.updateType === "resource");
 const platform = computed(() => installed.value?.platform === "android" ? "Android" : installed.value?.platform === "ios" ? "iOS" : "—");
 const reason = computed(() => required.value ? policy.value?.reasons[language.value] : "");
 const confirming = ref(false);
@@ -63,21 +64,27 @@ const opening = ref(false);
 const state = ref<"idle" | "opened" | "returned" | "failed">("idle");
 const statusTitle = computed(() => {
   const w = words.value;
+  if (restartPending.value && !required.value) return w.ready;
+  if (resourceInstalling.value) return w.downloading;
   if (checking.value) return w.checking;
   if (checkFailed.value) return w.error;
-  if (state.value === "failed") return w.failed;
+  if (state.value === "failed") return resource.value ? w.resourceFailed : w.failed;
   if (state.value === "opened") return w.opened;
   if (required.value) return w.required;
   if (upgrade.value) return w.available;
   return current.value?.decision === "none" ? w.none : w.current;
 });
 const statusBody = computed(() => {
+  if (restartPending.value && !required.value) return words.value.restartHint;
+  if (resourceInstalling.value) return "";
   if (checkFailed.value) return words.value.reconnect;
-  if (state.value === "failed") return policy.value?.updateType === "resource" ? words.value.unsupported : words.value.reconnect;
+  if (state.value === "failed") return resource.value ? words.value.resourceRetry : words.value.reconnect;
   if (state.value === "opened") return words.value.guide;
   return state.value === "returned" && upgrade.value ? words.value.unchanged : "";
 });
 const actionLabel = computed(() => {
+  if (restartPending.value && !required.value) return words.value.restart;
+  if (resourceInstalling.value) return words.value.downloading;
   if (checking.value) return words.value.checking;
   if (checkFailed.value || state.value === "failed") return words.value.retry;
   return upgrade.value && state.value !== "opened" ? words.value.now : words.value.check;
@@ -105,6 +112,7 @@ async function handoff() {
   finally { opening.value = false; }
 }
 async function act() {
+  if (restartPending.value && !required.value) { plus.runtime.restart(); return; }
   if (checkFailed.value || !upgrade.value || state.value === "opened") { await refresh(); return; }
   if (required.value || state.value === "failed") { await handoff(); return; }
   confirming.value = true;

@@ -6,10 +6,11 @@ import { useAuth } from "@/store/auth";
 import { useLocaleStore } from "@/store/locale";
 import { serverLanguage, type ServerLanguage } from "@/i18n";
 import { updateCopy } from "@/i18n/native-update";
+import { installResource, verifiedResource, type ResourceFields } from "./test-resource-update";
 
 type Platform = "android" | "ios";
 type Copy = Record<ServerLanguage, string>;
-interface Policy {
+interface Policy extends ResourceFields {
   releaseId: string | number;
   versionName: string;
   minBuild: number;
@@ -20,13 +21,15 @@ interface Policy {
   notes: Copy;
   reasons: Copy;
 }
-interface Device { platform: Platform; build: number; name: string; resourceBuild?: number }
+interface Device { platform: Platform; build: number; name: string; resourceBuild?: number; hostPackage?: string }
 interface Current { platform: Platform; decision: "none" | "current" | "optional" | "required"; policy: Policy | null }
 
 export const updateRoute = "/pages/me/app-update";
 export const installed = ref<Device | null>(null);
 export const current = ref<Current | null>(null);
 export const checking = ref(false);
+export const resourceInstalling = ref(false);
+export const restartPending = ref(false);
 export const checkFailed = ref(false);
 export const gateActive = ref(false);
 export const noticeKey = ref("");
@@ -48,6 +51,7 @@ function validCurrent(value: Current, device: Device) {
   const p = value.policy;
   if (!p) return value.decision === "none" && p === null;
   const build = p.updateType === "package" ? device.build : device.resourceBuild;
+  if (p.updateType === "resource" && (value.decision === "required" || !verifiedResource(apiRuntimeConfig.baseUrl, value.platform, p, device))) return false;
   return (p.updateType === "package" || p.updateType === "resource")
     && !!p.releaseId && typeof p.versionName === "string" && Number.isSafeInteger(p.latestBuild)
     && Number.isSafeInteger(p.minBuild) && p.latestBuild >= p.minBuild && p.minBuild >= 0
@@ -65,6 +69,9 @@ async function readCurrent() {
     const resource = await new Promise<import("@/lib/app-version").ResourceVersion>(readNativeResourceVersion);
     const resourceBuild = Number(resource.versionCode);
     const device: Device = { platform: os === "Android" ? "android" : "ios", build, name: plus.runtime.version || String(build) };
+    if (os === "Android" && plus.runtime.appid === "HBuilder" && build === 1532) {
+      device.hostPackage = String(plus.android.invoke(plus.android.runtimeMainActivity(), "getPackageName"));
+    }
     if (Number.isSafeInteger(resourceBuild) && resourceBuild > 0) device.resourceBuild = resourceBuild;
     installed.value = device;
     const key = cacheKey(device);
@@ -74,8 +81,10 @@ async function readCurrent() {
       if (cached?.decision === "required" && validCurrent(cached, device)) current.value = cached;
     }
     const resourceQuery = device.resourceBuild ? "&resourceBuild=" + device.resourceBuild : "";
+    const identity = "&appId=" + encodeURIComponent(plus.runtime.appid || "") +
+      (device.hostPackage ? "&hostPackage=" + encodeURIComponent(device.hostPackage) : "");
     const result = await apiClient.request<Current>({ authenticated: false, timeoutMs: 10000,
-      path: `/api/app/updates/current?platform=${device.platform}&build=${device.build}${resourceQuery}` });
+      path: `/api/app/updates/current?platform=${device.platform}&build=${device.build}${resourceQuery}${identity}` });
     if (!validCurrent(result, device)) throw Error("invalid update response");
     current.value = result;
     if (result.decision === "required") uni.setStorageSync(key, result);
@@ -133,7 +142,17 @@ export function installUpdateGuard() {
 
 export async function openInstaller(onFailure: () => void) {
   const p = current.value?.policy;
-  if (!p || p.updateType !== "package") throw Error("unverified resource");
+  if (!p || !installed.value) throw Error("no update");
+  if (p.updateType === "resource") {
+    if (resourceInstalling.value || restartPending.value) return;
+    resourceInstalling.value = true;
+    try {
+      await installResource(apiRuntimeConfig.baseUrl, current.value!.platform, p, installed.value);
+      restartPending.value = true;
+    } finally { resourceInstalling.value = false; }
+    return;
+  }
+  if (p.updateType !== "package") throw Error("unknown update type");
   if (installed.value?.platform === "android") {
     const origin = apiRuntimeConfig.baseUrl.replace(/\/+$/, "");
     if (!/^https:\/\/[^/?#@]+$/.test(origin) || !/^[0-9a-f]{64}$/.test(p.sha256)

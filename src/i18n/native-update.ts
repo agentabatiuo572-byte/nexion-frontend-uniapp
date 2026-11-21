@@ -1,5 +1,7 @@
 export const updateCopy = {
   zh: {
+    resourceGuide: "下载并校验成功后，重启 UVEL 以使用新内容。", download: "下载更新", downloading: "正在下载并校验", ready: "更新已准备好",
+    restartHint: "重启 UVEL 后，新内容将生效。", restart: "立即重启", resourceFailed: "更新未完成", resourceRetry: "当前版本仍可使用。请检查网络后重试。",
     about: "关于 UVEL", title: "版本更新", back: "返回", installed: "已装版本", latest: "最新版本", build: "构建号", resource: "资源构建号",
     available: "有新版本可用", required: "需要更新才能继续", current: "已是最新版本", none: "暂无已发布更新",
     notes: "更新内容", details: "版本信息", platform: "平台", view: "查看更新", close: "关闭", now: "立即更新", later: "稍后再说",
@@ -8,6 +10,8 @@ export const updateCopy = {
     unchanged: "此设备仍在使用旧版本。", unsupported: "此更新缺少可验证的安装资源。请稍后重试。", install: "前往安装", language: "语言",
   },
   en: {
+    resourceGuide: "After the download is verified, restart UVEL to use the new content.", download: "Download update", downloading: "Downloading and verifying", ready: "Update ready",
+    restartHint: "Restart UVEL to apply the update.", restart: "Restart now", resourceFailed: "Update incomplete", resourceRetry: "Your current version is still available. Check your connection and try again.",
     about: "About UVEL", title: "App updates", back: "Back", installed: "Installed version", latest: "Latest version", build: "Build", resource: "Resource build",
     available: "An update is available", required: "Update required", current: "You’re up to date", none: "No update has been published",
     notes: "What’s new", details: "Version details", platform: "Platform", view: "View update", close: "Close", now: "Update now", later: "Not now",
@@ -16,6 +20,8 @@ export const updateCopy = {
     unchanged: "This device is still on the earlier version.", unsupported: "A verified installation package is unavailable. Try again later.", install: "Open installer", language: "Language",
   },
   vi: {
+    resourceGuide: "Sau khi tải xuống và xác minh, hãy khởi động lại UVEL để dùng nội dung mới.", download: "Tải bản cập nhật", downloading: "Đang tải và xác minh", ready: "Bản cập nhật đã sẵn sàng",
+    restartHint: "Khởi động lại UVEL để áp dụng bản cập nhật.", restart: "Khởi động lại ngay", resourceFailed: "Chưa thể cập nhật", resourceRetry: "Bạn vẫn có thể dùng phiên bản hiện tại. Hãy kiểm tra kết nối và thử lại.",
     about: "Giới thiệu về UVEL", title: "Cập nhật ứng dụng", back: "Quay lại", installed: "Phiên bản đã cài", latest: "Phiên bản mới nhất", build: "Số bản dựng", resource: "Bản dựng tài nguyên",
     available: "Đã có phiên bản mới", required: "Cần cập nhật để tiếp tục", current: "Bạn đang dùng bản mới nhất", none: "Chưa có bản cập nhật được phát hành",
     notes: "Nội dung cập nhật", details: "Thông tin phiên bản", platform: "Nền tảng", view: "Xem cập nhật", close: "Đóng", now: "Cập nhật ngay", later: "Để sau",
