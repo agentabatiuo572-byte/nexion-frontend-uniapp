@@ -234,6 +234,7 @@ import { usePurchasePayment, purchaseConclusion, type PurchaseNotice } from '@/s
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
+import { useTrialLifecycleCopy } from '@/i18n/trial-lifecycle';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
@@ -250,6 +251,7 @@ const URGENT_MS = 5 * 60000;
 const active = ref(true);
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
+const trialCopy = useTrialLifecycleCopy();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const pending = computed(() => { app.accountKey; s.revision; return payment.pending(); });
 // A delivered purchase the caller already confirmed needs no follow-up, so it leaves the bar.
@@ -339,14 +341,21 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'rejectQuotaMonthFull':
     case 'rejectQuotaSoldOut':
     case 'rejectConditionsUnmet':
+    case 'rejectGateConditionsUnmet':
     case 'rejectPurchaseSetup':
     case 'rejectCapacitySourceChanged': {
       const flow = checkoutFlowCopy(locale.code);
-      const refusal = { icon: 'info', tone: 'warning', title: flow.cannotPay, body: flow[kind], primary: c.ok, onPrimary: payment.close, onSecondary: payment.close } as const;
+      const body = flow[kind === 'rejectGateConditionsUnmet' ? 'rejectConditionsUnmet' : kind];
+      const refusal = { icon: 'info', tone: 'warning', title: flow.cannotPay, body, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close } as const;
       if (kind === 'rejectPurchaseSetup') return { ...refusal, secondary: c.support, onSecondary: payment.support };
-      if (kind === 'rejectConditionsUnmet') return { ...refusal, secondary: t.value.tradein.purchaseViewConditions, onSecondary: payment.openConditions };
+      if (kind === 'rejectConditionsUnmet' || kind === 'rejectGateConditionsUnmet') return { ...refusal, secondary: t.value.tradein.purchaseViewConditions, onSecondary: payment.openConditions };
       return refusal;
     }
+    case 'trialConversionClosed':
+    case 'trialNotConvertible':
+      return { icon: 'info', tone: 'warning', title: checkoutFlowCopy(locale.code).cannotPay,
+        body: kind === 'trialConversionClosed' ? t.value.trial.eligReasonClosed : trialCopy.value.endedBody,
+        primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
     case 'orderExpired': return { ...refused, title: c.orderExpiredTitle, body: c.orderExpired };
     case 'orderClosed': return { ...refused, title: c.orderClosedTitle, body: c.orderClosed };
     // There is no order to open, so only ordering again remains.
