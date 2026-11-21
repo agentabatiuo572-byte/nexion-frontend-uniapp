@@ -144,13 +144,11 @@ function noteBasis(text: string): string {
 .referral-refresh-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Both cards keep their original brand-2 hue as a tinted solid with its shared rim (01 §1.1.2). */
 .referral-activity { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: var(--v5-space-5); border-radius: 28px; }
-/* The footer row's 44px target supplies the bottom spacing on the campaign card (P-67). */
-.referral-activity--footer { padding-bottom: 4px; }
 .referral-activity + .referral-activity { margin-top: var(--ui-space-inset); }
 .referral-hero { position: relative; display: flex; align-items: center; min-height: 84px; margin-top: -4px; }
 .referral-meta { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-2); min-height: 24px; }
 .referral-deadline { height: 24px; padding: 0 10px; display: flex; align-items: center; border-radius: 999px; font: 600 11px/1 var(--font-v5); color: var(--v5-brand-2-ink); background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
-.referral-rule-pill { margin: -10px -4px -10px auto; padding: 0 4px; }
+.referral-rule-pill { margin-left: auto; }
 .referral-copy { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .referral-title { display: block; max-width: 60%; font: 600 17px/24px var(--font-v5); overflow-wrap: anywhere; }
 .referral-count { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-top: var(--v5-space-1); }
@@ -162,7 +160,8 @@ function noteBasis(text: string): string {
 /* A fixed bow over the configured machine (P-67): the machine follows the activity, the bow marks it as a gift. */
 .referral-bow { position: absolute; left: 56%; top: 36%; width: 40%; height: 34%; pointer-events: none; }
 /* Note and action stay side by side while the note fits in two lines; otherwise the note takes the full width and the action drops to the bottom-right. */
-.referral-actions { position: relative; z-index: 1; flex-wrap: wrap; row-gap: 0; }
+/* The divider sits 20px from the content above and the text below, the card's own inset (14px gap + 6px). */
+.referral-actions { position: relative; z-index: 1; flex-wrap: wrap; row-gap: 8px; margin-top: 6px; padding-top: var(--v5-space-5); }
 .referral-actions > .nx-card-footer__note { flex: 1 1 auto; overflow-wrap: break-word; }
 .referral-actions > .referral-progress-link { margin-left: auto; white-space: nowrap; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }

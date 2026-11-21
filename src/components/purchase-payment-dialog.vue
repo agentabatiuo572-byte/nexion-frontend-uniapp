@@ -1,5 +1,5 @@
 <template>
-  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume" :class="{ 'has-close': !showHistory }" :style="barBottom === null ? undefined : { bottom: barBottom + 'px' }" role="status">
+  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume nx-float-panel" :class="{ 'has-close': !showHistory }" :style="barBottom === null ? undefined : { bottom: barBottom + 'px' }" role="status">
     <view v-if="!showHistory" class="purchase-payment-resume__close nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="payment.dismissResume(pending)" @keydown.enter.prevent="payment.dismissResume(pending)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
     </view>
@@ -115,7 +115,8 @@
     </view>
 
     <view v-if="received" class="pp-scroll pp-done">
-      <NxResultHead tone="success" :title="copy.received" :description="copy.provisioning" />
+      <!-- Shared result head (03 §3.6.1): 56px success block, the result as title, the next step as one line. -->
+      <view class="pp-done__hero"><NxResultHead tone="success" :title="copy.received" :description="copy.provisioning" /></view>
       <view class="pp-track" role="list" :aria-label="copy.provisionTrack">
         <view class="pp-step" role="listitem"><view class="pp-seg is-done" /><view class="pp-dot is-done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></view><text class="pp-step__l">{{ copy.trackPaid }}</text></view>
         <view class="pp-step" role="listitem"><view class="pp-seg" /><view class="pp-dot is-current" /><text class="pp-step__l">{{ copy.trackProvision }}</text></view>
@@ -761,6 +762,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 /* Bottom clearance for the note + button tray (04 §4.0: tray height + 38). */
 .pp-done { display: flex; flex-direction: column; padding: 48px var(--v5-space-4) 136px; }
 .pp-bar--done { flex-direction: column; align-items: stretch; }
+.pp-done__hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 var(--v5-space-2); }
 .pp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 36px; }
 .pp-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); text-align: center; }
 .pp-seg { position: absolute; top: 11px; left: calc(50% + 16px); width: calc(100% - 32px); height: 2px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); }
@@ -791,16 +793,18 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__row2 { display: flex; gap: 8px; }
 .pp-cashier__done { flex: 1; }
 
-/* One line sits in a 56px row with equal space above and below; the 48px text action keeps its touch height inside it. */
+/* One line sits in a 56px row with equal space above and below; the text action is its label line with a 44px target. */
 .purchase-payment__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 56px; box-sizing: border-box; padding: 4px 0; color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .purchase-payment__row > text { flex: 1; min-width: 0; padding-block: 6px; }
-/* The text action's own 8px inline padding sits in the bar padding, so its label keeps the same 16px inset as the row text. */
-.purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; margin-right: -8px; }
-/* The text action's hit area stops short of the close mark's 44px target. */
-.purchase-payment-resume.has-close { padding-right: 56px; }
+.purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; }
+/* The link's 44px target reaches 8px past its label (56 from the edge); the close mark's target starts 48 from the edge, so 8px stay between them. */
+.purchase-payment-resume.has-close { padding-right: 64px; }
 .purchase-payment-resume__close { position: absolute; top: 14px; right: var(--v5-space-3); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
 .purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
-.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-m); background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-description); }
+/* The bar already blurs what is behind it; the close disc keeps the shared fill and rim without a second filter (03 §3.2). */
+.purchase-payment-resume__close { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border-radius: 28px; color: var(--v5-ink); font-size: var(--ui-type-description); }
+
 
 .purchase-payment-resume:not(.has-close) .purchase-payment__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .purchase-payment-resume:not(.has-close) .purchase-payment__row > text { flex: 1; min-width: 0; }

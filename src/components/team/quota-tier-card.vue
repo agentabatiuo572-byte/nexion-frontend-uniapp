@@ -6,7 +6,9 @@
       <view ref="stockBarRef" class="quota-stock" role="img" :aria-label="stockText"><view class="quota-stock__ring" :class="{ 'quota-stock__ring--out': !pending && stockLeft <= 0 }" :style="stockRingStyle"><view class="quota-stock__hole nx-num-metric"><text>{{ pending ? '—' : stockLeft }}</text></view></view></view>
     </view>
     <view class="quota-product" role="link" tabindex="0" :aria-label="displayName" @click="openProduct" @keydown.enter.prevent="openProduct">
-      <view class="quota-product__stage"><image v-if="imageSrc" :src="imageSrc" mode="aspectFit" class="quota-product__image" :alt="displayName" @error="imageError" /><!-- Missing or failed art: the same neutral placeholder as the product render (04.2). --><svg v-else class="quota-product__placeholder" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg></view>
+      <view class="quota-product__stage">
+        <CatalogMachineImage class="quota-product__image" :sku="tier.productId" :image-url="tier.imageUrl" :scope-key="'quota:' + tier.productId" />
+      </view>
       <view class="quota-product__name-row"><text class="quota-product__name">{{ displayName }}</text><svg class="quota-product__arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
       <view class="quota-product__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ priceParts[0] }}</text><text v-if="priceParts[1]" class="quota-price-fraction">.{{ priceParts[1] }}</text></view>
     </view>
@@ -44,9 +46,9 @@ import { networkReauditCopy } from '@/i18n/network-reaudit';
 import QuotaConditionBar from './quota-condition-bar.vue';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
+import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { useT } from '@/i18n/use-t';
 import { fmt } from '@/i18n/format';
-import { useProductImage } from '@/composables/use-product-image';
 import { useScrollGrowProgress, VIZ_RING_TRANSITION } from '@/composables/use-scroll-grow-progress';
 export interface QuotaCondition {
   label: string;
@@ -85,7 +87,6 @@ const visibility = useDataVisibility();
 const locale = useLocaleStore();
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const displayName = computed(() => (props.tier.name));
-const { imageSrc, imageError } = useProductImage(() => props.tier.imageUrl);
 const { elRef: stockBarRef, inView: stockBarInView } = useScrollGrowProgress();
 const unlocked = computed(() => {
   const met = props.tier.conditions.map(condition => condition.current >= condition.required);
@@ -135,8 +136,9 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 .quota-product__stage { display:flex; align-items:center; justify-content:center; height:184px; margin:0 calc(-1 * var(--v5-space-2)); overflow:hidden; }
 .quota-tier--compact .quota-product__stage { height:156px; }
 /* Product art carries about 40% transparent margin (04.1 draws machine art at 1.5x its slot); scale it so the machine fills the stage. */
-.quota-product__image { width:100%; height:100%; transform:scale(1.4); pointer-events:none; }
-.quota-product__placeholder { color:var(--v5-ink-3); }
+.quota-product__image { width:100%; height:100%; pointer-events:none; }
+.quota-product__image :deep(.catalog-machine-image__image) { transform:scale(1.4); }
+.quota-product__image :deep(.catalog-machine-image__placeholder) { inset:12% auto; left:50%; aspect-ratio:1; transform:translateX(-50%); }
 .quota-product__name-row { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--v5-space-1); margin-top:var(--v5-space-2); }
 .quota-product__name { min-width:0; font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .quota-product__arrow { flex:none; margin-top:3px; color:var(--v5-ink-4); }
@@ -161,6 +163,6 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 .quota-blocked-note { display:block; min-height:var(--ui-type-note-lh); margin-top:var(--v5-space-1); font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); text-align:right; overflow-wrap:break-word; }
 .quota-blocked-note--center { text-align:center; }
 .quota-blocked-note--idle { visibility:hidden; }
-.quota-text-action { align-self:stretch; min-height:44px; border-top:0; }
+.quota-text-action { align-self:stretch; padding-top:0; border-top:0; }
 .quota-unavailable { display:block; align-self:stretch; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 </style>

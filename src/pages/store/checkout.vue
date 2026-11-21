@@ -19,7 +19,7 @@
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);white-space:pre-line;text-wrap:pretty">{{ t.tradein.recoveryChecking }}</text>
       </view>
-      <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" payment-confirmed :state="checkoutResultState" :product-name="completedOrder?.productName" :product-image="completedOrder?.imageUrl" :amount="completedOrder?.paidTotal ?? completedOrder?.total" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" />
+      <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" payment-confirmed :state="checkoutResultState" :product-name="completedOrder?.productName" :product-image="completedOrder?.imageUrl" :amount="completedOrder?.paidTotal ?? completedOrder?.total" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @support="contactResultSupport" />
       <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
@@ -274,6 +274,8 @@ import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
+import { advisorChatRoute } from '@/lib/advisor-chat-route';
+import { useConversations } from '@/store/conversations';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
@@ -1377,7 +1379,14 @@ function presentSettledPurchase(firstHardwareOrder: boolean, onResultShown: (() 
   void nextTick(() => { if (pageAlive && settledResultReplay.value) { forgetSettledOrder?.(); forgetSettledOrder = null; } });
 }
 const checkoutResultState = computed(() => completedOrder.value?.status === 'activated' ? 'activated'
-  : completedOrder.value?.status === 'inventory' ? 'inventory' : 'processing');
+  : completedOrder.value?.status === 'inventory' ? 'inventory' : completedOrder.value?.status === 'provisioning_failed' ? 'failed' : 'processing');
+// The failed result's exit, as on the order detail: copy the order number, then open support.
+const conversations = useConversations();
+function contactResultSupport() {
+  const orderNo = completedOrder.value?.id;
+  if (!orderNo) return;
+  uni.setClipboardData({ data: orderNo, success: async () => { if (!pageAlive) return; const route = await advisorChatRoute(conversations); if (pageAlive) void navTo(route); } });
+}
 const checkoutResultReading = ref(false);
 async function refreshCheckoutResult() {
   if (!orderId.value || !pageAlive || !pageVisible || checkoutResultReading.value) return;
@@ -2619,7 +2628,8 @@ async function submitRemoteOrder(): Promise<void> {
     await orders.refreshRemote();
     if (!scopeIsCurrent()) return;
     const settled = orders.orders.find((order) => order.id === created.orderNo);
-    if (!settled || settled.status !== "activated") {
+    // A server-confirmed provisioning failure is a settled result shown as such, not a read-back mismatch (03 §3.5.2).
+    if (!settled || (settled.status !== "activated" && settled.status !== "provisioning_failed")) {
       throw new Error("WALLET_PAYMENT_ORDER_READBACK_MISMATCH");
     }
     if (paymentKey) clearOrderAction(submissionScope.accountKey,created.orderNo,paymentKey);
@@ -3480,7 +3490,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
 .checkout-voucher-match { padding:var(--v5-space-2) var(--v5-space-4) 0 64px; }
 .checkout-voucher-choices { padding:var(--v5-space-1) var(--v5-space-4) var(--v5-space-1) 64px; }
-.checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; min-height:44px; padding:6px 0 6px 8px; }
+.checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; }
 /* Long trade-in labels (ru, kk) would squeeze the title into 3 lines: the action drops below, right-aligned. */
 .checkout-tradein { flex-wrap:wrap; }
 .checkout-tradein .checkout-option-copy { flex:1 1 8em; }
@@ -3503,8 +3513,9 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .checkout-note--warning { padding:10px 12px; border-radius:12px; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
 .checkout-capacity-hint { display:block; margin-top:4px; text-wrap:pretty; }
-.checkout-capacity-actions { display:flex; flex-wrap:wrap; align-items:center; gap:0 var(--v5-space-1); margin:6px -8px 0; }
-.checkout-capacity-links { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:0 var(--v5-space-1); margin-left:auto; }
+/* Text buttons are their label line; the gaps keep each 44px target clear of its neighbour's. */
+.checkout-capacity-actions { display:flex; flex-wrap:wrap; align-items:center; gap:26px var(--v5-space-4); margin-top:var(--v5-space-2); }
+.checkout-capacity-links { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:26px var(--v5-space-4); margin-left:auto; }
 .checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 12.5px/20px var(--font-v5); color:var(--v5-ink-3); text-align:center; }
 .checkout-legal-link { display:inline; color:var(--v5-brand); cursor:pointer; }
 .checkout-legal-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:2px; }
