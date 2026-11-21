@@ -9,6 +9,7 @@ export interface TeamQuotaCondition { kind: "rank" | "directRefs" | "teamCompute
 export interface TeamQuotaTier {
   productId: string; quotaCode: string; name: string; price: number; monthlyStock: number; soldThisMonth: number;
   unlockKind: "ALL" | "EITHER"; conditions: TeamQuotaCondition[]; perks: string[]; available: boolean;
+  usedThisMonth: number; pendingThisMonth: number; remaining: number;
 }
 export interface TeamQuotaSnapshot {
   source: "server"; sourceEnvironment: TeamQuotaEnvironment; runId: string;
@@ -37,8 +38,13 @@ function parse(value: unknown, mode: ApiEnvironment): TeamQuotaSnapshot {
       if (kind !== "rank" && kind !== "directRefs" && kind !== "teamComputePoints") return invalid();
       return { kind, required: num(condition.required), current: num(condition.current) };
     });
+    const monthlyStock = num(item.monthlyStock, true);
+    const soldThisMonth = num(item.soldThisMonth, true);
+    const usedThisMonth = "usedThisMonth" in item ? num(item.usedThisMonth, true) : soldThisMonth;
+    const pendingThisMonth = "pendingThisMonth" in item ? num(item.pendingThisMonth, true) : 0;
+    const remaining = "remaining" in item ? num(item.remaining, true) : Math.max(0, monthlyStock - usedThisMonth);
     return { productId: text(item.productId), quotaCode: text(item.quotaCode), name: text(item.name), price: num(item.price),
-      monthlyStock: num(item.monthlyStock, true), soldThisMonth: num(item.soldThisMonth, true), unlockKind,
+      monthlyStock, soldThisMonth, usedThisMonth, pendingThisMonth, remaining, unlockKind,
       conditions, perks: item.perks.map((perk) => text(perk)), available: item.available };
   });
   const generatedAt = text(source.generatedAt);
