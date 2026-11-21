@@ -85,14 +85,14 @@
           :style="{ borderBottom: i === products.length - 1 ? 'none' : '1px solid var(--v5-border)' }"
         >
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="itemNameStyle">{{ (p.name) }}</text>
+            <text class="block" :style="itemNameStyle">{{ (p.name) }}</text>
             <text class="block" :style="itemMetaStyle">
-              <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
+              {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
             </text>
             <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
             <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
-            <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
-            <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
+            <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
+            <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.purchaseEligibilityIneligible) }}</text>
           </view>
           <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: (p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-surface-2)">
@@ -103,40 +103,46 @@
       </view>
 
       <!-- Suggestions -->
-      <view v-if="suggestions.length > 0" class="mx-4 mt-3">
+      <view v-if="suggestions.length > 0" class="mx-4" style="margin-top: var(--ui-space-section-gap)">
         <text class="block" :style="suggestionsHeadingStyle">{{ t.bundle.suggestionsHeading }}</text>
         <view class="nx-glass-card overflow-hidden" :style="cardStyle">
           <view
             v-for="(p, i) in suggestions"
             :key="p.id"
-            class="w-full flex items-center gap-3 active:opacity-80"
+            class="w-full flex items-center gap-3"
+            :class="{ 'active:opacity-80': !eligibilityUnavailable(p.id) }"
             :style="suggestionRowStyle(i === suggestions.length - 1)"
             role="button"
-            tabindex="0"
-            :aria-label="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
+            :tabindex="eligibilityUnavailable(p.id) ? undefined : 0"
+            :aria-disabled="eligibilityUnavailable(p.id) ? 'true' : undefined"
+            :aria-label="eligibilityUnavailable(p.id) ? `${(p.name)} · ${t.store.temporarilyOutOfStock}`
+              : remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
               ? `${(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: (p.name) })"
             @click.stop="onAddSuggestion(p)"
             @keydown="activate($event, () => onAddSuggestion(p))"
           >
             <view class="flex-1 min-w-0 text-left">
-              <text class="block truncate" :style="suggestionNameStyle">{{ (p.name) }}</text>
+              <text class="block" :style="suggestionNameStyle">{{ (p.name) }}</text>
               <text class="block" :style="itemMetaStyle">
-                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
+                {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
               </text>
-              <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
-              <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.gateBlockedToast }}</text>
+              <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
+              <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.gateBlockedToast) }}</text>
               <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             </view>
-            <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
+            <view v-if="!eligibilityUnavailable(p.id)" class="shrink-0 flex items-center" style="gap: 4px">
+            <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
               <svg v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
               <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+            </view>
+            <NxIcon v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" name="chevron-right" :size="16" style="color: var(--v5-ink-4)" />
             </view>
           </view>
         </view>
       </view>
 
       <!-- Total summary -->
-      <view v-if="products.length > 0" class="nx-glass-card nx-tint mx-4 mt-3 relative overflow-hidden" :style="heroStyle">
+      <view v-if="products.length > 0" class="nx-glass-card nx-tint mx-4 relative overflow-hidden" style="margin-top: var(--ui-space-section-gap)" :style="heroStyle">
         <view class="relative">
           <!-- Subtotal -->
           <view class="flex items-center justify-between" style="min-height: 24px">
@@ -160,30 +166,34 @@
             <text :style="rowLabelStyle(false)">{{ t.bundle.estimatedDaily }}</text>
             <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">${{ cumulativeDailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
-          <!-- Checkout CTA — 结算不可用时置灰 + 换文案(禁用原因),下一步走 CTA 下方那句 hint。
-               箭头 / 上传图标一并撤掉:禁用态上留着「向前」的箭头是反语义的。 -->
-          <view
-            class="w-full flex items-center justify-center"
-            :class="checkoutUnavailable ? '' : 'active:scale-[0.98]'"
-            :style="ctaStyle"
-            role="button"
-            tabindex="0"
-            :aria-disabled="checkoutUnavailable"
-            :aria-label="ctaText"
-            @click.stop="onCheckout"
-            @keydown="activate($event, onCheckout)"
-          >
-            <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18" /><path d="M5 10l7-7 7 7" /><path d="M5 21h14" /></svg>
-            <text :style="ctaLabelStyle">{{ ctaText }}</text>
-            <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-          </view>
-          <!-- 禁用原因 + 下一步(项目不变量:业务链必须有下一步 / 禁用原因)。 -->
-          <text v-if="checkoutUnavailable" class="block" :style="ctaHintStyle">{{ checkoutHint }}</text>
         </view>
+      </view>
+      <!-- Room for the bottom action bar: the hidden note copy tracks the tray note's height. -->
+      <view v-if="products.length > 0" class="bundle-bar-space" :class="{ 'bundle-bar-space--tray': checkoutUnavailable && checkoutHint }" aria-hidden="true">
+        <text v-if="checkoutUnavailable && checkoutHint" class="bundle-bar-space__note">{{ checkoutHint }}</text>
       </view>
       </template>
       </template>
     </view>
+    </template>
+    <!-- Page main action in the shared bottom action bar (04 §4.0): a lone button floats; the
+         disabled reason sits above the button in the tray. -->
+    <template #pageFixed>
+      <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure && products.length > 0" class="bundle-bar nx-glass-bar">
+        <text v-if="checkoutUnavailable && checkoutHint" class="nx-tray-note">{{ checkoutHint }}</text>
+        <view
+          class="bundle-bar__cta"
+          role="button"
+          tabindex="0"
+          :aria-disabled="checkoutUnavailable"
+          :aria-label="ctaText"
+          @click.stop="onCheckout"
+          @keydown="activate($event, onCheckout)"
+        >
+          <text>{{ ctaText }}</text>
+          <NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" />
+        </view>
+      </view>
     </template>
   </AppChassis>
 </template>
@@ -203,6 +213,8 @@ import AppChassis from "@/components/app-chassis.vue";
 import PromotionBundle from '@/components/promotion/promotion-bundle.vue';
 import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
@@ -340,11 +352,34 @@ const suggestions = computed(() =>
     ).slice(0, 3)
     : [],
 );
-watch([() => products.value.map((p) => p.id).join("|"),
-  () => suggestions.value.map((p) => p.id).join("|"), () => app.accountKey], () => {
-  if (remoteApiEnabled) void Promise.all([...products.value, ...suggestions.value]
-    .map((p) => purchaseEligibilityStore.ensure(p.id, true)));
+const eligibilityProductIds = computed(() => [...products.value, ...suggestions.value].map((p) => p.id));
+watch([eligibilityProductIds, () => app.accountKey], ([ids, account], [previousIds, previousAccount]) => {
+  if (!remoteApiEnabled) return;
+  for (const id of ids) {
+    if (account !== previousAccount || !previousIds?.includes(id)) void purchaseEligibilityStore.ensure(id, true);
+  }
 }, { immediate: true });
+
+function eligibilityUnavailable(productNo: string): boolean {
+  return purchaseEligibilityStore.state(productNo).status === "unavailable";
+}
+
+const failedEligibilityIds = computed(() => remoteApiEnabled
+  ? eligibilityProductIds.value.filter((id) => purchaseEligibilityStore.state(id).status === "error")
+  : []);
+useAutoRecovery({
+  failed: () => failedEligibilityIds.value.length > 0,
+  retry: () => Promise.all(failedEligibilityIds.value.map((id) => purchaseEligibilityStore.ensure(id, true))),
+});
+
+function eligibilityLabel(productNo: string, ineligible: string): string {
+  switch (purchaseEligibilityStore.state(productNo).status) {
+    case "unavailable": return t.value.store.temporarilyOutOfStock;
+    case "error": return t.value.store.purchaseEligibilityError;
+    case "ready": return ineligible;
+    default: return t.value.store.purchaseEligibilityLoading;
+  }
+}
 
 async function retryCatalog() {
   await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
@@ -416,6 +451,7 @@ const checkoutHint = computed(() => {
   if (products.value.length < 2) return t.value.bundle.checkoutUnavailableHint;
   if (!remoteApiEnabled) return "";
   const entries = products.value.map((p) => purchaseEligibilityStore.state(p.id));
+  if (entries.some((entry) => entry.status === "unavailable")) return t.value.store.temporarilyOutOfStock;
   if (entries.some((entry) => entry.status === "error")) return t.value.store.purchaseEligibilityError;
   if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
   return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
@@ -473,15 +509,19 @@ function clear() {
 }
 async function onAddSuggestion(p: Product) {
   if (remoteApiEnabled) {
-    if (purchaseEligibilityStore.state(p.id).status === "ready" && !purchaseEligibilityStore.state(p.id).eligible) {
+    const entry = purchaseEligibilityStore.state(p.id);
+    if (entry.status === "unavailable") return;
+    if (entry.status === "ready" && !entry.eligible) {
       navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
       return;
     }
     const scope = captureAccountScope();
-    const eligible = await purchaseEligibilityStore.ensure(p.id, true);
+    const eligible = await purchaseEligibilityStore.ensure(p.id, entry.status !== "loading");
     if (!isCurrentAccountScope(scope)) return;
     if (!eligible) {
-      if (purchaseEligibilityStore.state(p.id).status === "error") toast.warn(t.value.store.purchaseEligibilityError);
+      const status = purchaseEligibilityStore.state(p.id).status;
+      if (status === "unavailable") return;
+      if (status === "error") toast.warn(t.value.store.purchaseEligibilityError);
       else navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
       return;
     }
@@ -572,6 +612,7 @@ async function openBundleReview(list:Product[]):Promise<boolean> {
       original=!!record?.pending||record?.order?.paymentStatus==='PENDING'
         ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
     }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
+    if (!original && list.some((p) => eligibilityUnavailable(p.id))) return true;
     // Every device and Cloud Share takes one slot; the server refuses a bundle
     // larger than the free slots, so say so before the review page.
     const used=app.remoteSlotsUsed;
@@ -597,6 +638,7 @@ async function onCheckout() {
   if (list.length < 2 || submitting.value || walletRefreshing.value) return;
   if (remoteApiEnabled) {
     if(await openBundleReview(list))return;
+    if (list.some((p) => eligibilityUnavailable(p.id))) return;
     const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();
     const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)
@@ -613,7 +655,9 @@ async function onCheckout() {
       if (!scopeIsCurrent()) return;
       const firstBlocked = decisions.findIndex((eligible) => !eligible);
       if (firstBlocked >= 0) {
-        toast.warn(purchaseEligibilityStore.state(list[firstBlocked].id).status === "error"
+        const status = purchaseEligibilityStore.state(list[firstBlocked].id).status;
+        if (status === "unavailable") return;
+        toast.warn(status === "error"
           ? t.value.store.purchaseEligibilityError : t.value.store.gateBlockedToast);
         return;
       }
@@ -937,41 +981,38 @@ const emptyTitleStyle: CSSProperties = {
 };
 const itemNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13px",
+  fontWeight: "var(--ui-type-list-title-weight)",
+  fontSize: "var(--ui-type-list-title)",
+  lineHeight: "var(--ui-type-list-title-lh)",
+  overflowWrap: "break-word",
   color: "var(--v5-ink)",
-  letterSpacing: "-0.008em",
 };
 const itemMetaStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
+  fontFamily: "var(--font-v5)",
+  fontWeight: "var(--ui-type-list-subtitle-weight)",
+  fontSize: "var(--ui-type-list-subtitle)",
+  lineHeight: "var(--ui-type-list-subtitle-lh)",
+  fontVariantNumeric: "tabular-nums",
   color: "var(--v5-ink-3)",
 };
 
 const suggestionsHeadingStyle: CSSProperties = {
-  marginBottom: "10px",
-  padding: "0 4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
+  marginBottom: "12px",
+  fontFamily: "var(--font-v5)",
+  fontWeight: "var(--ui-type-section-weight)",
+  fontSize: "var(--ui-type-section)",
+  lineHeight: "var(--ui-type-section-lh)",
+  color: "var(--v5-ink)",
 };
 // Suggestion rows now live in one form-b container → hairline-separated rows.
 function suggestionRowStyle(isLast: boolean): CSSProperties {
   return {
-    padding: "12px 14px",
+    padding: "12px 16px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }
-const suggestionNameStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13px",
-  color: "var(--v5-ink)",
-  letterSpacing: "-0.008em",
-};
+const suggestionNameStyle = itemNameStyle;
 
 function rowLabelStyle(big: boolean): CSSProperties {
   return {
@@ -991,32 +1032,23 @@ function rowValueStyle(tint?: string, big = false): CSSProperties {
   };
 }
 
-// disabled 态按设计系统的状态派生公式:填充降 surface 系 + 文字/图标降 ink-4 + 去掉 glow。
-const ctaStyle = computed<CSSProperties>(() => ({
-  marginTop: "14px",
-  gap: "6px",
-  height: "50px",
-  borderRadius: "999px",
-  background: checkoutUnavailable.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
-  boxShadow: checkoutUnavailable.value ? "none" : "var(--v5-spotlight-brand)",
-  color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
-}));
-const ctaLabelStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "var(--ui-type-button)",
-  letterSpacing: "-0.005em",
-  color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
-}));
-// 禁用原因 + 下一步那句。text-wrap: pretty 走排版铁律(禁末行孤字)。
-const ctaHintStyle: CSSProperties = {
-  marginTop: "10px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  lineHeight: 1.5,
-  color: "var(--v5-ink-3)",
-  textWrap: "pretty",
-};
-
-
 </script>
+
+<style scoped>
+.bundle-bar { position: absolute; z-index: 36; display: flex; flex-direction: column; animation: bundle-bar-in .42s cubic-bezier(.16,1,.3,1) .2s both; }
+/* Primary L 48 (03 §3.1); the shared bar rules restyle it while aria-disabled. */
+.bundle-bar__cta { display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 20px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
+.bundle-bar__cta :deep(uni-text), .bundle-bar__cta :deep(text) { white-space: nowrap; }
+.bundle-bar__cta[aria-disabled="false"]:active { transform: scale(.98); }
+.bundle-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+/* Sub-page content already ends 64px above the screen bottom (pb-6 24 + chassis 40). Floating: 48 + 22 + 16;
+   tray: 8 + note + 8 + 48 + 8, plus 22 + 16. */
+.bundle-bar-space { visibility: hidden; padding: 0 32px 22px; }
+.bundle-bar-space--tray { padding-bottom: 46px; }
+.bundle-bar-space__note { display: block; padding-top: 4px; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: anywhere; text-wrap: pretty; }
+@keyframes bundle-bar-in { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .bundle-bar { animation: none; }
+  .bundle-bar__cta[aria-disabled="false"]:active { transform: none; }
+}
+</style>
