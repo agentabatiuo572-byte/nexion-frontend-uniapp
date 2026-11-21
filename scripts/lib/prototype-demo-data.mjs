@@ -285,13 +285,23 @@ export function removeDemoPaymentQuotaHold(state,hold) {
   demoPaymentQuotaHolds.get(state)?.delete(hold);
 }
 
+export function requireDemoQuoteStock(products) {
+  if(!products.some(product=>product?.inventoryMode==='FINITE'&&product.stock===0))return;
+  if(products.length===1)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+  refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
+}
+
+function requireDemoOrderQuantity(quantity) {
+  if(!Number.isInteger(quantity)||quantity<1){
+    throw Object.assign(new Error('ORDER_QUANTITY_INVALID'),{status:422});
+  }
+}
+
 export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null) {
   const points=quotaHold ? 0 : demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
   const quantities=new Map();
   for(const item of items){
-    if(!Number.isInteger(item.quantity)||item.quantity<1){
-      throw Object.assign(new Error('ORDER_QUANTITY_INVALID'),{status:422});
-    }
+    requireDemoOrderQuantity(item.quantity);
     quantities.set(item.productNo,(quantities.get(item.productNo)??0)+item.quantity);
   }
   let hardwareQuotaUsedAt=quotaHold?.quantity ? quotaHold.at : null;
@@ -1041,10 +1051,17 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/app/trade-in/capacity-quote')return capacityQuote();
   if(pathname==='/api/orders/quote') {
     const input=request.postDataJSON();
+    const quoteProducts=input.items.map(item=>{
+      requireDemoOrderQuantity(item.quantity);
+      return products.find(product=>product.id===item.productNo);
+    });
+    if(empty||quoteProducts.some(product=>!product)){
+      throw Object.assign(new Error('PROMOTION_RESOURCE_NOT_FOUND'),{status:404});
+    }
+    requireDemoQuoteStock(quoteProducts);
     requireDemoPurchase(state,products,input.items,now);
     const items=input.items.map((item,index)=>{
-      const product=products.find(p=>p.id===item.productNo);
-      if(!product) throw new Error('Unknown demo SKU');
+      const product=quoteProducts[index];
       return {...item,lineId:'demo-line-'+index,unitPriceUsdt:product.price.toFixed(2),subtotalUsdt:(product.price*item.quantity).toFixed(2),discountUsdt:'0.00',payableUsdt:(product.price*item.quantity).toFixed(2)};
     });
     const subtotal=items.reduce((sum,item)=>sum+Number(item.subtotalUsdt),0).toFixed(2);
