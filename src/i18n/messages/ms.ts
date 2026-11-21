@@ -3665,7 +3665,7 @@ export const ms: Messages = {
     statusPaid: "Dibayar",
     statusProvisioning: "Disediakan",
     statusInventory: "Dalam inventori",
-    inventoryToast: "Tukar beli selesai. Peranti baharu anda dalam inventori dan boleh diaktifkan dari Inventori peranti.",
+    inventoryToast: "Peranti anda dalam inventori dan boleh diaktifkan dari Inventori peranti.",
     statusActivated: "Diaktifkan",
     statusPaymentFailed: "Bayaran gagal",
     statusExpired: "Bayaran tamat tempoh",

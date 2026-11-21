@@ -3665,7 +3665,7 @@ export const uz: Messages = {
     statusPaid: "Toʻlandi",
     statusProvisioning: "Sozlanmoqda",
     statusInventory: "Omborda",
-    inventoryToast: "Almashtirish yakunlandi. Yangi qurilmangiz omborda, uni Qurilmalar omboridan faollashtirish mumkin.",
+    inventoryToast: "Qurilmangiz omborda, uni Qurilmalar omboridan faollashtirish mumkin.",
     statusActivated: "Faollashtirildi",
     statusPaymentFailed: "Toʻlov amalga oshmadi",
     statusExpired: "Toʻlov muddati tugadi",

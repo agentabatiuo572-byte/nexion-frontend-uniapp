@@ -3665,7 +3665,7 @@ export const ru: Messages = {
     statusPaid: "Оплачен",
     statusProvisioning: "Размещение",
     statusInventory: "На складе",
-    inventoryToast: "Трейд-ин завершён. Новое устройство на складе — его можно активировать на складе устройств.",
+    inventoryToast: "Устройство на складе — его можно активировать на складе устройств.",
     statusActivated: "Активирован",
     statusPaymentFailed: "Сбой оплаты",
     statusExpired: "Истёк срок",
