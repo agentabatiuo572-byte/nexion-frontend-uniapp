@@ -7,7 +7,7 @@
   <view v-if="sheetOpen" class="pp-mask nx-sheet-fade-in" @click.self="payment.close">
     <view id="pp-sheet" class="pp-sheet nx-glass-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="sheetTitle">
       <view class="pp-head">
-        <view v-if="s.step !== 'methods'" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
+        <view v-if="s.step !== 'methods' && !s.originalRecovery" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
         </view>
         <view class="pp-head__text">
@@ -64,8 +64,8 @@
         <template v-else-if="s.step === 'network'">
           <text class="pp-label">{{ copy.networkLabel }}</text>
           <view class="pp-tabs" role="radiogroup" :aria-label="copy.networkLabel" @keydown.right.prevent="moveFocus($event, 1, true)" @keydown.down.prevent="moveFocus($event, 1, true)" @keydown.left.prevent="moveFocus($event, -1, true)" @keydown.up.prevent="moveFocus($event, -1, true)">
-            <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id }" role="radio" :tabindex="s.method === tab.id ? 0 : -1"
-              :aria-checked="s.method === tab.id" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
+            <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id }" role="radio" :tabindex="!s.originalRecovery && s.method === tab.id ? 0 : -1"
+              :aria-disabled="!!s.originalRecovery" :aria-checked="s.method === tab.id" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
               <text class="pp-tab__a">{{ tab.title }}</text><text class="pp-tab__b">{{ tab.chain }}</text>
             </view>
           </view>
@@ -88,9 +88,9 @@
         </view>
         <template v-if="s.step !== 'methods'">
           <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_TRC20' ? copy.gasTrc20 : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
-          <view v-if="s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying }" aria-hidden="true" /><text>{{ retryMessage || (s.retrying ? copy.retrying : s.quote && quoteLeft !== null ? fill(copy.quoteValid, { t: clock(quoteLeft) }) : copy.loadingFees) }}</text></view>
+          <view v-if="!s.originalRecovery && (s.quote || s.loading || s.retrying)" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying }" aria-hidden="true" /><text>{{ retryMessage || (s.retrying ? copy.retrying : s.quote && quoteLeft !== null ? fill(copy.quoteValid, { t: clock(quoteLeft) }) : copy.loadingFees) }}</text></view>
         </template>
-        <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="s.step === 'methods' ? !walletEnough : !s.quote || s.loading" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
+        <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="!!s.originalRecovery || (s.step === 'methods' ? !walletEnough : !s.quote || s.loading)" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
       </view>
     </view>
   </view>
@@ -130,12 +130,12 @@
       </view>
     </view>
 
-    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': isBank && !conclusion || networkPaused && s.orderNo }">
+    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': (isBank || s.canResubmit) && !conclusion || networkPaused && s.orderNo }">
       <view class="pp-card pp-hero nx-tint">
         <text class="pp-hero__lab">{{ conclusion ? copy.total : copy.payable }}</text>
         <view class="pp-hero__row">
           <CheckoutAmount class="pp-hero__amt" :value="fees?.totalUsdt ?? null" :currency="isBank ? 'USD' : 'USDT'" />
-          <view v-if="!isBank && !conclusion" class="pp-copy pp-copy--plain" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
+          <view v-if="!isBank && !conclusion && fees" class="pp-copy pp-copy--plain" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
         </view>
@@ -181,8 +181,9 @@
       </view>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30). -->
-    <view v-if="!received && isBank && !conclusion" class="pp-bar nx-glass-bar">
-      <NxButton class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
+    <view v-if="!received && (isBank || s.canResubmit) && !conclusion" class="pp-bar nx-glass-bar">
+      <NxButton v-if="s.canResubmit" class="pp-reopen" :label="copy.retryPay" variant="primary" :busy="s.busy" :disabled="s.reading" @click="payment.retryOriginal" />
+      <NxButton v-else class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
     </view>
     <view v-if="networkPaused && s.orderNo" class="pp-bar nx-glass-bar">
       <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
