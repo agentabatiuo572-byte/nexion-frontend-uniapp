@@ -95,6 +95,7 @@ const scopeId=ref(props.activityId),selection=ref<EntryItem[]>([]),termsOpen=ref
 const {activity,status:contextStatus,available,refresh:refreshContext}=usePromotionContext(scopeId);
 const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'>('idle');
 const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
+const capacityRecheckPending=ref(false);
 const fence=createPromotionReadFence();const visible=ref(true);
 const clockNow=()=>typeof performance!=='undefined'?performance.now():Date.now();
 let quoteReceivedAt=0;let expiryTimer:ReturnType<typeof setInterval>|null=null;
@@ -143,7 +144,7 @@ function invalidate(preserveBlock=false){
   fence.invalidate();
   quote.value=null;
   quoteStatus.value='idle';
-  if(!preserveBlock)quoteBlock.value=null;
+  if(!preserveBlock){quoteBlock.value=null;capacityRecheckPending.value=false;}
 }
 watch(selection,()=>{invalidate();writeAccountRow(storageKey,app.accountKey,{items:selection.value,entryItems:props.initialItems});},{deep:true,flush:'sync'});
 watch([()=>activity.value?.version,()=>locale.code],()=>{invalidate(true);termsOpen.value=false;},{flush:'sync'});
@@ -153,8 +154,10 @@ function remove(productNo:string){selection.value=selection.value.filter(item=>i
 function changeQuantity(productNo:string,delta:number){const item=selection.value.find(entry=>entry.productNo===productNo);if(!item||item.quantity+delta<1||totalUnits.value+delta>100)return;selection.value=selection.value.map(entry=>entry.productNo===productNo?{...entry,quantity:entry.quantity+delta}:entry);}
 function clearScope(){invalidate();void navTo(promotionStoreHref());}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(promotionBundleHref(scopeId.value,selection.value)));}
-async function refreshQuote(){
-  if(!canReadQuote.value||quoteStatus.value==='loading'||(quoteBlock.value&&quoteBlock.value!=='unavailable'))return;
+async function refreshQuote(recheckCapacity=false){
+  const block=quoteBlock.value;
+  if(block&&block!=='unavailable'&&!(recheckCapacity&&block==='capacity'))return;
+  if(!canReadQuote.value||quoteStatus.value==='loading')return;
   const ticket=fence.next(),identity=`${app.accountKey}:${app.accountBindingEpoch}`,chosen=selection.value.map(item=>({...item}));
   quote.value=null;quoteStatus.value='loading';
   try{
@@ -189,8 +192,17 @@ function continueCheckout(){
   if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
 }
 onMounted(()=>{expiryTimer=setInterval(()=>{if(quote.value&&!freshQuote())invalidate();},1000);});
-onHide(()=>{visible.value=false;invalidate(true);termsOpen.value=false;});
-onShow(()=>{visible.value=true;invalidate(true);});
+onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;});
+onShow(()=>{
+  const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
+  visible.value=true;invalidate(true);
+  if(recheckCapacity)capacityRecheckPending.value=true;
+});
+watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQuote.value,ready=>{
+  if(!ready)return;
+  capacityRecheckPending.value=false;
+  void refreshQuote(true);
+},{flush:'post'});
 onBeforeUnmount(()=>{visible.value=false;fence.invalidate();if(expiryTimer)clearInterval(expiryTimer);});
 </script>
 <style src="./promotion.css"></style>

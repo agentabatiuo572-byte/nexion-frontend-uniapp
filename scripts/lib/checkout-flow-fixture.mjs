@@ -31,6 +31,20 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
   }
+  function recoverPendingSingle(owner, product, quantity, voucherId, now) {
+    const ownedReceipts = [...orderCreates.values()].filter(entry => entry.owner === owner && entry.receipt?.idSource === 'server');
+    // The fixture inserts newest first. U-21 gives the oldest matching payable order priority.
+    for (const order of [...(state.createdOrders ?? [])].reverse()) {
+      if (order.orderType !== 'SINGLE' || order.promotionQuoteId || order.productNo !== product.id
+          || order.quantity !== quantity || order.subtotalUsdt !== product.price * quantity
+          || order.placedAt <= now - 86_400_000 || order.expiresAt <= now
+          || order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT'
+          || order.activationStatus !== 'WAITING_PAYMENT') continue;
+      const original = ownedReceipts.find(({receipt}) => receipt.orderNo === order.orderNo && receipt.voucherId === voucherId);
+      if (original) return original.receipt;
+    }
+    return null;
+  }
   async function handle(url, request) {
     syncScenario();
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
@@ -72,7 +86,13 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         return ok({...data,status:'SUCCEEDED',order:{orderNo,status:canonicalStatus,canonicalStatus,
           paymentStatus,orderStatus,activationStatus,amountUsdt,placedAt}});
       }
-      const input = request.postDataJSON();
+      let input;
+      try { input = request.postDataJSON(); } catch { input = null; }
+      if (!input || typeof input !== 'object' || Array.isArray(input)
+          || ['orderNo', 'productNo', 'voucherId', 'promotionQuoteId'].some(field => input[field] != null && typeof input[field] !== 'string')
+          || ['productId', 'quantity'].some(field => input[field] != null && !Number.isSafeInteger(input[field]))) {
+        return {status:400,message:'REQUEST_BODY_INVALID',data:null};
+      }
       // Hash the fixed order-create fields within the same owner and key scope as U-21.
       const fingerprint = createHash('sha256').update(JSON.stringify([owner, entry?.key ?? trimmed,
         input.orderNo ?? null, input.productId ?? null, input.productNo ?? null,
@@ -92,7 +112,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         if (state.scenarioEpoch !== originalEpoch || owner !== previewAccountId(state, headers)) {
           return {status:409,message:'PREVIEW_CREATE_SCOPE_CHANGED',data:null};
         }
-        creating.receipt = demoFixture(url,locale(),state,{...request,postDataJSON:()=>input,tracksOrderCreate:true});
+        creating.receipt = demoFixture(url,locale(),state,{...request,postDataJSON:()=>input,tracksOrderCreate:true,
+          recoverPendingSingle:(product,quantity,voucherId,now)=>recoverPendingSingle(owner,product,quantity,voucherId,now)});
         creating.updatedAt = new Date().toISOString();
         return ok(creating.receipt);
       } catch (error) {

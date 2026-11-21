@@ -306,7 +306,7 @@ import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
-import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
+import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
 import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
@@ -2374,9 +2374,12 @@ async function readPendingCheckoutCreate() {
     toast.info(t.value.store.coPendingCreateNotFound);
     if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute());
   } else if (result.status === 'FAILED') {
-    // The rejected command stays recorded server-side. Release its local intent for a fresh explicit submission.
+    // The active key can be released while the original request still owns the B60 readback.
     retireRemoteOrderKey(pending.intent, scope.accountKey, pending.request.idempotencyKey);
-    forgetCheckoutCreate(scope.accountKey, pending);
+    if (!completeFailedCheckoutCreate(scope.accountKey, pending, result)) {
+      await initializeCheckout(beginCheckoutRoute());
+      return;
+    }
     pendingCheckoutCreate.value = null;
     createLookupUnavailable.value = false;
     step.value = 'select-payment';
@@ -2767,8 +2770,8 @@ function refreshVisibleCheckout(retryCatalog = false) {
 }
 
 function showCheckout() {
-  if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
+  if(promotionRoute.value){promotionCheckout.value?.show();return;}
   void freeTrial.refreshVisible();
   refreshVisibleCheckout();
   reassertTradeinContext();
@@ -2792,7 +2795,7 @@ function showCheckout() {
 let checkoutHistoryEntry: { href: string; position: number | undefined } | null = null;
 let checkoutShownFromHistory = false;
 function restoreCheckoutFromHistory() {
-  if (!pageAlive || pageVisible || promotionRoute.value || !checkoutHistoryEntry
+  if (!pageAlive || pageVisible || !checkoutHistoryEntry
       || window.location.href !== checkoutHistoryEntry.href
       || window.history.state?.position !== checkoutHistoryEntry.position
       || !isTopCheckoutPage()) return;
@@ -2817,8 +2820,8 @@ onHide(() => {
   closePaymentSheet();
   purchasePolicyOpen.value = false;
   tradein.hide();
-  if(promotionRoute.value){promotionCheckout.value?.hide();return;}
   pageVisible = false;
+  if(promotionRoute.value){promotionCheckout.value?.hide();return;}
   invalidateCheckoutRoute(true);
   interceptFired = false;
   checkoutCapacityReadFailed.value = false;

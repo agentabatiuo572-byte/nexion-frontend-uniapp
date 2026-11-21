@@ -1059,8 +1059,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       throw Object.assign(new Error('PROMOTION_RESOURCE_NOT_FOUND'),{status:404});
     }
     requireDemoQuoteStock(quoteProducts);
-    requireDemoPurchase(state,products,input.items,now);
-    if(!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
     const items=input.items.map((item,index)=>{
       const product=quoteProducts[index];
       return {...item,lineId:'demo-line-'+index,unitPriceUsdt:product.price.toFixed(2),subtotalUsdt:(product.price*item.quantity).toFixed(2),discountUsdt:'0.00',payableUsdt:(product.price*item.quantity).toFixed(2)};
@@ -1077,10 +1075,12 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         &&(!repurchase||line.quantity>=candidate.minBuyQty));
       return rule?[{line,rule}]:[];
     });
-    if(input.activityId&&(!activity?.activityId
-        ||(repurchase&&(activity.eligibility!=='ESTIMATE_ELIGIBLE'||!matches.length)))){
+    if(input.activityId&&(!activity?.activityId||activity.state!=='ACTIVE'
+        ||activity.eligibility!=='ESTIMATE_ELIGIBLE'||(repurchase&&!matches.length))){
       refuse('PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
     }
+    requireDemoPurchase(state,products,input.items,now);
+    if(!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
     const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
     for(const {line,rule} of matches){
       const {disclosure,...reward}=rule.buyerReward;
@@ -1116,8 +1116,26 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
     const bundle=pathname==='/api/orders/bundle';
+    const quantityRequested=input.quantity??1;
+    let productNo=input.productNo,voucherId=input.voucherId;
+    if(!bundle){
+      if(input.orderNo?.trim())refuse('CLIENT_MINTED_ID_REJECTED');
+      productNo=productNo?.trim();
+      voucherId=voucherId?.trim()||null;
+      const productId=input.productId>0?input.productId:null;
+      if((productId===null&&!productNo)||!Number.isInteger(quantityRequested)||quantityRequested<1||quantityRequested>100){
+        throw Object.assign(new Error('ORDER_PRODUCT_OR_QUANTITY_INVALID'),{status:422});
+      }
+      const product=productId===null?products.find(p=>p.id===productNo):products[productId-1];
+      if(empty||!product||product.price<=0||(productNo&&productNo!==product.id))refuse('PRODUCT_NOT_AVAILABLE');
+      productNo=product.id;
+      if(!input.promotionQuoteId){
+        const original=request.recoverPendingSingle?.(product,quantityRequested,voucherId,now);
+        if(original)return original;
+      }
+    }
     const lines=quote?.items||(bundle&&(input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))))
-      ||[{productNo:input.productNo,quantity:input.quantity??1}];
+      ||[{productNo,quantity:quantityRequested}];
     const lineProducts=lines.map(line=>products.find(p=>p.id===line.productNo)),[product]=lineProducts;
     if(bundle&&(empty||lineProducts.some(p=>!p)))refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
     if(lineProducts.some(p=>!p)||lines.some(line=>!Number.isInteger(line.quantity)||line.quantity<1))throw new Error('Invalid demo order items');
@@ -1131,7 +1149,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
     }
     const quantity=lines.reduce((s,l)=>s+l.quantity,0),subtotal=lines.reduce((s,l)=>s+products.find(p=>p.id===l.productNo).price*l.quantity,0),discountRate=bundleRate(lines.length),bundleDiscount=Number((subtotal*discountRate).toFixed(2));
-    const voucher=demoVoucherRedemption(state,quote?quote.voucherId:input.voucherId,lines,subtotal,now);
+    const voucher=demoVoucherRedemption(state,quote?quote.voucherId:voucherId,lines,subtotal,now);
     if(quote&&quote.voucherGrantId!==voucher?.grantId)refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
     const amount=Number(quote?.amountUsdt??(subtotal-bundleDiscount-(voucher?.discountUsdt??0)).toFixed(2));
     if(bundle){
@@ -1149,7 +1167,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       Object.assign(order,{voucherId:voucher.voucherId,voucherRedemption:voucher});
     }
     state.createdOrders||=[];state.createdOrders.unshift(order);
-    const response=quote?order:input.productNos?{orderNo:order.orderNo,orderType:'BUNDLE',itemCount:lines.length,productNos:input.productNos,subtotalUsdt:subtotal,discountRate,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server',policyVersion:1}:{orderNo:order.orderNo,subtotalUsdt:subtotal,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,voucherId:order.voucherId||null,voucherRedemption:order.voucherRedemption??null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server'};
+    const response=quote?order:bundle&&input.productNos?{orderNo:order.orderNo,orderType:'BUNDLE',itemCount:lines.length,productNos:input.productNos,subtotalUsdt:subtotal,discountRate,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server',policyVersion:1}:{orderNo:order.orderNo,subtotalUsdt:subtotal,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:amount,voucherId:order.voucherId||null,voucherRedemption:order.voucherRedemption??null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',idSource:'server'};
     // The checkout fixture owns ordinary create replay. Promotion readback still needs its receipt.
     if(request.tracksOrderCreate&&!quote)return response;
     return remember(lines.length>1?'createBundle':'createOrder',quote?.quoteId||order.orderNo,response,order);
