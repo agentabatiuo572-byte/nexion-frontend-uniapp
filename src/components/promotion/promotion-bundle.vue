@@ -25,7 +25,7 @@
               <view role="button" :aria-label="t.uiChrome.increaseQty" :tabindex="totalUnits>=100?-1:0" :aria-disabled="totalUnits>=100" @click="changeQuantity(item.productNo,1)"><NxIcon name="plus" /></view>
             </view>
           </view>
-          <view class="bundle-remove" role="button" tabindex="0" :aria-label="t.promotion.removeSelection+' · '+nameFor(item.productNo)" @click="remove(item.productNo)">×</view>
+          <view class="bundle-remove" role="button" tabindex="0" :aria-label="t.promotion.removeSelection+' · '+nameFor(item.productNo)" @click="remove(item.productNo)"><NxIcon name="close" :size="20" /></view>
         </view>
       </view>
     </view>
@@ -42,12 +42,11 @@
       <text class="promotion-title">{{ t.promotion.expected }}</text>
       <text v-if="quoteStatus==='loading'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
       <text v-else-if="quoteStatus==='error'||quoteStatus==='unavailable'" class="promotion-copy" role="alert">{{ t.promotion.errorNote }}</text>
-      <text v-else-if="!quote&&quoteStatus!=='outOfStock'" class="promotion-copy">{{ t.promotion.awaitingQuote }}</text>
       <template v-if="quote">
         <RewardRows :expected="quote.expectedRewards" :lines="quote.items" />
         <text v-for="(warning,index) in quote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text>
         <view class="promotion-summary"><text>{{ t.promotion.subtotal }}</text><CheckoutAmount :value="quote.subtotalUsdt" currency="USD" /></view>
-        <view class="promotion-summary"><text>{{ t.promotion.discount }}</text><CheckoutAmount :value="quote.discountUsdt" currency="USD" /></view>
+        <view class="promotion-summary"><text>{{ t.promotion.discount }}</text><text class="bundle-discount">{{ formatCheckoutReviewAmount(quote.discountUsdt,'USD',{discount:true}) }}</text></view>
         <view class="promotion-summary total"><text>{{ t.promotion.total }}</text><CheckoutAmount :value="quote.amountUsdt" currency="USD" /></view>
       </template>
       <text class="promotion-copy">{{ t.promotion.rewardNote }}</text>
@@ -68,6 +67,7 @@
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
+import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
@@ -164,7 +164,7 @@ async function refreshQuote(){
 // Display-only hand-off to the page's bottom action tray (pages/store/bundle.vue #pageFixed); the reason a disabled
 // primary has sits above it there (03 §3.1, 04 §4.0).
 const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
-  note:quoteStatus.value==='outOfStock'?t.value.store.temporarilyOutOfStock:selection.value.length<2?t.value.promotion.selectTwo:quote.value&&quote.value.eligibility!=='ELIGIBLE'?t.value.promotion.disabledNote:'',
+  note:quoteStatus.value==='outOfStock'?t.value.store.temporarilyOutOfStock:selection.value.length<2?t.value.promotion.selectTwo:quote.value&&quote.value.eligibility!=='ELIGIBLE'?t.value.promotion.disabledNote:signedIn.value&&!quote.value&&quoteStatus.value==='idle'?t.value.promotion.awaitingQuote:'',
   signedIn:signedIn.value,canQuote:canQuote.value,canContinue:canContinue.value,quote:refreshQuote,continue:continueCheckout,signIn,
 });
 defineExpose({footer});
@@ -188,6 +188,8 @@ onBeforeUnmount(()=>{visible=false;fence.invalidate();if(expiryTimer)clearInterv
 .promotion-action text { position:relative;z-index:1; }
 @media(max-width:340px){.promotion-image{width:52px;height:52px}.promotion-row{gap:9px}}
 /* Entries to the next layer are text links: 13/18, 500, secondary ink with a trailing chevron (03 §3.1, §3.9). */
+/* Same discount format as the checkout summary that follows: minus sign, brand, tabular figures. */
+.bundle-discount { color:var(--v5-brand); font-variant-numeric:tabular-nums; }
 .bundle-link { align-self:flex-start; color:var(--v5-ink-3); font:500 13px/18px var(--font-v5); }
 /* Same rows and widths as the tray (12px page sides vs 16 here); the page already ends 20 (gap) + 28 + 40 below the
    last link, so this adds the rest of tray + 22 + 16 (04 §4.0). */
