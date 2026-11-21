@@ -3393,7 +3393,7 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-fees { padding:6px 0; }
 .checkout-fee { gap:var(--v5-space-4); min-height:40px; padding:6px 16px; }
 .checkout-fee :deep(uni-text),.checkout-fee :deep(text) { font-size:14px !important; line-height:20px; }
-.checkout-fee :deep(.tabular-nums) { text-align:right; flex-shrink:0; max-width:65%; overflow-wrap:anywhere; }
+.checkout-fee :deep(.tabular-nums) { text-align:right; flex-shrink:0; max-width:65%; overflow-wrap:break-word; }
 .checkout-fee--discount :deep(.tabular-nums) { color:var(--v5-brand) !important; }
 .checkout-fee--total { margin-top:var(--v5-space-1); padding-block:12px; min-height:55px; box-sizing:border-box; border-top:1px solid var(--v5-border); }
 .checkout-fee--total > text,.checkout-fee--total > uni-text { font-weight:600; }
@@ -3413,7 +3413,7 @@ button.checkout-policy-link { display:block; width:100%; min-height:44px; margin
 .checkout-policy-notice > button.checkout-policy-link { text-align:center; }
 button.checkout-policy-link::after { border:0; }
 .checkout-policy-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
-.checkout-policy-body { color:var(--v5-ink-2); font:400 14px/22px var(--font-v5); overflow-wrap:anywhere; }
+.checkout-policy-body { color:var(--v5-ink-2); font:400 14px/22px var(--font-v5); overflow-wrap:break-word; }
 .checkout-policy-section { display:block; margin-bottom:var(--v5-space-5); }
 .checkout-policy-title { display:block; margin-bottom:6px; color:var(--v5-ink); font-weight:600; }
 .checkout-policy-links { border-top:1px solid var(--v5-border); }
