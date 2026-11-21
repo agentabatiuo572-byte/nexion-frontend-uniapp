@@ -231,15 +231,20 @@ function requireDemoMonthlyQuota(policy) {
   if(policy.decisionCode==='F4B_MONTHLY_QUOTA_EXHAUSTED')refuse('ORDER_MONTHLY_QUOTA_EXHAUSTED');
 }
 
-export function requireDemoExternalPaymentQuota(state,products,items,now,reserve=false) {
+export function requireDemoExternalPaymentQuota(state,products,items,now) {
   const product=products.find(row=>row.id===approvedQuotaSku);
   const quantity=state.quotaState==='approved'&&product
     ? items.filter(item=>item.productNo===product.id).reduce((sum,item)=>sum+item.quantity,0) : 0;
   if(quantity>0){
+    if(state.quotaPaused)refuse('ORDER_MONTHLY_QUOTA_PAUSED');
     const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
     requireDemoMonthlyQuota(demoSkuPurchaseRules(state,product,points,now,quantity).policies[1]);
   }
-  if(!reserve||state.quotaHoldMode==='legacy-live-quota')return null;
+  return quantity;
+}
+
+export function reserveDemoPaymentQuotaHold(state,now,quantity) {
+  if(state.quotaHoldMode==='legacy-live-quota')return null;
   // Even a purchase without a configured tier captures the decision made at intent creation.
   const hold={at:now,quantity};
   if(!demoPaymentQuotaHolds.has(state))demoPaymentQuotaHolds.set(state,new Set());
@@ -249,15 +254,6 @@ export function requireDemoExternalPaymentQuota(state,products,items,now,reserve
 
 export function removeDemoPaymentQuotaHold(state,hold) {
   demoPaymentQuotaHolds.get(state)?.delete(hold);
-}
-
-export function requireDemoExternalOrderGate(products,items) {
-  for(const {productNo} of items){
-    const product=products.find(row=>row.id===productNo);
-    if(!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
-    const e1=demoE1PurchaseRule(product);
-    if(!e1.eligible)refuse(e1.decisionCode);
-  }
 }
 
 export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null) {
@@ -856,7 +852,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   };
   const tradeinTargetReason=product=>{
     if(!product||product.productType!=='DEVICE')return 'TARGET_NOT_ACTIVE';
-    if(product.stock<1)return 'TARGET_OUT_OF_STOCK';
+    if(product.stock<1){
+      if(request.externalPurchasePricing)throw Object.assign(new Error('PURCHASE_GATE_SOLD_OUT'),{status:403});
+      return 'TARGET_OUT_OF_STOCK';
+    }
     if(!product.available)return 'TARGET_NOT_RELEASED';
     return null;
   };

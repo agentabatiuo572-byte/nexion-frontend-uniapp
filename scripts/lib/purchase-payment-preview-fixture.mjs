@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoFixture,demoFleetFacts,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoPurchase,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
 import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
 import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
@@ -77,6 +77,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const quotaItems = (subject, payload, order) => subject.kind === 'ORDER_PAY'
     ? order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity}))
     : [{productNo: subject.kind === 'TRIAL_CONVERT' ? payload.productNo : subject.targetProductNo, quantity: 1}];
+  function requirePurchase(products, items, order, now) {
+    const quantity = requireDemoExternalPaymentQuota(state, products, items, now);
+    if (order) requireDemoPurchase(state, products, items, now);
+    return quantity;
+  }
   // The account's one order list.
   const ordersOf = origin => demoAccountOrders(new URL(origin), locale(), state);
   // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
@@ -290,8 +295,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const now = Date.now(), deadline = order ? Number(order.expiresAt) : now + paymentWindow;
       if (deadline <= now) return refused(409, 'ORDER_PAYMENT_EXPIRED');
       const items = quotaItems(subject, payload, order);
-      requireDemoExternalPaymentQuota(state, products, items, now);
-      if (order) requireDemoPurchase(state, products, items, now);
+      requirePurchase(products, items, order, now);
       const adjustment = Number(BigInt(subtotal) * 10000n - micros) / 1000000;
       const channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
       if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};
@@ -326,8 +330,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const amount = trial ? trial.quote.amountUsdt : order?.amountUsdt ?? replacementPrice(url, request, subject, source.payload);
       if (Number(amount).toFixed(6) !== source.quote.businessAmountUsdt) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       const products = demoProducts(state, url.origin), items = quotaItems(subject, source.payload, order), now = Date.now();
-      if (order) requireDemoExternalOrderGate(products, items);
-      const quotaHold = requireDemoExternalPaymentQuota(state, products, items, now, true);
+      const quantity = requirePurchase(products, items, order, now);
+      const quotaHold = reserveDemoPaymentQuotaHold(state, now, quantity);
       const intentNo = `PPI-PREVIEW-${++sequence}`;
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
       const intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
