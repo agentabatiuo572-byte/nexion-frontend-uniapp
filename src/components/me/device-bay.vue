@@ -2,11 +2,11 @@
 <template>
   <view class="device-bay" :class="{ 'device-bay--online': online }" role="button" tabindex="0" :aria-label="label" @click="emit('open')">
     <view class="device-bay__led" :class="{ 'device-bay__led--off': !online }" aria-hidden="true" />
-    <text v-if="badge" class="device-bay__badge">{{ badge }}</text>
     <view class="device-bay__art" aria-hidden="true">
       <image v-if="src" class="device-bay__image" :src="src" mode="aspectFit" @error="imageError" />
       <view class="device-bay__floor" />
     </view>
+    <NxTag v-if="badge" class="device-bay__badge" tone="brand">{{ badge }}</NxTag>
     <text class="device-bay__name">{{ name }}</text>
     <view v-if="online" class="device-bay__strip" aria-hidden="true"><view /></view>
   </view>
@@ -14,6 +14,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import type { Device } from "@/store/types";
 import { useDeviceProductImage } from "@/composables/use-device-product-image";
 
@@ -30,8 +31,9 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 .device-bay--online::before { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 55% at 50% 58%, color-mix(in srgb, var(--v5-success) 15%, transparent), transparent 72%); }
 .device-bay__led { position: absolute; z-index: 1; top: 10px; left: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success); }
 .device-bay__led--off { background: var(--v5-ink-4); animation: none; }
-.device-bay__badge { position: absolute; z-index: 1; top: 8px; right: 8px; padding: 1px 5px; border-radius: 6px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 10px/14px var(--font-v5); }
-.device-bay__art { position: relative; flex: none; width: 80px; height: 62px; }
+/* The trial tag (NxTag, 03 §3.8) sits under the art, never over it, so the device keeps its full 80px (04 §4.2). */
+.device-bay__badge { position: relative; z-index: 1; margin-top: 8px; max-width: 100%; }
+.device-bay__art { position: relative; flex: none; width: 80px; max-width: 100%; height: 62px; }
 .device-bay__image { display: block; width: 100%; height: 100%; }
 .device-bay__floor { position: absolute; left: 20%; right: 20%; bottom: -3px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
 [data-theme="light"] .device-bay__floor { background: radial-gradient(closest-side, rgba(20,16,8,.20), transparent); }
@@ -44,5 +46,7 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 @keyframes device-bay-flow { from { transform: translateX(-110%); } to { transform: translateX(290%); } }
 /* Paused while the warehouse stage is off-screen (its LoopScope), the page is hidden, or the chassis scrolls. */
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .device-bay__strip > view { animation-play-state: paused; }
+/* At 360 a bay cell is about 91px wide: narrower sides keep the 80px art inside the bay. */
+@media (max-width: 374px) { .device-bay { padding-inline: 4px; } }
 @media (prefers-reduced-motion: reduce) { .device-bay, .device-bay__strip > view { animation: none; } }
 </style>
