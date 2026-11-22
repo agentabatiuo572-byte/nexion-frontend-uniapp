@@ -1,7 +1,8 @@
-/** Genesis prices accept six decimals; keep cents padding without hiding a valid price. */
+import { formatGroupedAmount } from "./amount-display";
+/** Genesis prices accept six decimals; keep cents padding without hiding a valid price, thousands grouped (06 §6.2). */
 export function formatGenesisPrice(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value) || value < 0) return "-";
-  return value.toFixed(6).replace(/(\.\d{2}\d*?)0+$/, "$1");
+  return formatGroupedAmount(value, 6);
 }
 
 export type GenesisFloorDeltaState = "unavailable" | "up" | "down" | "flat";

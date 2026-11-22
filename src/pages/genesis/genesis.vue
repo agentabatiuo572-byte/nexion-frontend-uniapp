@@ -41,10 +41,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
-function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
-  return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
-}
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
