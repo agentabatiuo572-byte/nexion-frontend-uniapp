@@ -24,8 +24,8 @@
         <view class="device-inventory-row__task-name"><text class="device-inventory-row__label">{{ t.earn.currentTask }}</text><text class="device-inventory-row__task-value">{{ visibility.mask(device.currentTask.type) }}</text></view>
         <text class="device-inventory-row__pct font-mono-tabular">{{ visibility.mask(progressPct == null ? '—' : `${progressPct}%`) }}</text>
       </view>
-      <view class="device-inventory-row__bar" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
-        <view v-if="!visibility.hidden && progressPct != null" class="device-inventory-row__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
+      <view class="device-inventory-row__bar nx-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
+        <view v-if="!visibility.hidden && progressPct != null" class="device-inventory-row__fill nx-progress__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
       </view>
     </view>
     <view v-else-if="active && (!remoteApiEnabled || device.kind !== 'phone')" class="device-inventory-row__task device-inventory-row__task--idle">
@@ -226,8 +226,8 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__task-value { overflow-wrap: break-word; }
 .device-inventory-row__task-name .device-inventory-row__label { margin-right: 6px; }
 .device-inventory-row__pct { font: 500 12px/16px var(--font-metric, var(--font-jet-mono)); }
-.device-inventory-row__bar { position: relative; height: 4px; margin-top: 10px; overflow: hidden; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); }
-.device-inventory-row__fill { height: 100%; border-radius: inherit; background: var(--v5-brand); transition: width .6s linear; }
+.device-inventory-row__bar { margin-top: 10px; }
+.device-inventory-row__fill { transition: width .6s linear; }
 .device-inventory-row__task--idle { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .device-inventory-row__wait { width: 14px; height: 14px; flex: none; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed var(--v5-ink-3); }
 .device-inventory-row__pending { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
