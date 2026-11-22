@@ -151,12 +151,19 @@ function scene(state,now) {
   const candidates=['joined','claimable','claimed'].includes(mode)
     ? joinedPresetEvents : mode==='mixed'?['invite']:[];
   const spins=mode==='ended'&&state.wheelState==='open'?[{result:wheelAward(now-2*day,'DAILY',[],true),at:now-2*day,historyOnly:true}]:[];
-  const record=state.h4Events={at:now,joined:[],spins,reminders:[],claimsByOwner:{}};
-  record.joined=candidates.filter(code=>eventWindow(code,state,now).state!=='upcoming');
+  const record=state.h4Events={at:now,joinedByOwner:{},spins,remindersByOwner:{},claimsByOwner:{}};
+  const joined=candidates.filter(code=>eventWindow(code,state,now).state!=='upcoming');
+  if(joined.length)record.joinedByOwner[presetOwner(state)]=joined;
   return record;
 }
 
 const claimsForOwner=(record,owner)=>owner ? record?.claimsByOwner?.[owner] : undefined;
+// Joins and reminders belong to the signed-in account, as claims and receipts do. Presets and older saved scenes,
+// which kept one list for everyone, belong to the account the preview has selected.
+const presetOwner=state=>previewSelectedAccountId(state)??demoAccountId;
+const joinedFor=(record,owner)=>owner ? record?.joinedByOwner?.[owner]??[] : [];
+const remindersFor=(record,owner)=>owner ? record?.remindersByOwner?.[owner]??[] : [];
+const addFor=(byOwner,owner,code)=>{const list=byOwner[owner]??=[];if(!list.includes(code))list.push(code);};
 
 export function setDemoH4Scene(state,now) {
   delete state.h4Events;
@@ -167,9 +174,15 @@ export function initializeDemoH4State(state,now=Date.now()) {
   // An imported scene uses saved evidence. The panel can still explicitly
   // supply sample spins, referrals and receipts by selecting a new scene.
   const restoreJoinedPreset=!state.h4Events&&state.eventState==='joined';
-  const record=state.h4Events??={at:now,joined:
-    state.eventState==='mixed'&&!state.eventStatuses?.['demo-invite']?['invite']:[],
-    spins:[],reminders:[],claimsByOwner:{},sampleInvites:false};
+  const record=state.h4Events??={at:now,joinedByOwner:
+    state.eventState==='mixed'&&!state.eventStatuses?.['demo-invite']?{[presetOwner(state)]:['invite']}:{},
+    spins:[],remindersByOwner:{},claimsByOwner:{},sampleInvites:false};
+  if(!record.joinedByOwner||!record.remindersByOwner){
+    record.joinedByOwner=record.joined?.length?{[presetOwner(state)]:record.joined}:{};
+    record.remindersByOwner=record.reminders?.length?{[presetOwner(state)]:record.reminders}:{};
+    delete record.joined;
+    delete record.reminders;
+  }
   if(!record.claimsByOwner){
     // Preserve the old canned gift for the default account. Old keyed claims used a shared award and lack reliable ownership.
     const preset=record.claims?.invite;
@@ -184,8 +197,8 @@ export function initializeDemoH4State(state,now=Date.now()) {
   for(const [code] of events){
     const status=state.eventStatuses?.['demo-'+code];
     const joined=status==='JOINED'||restoreJoinedPreset&&joinedPresetEvents.includes(code);
-    if(joined&&eventWindow(code,state,now).state!=='upcoming'&&!record.joined.includes(code))record.joined.push(code);
-    if(state.reminders?.includes('demo-'+code)&&!record.reminders.includes(code))record.reminders.push(code);
+    if(joined&&eventWindow(code,state,now).state!=='upcoming')addFor(record.joinedByOwner,presetOwner(state),code);
+    if(state.reminders?.includes('demo-'+code))addFor(record.remindersByOwner,presetOwner(state),code);
   }
   // An open legacy scene saved no start time. Its dated spins still anchor
   // that window, but a scheduled wheel has a start and cannot award earlier.
@@ -307,8 +320,8 @@ export function demoH4PromotionWindow(state,now) {
 export function setDemoH4PromotionTiming(state,now) {
   state.promotionTimingAt=now;
   const record=state.h4Events;
-  if(record?.joined.includes('upgrade')&&demoH4PromotionWindow(state,now).state==='upcoming'){
-    record.joined=record.joined.filter(code=>code!=='upgrade');
+  if(record&&demoH4PromotionWindow(state,now).state==='upcoming'){
+    for(const [owner,joined] of Object.entries(record.joinedByOwner??{}))record.joinedByOwner[owner]=joined.filter(code=>code!=='upgrade');
   }
 }
 
@@ -389,7 +402,7 @@ function project(entry,locale,state,now,owner) {
   }
   const claimed=!!claimsForOwner(record,owner)?.[code];
   const userStatus=claimed?'CLAIMED':qualified?'CLAIMABLE'
-    :spun||started&&record.joined.includes(code)?'JOINED':'AVAILABLE';
+    :spun||started&&joinedFor(record,owner).includes(code)?'JOINED':'AVAILABLE';
   const eligible=userStatus==='CLAIMABLE'||ongoing&&!rules.voucherId&&(kind!=='onboarding'||inWindow);
   return {code,rules,eligible,event:{
     eventCode:'demo-'+code,kind,state:window.state,title:localized(locale,zh,en,vi),
@@ -498,17 +511,17 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
       : localized(locale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.');
     return {event,rules:code==='weekend'?rules:{...rules,description:event.subtitle,terms},enabled:true,eligible,eligibilityReason,
       progressValue:event.progressValue,targetValue:event.targetValue,rewards:rewards(rules),results:[],myRewardAmount:null,
-      userStatus:event.userStatus,claimKeys,voucher,reminderSubscribed:record.reminders.includes(code)};
+      userStatus:event.userStatus,claimKeys,voucher,reminderSubscribed:remindersFor(record,owner).includes(code)};
   }
   if(commandOperations.includes(action))return recordEventCommand(record,eventCommandReceiptKey(owner,id,action,commandKey),action,request.delayedEvent?.receipt,()=>{
     if(action==='join'){
       if(!ongoing)reject('EVENT_NOT_OPEN');
-      if(!record.joined.includes(code))record.joined.push(code);
+      addFor(record.joinedByOwner,owner,code);
       return {eventId:id,status:'JOINED'};
     }
     if(action==='reminder'){
       if(event.state!=='upcoming')reject('EVENT_REMINDER_NOT_AVAILABLE');
-      if(!record.reminders.includes(code))record.reminders.push(code);
+      addFor(record.remindersByOwner,owner,code);
       return {eventId:id,status:'SUBSCRIBED'};
     }
     const previous=claimsForOwner(record,owner)?.[code];
