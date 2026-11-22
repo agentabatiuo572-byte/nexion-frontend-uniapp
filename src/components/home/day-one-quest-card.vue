@@ -40,7 +40,7 @@
         <view class="newcomer-task__progress-copy" style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
           <text v-if="questUnavailable" style="color: var(--v5-ink-4)">{{ unavailableLabel }}</text>
           <template v-else>
-            <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ visibility.mask(completedCount) }}</text> / {{ visibility.mask(total) }} {{ t.home.dayOneDoneSuffix }}<text v-if="missionLayout && !claimState.claimed && !claimState.unverified"> · {{ t.home.dayOneCompleteAllHint }}</text></text>
+            <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ visibility.mask(completedCount) }}</text> / {{ visibility.mask(total) }} {{ t.home.dayOneDoneSuffix }}<text v-if="missionLayout && !claimState.claimed && !claimState.unverified && !dayOneExpired"> · {{ t.home.dayOneCompleteAllHint }}</text></text>
             <text v-if="remoteApiEnabled" style="color: var(--v5-nex)">{{ claimState.empty ? t.home.dayOneNoActiveTasks : claimState.claimed ? t.home.dayOneRewardClaimed : claimState.unverified ? t.home.dayOneSnapshotUnverified : t.home.dayOneRewardUnclaimed }}</text>
             <text v-else style="color: var(--v5-nex); font-variant-numeric: tabular-nums">{{ visibility.mask(nexEarnedText === "—" ? "—" : `+${nexEarnedText}`) }} {{ t.home.dayOneEarnedSuffix }}</text>
           </template>
@@ -374,7 +374,8 @@ function labelStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: props.missionLayout ? "15px" : "var(--ui-type-list-subtitle)",
+    fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
+    lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
     color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
