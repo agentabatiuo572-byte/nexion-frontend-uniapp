@@ -40,7 +40,7 @@
         <view class="newcomer-task__progress-copy" style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
           <text v-if="questUnavailable" style="color: var(--v5-ink-4)">{{ unavailableLabel }}</text>
           <template v-else>
-            <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ visibility.mask(completedCount) }}</text> / {{ visibility.mask(total) }} {{ t.home.dayOneDoneSuffix }}<text v-if="missionLayout && !claimState.claimed && !claimState.unverified"> · {{ t.home.dayOneCompleteAllHint }}</text></text>
+            <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ visibility.mask(completedCount) }}</text> / {{ visibility.mask(total) }} {{ t.home.dayOneDoneSuffix }}<text v-if="missionLayout && !claimState.claimed && !claimState.unverified && !dayOneExpired"> · {{ t.home.dayOneCompleteAllHint }}</text></text>
             <text v-if="remoteApiEnabled" style="color: var(--v5-nex)">{{ claimState.empty ? t.home.dayOneNoActiveTasks : claimState.claimed ? t.home.dayOneRewardClaimed : claimState.unverified ? t.home.dayOneSnapshotUnverified : t.home.dayOneRewardUnclaimed }}</text>
             <text v-else style="color: var(--v5-nex); font-variant-numeric: tabular-nums">{{ visibility.mask(nexEarnedText === "—" ? "—" : `+${nexEarnedText}`) }} {{ t.home.dayOneEarnedSuffix }}</text>
           </template>
@@ -86,11 +86,15 @@
         </view>
       </view>
       <!-- Lite: tasks the web cannot do stay in the list; finishing them needs the App. -->
+      <!-- 03 §3.6.1: the action sits beside a short note and drops to the bottom-right corner under a long one, the note
+           using the full width above it (a float pushed to the bottom; CSS only, no per-language rules). -->
       <view v-if="expanded && appOnlyPending" class="nx-card-footer newcomer-task__app">
-        <text class="nx-card-footer__note" :style="{ flexBasis: appNoteBasis }">{{ t.home.dayOneAppOnlyNote }}</text>
-        <view v-if="appDownloadHref" class="nx-card-action" role="link" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
-          @click="openAppDownload" @keydown.enter.prevent="openAppDownload">
-          <text class="nx-after-external">{{ t.home.dayOneAppDownload }}</text>
+        <view class="newcomer-task__app-copy">
+          <view v-if="appDownloadHref" class="nx-card-action" role="link" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
+            @click="openAppDownload" @keydown.enter.prevent="openAppDownload">
+            <text class="nx-after-external">{{ t.home.dayOneAppDownload }}</text>
+          </view>
+          <text class="nx-card-footer__note">{{ t.home.dayOneAppOnlyNote }}</text>
         </view>
       </view>
     </view>
@@ -339,12 +343,6 @@ function isActionable(task: QuestTask) {
 
 const appOnlyPending = computed(() => !dayOneExpired.value && tasks.value.some((task) => task.appOnly && task.eligible && !isDone(task)));
 const appDownloadHref = computed(() => appDownloadUrl(stakingDisplay.config.share.appDownload.officialUrl));
-// Half the note's length as its basis: the action stays beside a note of up to two lines and wraps below a longer one (03 §3.6.1).
-const appNoteBasis = computed(() => {
-  let em = 0;
-  for (const ch of t.value.home.dayOneAppOnlyNote) em += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 1 : 0.55;
-  return `${(em / 2).toFixed(1)}em`;
-});
 function openAppDownload() {
   if (!props.active || !appDownloadHref.value) return;
   window.location.assign(appDownloadHref.value);
@@ -402,7 +400,8 @@ function labelStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: props.missionLayout ? "15px" : "var(--ui-type-list-subtitle)",
+    fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
+    lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
     color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
@@ -461,7 +460,12 @@ const toggleStyle: CSSProperties = {
 </script>
 
 <style scoped>
-.newcomer-task__app { margin-top: var(--v5-space-3); }
+.newcomer-task__app { margin-top: var(--v5-space-3); align-items: stretch; }
+.newcomer-task__app-copy { flex: 1 1 auto; min-width: 0; }
+/* Spacer as tall as the copy minus one action line: the action float below it lands in the bottom-right corner. */
+.newcomer-task__app-copy::before { content: ""; float: right; height: 100%; margin-bottom: -20px; }
+.newcomer-task__app-copy > .nx-card-action { float: right; clear: right; margin-left: 12px; }
+.newcomer-task__app-copy > .nx-card-footer__note { display: block; }
 .newcomer-task__app-name { min-width: 0; overflow-wrap: break-word; }
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
