@@ -1148,7 +1148,15 @@ async function toggleTwoFactor(value: boolean, resend = false) {
       twoFactorPasswordFocus.value = true;
     // Any other failed send is an operation failure: one toast above the sheet (03 §3.5.1). The sheet stays open with
     // the password kept, so 确认 sends the code again.
-    } else toast.error(securityErrorMessage(cause));
+    } else {
+      // A failed resend may already have retired the earlier code on the server (it is invalidated before the new one
+      // goes out), so the field stops treating it as valid: it reads expired and resend stays open.
+      if (resend && twoFactorChallengeNo.value) {
+        twoFactorValidUntil = Date.now();
+        tickTwoFactorTimers();
+      }
+      toast.error(securityErrorMessage(cause));
+    }
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }

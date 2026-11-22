@@ -212,6 +212,8 @@ export function installBrowserBackGuard(): void {
   browserBackGuarded = true;
   currentMarker = markerOf(history.state);
   currentPosition = positionOf(history.state);
+  // A reload restarts the counter while the history still holds this tab's earlier markers: new ids start above them.
+  entrySeq = Math.max(entrySeq, currentMarker ?? 0);
   // Every entry the router or a layer pushes or replaces tells us whether the browser now sits on a layer entry.
   const push = history.pushState.bind(history), replace = history.replaceState.bind(history);
   history.pushState = (state, title, url) => { push(state, title, url); currentMarker = markerOf(state); currentPosition = positionOf(state); };
@@ -236,6 +238,7 @@ export function installBrowserBackGuard(): void {
     const landed = markerOf(ev.state), landedPosition = positionOf(ev.state);
     currentMarker = landed;
     currentPosition = landedPosition;
+    entrySeq = Math.max(entrySeq, landed ?? 0);
     if (ignoredPops.length) {
       const expected = ignoredPops.shift();
       ev.stopImmediatePropagation();
