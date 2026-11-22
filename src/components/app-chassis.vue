@@ -152,7 +152,7 @@
       <TrialClaimSheet />
       <VoucherClaimSheet />
       <SlotActionSheet />
-      <TradeinSheets :active="pageVisible && hostVisible" />
+      <TradeinSheets :active="pageVisible && hostVisible" :checkout-capacity-target="checkoutCapacityTarget" @checkout-capacity-cleared="emit('checkout-capacity-cleared', $event)" />
       <LuckySpinSheet />
       <StickyCtaBar />
       <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
@@ -167,7 +167,8 @@
 
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
-import { ref, computed, watch, onMounted, onUnmounted, provide, getCurrentInstance } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, inject, provide, getCurrentInstance } from "vue";
+import { checkoutKeepResumeKey, reportCheckoutKeepResumeKey } from "@/components/checkout/checkout-keep-resume";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
 // #ifdef APP-PLUS
@@ -243,9 +244,19 @@ const props = withDefaults(defineProps<{
   hostVisible?: boolean;
   navCapsule?: boolean;
   scrollLoadKey?: string;
+  checkoutCapacityTarget?: string | null;
 }>(), { hostVisible: true });
 
-const emit = defineEmits<{ (event: "scroll-load-more"): void }>();
+const emit = defineEmits<{
+  (event: "scroll-load-more"): void;
+  (event: "checkout-capacity-cleared", target: string): void;
+}>();
+const checkoutKeepResume = inject(checkoutKeepResumeKey, null);
+if (checkoutKeepResume) {
+  provide(reportCheckoutKeepResumeKey, resume => {
+    if (!resume || resume.target === props.checkoutCapacityTarget) checkoutKeepResume.value = resume;
+  });
+}
 const t = useT();
 // The App build has no document in the logic layer; the shell root carries the language for :lang() rules.
 const contentLang = computed(() => useLocaleStore().code);

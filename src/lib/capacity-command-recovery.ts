@@ -6,6 +6,10 @@ export const CAPACITY_RECOVERY_TABLE = "nexgrid-e3-capacity-payment-accounts-v1"
 export type CapacityPending = {operation:"replace"|"keep";intent:string;key:string;quote:CanonicalCapacityReplaceQuote}
   | (PendingKeepCommand & {operation:"keep";quote:null});
 
+export function capacityPaymentKind(operation: CapacityPending["operation"]) {
+  return operation === "keep" ? "CAPACITY_KEEP" : "CAPACITY_REPLACE";
+}
+
 export function capacityIntent(operation: "replace" | "keep", quote: CanonicalCapacityReplaceQuote): string {
   return [operation, quote.sourceDeviceId ?? "none", quote.targetProductNo, quote.targetProductId,
     quote.targetPriceUsdt, quote.payableUsdt, quote.maxActiveDevices].join("|");

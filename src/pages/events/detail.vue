@@ -39,7 +39,7 @@
         </view>
       </view>
       <text v-if="commandError" class="event-copy" role="alert">{{ copy.pending }}</text>
-      <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" icon="arrow-right" :busy="busy" :disabled="loading || error" @click="run"><text>{{ copy.open }}</text></NxButton>
+      <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
       <view v-else-if="action" class="event-primary" role="button" :tabindex="busy || loading || error ? -1 : 0" :aria-disabled="busy || loading || error" @click="run" @keydown.enter.prevent="activate($event, run)" @keydown.space.prevent="activate($event, run)"><text>{{ busy ? copy.busy : action === 'remind' ? reminderCopy.remind : copy[action] }}</text></view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
@@ -55,7 +55,7 @@ import { useT } from "@/i18n/use-t";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
-import { ApiError } from "@/api/errors";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { apiClient, eventsApi, remoteApiEnabled } from "@/api/runtime";
 import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { createEventDetailApi, type EventDetail } from "@/api/event-detail-api";
@@ -98,13 +98,14 @@ async function load() {
         commandError.value = false; unconfirmedAction = null;
       }
     }
-  } catch (cause) { if (current()) { error.value = true; if (!(cause instanceof ApiError && cause.kind === "network")) detail.value = null; } }
+  } catch (cause) { if (current()) { error.value = true; if (!isTransientReadFailure(cause)) detail.value = null; } }
   finally { if (current()) loading.value = false; }
 }
 async function run() {
-  if (busy.value || loading.value || error.value || !detail.value || !action.value) return;
+  if (!visible || busy.value || !detail.value || !action.value) return;
   const selectedAction = action.value;
   if (selectedAction === "open") { navTo(eventDetailHref(detail.value)); return; }
+  if (loading.value || error.value) return;
   const scope = identity(), request = generation;
   const current = () => visible && request === generation && scope === identity();
   busy.value = true; commandError.value = false;
