@@ -956,7 +956,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .device-statistics { padding:20px;border-block:1px solid var(--v5-border);scroll-margin-top:76px; }
 .device-statistics:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
 .device-statistics__values { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-block:16px; }
-.device-statistics__amount { font:600 24px/32px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
+.device-statistics__amount { font:500 24px/32px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
 .device-statistics__label { color:var(--v5-ink-3);font:400 12px/18px var(--font-v5); }
 .device-statistics__status { display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding-top:12px;font:500 13px/18px var(--font-v5); }
 .device-statistics__scope { margin-top:12px;color:var(--v5-ink-3);font:400 12px/18px var(--font-v5);overflow-wrap:break-word; }

@@ -174,7 +174,7 @@ function noteBasis(text: string): string {
 .referral-copy { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .referral-title { display: block; max-width: 60%; font: 600 17px/24px var(--font-v5); overflow-wrap: break-word; }
 .referral-count { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-top: var(--v5-space-1); }
-.referral-number { color: var(--v5-brand-2-ink); font: 600 40px/44px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.referral-number { color: var(--v5-brand-2-ink); font: 500 40px/44px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 .referral-unit { font: 500 14px/1.4 var(--font-v5); }
 .referral-caption { color: var(--v5-ink-2); font: 400 13px/18px var(--font-v5); }
 .referral-art { position: absolute; top: -40px; right: -16px; width: 150px; height: 150px; pointer-events: none; }

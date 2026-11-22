@@ -35,5 +35,5 @@ defineProps<{ cells: NetworkStatCell[] }>();
 .network-compact__cell {position:relative;min-width:0;padding:0 14px;border-left:1px solid var(--v5-border);}
 .network-compact__cell:first-child {border:0;padding-left:16px;}
 .network-compact__label {display:block;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);min-height:36px;}
-.network-compact__value {display:block;margin-top:4px;font:600 18px/24px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:break-word;}
+.network-compact__value {display:block;margin-top:4px;font:500 18px/24px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:break-word;}
 </style>
