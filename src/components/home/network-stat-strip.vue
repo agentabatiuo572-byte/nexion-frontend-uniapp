@@ -9,7 +9,7 @@
     <view v-for="m in cells" :key="m.key" class="network-compact__cell" :role="m.tap ? 'button' : undefined" :tabindex="m.tap ? 0 : -1" @click="m.tap?.()" @keydown.enter.prevent="m.tap?.()" @keydown.space.prevent="m.tap?.()">
       <text class="network-compact__label">{{ m.label }}</text>
       <view class="network-compact__value-row">
-        <view v-if="m.live && m.text !== null && m.text !== '—'" class="network-compact__dot nx-online-dot" aria-hidden="true" />
+        <view v-if="m.live" class="network-compact__dot nx-online-dot" aria-hidden="true" />
         <NxTickNumber v-if="m.roll" class="network-compact__value" :text="m.text" />
         <text v-else class="network-compact__value" :style="m.vSize ? { fontSize: m.vSize } : {}">{{ m.text }}</text>
       </view>
@@ -28,7 +28,7 @@ export interface NetworkStatCell {
   text: string | null;
   /** Roll changed digits (platform bands). */
   roll?: boolean;
-  /** An online figure: breathing dot beside the value. */
+  /** A positive, available online figure: breathing dot beside the value (never for 0 or unknown). */
   live?: boolean;
   vSize?: string;
   tap?: () => void;

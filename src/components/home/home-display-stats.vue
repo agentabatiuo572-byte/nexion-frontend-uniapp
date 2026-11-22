@@ -1,7 +1,7 @@
 <template>
   <view ref="elRef" class="home-display-stats" :class="{ 'nx-loops-paused': !running }">
     <view class="home-display-item">
-      <view v-if="value" class="home-display-dot nx-online-dot" aria-hidden="true" />
+      <view v-if="value && value.online > 0" class="home-display-dot nx-online-dot" aria-hidden="true" />
       <NxTickNumber class="home-display-number" :text="value ? networkPopulationBand(value.online, locale.code) : null" />
       <text>{{ t.intro.statsDevices }}</text>
     </view>

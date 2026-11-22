@@ -28,7 +28,7 @@
       </view>
       <view ref="footerRef" class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular on-grid__footer" :class="{ 'nx-loops-paused': !footerRunning }" style="border-top:1px solid var(--v5-border);font-size:12px;color:var(--v5-ink-3);min-height:44px">
         <view class="flex items-center" style="gap:6px;min-width:0">
-          <view v-if="onlineBand !== null" class="on-grid__dot nx-online-dot" aria-hidden="true" />
+          <view v-if="activeDevices !== null && activeDevices > 0" class="on-grid__dot nx-online-dot" aria-hidden="true" />
           <text><text style="color:var(--v5-ink);font-weight:500"><NxTickNumber :text="onlineBand" /></text> {{ t.home.onGridOnline }}</text>
         </view>
         <text style="color:var(--v5-success-ink);font-weight:500">{{ perSecText }}</text>
