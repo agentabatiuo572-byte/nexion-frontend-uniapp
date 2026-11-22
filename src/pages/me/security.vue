@@ -308,15 +308,22 @@ const securityPageFence = createP318AccountPageFence(
   () => app.accountBindingEpoch,
 );
 const securityConfirmOwner = `p3-18-security:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
-let securityPageVisible = true;
+const securityPageVisible = ref(false);
 let releaseActiveRefresh = () => {};
 
 const remoteSecurity = ref<SecurityState | null>(null);
 const securityPresentation = ref<SecurityState | null>(null);
 const securityLocale = useLocaleStore();
+type SecurityRead = "overview" | "deletion" | "phone-policy";
+const securityReadsInFlight = new Map<SecurityRead, Promise<boolean>>();
 let securityEnvironmentInvalidated = false;
 watch(() => apiRuntimeConfig?.environment, () => { securityEnvironmentInvalidated = true; clearSecurityAccountState(); }, { flush: 'sync' });
-watch(() => securityLocale.code, () => { clearSecurityAccountState(); refreshSecurityForCurrentAccount(); }, { flush: 'sync' });
+// Account locale hydration only affects presentation. Keep the existing reset for a deliberate language change.
+watch([() => securityLocale.code, () => securityLocale.explicitRevision], ([code, revision], [oldCode, oldRevision]) => {
+  if (code === oldCode || revision === oldRevision) return;
+  clearSecurityAccountState();
+  refreshSecurityForCurrentAccount();
+});
 // Unknown (null) until there is a session: after an H5 reload it is restored after the page shows, then the
 // account watch below reads it again. Neither the binding prompt nor the change-phone entry shows while unknown.
 const phoneBound = ref<boolean | null>(null);
@@ -556,14 +563,40 @@ function isCurrentSecurityRequest(
   accountScope = captureAccountScope(),
   accountKey = auth.accountId,
 ): boolean {
-  return !securityEnvironmentInvalidated && securityPageVisible
+  return !securityEnvironmentInvalidated && securityPageVisible.value
     && securityPageFence.isCurrent(pageScope)
     && isCurrentAccountScope(accountScope)
     && auth.accountId === accountKey;
 }
 
+function canReadRemoteSecurity(): boolean {
+  if (!remoteApiEnabled || securityEnvironmentInvalidated || !securityPageVisible.value || !auth.isAuthenticated) return false;
+  const currentSession = sessionVault.read();
+  return !!currentSession?.accessToken && auth.accountId === `user:${currentSession.user.userId}`
+    && app.accountKey === auth.accountId;
+}
+
+function createSecurityRead(lane: SecurityRead, read: (isCurrent: () => boolean, accountKey: string) => Promise<boolean>) {
+  return () => {
+    if (!canReadRemoteSecurity()) return Promise.resolve(false);
+    const existing = securityReadsInFlight.get(lane);
+    if (existing) return existing;
+    const pageScope = securityPageFence.capture(lane);
+    const accountScope = captureAccountScope();
+    const accountKey = auth.accountId;
+    const isCurrent = () => isCurrentSecurityRequest(pageScope, accountScope, accountKey);
+    const request = Promise.resolve().then(() => {
+      return isCurrent() && canReadRemoteSecurity() ? read(isCurrent, accountKey) : false;
+    }).finally(() => {
+      if (securityReadsInFlight.get(lane) === request) securityReadsInFlight.delete(lane);
+    });
+    securityReadsInFlight.set(lane, request);
+    return request;
+  };
+}
+
 function clearSecurityAccountState(keepPresentation = false) {
-  if (!securityPageVisible && securityCommandToastId) {
+  if (!securityPageVisible.value && securityCommandToastId) {
     ui.dismissToast(securityCommandToastId);
     securityCommandToastId = undefined;
   }
@@ -578,6 +611,7 @@ function clearSecurityAccountState(keepPresentation = false) {
   deletionSheetOpen.value = false;
   deletionDebtOpen.value = false;
   securityPageFence.invalidate();
+  securityReadsInFlight.clear();
   ui.clearConfirmsBy(securityConfirmOwner);
   securityBusy.value = false;
   remoteSecurityLoading.value = false;
@@ -616,7 +650,7 @@ function clearSecurityAccountState(keepPresentation = false) {
 }
 
 function refreshSecurityForCurrentAccount() {
-  if (securityPageVisible && remoteApiEnabled) {
+  if (canReadRemoteSecurity()) {
     void loadRemoteSecurity();
     void loadRemoteDeletionStatus();
     void loadPhonePolicy();
@@ -628,40 +662,37 @@ function refreshSecurityForCurrentAccount() {
 }
 
 async function refreshVisibleSecurity() {
-  if (!remoteApiEnabled || !securityPageVisible) return;
+  if (!canReadRemoteSecurity()) return;
   // The shared recovery registry already handles any failed sections on this pull.
   await Promise.all([
-    !remoteSecurityReadFailed.value && !remoteSecurityLoading.value && loadRemoteSecurity(),
-    !deletionStatusReadFailed.value && !deletionStatusLoading.value && loadRemoteDeletionStatus(),
+    !remoteSecurityReadFailed.value && loadRemoteSecurity(),
+    !deletionStatusReadFailed.value && loadRemoteDeletionStatus(),
     !phonePolicyReadFailed.value && loadPhonePolicy(),
   ]);
 }
 
-async function loadPhonePolicy() {
-  if (phonePolicyLoading.value) return;
-  const pageScope = securityPageFence.capture("phone-policy");
-  const accountScope = captureAccountScope();
-  const accountKey = auth.accountId;
-  if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+const loadPhonePolicy = createSecurityRead("phone-policy", async (isCurrent) => {
   phonePolicyCurrent.value = false;
   phonePolicyLoading.value = true;
   try {
     const policy = await accountApi.phoneNumberPolicy();
-    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    if (!isCurrent()) return false;
     phonePolicy.value = policy;
     phonePolicyCurrent.value = true;
     phonePolicyReadFailed.value = false;
+    return true;
   } catch (cause) {
-    if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    if (!isCurrent()) return false;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
       clearSecurityAccountState();
     } else {
       phonePolicyReadFailed.value = true;
     }
+    return false;
   } finally {
-    if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) phonePolicyLoading.value = false;
+    if (isCurrent()) phonePolicyLoading.value = false;
   }
-}
+});
 
 const { retry: retryPhonePolicy } = useAutoRecovery({
   failed: () => remoteApiEnabled && phonePolicyReadFailed.value && !phonePolicyLoading.value,
@@ -751,30 +782,29 @@ async function confirmPhoneChange() {
 }
 
 onShow(() => {
-  securityPageVisible = true;
+  securityPageVisible.value = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshVisibleSecurity, "pages/me/security");
   readPhoneBinding();
-  refreshSecurityForCurrentAccount();
 });
 onHide(() => {
-  securityPageVisible = false;
+  securityPageVisible.value = false;
   releaseActiveRefresh();
   clearSecurityAccountState(true);
 });
 onUnmounted(() => {
   stopTwoFactorTimers();
-  securityPageVisible = false;
+  securityPageVisible.value = false;
   releaseActiveRefresh();
   clearSecurityAccountState();
 });
-watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.accountId], () => {
+const securityAccountSources = [() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId, () => auth.isAuthenticated] as const;
+watch(securityAccountSources, () => {
   readPhoneBinding();
   clearSecurityAccountState();
 }, { flush: "sync" });
-// Sign-in changes these keys before it rebinds the account scope; a read started here would be fenced out as stale.
-// The default flush runs once after the whole sign-in step, under the rebound scope.
-watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.accountId], refreshSecurityForCurrentAccount);
+// Page entry and sign-in share one trigger, after the synchronous account rebind.
+watch([securityPageVisible, ...securityAccountSources], refreshSecurityForCurrentAccount);
 
 const passwordHintLine = computed(() => {
   if (remoteApiEnabled && !securityPresentation.value) return unknownMark(remoteSecurityReadFailed.value);
@@ -790,7 +820,13 @@ async function readBackConfirmedSecurityCommand(
   const { pending, read, restartBackoff } = securityReadbacks[section];
   pending.value = confirmation;
   securityCommandToastId = confirmation.tone === "warn" ? toast.warn(confirmation.message()) : toast.success(confirmation.message());
-  if (!(await read()) && pending.value === confirmation && securityPageVisible) {
+  // A read started before the command was confirmed cannot confirm its result.
+  const previousRead = securityReadsInFlight.get(section);
+  if (previousRead) {
+    await previousRead;
+    if (pending.value !== confirmation) return;
+  }
+  if (!(await read()) && pending.value === confirmation && securityPageVisible.value) {
     restartBackoff();
   }
 }
@@ -834,25 +870,22 @@ useAutoRecovery({
   retry: checkRestoredPasswordReceipt,
 });
 
-async function loadRemoteSecurity(): Promise<boolean> {
-  const pageScope = securityPageFence.capture("security-overview");
-  const scope = captureAccountScope();
-  const accountKey = auth.accountId;
-  if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+const loadRemoteSecurity = createSecurityRead("overview", async (isCurrent, accountKey) => {
+  const readback = overviewReadback.value;
   remoteSecurityLoading.value = true;
   sessionPageLoading.value = false;
   remoteSecurity.value = null;
   try {
     const securityState = await accountApi.securityOverview();
-    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+    if (!isCurrent()) return false;
     remoteSecurity.value = securityState;
     securityPresentation.value = { ...securityState, sessions: [...securityState.sessions] };
     remoteSecurityReadFailed.value = false;
-    settleSecurityReadback(overviewReadback);
+    if (overviewReadback.value === readback) settleSecurityReadback(overviewReadback);
     settleRestoredPasswordReceipt(accountKey);
     return true;
   } catch (cause) {
-    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+    if (!isCurrent()) return false;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
       clearSecurityAccountState();
     } else {
@@ -861,33 +894,30 @@ async function loadRemoteSecurity(): Promise<boolean> {
     console.warn("[security] overview load failed:", cause);
     return false;
   } finally {
-    if (isCurrentSecurityRequest(pageScope, scope, accountKey)) remoteSecurityLoading.value = false;
+    if (isCurrent()) remoteSecurityLoading.value = false;
   }
-}
+});
 
-async function loadRemoteDeletionStatus(): Promise<boolean> {
-  const pageScope = securityPageFence.capture("deletion-status");
-  const scope = captureAccountScope();
-  const accountKey = auth.accountId;
-  if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+const loadRemoteDeletionStatus = createSecurityRead("deletion", async (isCurrent) => {
+  const readback = deletionReadback.value;
   deletionStatusCurrent.value = false;
   deletionStatusLoading.value = true;
   try {
     const status = await accountApi.accountDeletionStatus();
-    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+    if (!isCurrent()) return false;
     deletionStatus.value = status;
     deletionStatusCurrent.value = true;
     deletionStatusReadFailed.value = false;
     // The acknowledged request reads back CANCELLED, or a newer application has replaced it (one active
     // application at a time, PRD §4.5.3): either way the old cancellation is over and its own keys are released.
-    const cancelledRequestNo = deletionReadback.value?.cancelledRequestNo;
-    if (cancelledRequestNo && ((status.status === "CANCELLED" && status.requestNo === cancelledRequestNo)
+    const cancelledRequestNo = readback?.cancelledRequestNo;
+    if (deletionReadback.value === readback && cancelledRequestNo && ((status.status === "CANCELLED" && status.requestNo === cancelledRequestNo)
         || (status.status !== "NONE" && status.requestNo !== cancelledRequestNo))) {
       settleSecurityReadback(deletionReadback);
     }
     return true;
   } catch (cause) {
-    if (!isCurrentSecurityRequest(pageScope, scope, accountKey)) return false;
+    if (!isCurrent()) return false;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
       clearSecurityAccountState();
     } else {
@@ -895,9 +925,9 @@ async function loadRemoteDeletionStatus(): Promise<boolean> {
     }
     return false;
   } finally {
-    if (isCurrentSecurityRequest(pageScope, scope, accountKey)) deletionStatusLoading.value = false;
+    if (isCurrent()) deletionStatusLoading.value = false;
   }
-}
+});
 
 // The deletion sheet blocks pull-to-refresh, so a failed read that blocks its submit keeps an in-place retry (03 §3.5.2).
 const deletionReadBlocked = computed(() => remoteApiEnabled && !!deletionWriteUnavailableReason.value
