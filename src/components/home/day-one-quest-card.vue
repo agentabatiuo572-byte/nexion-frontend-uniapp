@@ -71,9 +71,10 @@
             </svg>
             <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: missionLayout ? 'var(--v5-ink-3)' : task.color }">{{ task.order }}</text>
           </view>
-          <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
-            <text class="truncate" :style="labelStyle(task)">{{ task.label }}</text>
-            <NxTag v-if="task.appOnly && !isDone(task)" :label="t.home.dayOneAppOnlyTag" />
+          <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0" :style="task.appOnly ? { flexWrap: 'wrap', alignItems: 'center' } : undefined">
+            <!-- An App-only row opens nothing, so its whole name stays readable and the tag drops below when both don't fit. -->
+            <text :class="task.appOnly ? 'newcomer-task__app-name' : 'truncate'" :style="labelStyle(task)">{{ task.label }}</text>
+            <NxTag v-if="task.appOnly && !isDone(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
             <text v-else :style="catStyle(task)">{{ task.cat }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
@@ -86,7 +87,7 @@
       </view>
       <!-- Lite: tasks the web cannot do stay in the list; finishing them needs the App. -->
       <view v-if="expanded && appOnlyPending" class="nx-card-footer newcomer-task__app">
-        <text class="nx-card-footer__note">{{ t.home.dayOneAppOnlyNote }}</text>
+        <text class="nx-card-footer__note" :style="{ flexBasis: appNoteBasis }">{{ t.home.dayOneAppOnlyNote }}</text>
         <view v-if="appDownloadHref" class="nx-card-action" role="link" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
           @click="openAppDownload" @keydown.enter.prevent="openAppDownload">
           <text class="nx-after-external">{{ t.home.dayOneAppDownload }}</text>
@@ -338,6 +339,12 @@ function isActionable(task: QuestTask) {
 
 const appOnlyPending = computed(() => !dayOneExpired.value && tasks.value.some((task) => task.appOnly && task.eligible && !isDone(task)));
 const appDownloadHref = computed(() => appDownloadUrl(stakingDisplay.config.share.appDownload.officialUrl));
+// Half the note's length as its basis: the action stays beside a note of up to two lines and wraps below a longer one (03 §3.6.1).
+const appNoteBasis = computed(() => {
+  let em = 0;
+  for (const ch of t.value.home.dayOneAppOnlyNote) em += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 1 : 0.55;
+  return `${(em / 2).toFixed(1)}em`;
+});
 function openAppDownload() {
   if (!props.active || !appDownloadHref.value) return;
   window.location.assign(appDownloadHref.value);
@@ -455,6 +462,7 @@ const toggleStyle: CSSProperties = {
 
 <style scoped>
 .newcomer-task__app { margin-top: var(--v5-space-3); }
+.newcomer-task__app-name { min-width: 0; overflow-wrap: break-word; }
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
 .newcomer-task__observation-item { margin-top: var(--v5-space-2); }
