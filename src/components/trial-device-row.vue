@@ -2,8 +2,8 @@
   <view v-if="presentation.active.value" ref="loopRef" class="trial-device-row" :class="[`trial-device-row--${variant}`, { 'nx-glass-card': variant === 'inventory', 'nx-loops-paused': !loops.running.value }]" data-trial-device-row="true" data-device-key="trial:current">
     <view class="trial-device-row__heading" :role="variant === 'inventory' ? undefined : 'button'" :tabindex="variant === 'inventory' ? undefined : '0'" :aria-label="`${copy.details}: ${presentation.deviceName.value || '—'} · ${statusText} · ${presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining} ${remainingText}`" :aria-expanded="variant === 'earn' ? isExpanded : undefined" :aria-controls="variant === 'earn' ? `trial-device-details-${variant}` : undefined" @click="onRowClick" @keydown.enter.stop.prevent="onRowClick" @keydown.space.stop.prevent="onRowClick">
       <view class="trial-device-row__main">
-        <view class="trial-device-row__art" aria-hidden="true"><image v-if="productMedia" class="trial-device-row__image" :src="productMedia.src" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view>
-        <view class="trial-device-row__identity"><text class="trial-device-row__name">{{ presentation.deviceName.value || '—' }}</text><NxTag v-if="variant === 'inventory'" class="trial-device-row__tag" tone="brand">{{ copy.imageBadge }}</NxTag><text class="trial-device-row__status" :class="{ 'trial-device-row__status--online': isOnline }">{{ statusText }}</text></view>
+        <view class="trial-device-row__visual"><view class="trial-device-row__art" aria-hidden="true"><image v-if="productMedia" class="trial-device-row__image" :src="productMedia.src" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view><NxTag v-if="variant === 'inventory'" class="trial-device-row__tag" tone="brand">{{ copy.imageBadge }}</NxTag></view>
+        <view class="trial-device-row__identity"><text class="trial-device-row__name">{{ presentation.deviceName.value || '—' }}</text><text class="trial-device-row__status" :class="{ 'trial-device-row__status--online': isOnline }">{{ statusText }}</text></view>
       </view>
       <view class="trial-device-row__summary">
         <view class="trial-device-row__time"><text>{{ presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining }}</text><text class="trial-device-row__remaining">{{ remainingText }}</text></view>
@@ -13,7 +13,7 @@
     <view v-if="variant !== 'home' && isExpanded" :id="`trial-device-details-${variant}`" class="trial-device-row__body">
       <text v-if="presentation.status.value === 'grace'" class="trial-device-row__state">{{ copy.grace }}</text>
       <view class="trial-device-row__credit-block"><view class="trial-device-row__credit"><text>{{ copy.availableCredit }}</text><text v-if="variant === 'inventory'" class="trial-device-row__amount font-mono-tabular">{{ offsetParts[0] }}<text class="trial-device-row__dec">{{ offsetParts[1] }}</text></text><text v-else class="trial-device-row__amount font-mono-tabular">{{ money(presentation.offsetUSD.value) }}</text></view>
-      <view v-if="!hidePersonalData" class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view v-viz-inview :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
+      <view v-if="!hidePersonalData" class="trial-device-row__progress nx-progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view v-viz-inview class="nx-progress__fill" :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
       <view class="trial-device-row__actions">
@@ -102,8 +102,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__state { display:block; margin-top:3px; color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); overflow-wrap:break-word; }
 .trial-device-row__credit,.trial-device-row__estimate { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:5px 12px; margin-top:12px; font:400 12px/18px var(--font-v5); color:var(--v5-ink-3); }
 .trial-device-row__amount { color:var(--v5-brand); font-size:20px; line-height:26px; font-weight:600; }
-.trial-device-row__progress { height:5px; margin-top:8px; overflow:hidden; border-radius:var(--v5-radius-full); background:var(--v5-surface-3); }
-.trial-device-row__progress > view { height:100%; border-radius:inherit; background:var(--v5-brand); }
+.trial-device-row__progress { margin-top:8px; }
 .trial-device-row__estimate { margin-top:6px; }
 .trial-device-row__note { display:block; margin-top:8px; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .trial-device-row__actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 8px; margin-top:8px; }
@@ -134,14 +133,18 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__heading:active { opacity:1; }
 .trial-device-row--inventory .trial-device-row__chevron { display:none; }
 .trial-device-row--inventory .trial-device-row__image-badge { display:none; }
-/* Name and trial tag (NxTag, 03 §3.8) share a line while they fit; otherwise the whole tag moves under the name, so it
-   never runs into the remaining time on the right in any language (03 §3.6.1). */
+/* The name wraps at word boundaries and never runs into the remaining time on the right (03 §3.6.1); the trial tag
+   sits on the art instead (see .trial-device-row__visual). */
 .trial-device-row--inventory .trial-device-row__identity { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
 .trial-device-row--inventory .trial-device-row__identity > .trial-device-row__name { min-width:0; max-width:100%; overflow-wrap:break-word; }
 .trial-device-row--inventory .trial-device-row__identity > .trial-device-row__status { flex-basis:100%; margin-top:0; }
 .trial-device-row--inventory .trial-device-row__time > text { overflow-wrap:break-word; }
-.trial-device-row--inventory .trial-device-row__art { width:84px; height:72px; overflow:visible; }
-.trial-device-row--inventory .trial-device-row__image { width:78px; height:64px; margin-top:-4px; }
+/* Same art band as the warehouse device cards: the square catalog image spans the column, the band is the machine's height. */
+/* The trial tag sits on the art's top-right corner, as on the warehouse bay: NxTag on an opaque surface, over the art. */
+.trial-device-row__visual { position:relative; display:flex; flex:none; }
+.trial-device-row--inventory .trial-device-row__tag { position:absolute; z-index:1; top:-6px; right:0; background:linear-gradient(var(--v5-brand-soft),var(--v5-brand-soft)),var(--v5-surface); }
+.trial-device-row--inventory .trial-device-row__art { width:100px; height:56px; margin-left:-12px; margin-right:-12px; overflow:visible; }
+.trial-device-row--inventory .trial-device-row__image { position:absolute; left:0; top:50%; width:100px; height:100px; transform:translateY(-56%); pointer-events:none; }
 .trial-device-row--inventory .trial-device-row__name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__remaining { font:500 15px/20px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__body { padding:0; }
@@ -150,12 +153,14 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__credit-block { margin-top:12px; padding:12px; border-radius:var(--v5-radius-s); background:var(--v5-surface-2); }
 .trial-device-row--inventory .trial-device-row__credit { margin-top:0; }
 .trial-device-row--inventory .trial-device-row__amount { font-family:var(--font-amount); font-size:22px; line-height:28px; font-weight:500; letter-spacing:-.02em; }
-.trial-device-row--inventory .trial-device-row__progress { height:6px; }
 .trial-device-row__progress > view { animation:nx-viz-grow 1400ms cubic-bezier(.16,1,.3,1) both; }
 /* Actions sit right (03 §3.1); 取消试用 keeps the left edge, and a button that no longer fits wraps whole to the right of the next line (03 §3.6.1). */
 .trial-device-row--inventory .trial-device-row__actions { margin-top:12px; justify-content:flex-end; }
 /* Cancelling the trial is destructive: a neutral glass S like 详情, with only its text in the error colour (03 §3.1). */
-.trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; color:var(--v5-danger); }
+/* A reverse action stays findable but quiet (user): bare text in the secondary ink, no pill, no error colour; the
+   confirm dialog after it carries the consequence. */
+.trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; padding-inline:0; color:var(--v5-ink-3); }
+.trial-device-row--inventory .trial-device-row__actions > .trial-device-row__cancel--inline { font:400 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__actions > view { font:var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); white-space:nowrap; }
 .trial-device-row--inventory .trial-device-row__main { gap:12px; }
 .trial-device-row--inventory .trial-device-row__status { font:400 13px/18px var(--font-v5); }
@@ -166,10 +171,10 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 /* Compact actions are glass pills: neutral for details, brand-tinted for buying early. */
 .trial-device-row--inventory .trial-device-row__details { color:var(--v5-ink); }
 .trial-device-row--inventory .trial-device-row__buy { gap:4px; }
-.trial-device-row--inventory .trial-device-row__details::before,.trial-device-row--inventory .trial-device-row__buy::before,.trial-device-row--inventory .trial-device-row__cancel--inline::before { border:0;
+.trial-device-row--inventory .trial-device-row__details::before,.trial-device-row--inventory .trial-device-row__buy::before { border:0;
   background:linear-gradient(145deg,rgba(255,255,255,.06),transparent 38%,transparent 66%,rgba(255,255,255,.06)),var(--trial-pill-fill,color-mix(in srgb,var(--v5-ink) 7%,transparent));
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.10),inset 0 3px 6px -2px rgba(255,255,255,.24),inset 2px 0 8px -4px rgba(255,255,255,.24),inset 0 -4px 9px -4px rgba(0,0,0,.28); }
-[data-theme="light"] .trial-device-row--inventory .trial-device-row__details::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__buy::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__cancel--inline::before {
+[data-theme="light"] .trial-device-row--inventory .trial-device-row__details::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__buy::before {
   background:linear-gradient(145deg,rgba(255,255,255,.30),transparent 38%,transparent 66%,rgba(255,255,255,.30)),var(--trial-pill-fill,color-mix(in srgb,var(--v5-ink) 7%,transparent));
   box-shadow:inset 0 0 0 1px rgba(73,94,125,.12),inset 0 3px 6px -2px rgba(255,255,255,.85),inset 2px 0 8px -4px rgba(255,255,255,.85),inset 0 -4px 9px -4px rgba(87,115,155,.18); }
 .trial-device-row--inventory .trial-device-row__buy { --trial-pill-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent); }
@@ -178,7 +183,8 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 [role="button"]:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
 .trial-device-row__heading:focus-visible { outline-offset:-2px; }
 @media (max-width:374px) {
-  .trial-device-row--inventory .trial-device-row__art,.trial-device-row--inventory .trial-device-row__image { width:56px; height:56px; margin-top:0; }
+  .trial-device-row--inventory .trial-device-row__art { width:84px; height:48px; margin-left:-8px; margin-right:-8px; }
+  .trial-device-row--inventory .trial-device-row__image { width:84px; height:84px; }
 }
 @media (max-width:350px) {
   .trial-device-row--earn .trial-device-row__heading { padding:12px; gap:6px; }

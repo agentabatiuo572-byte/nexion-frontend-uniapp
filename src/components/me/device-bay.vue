@@ -1,12 +1,12 @@
 <!-- One occupied compute slot on the device warehouse hero (P-43): live LED, device art, name and a running strip while online. -->
 <template>
-  <view class="device-bay" :class="{ 'device-bay--online': online }" role="button" tabindex="0" :aria-label="label" @click="emit('open')">
+  <view class="device-bay" :class="{ 'device-bay--online': online, 'device-bay--phone': device?.kind === 'phone' }" role="button" tabindex="0" :aria-label="label" @click="emit('open')">
     <view class="device-bay__led" :class="{ 'device-bay__led--off': !online }" aria-hidden="true" />
-    <view class="device-bay__art" aria-hidden="true">
-      <image v-if="src" class="device-bay__image" :src="src" mode="aspectFit" @error="imageError" />
-      <view class="device-bay__floor" />
-    </view>
     <NxTag v-if="badge" class="device-bay__badge" tone="brand">{{ badge }}</NxTag>
+    <view class="device-bay__art" aria-hidden="true">
+      <view class="device-bay__floor" />
+      <view class="device-bay__frame"><image v-if="src" class="device-bay__image" :src="src" mode="aspectFit" @error="imageError" /></view>
+    </view>
     <text class="device-bay__name">{{ name }}</text>
     <view v-if="online" class="device-bay__strip" aria-hidden="true"><view /></view>
   </view>
@@ -31,11 +31,19 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 .device-bay--online::before { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 55% at 50% 58%, color-mix(in srgb, var(--v5-success) 15%, transparent), transparent 72%); }
 .device-bay__led { position: absolute; z-index: 1; top: 10px; left: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success); }
 .device-bay__led--off { background: var(--v5-ink-4); animation: none; }
-/* The trial tag (NxTag, 03 §3.8) sits under the art, never over it, so the device keeps its full 80px (04 §4.2). */
-.device-bay__badge { position: relative; z-index: 1; margin-top: 8px; max-width: 100%; }
-.device-bay__art { position: relative; flex: none; width: 80px; max-width: 100%; height: 62px; }
-.device-bay__image { display: block; width: 100%; height: 100%; }
-.device-bay__floor { position: absolute; left: 20%; right: 20%; bottom: -3px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
+/* The trial tag (NxTag, 03 §3.8) sits in the top-right corner, mirroring the LED, and may cover the art (user).
+   Its brand tint sits on an opaque surface so the device never shows through the label. */
+.device-bay .device-bay__badge { position: absolute; z-index: 2; top: 6px; right: 6px; max-width: calc(100% - 28px); background: linear-gradient(var(--v5-brand-soft), var(--v5-brand-soft)), var(--v5-surface); }
+/* The device is the bay's main visual. The catalog art leaves about 40% empty around the machine, so a square frame
+   as wide as the whole bay (the widest body, Rack P2 at 91%, still fits) sits a quarter of its width above a band 58%
+   as tall: every SKU's body lands in that band, below the LED and above the name. */
+.device-bay__art { position: relative; flex: none; align-self: stretch; margin-inline: -8px; }
+.device-bay__art::before { content: ""; display: block; padding-top: 58%; }
+.device-bay__frame { position: absolute; left: 0; top: 0; width: 100%; margin-top: -25%; padding-top: 100%; pointer-events: none; }
+/* The phone art fills more of its square, so it is drawn at three quarters. */
+.device-bay--phone .device-bay__frame { left: 12.5%; width: 75%; margin-top: -10%; padding-top: 75%; }
+.device-bay__image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.device-bay__floor { position: absolute; left: 26%; right: 26%; bottom: 2%; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
 [data-theme="light"] .device-bay__floor { background: radial-gradient(closest-side, rgba(20,16,8,.20), transparent); }
 .device-bay:not(.device-bay--online) .device-bay__image { filter: grayscale(.7); opacity: .55; }
 .device-bay__name { position: relative; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; align-self: stretch; margin-top: auto; padding-top: 6px; overflow: hidden; text-align: center; white-space: normal; overflow-wrap: break-word; color: var(--v5-ink); font: 500 12px/16px var(--font-v5); }
@@ -46,7 +54,7 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 @keyframes device-bay-flow { from { transform: translateX(-110%); } to { transform: translateX(290%); } }
 /* Paused while the warehouse stage is off-screen (its LoopScope), the page is hidden, or the chassis scrolls. */
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .device-bay__strip > view { animation-play-state: paused; }
-/* At 360 a bay cell is about 91px wide: narrower sides keep the 80px art inside the bay. */
-@media (max-width: 374px) { .device-bay { padding-inline: 4px; } }
+/* At 360 a bay cell is about 91px wide: narrower sides keep the name on one line more often. */
+@media (max-width: 374px) { .device-bay { padding-inline: 4px; } .device-bay__art { margin-inline: -4px; } }
 @media (prefers-reduced-motion: reduce) { .device-bay, .device-bay__strip > view { animation: none; } }
 </style>

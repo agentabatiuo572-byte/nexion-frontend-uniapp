@@ -2,7 +2,7 @@
 <template>
   <view class="fleet-reel-card" :class="{ 'fleet-reel-card--online': online, 'fleet-reel-card--off': !online }" :data-device-id="device.id" role="button" tabindex="0" :aria-label="label" @click="go">
     <view class="fleet-reel-card__status"><view class="fleet-reel-card__dot" :class="{ 'nx-online-dot': online }" /><text>{{ statusText }}</text></view>
-    <view class="fleet-reel-card__art"><DeviceArt class="fleet-reel-card__image" :device="device" /><view class="fleet-reel-card__floor" /></view>
+    <view class="fleet-reel-card__art"><view class="fleet-reel-card__floor" /><DeviceArt class="fleet-reel-card__image" :device="device" /></view>
     <text class="fleet-reel-card__name">{{ displayName }}</text>
     <view class="fleet-reel-card__kv"><text class="fleet-reel-card__key">{{ t.home.todayShort }}</text><text class="fleet-reel-card__money">{{ todayText }}</text></view>
     <view class="fleet-reel-card__kv"><text class="fleet-reel-card__key">{{ t.home.jobLabel }}</text><text class="fleet-reel-card__job" :class="{ 'fleet-reel-card__job--dim': jobText === '—' }">{{ jobText }}</text></view>
@@ -60,9 +60,10 @@ function go() {
 .fleet-reel-card__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .fleet-reel-card__dot.nx-online-dot { background: var(--v5-success); }
 .fleet-reel-card__art { position: relative; flex: none; width: 132px; height: 98px; margin: 6px auto 0; }
-.fleet-reel-card__image { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* Same art band as the trial card in this reel: the square catalog image spans the card's content width. */
+.fleet-reel-card__art .fleet-reel-card__image { position: absolute; left: 50%; top: 50%; width: 140px; height: 140px; transform: translate(-50%, -52%); }
 .fleet-reel-card--off .fleet-reel-card__image { filter: grayscale(.75); opacity: .55; }
-.fleet-reel-card__floor { position: absolute; left: 18%; right: 18%; bottom: -3px; height: 9px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-bg) 65%, transparent), transparent); }
+.fleet-reel-card__floor { position: absolute; left: 24%; right: 24%; bottom: 8px; height: 9px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-bg) 65%, transparent), transparent); }
 [data-theme="light"] .fleet-reel-card__floor { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 20%, transparent), transparent); }
 .fleet-reel-card__name { position: relative; display: block; margin-top: 8px; font: 500 15px/20px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fleet-reel-card__kv { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 2px; }

@@ -11,8 +11,8 @@
     <view class="nx-feed-figure">
       <text class="nx-feed-pct font-mono-tabular">{{ visibility.mask(row.pct == null ? '—' : `${row.pct}%`) }}</text>
     </view>
-    <view class="nx-feed-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || row.pct == null ? undefined : row.pct" aria-valuemin="0" aria-valuemax="100">
-      <view v-if="!visibility.hidden && row.pct != null" v-viz-inview class="nx-feed-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
+    <view class="nx-feed-progress nx-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || row.pct == null ? undefined : row.pct" aria-valuemin="0" aria-valuemax="100">
+      <view v-if="!visibility.hidden && row.pct != null" v-viz-inview class="nx-feed-progress__fill nx-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
     </view>
   </view>
 </template>
