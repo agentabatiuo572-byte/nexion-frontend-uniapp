@@ -3,7 +3,7 @@
 .reward-page {
   --reward-accent: #c5f45a;
   --reward-panel-edge: rgba(210, 216, 224, .16);
-  color: var(--v5-ink); padding-bottom: 28px; overflow-wrap: anywhere;
+  color: var(--v5-ink); padding-bottom: 28px; overflow-wrap: break-word;
 }
 .reward-page :deep(.reward-summary-panel) { padding: 0 18px 16px; border: 1px solid var(--reward-panel-edge); border-radius: 20px; }
 /* Reward CTAs share the neutral glass material from tokens.css (design system 03 §3.1):
@@ -22,7 +22,7 @@
 .reward-page :deep(.reward-cta > svg) { display: none; }
 .reward-page :deep(.reward-cta > text) { color: inherit !important; }
 .reward-page :deep(.reward-cta--wide) { display: flex; width: 100%; min-height: 48px; padding: 10px 20px; }
-.reward-page :deep(.reward-amount) { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: clamp(26px, 8vw, 36px); font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.reward-page :deep(.reward-amount) { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: clamp(26px, 8vw, 36px); font-weight: 500; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.025em; overflow-wrap: break-word; }
 .reward-page :deep(.reward-caption) { color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; }
 .reward-page :deep(.reward-rule-link) { margin-top: var(--ui-space-inline); }
 </style>

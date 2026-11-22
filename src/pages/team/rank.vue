@@ -26,7 +26,7 @@
             </view>
               </view>
             </view>
-            <view class="rank-upcoming"><text class="rank-caption">{{ upcomingBenefitsTitle }}</text><view class="rank-perk-tags"><text v-for="perk in upcomingBenefits" :key="perk.key" class="rank-perk-tag">{{ perk.label }} {{ perk.value }}</text></view><text v-if="upcomingPeerNotice" class="rank-caption rank-upcoming__notice">{{ upcomingPeerNotice }}</text><view v-if="prog.next.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
+            <view class="rank-upcoming"><text class="rank-caption">{{ upcomingBenefitsTitle }}</text><view class="rank-perk-tags"><NxTag v-for="perk in upcomingBenefits" :key="perk.key" tone="uvt">{{ perk.label }} {{ perk.value }}</NxTag></view><text v-if="upcomingPeerNotice" class="rank-caption rank-upcoming__notice">{{ upcomingPeerNotice }}</text><view v-if="prog.next.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
             <NxButton class="rank-invite" variant="primary" :label="designCopy.rankUpInvite" @click="go('/pages/team/team?intent=share')"><text>{{ designCopy.rankUpInvite }}</text><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></NxButton>
           </view>
         </view>
@@ -76,6 +76,7 @@ import NxListRow from "@/components/ui/nx-list-row.vue";
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { rankGuideCopy } from '@/i18n/rank-guide-copy';
 import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useVRank, type VRank, type VRankDef, type VRankReward, type VRankConditions } from "@/store/v-rank";
@@ -247,7 +248,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 <style scoped>
 .rank-page { color:var(--v5-ink);padding-bottom:28px; }
 .rank-scope-link { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-top:8px;color:var(--v5-brand);font:500 13px/1.5 var(--font-v5);cursor:pointer; }
-.rank-scope-link > text { min-width:0;overflow-wrap:anywhere; }
+.rank-scope-link > text { min-width:0;overflow-wrap:break-word; }
 .rank-scope-link > svg { flex:none; }
 .rank-scope-link:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 .rank-content { padding:12px 16px 0; }
@@ -258,27 +259,26 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-private-emblem { width:76px;height:76px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--v5-surface-3);color:var(--v5-ink-2);font-size:18px; }
 .rank-identity__copy { flex:1;min-width:0; }
 .rank-current-level { display:block;padding:0 9px;border:1px solid var(--v5-brand-border);border-radius:999px;background:var(--v5-surface);color:var(--ui-lime-soft);font:600 12.5px/20px var(--font-v5);font-variant-numeric:tabular-nums; }
-.rank-current-name { display:block;margin-top:2px;font:600 26px/32px var(--font-v5);overflow-wrap:anywhere; }
-.rank-caption { display:block;font:400 12.5px/1.5 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.rank-current-name { display:block;margin-top:2px;font:600 26px/32px var(--font-v5);overflow-wrap:break-word; }
+.rank-caption { display:block;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-rules-link { display:flex;align-items:center;justify-content:flex-end;gap:6px;min-height:44px;margin-top:4px;font:500 13px/1.5 var(--font-v5);color:var(--v5-ink-2);cursor:pointer; }
 .rank-rules-link svg { flex:none; }
 .rank-next-progress { padding-top:16px;border-top:1px solid var(--v5-border); }
 .rank-next-heading { display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap; }
-.rank-next-title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/20px var(--font-v5);overflow-wrap:anywhere; }
+.rank-next-title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/20px var(--font-v5);overflow-wrap:break-word; }
 .rank-condition { margin-top:14px; }
 .rank-condition__heading { display:flex;justify-content:space-between;align-items:baseline;gap:6px 12px;flex-wrap:wrap;font:400 13.5px/20px var(--font-v5);color:var(--v5-ink-2); }
-.rank-condition__name { min-width:0;overflow-wrap:anywhere; }
+.rank-condition__name { min-width:0;overflow-wrap:break-word; }
 .rank-condition__value { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0 4px;max-width:100%;margin-left:auto;font-variant-numeric:tabular-nums;color:var(--v5-ink-3);text-align:right; }
 .rank-condition__current,.rank-condition__target { white-space:nowrap; }
 .rank-condition__current { color:var(--v5-ink);font-weight:600; }
 .rank-progress-track { overflow:hidden;height:6px;border-radius:999px;background:var(--v5-surface-3);margin-top:8px; }
 .rank-progress-track > view { height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--v5-brand-deep),var(--ui-lime-soft));box-shadow:0 0 10px var(--v5-brand-border); }
-.rank-condition__gap { display:block;margin-top:6px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.rank-condition__gap { display:block;margin-top:6px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-inherited { border-top:1px solid var(--v5-border);margin-top:18px;padding-top:4px; }
 .rank-inherited__toggle { min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);font-size:12px;color:var(--v5-ink-3);cursor:pointer; }
 .rank-upcoming { margin-top:16px; }
 .rank-perk-tags { display:flex;flex-wrap:wrap;gap:6px;margin-top:8px; }
-.rank-perk-tag { display:inline-flex;align-items:center;box-sizing:border-box;min-height:26px;max-width:100%;padding:3px 10px;border:1px solid var(--v5-border);border-radius:999px;background:var(--ui-perk);font:500 12px/18px var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }
 .rank-upcoming__notice { margin-top:8px; }
 .rank-invite { width:100%;margin-top:18px;box-sizing:border-box;color:var(--v5-ink); }
 .rank-ladder-section { margin-top:6px; }
@@ -295,25 +295,25 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-row-heading:focus-visible,.rank-rules-link:focus-visible,.rank-inherited__toggle:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 .rank-row-heading:focus-visible { outline-offset:-3px; }
 .rank-row-copy { flex:1;min-width:0; }
-.rank-row-title { display:block;font:500 var(--ui-type-list-title)/20px var(--font-v5);overflow-wrap:anywhere; }
-.rank-row-sub { display:block;margin-top:2px;font:400 var(--ui-type-list-subtitle)/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.rank-row-title { display:block;font:500 var(--ui-type-list-title)/20px var(--font-v5);overflow-wrap:break-word; }
+.rank-row-sub { display:block;margin-top:2px;font:400 var(--ui-type-list-subtitle)/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-row-sub--active { color:var(--v5-brand); }
 .rank-row-chevron { flex:none;color:var(--v5-ink-3);transition:transform 180ms; }.rank-row-chevron--open { transform:rotate(180deg); }
 .rank-details { position:relative;padding:2px 16px 18px 64px; }
 .rank-detail-label { display:block;font:600 12.5px/18px var(--font-v5);color:var(--v5-ink-2);margin-bottom:6px; }
 .rank-detail-label--spaced { margin-top:14px; }
-.rank-condition-copy { display:flex;gap:8px;align-items:baseline;margin:0;font:400 13.5px/20px var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }
+.rank-condition-copy { display:flex;gap:8px;align-items:baseline;margin:0;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
 .rank-condition-dot { width:5px;height:5px;border-radius:50%;background:var(--v5-ink-3);flex:none;transform:translateY(-2px); }
-.rank-detail-hint,.rank-reward-note { display:block;margin-top:8px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.rank-detail-hint,.rank-reward-note { display:block;margin-top:8px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-perk-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px; }
 .rank-perk { display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--v5-border);border-radius:12px;background:var(--ui-perk); }
-.rank-perk-value { font:600 14px/20px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+.rank-perk-value { font:600 14px/20px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
 .rank-reward-item + .rank-reward-item { margin-top:12px; }
 .rank-reward-summary { display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;color:var(--v5-nex); }
 .rank-reward-title { display:block;font:600 var(--ui-type-section)/22px var(--font-v5); }
-.rank-reward-amount { display:block;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+.rank-reward-amount { display:block;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
 .rank-reward-description { display:block;margin-top:2px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
-.rank-reward { display:block;margin-top:2px;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-nex);overflow-wrap:anywhere; }
+.rank-reward { display:block;margin-top:2px;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-nex);overflow-wrap:break-word; }
 .rank-actions { margin-top:18px;border-top:1px solid var(--v5-border); }.rank-actions :deep(.nx-list-row) { padding-inline:0;border-bottom:1px solid var(--v5-border); }
 .rank-action-icon { width:32px;height:32px;display:grid;place-items:center;color:var(--v5-ink-2); }
 .rank-state { padding:32px 0;color:var(--v5-ink-2); }.rank-state text { display:block;margin-top:var(--ui-space-row-y); }
@@ -357,7 +357,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-upcoming { display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:14px;padding:10px 14px; }
 .rank-upcoming .rank-caption { color:var(--v5-ink-2); }
 .rank-upcoming .rank-perk-tags { margin-top:0; }
-.rank-upcoming .rank-perk-tag { min-height:0;padding:0;border:0;background:none;color:var(--v5-nex-ink);font-weight:600; }
 .rank-upcoming .rank-scope-link { min-height:24px;margin:0 0 0 auto; }
 .rank-ladder-row + .rank-ladder-row::after { content:"";position:absolute;left:-6px;top:26px;width:6px;height:2px;background:var(--v5-surface-3); }
 .rank-ladder-row[data-status="done"] + .rank-ladder-row::after,.rank-ladder-row[data-status="current"]::after { background:var(--v5-brand); }

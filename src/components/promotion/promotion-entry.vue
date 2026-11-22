@@ -276,12 +276,12 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-advert .entry-copy { position: relative; display: flex; flex-direction: column; padding: 18px 18px 16px; min-height: 146px; box-sizing: border-box; color: var(--promotion-copy-ink, #f5f7fa); }
 .entry-advert:has(.entry-product-art) .entry-copy { padding-right: 148px; }
 .entry-label,.entry-eyebrow { display: block; color: var(--v5-brand); font: 500 12px/1.5 var(--font-v5); }
-.entry-title { display: block; margin-top: 7px; font: 600 23px/1.3 var(--font-v5); overflow-wrap: anywhere; }
+.entry-title { display: block; margin-top: 7px; font: 600 23px/1.3 var(--font-v5); overflow-wrap: break-word; }
 .entry-advert .entry-label { font-size: 12.5px; color: #c8f25a; }
 .entry-advert .entry-title { margin-top: 6px; font-size: 19px; line-height: 25px; }
 .entry-advert .promotion-copy { color: var(--v5-ink-2); font-size: 12px; line-height: 1.5; }
 .entry-copy,.entry-event-copy { min-width: 0; }
-.entry-benefit { display: block; margin-top: 5px; color: var(--v5-ink-2); font: 500 14px/1.5 var(--font-v5); overflow-wrap: anywhere; }
+.entry-benefit { display: block; margin-top: 5px; color: var(--v5-ink-2); font: 500 14px/1.5 var(--font-v5); overflow-wrap: break-word; }
 .entry-advert .entry-benefit { margin-top: 0; color: inherit; font: 600 19px/25px var(--font-v5); }
 .entry-advert.entry-kind-gift .entry-title { color: var(--v5-ink-2); font: 500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .entry-advert.entry-kind-gift .entry-benefit { margin-top: 4px; color: var(--v5-brand); font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
@@ -308,7 +308,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-inviter-benefit,.entry-condition { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/1.5 var(--font-v5); }
 .entry-eligibility { margin-top: var(--ui-space-row-y); }
 .entry-event-footer { position: relative; z-index: 1; grid-column: 1 / -1; }
-.entry-deadline { display: block; color: var(--v5-ink-3); font: 400 11px/1.5 var(--font-v5); overflow-wrap: anywhere; }
+.entry-deadline { display: block; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .entry-event-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: var(--ui-space-row-y); }
 .promotion-link { gap: 8px; color: var(--v5-ink-2); }
 /* A text link and its chevron stay on one line; when the title row cannot hold both, the link drops to the right on its own line. */
@@ -355,8 +355,8 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card--gift { height: 184px; }
 .entry-card__copy { position: absolute; left: 18px; top: 20px; width: min(176px, 52%); }
 /* Purchase line stays body/500 and the gift line profile/600 in brand (04.2, 10.2). */
-.entry-card__buy { display: block; font: 500 var(--ui-type-body)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.entry-card__get { display: block; margin-top: 4px; font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); color: var(--v5-brand); overflow-wrap: anywhere; }
+.entry-card__buy { display: block; font: 500 var(--ui-type-body)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.entry-card__get { display: block; margin-top: 4px; font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); color: var(--v5-brand); overflow-wrap: break-word; }
 .entry-card__keep { white-space: nowrap; }
 .entry-card__days { position: absolute; right: 14px; top: 14px; z-index: 1; }
 .entry-card__main { position: absolute; right: 70px; top: 44px; width: 118px; height: 118px; }
@@ -366,7 +366,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__eyebrow { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .entry-card__amount { margin-top: 2px; font: 500 36px/40px var(--font-amount); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--v5-ink); }
 .entry-card__amount--long { font-size: 26px; line-height: 32px; }
-.entry-card__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.entry-card__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .entry-card__unit--uvt { color: var(--v5-nex-ink); }
 .entry-card__tear { position: absolute; left: 111px; top: 12px; bottom: 12px; border-left: 1.5px dashed var(--v5-border-strong); }
 .entry-card__notch { position: absolute; left: 103px; width: 18px; height: 18px; border-radius: 50%; background: var(--v5-bg); }
@@ -374,8 +374,8 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__notch--bottom { bottom: -9px; }
 .entry-card__body { display: flex; flex-direction: column; min-width: 0; padding: 16px 14px 16px 18px; }
 .entry-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.entry-card__title { min-width: 0; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.entry-card__note { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.entry-card__title { min-width: 0; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.entry-card__note { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .entry-card--repurchase { display: flex; gap: 14px; min-height: 132px; box-sizing: border-box; padding: 10px; }
 .entry-card--repurchase .entry-card__body { flex: 1; padding: 6px 4px 6px 0; }
 .entry-card__well { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 104px; padding: 10px 0; border-radius: 16px; background: var(--v5-surface-2); }
@@ -383,7 +383,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__slot-image { width: 54px; height: 54px; }
 .entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: white; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
 .entry-card__bonus { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 3px; padding: 0 6px; }
-.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: anywhere; }
+.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: break-word; }
 .entry-pop { animation: entry-card-pop .45s cubic-bezier(.2,.8,.2,1) .5s backwards; }
 @keyframes entry-card-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes entry-card-pop { 0% { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }

@@ -90,5 +90,5 @@ onUnmounted(() => { generation += 1; });
 .jpush-privacy { display: grid; gap: 12px; margin-top: 24px; }
 .jpush-privacy button { width: 100%; }
 .privacy-section-title { display: block; font-size: var(--ui-type-section); font-weight: 600; }
-.privacy-copy { display: block; font-size: var(--ui-type-long-form); line-height: var(--ui-type-long-form-lh); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 10px; color: var(--v5-ink-2); }
+.privacy-copy { display: block; font-size: var(--ui-type-long-form); line-height: var(--ui-type-long-form-lh); white-space: pre-wrap; overflow-wrap: break-word; margin-top: 10px; color: var(--v5-ink-2); }
 </style>

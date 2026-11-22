@@ -80,18 +80,18 @@ function statusColor(status: MemberStatus): string {
 .team-roster { min-width: 0; }
 .roster-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); padding: 0 var(--v5-space-1) 10px; }
 .roster-title { min-width: 0; font-size: 16px; font-weight: 600; }
-.roster-subtitle { flex-shrink: 0; max-width: 60%; text-align: right; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.roster-subtitle { flex-shrink: 0; max-width: 60%; text-align: right; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); overflow-wrap: break-word; }
 .relation-dot { width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto; }
 .roster-empty { display: block; padding: 22px 0; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
 .member-row + .member-row { border-top: 1px solid var(--v5-border); }
 .member-trigger { display: flex; align-items: center; gap: var(--ui-space-inline); padding: 10px 0; min-height: 60px; box-sizing: border-box; }
 .member-identity { flex: 1; min-width: 0; }
-.member-name { display: block; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.member-name { display: block; font-size: 14px; font-weight: 600; overflow-wrap: break-word; }
 .member-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; font-size: 11px; color: var(--v5-ink-3); }
-.member-points { text-align: right; font: 600 15px/20px var(--font-metric); color: var(--v5-ink); max-width: 34%; overflow-wrap: anywhere; }
+.member-points { text-align: right; font: 500 15px/20px var(--font-metric); color: var(--v5-ink); max-width: 34%; overflow-wrap: break-word; }
 .member-details { margin-left: 48px; padding: 0 0 var(--v5-space-4); display: flex; flex-direction: column; gap: var(--ui-space-inline); }
 .member-detail { display: flex; justify-content: space-between; gap: var(--ui-space-inset); font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); }
-.member-detail > :last-child { text-align: right; color: var(--v5-ink-2); overflow-wrap: anywhere; }
+.member-detail > :last-child { text-align: right; color: var(--v5-ink-2); overflow-wrap: break-word; }
 .member-joined { flex-wrap: wrap; }
 .member-joined > :last-child { min-width: 0; flex: 1 1 170px; }
 .member-contribution { color: var(--v5-ink-2); text-align: right; font-size: 12px; }

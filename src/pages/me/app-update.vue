@@ -130,7 +130,7 @@ async function act() {
 .update-version { color: var(--v5-ink); font-size: 34px; font-weight: 650; }
 .update-panel { display: flex; flex-direction: column; gap: 10px; border-radius: 18px; background: var(--v5-surface-2); padding: 17px; margin-bottom: 12px; }
 .update-heading { font-weight: 650; font-size: 17px; }
-.update-description { display: block; color: var(--v5-ink-2); line-height: 1.5; font-size: 15px; white-space: pre-line; overflow-wrap: anywhere; }
+.update-description { display: block; color: var(--v5-ink-2); line-height: 1.5; font-size: 15px; white-space: pre-line; overflow-wrap: break-word; }
 .update-row { display: flex; justify-content: space-between; gap: 14px; font-size: 14px; color: var(--v5-ink-2); }
 .update-actions,.update-sheet { flex: none; padding: 12px 18px calc(16px + env(safe-area-inset-bottom)); }
 .update-primary,.update-later { margin: 0; width: 100%; font-size: 16px; line-height: 48px; font-weight: 600; border-radius: 14px; }

@@ -207,7 +207,7 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .device-inventory-row__state { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .device-inventory-row__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); flex: none; }
-.device-inventory-row__status { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); overflow-wrap: anywhere; }
+.device-inventory-row__status { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); overflow-wrap: break-word; }
 .device-inventory-row__today-box { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .device-inventory-row__label { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); white-space: nowrap; }
 .device-inventory-row__today { color: var(--v5-success-ink); font: 500 18px/24px var(--font-metric, var(--font-jet-mono)); white-space: nowrap; }

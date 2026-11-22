@@ -427,7 +427,7 @@ useAutoRecovery({
 }
 .nx-conv-refresh-warning__text {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   font-size: 12px;
   line-height: 1.45;
   color: var(--v5-ink-3);
@@ -529,7 +529,7 @@ useAutoRecovery({
 }
 .nx-conv-retry-state { text-align: center; padding-bottom: 16px; }
 .nx-conv-rowtop { flex-wrap: wrap; }
-.nx-conv-rowname { overflow-wrap: anywhere; white-space: normal; }
+.nx-conv-rowname { overflow-wrap: break-word; white-space: normal; }
 </style>
 
 <style src="@/styles/message-family.css"></style>

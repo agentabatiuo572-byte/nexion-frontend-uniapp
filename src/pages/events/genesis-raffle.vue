@@ -158,7 +158,7 @@ useAutoRecovery({ failed: () => error.value && !loading.value && !busy.value, re
 <style scoped>
 .raffle-page { padding:0 16px 28px; color:var(--v5-ink); }
 .raffle-card { margin-top:14px; padding:16px; border-radius:var(--nx-glass-radius); background:var(--nx-glass-fill); box-shadow:var(--nx-glass-edge); }
-.raffle-title { display:block; font-size:18px; font-weight:600; overflow-wrap:anywhere; }
+.raffle-title { display:block; font-size:18px; font-weight:600; overflow-wrap:break-word; }
 .raffle-copy { display:block; margin-top:10px; font-size:12px; color:var(--v5-ink-3); line-height:1.6; }
 .raffle-status { min-height: 20px; margin-top: 10px; font-size: 12px; color: var(--v5-ink-2); line-height: 20px; }
 .raffle-row, .raffle-prize { display:flex; justify-content:space-between; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:12px; font-size:12px; line-height:1.5; }

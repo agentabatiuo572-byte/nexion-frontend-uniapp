@@ -30,7 +30,7 @@
                 <view class="nx-unilevel-record-head">
                   <view class="nx-unilevel-icon" :class="`nx-unilevel-icon--${filter}`" aria-hidden="true"><svg v-if="filter === 'device_earning'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></view>
                   <view class="nx-unilevel-record-copy">
-                    <view class="nx-unilevel-member-line"><text class="nx-unilevel-member">{{ event.sourceUserName }}</text><text v-if="event.status !== 'unlocked' || ('statusUSDT' in event && event.statusUSDT !== event.statusNEX)" class="nx-royalty-status" :class="{ 'nx-royalty-status--cooling': event.status === 'cooling' }">{{ statusText(event) }}</text></view>
+                    <view class="nx-unilevel-member-line"><text class="nx-unilevel-member">{{ event.sourceUserName }}</text><NxTag v-if="event.status !== 'unlocked' || ('statusUSDT' in event && event.statusUSDT !== event.statusNEX)" :tone="event.status === 'cooling' ? 'warning' : 'neutral'">{{ statusText(event) }}</NxTag></view>
                     <text class="nx-unilevel-source-label">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : filter === 'direct' ? t.directReferral.purchase : t.directReferral.networkPurchase }} · {{ recordTime(event.ts) }}</text>
                   </view>
                   <view class="nx-unilevel-record-amounts">
@@ -69,6 +69,7 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { formatAmount } from "@/lib/amount-display";
@@ -246,7 +247,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 </script>
 
 <style scoped>
-.nx-direct-amount { overflow-wrap: anywhere; }
+.nx-direct-amount { overflow-wrap: break-word; }
 /* Hero (P-41): flat surface with a faint brand tint; USDT total in the amount font, UVT in metric. */
 :deep(.nx-unilevel-hero) { --nx-tint: var(--v5-brand); padding: var(--v5-space-5); border: 0; border-radius: 28px; }
 .nx-unilevel-hero-title { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--v5-ink-2); }
@@ -276,18 +277,14 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 .nx-unilevel-icon--device_earning { color: var(--v5-nex); background: color-mix(in srgb, var(--v5-nex) 16%, transparent); }
 .nx-unilevel-record-copy { min-width: 0; }
 .nx-unilevel-member-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--v5-space-1) 6px; }
-.nx-unilevel-member { min-width: 0; color: var(--v5-ink); font: var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5); overflow-wrap: anywhere; }
+.nx-unilevel-member { min-width: 0; color: var(--v5-ink); font: var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .nx-unilevel-record-amounts { min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .nx-unilevel-currency-row { display: block; font: 500 15px/20px var(--font-metric); color: var(--v5-brand); }
 .nx-unilevel-uvt { display: block; margin-top: 2px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); }
 .nx-unilevel-source-label { display: block; margin-top: 2px; color: var(--v5-ink-3); font-size: 12px; line-height: 18px; }
-.nx-royalty-status { display: inline-flex; align-items: center; min-height: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-2); font: 500 11px/16px var(--font-v5); overflow-wrap: anywhere; }
-.nx-royalty-status--cooling { color: var(--v5-warning); background: color-mix(in srgb, var(--v5-warning) 16%, transparent); }
-/* Light: the status-tag pair (opaque warning-soft + warning-ink, 03 §3.8) so the text clears 4.5:1 on any card (BUG-392). */
-[data-theme="light"] .nx-royalty-status--cooling { color: var(--v5-warning-ink); background: var(--v5-warning-soft); }
 .nx-unilevel-recovery { display: block; margin: var(--v5-space-2) 0 0 48px; color: var(--v5-ink-2); font-size: 12px; line-height: 1.6; }
 .nx-unilevel-focus:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .nx-unilevel-details-toggle { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 12px; }
-.nx-unilevel-details { color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.nx-unilevel-details { color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; overflow-wrap: break-word; }
 .nx-unilevel-details > text { margin-bottom: var(--v5-space-2); }
 </style>

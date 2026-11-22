@@ -1813,7 +1813,7 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-bal__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 30px/36px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wd-locks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .wd-locks__i { display: inline-flex; align-items: center; gap: 4px; }
-.wd-debt { display: flex; align-items: flex-start; gap: 6px; margin-top: 10px; color: var(--v5-ink-2); font: 400 12px/18px var(--font-v5); overflow-wrap: anywhere; }
+.wd-debt { display: flex; align-items: flex-start; gap: 6px; margin-top: 10px; color: var(--v5-ink-2); font: 400 12px/18px var(--font-v5); overflow-wrap: break-word; }
 .wd-debt svg { flex-shrink: 0; margin-top: 2px; color: var(--v5-warning-ink); }
 .wd-locks__v { color: var(--v5-ink-2); font: 500 12px/16px var(--font-metric); }
 .wd-stage { position: relative; margin-top: 12px; }
@@ -1880,8 +1880,8 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-recover__icon { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--wd-recover-hue) 20%, transparent); color: var(--wd-recover-hue); }
 .wd-recover__spin { animation: spin 1.6s linear infinite; }
 .wd-recover__main { flex: 1; min-width: 0; padding-bottom: 6px; }
-.wd-recover__title { display: block; color: var(--v5-ink); font: 600 13px/18px var(--font-v5); overflow-wrap: anywhere; }
-.wd-recover__body { display: block; margin-top: 3px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); overflow-wrap: anywhere; }
+.wd-recover__title { display: block; color: var(--v5-ink); font: 600 13px/18px var(--font-v5); overflow-wrap: break-word; }
+.wd-recover__body { display: block; margin-top: 3px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); overflow-wrap: break-word; }
 .wd-recover__acts { display: flex; flex-wrap: wrap; align-items: center; column-gap: 20px; margin: 2px 0 -6px; }
 .wd-recover__act { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .wd-recover__act--muted { color: var(--v5-ink-2); }

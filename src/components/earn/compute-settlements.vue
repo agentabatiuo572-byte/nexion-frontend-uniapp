@@ -109,7 +109,7 @@ watch(() => app.remoteComputeProtocolVersion, () => { reset(); void load(false);
 </script>
 
 <style scoped>
-.compute-settlements { padding:16px 0; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.compute-settlements { padding:16px 0; font-size:12px; line-height:1.6; overflow-wrap:break-word; }
 .compute-settlements__row { padding:10px 0; border-bottom:1px solid var(--v5-border); min-height:44px; }
 .compute-settlements__detail { margin-top:12px; padding:12px; background:var(--v5-surface-2); border-radius:12px; }
 </style>

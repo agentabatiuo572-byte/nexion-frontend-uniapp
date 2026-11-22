@@ -93,7 +93,7 @@ onMounted(() => {
 .home-trust__mark { width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:var(--ui-radius-icon);background:color-mix(in srgb,var(--v5-genesis-gold) 14%,transparent);color:var(--v5-genesis-gold); }
 .home-trust__entity { display:flex;flex-direction:column;min-width:0; }
 .home-trust__eyebrow { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
-.home-trust__name { font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);overflow-wrap:anywhere; }
+.home-trust__name { font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);overflow-wrap:break-word; }
 .home-trust__copy { display:flex;flex-direction:column;gap:4px; }
 .home-trust__headline { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .home-trust__body { font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-2);text-wrap:balance; }

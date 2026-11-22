@@ -19,6 +19,6 @@ const emblemSize = computed(() => ({ sm: 24, md: 30, lg: 40 })[props.size]);
 <style scoped>
 .nx-vbadge { display:inline-flex;align-items:center;gap:6px;max-width:100%;vertical-align:middle;color:var(--v5-ink);font:500 12px/1.5 var(--font-v5); }
 .nx-vbadge__level { flex:none;font-variant-numeric:tabular-nums;font-weight:600; }
-.nx-vbadge__title { min-width:0;overflow-wrap:anywhere;color:var(--v5-ink-2); }
+.nx-vbadge__title { min-width:0;overflow-wrap:break-word;color:var(--v5-ink-2); }
 .nx-vbadge--lg { font-size:14px;gap:8px; }
 </style>

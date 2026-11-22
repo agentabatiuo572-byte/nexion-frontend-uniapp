@@ -79,7 +79,7 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 /* Plain card (04 §4.2: one tinted card per screen region); the target device keeps its lime floor light. */
 .upgrade-spotlight { position:relative; overflow:hidden; padding:18px; border:1px solid var(--v5-border); border-radius:22px; background:var(--v5-surface); }
 .upgrade-eyebrow { display:block; font:500 12.5px/18px var(--font-v5); color:var(--ui-lime-soft); }
-.upgrade-title { margin-top:6px; overflow-wrap:anywhere; }
+.upgrade-title { margin-top:6px; overflow-wrap:break-word; }
 .upgrade-title__base { display:block; color:var(--v5-ink-2); font:500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .upgrade-title__target { display:block; margin-top:4px; color:var(--v5-brand); font:600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
 .upgrade-art { position:relative; height:118px; margin-top:6px; }
