@@ -270,7 +270,7 @@ import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { reportCheckoutKeepResumeKey, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
+import { reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
@@ -1331,13 +1331,27 @@ async function completeCapacityPurchase(original: CapacityPending, receipt: Cano
 function openCapacityIntent(target: string): boolean {
   const intent = capacityIntentResume.value;
   const original = capacityRecovery.value;
-  if (!intent || original?.key !== intent.commandKey || props.checkoutCapacityTarget !== target
+  if (!intent || original?.key !== intent.commandKey
       || intent.cutoff !== null && Date.now() >= intent.cutoff) return false;
+  return openCheckoutCapacityPayment(original, target, intent.intentNo);
+}
+
+function openCapacityProgress(row: CheckoutCapacityPaymentRow): boolean {
+  const target = props.checkoutCapacityTarget;
+  const original = capacityRecovery.value;
+  if (!target || original?.key !== row.commandKey || capacityPaymentKind(original.operation) !== row.kind) return false;
+  return openCheckoutCapacityPayment(original, target, row.intentNo);
+}
+defineExpose({ openCapacityProgress });
+
+function openCheckoutCapacityPayment(original: CapacityPending, target: string, intentNo?: string): boolean {
+  const originalTarget = original.quote ? original.quote.targetProductNo : original.targetProductNo;
+  if (!props.active || !capacityPageShown.value || props.checkoutCapacityTarget !== target || originalTarget !== target) return false;
   const scope = captureAccountScope();
   let generation = capacityRecoveryGeneration;
   const current = () => isCurrentAccountScope(scope) && props.active && capacityPageShown.value
     && props.checkoutCapacityTarget === target && generation === capacityRecoveryGeneration;
-  const opened = resumeCheckoutCapacityPayment(scope.accountKey, capacityPaymentKind(original.operation), original.key, intent.intentNo, {
+  const opened = resumeCheckoutCapacityPayment(scope.accountKey, capacityPaymentKind(original.operation), original.key, intentNo, {
     async onDelivered(result) {
       if (!current()) return;
       capacityRecoveryBusy.value = true;

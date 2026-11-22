@@ -152,7 +152,7 @@
       <TrialClaimSheet />
       <VoucherClaimSheet />
       <SlotActionSheet />
-      <TradeinSheets :active="pageVisible && hostVisible" :checkout-capacity-target="checkoutCapacityTarget" @checkout-capacity-cleared="emit('checkout-capacity-cleared', $event)" />
+      <TradeinSheets ref="tradeinSheets" :active="pageVisible && hostVisible" :checkout-capacity-target="checkoutCapacityTarget" @checkout-capacity-cleared="emit('checkout-capacity-cleared', $event)" />
       <LuckySpinSheet />
       <StickyCtaBar />
       <!-- 待支付浮动条:结算扫码步开出的那笔发票还没付,全站置顶提醒 + 一键回到同一笔。
@@ -168,7 +168,7 @@
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
 import { ref, computed, watch, onMounted, onUnmounted, inject, provide, getCurrentInstance } from "vue";
-import { checkoutKeepResumeKey, reportCheckoutKeepResumeKey } from "@/components/checkout/checkout-keep-resume";
+import { checkoutKeepResumeKey, openCheckoutCapacityProgressKey, reportCheckoutKeepResumeKey } from "@/components/checkout/checkout-keep-resume";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
 // #ifdef APP-PLUS
@@ -252,10 +252,12 @@ const emit = defineEmits<{
   (event: "checkout-capacity-cleared", target: string): void;
 }>();
 const checkoutKeepResume = inject(checkoutKeepResumeKey, null);
+const tradeinSheets = ref<InstanceType<typeof TradeinSheets> | null>(null);
 if (checkoutKeepResume) {
   provide(reportCheckoutKeepResumeKey, resume => {
     if (!resume || resume.target === props.checkoutCapacityTarget) checkoutKeepResume.value = resume;
   });
+  provide(openCheckoutCapacityProgressKey, row => tradeinSheets.value?.openCapacityProgress(row) ?? false);
 }
 const t = useT();
 // The App build has no document in the logic layer; the shell root carries the language for :lang() rules.

@@ -244,7 +244,7 @@
 </template>
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
-import { ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type OwnsCheckoutCapacityPayment } from '@/components/checkout/checkout-keep-resume';
+import { openCheckoutCapacityProgressKey, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type OwnsCheckoutCapacityPayment } from '@/components/checkout/checkout-keep-resume';
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import NxButton from '@/components/ui/nx-button.vue';
@@ -286,11 +286,17 @@ const showsCheckoutCapacityResume = inject(showsCheckoutCapacityResumeKey, null)
 const records = computed(() => unsettled.value.filter(row => !row.validated && !row.businessDelivered
   && row.lastStatus !== 'DELIVERED' && !showsCheckoutCapacityResume?.(row)));
 const pending = computed(() => records.value.filter(row => !payment.resumeDismissed(row)));
+const ownsCheckoutCapacityPayment = inject(ownsCheckoutCapacityPaymentKey, null);
+const openCheckoutCapacityProgress = inject(openCheckoutCapacityProgressKey, null);
 // One payment opens directly; several are listed on Orders.
-function openPending() { if (pending.value.length === 1) void payment.resume(pending.value[0]); else void navTo('/pages/store/orders'); }
+function openPending() {
+  const [row] = pending.value;
+  if (pending.value.length !== 1 || !row) { void navTo('/pages/store/orders'); return; }
+  if (ownsCheckoutCapacityPayment?.(row)) openCheckoutCapacityProgress?.(row);
+  else void payment.resume(row);
+}
 // Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
 // payment leaves the bar, and a closed one returns when its status changes.
-const ownsCheckoutCapacityPayment = inject(ownsCheckoutCapacityPaymentKey, null);
 const canReadResumeRow: OwnsCheckoutCapacityPayment = row => !ownsCheckoutCapacityPayment?.(row);
 const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.some(canReadResumeRow));
 function readResumeRows() {

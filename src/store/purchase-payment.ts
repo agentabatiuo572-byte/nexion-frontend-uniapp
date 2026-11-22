@@ -812,13 +812,13 @@ function waitForResumedChoice(checkout?: CheckoutCapacityResume) {
     if (typeof orderNo === 'string' && orderNo) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
   });
 }
-/** Open a checkout-confirmed original through the same payment layer as View Progress. */
+/** Open the original payment and hand final results back to its owning checkout. */
 export function resumeCheckoutCapacityPayment(accountKey: string, kind: 'CAPACITY_KEEP' | 'CAPACITY_REPLACE',
-  commandKey: string, intentNo: string, checkout: CheckoutCapacityResume): boolean {
+  commandKey: string, intentNo: string | undefined, checkout: CheckoutCapacityResume): boolean {
   if (state.open || accountKey !== account()) return false;
   const pending = pendingPayments().find(row => row.commandKey === commandKey && row.kind === kind);
-  if (!pending || pending.intentNo && pending.intentNo !== intentNo) return false;
-  void resume({ ...pending, intentNo }, checkout);
+  if (!pending || intentNo && pending.intentNo && pending.intentNo !== intentNo) return false;
+  void resume(intentNo ? { ...pending, intentNo } : pending, checkout);
   return true;
 }
 // The App runtime keeps a page's query on $page.options; H5 also sets options.
