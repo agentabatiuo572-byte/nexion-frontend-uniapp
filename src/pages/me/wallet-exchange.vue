@@ -61,7 +61,7 @@
             @input="onInput"
             @blur="onInputBlur"
             />
-            <view class="ex-coin" :class="fromSym === 'UVT' ? 'ex-coin--uvt' : 'ex-coin--usdt'"><text class="ex-coin__i">{{ fromSym === 'UVT' ? 'U' : '₮' }}</text><text>{{ platformDisplayText(fromSym) }}</text></view>
+            <view class="ex-coin" :class="fromSym === 'UVT' ? 'ex-coin--uvt' : 'ex-coin--usdt'"><view class="ex-coin__i"><UvtCoin v-if="fromSym === 'UVT'" /><UsdtCoin v-else /></view><text>{{ platformDisplayText(fromSym) }}</text></view>
           </view>
           <text class="ex-k ex-leg__f">{{ minLabel }}</text>
         </view>
@@ -72,7 +72,7 @@
           <text class="ex-k ex-leg__label">{{ remoteApiEnabled ? t.exchange.netReceive : t.exchange.receive }}</text>
           <view class="ex-leg__m">
             <text class="ex-amt">{{ toParts[0] }}<text class="ex-dec">{{ toParts[1] }}</text></text>
-            <view class="ex-coin" :class="toSym === 'UVT' ? 'ex-coin--uvt' : 'ex-coin--usdt'"><text class="ex-coin__i">{{ toSym === 'UVT' ? 'U' : '₮' }}</text><text>{{ platformDisplayText(toSym) }}</text></view>
+            <view class="ex-coin" :class="toSym === 'UVT' ? 'ex-coin--uvt' : 'ex-coin--usdt'"><view class="ex-coin__i"><UvtCoin v-if="toSym === 'UVT'" /><UsdtCoin v-else /></view><text>{{ platformDisplayText(toSym) }}</text></view>
           </view>
           <view class="ex-leg__f"><text class="ex-k ex-mono">{{ rateLabel }}</text></view>
         </view>
@@ -151,9 +151,9 @@
         <EmptyState v-if="history.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
         <view v-else class="ex-rows">
           <view v-for="h in history" :key="h.id" class="ex-row">
-            <view class="ex-row__ico">
+            <NxIconTile tone="purple" size="m">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
-            </view>
+            </NxIconTile>
             <view class="flex-1 min-w-0">
               <text class="ex-row__p">{{ swapLine(h) }}</text>
               <text class="ex-k ex-mono">@ {{ h.rate.toFixed(5) }} · {{ formatDisplayDateTime(h.ts, dateLocale(), true) }}</text>
@@ -178,6 +178,9 @@
 </template>
 
 <script setup lang="ts">
+import UvtCoin from "@/components/ui/uvt-coin.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import UsdtCoin from "@/components/ui/usdt-coin.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
@@ -1108,11 +1111,10 @@ const historyEmptyStyle: CSSProperties = {
 .ex-amt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ex-dec { color: var(--v5-ink-3); }
 .ex-coin { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 6px; border-radius: var(--v5-radius-full); font: 500 14px/20px var(--font-v5); }
-.ex-coin__i { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font: 600 11px/1 var(--font-metric); }
+/* The shared token coins (uvt-coin.vue, usdt-coin.vue) fill this slot. */
+.ex-coin__i { display: grid; place-items: center; width: 24px; height: 24px; }
 .ex-coin--uvt { background: var(--v5-nex-soft); color: var(--v5-nex-ink); }
-.ex-coin--uvt .ex-coin__i { background: var(--v5-nex); color: white; }
 .ex-coin--usdt { background: var(--v5-surface-3); color: var(--v5-ink); }
-.ex-coin--usdt .ex-coin__i { background: var(--v5-ink); color: var(--v5-bg); }
 .ex-swap { position: absolute; left: 50%; top: 50%; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand); cursor: pointer;
   box-shadow: 0 0 0 4px var(--v5-bg), var(--ui-glass-edge-shadow); transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
 .ex-swap > svg { animation: ex-flip 700ms 520ms cubic-bezier(.2,.8,.2,1) both; }
@@ -1146,7 +1148,6 @@ const historyEmptyStyle: CSSProperties = {
 .ex-rows { overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .ex-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
 .ex-row + .ex-row { border-top: 1px solid var(--v5-border); }
-.ex-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); background: var(--v5-nex-soft); color: var(--v5-nex-ink); }
 .ex-row__p { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; }
 .ex-bar-space { height: 110px; }
 .ex-bar { position: absolute; z-index: 36; }

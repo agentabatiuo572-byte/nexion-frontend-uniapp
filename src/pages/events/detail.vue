@@ -77,9 +77,9 @@ import { navTo, takeNavigationQuery } from "@/lib/route";
 import { displayDeadline } from "@/lib/promotion-display";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
-import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref, eventCommandFailure, isEventNotFound } from "./event-detail-display";
+import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref, eventCommandFailure, isEventNotFound, type EventCommandFailure } from "./event-detail-display";
 import { toast } from "@/store/ui";
-import { forgetPendingEventCommand, readPendingEventCommand, rememberPendingEventCommand } from "@/lib/event-pending-command";
+import { forgetPendingEventCommand, isPendingEventCommandExpired, readPendingEventCommand, rememberPendingEventCommand, type PendingEventCommand } from "@/lib/event-pending-command";
 import { uiLocale, serverLanguage } from "@/i18n";
 
 const app = useApp(), locale = useLocaleStore(), api = createEventDetailApi(apiClient);
@@ -88,6 +88,7 @@ const copy = computed(() => eventDetailCopy[uiLocale(locale.code)]);
 const uiT = useT();
 const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
+const readingReceipt = ref(false);
 // Progress is drawn only from a measured value (04 §4.0). Only referral, onboarding and the reinvest bonus count real
 // progress; the other kinds (promotion, voucher, boost, wheel) get a 0 / 1 placeholder from the server, as every event
 // does before it starts, and regional events rank by region instead.
@@ -127,55 +128,78 @@ watch(action, (next, prev) => {
 // generation orders reads; commands is bumped only by reset(), so a read the user starts (a pull) during a command does
 // not orphan it: the command still clears busy and reads its result.
 let code = "", visible = false, generation = 0, commands = 0;
-let unconfirmedAction: "join" | "claim" | "remind" | null = null;
-// The claim key a claim with an unknown outcome used: a tiered event (the reinvest bonus) stays claimable after one tier,
-// so the claim is confirmed once that key has left claimKeys, not only by CLAIMED.
-let unconfirmedClaimKey = "";
+let pendingCommand: PendingEventCommand | null = null;
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
-function reset() { generation += 1; commands += 1; detail.value = null; error.value = false; commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = ""; busy.value = false; }
+function reset() { generation += 1; commands += 1; detail.value = null; error.value = false; commandError.value = false; pendingCommand = null; readingReceipt.value = false; busy.value = false; }
+function showCommandFailure(failure: Exclude<EventCommandFailure, "unknown">) {
+  if (failure === "claimed") toast.info(copy.value.eligibility.CLAIMED);
+  else if (failure === "joined") toast.info(copy.value.joined);
+  // Each says what happened and the next step (06 §6.1): slots reuse the warehouse line, stock and account add a line.
+  else if (failure === "slots") toast.error(uiT.value.myDevices.inventorySlotsFullWarning);
+  else if (failure === "stock") toast.error(copy.value.failed.stock, copy.value.failed.stockNext);
+  else if (failure === "account") toast.error(copy.value.failed.account, copy.value.failed.accountNext);
+  else toast.error(failure === "notEligible" ? copy.value.eligibility.NOT_ELIGIBLE : copy.value.failed[failure]);
+}
 async function load() {
   if (!visible) return;
-  // A command left unconfirmed by a reload or an earlier visit of this account is confirmed again by this read. Not while
-  // a command is in flight: it writes its own record before it is sent.
-  const saved = !unconfirmedAction && !busy.value && code ? readPendingEventCommand(app.accountKey, code) : null;
-  if (saved) { commandError.value = true; unconfirmedAction = saved.action; unconfirmedClaimKey = saved.claimKey; }
+  const account = app.accountKey, eventCode = code;
+  // A foreground write owns its record until the write returns. Later visits resume with the recorded key.
+  const saved = !busy.value && eventCode ? readPendingEventCommand(account, eventCode) : null;
+  if (saved) { pendingCommand = saved; commandError.value = true; }
+  const attempt = busy.value ? null : pendingCommand;
   const request = ++generation, scope = identity();
   // A failed read keeps its stale-snapshot state (greyed action and its reason) until a read succeeds, so a retry in
   // flight does not re-enable the action on data that is still stale.
   loading.value = true;
   const current = () => visible && generation === request && scope === identity();
+  const clearAttempt = () => {
+    if (!attempt) return;
+    void forgetPendingEventCommand(account, eventCode, attempt.at);
+    pendingCommand = null;
+    commandError.value = false;
+  };
   try {
-    if (!remoteApiEnabled || !code) throw new Error("EVENT_UNAVAILABLE");
-    const value = await api.detail(code, language.value);
-    if (current()) {
-      detail.value = value; error.value = false;
-      // Success is said only on positive evidence: claimed, joined, subscribed. A claim key that left claimKeys only shows
-      // the reward is not claimable now (a tiered claim's tier taken, or eligibility lost), so it ends the check quietly.
-      const confirmed = (unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && value.userStatus === "CLAIMED") || (unconfirmedAction === "remind" && !!value.reminderSubscribed);
-      const claimKeyGone = unconfirmedAction === "claim" && !!unconfirmedClaimKey && !(value.claimKeys ?? []).includes(unconfirmedClaimKey);
-      if (confirmed || claimKeyGone) {
-        // A claim confirmed only by this read lost its receipt; a device it issued still has to reach the fleet.
-        if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
-        // The result the server confirmed is said once (03 §3.5.2 提交结果未知).
-        if (confirmed) toast.success(unconfirmedAction === "claim" ? copy.value.eligibility.CLAIMED : unconfirmedAction === "remind" ? reminderCopy.value.subscribed : copy.value.joined);
-        commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
-        void forgetPendingEventCommand(app.accountKey, code);
-      } else if (unconfirmedAction && (eventDetailAction(value) !== unconfirmedAction || !readPendingEventCommand(app.accountKey, code))) {
-        // Nothing is left to confirm when the event no longer offers that action (ended, claimed, no longer open to join or
-        // remind), or when the stored record is gone or a day old: another page instance got the command's result, or it
-        // never ran. The note and the record go; the page keeps the state it just read.
-        commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
-        void forgetPendingEventCommand(app.accountKey, code);
+    if (attempt && isPendingEventCommandExpired(attempt)) clearAttempt();
+    // The two reads start together. Activity detail drives the page; the receipt settles this specific attempt.
+    const receipt = remoteApiEnabled && attempt && pendingCommand === attempt
+      ? api.commandReceipt(eventCode, attempt.action === "remind" ? "reminder" : attempt.action, attempt.key).catch(() => null)
+      : null;
+    readingReceipt.value = receipt !== null;
+    try {
+      if (!remoteApiEnabled || !eventCode) throw new Error("EVENT_UNAVAILABLE");
+      const value = await api.detail(eventCode, language.value);
+      if (!current()) return;
+      detail.value = value;
+      error.value = false;
+    } catch (cause) {
+      if (!current()) return;
+      error.value = true;
+      if (!isTransientReadFailure(cause)) detail.value = null;
+      if (isEventNotFound(cause)) {
+        if (pendingCommand === attempt) clearAttempt();
+        return;
       }
+    } finally { if (current()) loading.value = false; }
+    if (!receipt || !attempt) return;
+    const result = await receipt;
+    if (!current() || pendingCommand !== attempt) return;
+    if (isPendingEventCommandExpired(attempt) || (saved && readPendingEventCommand(account, eventCode)?.at !== attempt.at)) {
+      clearAttempt();
+      return;
     }
-  } catch (cause) {
-    if (current()) {
-      error.value = true; if (!isTransientReadFailure(cause)) detail.value = null;
-      // The event no longer exists: a command on it has nothing left to confirm. This is not its success.
-      if (isEventNotFound(cause)) { commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = ""; void forgetPendingEventCommand(app.accountKey, code); }
+    if (result?.status === "SUCCEEDED") {
+      clearAttempt();
+      if (attempt.action === "claim" && result.rewardType === "DEVICE") void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
+      toast.success(attempt.action === "claim" ? copy.value.eligibility.CLAIMED : attempt.action === "remind" ? reminderCopy.value.subscribed : copy.value.joined);
+    } else if (result?.status === "FAILED") {
+      clearAttempt();
+      const failure = eventCommandFailure(result.error);
+      showCommandFailure(failure === "unknown" ? "generic" : failure);
+    } else if (result?.status === "NOT_FOUND") {
+      clearAttempt();
     }
   }
-  finally { if (current()) loading.value = false; }
+  finally { if (current()) readingReceipt.value = false; }
 }
 async function run() {
   if (!visible || busy.value || !detail.value || !action.value) return;
@@ -188,23 +212,25 @@ async function run() {
   const claimKey = detail.value.claimKeys?.[0] ?? "";
   const fleetRequest = selectedAction === "claim" ? app.captureRemoteAccountRequest() : undefined;
   const deviceClaim = selectedAction === "claim" && detail.value.rewards.some((reward) => reward.type === "DEVICE");
-  const account = app.accountKey, attempt = Date.now();
+  const account = app.accountKey, eventCode = code;
   const commandKey = selectedAction === "remind" ? `h4-event-reminder:${code}` : selectedAction === "claim" ? eventClaimCommandKey(code, detail.value.claimKeys) : `h4-event-join:${code}`;
+  const attempt: PendingEventCommand = { action: selectedAction, key: commandKey, claimKey: selectedAction === "claim" ? claimKey : "", at: Date.now() };
+  pendingCommand = attempt;
   // Recorded before sending, as checkout does, so a reload while the result is unknown still confirms it. The record only
   // restores the confirming note; the fixed idempotency key keeps a resend safe without it, so a storage failure does not
   // block the command.
-  void rememberPendingEventCommand(account, code, { action: selectedAction, key: commandKey, claimKey: selectedAction === "claim" ? claimKey : "", at: attempt });
+  void rememberPendingEventCommand(account, eventCode, attempt);
   try {
-    if (selectedAction === "remind") await api.remind(code, commandKey);
+    if (selectedAction === "remind") await api.remind(eventCode, commandKey);
     else if (selectedAction === "claim") {
       // A lost claim receipt can leave the warehouse refresh to onShow.
       if (deviceClaim) app.invalidateRemoteFleet(fleetRequest);
-      const claim = await eventsApi.claim(code, commandKey);
+      const claim = await eventsApi.claim(eventCode, commandKey);
       if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
-    } else await eventsApi.join(code, commandKey);
+    } else await eventsApi.join(eventCode, commandKey);
     // Only this attempt's record: a later attempt (after leaving and coming back) owns its own.
-    void forgetPendingEventCommand(account, code, attempt);
-    if (current()) { busy.value = false; await load(); }
+    void forgetPendingEventCommand(account, eventCode, attempt.at);
+    if (current()) { pendingCommand = null; busy.value = false; await load(); }
   } catch (cause) {
     // The outcome may be unknown even if this page is gone: a fleet read started during the claim may predate the device.
     // Invalidate it, then read again so a warehouse already on screen does not keep the pre-claim fleet.
@@ -213,13 +239,11 @@ async function run() {
     // once (03 §3.5.1 toast) and leave the action available. The read shows the event as it now stands. A known result
     // needs no confirming later, even if this page is gone.
     const failure = eventCommandFailure(cause);
-    if (failure !== "unknown") void forgetPendingEventCommand(account, code, attempt);
+    if (failure !== "unknown") void forgetPendingEventCommand(account, eventCode, attempt.at);
     if (!current()) return;
     busy.value = false;
-    if (failure === "unknown") { commandError.value = true; unconfirmedAction = selectedAction; unconfirmedClaimKey = selectedAction === "claim" ? claimKey : ""; }
-    // Already claimed is the outcome the user wanted, not an error.
-    else if (failure === "claimed") toast.info(copy.value.eligibility.CLAIMED);
-    else toast.error(failure === "notEligible" ? copy.value.eligibility.NOT_ELIGIBLE : copy.value.failed[failure]);
+    if (failure === "unknown") commandError.value = true;
+    else { pendingCommand = null; showCommandFailure(failure); }
     await load();
   } finally {
     // Only the change this action makes may move focus; later background reads do not.
@@ -232,13 +256,16 @@ let releaseActiveRefresh = () => {};
 onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value || commandError.value ? undefined : load()); void load(); });
 onHide(() => { visible = false; releaseActiveRefresh(); reset(); });
 // Another account does not inherit this account's unconfirmed command.
-watch(() => [app.accountKey, app.accountBindingEpoch, language.value], (next, prev) => { if (code && next[0] !== prev[0]) void forgetPendingEventCommand(String(prev[0]), code); reset(); void load(); }, { flush: "sync" });
+watch(() => [app.accountKey, app.accountBindingEpoch, language.value], (next, prev) => {
+  if (pendingCommand && code && next[0] !== prev[0]) void forgetPendingEventCommand(String(prev[0]), code, pendingCommand.at);
+  reset(); void load();
+}, { flush: "sync" });
 const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });
 onUnmounted(() => { visible = false; releaseActiveRefresh(); reset(); unsubscribe(); });
 useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !commandError.value && !loading.value && !busy.value, retry: load });
 // A command whose result is unknown is settled by this read (load reconciles it), so the page keeps reading at a low rate
 // until it is, quietly: a pull during the check is not a failed refresh (03 §3.5.2). One owner per state.
-useAutoRecovery({ failed: () => remoteApiEnabled && commandError.value && !loading.value && !busy.value, retry: load, repeatMs: 30_000 });
+useAutoRecovery({ failed: () => remoteApiEnabled && commandError.value && !loading.value && !readingReceipt.value && !busy.value, retry: load, repeatMs: 30_000 });
 </script>
 <style scoped>
 .event-detail { padding:0 16px 28px; color:var(--v5-ink); }

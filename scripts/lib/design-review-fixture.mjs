@@ -158,7 +158,7 @@ export function previewHomeDisplay(state, at = Date.now()) {
   const samples = Array.from({ length: enabled ? homeDisplayPlanSeconds + 1 : 1 }, (_, offset) => elapsed + offset);
   const jobsBase = previewActiveJobsBase(state);
   return { enabled, startAt, serverNow: at, validUntil,
-    sequence: elapsed + 1, online: samples.map(t => 800 + t * 2), paidCents: samples.map(t => 300000 + t * 25),
+    sequence: elapsed + 1, online: samples.map(t => 800 + t * 2), paidCents: samples.map(t => 300000 + t * 300),
     activeJobs: samples.map(t => jobsBase === null ? null : jobsBase + (t - (state.homeDisplayJobsAnchor ?? 0)) * 2) };
 }
 

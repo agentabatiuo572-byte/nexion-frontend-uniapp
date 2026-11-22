@@ -84,7 +84,7 @@
             <view class="checkout-section-heading"><text>{{ t.promotion.discount }}</text></view>
             <view class="checkout-group">
               <view class="checkout-option checkout-voucher" role="button" tabindex="0" :aria-expanded="voucherDetailsOpen" @click="voucherDetailsOpen = !voucherDetailsOpen" @keydown.enter.prevent="voucherDetailsOpen = !voucherDetailsOpen" @keydown.space.prevent="voucherDetailsOpen = !voucherDetailsOpen">
-                <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 0 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z" /><path d="M14 6v2m0 3v2m0 3v2" /></svg></view>
+                <NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 0 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z" /><path d="M14 6v2m0 3v2m0 3v2" /></svg></NxIconTile>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.voucher.checkoutRowLabel }}</text><text class="checkout-row-description">{{ remoteApiEnabled && trialConversionMode ? trialCopy.voucherUnavailable : hasVoucher ? auditCopy.autoApplyVoucher : !voucherAutomatic ? t.promotion.noVoucher : expiredVoucherForSku ? t.voucher.expiredNote : t.voucher.noneAvailable }}</text></view>
                 <text v-if="hasVoucher" class="checkout-discount">{{ reviewMoney(voucherDiscount, true) }}</text><svg class="checkout-chevron" :class="{ 'checkout-chevron--open': voucherDetailsOpen }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
               </view>
@@ -98,14 +98,14 @@
                 </view>
                 <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
               </view>
-              <view v-if="promoDiscount > 0" class="checkout-option"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12v9h16v-9M2 7h20v5H2zM12 7v14M12 7C3 8 4 0 8 2c3 1 4 5 4 5s1-4 4-5c4-2 5 6-4 5" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ promoRowLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(promoDiscount, true) }}</text></view>
-              <view v-if="trialOffsetView.offsetUSD > 0" class="checkout-option"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ t.store.coRowTrialOffset }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.offsetUSD, true) }}</text></view>
-              <view v-if="trialOffsetView.earlyDiscountUSD > 0" class="checkout-option" data-testid="checkout-trial-early-discount"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ trialCopy.earlyDiscountLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.earlyDiscountUSD, true) }}</text></view>
+              <view v-if="promoDiscount > 0" class="checkout-option"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12v9h16v-9M2 7h20v5H2zM12 7v14M12 7C3 8 4 0 8 2c3 1 4 5 4 5s1-4 4-5c4-2 5 6-4 5" /></svg></NxIconTile><view class="checkout-option-copy"><text class="checkout-row-title">{{ promoRowLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(promoDiscount, true) }}</text></view>
+              <view v-if="trialOffsetView.offsetUSD > 0" class="checkout-option"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></NxIconTile><view class="checkout-option-copy"><text class="checkout-row-title">{{ t.store.coRowTrialOffset }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.offsetUSD, true) }}</text></view>
+              <view v-if="trialOffsetView.earlyDiscountUSD > 0" class="checkout-option" data-testid="checkout-trial-early-discount"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg></NxIconTile><view class="checkout-option-copy"><text class="checkout-row-title">{{ trialCopy.earlyDiscountLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.earlyDiscountUSD, true) }}</text></view>
               <!-- Trade-in remains a separate, reversible action, never a payment switch. -->
               <view v-if="!hasVoucher && (hasTradein || removedTradein || tradeinAvailable)" class="checkout-option checkout-tradein">
-                <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h13m1 12 4-4-4-4M21 16H8" /></svg></view>
+                <NxIconTile tone="coral" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h13m1 12 4-4-4-4M21 16H8" /></svg></NxIconTile>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-row-description">{{ tradeinChipText }}</text></view>
-                <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
+                <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" class="nx-reverse-action" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
                 <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" @click="reAddTradein" />
               </view>
             </view>
@@ -115,7 +115,7 @@
             <view class="checkout-section-heading"><text>{{ t.store.coPaymentMethod }}</text></view>
             <view class="checkout-group" role="group" :aria-label="t.store.coPaymentMethod">
               <view v-for="m in PAYMENT_METHODS" :key="m.id" class="checkout-option checkout-payment" :class="{ 'checkout-payment--active': payment === m.id }" role="button" tabindex="0" :aria-pressed="payment === m.id" @click.stop="selectPayment(m.id)">
-                <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="m.iconPath" /><path v-if="m.iconPath2" :d="m.iconPath2" /></svg></view>
+                <NxIconTile tone="teal" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="m.iconPath" /><path v-if="m.iconPath2" :d="m.iconPath2" /></svg></NxIconTile>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ m.label }}</text><text class="checkout-row-description">{{ m.hint }}</text></view>
                 <view class="checkout-radio" :class="{ 'checkout-radio--active': payment === m.id }" aria-hidden="true" />
               </view>
@@ -279,6 +279,7 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
@@ -3760,7 +3761,6 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); letter-spacing:-.012em; }
 .checkout-option { display:flex; align-items:center; gap:var(--v5-space-3); min-height:64px; padding:10px 16px; border-bottom:1px solid var(--v5-border); }
 .checkout-option:last-child { border-bottom:0; }
-.checkout-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; color:var(--v5-ink-2); background:var(--ui-content-surface-2); }
 .checkout-option-copy { flex:1; min-width:0; }
 .checkout-row-title { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); }
 .checkout-row-description { display:block; margin-top:2px; font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
@@ -3776,10 +3776,8 @@ button.checkout-quantity-button::after {border:0;}
 /* Long trade-in labels (ru, kk) would squeeze the title into 3 lines: the action drops below, right-aligned. */
 .checkout-tradein { flex-wrap:wrap; }
 .checkout-tradein .checkout-option-copy { flex:1 1 8em; }
-.checkout-tradein :deep(.nx-button) { margin-left:auto; }
-.checkout-payment { cursor:pointer; transition:background 180ms ease; }
+.checkout-tradein :deep(.nx-button) { margin-left:auto; }.checkout-payment { cursor:pointer; transition:background 180ms ease; }
 .checkout-payment--active { background:color-mix(in srgb,var(--v5-brand) 7%,transparent); box-shadow:inset 3px 0 0 var(--v5-brand); }
-.checkout-payment--active .checkout-icon { color:var(--v5-brand); }
 .checkout-radio { flex:none; width:20px; height:20px; border-radius:50%; border:1.5px solid var(--v5-ink-4); background:var(--v5-ink); }
 .checkout-radio--active { box-sizing:border-box; padding:4px; border-color:var(--v5-brand); background:var(--v5-brand); background-clip:content-box; }
 .checkout-fees { padding:6px 0; }

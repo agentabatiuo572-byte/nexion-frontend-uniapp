@@ -171,7 +171,7 @@
           <view class="grid grid-cols-3 gap-2 mt-4">
             <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
-              <text class="block tabular-nums" :style="drawerStatValStyle"><NxTickNumber :value="selected.devices" /></text>
+              <text class="block tabular-nums" :style="drawerStatValStyle"><NxTickNumber :text="selected.devices === null ? null : networkPopulationBand(selected.devices, locale.code)" /></text>
               <text class="block" :style="drawerStatLabelStyle">{{ t.home.networkDevices }}</text>
             </view>
             <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
@@ -199,6 +199,8 @@ import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
 import NetworkStatStrip, { type NetworkStatCell } from "@/components/home/network-stat-strip.vue";
 import NxTickNumber from "@/components/ui/nx-tick-number.vue";
+import { networkPopulationBand } from "@/lib/platform-stats";
+import { useLocaleStore } from "@/store/locale";
 // #ifdef APP-PLUS
 import NativeSvg from "@/components/native-svg.vue";
 // #endif
@@ -216,6 +218,7 @@ import { onHide, onShow } from "@dcloudio/uni-app";
 import { globeSimulation, GLOBE_CENTERS } from "@/lib/globe-simulation";
 
 const t = useT();
+const locale = useLocaleStore();
 const cfg = useConfig();
 const app = useApp();
 // #ifndef APP-PLUS
@@ -235,9 +238,11 @@ const display = useHomeDisplay(() => remoteApiEnabled);
 const onlineTotal = computed(() => (remoteApiEnabled ? display.value?.online : cfg.config.networkPulse?.onlineDevices) ?? null);
 const centerStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0,
   globeSettings.value, onlineTotal.value, app.activeJobsDisplay, remoteApiEnabled));
+// Platform counts show the 06 §6.4 band and roll when the band changes; the online figure carries the live dot.
+const band = (value: number | null) => value === null ? null : networkPopulationBand(value, locale.code);
 const topStats = computed<NetworkStatCell[]>(() => [
-  { key: "devices", label: t.value.home.networkDevices, count: onlineTotal.value },
-  { key: "jobs", label: t.value.globe.activeJobs, count: app.activeJobsDisplay },
+  { key: "devices", label: t.value.home.networkDevices, text: band(onlineTotal.value), roll: true, live: (onlineTotal.value ?? 0) > 0 },
+  { key: "jobs", label: t.value.globe.activeJobs, text: band(app.activeJobsDisplay), roll: true },
 ]);
 // Display offsets separate nearby centers; leader lines preserve geographic anchors.
 const mapPositions: Record<string, readonly [number, number]> = {

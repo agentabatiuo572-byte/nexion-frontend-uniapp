@@ -34,7 +34,7 @@
             <view class="dly-spk" style="right: -20px; top: 52px; width: 4px; height: 4px; background: var(--v5-brand-2); opacity: .6" />
             <view class="dly-spk" style="right: -12px; top: 170px; width: 7px; height: 7px; background: var(--v5-warning); opacity: .5" />
             <view v-if="ring.next !== null" class="dly-gift" :class="{ 'dly-gift--reached': ring.reached }" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
+              <view class="dly-gift__object"><NxObjectIcon kind="gift" /></view>
             </view>
           </template>
           <view class="dly-ctr" aria-hidden="true">
@@ -98,8 +98,8 @@
                     <text>{{ m.labelText ?? t.daily.milestones[m.labelKey] }}</text>
                     <view v-if="isMilestoneClaimed(m)" class="dly-tk__ck" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></view>
                     <view v-else-if="m.reward.type !== 'unknown'" class="dly-tk__ti" aria-hidden="true">
-                      <svg v-if="m.reward.type === 'uvt'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-nex-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
-                      <svg v-else-if="m.reward.type === 'usdt'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" /><path d="M12 18V6" /></svg>
+                      <view v-if="m.reward.type === 'uvt'" class="dly-coin"><UvtCoin /></view>
+                      <view v-else-if="m.reward.type === 'usdt'" class="dly-coin"><UsdtCoin /></view>
                       <svg v-else-if="m.reward.type === 'spin'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" /><path d="M13 5v2" /><path d="M13 17v2" /><path d="M13 11v2" /></svg>
                       <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg>
                     </view>
@@ -171,7 +171,7 @@
       <!-- UVT -->
       <view class="dly-sec">
         <view class="dly-wl dly-card">
-          <view class="dly-wk"><text>{{ t.daily.balance }}</text><view class="dly-uvt"><text class="dly-uvt__i">U</text><text>{{ t.daily.points }}</text></view></view>
+          <view class="dly-wk"><text>{{ t.daily.balance }}</text><view class="dly-uvt"><view class="dly-uvt__i"><UvtCoin /></view><text>{{ t.daily.points }}</text></view></view>
           <view class="dly-wa">
             <template v-if="balanceParts"><text class="dly-wa__i">{{ balanceParts.whole }}</text><text class="dly-wa__c">{{ balanceParts.fraction }}</text></template>
             <text v-else class="dly-wa__i">—</text>
@@ -242,6 +242,8 @@
 </template>
 
 <script setup lang="ts">
+import UvtCoin from "@/components/ui/uvt-coin.vue";
+import UsdtCoin from "@/components/ui/usdt-coin.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
@@ -254,6 +256,7 @@ import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StreakPowerUps from "@/components/daily/streak-power-ups.vue";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -917,8 +920,10 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 [data-theme="light"] .dly-ring__td--breathe { opacity: .6; animation-name: dly-breathe-light; }
 .nx-loops-paused .dly-ring__td--breathe { animation-play-state: paused; }
 .dly-spk { position: absolute; border-radius: 50%; pointer-events: none; }
-.dly-gift.dly-gift--reached { background: var(--v5-warning); box-shadow: 0 0 0 4px var(--v5-bg); color: var(--v5-bg); }
-.dly-gift { position: absolute; left: 104px; top: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--v5-warning) 18%, var(--v5-bg)); box-shadow: 0 0 0 4px var(--v5-bg), inset 0 0 0 1.5px color-mix(in srgb, var(--v5-warning) 70%, transparent); color: var(--v5-warning-ink); }
+/* The gift object sits straight on the ring (no disc behind it); an unreached milestone is a little quieter. */
+.dly-gift__object { width: 40px; height: 40px; opacity: .85; }
+.dly-gift--reached .dly-gift__object { opacity: 1; }
+.dly-gift { position: absolute; left: 104px; top: 0; display: grid; place-items: center; width: 40px; height: 40px; }
 .dly-ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dly-num { margin-top: 2px; font: 500 76px/76px var(--font-metric); letter-spacing: -.05em; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .dly-num--q { color: var(--v5-ink-4); }
@@ -1038,7 +1043,9 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-wl { margin: 0 16px; padding: 16px 16px 0; overflow: hidden; }
 .dly-wk { display: flex; align-items: center; justify-content: space-between; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .dly-uvt { display: inline-flex; align-items: center; gap: 5px; font: 500 12px/16px var(--font-v5); color: var(--v5-nex-ink); }
-.dly-uvt__i { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--v5-nex-ink); color: var(--v5-bg); font: 600 10px/10px var(--font-v5); }
+/* The shared token coins (uvt-coin.vue, usdt-coin.vue) fill these slots. */
+.dly-uvt__i { display: grid; place-items: center; width: 16px; height: 16px; }
+.dly-coin { width: 18px; height: 18px; }
 .dly-wa { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px; margin-top: 6px; font-family: var(--font-amount); font-weight: 600; line-height: 1; letter-spacing: -.024em; color: var(--v5-ink); }
 .dly-wa__i { font-size: 38px; }
 .dly-wa__c { font-size: 24px; color: var(--v5-ink-3); }

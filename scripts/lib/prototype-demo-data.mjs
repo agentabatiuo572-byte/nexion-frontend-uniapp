@@ -60,7 +60,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'paused',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
@@ -489,7 +489,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   return devices;
 }
 // The authoritative fleet from the retained state, independent of presentation knobs.
-export function demoFleetFacts(url,locale,state) {
+export function demoFleetFacts(url,locale,state,eventOwner) {
   // Initialize sample orders and the trial before projecting the fleet.
   const trialSlotCount=demoTrialSlots(url,locale,state);
   const now=Date.now(),products=demoProducts(state,url.origin);
@@ -518,7 +518,7 @@ export function demoFleetFacts(url,locale,state) {
   if(!state.promotionGift&&state.promotionRewardState!=='CANCELLED'&&demoAccountOrders(url,locale,state,now)
       .some(order=>order.orderNo===demoPromotionGift.orderNo&&order.paymentStatus==='PAID'))reservedSlotCount+=demoPromotionGift.quantity;
   const roster=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
-  const eventGift=demoH4Gift(state);
+  const eventGift=demoH4Gift(state,eventOwner);
   const gifts=[eventGift&&{...eventGift.result.receipt,at:eventGift.at,deviceIds:eventGift.deviceIds},state.promotionGift];
   for(const gift of gifts){
     if(!gift)continue;
@@ -739,7 +739,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const sample=previewHomeDisplaySample(state,now);
     Object.assign(config.publicStats,{
       registeredUsersBase:2000,registeredUsersAnchorAt:demoStartedAt,
-      registeredUsersTickIntervalSec:300,registeredUsersTickStepMin:0,registeredUsersTickStepMax:2,
+      registeredUsersTickIntervalSec:2,registeredUsersTickStepMin:2,registeredUsersTickStepMax:4,
       virtualUserCount:0,activeJobsBase:previewActiveJobsBase(state),
     });
     config.publicStats.networkPulse={
@@ -783,8 +783,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!empty){
       overview.marketBoard={workloads:[
         {code:'IG',name:'SDXL Turbo',unit:null,price:.003,deltaPct:4.2,sparkline:[.4,.5,.42,.55,.6,.7,.72],flagshipDeltaPct:null},
-        {code:'LL',name:'Llama 70B',unit:null,price:.0024,deltaPct:18.7,sparkline:[.3,.35,.4,.42,.6,.78,.88],flagshipDeltaPct:32.1},
+        {code:'LL',name:'Llama 70B',unit:null,price:.0024,deltaPct:18.7,sparkline:[.3,.35,.4,.42,.6,.78,.88],flagshipDeltaPct:null},
         {code:'VG',name:'Video generation',unit:null,price:.1,deltaPct:-1.2,sparkline:[.8,.75,.78,.72,.7,.72,.69],flagshipDeltaPct:null},
+        {code:'FT',name:'LoRA fine-tune',unit:null,price:.06,deltaPct:0,sparkline:[.5,.52,.49,.51,.5,.5,.5],flagshipDeltaPct:null},
+        {code:'EM',name:'BGE-M3',unit:null,price:.0008,deltaPct:2.1,sparkline:[.4,.45,.4,.5,.52,.55,.57],flagshipDeltaPct:null},
+        {code:'SP',name:'Whisper v3',unit:null,price:.0003,deltaPct:-.6,sparkline:[.56,.55,.57,.53,.52,.53,.5],flagshipDeltaPct:null},
       ],deviceRankings:[
         {rank:1,kind:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,bestFor:null},
         {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null},
@@ -1254,6 +1257,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         if(state.promotionRewardType==='gift-discount')item.rewardRules[0].buyerReward={rewardRuleId:reward.rewardRuleId,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:'100',disclosure:orderDiscountDisclosure(100)};
       }
       if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
+      // The referral offer also publishes what the inviter gets for each friend's first purchase.
+      if(template==='DIRECT_REFERRAL')item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:structuredClone(item.rewardRules[0].buyerReward.disclosure)};
       if(i>0){
         if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
         // Boundary scenarios flip on the clock, one minute after the switch.
@@ -1422,7 +1427,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       count+(type==='SPIN'&&demoMilestoneClaimed(state,index+1)?amount:0),0);
     const cardGrantBefore=state.streakSaverBalance==null?0:demoH4Savers(state);
     const eventResponse=demoH4EventResponse(url,contentLocale,state,request,now,{
-      fleet:()=>demoFleetFacts(url,locale,state),
+      fleet:owner=>demoFleetFacts(url,locale,state,owner),
       promotion:id=>demoFixture(new URL('/api/promotions/'+id,url.origin),locale,state,request),
       products,spinTickets,
     });
@@ -1562,7 +1567,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
   }
   if(pathname==='/api/devices/earnings') {
-    const facts=demoFleetFacts(url,locale,state);
+    const facts=demoFleetFacts(url,locale,state,previewAccountId(state,request.headers?.()??{}));
     const active=facts.devices.filter(device=>device.activatedAt!==null);
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
     const data=base();data.walletUsdt=demoWalletUsdt(state);data.walletNex=demoWalletNex(state,now);data.userJoinedAt=demoH4Account(state).createdAt;

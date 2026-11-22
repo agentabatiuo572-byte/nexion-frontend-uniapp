@@ -13,30 +13,66 @@
 import { en, type Messages } from "@/i18n/messages/en";
 import { vi } from "@/i18n/messages/vi";
 import { zh } from "@/i18n/messages/zh";
+import { ru } from "@/i18n/messages/ru";
+import { kk } from "@/i18n/messages/kk";
+import { uz } from "@/i18n/messages/uz";
+import { id as idMessages } from "@/i18n/messages/id";
+import { ms } from "@/i18n/messages/ms";
+import { fil } from "@/i18n/messages/fil";
 import { uiLocale, type LocaleCode } from "@/i18n";
 import type { Product, ProductTaskLevel } from "@/mock/products";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { fmt } from "@/i18n/format";
 
+/** Marketing badge types the App knows; `custom` is operator free text shown as written. */
+export type ProductBadgeKind = "recommended" | "bestSeller" | "trending" | "upgradePick" | "flagship" | "lowBarrier" | "custom";
+
+type KnownBadgeKind = Exclude<ProductBadgeKind, "custom">;
+
 export interface ProductCopy {
   tagline: string;
   badge: string;
+  badgeKind: ProductBadgeKind;
   taskLevels: string;
 }
 
 type CatalogEntry = { tagline: string; badge: string };
+type CatalogId = keyof typeof en.store.catalog;
 
-const badgeSources = [en.store, vi.store, zh.store];
+const CATALOG_BADGE_KIND: Record<CatalogId, KnownBadgeKind> = {
+  "stellarbox-s1": "bestSeller",
+  "stellarbox-pro": "trending",
+  "stellarbox-pro-v2": "upgradePick",
+  "stellarrack-p1": "flagship",
+  "stellarrack-p2": "flagship",
+  "cloud-share": "lowBarrier",
+};
 
-// Match known free-text marketing labels by meaning; leave custom copy intact.
-function serverBadge(t: Messages, badge: string | undefined): string {
-  if (!badge) return "";
-  if (badgeSources.some((store) => store.bestSeller === badge || store.catalog["stellarbox-s1"].badge === badge)) return t.store.bestSeller;
-  if (badgeSources.some((store) => store.trending === badge || store.catalog["stellarbox-pro"].badge === badge)) return t.store.catalog["stellarbox-pro"].badge;
-  for (const id of Object.keys(en.store.catalog) as (keyof typeof en.store.catalog)[]) {
-    if (badgeSources.some((store) => store.catalog[id].badge === badge)) return t.store.catalog[id].badge;
-  }
-  return badge;
+function badgeText(t: Messages, kind: KnownBadgeKind): string {
+  if (kind === "recommended") return t.store.badgeRecommended;
+  if (kind === "bestSeller") return t.store.bestSeller;
+  if (kind === "trending") return t.store.catalog["stellarbox-pro"].badge;
+  if (kind === "upgradePick") return t.store.catalog["stellarbox-pro-v2"].badge;
+  if (kind === "flagship") return t.store.catalog["stellarrack-p1"].badge;
+  return t.store.catalog["cloud-share"].badge;
+}
+
+// The server badge is operator free text (PC 营销角标). Known labels in any App language are matched by
+// meaning, ignoring case and spacing ("Best seller" = "Best Seller" = "热销"); anything else is shown as written.
+const badgeKey = (value: string) => value.normalize("NFKC").trim().replace(/\s+/gu, " ").toLocaleLowerCase();
+const KNOWN_BADGES = new Map<string, KnownBadgeKind>();
+for (const store of [en.store, zh.store, vi.store, ru.store, kk.store, uz.store, idMessages.store, ms.store, fil.store]) {
+  const add = (label: string, kind: KnownBadgeKind) => { if (!KNOWN_BADGES.has(badgeKey(label))) KNOWN_BADGES.set(badgeKey(label), kind); };
+  add(store.badgeRecommended, "recommended");
+  add(store.bestSeller, "bestSeller");
+  add(store.trending, "trending");
+  for (const id of Object.keys(CATALOG_BADGE_KIND) as CatalogId[]) add(store.catalog[id].badge, CATALOG_BADGE_KIND[id]);
+}
+
+function serverBadge(t: Messages, badge: string | undefined): Pick<ProductCopy, "badge" | "badgeKind"> {
+  const text = badge?.trim() ?? "";
+  const kind = text ? KNOWN_BADGES.get(badgeKey(text)) : undefined;
+  return kind ? { badge: badgeText(t, kind), badgeKind: kind } : { badge: text, badgeKind: "custom" };
 }
 
 function normalizedPublishedTagline(value: string): string {
@@ -74,13 +110,14 @@ export function productTaskLevelsText(t: Messages, levels: readonly ProductTaskL
 export function productCopy(t: Messages, p: Product, serverCatalog = false, locale?: LocaleCode): ProductCopy {
   if (serverCatalog) return {
     tagline: serverTagline(t, p, locale),
-    badge: serverBadge(t, p.badge),
+    ...serverBadge(t, p.badge),
     taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];
   return {
     tagline: entry?.tagline ?? p.tagline,
     badge: entry?.badge ?? p.badge ?? "",
+    badgeKind: entry ? CATALOG_BADGE_KIND[p.id as CatalogId] : "custom",
     taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
 }

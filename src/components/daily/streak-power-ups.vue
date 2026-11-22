@@ -16,13 +16,13 @@
     <view v-if="powerUps.length > 0" class="spu-grid">
       <view v-for="(p, i) in powerUps" :key="p.id" class="spu-card" :class="isOpenSlot(p) ? 'spu-card--l' : 'spu-card--s'" :style="{ '--t': PERK_TINT[perkKind(p)], '--i': i }">
         <view class="spu-r">
-          <view class="spu-ic" aria-hidden="true">
+          <NxIconTile :tone="isOpenSlot(p) ? 'muted' : PERK_TONE[perkKind(p)]" size="m">
             <svg v-if="perkKind(p) === 'team'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             <svg v-else-if="perkKind(p) === 'badge'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg>
             <svg v-else-if="perkKind(p) === 'boost'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg>
             <svg v-else-if="perkKind(p) === 'gem'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>
             <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-          </view>
+          </NxIconTile>
           <text class="spu-th">{{ thresholdText(p.threshold) }}</text>
         </view>
         <text class="spu-nm">{{ p.labelText }}</text>
@@ -63,6 +63,7 @@
 
 <script setup lang="ts">
 import { isStakingVisibilityRoute, navTo } from "@/lib/route";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { computed, ref, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -241,6 +242,7 @@ function perkKind(p: PowerUp): "team" | "badge" | "boost" | "gem" | "other" {
   return "other";
 }
 const PERK_TINT = { team: "var(--v5-aura-sky)", badge: "var(--v5-warning)", boost: "var(--v5-warning)", gem: "var(--v5-brand-2)", other: "var(--v5-tech-cyan)" } as const;
+const PERK_TONE = { team: "sky", badge: "amber", boost: "amber", gem: "coral", other: "teal" } as const;
 function isOpenSlot(p: PowerUp): boolean {
   return !isClaimed(p.id) && isBusinessReady(p) && !isUnlocked(p);
 }
@@ -259,8 +261,6 @@ function isOpenSlot(p: PowerUp): boolean {
 [data-theme="light"] .spu-card--s { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .spu-card--l { border: 1.5px dashed var(--spu-dash); }
 .spu-r { display: flex; align-items: center; justify-content: space-between; }
-.spu-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: color-mix(in srgb, var(--t) 16%, transparent); color: var(--t); }
-.spu-card--l .spu-ic { background: color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink-4); }
 .spu-th { font: 500 12px/16px var(--font-metric); color: var(--v5-ink-3); }
 .spu-nm { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); word-break: keep-all; overflow-wrap: break-word; }
 .spu-card--l .spu-nm { color: var(--v5-ink-2); }

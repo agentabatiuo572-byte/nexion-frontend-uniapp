@@ -3,6 +3,7 @@ import { asApiError, isAmbiguousEnvelopeOutcome } from "@/api/errors";
 import type { eventDetailCopy } from "@/i18n/event-detail";
 import { formatAmount } from "@/lib/amount-display";
 import { promotionStoreHref } from "@/lib/promotion-entry";
+import { promotionLandingHref } from "@/lib/promotion-landing";
 
 export function eventDetailRules(rules: EventDetail["rules"], copy: typeof eventDetailCopy.en) {
   return Object.entries(copy.labels).flatMap(([key, label]) => {
@@ -22,7 +23,7 @@ export function eventClaimCommandKey(code: string, claimKeys: readonly string[] 
 }
 export function eventDetailHref(detail: EventDetail): string {
   if(detail.event.kind==='seasonal'&&typeof detail.rules.voucherId==='string'&&detail.rules.voucherId.trim())return promotionStoreHref(undefined,{voucherId:detail.rules.voucherId,upgradeActivityId:typeof detail.rules.promotionActivityId==='string'?detail.rules.promotionActivityId:undefined});
-  if (["discount", "seasonal"].includes(detail.event.kind) && typeof detail.rules.promotionActivityId === "string" && detail.rules.promotionActivityId) return promotionStoreHref(detail.rules.promotionActivityId);
+  if (["discount", "seasonal"].includes(detail.event.kind) && typeof detail.rules.promotionActivityId === "string" && detail.rules.promotionActivityId) return promotionLandingHref(detail.rules.promotionActivityId);
   if (detail.event.kind === "regional") return "";
   return detail.event.href;
 }
@@ -31,8 +32,19 @@ export function eventDetailHref(detail: EventDetail): string {
 const eventRefusals: Record<string, EventCommandFailure> = {
   EVENT_NOT_CLAIMABLE: "notClaimable", EVENT_ALREADY_CLAIMED: "claimed", EVENT_NOT_OPEN: "notOpen", EVENT_REGION_NOT_ELIGIBLE: "notEligible",
   EVENT_BUDGET_EXHAUSTED: "budget", COVERAGE_REDLINE: "generic", EVENT_REMINDER_NOT_AVAILABLE: "reminder",
+  // The other refusals join, claim and the managed claim save with their receipt (backend 44d03004): gift stock, the
+  // user's device slots, the account, a platform pool that can take the command later, and rule or data conflicts.
+  EVENT_ALREADY_JOINED: "joined", H4_EVENT_NOT_ACTIVE: "notOpen", H4_EVENT_NOT_ELIGIBLE: "notClaimable", H4_EVENT_PURCHASE_REQUIRED: "notClaimable",
+  H4_EVENT_GIFT_STOCK_UNAVAILABLE: "stock", H4_EVENT_GIFT_PRODUCT_UNAVAILABLE: "stock", H4_EVENT_DEVICE_CAPACITY_UNAVAILABLE: "slots",
+  H4_EVENT_ACCOUNT_UNAVAILABLE: "account", USER_NOT_FOUND_OR_INACTIVE: "account",
+  HOSTING_CENTERS_UNAVAILABLE: "notRun", EVENT_CLAIM_CONFLICT: "notRun", EVENT_REMINDER_DELIVERY_CONFLICT: "notRun",
+  H4_EVENT_GIFT_QUANTITY_INVALID: "generic", H4_EVENT_GIFT_SOURCE_REQUIRED: "generic", H4_EVENT_CLAIM_KEY_INVALID: "generic",
+  H4_EVENT_TICKET_RULE_INVALID: "generic", H4_EVENT_TICKET_QUANTITY_INVALID: "generic", EVENT_BADGE_GRANT_CONFLICT: "generic", REWARD_TYPE_UNSUPPORTED: "generic",
+  // The legacy claim's wallet credit: a lock conflict can go through on another try; the rest need the reward fixed.
+  USER_WALLET_CONFLICT: "notRun", REWARD_LEDGER_CONFLICT: "notRun", REWARD_AMOUNT_INVALID: "generic", USER_WALLET_NOT_FOUND: "generic",
+  B1_COVERAGE_DATA_UNAVAILABLE: "generic", B1_COVERAGE_BELOW_REDLINE: "generic", EARNINGS_RELEASE_ENTRY_INVALID: "generic",
 };
-export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "notOpen" | "notEligible" | "budget" | "reminder" | "notRun" | "generic";
+export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "joined" | "notOpen" | "notEligible" | "budget" | "stock" | "slots" | "account" | "reminder" | "notRun" | "generic";
 /** "unknown" only when the command may have run (network loss, timeout, gateway 5xx, unreadable reply); otherwise the reason to show. */
 export function eventCommandFailure(cause: unknown): EventCommandFailure {
   const error = asApiError(cause);

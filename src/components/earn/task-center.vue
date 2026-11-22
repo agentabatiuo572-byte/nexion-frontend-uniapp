@@ -13,13 +13,13 @@
       <text class="earn-tc__title" role="heading" aria-level="2">{{ t.earn.taskCenter }}</text>
       <view class="earn-tc__pulse">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--v5-tech-cyan)"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
-        <text class="earn-tc__count">{{ activeJobsText }}</text>
+        <NxTickNumber class="earn-tc__count" :text="activeJobsText" />
         <text>{{ t.earn.jobsLive }}</text>
       </view>
     </view>
     <view class="earn-tc__card">
     <view class="earn-tc__row" role="button" tabindex="0" :aria-expanded="historyOpen ? 'true' : 'false'" @click="historyOpen = !historyOpen" @keydown.enter.stop.prevent="historyOpen = !historyOpen" @keydown.space.stop.prevent="historyOpen = !historyOpen">
-      <view class="earn-tc__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg></view>
+      <NxIconTile tone="teal" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg></NxIconTile>
       <view class="earn-tc__copy"><text class="earn-tc__row-title">{{ t.earn.taskHistoryTitle }}</text><text class="earn-tc__row-sub">{{ historyHintText }}</text></view>
       <view class="earn-tc__arrow" :class="{ 'earn-tc__arrow--open': historyOpen }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
     </view>
@@ -76,7 +76,7 @@
     </view>
     </view>
     <view v-if="legacySettlementsEnabled" v-show="settlementsAvailable" class="earn-tc__row" role="button" tabindex="0" :aria-expanded="settlementsOpen ? 'true' : 'false'" @click="settlementsOpen = !settlementsOpen" @keydown.enter.stop.prevent="settlementsOpen = !settlementsOpen" @keydown.space.stop.prevent="settlementsOpen = !settlementsOpen">
-      <view class="earn-tc__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M3 9h18M8 14h4" /></svg></view>
+      <NxIconTile tone="teal" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M3 9h18M8 14h4" /></svg></NxIconTile>
       <view class="earn-tc__copy"><text class="earn-tc__row-title">{{ computeCopy.batch }}</text><text class="earn-tc__row-sub">{{ t.earn.settlementBatchesHint }}</text></view>
       <view class="earn-tc__arrow" :class="{ 'earn-tc__arrow--open': settlementsOpen }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
     </view>
@@ -103,7 +103,11 @@ import type { Receipt } from "@/mock/receipt";
 import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import TaskV2Status from "@/components/earn/task-v2-status.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import ComputeSettlements from "@/components/earn/compute-settlements.vue";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
+import { networkPopulationBand } from "@/lib/platform-stats";
+import { useLocaleStore } from "@/store/locale";
 
 import { toast } from "@/store/ui";
 
@@ -131,7 +135,9 @@ onHide(() => {
   receiptRequestEpoch += 1;
 });
 useHomeDisplay(() => remoteApiEnabled);
-const activeJobsText = computed(() => app.activeJobsDisplay?.toLocaleString() ?? "—");
+const locale = useLocaleStore();
+// Global jobs are a platform figure: the 06 §6.4 band, rolling when the band changes.
+const activeJobsText = computed(() => app.activeJobsDisplay == null ? null : networkPopulationBand(app.activeJobsDisplay, locale.code));
 function receiptFor(id: string): Receipt | undefined {
   return receipts?.byId(id);
 }
@@ -235,8 +241,6 @@ function completedTime(ts: number): string {
 .earn-tc__card > .earn-tc__row ~ .earn-tc__row, .earn-tc__panel + .earn-tc__row { border-top: 1px solid var(--v5-border); }
 .earn-tc__row:active { opacity: .8; }
 .earn-tc__row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
-.earn-tc__icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 12px; background: var(--v5-surface-2); color: var(--v5-tech-cyan); }
-[data-theme="light"] .earn-tc__icon { background: var(--v5-bg); }
 .earn-tc__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .earn-tc__row-title { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); }
 .earn-tc__row-sub { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }

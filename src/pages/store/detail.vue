@@ -3,7 +3,7 @@
   {page.tsx + _client.tsx}. Dynamic [productId] → `?id=` query (onLoad).
 
   Wrapped in <AppChassis active="store">. Top→bottom:
-    in-page header (back + product name) → Hero (ProductRender + ribbon +
+    in-page header (back + product name) → Hero (ProductRender + badge +
     LiveSocialProof + name/tagline/mult + trust chips) → Vs-phone strip →
     ROI (qty stepper + 4-cell grid) → Hardware spec →
     Trust badges → FAQ accordion → sticky bottom Buy CTA.
@@ -71,10 +71,7 @@
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
             <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
-            <!-- Folded-corner ribbon -->
-            <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
-              <text>{{ copy.badge }}</text>
-            </view>
+            <ProductBadge v-if="copy.badge" :label="copy.badge" :kind="copy.badgeKind" detail />
             <!-- Live activity danmaku -->
             <LiveSocialProof :product="product" />
           </view>
@@ -245,6 +242,7 @@ import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
 import { useEarnConfig } from "@/store/earn-config";
 import { useLocaleStore } from "@/store/locale";
+import { storeHeatFigure } from "@/lib/platform-stats";
 import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
@@ -269,6 +267,7 @@ import type { TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
 import { usePublishedTrust } from "@/composables/use-published-trust";
 import { serverLanguage } from "@/i18n";
+import ProductBadge from "@/components/store/product-badge.vue";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -395,14 +394,14 @@ const isShare = computed(() => product.value?.productType === "SHARE");
 const earnConfig = useEarnConfig();
 const stockUnavailable = computed(() => product.value?.inventoryMode === "FINITE"
   && product.value.stock === 0);
-// Localized SKU copy (tagline / ribbon badge). Empty strings until `id` resolves —
+// Localized SKU copy (tagline / badge). Empty strings until `id` resolves —
 // both consumers are inside `v-if="product"`, so the blanks never render.
 const copy = computed(() =>
   product.value
     ? remoteApiEnabled
       ? productCopy(t.value, product.value, true, locale.code)
       : productCopy(t.value, product.value, false, locale.code)
-    : { tagline: "", badge: "", taskLevels: "" },
+    : { tagline: "", badge: "", badgeKind: "custom" as const, taskLevels: "" },
 );
 
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
@@ -537,7 +536,8 @@ const faqs = computed(() => {
 const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock > 0 && product.value.stock < 50,
 );
-const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
+// Store heat figure: exact under 100, the platform band from 100 (storeHeatFigure).
+const soldText = computed(() => storeHeatFigure(product.value?.sold ?? 0, locale.code));
 // Per-unit team compute points: a quiet product fact, not personal data, so the hide-stats eye does not mask it.
 const computePointsLine = computed(() => {
   const points = product.value?.computePoints;
@@ -713,21 +713,6 @@ const catalogRetryStyle: CSSProperties = {
 const heroCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderColor: "var(--v5-border)",
-};
-const ribbonStyle: CSSProperties = {
-  top: 0,
-  left: "16px",
-  padding: "3px 10px 4px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontVariantNumeric: "tabular-nums",
-  fontSize: "12px",
-  fontWeight: 500,
-  borderRadius: "0 0 6px 6px",
-  letterSpacing: "-0.005em",
-  zIndex: 2,
-  pointerEvents: "none",
 };
 const nameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

@@ -135,6 +135,8 @@
 
   --v5-tech-cyan: #0CC4D6;
   --v5-aura-sky: #1E7BE8;       /* DS-32 aura sky */
+  --v5-aura-sky-soft: #E4EFFC;
+  --v5-aura-sky-ink: #175FB5;   /* tag text: aura-sky-soft 5.40 */
   --v5-tech-cyan-soft: #E0F6F9;
   --v5-tech-cyan-border: #9FE0E8;
 
@@ -291,6 +293,7 @@
   --v5-success-ink: #0D7A40;    /* success-soft 4.74 · 页面底 4.80 · 白 5.42 */
   --v5-tech-cyan-ink: #077A85;  /* AA 4.50(base #0CC4D6 = 1.88) */
   --v5-brand-2-ink: #CD3600;    /* AA 4.51(base #FF5A1F = 2.76) */
+  --v5-brand-2-tag-ink: #B42F00; /* tag text: brand-2-soft 5.53 (brand-2-ink is 4.49 there) */
 
   /* 创世节点「奢华金」子调色板(2026-07-23 C1,主人批「修」)。
      原为散落的 #D4AF5A / #F4E5C2 字面量,双主题恒定。在**固定曜石底**(genesis hero)上
@@ -403,6 +406,8 @@
   /* Tech accent — purple, lifted for visibility on dark cards */
   --v5-tech-cyan: #2DD4BF;      /* teal — tech accent / aura (DS-32: no purple) */
   --v5-aura-sky: #4FA8FF;       /* DS-32 aura sky */
+  --v5-aura-sky-soft: rgba(79,168,255,0.20);
+  --v5-aura-sky-ink: #4FA8FF;
   --v5-tech-cyan-soft: rgba(45,212,191,0.20);
   --v5-tech-cyan-border: rgba(45,212,191,0.45);
 
@@ -495,6 +500,7 @@
   --ui-device-ink: #65C9F4;
   --ui-device-soft: #142C38;
   --v5-brand-2-ink: #FF7A3D;
+  --v5-brand-2-tag-ink: #FF7A3D;
   --v5-genesis-gold: #D4AF5A;
   --v5-genesis-gold-hi: #F4E5C2;
 }
@@ -586,6 +592,16 @@ body {
 @keyframes nx-viz-grow { from { width: 0; } }
 .nx-viz-rise { animation: nx-viz-rise 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .nx-viz-grow { animation: nx-viz-grow 1400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* Job and credit progress bars, one look everywhere (user: thin and quiet): a 3px track in ink 8%, a fill that fades
+   in from 12% to 60% of its hue toward the head, and a small solid head dot so the position reads without colour
+   strength. The hue defaults to the theme brand; a row may set --nx-progress-hue. Entrance stays .nx-viz-grow. */
+.nx-progress { position: relative; height: 3px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.nx-progress__fill { position: relative; height: 100%; max-width: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--nx-progress-hue, var(--v5-brand)) 12%, transparent), color-mix(in srgb, var(--nx-progress-hue, var(--v5-brand)) 60%, transparent)); }
+.nx-progress__fill::after { content: ""; position: absolute; top: 50%; right: -2.5px; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: color-mix(in srgb, var(--nx-progress-hue, var(--v5-brand)) 85%, var(--v5-surface)); }
+/* The bar draws the real value (03 §3.4, 07 §7.1.1): at 0 only the empty track shows, no head dot; with no known value
+   (the progressbar carries no aria-valuenow) there is no fill at all, and the row's own 「—」 says it is unknown. */
+.nx-progress[aria-valuenow="0"] .nx-progress__fill::after { content: none; }
+.nx-progress:not([aria-valuenow]) .nx-progress__fill { display: none; }
 /* Rings sweep from zero to their --nx-viz-ring value; dots light up one after another. */
 @keyframes nx-viz-sweep { from { --nx-viz-ring: 0; } }
 @keyframes nx-viz-light { from { opacity: .15; transform: scale(.6); } }
@@ -1091,6 +1107,13 @@ body {
 .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) :is(.nx-button--secondary, .nx-button--brand) > .nx-button__surface, .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))).nx-glass-bar .nx-tray-text { background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; color: var(--v5-ink); }
 .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) :is(.nx-button--secondary, .nx-button--brand).nx-button--disabled { opacity: 1; }
 .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) :is(.nx-button--secondary, .nx-button--brand).nx-button--disabled > .nx-button__surface, .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))).nx-glass-bar .nx-tray-text[aria-disabled="true"] { color: var(--v5-ink-4); opacity: 1; }
+/* Reverse actions (取消订单, 取消试用, 退出登录 … PRD §0.13; 03 §3.1 tray exception): quiet secondary-ink text at the
+   text-link size, weight 400, no container, own width, the confirm dialog carries the consequence. In the tray it
+   keeps the row's 48px hit height and sits left of the main action; the busy spinner takes the same ink. The doubled
+   classes outrank the tray's neutral-ink rule above, the button's own size roles and a row's own button font. */
+.nx-reverse-action.nx-reverse-action.nx-reverse-action { --ui-button-ink: var(--v5-ink-3); color: var(--v5-ink-3); font: 400 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
+.nx-glass-bar > .nx-reverse-action.nx-reverse-action { flex: 0 0 auto; min-width: 0; }
+.nx-glass-bar.nx-glass-bar .nx-reverse-action.nx-reverse-action > .nx-button__surface { padding-inline: 12px; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; color: var(--v5-ink-3); font: inherit; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .nx-frosted-button, .promotion-action, .reward-cta, .nx-soft-glass { background:var(--ui-button-solid,var(--v5-surface-2));backdrop-filter:none;-webkit-backdrop-filter:none; }
   .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) { background:var(--v5-surface-2);backdrop-filter:none;-webkit-backdrop-filter:none; }

@@ -2,9 +2,9 @@
   <NxSection :title="t.home.trustSnapshotTitle" :action="t.home.trustSnapshotOpen" class="home-trust" data-home-section="trust" @action="goTrust">
     <view class="home-trust__card" role="link" tabindex="0" @click="goTrust" @keydown.enter.stop.prevent="goTrust">
       <view v-if="profile" class="home-trust__identity">
-        <view class="home-trust__mark" aria-hidden="true">
+        <NxIconTile tone="amber" size="l">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
-        </view>
+        </NxIconTile>
         <view class="home-trust__entity">
           <text class="home-trust__eyebrow">{{ center.operator }}</text>
           <text class="home-trust__name">{{ profile.legalName }}</text>
@@ -33,7 +33,7 @@
         <view class="home-trust__rule" />
         <view class="home-trust__payout">
           <view class="home-trust__payout-label"><view class="home-trust__dot" aria-hidden="true" /><text>{{ t.home.trustSnapshotPayouts }}</text></view>
-          <text class="home-trust__payout-value"><text class="nx-num-metric">{{ formatGroupedAmount(display.paid) }}</text><text class="home-trust__unit">USDT</text></text>
+          <text class="home-trust__payout-value"><NxTickNumber class="nx-num-metric" :text="platformAmountBand(display.paid, false)" /><text class="home-trust__unit">USDT</text></text>
         </view>
       </template>
       <view class="home-trust__rule" />
@@ -54,12 +54,14 @@ import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { trustCenterCopy } from "@/i18n/trust-center";
-import { formatGroupedAmount } from "@/lib/amount-display";
+import { platformAmountBand } from "@/lib/platform-stats";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 import { useTrustDocuments } from "@/composables/use-trust-documents";
 import { refreshHomeDisplay, useHomeDisplay } from "@/composables/use-home-display";
 import { onShow } from "@/composables/use-tab-page-lifecycle";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import NxSection from "@/components/ui/nx-section.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -90,7 +92,6 @@ onMounted(() => {
 .home-trust__card:active { opacity:.85; }
 .home-trust__card:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 .home-trust__identity { display:flex;align-items:center;gap:var(--ui-space-inline); }
-.home-trust__mark { width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:var(--ui-radius-icon);background:color-mix(in srgb,var(--v5-genesis-gold) 14%,transparent);color:var(--v5-genesis-gold); }
 .home-trust__entity { display:flex;flex-direction:column;min-width:0; }
 .home-trust__eyebrow { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .home-trust__name { font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);overflow-wrap:break-word; }
