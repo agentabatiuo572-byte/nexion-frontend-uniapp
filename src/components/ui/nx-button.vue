@@ -1,6 +1,6 @@
 <template>
   <view class="nx-button" :class="[`nx-button--${variant}`, `nx-button--${size}`, { 'nx-button--disabled': disabled || busy }]"
-    role="button" :tabindex="disabled || busy ? -1 : 0" :aria-disabled="disabled || busy" :aria-busy="busy" :aria-label="label"
+    role="button" :tabindex="disabled || busy ? -1 : 0" :aria-disabled="disabled || busy" :aria-busy="busy" :aria-label="busy && busyLabel ? busyLabel : label"
     @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
     <view class="nx-button__surface" :class="{ 'nx-frosted-button': variant === 'secondary' || variant === 'brand' }">
       <view class="nx-button__content" :class="{ 'nx-button__content--busy': busy }"><slot><text>{{ label }}</text></slot><NxIcon v-if="icon" :name="icon" /></view>
@@ -15,7 +15,7 @@
 // text = in-place action in brand color, link = next-level navigation in muted color.
 // icon = trailing glyph after the label (forward arrow, chevron); never a text character in the copy.
 import NxIcon, { type NxIconName } from './nx-icon.vue';
-const props = withDefaults(defineProps<{ label?: string; variant?: 'primary' | 'brand' | 'secondary' | 'text' | 'link'; size?: 'large' | 'medium' | 'small'; disabled?: boolean; busy?: boolean; icon?: NxIconName }>(), { variant: 'secondary', size: 'large' });
+const props = withDefaults(defineProps<{ label?: string; variant?: 'primary' | 'brand' | 'secondary' | 'text' | 'link'; size?: 'large' | 'medium' | 'small'; disabled?: boolean; busy?: boolean; busyLabel?: string; icon?: NxIconName }>(), { variant: 'secondary', size: 'large' });
 const emit = defineEmits<{ (event: 'click'): void }>();
 function activate(event?: Event) { if (!props.disabled && !props.busy && !(event as KeyboardEvent)?.repeat) emit('click'); }
 </script>
