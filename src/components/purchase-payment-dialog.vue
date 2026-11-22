@@ -292,8 +292,8 @@ const openCheckoutCapacityProgress = inject(openCheckoutCapacityProgressKey, nul
 function openPending() {
   const [row] = pending.value;
   if (pending.value.length !== 1 || !row) { void navTo('/pages/store/orders'); return; }
-  if (ownsCheckoutCapacityPayment?.(row)) openCheckoutCapacityProgress?.(row);
-  else void payment.resume(row);
+  // A checkout that cannot take its row right now (still settling its owner) leaves the tap to the generic payment layer.
+  if (!ownsCheckoutCapacityPayment?.(row) || !openCheckoutCapacityProgress?.(row)) void payment.resume(row);
 }
 // Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
 // payment leaves the bar, and a closed one returns when its status changes.
