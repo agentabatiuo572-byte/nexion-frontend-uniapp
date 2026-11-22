@@ -78,7 +78,7 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 <style scoped>
 /* Plain card (04 §4.2: one tinted card per screen region); the target device keeps its lime floor light. */
 .upgrade-spotlight { position:relative; overflow:hidden; padding:18px; border:1px solid var(--v5-border); border-radius:22px; background:var(--v5-surface); }
-.upgrade-eyebrow { display:block; font:500 12.5px/18px var(--font-v5); color:var(--ui-lime-soft); }
+.upgrade-eyebrow { display:block; font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--ui-lime-soft); }
 .upgrade-title { margin-top:6px; overflow-wrap:break-word; }
 .upgrade-title__base { display:block; color:var(--v5-ink-2); font:500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .upgrade-title__target { display:block; margin-top:4px; color:var(--v5-brand); font:600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
@@ -91,10 +91,10 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-art__base-shadow { position:absolute; left:16px; bottom:12px; width:86px; height:14px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-ink) 18%,transparent),transparent); }
 .upgrade-art__target-shadow { position:absolute; right:6px; bottom:8px; width:150px; height:22px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--ui-lime-soft) 45%,transparent),transparent); }
 .upgrade-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:4px; }
-.upgrade-comparison__label { display:block; font:400 12.5px/18px var(--font-v5); color:var(--v5-ink-3); }
+.upgrade-comparison__label { display:block; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .upgrade-comparison__value { display:block; margin-top:2px; font:600 16px/22px var(--font-metric); font-variant-numeric:tabular-nums; }
 .upgrade-comparison__value--target { color:var(--v5-brand); }
-.upgrade-note { display:block; margin-top:10px; font:400 12.5px/18px var(--font-v5); color:var(--v5-ink-3); }
+.upgrade-note { display:block; margin-top:10px; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .upgrade-spotlight .upgrade-action { display:flex; margin-top:14px; min-height:44px; padding:0; }
 .upgrade-action :deep(.nx-button__surface) { min-height:44px; }
 @keyframes upgrade-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }

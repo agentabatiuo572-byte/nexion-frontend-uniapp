@@ -283,7 +283,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-advert:has(.entry-product-art) .entry-copy { padding-right: 148px; }
 .entry-label,.entry-eyebrow { display: block; color: var(--v5-brand); font: 500 12px/1.5 var(--font-v5); }
 .entry-title { display: block; margin-top: 7px; font: 600 23px/1.3 var(--font-v5); overflow-wrap: break-word; }
-.entry-advert .entry-label { font-size: 12.5px; color: #c8f25a; }
+.entry-advert .entry-label { font-size: var(--ui-type-note); color: #c8f25a; }
 .entry-advert .entry-title { margin-top: 6px; font-size: 19px; line-height: 25px; }
 .entry-advert .promotion-copy { color: var(--v5-ink-2); font-size: 12px; line-height: 1.5; }
 .entry-copy,.entry-event-copy { min-width: 0; }
@@ -293,7 +293,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-advert.entry-kind-gift .entry-benefit { margin-top: 4px; color: var(--v5-brand); font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
 .entry-home-deadline { position: relative; z-index: 2; align-self: flex-start; margin-top: auto; padding: 13px 0; margin-bottom: -13px; color: #9aa2b2; font: 400 12px/18px var(--font-v5); white-space: nowrap; }
 .entry-home-deadline:focus-visible { outline: 2px solid var(--v5-brand); }
-.entry-remaining { position: absolute; top: 12px; right: 16px; z-index: 2; pointer-events: none; color: var(--v5-warning-ink); font: 500 11px/18px var(--font-v5); white-space: nowrap; }
+.entry-remaining { position: absolute; top: 12px; right: 16px; z-index: 2; pointer-events: none; color: var(--v5-warning-ink); font: 500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); white-space: nowrap; }
 .entry-advert--banner .entry-remaining { padding:2px 7px;border-radius:6px;background:var(--v5-surface); }
 .entry-advert--banner .entry-home-deadline { padding-inline:8px;border-radius:8px;background:var(--v5-surface);color:var(--v5-ink-2); }
 .entry-product-art { position: absolute; right: 0; width: 160px; inset-block: 0; pointer-events: none; }
@@ -346,7 +346,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
   .entry-main-image { right: 24px; width: 96px; height: 96px; }
   .entry-gift-image { right: 10px; width: 68px; height: 68px; }
   .entry-advert .entry-title,.entry-advert .entry-benefit { font-size: 17px; line-height: 22px; }
-  .entry-home-deadline { font-size: 11px; }
+  .entry-home-deadline { font-size: var(--ui-type-note); }
   .entry-event { padding: var(--ui-space-inset); grid-template-columns: minmax(0,1fr) 104px; }
   .entry-title { font-size: 20px; }
   .entry-kind-coupon .entry-event-art { margin: -16px -16px -16px 0; }

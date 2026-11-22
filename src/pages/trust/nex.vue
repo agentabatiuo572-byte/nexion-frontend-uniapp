@@ -211,8 +211,8 @@ const tableStyle: CSSProperties = {
   paddingBlock: "4px",
 };
 const tableHeadStyle: CSSProperties = { fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-2)", borderBottom: "1px solid var(--v5-border)" };
-const thWhat: CSSProperties = { flex: "1.2 1 0", minWidth: 0, overflowWrap: "anywhere", padding: "10px 6px", fontWeight: 500 };
-const thCell: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "anywhere", padding: "10px 6px", fontWeight: 500 };
+const thWhat: CSSProperties = { flex: "1.2 1 0", minWidth: 0, overflowWrap: "break-word", padding: "10px 6px", fontWeight: 500 };
+const thCell: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "break-word", padding: "10px 6px", fontWeight: 500 };
 function tableRowStyle(isFirst: boolean): CSSProperties {
   return {
     fontSize: "var(--ui-type-list-subtitle)",
@@ -220,9 +220,9 @@ function tableRowStyle(isFirst: boolean): CSSProperties {
     borderTop: isFirst ? "none" : "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)",
   };
 }
-const tdWhat: CSSProperties = { flex: "1.2 1 0", minWidth: 0, overflowWrap: "anywhere", padding: "10px 6px", color: "var(--v5-ink-3)" };
-const tdUsdt: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "anywhere", padding: "10px 6px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
-const tdNex: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "anywhere", padding: "10px 6px", color: "var(--v5-ink)" };
+const tdWhat: CSSProperties = { flex: "1.2 1 0", minWidth: 0, overflowWrap: "break-word", padding: "10px 6px", color: "var(--v5-ink-3)" };
+const tdUsdt: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "break-word", padding: "10px 6px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
+const tdNex: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "break-word", padding: "10px 6px", color: "var(--v5-ink)" };
 const demandBoxStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",

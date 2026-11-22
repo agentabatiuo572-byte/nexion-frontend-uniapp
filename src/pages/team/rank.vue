@@ -223,10 +223,17 @@ function go(url: string) {
   navTo(url);
 }
 
+// chips.votes holds the plural forms a language needs, "one|few|many" (ru) or "one|other" (en); others have one word.
+function voteWord(n: number) {
+  const forms = t.value.rank.chips.votes.split('|');
+  if (forms.length === 1) return forms[0];
+  const form = new Intl.PluralRules(locale.code).select(n);
+  return forms.length === 2 ? forms[form === 'one' ? 0 : 1] : forms[form === 'one' ? 0 : form === 'many' ? 2 : 1];
+}
 function benefitItems(r: VRankDef): {key:RankBenefitKey;label:string;value:string}[] {
   const items: {key:RankBenefitKey;label:string;value:string}[]=[{key:'directBonus',label:t.value.rank.chips.direct,value:formatHowNumber(r.directBonus*100,locale.code)+'%'}];
   if(r.peerBonus>0) items.push({key:'peerBonus',label:t.value.rank.chips.peer,value:vState.capabilities.peer ? formatHowNumber(r.peerBonus*100,locale.code)+'%' : fmt(t.value.rank.chips.peerNotDispatched,{n:formatHowNumber(r.peerBonus*100,locale.code)})});
-  if(r.leadershipVotes>0) items.push({key:'leadershipVotes',label:t.value.rank.chips.pool,value:`${r.leadershipVotes} ${t.value.rank.chips.votes}`});
+  if(r.leadershipVotes>0) items.push({key:'leadershipVotes',label:t.value.rank.chips.pool,value:`${r.leadershipVotes}\u00A0${voteWord(r.leadershipVotes)}`});
   return items;
 }
 const upcomingBenefitKeys = computed(() => increasedRankBenefitKeys(rankDefs.value.find(rank => rank.v === myRank.value), prog.value.next));

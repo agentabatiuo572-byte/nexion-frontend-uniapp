@@ -31,10 +31,10 @@ defineProps<{ name?: string; amount: string; detail?: string; time?: string; uni
 .nx-amount-row__amount--muted { color: var(--v5-ink-3); }
 .nx-amount-row__time { flex: none; width: 38px; font: 400 12px/16px var(--font-metric); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .nx-amount-row--header { min-height: 24px; }
-.nx-amount-row--header .nx-amount-row__amount { font: 500 11px/16px var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; }
+.nx-amount-row--header .nx-amount-row__amount { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; }
 .nx-amount-row--compact { gap: calc(var(--v5-space-2) + var(--v5-space-1) / 2); min-height: 36px; padding: var(--v5-space-1) 0; box-sizing: border-box; }
 .nx-amount-row--compact .nx-amount-row__name { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-2); }
 .nx-amount-row--compact .nx-amount-row__amount { font: 500 12px/16px var(--font-metric); }
 .nx-amount-row--compact.nx-amount-row--header { min-height: 24px; padding: 0 0 var(--v5-space-1); }
-.nx-amount-row--compact.nx-amount-row--header .nx-amount-row__amount { font: 500 11px/16px var(--font-metric); color: var(--v5-ink-3); }
+.nx-amount-row--compact.nx-amount-row--header .nx-amount-row__amount { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); }
 </style>

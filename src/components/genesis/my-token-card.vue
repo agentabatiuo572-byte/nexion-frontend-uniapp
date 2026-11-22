@@ -375,7 +375,7 @@ const listBtnBase: CSSProperties = {
   height: "44px",
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
-  fontWeight: 550,
+  fontWeight: 500,
   fontSize: "13px",
   letterSpacing: "-0.005em",
 };

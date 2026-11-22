@@ -458,7 +458,7 @@ const browseBtnStyle: CSSProperties = {
 .orders-filters :deep(.nx-glass-indicator), .orders-filters :deep(.nx-glass-backdrop) { display: none; }
 .orders-filters :deep(.nx-glass-option) { flex: 1 0 auto; min-height: 44px; padding: 0 6px; background: transparent; color: var(--v5-ink-3); font-weight: 500; }
 .orders-filters :deep(.nx-glass-option--selected) { color: var(--v5-ink); font-weight: 500; background: transparent; }
-.orders-filter__label { white-space: nowrap; font-size: 13.5px; line-height: 18px; font-weight: inherit; color: inherit; }
+.orders-filter__label { white-space: nowrap; font-size: var(--ui-type-segment); line-height: var(--ui-type-segment-lh); font-weight: inherit; color: inherit; }
 .orders-filter__badge { min-width: 18px; height: 18px; box-sizing: border-box; margin-left: 1px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); font: 600 11px/18px var(--font-v5); }
 /* Order cards (DS-28): solid surface, machine art as the anchor; the pending card adds one faint warning glow. */
 .orders-list { display: flex; flex-direction: column; gap: var(--ui-space-card-gap); margin: 0 16px; }

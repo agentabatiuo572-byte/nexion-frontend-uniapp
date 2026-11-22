@@ -56,6 +56,9 @@ onUnmounted(() => {
   border-radius: 8px;
   color: var(--v5-ink-3);
 }
+/* The visible 28px square keeps its size; the hit area grows to 44px around it (01 §1.3, 07 §7.2). */
+.copy-code-button { position: relative; }
+.copy-code-button::after { content: ""; position: absolute; inset: -8px; }
 .copy-code-button:active {
   background: color-mix(in srgb, var(--v5-ink) 8%, transparent);
 }
