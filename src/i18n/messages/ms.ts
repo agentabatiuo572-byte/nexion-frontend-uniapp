@@ -1814,6 +1814,7 @@ export const ms: Messages = {
     recoveryUnreadableNote: "Untuk mengelakkan bayaran berganda, pembayaran di halaman ini dihentikan sementara.",
     recoveryUnreadableBody: "Untuk mengelakkan bayaran berganda, semak pesanan anda dahulu.",
     recoveryViewOrders: "Lihat pesanan",
+    recoveryContactSupport: "Hubungi bantuan",
     purchasePoliciesAll: "Semua syarat pembelian di bawah mesti dipenuhi",
     purchaseProductPolicy: "Syarat pembelian produk",
     purchaseHardwarePolicy: "Syarat kuota perkakasan",

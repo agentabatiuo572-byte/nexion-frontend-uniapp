@@ -259,8 +259,8 @@
         <NxButton variant="primary" :disabled="tradein.state.kind === 'keep-recovery'" :label="purchaseRecoveryCopy(locale.code).resume" @click="promotionRoute ? promotionCheckout?.openKeepResume() : openKeepResume()" />
       </view>
       <!-- The original purchase cannot be identified: payment stays blocked, the ways out are the orders list and support (04 §4.0 tray). -->
-      <view v-if="(promotionRoute ? promotionCheckout?.keepRecoveryTarget && promotionCheckout.keepRecoveryReadError && !promotionCheckout.keepResumeAllowed : keepCheckoutTarget && keepCheckoutReadError && !keepResumeAllowed)" class="checkout-sticky nx-glass-bar">
-        <NxButton variant="secondary" :label="purchasePaymentCopy(locale.code).support" :busy="recoverySupportOpening" @click="openRecoverySupport" />
+      <view v-if="(promotionRoute ? promotionCheckout?.keepRecoveryTarget && promotionCheckout.keepRecoveryReadError && !promotionCheckout.keepResumeAllowed : keepCheckoutTarget && keepCheckoutReadError && !keepResumeAllowed)" class="checkout-sticky checkout-sticky--exits nx-glass-bar">
+        <NxButton variant="secondary" :label="t.tradein.recoveryContactSupport" :busy="recoverySupportOpening" @click="openRecoverySupport" />
         <NxButton variant="primary" :label="t.tradein.recoveryViewOrders" @click="navTo('/pages/store/orders')" />
       </view>
       <view v-if="!promotionRoute && (originalOrderNavigationFailed || pendingCreateTerms) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
@@ -311,7 +311,6 @@ import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { commerceCopy } from '@/lib/commerce-review';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
-import { purchasePaymentCopy } from '@/lib/purchase-payment-copy';
 import { useLocaleStore } from "@/store/locale";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
@@ -3825,6 +3824,8 @@ button.checkout-policy-link::after { border:0; }
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }
 .checkout-sticky--single :deep(.nx-button) { flex:1 1 auto; }
+/* Two exits share the row; if a long language still wraps, each button takes the full width (03 §3.6.1). */
+.checkout-sticky--exits :deep(.nx-button) { flex:1 1 auto; }
 .checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }
 .checkout-summary-total :deep(.checkout-amount) { font-size:var(--ui-type-section); }
 /* Whole-page pending result (03 §3.4, §3.5.2): one centred status, no query button; short-body role (10.1). */

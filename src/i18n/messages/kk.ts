@@ -1814,6 +1814,7 @@ export const kk: Messages = {
     recoveryUnreadableNote: "Екі рет төлемеу үшін бұл бетте төлем уақытша тоқтатылды.",
     recoveryUnreadableBody: "Екі рет төлемеу үшін алдымен тапсырыстарды қараңыз.",
     recoveryViewOrders: "Тапсырыстарым",
+    recoveryContactSupport: "Қолдауға жазу",
     purchasePoliciesAll: "Төмендегі барлық сатып алу шарты орындалуы керек",
     purchaseProductPolicy: "Тауарды сатып алу шарттары",
     purchaseHardwarePolicy: "Жабдық квотасы шарттары",

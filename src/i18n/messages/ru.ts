@@ -1814,6 +1814,7 @@ export const ru: Messages = {
     recoveryUnreadableNote: "Чтобы не оплатить дважды, оплата на этой странице приостановлена.",
     recoveryUnreadableBody: "Чтобы не оплатить дважды, сначала проверьте заказы.",
     recoveryViewOrders: "Мои заказы",
+    recoveryContactSupport: "Поддержка",
     purchasePoliciesAll: "Нужно выполнить все условия покупки ниже",
     purchaseProductPolicy: "Условия покупки товара",
     purchaseHardwarePolicy: "Условия квоты оборудования",

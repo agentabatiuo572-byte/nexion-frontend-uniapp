@@ -1814,6 +1814,7 @@ export const id: Messages = {
     recoveryUnreadableNote: "Agar tidak membayar dua kali, pembayaran di halaman ini dijeda.",
     recoveryUnreadableBody: "Agar tidak membayar dua kali, cek pesanan Anda dulu.",
     recoveryViewOrders: "Lihat pesanan",
+    recoveryContactSupport: "Hubungi CS",
     purchasePoliciesAll: "Semua syarat pembelian di bawah harus terpenuhi",
     purchaseProductPolicy: "Syarat pembelian produk",
     purchaseHardwarePolicy: "Syarat kuota perangkat keras",

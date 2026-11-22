@@ -1814,6 +1814,7 @@ export const uz: Messages = {
     recoveryUnreadableNote: "Ikki marta toʻlamaslik uchun bu sahifada toʻlov vaqtincha toʻxtatildi.",
     recoveryUnreadableBody: "Ikki marta toʻlamaslik uchun avval buyurtmalaringizni tekshiring.",
     recoveryViewOrders: "Buyurtmalarim",
+    recoveryContactSupport: "Yordam xizmati",
     purchasePoliciesAll: "Quyidagi barcha xarid shartlari bajarilishi kerak",
     purchaseProductPolicy: "Mahsulot xarid shartlari",
     purchaseHardwarePolicy: "Qurilma kvotasi shartlari",
