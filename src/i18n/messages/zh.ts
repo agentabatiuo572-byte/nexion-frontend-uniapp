@@ -40,7 +40,6 @@ export const zh: Messages = {
     failed: "扫码未完成，请重试。",
   },
   pageLoad: {
-    module: "本页已有新版本",
     unknown: "页面暂时无法加载",
   },
   bankBinding: {

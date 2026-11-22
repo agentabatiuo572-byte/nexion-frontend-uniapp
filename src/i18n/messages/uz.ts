@@ -355,7 +355,6 @@ export const uz: Messages = {
     failed: "Taklifni skanerlab boʻlmadi. Qayta urinib koʻring.",
   },
   pageLoad: {
-    module: "Bu sahifaning yangi versiyasi chiqdi",
     unknown: "Sahifani yuklab boʻlmadi",
   },
   bankBinding: {

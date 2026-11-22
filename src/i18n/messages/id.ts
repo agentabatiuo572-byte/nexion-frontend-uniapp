@@ -355,7 +355,6 @@ export const id: Messages = {
     failed: "Undangan gagal dipindai. Coba lagi.",
   },
   pageLoad: {
-    module: "Versi baru halaman ini sudah tersedia",
     unknown: "Halaman tidak dapat dimuat",
   },
   bankBinding: {

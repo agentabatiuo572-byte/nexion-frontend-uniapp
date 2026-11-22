@@ -355,7 +355,6 @@ export const fil: Messages = {
     failed: "Hindi ma-scan ang imbitasyon. Subukan ulit.",
   },
   pageLoad: {
-    module: "May bagong bersyon na ang page na ito",
     unknown: "Hindi ma-load ang page",
   },
   bankBinding: {

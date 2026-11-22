@@ -355,7 +355,6 @@ export const ms: Messages = {
     failed: "Jemputan tidak dapat diimbas. Sila cuba lagi.",
   },
   pageLoad: {
-    module: "Versi baharu halaman ini sudah tersedia",
     unknown: "Halaman tidak dapat dimuatkan",
   },
   bankBinding: {

@@ -355,7 +355,6 @@ export const kk: Messages = {
     failed: "Шақыру сканерленбеді. Қайталап көріңіз.",
   },
   pageLoad: {
-    module: "Бұл беттің жаңа нұсқасы шықты",
     unknown: "Бетті жүктеу мүмкін болмады",
   },
   bankBinding: {

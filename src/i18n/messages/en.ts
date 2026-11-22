@@ -39,7 +39,6 @@ export const en = {
     failed: "Could not scan the invitation. Please try again.",
   },
   pageLoad: {
-    module: "A new version of this page is available",
     unknown: "The page could not be loaded",
   },
   bankBinding: {

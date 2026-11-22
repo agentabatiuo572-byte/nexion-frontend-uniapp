@@ -40,7 +40,6 @@ export const vi: Messages = {
     failed: "Chưa quét được lời mời. Vui lòng thử lại.",
   },
   pageLoad: {
-    module: "Trang này đã có phiên bản mới",
     unknown: "Không thể tải trang",
   },
   bankBinding: {
