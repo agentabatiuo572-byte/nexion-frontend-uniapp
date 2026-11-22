@@ -3418,6 +3418,7 @@ export const id: Messages = {
     loadEarlier: "Muat pesan sebelumnya",
     sessionTransferred: "Percakapan ini sudah dialihkan dan tidak bisa dibalas lagi. Mulai percakapan baru.",
     sessionTransferredOpenCurrent: "Percakapan ini sudah dialihkan dan tidak bisa dibalas lagi. Silakan lanjutkan di percakapan saat ini.",
+    sessionDisconnected: "Terputus",
     title: "Pesan",
     back: "Kembali",
     typeAdvisor: "CS pribadi",
