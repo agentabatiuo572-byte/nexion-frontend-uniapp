@@ -92,7 +92,7 @@
       <view :style="proofCardStyle">
         <view class="flex items-center" :style="proofHeadStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text>{{ t.home.networkPulseTitle }}</text>
+          <text>{{ t.home.platformStatsTitle }}</text>
         </view>
         <view class="grid grid-cols-2 text-center" style="gap: 12px 8px">
           <Stat :label="t.home.networkMembers" :value="published.registered.value" tint="var(--v5-brand)" />

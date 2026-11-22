@@ -18,7 +18,7 @@
     <view v-if="remoteProof" ref="trackRef" class="social-proof__track" :class="{ 'social-proof__track--running': trackRunning }" :style="{ animationDuration: `${remoteRows.length * 2}s` }">
       <view v-for="(r, i) in [...remoteRows, ...remoteRows]" :key="i" :aria-hidden="i >= remoteRows.length ? true : undefined" class="flex items-baseline" :style="rowStyle">
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
-        <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.n.toLocaleString() }}</text>
+        <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.exact ? r.n.toLocaleString() : storeHeatFigure(r.n, locale.code) }}</text>
         <text class="truncate" :style="labelStyle">{{ r.label }}</text>
         <svg v-if="r.hot" class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2"><path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z" /></svg>
       </view>
@@ -29,7 +29,7 @@
     <view :style="listStyle">
       <view v-for="(r, i) in doubled" :key="i" class="flex items-baseline" :style="rowStyle">
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
-        <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.n.toLocaleString() }}</text>
+        <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.exact ? r.n.toLocaleString() : storeHeatFigure(r.n, locale.code) }}</text>
         <text class="truncate" :style="labelStyle">{{ r.label }}</text>
         <text v-if="r.hot" class="shrink-0" style="color: var(--v5-brand-2); font-size: 12px; margin-left: 1px">⚡</text>
       </view>
@@ -41,6 +41,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
+import { storeHeatFigure } from "@/lib/platform-stats";
 import { fmt } from "@/i18n/format";
 import { remoteApiEnabled, storefrontActivityApi } from "@/api/runtime";
 import type { StorefrontSocialProof } from "@/api/storefront-activity-api";
@@ -56,6 +58,7 @@ import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from
 
 const props = defineProps<{ product: Product }>();
 const t = useT();
+const locale = useLocaleStore();
 const app = useApp();
 const { elRef: proofRef, inView: proofInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false, nativeSelector: ".social-proof" });
 // The scroll loop observes its track; proofInView gates the enclosing block's 4s read on App and H5.
@@ -170,7 +173,8 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-type FlatRow = { n: number; label: string; color: string; hot?: boolean };
+// Heat figures are exact under 100 and banded from 100 (storeHeatFigure); stock stays exact.
+type FlatRow = { n: number; label: string; color: string; hot?: boolean; exact?: boolean };
 const remoteRows = computed<FlatRow[]>(() => {
   const proof = remoteProof.value;
   if (!proof) return [];
@@ -185,7 +189,7 @@ const remoteRows = computed<FlatRow[]>(() => {
   ];
   const stock = props.product.stock;
   if (stock !== undefined && stock < 50) {
-    rows.push({ n: stock, label: w.value.stockShortLabel, color: "var(--v5-brand-2)" });
+    rows.push({ n: stock, label: w.value.stockShortLabel, color: "var(--v5-brand-2)", exact: true });
   }
   return rows;
 });
@@ -197,7 +201,7 @@ const flat = computed<FlatRow[]>(() => {
   ];
   const stock = props.product.stock;
   if (stock !== undefined && stock < 50) {
-    rows.push({ n: stock, label: w.value.stockShortLabel, color: "var(--v5-brand-2)", hot: true });
+    rows.push({ n: stock, label: w.value.stockShortLabel, color: "var(--v5-brand-2)", hot: true, exact: true });
   }
   return rows;
 });

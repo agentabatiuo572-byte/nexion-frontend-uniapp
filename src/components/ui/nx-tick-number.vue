@@ -1,26 +1,28 @@
 <!--
-  NxTickNumber — a whole count with thousands separators (comma grouping on every page and in every
-  language, e.g. 2,968; formatGroupedAmount, no Intl). When the value changes, only the digits that changed roll in from below; the
-  rest stay put. Reduced motion shows the new figure without movement. Screen readers read the whole
-  figure once instead of the separate digits. null renders "—".
+  NxTickNumber — a platform display figure that is already formatted (a band such as 3.2K+ or $1.2M+, from
+  networkPopulationBand / platformAmountBand). When the text changes, only the characters that changed roll in from
+  below; the rest stay put. A change while the owner is off-screen, its page hidden or the chassis scrolling swaps
+  without the roll (device-presence.css), and reduced motion never rolls. Screen readers read the whole figure once.
+  null renders "—".
 -->
 <template>
-  <text class="nx-tick"><text class="nx-sr-only">{{ text }}</text><text v-for="c in chars" :key="c.key" class="nx-tick__ch" :class="{ 'nx-tick__ch--roll': c.roll }" aria-hidden="true">{{ c.ch }}</text></text>
+  <text class="nx-tick"><text class="nx-sr-only">{{ shown }}</text><text v-for="c in chars" :key="c.key" class="nx-tick__ch" :class="{ 'nx-tick__ch--roll': c.roll }" aria-hidden="true">{{ c.ch }}</text></text>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { formatGroupedAmount } from "@/lib/amount-display";
 
-const props = defineProps<{ value: number | null }>();
-const text = computed(() => props.value === null ? "—" : formatGroupedAmount(props.value, "full"));
-// Each character is keyed by its place counted from the right, so a changed digit is a new node and
-// replays the roll, while unchanged digits keep their node. The first figure and "—" never roll.
+const props = defineProps<{ text: string | null }>();
+const shown = computed(() => props.text ?? "—");
+// Each character is keyed by its place counted from the right, so a changed character is a new node and
+// replays the roll, while unchanged ones keep their node. The first figure and "—" never roll. The band's
+// trailing "+" stays with the letter before it ("K+"), so it reads as part of the figure, not a separate sign.
 const chars = ref<{ ch: string; key: string; roll: boolean }[]>([]);
-watch(text, (next, previous) => {
+watch(shown, (next, previous) => {
   const before = previous === undefined || previous === "—" || next === "—" ? null : new Set(chars.value.map(c => c.key));
-  chars.value = Array.from(next, (ch, i) => {
-    const key = `${next.length - i}:${ch}`;
+  const units = next.match(/.\+?/gsu) ?? [];
+  chars.value = units.map((ch, i) => {
+    const key = `${units.length - i}:${ch}`;
     return { ch, key, roll: before !== null && !before.has(key) };
   });
 }, { immediate: true });
