@@ -99,7 +99,7 @@
         <text class="block font-mono-tabular" :style="priceEyebrowStyle">{{ t.store.cardPriceLabel }}</text>
         <view class="tabular-nums flex items-baseline" :style="priceRowStyle">
           <text style="font-size: var(--ui-type-list-title); color: var(--v5-ink-3); font-weight: 500">$</text>
-          <text style="font-family: var(--font-amount); font-size: 26px; font-weight: 600">{{ priceText }}</text>
+          <text style="font-family: var(--font-amount); font-size: 26px; font-weight: 500">{{ priceText }}</text>
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
@@ -553,7 +553,7 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .product-compact-levels { display:block; margin-top:6px; font:400 12px/17px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
-.product-compact-price { color:var(--v5-ink); font:600 16px/21px var(--font-v5); }
+.product-compact-price { color:var(--v5-ink); font:500 16px/21px var(--font-amount); font-variant-numeric:tabular-nums; }
 .product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
 /* The rate and its "/day" never split across lines. */
 .product-compact-estimate__value { white-space:nowrap; }
