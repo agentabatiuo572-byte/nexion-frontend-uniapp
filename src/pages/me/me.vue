@@ -29,10 +29,10 @@
       <NxSection v-for="section in settingSections" :key="section.key" :title="section.title" :meta="section.count == null ? undefined : visibility.mask(section.count)">
         <NxListGroup>
           <NxListRow v-for="item in section.items" :key="item.key" :data-quick-key="item.key" :title="item.label" :value="['inventory', 'slots', 'orders', 'genesis'].includes(item.key) && item.meta ? visibility.mask(item.meta) : item.meta" @click="handleQuickItem(item)">
-            <template #leading><view class="me-row-icon" :class="'me-tone--' + (item.tone || 'muted')">
+            <template #leading><NxIconTile :tone="tileTone(item.tone)" size="s">
               <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg>
               <view v-if="item.dot || item.badge" class="me-row-dot" />
-            </view></template>
+            </NxIconTile></template>
           </NxListRow>
         </NxListGroup>
       </NxSection>
@@ -314,7 +314,7 @@ const quickSections = computed<QuickSection[]>(() => [
     items: [
       { key: "preferences", label: t.value.me.preferencesRow, href: "/me/preferences", icon: "sliders", tone: "muted" },
       { key: "theme", label: t.value.me.themeRow, href: "/me/preferences", icon: theme.mode === "system" ? "monitor" : theme.mode === "dark" ? "moon" : "sun", meta: themeModeLabel.value, tone: "purple" },
-      { key: "language", label: t.value.me.languageRow, href: "/me/language", icon: "globe", meta: localeUpper.value, tone: "brand" },
+      { key: "language", label: t.value.me.languageRow, href: "/me/language", icon: "globe", meta: localeUpper.value, tone: "teal" },
     ],
   },
   {
@@ -323,9 +323,9 @@ const quickSections = computed<QuickSection[]>(() => [
     items: [
       { key: "messages", label: t.value.notifs.drawerTitle, href: "/me/notifications", icon: "messages", badge: formatUnreadBadge(messageUnread.value) || undefined, tone: "purple" },
       // This opens the advisor chat directly (handleQuickItem); availability is not inferred from a local badge.
-      { key: "support", label: t.value.me.supportHubRow, href: "/me/support", icon: "chat", meta: t.value.me.supportHubMeta, tone: "success" },
+      { key: "support", label: t.value.me.supportHubRow, href: "/me/support", icon: "chat", meta: t.value.me.supportHubMeta, tone: "sky" },
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
-      { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
+      { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "teal" },
       { key: "learning", label: t.value.me.learningRow, href: "/learn/courses", icon: "book", tone: "brand" },
       { key: "developer", label: t.value.me.developer, href: "/developer", icon: "code", tone: "muted" },
     ],
@@ -694,13 +694,6 @@ const signOutStyle: CSSProperties = {
 .me-shortcut-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--v5-space-3) var(--v5-space-1); padding: var(--v5-space-3) 0 var(--v5-space-1); }
 .me-shortcut { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); min-width: 0; min-height: 80px; cursor: pointer; }
 .me-shortcut__label { font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); text-align: center; overflow-wrap: break-word; }
-.me-row-icon { --me-icon: var(--v5-ink-2); --me-icon-bg: var(--v5-surface-3); position: relative; display: grid; place-items: center; flex: none; width: var(--v5-space-8); height: var(--v5-space-8); border-radius: var(--v5-radius-s); color: var(--me-icon); background: var(--me-icon-bg); }
-.me-tone--brand { --me-icon: var(--v5-brand); --me-icon-bg: var(--v5-brand-soft); }
-.me-tone--blue { --me-icon: var(--ui-device-ink); --me-icon-bg: var(--ui-device-soft); }
-.me-tone--purple { --me-icon: var(--v5-nex); --me-icon-bg: var(--v5-nex-soft); }
-.me-tone--orange, .me-tone--warning { --me-icon: var(--v5-warning-ink); --me-icon-bg: var(--v5-warning-soft); }
-.me-tone--success { --me-icon: var(--v5-success-ink); --me-icon-bg: var(--v5-success-soft); }
-.me-tone--danger { --me-icon: var(--v5-danger); --me-icon-bg: var(--v5-danger-soft); }
 .me-row-dot { position: absolute; right: 0; top: 0; width: var(--v5-space-2); height: var(--v5-space-2); border-radius: var(--v5-radius-full); background: var(--v5-danger); box-shadow: 0 0 0 2px var(--v5-bg); }
 .me-network-item__meta { margin-top: -4px; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); text-align: center; overflow-wrap: break-word; }
 .me-shortcut:focus-visible, .me-network-item:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: var(--v5-radius-s); }

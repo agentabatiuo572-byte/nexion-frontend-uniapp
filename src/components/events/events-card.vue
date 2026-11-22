@@ -18,9 +18,9 @@
       <view v-if="ev.runtimeSource === 'remote' && ev.kind === 'wheel'" class="flex justify-end" role="link" tabindex="0" :aria-label="t.events.action.viewDetails + ' · ' + ev.title" @click="openDetails" @keydown.enter.prevent="openDetails"><text class="nx-after-chevron" style="font-size:12px;color:var(--v5-brand)">{{ t.events.action.viewDetails }}</text></view>
       <!-- HEADER row -->
       <view class="flex items-start" style="gap: 12px">
-        <view class="grid place-items-center shrink-0" :style="emojiChipStyle">
-          <EventIcon :kind="ev.kind" :size="22" />
-        </view>
+        <NxIconTile :tone="EVENT_TONES[ev.kind] ?? 'amber'" size="m">
+          <EventIcon :kind="ev.kind" :size="22" style="color: inherit" />
+        </NxIconTile>
         <view class="flex-1 min-w-0">
           <text class="block font-mono-tabular" :style="kindLineStyle">{{ kindLabel }}<text v-if="ev.ribbon" style="color: var(--v5-ink-4)"> · {{ ev.ribbon }}</text></text>
           <text :style="titleStyle">{{ ev.title }}</text>
@@ -81,6 +81,9 @@
 
 <script setup lang="ts">
 import EventIcon from "./event-icon.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+// The event kind's tile hue (the lime tile is kept for main actions).
+const EVENT_TONES: Record<string, "sky" | "purple" | "coral" | "amber" | "teal"> = { referral: "sky", wheel: "purple", regional: "coral", boost: "amber", onboarding: "teal", seasonal: "coral", discount: "amber" };
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -181,12 +184,6 @@ const hairlineStyle = computed<CSSProperties>(() => ({
   width: "2px",
   background: "var(--v5-border)",
   opacity: 0.85,
-}));
-const emojiChipStyle = computed<CSSProperties>(() => ({
-  width: "40px",
-  height: "40px",
-  borderRadius: "8px",
-  background: "var(--v5-surface-2)",
 }));
 const kindLineStyle = computed<CSSProperties>(() => ({
   fontSize: "12px",

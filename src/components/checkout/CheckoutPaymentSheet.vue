@@ -4,7 +4,7 @@
       <text class="checkout-payment__label">{{ copy.paymentTotal }}</text>
       <CheckoutAmount class="checkout-payment__amount" :value="amount" currency="USDT" />
       <view class="checkout-payment__wallet" :aria-label="copy.wallet + ' · ' + copy.selected">
-        <svg class="checkout-payment__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6.5h15a1 1 0 0 1 1 1V19H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12v2.5"/><path d="M20 10h-5v5h5M16.5 12.5h.01"/></svg>
+        <NxIconTile tone="amber" size="s"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6.5h15a1 1 0 0 1 1 1V19H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12v2.5"/><path d="M20 10h-5v5h5M16.5 12.5h.01"/></svg></NxIconTile>
         <view class="checkout-payment__wallet-copy"><text class="checkout-payment__wallet-title">{{ copy.wallet }}</text><text class="checkout-payment__label">{{ copy.walletBalance }} · {{ balanceText }}</text></view>
         <svg class="checkout-payment__selected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>
       </view>
@@ -21,6 +21,7 @@
 </template>
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import NxSheet from '@/components/ui/nx-sheet.vue';
 import NxButton from '@/components/ui/nx-button.vue';
 import CheckoutAmount from './CheckoutAmount.vue';
@@ -52,7 +53,7 @@ function confirm() { if (!canConfirm.value) return; submitted.value = true; emit
 .checkout-payment__wallet { display: flex; align-items: center; gap: var(--v5-space-3); padding: var(--v5-space-4); border: 1px solid var(--v5-brand); border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
 .checkout-payment__wallet-copy { flex: 1; min-width: 0; }
 .checkout-payment__wallet-title { display: block; margin-bottom: var(--v5-space-1); color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
-.checkout-payment__icon, .checkout-payment__selected { flex: none; width: 24px; height: 24px; color: var(--v5-brand); }
+.checkout-payment__selected { flex: none; width: 24px; height: 24px; color: var(--v5-brand); }
 .checkout-payment__note { display: block; color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .checkout-payment__footer { display: grid; gap: var(--v5-space-3); }
 .checkout-payment__error { color: var(--v5-danger); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
