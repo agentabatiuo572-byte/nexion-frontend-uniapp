@@ -121,6 +121,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { ref, shallowRef, computed, watch, nextTick, onMounted, onUnmounted, getCurrentInstance, type CSSProperties } from "vue";
 import { onLoad, onUnload, onShow, onHide } from "@dcloudio/uni-app";
 import ConversationThread from "@/components/support/conversation-thread.vue";
@@ -1227,6 +1228,8 @@ function onCta(href: string) {
 function goBack() {
   navBack("/pages/support/messages");
 }
+// Alone on the stack, the system back does what the header back does (02 §2.7.3).
+useHeaderSystemBack(() => goBack);
 
 function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   if (event.repeat) return;
