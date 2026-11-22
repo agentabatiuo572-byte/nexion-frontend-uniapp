@@ -8,7 +8,7 @@
         <text class="event-title">{{ detail.event.title }}</text>
         <text class="event-copy">{{ detail.event.subtitle }}</text>
         <text v-if="detail.event.kind==='seasonal'&&detail.rules.voucherId" class="event-copy">{{ copy.voucherTerms }}</text>
-        <NxTag class="event-status" role="status" wrap :tone="statusTone" :label="statusLabel" />
+        <NxTag ref="statusTag" class="event-status" role="status" tabindex="-1" wrap :tone="statusTone" :label="statusLabel" />
         <text v-if="detail.reminderSubscribed" class="event-copy" role="status">{{ reminderCopy.subscribed }}</text>
         <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, locale.code) }}</text></view>
         <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
@@ -108,6 +108,14 @@ const eligibilityTone: Record<EventEligibilityReason, "success" | "warning" | "n
 const readyToContinue = computed(() => detail.value!.eligibilityReason === "READY" && detail.value!.userStatus !== "CLAIMABLE");
 const statusTone = computed(() => readyToContinue.value ? "neutral" : eligibilityTone[detail.value!.eligibilityReason]);
 const statusLabel = computed(() => readyToContinue.value ? copy.value.readyToContinue : copy.value.eligibility[detail.value!.eligibilityReason]);
+const statusTag = ref<{ $el?: HTMLElement } | null>(null);
+// When the bar leaves (claim confirmed, reminder set) the focused button is gone: land focus on the status the action
+// changed instead of the document (03 §3.5, 07 §7.2). Focus elsewhere is left alone.
+watch(action, (next, prev) => {
+  if (!prev || next || typeof document === "undefined") return;
+  if (document.activeElement && document.activeElement !== document.body) return;
+  statusTag.value?.$el?.focus();
+}, { flush: "post" });
 let code = "", visible = false, generation = 0;
 let unconfirmedAction: "join" | "claim" | "remind" | null = null;
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
