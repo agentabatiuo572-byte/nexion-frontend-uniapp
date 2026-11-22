@@ -87,7 +87,7 @@
       <text class="product-compact-tagline">{{ copy.tagline }}</text>
       <text v-if="copy.taskLevels" class="product-compact-levels">{{ copy.taskLevels }}</text>
       <view class="product-compact-bottom">
-        <text class="product-compact-price">{{ fmtMoney(product.price).replace(/\.00$/, '') }}</text>
+        <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.label }} · <text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
@@ -123,7 +123,7 @@ import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { computeTradeInCredit } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
-import { fmt, fmtMoney } from "@/i18n/format";
+import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
@@ -324,7 +324,7 @@ const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: forma
 const tradeCreditText = computed(() =>
   fmt(t.value.store.cardTradeCredit, { n: formatAmount(bestTradeinCredit.value) }),
 );
-const priceText = computed(() => fmtMoney(props.product.price).replace(/^\$/, ""));
+const priceText = computed(() => formatGroupedAmount(props.product.price));
 const stockHintText = computed(() => fmt(t.value.store.cardStockCompact, { n: props.product.stock ?? 0 }));
 
 function goDetail() {

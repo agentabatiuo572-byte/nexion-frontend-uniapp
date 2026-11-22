@@ -261,7 +261,7 @@ import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
 import { useEarnConfig } from "@/store/earn-config";
 import { useLocaleStore } from "@/store/locale";
-import { fmt, fmtMoney } from "@/i18n/format";
+import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -603,7 +603,7 @@ const monthlyPctText = computed(() =>
 const annualPctText = computed(() =>
   totalPrice.value > 0 ? ((annualYield.value / totalPrice.value) * 100).toFixed(0) : "0",
 );
-const priceText = computed(() => fmtMoney(product.value ? product.value.price * qty.value : null));
+const priceText = computed(() => product.value ? `$${formatAmount(product.value.price * qty.value)}` : "-");
 
 function dec() {
   if (qty.value > 1) qty.value -= 1;
