@@ -11,7 +11,7 @@
         <view class="me-shortcut-grid">
           <template v-for="item in frequentItems" :key="item.key">
           <view class="me-shortcut" :data-quick-key="item.key" role="button" tabindex="0" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
-            <view class="me-row-icon me-shortcut__icon" :class="'me-tone--' + (item.tone || 'muted')"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg><view v-if="item.dot || item.badge" class="me-row-dot" /></view>
+            <NxIconTile :tone="tileTone(item.tone)" size="m"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg><view v-if="item.dot || item.badge" class="me-row-dot" /></NxIconTile>
             <text class="me-shortcut__label">{{ item.label }}</text>
           </view>
           </template>
@@ -20,7 +20,7 @@
       <NxSection :title="t.me.myNetwork">
         <view class="me-shortcut-grid me-network-grid">
           <view v-for="item in networkItems" :key="item.key" class="me-shortcut me-network-item" :data-quick-key="item.key" role="button" tabindex="0" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
-            <view class="me-row-icon me-shortcut__icon" :class="'me-tone--' + (item.tone || 'muted')"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg></view>
+            <NxIconTile :tone="tileTone(item.tone)" size="m"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg></NxIconTile>
             <text class="me-shortcut__label">{{ item.label }}</text>
             <text v-if="item.meta" class="me-network-item__meta">{{ item.key === 'rank' ? visibility.mask(item.meta) : item.meta }}</text>
           </view>
@@ -69,6 +69,7 @@ import CardStagger from "@/components/card-stagger.vue";
 import NxSection from "@/components/ui/nx-section.vue";
 import NxListGroup from "@/components/ui/nx-list-group.vue";
 import NxListRow from "@/components/ui/nx-list-row.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import ProfileRow from "@/components/me/profile-row.vue";
 import WalletCard from "@/components/me/wallet-card.vue";
 import WalletOverview from "@/components/me/wallet-overview.vue";
@@ -206,7 +207,9 @@ const iconPaths = {
 } as const;
 
 type QuickIcon = keyof typeof iconPaths;
-type QuickTone = "brand" | "blue" | "purple" | "orange" | "success" | "warning" | "muted" | "danger";
+type QuickTone = "brand" | "blue" | "purple" | "orange" | "success" | "warning" | "muted" | "danger" | "sky" | "teal" | "coral";
+const TILE_TONES = { brand: "brand", blue: "device", purple: "purple", orange: "amber", warning: "amber", success: "success", muted: "muted", danger: "danger", sky: "sky", teal: "teal", coral: "coral" } as const;
+function tileTone(tone?: QuickTone) { return TILE_TONES[tone ?? "muted"]; }
 
 interface QuickItem {
   key: string;
@@ -273,9 +276,9 @@ const quickSections = computed<QuickSection[]>(() => [
     key: "network",
     title: t.value.me.myNetwork,
     items: [
-      { key: "team", label: t.value.me.team, href: "/team", icon: "network", meta: t.value.me.networkOverviewMeta, tone: "brand" },
+      { key: "team", label: t.value.me.team, href: "/team", icon: "network", meta: t.value.me.networkOverviewMeta, tone: "sky" },
       { key: "invite", label: t.value.me.networkInviteLabel, href: "/team", icon: "invite", meta: config.config.rewards.enabled ? fmt(t.value.me.networkInviteMeta, { nex: formatAmount(config.config.rewards.inviterReward.nexAmount) }) : t.value.me.networkInviteMetaDisabled, tone: "orange" },
-      { key: "commissions", label: t.value.me.networkCommissionsLabel, href: "/team/commissions", icon: "commission", meta: t.value.me.networkCommissionsMeta, tone: "success" },
+      { key: "commissions", label: t.value.me.networkCommissionsLabel, href: "/team/commissions", icon: "commission", meta: t.value.me.networkCommissionsMeta, tone: "coral" },
       { key: "rank", label: t.value.me.currentRank, href: "/team/rank", icon: "rank", meta: rankValue.value, tone: "purple" },
     ],
   },
@@ -331,7 +334,7 @@ const quickSections = computed<QuickSection[]>(() => [
 const frequentKeys = ['inventory', 'orders', 'missions', 'rewards', 'receipts', 'goals', 'learning'] as const;
 const frequentItems = computed<QuickItem[]>(() => frequentKeys.map((key) => {
   const item = quickSections.value.flatMap(section => section.items).find(item => item.key === key)!;
-  const tones: Record<string, QuickTone> = { inventory:'blue', orders:'purple', missions:'brand', rewards:'orange', receipts:'blue', goals:'purple', genesis:'orange', learning:'purple' };
+  const tones: Record<string, QuickTone> = { inventory:'blue', orders:'purple', missions:'sky', rewards:'orange', receipts:'blue', goals:'purple', genesis:'orange', learning:'purple' };
   return { ...item, label: t.value.me.shortcutLabels[key], icon: key === 'goals' ? 'trend' as const : item.icon, tone: tones[key] };
 }));
 const networkItems = computed(() => quickSections.value.find(section => section.key === 'network')?.items ?? []);
@@ -687,7 +690,6 @@ const signOutStyle: CSSProperties = {
 .me-shortcut { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); min-width: 0; min-height: 80px; cursor: pointer; }
 .me-shortcut__label { font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); text-align: center; overflow-wrap: break-word; }
 .me-row-icon { --me-icon: var(--v5-ink-2); --me-icon-bg: var(--v5-surface-3); position: relative; display: grid; place-items: center; flex: none; width: var(--v5-space-8); height: var(--v5-space-8); border-radius: var(--v5-radius-s); color: var(--me-icon); background: var(--me-icon-bg); }
-.me-shortcut__icon { width: var(--v5-space-10); height: var(--v5-space-10); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--me-icon) 14%, transparent); }
 .me-tone--brand { --me-icon: var(--v5-brand); --me-icon-bg: var(--v5-brand-soft); }
 .me-tone--blue { --me-icon: var(--ui-device-ink); --me-icon-bg: var(--ui-device-soft); }
 .me-tone--purple { --me-icon: var(--v5-nex); --me-icon-bg: var(--v5-nex-soft); }
