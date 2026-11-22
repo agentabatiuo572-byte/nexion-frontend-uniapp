@@ -114,7 +114,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
@@ -304,8 +304,8 @@ const dailyEstimate = computed(() => productDailyEstimateRange(props.product));
 const dailyEarnText = computed(() => {
   const estimate = dailyEstimate.value;
   if (!estimate) return "";
-  if (!isShare.value) return formatAmount(estimate.low);
-  const low = formatAmount(estimate.low, 6), high = formatAmount(estimate.high, 6);
+  if (!isShare.value) return formatGroupedAmount(estimate.low);
+  const low = formatGroupedAmount(estimate.low), high = formatGroupedAmount(estimate.high);
   return low === high ? low : `${low}–${high}`;
 });
 const compactEstimate = computed(() => {
@@ -313,10 +313,10 @@ const compactEstimate = computed(() => {
     const value = dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—";
     return { label: t.value.bundle.estimatedDaily, value, ariaLabel: `${t.value.bundle.estimatedDaily} · ${value}` };
   }
-  const daily = fmtMoney(props.product.dailyEarn);
+  const daily = `$${formatGroupedAmount(props.product.dailyEarn)}`;
   return {
     label: estimateLabel.value,
-    value: `${daily.replace(/\.00$/, "")}${t.value.store.cardPerDaySuffix}`,
+    value: `${daily}${t.value.store.cardPerDaySuffix}`,
     ariaLabel: `${t.value.store.cardYouEarn} · ${daily}${t.value.store.cardPerDaySuffix}`,
   };
 });
