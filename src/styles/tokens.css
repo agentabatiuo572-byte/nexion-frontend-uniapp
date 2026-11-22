@@ -592,6 +592,10 @@ body {
 .nx-progress { position: relative; height: 3px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .nx-progress__fill { position: relative; height: 100%; max-width: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--nx-progress-hue, var(--v5-brand)) 12%, transparent), color-mix(in srgb, var(--nx-progress-hue, var(--v5-brand)) 60%, transparent)); }
 .nx-progress__fill::after { content: ""; position: absolute; top: 50%; right: -2.5px; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: color-mix(in srgb, var(--nx-progress-hue, var(--v5-brand)) 85%, var(--v5-surface)); }
+/* The bar draws the real value (03 §3.4, 07 §7.1.1): at 0 only the empty track shows, no head dot; with no known value
+   (the progressbar carries no aria-valuenow) there is no fill at all, and the row's own 「—」 says it is unknown. */
+.nx-progress[aria-valuenow="0"] .nx-progress__fill::after { content: none; }
+.nx-progress:not([aria-valuenow]) .nx-progress__fill { display: none; }
 /* Rings sweep from zero to their --nx-viz-ring value; dots light up one after another. */
 @keyframes nx-viz-sweep { from { --nx-viz-ring: 0; } }
 @keyframes nx-viz-light { from { opacity: .15; transform: scale(.6); } }
