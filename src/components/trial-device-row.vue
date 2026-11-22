@@ -17,7 +17,7 @@
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
       <view class="trial-device-row__actions">
-        <view v-if="variant === 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
+        <view v-if="variant === 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline nx-reverse-action" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
         <view class="trial-device-row__details" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails" @keydown.enter.stop.prevent="goDetails" @keydown.space.stop.prevent="goDetails"><text>{{ copy.detailsAction }}</text></view>
         <view class="trial-device-row__buy" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy" @keydown.enter.stop.prevent="goBuy" @keydown.space.stop.prevent="goBuy"><text>{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }}</text><NxIcon name="arrow-right" /></view>
       </view>
@@ -115,7 +115,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__buy { gap:6px; margin-left:auto; color:var(--v5-brand); }
 .trial-device-row__buy::before { background:var(--v5-brand-soft); }
 .trial-device-row__buy[aria-disabled="true"],.trial-device-row__cancel[aria-disabled="true"] { opacity:.5; }
-.trial-device-row__cancel { display:flex; align-items:center; justify-content:center; min-height:44px; margin-top:8px; border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); }
+.trial-device-row__cancel:not(.trial-device-row__cancel--inline) { display:flex; align-items:center; justify-content:center; min-height:44px; margin-top:8px; border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); }
 .trial-device-row--home .trial-device-row__heading { min-height:64px; padding:10px 16px; gap:12px; }
 .trial-device-row--home .trial-device-row__main { gap:12px; }
 .trial-device-row--home .trial-device-row__art { width:48px; height:48px; border-radius:14px; overflow:visible; background:var(--v5-surface-2); }
@@ -159,9 +159,8 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 /* Cancelling the trial is destructive: a neutral glass S like 详情, with only its text in the error colour (03 §3.1). */
 /* A reverse action stays findable but quiet (user): bare text in the secondary ink, no pill, no error colour; the
    confirm dialog after it carries the consequence. */
-.trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; padding-inline:0; color:var(--v5-ink-3); }
-.trial-device-row--inventory .trial-device-row__actions > .trial-device-row__cancel--inline { font:400 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
-.trial-device-row--inventory .trial-device-row__actions > view { font:var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); white-space:nowrap; }
+.trial-device-row__actions > .trial-device-row__cancel--inline { display:flex; align-items:center; margin:0 auto 0 0; min-height:44px; padding-inline:0; }
+.trial-device-row--inventory .trial-device-row__actions > view:not(.nx-reverse-action) { font:var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); white-space:nowrap; }
 .trial-device-row--inventory .trial-device-row__main { gap:12px; }
 .trial-device-row--inventory .trial-device-row__status { font:400 13px/18px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__note { font:400 12px/18px var(--font-v5); }
