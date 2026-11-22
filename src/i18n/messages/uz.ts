@@ -2562,7 +2562,7 @@ export const uz: Messages = {
     gateSoldOut: "Bu davrda sotilib boʻldi",
     temporarilyOutOfStock: "Vaqtincha omborda yoʻq",
     gateBlockedToast: "Shartlar bajarilmagan — qanday ochishni koʻring",
-    gateSoldOutToast: "Bu davrda sotilib boʻldi",
+    gateSoldOutToast: "Sotuv kvotasi qolmadi",
     purchaseEligibilityCheck: "Xarid shartlarini tekshirish",
     purchaseEligibilityLoading: "Xarid shartlari tekshirilmoqda…",
     purchaseEligibilityIneligible: "Xarid shartlariga mos emas",

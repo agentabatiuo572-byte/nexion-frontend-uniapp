@@ -2562,7 +2562,7 @@ export const ru: Messages = {
     gateSoldOut: "Распродано в этом цикле",
     temporarilyOutOfStock: "Временно нет в наличии",
     gateBlockedToast: "Условия не выполнены — посмотрите, как открыть",
-    gateSoldOutToast: "Распродано в этом цикле",
+    gateSoldOutToast: "Квота продаж исчерпана",
     purchaseEligibilityCheck: "Проверить условия покупки",
     purchaseEligibilityLoading: "Проверяем условия покупки…",
     purchaseEligibilityIneligible: "Покупка недоступна",
