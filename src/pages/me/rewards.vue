@@ -278,7 +278,7 @@ const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
 const catTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
-  fontWeight: 550,
+  fontWeight: 500,
   color: "var(--v5-ink)",
 };
 const bigNumStyle: CSSProperties = {
