@@ -304,7 +304,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && remoteState.value === "error
 .leader-person { min-width: 0; flex: 1; }
 .leader-name { display: block; font: var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .leader-meta { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); overflow-wrap: break-word; }
-.leader-points { text-align: right; font: 600 var(--ui-type-subheading)/20px var(--font-metric); font-variant-numeric: tabular-nums; max-width: 34%; overflow-wrap: break-word; }
+.leader-points { text-align: right; font: 500 var(--ui-type-subheading)/20px var(--font-metric); font-variant-numeric: tabular-nums; max-width: 34%; overflow-wrap: break-word; }
 .leader-currency { display: block; margin-top: var(--v5-space-1); font-size: 11px; color: var(--v5-ink-3); }
 /* My rank: brand-tinted strip with the gap and, when known, progress to the next rank. */
 .leader-me { display: flex; align-items: center; gap: var(--ui-space-inline); padding: var(--ui-space-inline) var(--ui-space-inset); border-radius: 20px; background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-brand) 30%, transparent); }

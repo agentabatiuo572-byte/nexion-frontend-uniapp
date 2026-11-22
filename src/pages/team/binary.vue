@@ -386,11 +386,11 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-group-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 2px var(--ui-space-row-y); border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .binary-weak { background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); color: var(--ui-device-ink); }
 .binary-group-name { color: var(--v5-ink-2); font-size: 13px; line-height: 18px; }
-.binary-points { display: block; color: var(--v5-ink); font: 600 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.binary-points { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 .binary-contribution-track { position: relative; width: 64px; height: 150px; margin: var(--v5-space-1) 0; border-radius: 18px; background: var(--v5-surface-3); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; }
 .binary-contribution-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px; background: linear-gradient(180deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 25%, transparent)); }
 .binary-contribution-fill--other { background: linear-gradient(180deg, var(--ui-device-ink), color-mix(in srgb, var(--ui-device-ink) 25%, transparent)); }
-.binary-rate { position: absolute; left: 50%; top: 132px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; color: var(--ui-device-ink); font: 600 14px/20px var(--font-metric); text-align: center; overflow-wrap: break-word; }
+.binary-rate { position: absolute; left: 50%; top: 132px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; color: var(--ui-device-ink); font: 500 14px/20px var(--font-metric); text-align: center; overflow-wrap: break-word; }
 .binary-rate .binary-note { font-size: 11px; line-height: 16px; }
 .reward-binary-basis { display: flex; flex-direction: column; gap: var(--v5-space-1); margin-top: var(--v5-space-3); padding-inline: var(--v5-space-1); }
 .binary-member-recovery { display: flex; align-items: center; justify-content: space-between; }
