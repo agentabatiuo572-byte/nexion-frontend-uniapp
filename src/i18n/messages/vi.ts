@@ -2112,7 +2112,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     purchaseEligibilityRetry: "Thử lại kiểm tra điều kiện",
     purchaseEligibilityProductPolicy: "Điều kiện mua sản phẩm",
     purchaseEligibilityQuotaDepleted: "Đã hết suất mua hiện tại",
-    purchaseMonthlyQuotaDepleted: "Đã hết suất mua trong tháng này. Tháng sau bạn có thể mua tiếp.",
+    purchaseMonthlyQuotaDepleted: "Đã hết suất mua trong tháng này.",
     // zentao #29: chính sách không có dữ kiện điều kiện thì không được báo là đã đáp ứng.
     trialProductUnavailable: "Thiết bị dùng thử tạm thời hết hàng. Vui lòng thử lại sau.",
     productUnavailable: "Sản phẩm này tạm thời chưa thể mua. Hãy quay lại cửa hàng và thử lại.",

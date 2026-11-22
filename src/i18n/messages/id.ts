@@ -2570,7 +2570,7 @@ export const id: Messages = {
     purchaseEligibilityRetry: "Cek ulang kelayakan",
     purchaseEligibilityProductPolicy: "Kelayakan pembelian produk",
     purchaseEligibilityQuotaDepleted: "Kuota penjualan habis",
-    purchaseMonthlyQuotaDepleted: "Kuota bulan ini sudah habis. Anda bisa membeli lagi bulan depan.",
+    purchaseMonthlyQuotaDepleted: "Kuota bulan ini sudah habis.",
     trialProductUnavailable: "Stok perangkat uji coba sedang habis. Coba lagi nanti.",
     productUnavailable: "Produk ini sedang tidak tersedia. Kembali ke Toko dan coba lagi.",
     tickerBought: "membeli",
