@@ -8,7 +8,7 @@
         <text class="event-title">{{ detail.event.title }}</text>
         <text class="event-copy">{{ detail.event.subtitle }}</text>
         <text v-if="detail.event.kind==='seasonal'&&detail.rules.voucherId" class="event-copy">{{ copy.voucherTerms }}</text>
-        <NxTag class="event-status" role="status" wrap :tone="statusTone" :label="copy.eligibility[detail.eligibilityReason]" />
+        <NxTag class="event-status" role="status" wrap :tone="statusTone" :label="statusLabel" />
         <text v-if="detail.reminderSubscribed" class="event-copy" role="status">{{ reminderCopy.subscribed }}</text>
         <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, locale.code) }}</text></view>
         <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
@@ -99,8 +99,11 @@ const eligibilityTone: Record<EventEligibilityReason, "success" | "warning" | "n
   VOUCHER_NOT_STARTED: "neutral", VOUCHER_EXPIRED: "neutral", VOUCHER_ALREADY_USED: "neutral", VOUCHER_EXHAUSTED: "neutral",
   DISABLED: "unavailable", VOUCHER_UNAVAILABLE: "unavailable",
 };
-// Read only where the tag renders, i.e. once a detail is loaded.
-const statusTone = computed(() => { const { eligibilityReason, userStatus } = detail.value!; return eligibilityReason === "READY" && userStatus !== "CLAIMABLE" ? "neutral" : eligibilityTone[eligibilityReason]; });
+// Read only where the tag renders, i.e. once a detail is loaded. READY without a claimable reward is eligibility to keep
+// going (purchase, upgrade, voucher): neutral, and worded without "claim".
+const readyToContinue = computed(() => detail.value!.eligibilityReason === "READY" && detail.value!.userStatus !== "CLAIMABLE");
+const statusTone = computed(() => readyToContinue.value ? "neutral" : eligibilityTone[detail.value!.eligibilityReason]);
+const statusLabel = computed(() => readyToContinue.value ? copy.value.readyToContinue : copy.value.eligibility[detail.value!.eligibilityReason]);
 let code = "", visible = false, generation = 0;
 let unconfirmedAction: "join" | "claim" | "remind" | null = null;
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
