@@ -29,7 +29,7 @@
         <text>{{ fmt(t.me.walletDebtNote, { amount: visibility.mask(formatGroupedAmount(-usdt, 6)) }) }}</text>
       </view>
       <view class="nx-wallet-nex" role="link" tabindex="0" @click="goNex" @keydown.enter.prevent="goNex" :aria-label="t.uiChrome.nexBalance + ': ' + nexLabel + ' UVT'">
-        <view class="nx-wallet-coin" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" /></svg></view>
+        <view class="nx-wallet-coin" aria-hidden="true"><UvtCoin /></view>
         <view class="nx-wallet-token-value"><text class="tabular-nums nx-wallet-token-amount">{{ nexLabel }}</text><text class="nx-wallet-token-unit"> UVT</text></view>
         <svg class="nx-wallet-nex-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
       </view>
@@ -75,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import UvtCoin from "@/components/ui/uvt-coin.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
@@ -308,7 +309,8 @@ export default countUpView;
 .nx-wallet-debt { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 6px; margin-bottom: 18px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .nx-wallet-debt__icon { flex-shrink: 0; margin-top: 1px; color: var(--v5-warning-ink); }
 .nx-wallet-nex { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; font: 500 20px/1.4 var(--font-amount); color: var(--v5-ink-2); overflow-wrap: break-word; }
-.nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; color: var(--v5-bg); background: var(--v5-nex); }
+/* The shared UVT coin (uvt-coin.vue) fills this slot. */
+.nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; }
 .nx-wallet-arc { position: absolute; width: 360px; height: 300px; border-radius: 50%;  bottom: -220px; right: -190px; transform: rotate(-30deg); background: radial-gradient(ellipse at center, var(--v5-nex-soft), transparent 68%); box-shadow: 0 0 40px var(--v5-nex-soft); pointer-events: none; animation: wallet-arc-breathe 7s ease-in-out infinite alternate; }
 .nx-wallet-particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .nx-wallet-details { padding: 12px 4px 0; }

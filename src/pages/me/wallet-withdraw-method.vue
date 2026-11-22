@@ -6,7 +6,7 @@
       <text class="intro">{{ t.bankWithdrawal.chooseMethodHint }}</text>
       <view class="method" role="button" tabindex="0" data-testid="withdraw-method-usdt" :aria-disabled="!canOpenUsdt" @click="openUsdt" @keydown.enter.prevent="openUsdt" @keydown.space.prevent="openUsdt">
         <view class="method-top">
-          <view class="method-icon method-icon--usdt" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 8h8M12 8v9M8.5 11.5c2 .8 5 .8 7 0" /></svg></view>
+          <view class="method-icon method-icon--usdt" aria-hidden="true"><view class="method-coin"><UsdtCoin /></view></view>
           <view class="method-copy"><text class="method-title">USDT</text><text class="method-note">{{ pending ? t.bankWithdrawal.resumeUsdt : t.bankWithdrawal.usdtMethodHint }}</text></view>
           <svg class="method-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
@@ -26,6 +26,7 @@
 </template>
 
 <script setup lang="ts">
+import UsdtCoin from "@/components/ui/usdt-coin.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, ref, watch } from "vue";
 import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
@@ -86,6 +87,8 @@ function openBank() {
 .method-top { display: flex; align-items: center; gap: 14px; }
 .method-icon { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: var(--v5-radius-m); }
 .method-icon--usdt { background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); }
+/* The shared USDT coin (usdt-coin.vue) inside the method tile. */
+.method-coin { width: 30px; height: 30px; }
 .method-icon--bank { background: var(--v5-success-soft); color: var(--v5-success-ink); }
 .method-copy { flex: 1; min-width: 0; }
 .method-title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
