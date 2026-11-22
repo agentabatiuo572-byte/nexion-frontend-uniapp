@@ -29,6 +29,11 @@ export function purchaseEligibilityUnlockHref(snapshot: PurchaseEligibilitySnaps
  * unknown, internally inconsistent, or absent is an error: local rank/team
  * snapshots must never turn it into a more specific deny reason.
  */
+/** The monthly purchase allowance (F4B) is used up, as opposed to the sale allowance (E1): it opens again next month. */
+export function monthlyQuotaExhausted(snapshot: PurchaseEligibilitySnapshot | null): boolean {
+  return snapshot?.decisionCode === "F4B_MONTHLY_QUOTA_EXHAUSTED";
+}
+
 export function resolvePurchaseEligibilityMessage(
   status: PurchaseEligibilityRequestStatus,
   snapshot: PurchaseEligibilitySnapshot | null,

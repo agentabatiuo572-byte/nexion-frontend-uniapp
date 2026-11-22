@@ -2565,6 +2565,7 @@ export const fil: Messages = {
     purchaseEligibilityRetry: "Suriin ulit ang eligibility",
     purchaseEligibilityProductPolicy: "Eligibility sa pagbili",
     purchaseEligibilityQuotaDepleted: "Ubos na ang quota ng benta",
+    purchaseMonthlyQuotaDepleted: "Ubos na ang quota ngayong buwan. Makakabili ka ulit sa susunod na buwan.",
     trialProductUnavailable: "Pansamantalang ubos ang stock ng device sa trial. Subukan ulit mamaya.",
     productUnavailable: "Pansamantalang hindi mabibili ang produktong ito. Bumalik sa store at subukan ulit.",
     tickerBought: "bumili ng",
