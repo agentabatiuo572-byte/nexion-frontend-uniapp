@@ -33,7 +33,7 @@
         <view class="home-trust__rule" />
         <view class="home-trust__payout">
           <view class="home-trust__payout-label"><view class="home-trust__dot" aria-hidden="true" /><text>{{ t.home.trustSnapshotPayouts }}</text></view>
-          <text class="home-trust__payout-value"><text class="nx-num-metric">{{ formatGroupedAmount(display.paid) }}</text><text class="home-trust__unit">USDT</text></text>
+          <text class="home-trust__payout-value"><NxTickNumber class="nx-num-metric" :text="platformAmountBand(display.paid, false)" /><text class="home-trust__unit">USDT</text></text>
         </view>
       </template>
       <view class="home-trust__rule" />
@@ -54,7 +54,8 @@ import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { trustCenterCopy } from "@/i18n/trust-center";
-import { formatGroupedAmount } from "@/lib/amount-display";
+import { platformAmountBand } from "@/lib/platform-stats";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 import { useTrustDocuments } from "@/composables/use-trust-documents";
 import { refreshHomeDisplay, useHomeDisplay } from "@/composables/use-home-display";
 import { onShow } from "@/composables/use-tab-page-lifecycle";

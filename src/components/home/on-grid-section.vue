@@ -26,8 +26,11 @@
           <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.model ?? "—" }} <text style="color: var(--v5-ink-4)">· {{ c.city ?? "—" }}</text></text>
         </view>
       </view>
-      <view class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top:1px solid var(--v5-border);font-size:12px;color:var(--v5-ink-3);min-height:44px">
-        <text><text style="color:var(--v5-ink);font-weight:500"><NxTickNumber :value="activeDevices" /></text> {{ t.home.onGridOnline }}</text>
+      <view ref="footerRef" class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular on-grid__footer" :class="{ 'nx-loops-paused': !footerRunning }" style="border-top:1px solid var(--v5-border);font-size:12px;color:var(--v5-ink-3);min-height:44px">
+        <view class="flex items-center" style="gap:6px;min-width:0">
+          <view v-if="onlineBand !== null" class="on-grid__dot nx-online-dot" aria-hidden="true" />
+          <text><text style="color:var(--v5-ink);font-weight:500"><NxTickNumber :text="onlineBand" /></text> {{ t.home.onGridOnline }}</text>
+        </view>
         <text style="color:var(--v5-success-ink);font-weight:500">{{ perSecText }}</text>
       </view>
     </view>
@@ -37,6 +40,9 @@
 <script setup lang="ts">
 import { refreshHomeDisplay, useHomeDisplay } from "@/composables/use-home-display";
 import { formatAmount } from "@/lib/amount-display";
+import { networkPopulationBand } from "@/lib/platform-stats";
+import { useLocaleStore } from "@/store/locale";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
@@ -48,7 +54,10 @@ import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 const t = useT();
 const app = useApp();
 const cfg = useConfig();
+const locale = useLocaleStore();
 const displayValue = useHomeDisplay();
+// The online figure is a platform band (06 §6.4); its live dot breathes only while the footer is on screen.
+const { elRef: footerRef, running: footerRunning } = useLoopsInView(".on-grid__footer");
 const perSecText = computed(() => {
   const value = displayValue.value?.paidPerSec;
   if (value == null) return "—";
@@ -64,6 +73,8 @@ const activeDevices = computed(() => {
   return !cfg.syncFailed && online != null && Number.isSafeInteger(online) && online >= 0 ? online : null;
 });
 
+const onlineBand = computed(() => activeDevices.value === null ? null : networkPopulationBand(activeDevices.value, locale.code));
+
 function companyInitial(value: string | null) {
   return value?.trim().charAt(0).toUpperCase() || "—";
 }
@@ -73,3 +84,7 @@ function goGlobe() {
 
 
 </script>
+
+<style scoped>
+.on-grid__dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success); }
+</style>

@@ -5,12 +5,13 @@
 <template>
   <view>
     <text class="block" :style="labelStyle">{{ label }}</text>
-    <text class="block tabular-nums" :style="valueStyle">{{ value }}</text>
+    <NxTickNumber class="block tabular-nums" :style="valueStyle" :text="value" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 
 const props = withDefaults(defineProps<{ label: string; value: string; tint?: string }>(), {
   tint: "var(--v5-ink)",
