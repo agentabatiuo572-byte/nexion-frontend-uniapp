@@ -234,12 +234,16 @@ const markerOf = (state: unknown): number | null => {
   const marker = (state as { __nxLayer?: unknown } | null)?.__nxLayer;
   return typeof marker === "number" ? marker : null;
 };
+// Something was pushed above this layer entry (a page navigated to from inside the layer, or the next layer), so a
+// forward step from it has somewhere to go. Kept in the entry's state, it survives a reload.
+const hasNextOf = (state: unknown): boolean => (state as { __nxNext?: unknown } | null)?.__nxNext === true;
 // Entries written before depths were kept count as one above the page.
 const depthOf = (state: unknown): number => markerOf(state) === null ? 0 : (state as { __nxDepth?: number }).__nxDepth ?? 1;
 function pushLayerEntry(layer: Layer): void {
   if (!browserBackGuarded) return;
   const id = ++entrySeq;
-  history.pushState({ ...((history.state as object | null) ?? {}), __nxLayer: id, __nxDepth: currentDepth + 1 }, "", location.href);
+  const { __nxNext: _next, ...below } = (history.state as Record<string, unknown> | null) ?? {};
+  history.pushState({ ...below, __nxLayer: id, __nxDepth: currentDepth + 1 }, "", location.href);
   layerEntries.push({ id, layer });
 }
 /** A layer closed by code (or unmounted) leaves its entry: step back off it once the current step has settled, so a
@@ -266,7 +270,13 @@ export function installBrowserBackGuard(): void {
   entrySeq = Math.max(entrySeq, currentMarker ?? 0);
   // Every entry the router or a layer pushes or replaces tells us whether the browser now sits on a layer entry.
   const push = history.pushState.bind(history), replace = history.replaceState.bind(history);
-  history.pushState = (state, title, url) => { push(state, title, url); currentMarker = markerOf(state); currentPosition = positionOf(state); currentDepth = depthOf(state); };
+  history.pushState = (state, title, url) => {
+    if (currentMarker !== null && !hasNextOf(history.state)) replace({ ...(history.state as object), __nxNext: true }, "", location.href);
+    push(state, title, url);
+    currentMarker = markerOf(state);
+    currentPosition = positionOf(state);
+    currentDepth = depthOf(state);
+  };
   history.replaceState = (state, title, url) => {
     const before = history.state as { __nxLayer?: unknown; current?: unknown; position?: unknown } | null;
     let next = state;
@@ -275,7 +285,7 @@ export function installBrowserBackGuard(): void {
     // gone, and are stepped over on the way back.
     if (markerOf(before) !== null && state && typeof state === "object" && (state as { current?: unknown }).current !== before?.current) {
       stalePageEntries.push({ current: before?.current, position: before?.position });
-      const { __nxLayer: _layer, __nxDepth: _depth, ...rest } = state as Record<string, unknown>;
+      const { __nxLayer: _layer, __nxDepth: _depth, __nxNext: _next, ...rest } = state as Record<string, unknown>;
       next = rest;
     }
     replace(next, title, url);
@@ -317,8 +327,9 @@ export function installBrowserBackGuard(): void {
       ev.stopImmediatePropagation();
       // A jump (history.go(2)) can cross several gone entries at once: measure by depth, not by the number of pops.
       if (forwardFrom === null || !gone(from)) forwardFrom = fromDepth;
-      const navigation = (window as { navigation?: { canGoForward?: boolean } }).navigation;
-      if (navigation?.canGoForward !== false) { history.forward(); return; }
+      // Without the Navigation API (older iOS WebKit) the entry's own state says whether anything follows it.
+      const navigation = (window as { navigation?: { canGoForward: boolean } }).navigation;
+      if (navigation ? navigation.canGoForward : hasNextOf(ev.state)) { history.forward(); return; }
       // Nothing real after them: back over every gone entry crossed, to the entry the user left.
       ignoredPops.push(landed!);
       history.go(forwardFrom - landedDepth);
