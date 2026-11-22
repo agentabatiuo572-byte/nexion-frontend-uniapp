@@ -85,7 +85,7 @@
       <text v-if="copy.taskLevels" class="product-compact-levels">{{ copy.taskLevels }}</text>
       <view class="product-compact-bottom">
         <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
-        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label }} · </text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
+        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label + '\u00A0·\u00A0' }}</text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
     </view>
@@ -309,7 +309,8 @@ const dailyEarnText = computed(() => {
 const compactEstimate = computed(() => {
   if (isShare.value) {
     const value = dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—";
-    return { label: t.value.bundle.estimatedDaily, value, ariaLabel: `${t.value.bundle.estimatedDaily} · ${value}` };
+    // Same short label as the device cards; the accessible name keeps the full wording.
+    return { label: estimateLabel.value, value, ariaLabel: `${t.value.bundle.estimatedDaily} · ${value}` };
   }
   const daily = `$${formatGroupedAmount(props.product.dailyEarn)}`;
   return {
