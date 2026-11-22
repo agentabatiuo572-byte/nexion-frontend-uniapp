@@ -53,7 +53,7 @@
           <view class="team-section-head"><text class="team-section-title">{{ designCopy.rewardsSection }}</text><text class="team-section-meta">{{ periodLabel }}</text></view>
           <view ref="bentoEl" class="team-bento nx-viz-motion">
             <view class="nx-team-leaderboard-link team-bento__card team-bento__card--wide team-bento__card--gold" role="link" tabindex="0" @click="go('/pages/team/leaderboard')" @keydown.enter.prevent="go('/pages/team/leaderboard')">
-              <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
+              <view class="team-bento__head"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view class="team-bento__podium" aria-hidden="true"><view v-for="(bar, index) in PODIUM_BARS" :key="index" :style="{ height: bentoInView === false ? '0px' : `${bar.height}px`, transition: bentoInView === false ? 'none' : VIZ_GROW_HEIGHT_TRANSITION, transitionDelay: bentoInView === false ? '0ms' : vizStagger(bar.order) }" /></view>
               <view class="team-bento__foot">
                 <text class="team-bento__headline">{{ t.teamV3.leaderboardCard.subtitle }}</text>
@@ -61,7 +61,7 @@
               </view>
             </view>
             <view class="nx-team-royalty-network-link team-bento__card team-bento__card--brand" role="button" tabindex="0" :aria-label="t.teamV3.sevenLayerNetwork" @click="openReferralNetwork" @keydown.enter.prevent="openReferralNetwork">
-              <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
+              <view class="team-bento__head"><NxIconTile tone="sky" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view v-if="memberInitials.length" class="team-bento__avatars" aria-hidden="true">
                 <text v-for="(initial, index) in memberInitials" :key="index" class="team-bento__avatar">{{ initial }}</text>
               </view>
@@ -71,7 +71,7 @@
               </view>
             </view>
             <view class="nx-team-binary-link team-bento__card team-bento__card--cyan" role="link" tabindex="0" @click="go('/pages/team/binary')" @keydown.enter.prevent="go('/pages/team/binary')">
-              <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
+              <view class="team-bento__head"><NxIconTile tone="device" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view v-if="binary && !visibility.hidden" class="team-bento__split" aria-hidden="true"><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.left}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION }" /><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.right}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: bentoInView === false ? '0ms' : vizStagger(1) }" /></view>
               <view class="team-bento__foot">
                 <text v-if="binaryAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount"><text class="team-bento__currency">{{ binaryAmountParts.prefix }}</text>{{ binaryAmountParts.integer }}<text class="team-bento__fraction">.{{ binaryAmountParts.fraction }}</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(binaryMatchText) }}</text>
@@ -79,7 +79,7 @@
               </view>
             </view>
             <view class="nx-team-leadership-pool-link team-bento__card team-bento__card--wide team-bento__card--violet" role="link" tabindex="0" @click="go('/pages/team/leadership-pool')" @keydown.enter.prevent="go('/pages/team/leadership-pool')">
-              <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
+              <view class="team-bento__head"><NxIconTile tone="purple" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view class="team-bento__pool">
                 <view class="team-bento__foot">
                   <view class="team-estimate"><text v-if="leadershipPoolUnlocked && remotePoolReadable" class="team-estimate__label">{{ designCopy.estimated }}</text><text v-if="poolAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount"><text class="team-bento__currency">{{ poolAmountParts.prefix }}</text>{{ poolAmountParts.integer }}<text class="team-bento__fraction">.{{ poolAmountParts.fraction }}</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(leadershipPoolPrimary) }}</text></view>
@@ -108,6 +108,7 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
@@ -671,7 +672,6 @@ useAutoRecovery({
 .team-bento__card--violet { --accent: var(--v5-nex); }
 .team-bento__card:focus-visible, .team-tool:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .team-bento__head { display: flex; align-items: center; justify-content: space-between; }
-.team-bento__icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
 .team-bento__chev { color: var(--v5-ink-4); }
 .team-bento__foot { display: flex; flex-direction: column; gap: 2px; margin-top: auto; min-width: 0; }
 .team-bento__headline { font: 600 var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
