@@ -35,8 +35,8 @@
           <FleetReelCard v-if="slot.kind === 'device'" :device="slot.device" :online="slot.online" :runtime-confirmed="fleet.fleetReady.value" :tasks-confirmed="tasksReady" />
           <view v-else class="hf-card hf-card--trial" :class="{ 'hf-card--online': slot.kind === 'trial' && slot.online }" role="button" tabindex="0" :aria-label="trialLabel" @click="goTrial">
             <view class="hf-card__status"><view class="hf-card__dot" :class="{ 'nx-online-dot': fleet.trialOnline.value }" /><text>{{ trialStatusText }}</text></view>
-            <text class="hf-card__badge">{{ trialCopy.imageBadge }}</text>
-            <view class="hf-card__art"><DeviceArt class="hf-card__image" :src="trialArt" /><view class="hf-card__floor" /></view>
+            <NxTag class="hf-card__badge" tone="brand">{{ trialCopy.imageBadge }}</NxTag>
+            <view class="hf-card__art"><view class="hf-card__floor" /><DeviceArt class="hf-card__image" :src="trialArt" /></view>
             <text class="hf-card__name">{{ fleet.trial.deviceName.value || '—' }}</text>
             <view class="hf-card__kv"><text class="hf-card__key">{{ t.home.trialLeftShort }}</text><text class="hf-card__mono">{{ trialRemaining }}</text></view>
             <view class="hf-card__kv"><text class="hf-card__key">{{ t.home.trialCreditShort }}</text><text class="hf-card__mono">{{ trialCredit }}</text></view>
@@ -77,6 +77,7 @@ import { useFleetSlots, type FleetSlot } from "@/composables/use-fleet-slots";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { deviceTaskRunning } from "@/lib/task-progress";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import SlotRing from "@/components/slot-ring.vue";
 import DeviceArt from "@/components/device-art.vue";
 import LoopScope from "@/components/loop-scope.vue";
@@ -147,7 +148,9 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 .hf-av { position: relative; flex: none; width: 38px; height: 38px; margin-left: -10px; border-radius: 50%; box-sizing: border-box; background: radial-gradient(80% 70% at 50% 72%, color-mix(in srgb, var(--v5-ink) 10%, transparent), transparent), var(--v5-surface-2); box-shadow: 0 0 0 2.5px var(--v5-surface), inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 45%, transparent); animation: hf-pop 360ms cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
 [data-theme="light"] .hf-av { box-shadow: 0 0 0 2.5px var(--v5-surface), inset 0 1px 3px color-mix(in srgb, var(--v5-ink) 10%, transparent); }
 .hf-av:first-child { margin-left: 0; }
-.hf-av__art { position: absolute; left: 3px; top: 4px; width: 32px; height: 28px; }
+/* The catalog art leaves about 40% empty around the machine: the square image is drawn larger than the avatar so the
+   machine fills the disc, centred on its body. */
+.hf-av .hf-av__art { position: absolute; left: 50%; top: 50%; width: 42px; height: 42px; transform: translate(-50%, -56%); }
 .hf-av--off .hf-av__art { filter: grayscale(.75); opacity: .55; }
 .hf-av__led { position: absolute; right: -1px; bottom: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--v5-ink-4); box-shadow: 0 0 0 2px var(--v5-surface); }
 .hf-av__led.nx-online-dot { background: var(--v5-success); }
@@ -181,10 +184,13 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 .hf-card__status { position: relative; display: flex; align-items: center; gap: 6px; height: 16px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .hf-card__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .hf-card__dot.nx-online-dot { background: var(--v5-success); }
-.hf-card__badge { position: absolute; z-index: 1; top: 11px; right: 12px; padding: 1px 6px; border-radius: 6px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 10px/14px var(--font-v5); }
+/* The trial tag is NxTag (03 §3.8) on an opaque surface, so it stays readable where it meets the art. */
+.hf-section .hf-card__badge { position: absolute; z-index: 1; top: 8px; right: 8px; background: linear-gradient(var(--v5-brand-soft), var(--v5-brand-soft)), var(--v5-surface); }
 .hf-card__art { position: relative; flex: none; width: 132px; height: 98px; margin: 6px auto 0; }
-.hf-card__image { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hf-card__floor { position: absolute; left: 18%; right: 18%; bottom: -3px; height: 9px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-bg) 65%, transparent), transparent); }
+/* The machine is the card's main visual: the square catalog image spans the card's content width (140px, the Rack's
+   87%-wide body still fits), centred a little below the middle so the pedestal meets its floor shadow. */
+.hf-card__art .hf-card__image { position: absolute; left: 50%; top: 50%; width: 140px; height: 140px; transform: translate(-50%, -52%); }
+.hf-card__floor { position: absolute; left: 24%; right: 24%; bottom: 8px; height: 9px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-bg) 65%, transparent), transparent); }
 [data-theme="light"] .hf-card__floor { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 20%, transparent), transparent); }
 .hf-card__name { position: relative; display: block; margin-top: 8px; font: 500 15px/20px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hf-card__kv { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 2px; }
@@ -204,7 +210,7 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 @media (max-width: 374px) {
   .hf-av { width: 32px; height: 32px; margin-left: -12px; }
   .hf-av:nth-child(n + 5) { display: none; }
-  .hf-av__art { left: 2px; top: 3px; width: 28px; height: 24px; }
+  .hf-av .hf-av__art { width: 36px; height: 36px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hf-av, .hf-reel__item > *, .hf-spin { animation: none; }
