@@ -1117,6 +1117,7 @@ async function toggleTwoFactor(value: boolean, resend = false) {
     twoFactorPhoneMasked.value = challenge.phoneMasked;
     twoFactorCode.value = "";
     twoFactorCodeError.value = "";
+    twoFactorPasswordError.value = "";
     startTwoFactorResendCountdown(challenge.expiresInSeconds);
     toast.success(t.value.addrRebind.otpSendCta);
   } catch (cause) {
