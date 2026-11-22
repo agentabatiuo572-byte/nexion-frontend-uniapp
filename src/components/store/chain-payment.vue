@@ -14,9 +14,7 @@
   <view class="nx-glass-card rounded-2xl overflow-hidden" :style="cardStyle">
     <!-- Header -->
     <view class="flex items-center border-b" :style="headerStyle">
-      <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
-      </view>
+      <view class="shrink-0" style="width: 36px; height: 36px"><UsdtCoin /></view>
       <view class="flex-1 min-w-0">
         <text class="block" :style="headerTitleStyle">{{ expired ? network : sendLabel }}</text>
         <text v-if="!expired" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.store.coNetworkConfirms }}</text>
@@ -85,6 +83,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import UsdtCoin from "@/components/ui/usdt-coin.vue";
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -184,7 +183,6 @@ const qrCells = computed<{ i: number; x: number; y: number }[]>(() => {
 // bg-filled card → zero border(带 bg 的容器不加边框,2026-07-09 终裁);层级靠 surface 微差。
 const cardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)", background: "var(--nx-glass-fill)" };
 const headerStyle: CSSProperties = { padding: "16px 20px", gap: "12px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const iconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
 const headerTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",

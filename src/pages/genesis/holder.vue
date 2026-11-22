@@ -17,9 +17,9 @@
         <template v-if="!hasNodes">
           <view class="gh-empty-card" :style="ctaCardStyle" role="button" tabindex="0" :aria-label="consumerCopy.learn" @click="goGenesis">
             <view class="flex items-center" style="gap: 12px">
-              <view class="grid place-items-center shrink-0" :style="ctaIconStyle">
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z" /><path d="M4 21h16" /></svg>
-              </view>
+              <NxIconTile tone="amber" size="l">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z" /><path d="M4 21h16" /></svg>
+              </NxIconTile>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="ctaTitleStyle">{{ remoteApiEnabled && genesis.remoteAccountReadState !== "ready" ? t.holderFacts.unconfirmed : t.genesisHolder.notHolderTitle }}</text>
                 <text class="block" :style="ctaBodyStyle">{{ notHolderBodyText }}</text>
@@ -170,9 +170,9 @@
             <text class="block" :style="sectionLabelStyle">{{ t.genesisHolder.holdingsLabel }}</text>
             <view :style="holdingListStyle">
               <view v-for="(h, i) in holdings" :key="h.id" class="flex items-center" :style="holdingRowStyle(i)">
-                <view class="shrink-0 grid place-items-center" :style="holdingArtStyle">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-                </view>
+                <NxIconTile tone="amber" size="l">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
+                </NxIconTile>
                 <view class="flex-1 min-w-0">
                   <text class="block" :style="holdingIdStyle">{{ h.id }}</text>
                   <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ mintedText(h.mintedAt) }}</text>
@@ -190,9 +190,7 @@
             <text class="block" :style="perksLabelStyle">{{ t.genesisHolder.perksLabel }}</text>
             <view :style="perkListStyle">
               <view v-for="(k, i) in perkKeys" :key="k" class="grid items-start" :style="perkRowStyle(i)">
-                <view class="flex items-center justify-center" :style="perkIconStyle">
-                  <text style="font-size: 20px; line-height: 1">{{ t.genesisHolder.perks[k].icon }}</text>
-                </view>
+                <NxIconTile :tone="PERK_TILES[k].tone" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="PERK_TILES[k].path" /></svg></NxIconTile>
                 <view class="min-w-0">
                   <text class="block" :style="perkLabelStyle">{{ t.genesisHolder.perks[k].label }}</text>
                   <text class="block" :style="perkBodyStyle">{{ t.genesisHolder.perks[k].body }}</text>
@@ -246,6 +244,7 @@ import { computed, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";
 import AppChassis from "@/components/app-chassis.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -278,6 +277,12 @@ onShow(() => { void config.load(); });
 const genesisPoints = useGenesisPoints();
 
 const perkKeys = ["a", "c", "f"] as const;
+// Perk icons: line glyphs in the shared tile (03 §3.6.1: no emoji as icons). a = UVT allowance, c = founding member, f = transferable.
+const PERK_TILES = {
+  a: { tone: "purple", path: "m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" },
+  c: { tone: "sky", path: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
+  f: { tone: "coral", path: "M7 7h13l-3-3M17 17H4l3 3" },
+} as const;
 
 const owned = computed(() => genesis.myOwned);
 const hasNodes = computed(() => (!remoteApiEnabled || genesis.remoteAccountReadState === "ready") && owned.value > 0);
@@ -674,14 +679,6 @@ const feedAmtStyle: CSSProperties = {
 };
 // cta / preview (empty state)
 const ctaCardStyle: CSSProperties = { padding: "var(--v5-space-4)", borderRadius: "var(--v5-radius-m)", background: "var(--v5-brand-2-soft)" };
-const ctaIconStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "var(--ui-radius-icon)",
-  background: "var(--v5-brand-2)",
-  boxShadow: "var(--v5-spotlight-brand-2)",
-  color: "var(--v5-on-brand-2)",
-};
 const ctaTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
@@ -708,12 +705,6 @@ function holdingRowStyle(i: number): CSSProperties {
     borderBottom: i < holdings.value.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }
-const holdingArtStyle: CSSProperties = {
-  width: "48px",
-  height: "48px",
-  borderRadius: "var(--ui-radius-icon)",
-  background: "radial-gradient(60% 60% at 30% 30%, rgba(114,80,200,0.40), rgba(114,80,200,0.10) 80%)",
-};
 const holdingIdStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
@@ -746,12 +737,6 @@ function perkRowStyle(i: number): CSSProperties {
     borderBottom: i < perkKeys.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }
-const perkIconStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "10px",
-  background: "var(--v5-brand-soft)",
-};
 const perkLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
@@ -827,8 +812,6 @@ const noteStyle: CSSProperties = {
 <style scoped>
 .gh-empty-card { margin-top:3px; padding:28px 20px 24px!important; border-radius:var(--ui-radius-surface)!important; border:1.5px dashed var(--v5-border-strong); background:color-mix(in srgb,var(--v5-ink) 3%,transparent)!important; text-align:center; }
 .gh-empty-card > view { flex-direction:column; gap:0!important; }
-.gh-empty-card > view > view:first-child { width:64px!important; height:64px!important; border-radius:var(--v5-radius-l)!important; background:color-mix(in srgb,var(--v5-genesis-gold) 16%,transparent)!important; color:var(--v5-genesis-gold)!important; box-shadow:none!important; }
-.gh-empty-card > view > view:first-child svg { width:30px; height:30px; }
 .gh-empty-card > view > view:nth-child(2) { margin-top:14px; }
 .gh-empty-card > view > view:nth-child(2) > text:first-child { font:600 16px/22px var(--font-v5)!important; }
 .gh-empty-card > view > view:nth-child(2) > text:nth-child(2) { margin-top:var(--v5-space-1)!important; font:400 13px/20px var(--font-v5)!important; }
