@@ -31,9 +31,10 @@ export function readPendingEventCommand(accountKey: string, code: string, now = 
 export function rememberPendingEventCommand(accountKey: string, code: string, command: PendingEventCommand): boolean {
   return writeAccountRow(KEY, accountKey, { ...readAccountRow<Row>(KEY, accountKey), [code]: command });
 }
-export function forgetPendingEventCommand(accountKey: string, code: string): boolean {
+/** With `at`, only the record of that attempt goes: a newer attempt on the same event keeps its own. */
+export function forgetPendingEventCommand(accountKey: string, code: string, at?: number): boolean {
   const row = readAccountRow<Row>(KEY, accountKey);
-  if (!row?.[code]) return true;
+  if (!row?.[code] || (at !== undefined && row[code].at !== at)) return true;
   const next = { ...row };
   delete next[code];
   return writeAccountRow(KEY, accountKey, next);
