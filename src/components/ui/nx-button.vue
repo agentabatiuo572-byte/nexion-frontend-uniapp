@@ -4,7 +4,8 @@
     @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
     <view class="nx-button__surface" :class="{ 'nx-frosted-button': variant === 'secondary' || variant === 'brand' }">
       <view class="nx-button__content" :class="{ 'nx-button__content--busy': busy }"><slot><text>{{ label }}</text></slot><NxIcon v-if="icon" :name="icon" /></view>
-      <!-- Busy (03 §3.1): a spinner takes the label's place; the label stays laid out, hidden, so the width holds. -->
+      <!-- Busy (03 §3.1): a spinner takes the label's place. The idle label stays laid out, transparent, so the width holds and
+           it still names the button (slot use has no aria-label); busyLabel, when given, is the name while busy. -->
       <view v-if="busy" class="nx-button__spinner" aria-hidden="true" />
     </view>
   </view>
@@ -45,7 +46,8 @@ function activate(event?: Event) { if (!props.disabled && !props.busy && !(event
 .nx-button--disabled { opacity: .5; cursor: default; }
 /* Busy is "working", not "unavailable": full ink with the spinner instead of the 50% disabled fade. */
 .nx-button[aria-busy="true"] { opacity: 1; }
-.nx-button__content--busy { visibility: hidden; }
+/* Transparent, not visibility:hidden: hidden text would leave a slot-labelled button with an empty accessible name. */
+.nx-button__content--busy { opacity: 0; }
 .nx-button__spinner { position: absolute; z-index: 1; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: nx-button-spin 800ms linear infinite; }
 .nx-button--small .nx-button__spinner { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
 @keyframes nx-button-spin { to { transform: rotate(360deg); } }
