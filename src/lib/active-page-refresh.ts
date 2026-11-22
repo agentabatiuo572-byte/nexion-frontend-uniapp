@@ -1,6 +1,18 @@
+import { ref } from "vue";
+
 export type ActivePageRefresh = () => Promise<unknown> | unknown;
 
 let activeRefresh: { refresh: ActivePageRefresh; route?: string } | null = null;
+const visiblePullRefreshHosts = ref(0);
+
+export function registerVisiblePullRefresh(): () => void {
+  visiblePullRefreshHosts.value += 1;
+  return () => { visiblePullRefreshHosts.value -= 1; };
+}
+
+export function hasVisiblePullRefresh(): boolean {
+  return visiblePullRefreshHosts.value > 0;
+}
 
 type PageRecovery = {
   failed: () => boolean;

@@ -3,6 +3,7 @@ import { TAB_LIFECYCLE, onShow, onHide } from "@/composables/use-tab-page-lifecy
 import { ApiError } from "@/api/errors";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { registerPageRecovery } from "@/lib/active-page-refresh";
+import { READ_RECOVERY_DELAYS_MS as delays } from "@/lib/remote-read-failure";
 import { useApp } from "@/store/app";
 
 /** READS only. retry must use the store's account/generation guards and read window. */
@@ -17,7 +18,6 @@ export function useAutoRecovery(options: {
 }) {
   const app = useApp();
   const shown = ref(false);
-  const delays = [3_000, 10_000, 30_000];
   let timer: ReturnType<typeof setTimeout> | undefined;
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
   let inFlight: Promise<boolean> | null = null;
@@ -34,7 +34,7 @@ export function useAutoRecovery(options: {
 
   const retryWait = () => Math.max(retryAt, options.retryNotBefore?.() ?? 0) - Date.now();
 
-  function schedule(delay = delays[attempts] ?? (options.repeatWhile?.() === false ? undefined : options.repeatMs)) {
+  function schedule(delay: number | undefined = delays[attempts] ?? (options.repeatWhile?.() === false ? undefined : options.repeatMs)) {
     if (disposed || timer !== undefined || inFlight || !isActive() || !foregroundReadAllowed()
       || !options.failed() || delay === undefined) return;
     const epoch = app.accountBindingEpoch;

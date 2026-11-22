@@ -2,7 +2,7 @@
 import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
-import { refreshActivePage } from "@/lib/active-page-refresh";
+import { hasVisiblePullRefresh, refreshActivePage } from "@/lib/active-page-refresh";
 import { useNotifications } from "@/store/notifications";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -459,15 +459,18 @@ function installForegroundReadSignals() {
 }
 
 if (remoteApiEnabled) {
+  const repeatWithoutPull = () => !hasVisiblePullRefresh();
   useAutoRecovery({
     failed: () => serverProductPhaseState.retryableError,
     retry: () => refreshServerProductPhase(true),
-    quiet: true,
+    repeatMs: 30_000,
+    repeatWhile: repeatWithoutPull,
   });
   useAutoRecovery({
     failed: () => useI18nRuntime().retryableError[useLocaleStore().code] === true,
     retry: () => useI18nRuntime().refresh(useLocaleStore().code, true),
-    quiet: true,
+    repeatMs: 30_000,
+    repeatWhile: repeatWithoutPull,
   });
 }
 

@@ -26,7 +26,8 @@ export function checkoutQuoteBlock(cause: unknown, source: 'quote' | 'eligibilit
   if (isApiRefusal(cause, 404, 'PROMOTION_RESOURCE_NOT_FOUND')) return 'productMissing';
   if (cause instanceof ApiError) {
     const status = cause.kind === 'http' ? cause.status : cause.kind === 'business' ? cause.code : undefined;
-    if ((cause.kind === 'network' && cause.retryable) || status === 408 || (status ?? 0) >= 500) return 'unavailable';
+    if ((cause.kind === 'network' && cause.retryable) || status === 408 || (status ?? 0) >= 500
+        || (source === 'eligibility' && cause.kind === 'http' && status === 429)) return 'unavailable';
   }
   return null;
 }

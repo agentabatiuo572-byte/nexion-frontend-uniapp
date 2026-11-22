@@ -51,7 +51,6 @@ export function useT() {
   const runtime = useI18nRuntime();
   return computed<Messages>(() => {
     const bundled = DICTS[locale.code] ?? en;
-    // bundled fallback is intentional: stale/failed remote bundles are never presented as current.
     return applyRuntimeMessages(bundled, runtime.messages(locale.code));
   });
 }
