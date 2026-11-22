@@ -2565,6 +2565,7 @@ export const uz: Messages = {
     purchaseEligibilityRetry: "Qayta tekshirish",
     purchaseEligibilityProductPolicy: "Xarid shartlari",
     purchaseEligibilityQuotaDepleted: "Sotuv kvotasi qolmadi",
+    purchaseMonthlyQuotaDepleted: "Bu oylik kvota tugadi. Keyingi oy yana xarid qilishingiz mumkin.",
     trialProductUnavailable: "Sinov qurilmasi vaqtincha omborda yoʻq. Keyinroq qayta urinib koʻring.",
     productUnavailable: "Bu mahsulotni vaqtincha sotib olib boʻlmaydi. Doʻkonga qaytib, qayta urinib koʻring.",
     tickerBought: "sotib oldi",

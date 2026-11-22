@@ -194,26 +194,58 @@ function canTake(el: Element | null | undefined): el is HTMLElement | SVGElement
   return getComputedStyle(el).visibility === "visible" && el.matches(CAN_FOCUS);
 }
 type Candidate = Element | null | undefined | (() => Element | null | undefined);
+/** How a trigger is found again once the page redrew it while the dialog was open (a re-read redraws the order
+ *  detail tray): its test id; its slot, a class only it carried when the dialog opened (`order-hero__pay`), which
+ *  holds while a busy label changes its name; else its role, name and first class. */
+type Trace = { testid: string | null; role: string | null; name: string; cls: string | null; slot: string | null };
+function traceOf(el: HTMLElement | SVGElement): Trace {
+  const slot = Array.from(el.classList).find((c) => document.getElementsByClassName(c).length === 1) ?? null;
+  return { testid: el.getAttribute("data-testid"), role: el.getAttribute("role"), name: accessibleName(el), cls: el.classList[0] ?? null, slot };
+}
+/** The trigger's redrawn copies inside scope (or the page), best match first. */
+function replacements(trace: Trace | null, scope: HTMLElement | null): HTMLElement[] {
+  if (!trace) return [];
+  const within: ParentNode = scope ?? document;
+  const all = (selector: string) => Array.from(within.querySelectorAll<HTMLElement>(selector));
+  const list: HTMLElement[] = [];
+  if (trace.testid) list.push(...all(`[data-testid="${CSS.escape(trace.testid)}"]`));
+  if (trace.slot) list.push(...all(`.${CSS.escape(trace.slot)}`));
+  if (trace.name) {
+    const same = trace.role ? `[role="${CSS.escape(trace.role)}"]` : '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea';
+    // Same name and same first class: a redrawn copy of the control, not another control that happens to share its name.
+    for (const el of all(same)) if (accessibleName(el) === trace.name && (!trace.cls || el.classList.contains(trace.cls))) list.push(el);
+  }
+  return [...new Set(list)];
+}
 /** A trigger still on screen that is only disabled for the moment: not removed, hidden or inert. */
 const onlyDisabled = (el: Element) => el.isConnected && shown(el) && !el.closest("[inert]") && getComputedStyle(el).visibility === "visible"
   && (el.getAttribute("aria-disabled") === "true" || (el as HTMLButtonElement).disabled === true);
 // Restores waiting for their trigger; the shared focusout fallback stays out of their way meanwhile.
 let waitingForTrigger = 0;
-/** A page may re-enable the trigger only once the layer has fully closed (order detail turns 「继续支付」 back on after
- *  the payment sheet is gone). Give it up to a second, then land; if focus moves meanwhile (the user, a new layer),
- *  leave it there. */
-function waitForTrigger(el: Element, scope: HTMLElement | null, land: () => void): void {
+/** A page may hand the trigger back only once the layer has fully closed, or after redrawing it (order detail turns
+ *  「继续支付」 back on after the payment sheet is gone). Wait while the trigger, or its redrawn copy, is busy (aria-busy:
+ *  the page is still working and will release it) or only briefly disabled; land on it once it can take focus. If it
+ *  goes away, or stays disabled without being busy, take the fallback order. If focus moves meanwhile (the user, a
+ *  new layer, the page hidden), leave it there. */
+function waitForTrigger(find: () => Element | null, scope: HTMLElement | null, land: (el: Element | null) => void): void {
   waitingForTrigger += 1;
-  let tries = 0;
+  let idle = 0;
+  let total = 0;
   const timer = setInterval(() => {
-    tries += 1;
+    total += 1;
     const active = document.activeElement;
     // The layer below holding focus on its own root (the shared focusout keeps focus in it) is still waiting too.
-    const moved = !!active && active !== document.body && active !== scope;
-    if (!moved && !canTake(el) && onlyDisabled(el) && tries < 20) return;
+    const moved = !!active && active !== document.body && active !== scope || document.hidden;
+    const el = find();
+    const ready = !!el && canTake(el);
+    const waiting = !!el && !ready && onlyDisabled(el);
+    if (el?.getAttribute("aria-busy") !== "true") idle += 1;
+    // A disabled trigger that is not busy gets a second; a busy one is waited for, with a cap so no timer outlives a
+    // control that never comes back.
+    if (!moved && waiting && idle < 20 && total < 300) return;
     clearInterval(timer);
     waitingForTrigger -= 1;
-    if (!moved) land();
+    if (!moved) land(ready ? el : null);
   }, 50);
 }
 /** Focus the first candidate that can take it and really does; otherwise go on down the list. */
@@ -265,16 +297,8 @@ const accessibleName = (el: Element) => (el.getAttribute("aria-label") || el.tex
 /** Where focus goes when the trigger cannot take it, in order: the trigger's replacement (same test id, else same role,
  *  name and first class); inside a layer still open below, its first control, else its root; with no layer left, the
  *  page's bottom-bar action, the visible heading, the page title, the main region. Never <body>. */
-function fallbacks(trace: { testid: string | null; role: string | null; name: string; cls: string | null } | null, scope: HTMLElement | null): (() => Element | null | undefined)[] {
-  const within: ParentNode = scope ?? document;
-  const all = (selector: string) => Array.from(within.querySelectorAll<HTMLElement>(selector));
-  const list: (() => Element | null | undefined)[] = [];
-  if (trace?.testid) for (const el of all(`[data-testid="${CSS.escape(trace.testid)}"]`)) list.push(() => el);
-  if (trace?.name) {
-    const same = trace.role ? `[role="${CSS.escape(trace.role)}"]` : '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea';
-    // Same name and same first class: a redrawn copy of the control, not another control that happens to share its name.
-    for (const el of all(same)) if (accessibleName(el) === trace.name && (!trace.cls || el.classList.contains(trace.cls))) list.push(() => el);
-  }
+function fallbacks(trace: Trace | null, scope: HTMLElement | null): (() => Element | null | undefined)[] {
+  const list: (() => Element | null | undefined)[] = replacements(trace, scope).map((el) => () => el);
   if (scope) return [...list, () => firstFocusable(scope), () => landingSpot(scope)];
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse()) list.push(() => el);
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'))) list.push(() => landingSpot(el));
@@ -328,7 +352,7 @@ export function useDialogA11y(
   let previousFocus: HTMLElement | SVGElement | null = null;
   // How to find the trigger again when the page re-rendered it while the dialog was open (a fresh checkout creates the
   // order and redraws its pay button): its test id, else its role and accessible name.
-  let previousTrace: { testid: string | null; role: string | null; name: string; cls: string | null } | null = null;
+  let previousTrace: Trace | null = null;
   let openedAt = 0;
   const layer: Layer = { order: 0, root: () => rootEl() };
   // Closed only because a newer layer took over (a notice over the payment page): the trigger is kept for its return.
@@ -404,13 +428,16 @@ export function useDialogA11y(
     const trace = previousTrace;
     previousFocus = null;
     previousTrace = null;
-    const land = () => {
-      const back = focusFirst([() => trigger, ...(settled ? [] : fallbacks(trace, scope))]);
+    const land = (ready: Element | null = null) => {
+      const back = focusFirst([() => ready, () => trigger, ...(settled ? [] : fallbacks(trace, scope))]);
       restoredAt = Date.now();
       if (back) settleOnLanding(back);
     };
-    // The trigger is still there and only disabled for now: wait for it before taking the fallback order (03 §3.5).
-    if (!settled && trigger && !canTake(trigger) && onlyDisabled(trigger)) waitForTrigger(trigger, scope, land);
+    // The trigger, or the copy the page redrew in its place, is still there and only disabled for now: wait for it
+    // before taking the fallback order (03 §3.5).
+    const find = () => (trigger?.isConnected ? trigger : replacements(trace, scope).find((el) => shown(el)) ?? null);
+    const current = settled ? null : find();
+    if (current && !canTake(current) && onlyDisabled(current)) waitForTrigger(find, scope, land);
     else land();
   }
 
@@ -431,7 +458,7 @@ export function useDialogA11y(
       // Back from a pause, focus sits in the layer that is about to go: keep the trigger recorded before the pause.
       if (!(paused && (previousFocus || previousTrace) && (!candidate || modal && modal !== rootEl()))) {
         previousFocus = candidate;
-        previousTrace = previousFocus && previousFocus !== document.body ? { testid: previousFocus.getAttribute("data-testid"), role: previousFocus.getAttribute("role"), name: accessibleName(previousFocus), cls: previousFocus.classList[0] ?? null } : null;
+        previousTrace = previousFocus && previousFocus !== document.body ? traceOf(previousFocus) : null;
       }
       paused = false;
       wasOpen = true;

@@ -344,7 +344,7 @@ import { readPaymentCommand } from "@/api/payment-command-api";
 import { apiClient } from "@/api/runtime";
 import { parseCanonicalTradeinResult } from "@/api/device-e3-api";
 import type { CanonicalTradeinEligibility, CanonicalTradeinResult } from "@/api/device-e3-api";
-import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
+import { monthlyQuotaExhausted, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -660,7 +660,7 @@ function remotePurchaseEligibilityFailureCopy(): string {
     remotePurchaseEligibilityStatus.value,
     remotePurchaseEligibility.value,
   )) {
-    case "quotaDepleted": return t.value.store.gateSoldOutToast;
+    case "quotaDepleted": return monthlyQuotaExhausted(remotePurchaseEligibility.value) ? t.value.store.purchaseMonthlyQuotaDepleted : t.value.store.gateSoldOutToast;
     case "ineligible": return t.value.store.gateBlockedToast;
     default: return t.value.store.purchaseEligibilityError;
   }
@@ -874,7 +874,7 @@ const checkoutEligibilityBlock = computed(() => {
   if (eligibilityCatalogUnconfirmed.value) return t.value.store.purchaseEligibilityError;
   if (!recoveredCreateRefusal.value && !foregroundEligibilityBlocked.value) return "";
   switch (resolvePurchaseEligibilityMessage(remotePurchaseEligibilityStatus.value, remotePurchaseEligibility.value)) {
-    case "quotaDepleted": return t.value.store.purchaseEligibilityQuotaDepleted;
+    case "quotaDepleted": return monthlyQuotaExhausted(remotePurchaseEligibility.value) ? t.value.store.purchaseMonthlyQuotaDepleted : t.value.store.purchaseEligibilityQuotaDepleted;
     case "ineligible": return t.value.store.coCapacityPurchaseConditions;
     case "error": return remotePurchaseEligibilityStatus.value === "error" || remotePurchaseEligibility.value?.eligible === false
       ? t.value.store.purchaseEligibilityError : "";
@@ -2498,7 +2498,8 @@ async function readPendingCheckoutCreate() {
     recoveredCreateRefusal.value = !ordinaryCheckoutInitialized.value;
     if (outOfStock) checkoutStockRefused.value = true;
     const reason = outOfStock ? t.value.store.temporarilyOutOfStock
-      : isApiRefusal(failure, 409, 'PURCHASE_GATE_SOLD_OUT', 'F4B_MONTHLY_QUOTA_EXHAUSTED')
+      : isApiRefusal(failure, 409, 'F4B_MONTHLY_QUOTA_EXHAUSTED') ? t.value.store.purchaseMonthlyQuotaDepleted
+      : isApiRefusal(failure, 409, 'PURCHASE_GATE_SOLD_OUT')
       ? t.value.store.purchaseEligibilityQuotaDepleted
       : isApiRefusal(failure, 403, 'PURCHASE_GATE_NOT_MET', 'PURCHASE_GATE_SOLD_OUT')
         || isApiRefusal(failure, 409, 'PURCHASE_GATE_NOT_MET', 'F4B_REQUIREMENTS_NOT_MET')

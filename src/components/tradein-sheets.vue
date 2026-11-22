@@ -59,7 +59,7 @@
       <template v-if="capacityRecovery || capacityRecoveryUnavailable || keepRecoveryError">
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
-        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatGroupedAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
+        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatGroupedAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }}&nbsp;USDT</text>
         <view v-if="capacityResumeAllowed" class="tis-cta" :class="{ 'tis-cta-disabled': capacityRecoveryBusy }" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
