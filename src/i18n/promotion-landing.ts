@@ -8,6 +8,13 @@ type Count = Parameters<typeof ambassadorCount>[0];
 // public promotion; these strings only frame them. Placeholders: {n} count, {name}
 // product, {reward} amount with unit, {time} date or countdown, {unit} asset.
 const zh = {
+  // Referral and bundle activity pages: hero, step track and card entry.
+  navReferral: '邀请购机礼', navBundle: '组合礼',
+  subtitleReferral: '邀请好友购买指定设备，好友首单付款后发放奖励', subtitleBundle: '活动期内购买指定设备，额外得 {unit} 奖励',
+  youGet: '每位好友首购，你得', friendGets: '好友购机得', friendAlso: '好友购机也得 ',
+  referralSteps: '三步拿邀请奖励', stepShare: '分享邀请', stepShareNote: '海报或链接', stepFriendBuys: '好友购机', stepFriendBuysNote: '首单付款后计入', stepRewardPaid: '奖励发放', stepRewardPaidNote: '在我的奖励查看',
+  friendsBought: '{n} 位好友已首购' as Count, rewardsPaid: '已发放 {n} 笔' as Count,
+  friendDevices: '好友可购设备', invite: '邀请好友', signInInvite: '登录后邀请', viewOffer: '查看活动', buyBundle: '组合购买', inviteAfterStart: '开始后可邀请',
   navGift: '购机赠礼', navFirst: '首购礼', navRepurchase: '老用户加购', navPending: '活动',
   eligibleGift: '符合参与条件', eligibleFirst: '符合首购条件', eligibleRepurchase: '符合加购条件',
   ineligibleGift: '暂不符合参与条件', ineligibleFirst: '不符合首购条件', ineligibleRepurchase: '需先完成一笔购机',
@@ -72,6 +79,12 @@ const zh = {
 };
 type LandingCopy = typeof zh;
 const en: LandingCopy = {
+  navReferral: 'Referral gift', navBundle: 'Bundle offer',
+  subtitleReferral: 'Invite friends to buy a listed device. Rewards follow their first paid order', subtitleBundle: 'Buy listed devices during the offer and earn extra {unit}',
+  youGet: "For each friend's first purchase, you get", friendGets: 'Your friend gets', friendAlso: 'Your friend also gets ',
+  referralSteps: 'Three steps to your reward', stepShare: 'Share', stepShareNote: 'Poster or link', stepFriendBuys: 'Friend buys', stepFriendBuysNote: 'First paid order', stepRewardPaid: 'Reward paid', stepRewardPaidNote: 'See My rewards',
+  friendsBought: { one: '{n} friend bought', other: '{n} friends bought' }, rewardsPaid: '{n} paid' as Count,
+  friendDevices: 'Devices friends can buy', invite: 'Invite friends', signInInvite: 'Sign in to invite', viewOffer: 'View offer', buyBundle: 'Buy as a bundle', inviteAfterStart: 'Invite once it starts',
   navGift: 'Purchase gift', navFirst: 'First purchase', navRepurchase: 'Buy again', navPending: 'Offer',
   eligibleGift: 'You qualify', eligibleFirst: 'First order qualifies', eligibleRepurchase: 'You can add one',
   ineligibleGift: 'Not eligible yet', ineligibleFirst: 'Not a first order', ineligibleRepurchase: 'Buy a device first',
@@ -133,6 +146,12 @@ const en: LandingCopy = {
   addLineDiscount: 'Add {n} {name}: {reward}', emptyLineDiscount: 'After your first device purchase, add one more: {reward}',
 };
 const vi: LandingCopy = {
+  navReferral: 'Quà giới thiệu', navBundle: 'Ưu đãi kết hợp',
+  subtitleReferral: 'Mời bạn bè mua thiết bị áp dụng, thưởng được chi trả sau đơn đầu tiên đã thanh toán của bạn bè', subtitleBundle: 'Mua thiết bị áp dụng trong thời gian ưu đãi để nhận thêm {unit}',
+  youGet: 'Mỗi bạn bè mua lần đầu, bạn nhận', friendGets: 'Bạn bè mua máy nhận', friendAlso: 'Bạn bè mua máy cũng nhận ',
+  referralSteps: '3 bước nhận thưởng giới thiệu', stepShare: 'Chia sẻ lời mời', stepShareNote: 'Poster hoặc liên kết', stepFriendBuys: 'Bạn bè mua máy', stepFriendBuysNote: 'Tính khi đơn đầu đã thanh toán', stepRewardPaid: 'Chi trả thưởng', stepRewardPaidNote: 'Xem ở Phần thưởng',
+  friendsBought: '{n} bạn bè đã mua lần đầu' as Count, rewardsPaid: 'Đã chi trả {n} khoản' as Count,
+  friendDevices: 'Thiết bị bạn bè có thể mua', invite: 'Mời bạn bè', signInInvite: 'Đăng nhập để mời', viewOffer: 'Xem ưu đãi', buyBundle: 'Mua kết hợp', inviteAfterStart: 'Mời được khi ưu đãi bắt đầu',
   navGift: 'Quà mua máy', navFirst: 'Quà đơn đầu', navRepurchase: 'Mua thêm', navPending: 'Ưu đãi',
   eligibleGift: 'Bạn đủ điều kiện', eligibleFirst: 'Đủ điều kiện đơn đầu', eligibleRepurchase: 'Đủ điều kiện mua thêm',
   ineligibleGift: 'Chưa đủ điều kiện', ineligibleFirst: 'Không phải đơn đầu', ineligibleRepurchase: 'Cần mua máy trước',
@@ -194,6 +213,12 @@ const vi: LandingCopy = {
   addLineDiscount: 'Mua thêm {n} {name}: {reward}', emptyLineDiscount: 'Sau đơn mua máy đầu tiên, mua thêm một máy: {reward}',
 };
 const id: LandingCopy = {
+  navReferral: 'Hadiah referal', navBundle: 'Promo paket',
+  subtitleReferral: 'Ajak teman membeli perangkat yang tercantum. Hadiah diberikan setelah pesanan pertama mereka dibayar', subtitleBundle: 'Beli perangkat yang tercantum selama promo dan dapatkan {unit} ekstra',
+  youGet: 'Tiap pembelian pertama teman, Anda dapat', friendGets: 'Teman Anda dapat', friendAlso: 'Teman Anda juga dapat ',
+  referralSteps: '3 langkah dapat hadiah', stepShare: 'Bagikan', stepShareNote: 'Poster atau tautan', stepFriendBuys: 'Teman membeli', stepFriendBuysNote: 'Pesanan pertama dibayar', stepRewardPaid: 'Hadiah dibayar', stepRewardPaidNote: 'Lihat di Hadiah saya',
+  friendsBought: '{n} teman sudah membeli' as Count, rewardsPaid: '{n} sudah dibayar' as Count,
+  friendDevices: 'Perangkat untuk teman', invite: 'Ajak teman', signInInvite: 'Masuk untuk mengajak', viewOffer: 'Lihat promo', buyBundle: 'Beli paket', inviteAfterStart: 'Bisa mengajak setelah dimulai',
   navGift: 'Hadiah pembelian', navFirst: 'Pembelian pertama', navRepurchase: 'Beli lagi', navPending: 'Promo',
   eligibleGift: 'Anda memenuhi syarat', eligibleFirst: 'Memenuhi syarat', eligibleRepurchase: 'Bisa beli lagi',
   ineligibleGift: 'Belum memenuhi syarat', ineligibleFirst: 'Bukan pesanan pertama', ineligibleRepurchase: 'Beli satu perangkat dulu',
@@ -255,6 +280,12 @@ const id: LandingCopy = {
   addLineDiscount: 'Tambah {n} {name}: {reward}', emptyLineDiscount: 'Setelah pembelian perangkat pertama, tambah satu lagi: {reward}',
 };
 const ms: LandingCopy = {
+  navReferral: 'Hadiah rujukan', navBundle: 'Tawaran pakej',
+  subtitleReferral: 'Jemput rakan membeli peranti tersenarai. Ganjaran diberi selepas pesanan pertama mereka dibayar', subtitleBundle: 'Beli peranti tersenarai dalam tempoh tawaran dan dapat {unit} tambahan',
+  youGet: 'Setiap pembelian pertama rakan, anda dapat', friendGets: 'Rakan anda dapat', friendAlso: 'Rakan anda juga dapat ',
+  referralSteps: '3 langkah dapat ganjaran', stepShare: 'Kongsi', stepShareNote: 'Poster atau pautan', stepFriendBuys: 'Rakan membeli', stepFriendBuysNote: 'Pesanan pertama dibayar', stepRewardPaid: 'Ganjaran dibayar', stepRewardPaidNote: 'Lihat di Ganjaran saya',
+  friendsBought: '{n} rakan sudah membeli' as Count, rewardsPaid: '{n} sudah dibayar' as Count,
+  friendDevices: 'Peranti untuk rakan', invite: 'Jemput rakan', signInInvite: 'Log masuk untuk menjemput', viewOffer: 'Lihat tawaran', buyBundle: 'Beli pakej', inviteAfterStart: 'Boleh menjemput selepas bermula',
   navGift: 'Hadiah pembelian', navFirst: 'Pembelian pertama', navRepurchase: 'Beli lagi', navPending: 'Tawaran',
   eligibleGift: 'Anda layak', eligibleFirst: 'Pesanan pertama layak', eligibleRepurchase: 'Anda boleh tambah satu',
   ineligibleGift: 'Belum layak', ineligibleFirst: 'Bukan pesanan pertama', ineligibleRepurchase: 'Beli peranti dahulu',
@@ -316,6 +347,12 @@ const ms: LandingCopy = {
   addLineDiscount: 'Tambah {n} {name}: {reward}', emptyLineDiscount: 'Selepas pembelian peranti pertama, tambah satu lagi: {reward}',
 };
 const fil: LandingCopy = {
+  navReferral: 'Regalo sa referral', navBundle: 'Bundle offer',
+  subtitleReferral: 'Imbitahan ang mga kaibigan na bumili ng nakalistang device. Darating ang reward pagkatapos ng una nilang bayad na order', subtitleBundle: 'Bumili ng nakalistang device habang may offer at makakuha ng dagdag na {unit}',
+  youGet: 'Sa bawat unang bili ng kaibigan, makukuha mo', friendGets: 'Makukuha ng kaibigan mo', friendAlso: 'Makukuha rin ng kaibigan mo ',
+  referralSteps: '3 hakbang sa reward', stepShare: 'Ibahagi', stepShareNote: 'Poster o link', stepFriendBuys: 'Bibili ang kaibigan', stepFriendBuysNote: 'Unang bayad na order', stepRewardPaid: 'Bayad na reward', stepRewardPaidNote: 'Tingnan sa Aking mga reward',
+  friendsBought: '{n} kaibigan ang bumili na' as Count, rewardsPaid: '{n} ang nabayaran' as Count,
+  friendDevices: 'Device para sa kaibigan', invite: 'Mag-imbita', signInInvite: 'Mag-log in para mag-imbita', viewOffer: 'Tingnan ang offer', buyBundle: 'Bilhin nang bundle', inviteAfterStart: 'Puwedeng mag-imbita pagkasimula',
   navGift: 'Regalo sa pagbili', navFirst: 'Unang pagbili', navRepurchase: 'Bumili ulit', navPending: 'Offer',
   eligibleGift: 'Kwalipikado ka', eligibleFirst: 'Kwalipikado ang unang order', eligibleRepurchase: 'Puwede kang magdagdag',
   ineligibleGift: 'Hindi pa kwalipikado', ineligibleFirst: 'Hindi unang order', ineligibleRepurchase: 'Bumili muna ng device',
@@ -377,6 +414,12 @@ const fil: LandingCopy = {
   addLineDiscount: 'Magdagdag ng {n} {name}: {reward}', emptyLineDiscount: 'Pagkatapos ng una mong pagbili ng device, magdagdag ng isa pa: {reward}',
 };
 const ru: LandingCopy = {
+  navReferral: 'Подарок за друга', navBundle: 'Комплект',
+  subtitleReferral: 'Пригласите друзей купить устройство из списка. Награда — после их первого оплаченного заказа', subtitleBundle: 'Купите устройства из списка во время акции и получите доп. {unit}',
+  youGet: 'За первую покупку друга вы получаете', friendGets: 'Друг получает', friendAlso: 'Друг тоже получает ',
+  referralSteps: 'Три шага к награде', stepShare: 'Поделитесь', stepShareNote: 'Постер или ссылка', stepFriendBuys: 'Друг покупает', stepFriendBuysNote: 'Первый оплаченный заказ', stepRewardPaid: 'Выплата', stepRewardPaidNote: 'См. «Мои награды»',
+  friendsBought: { one: '{n} друг купил', few: '{n} друга купили', other: '{n} друзей купили' }, rewardsPaid: 'Выплачено: {n}' as Count,
+  friendDevices: 'Устройства для друзей', invite: 'Пригласить друзей', signInInvite: 'Войти и пригласить', viewOffer: 'Открыть акцию', buyBundle: 'Купить комплектом', inviteAfterStart: 'Приглашать можно после старта',
   navGift: 'Подарок', navFirst: 'Первая покупка', navRepurchase: 'Докупить', navPending: 'Акция',
   eligibleGift: 'Условия выполнены', eligibleFirst: 'Условия выполнены', eligibleRepurchase: 'Можно докупить',
   ineligibleGift: 'Условия не выполнены', ineligibleFirst: 'Не первый заказ', ineligibleRepurchase: 'Нужна первая покупка',
@@ -438,6 +481,12 @@ const ru: LandingCopy = {
   addLineDiscount: 'Ещё {n} шт. {name}: {reward}', emptyLineDiscount: 'После первой покупки устройства добавьте ещё одно: {reward}',
 };
 const kk: LandingCopy = {
+  navReferral: 'Шақыру сыйлығы', navBundle: 'Жиынтық акция',
+  subtitleReferral: 'Достарыңызды тізімдегі құрылғыны алуға шақырыңыз. Сыйақы олардың алғашқы төленген тапсырысынан кейін беріледі', subtitleBundle: 'Акция кезінде тізімдегі құрылғыларды алып, қосымша {unit} алыңыз',
+  youGet: 'Әр достың алғашқы сатып алуы үшін сіз аласыз', friendGets: 'Досыңыз алады', friendAlso: 'Досыңыз да алады ',
+  referralSteps: 'Сыйақыға үш қадам', stepShare: 'Бөлісіңіз', stepShareNote: 'Постер не сілтеме', stepFriendBuys: 'Дос сатып алады', stepFriendBuysNote: 'Алғашқы төлемнен кейін', stepRewardPaid: 'Сыйақы төленеді', stepRewardPaidNote: 'Сыйақылар бөлімінде',
+  friendsBought: '{n} дос сатып алды' as Count, rewardsPaid: 'Төленді: {n}' as Count,
+  friendDevices: 'Достарға арналған құрылғылар', invite: 'Достарды шақыру', signInInvite: 'Кіріп, шақырыңыз', viewOffer: 'Акцияны ашу', buyBundle: 'Жиынтықпен алу', inviteAfterStart: 'Басталғаннан кейін шақыруға болады',
   navGift: 'Сатып алу сыйлығы', navFirst: 'Алғашқы сатып алу', navRepurchase: 'Қайта сатып алу', navPending: 'Акция',
   eligibleGift: 'Талаптарға сайсыз', eligibleFirst: 'Алғашқы сатып алуға сайсыз', eligibleRepurchase: 'Тағы біреуін сатып ала аласыз',
   ineligibleGift: 'Талапқа сай емессіз', ineligibleFirst: 'Талапқа сай емессіз', ineligibleRepurchase: 'Алдымен құрылғы сатып алыңыз',
@@ -499,6 +548,12 @@ const kk: LandingCopy = {
   addLineDiscount: 'Тағы {n} {name} сатып алыңыз: {reward}', emptyLineDiscount: 'Алғашқы құрылғыны сатып алғаннан кейін тағы біреуін сатып алыңыз: {reward}',
 };
 const uz: LandingCopy = {
+  navReferral: 'Taklif sovgʻasi', navBundle: 'Toʻplam aksiyasi',
+  subtitleReferral: 'Doʻstlaringizni roʻyxatdagi qurilmani olishga taklif qiling. Mukofot ularning birinchi toʻlangan buyurtmasidan keyin beriladi', subtitleBundle: 'Aksiya davomida roʻyxatdagi qurilmalarni oling va qoʻshimcha {unit} oling',
+  youGet: 'Har bir doʻstning birinchi xaridi uchun siz olasiz', friendGets: 'Doʻstingiz oladi', friendAlso: 'Doʻstingiz ham oladi ',
+  referralSteps: 'Mukofotga uch qadam', stepShare: 'Ulashing', stepShareNote: 'Poster yoki havola', stepFriendBuys: 'Doʻst xarid qiladi', stepFriendBuysNote: 'Birinchi toʻlovdan keyin', stepRewardPaid: 'Mukofot toʻlanadi', stepRewardPaidNote: 'Mukofotlarda koʻring',
+  friendsBought: '{n} doʻst xarid qildi' as Count, rewardsPaid: 'Toʻlandi: {n}' as Count,
+  friendDevices: 'Doʻstlar uchun qurilmalar', invite: 'Doʻstlarni taklif qilish', signInInvite: 'Kirib taklif qiling', viewOffer: 'Aksiyani ochish', buyBundle: 'Toʻplam qilib olish', inviteAfterStart: 'Boshlangach taklif qilish mumkin',
   navGift: 'Xarid sovgʻasi', navFirst: 'Birinchi xarid', navRepurchase: 'Yana xarid', navPending: 'Aksiya',
   eligibleGift: 'Siz mos kelasiz', eligibleFirst: 'Birinchi xarid mos', eligibleRepurchase: 'Yana qoʻshishingiz mumkin',
   ineligibleGift: 'Hozircha mos emas', ineligibleFirst: 'Birinchi xarid emas', ineligibleRepurchase: 'Avval qurilma oling',

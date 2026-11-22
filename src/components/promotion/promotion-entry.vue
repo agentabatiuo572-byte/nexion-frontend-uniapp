@@ -11,7 +11,7 @@
       <NxButton class="entry-cta" size="medium" :label="t.promotion.allProducts" icon="arrow-right" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text></NxButton>
     </view>
     <view class="entry-list" :class="{ 'entry-list--home': mode==='home' }"><view class="entry-track" :style="mode==='home' ? { transform: `translateX(-${activeIndex * 100}%)` } : undefined">
-    <view v-for="(activity, index) in items" :key="activity.activityId" :inert="mode==='home' && index!==activeIndex ? true : undefined" :aria-hidden="mode==='home' && index!==activeIndex ? 'true' : undefined" :class="[mode==='home'?'entry-advert':eventLanding(activity)?'entry-landing':'entry-event', 'entry-kind-'+activityKind(activity), { 'entry-advert--banner': mode==='home' && bannerReady(activity), 'nx-tint': tinted }]" :data-color-scheme="theme.resolved" :data-activity-id="activity.activityId" :data-activity-kind="activityKind(activity)">
+    <view v-for="(activity, index) in items" :key="activity.activityId" :inert="mode==='home' && index!==activeIndex ? true : undefined" :aria-hidden="mode==='home' && index!==activeIndex ? 'true' : undefined" :class="[mode==='home'?'entry-advert':eventLanding(activity)?'entry-landing':'entry-event', 'entry-kind-'+activityKind(activity), { 'entry-advert--banner': mode==='home' && bannerReady(activity), 'nx-tint': tinted }]" :data-color-scheme="theme.resolved" :data-activity-id="activity.activityId" :data-activity-kind="activityKind(activity)" @click="openEventCard(activity)">
       <view v-if="mode==='home'" class="entry-advert-target" role="button" :tabindex="active && index===activeIndex ? 0 : -1" :aria-hidden="!active || index!==activeIndex" :aria-label="localized(activity.title,locale.code)+' · '+t.promotion.browse" @click="active && navTo(offerHref(activity))" @keydown.enter.prevent="active && navTo(offerHref(activity))" @keydown.space.prevent="active && navTo(offerHref(activity))" />
       <CatalogMachineImage v-if="mode==='home'&&bannerUrl(activity)" :key="bannerKey(activity)" v-show="bannerReady(activity)" class="entry-artwork" v-bind="bannerImageProps(activity)" />
       <view v-if="mode==='home'&&!bannerReady(activity)&&promoSlots(activity).length" class="entry-product-art" aria-hidden="true"><CatalogMachineImage v-for="slot in promoSlots(activity)" :key="slot.role" :sku="slot.sku" :image-url="slot.imageUrl" :scope-key="activity.activityId+':'+slot.role" :refresh-key="catalogRefreshKey" :class="slot.role==='purchase' ? 'entry-main-image' : 'entry-gift-image'" /></view>
@@ -40,8 +40,7 @@
       <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-footer">
         <text class="entry-deadline">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
         <view class="entry-event-actions">
-          <view class="promotion-link" role="button" tabindex="0" @click="openTerms(activity)" @keydown.enter.prevent="openTerms(activity)" @keydown.space.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }}</text><NxIcon name="chevron-right" /></view>
-          <NxButton class="entry-cta" size="medium" :label="t.promotion.browse" icon="arrow-right" @click="navTo(promotionStoreHref(activity.activityId))"><text>{{ t.promotion.browse }}</text></NxButton>
+          <NxButton class="entry-cta" size="medium" :label="landing.viewOffer" icon="arrow-right" @click.stop="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton>
         </view>
       </view>
       <!-- Purchase gift, first purchase and repurchase open their own landing page; the
@@ -109,7 +108,7 @@ import { productImageCacheKey } from '@/lib/product-image-cache';
 import { useLoopsInView } from '@/composables/use-loops-in-view';
 import { getHomePromotions,readHomePromotions } from '@/store/home-promotions';
 import { landingCopy } from '@/i18n/promotion-landing';
-import { landingKind,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
+import { activityPageKind,landingKind,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
 const props=withDefaults(defineProps<{mode?:'home'|'events';activities?:PublicPromotion[];active?:boolean;tinted?:boolean}>(),{mode:'home',active:true,tinted:false});
 // The fallback product art floats only while the entry is on screen and its page is shown.
 const loops=useLoopsInView('.promotion-entry');
@@ -174,7 +173,9 @@ function startAutoplay(){stopAutoplay();if(props.mode==='home'&&props.active&&vi
 const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,publicName):[]);
 const termsText=computed(()=>termsActivity.value?promotionTermsText(termsActivity.value,t.value.promotion,locale.code):'');
 // Purchase gift, first purchase and repurchase have a landing page; other offers keep the store filter.
-function offerHref(activity:EntryPromotion){if ('displayOnly' in activity) return activity.href;return landingKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
+function offerHref(activity:EntryPromotion){if ('displayOnly' in activity) return activity.href;return activityPageKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
+// An event card has one entry: the whole card and its button open the activity page, where the full terms stay a sheet.
+function openEventCard(activity:EntryPromotion){if(props.mode==='events'&&!eventLanding(activity))navTo(promotionLandingHref(activity.activityId));}
 function eventLanding(activity:EntryPromotion){return props.mode==='events'?landingKind(activity):null;}
 function landingCards(activity:EntryPromotion){
   if ('displayOnly' in activity) return [];
@@ -297,7 +298,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 @keyframes promotion-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) :is(.entry-main-image,.entry-gift-image) { animation-play-state: paused; }
 @media(prefers-reduced-motion:reduce) { .entry-main-image,.entry-gift-image { animation: none; } }
-.entry-event { display: grid; grid-template-columns: minmax(0,1fr) 128px; padding: var(--ui-space-section); gap: var(--ui-space-inset) 0; }
+.entry-event { cursor: pointer; display: grid; grid-template-columns: minmax(0,1fr) 128px; padding: var(--ui-space-section); gap: var(--ui-space-inset) 0; }
 .entry-event-copy { position: relative; z-index: 1; grid-column: 1; grid-row: 1; }
 .entry-event-art { display: flex; align-items: center; justify-content: center; grid-column: 2; grid-row: 1; pointer-events: none; }
 .entry-event-art :deep(.team-art) { max-width: none; }
