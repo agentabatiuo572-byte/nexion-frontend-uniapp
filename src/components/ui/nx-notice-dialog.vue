@@ -15,7 +15,7 @@
       <slot />
       <view class="nx-notice__actions">
         <NxButton :label="primary" variant="primary" :busy="busy" @click="$emit('primary')" />
-        <NxButton v-if="secondary" :label="secondary" variant="text" :disabled="busy" @click="$emit('secondary')" />
+        <NxButton v-if="secondary" :label="secondary" variant="text" :disabled="busy && !secondaryWhileBusy" @click="$emit('secondary')" />
       </view>
     </view>
   </view>
@@ -27,11 +27,13 @@ import { useDialogA11y } from '@/composables/use-dialog-a11y';
 // Centered notice (DS 03 §3.5 居中确认框, the same anatomy as the global confirm()): icon, title, one short explanation,
 // a solid primary and an optional secondary exit below it as a brand text button.
 const props = withDefaults(defineProps<{ open: boolean; title: string; body?: string; primary: string; secondary?: string;
-  icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean }>(), { icon: 'alert', tone: 'warning' });
+  icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean;
+  // A busy primary that only reads (no write in flight) can still be left: the quiet exit, Esc and back stay live (03 §3.5.2).
+  secondaryWhileBusy?: boolean }>(), { icon: 'alert', tone: 'warning' });
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
 // Esc / Android back take the quiet action when there is one; a notice without one must be answered.
-useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && !props.busy) emit('secondary'); }, true, 6);
+useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary'); }, true, 6);
 </script>
 <style scoped>
 .nx-notice-mask { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 24px 23px; box-sizing: border-box; background: var(--v5-bg-color-mask); }

@@ -255,12 +255,13 @@
     </view>
   </view>
   <!-- Resuming the original payment is a 决定 (03 §3.5.1): a centred confirm, one solid action, a text exit, no close glyph.
-       Back / Esc take the text exit; while the original command is being read the action shows busy at full ink.
+       Back / Esc take the text exit; while the original command is being read the action shows busy at full ink and the
+       exits stay live, since that step only reads (03 §3.5.2).
        It steps aside while the payment layer it opened is up (that layer sits below z 960), and returns if the user backs out of it. -->
   <NxNoticeDialog :open="capacitySheetOpen && !!capacityOriginal && !payment.state.open" icon="clock" tone="warning"
     :title="capacityRecovery?.operation === 'replace' ? t.tradein.recoveryUnpaid : t.tradein.keepRecoveryUnpaid"
     :body="capacityOriginal ? fmt(t.tradein.recoveryResumeBody, { order: capacityOrderLine(capacityOriginal) }) : ''"
-    :primary="recoveryCopy.resume" :secondary="t.tradein.recoveryLater" :busy="capacityResumeBusy"
+    :primary="recoveryCopy.resume" :secondary="t.tradein.recoveryLater" :busy="capacityResumeBusy" secondary-while-busy
     @primary="resumeCapacityCommand" @secondary="hide" />
 </template>
 
