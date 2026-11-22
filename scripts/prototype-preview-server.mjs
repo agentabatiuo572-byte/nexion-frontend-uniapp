@@ -13,8 +13,10 @@ import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/pro
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
-import { setTransferSampleOutcome } from './lib/prototype-demo-support.mjs';
+import { restoreSupportConversationNumbers, setTransferSampleOutcome, supportStateFor } from './lib/prototype-demo-support.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
+import { demoAccountId, previewAccountId, previewSelectedAccountId } from './lib/prototype-demo-identity.mjs';
+import { demoPaymentIntentMissing, demoPaymentScenario, selectDemoPaymentState } from './lib/prototype-demo-payment-mode.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.mjs';
@@ -27,6 +29,7 @@ const state=structuredClone(demoDefaults),routes=[],init=[];
 if(process.env.DEMO_STATE_FILE){
   const saved=JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state;
   Object.assign(state,saved,{walletLegacySeed:saved.walletLegacySeed??!saved.walletMovements});
+  restoreSupportConversationNumbers(state);
   for(const assignment of Object.values(saved.cancelledReplacementAssignments??{})){
     for(const task of assignment.recentTasks){
       if(task.status==='CANCELLED')recordDemoTaskCancellation(state,assignment,task);
@@ -43,7 +46,12 @@ if(process.env.DEMO_STATE_FILE){
   restoreDemoBankWithdrawals(state,startedAt);
   initializeDemoH4State(state,startedAt);
   initializeLegacyStreakSavers(state);
-  if(state.computeTaskSnapshots)state.computeResumeAt=startedAt;
+  if(state.computeTaskSnapshots){
+    state.computeResumeAt=startedAt;
+    for(const {device} of Object.values(state.computeTaskSnapshots)){
+      if(device.productCode==='CLOUD-SHARE'&&device.deviceType==='CLOUD')device.deviceType='SHARE';
+    }
+  }
 }else state.catalogAvailableAt=startedAt;
 initializeDemoPreviewAccount(state,startedAt);
 if(state.dataState==='empty')state.withdrawLimitState='open';
@@ -51,6 +59,7 @@ else if(state.withdrawLimitState==='used')state.withdrawLimitCreatedAt??=started
 initializeDemoWalletHistory(state,state.previewFactsAt);
 seedLongBankOrder(state,startedAt,unreservedBankQuote);
 let locale='zh';
+demoFleetFacts(new URL('http://127.0.0.1:'+port),locale,state);
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
 // Continue from an imported epoch, so the first scenario change never reuses it.
@@ -65,7 +74,7 @@ const fixtureFor=(url,request)=>{
 };
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
-await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor});
+await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor,realtimeAccount:headers=>previewAccountId(state,headers)});
 const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{explicitChoice:'zh'}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
@@ -111,36 +120,51 @@ function previewScenarioPage(scenario,keys,purchaseCashierPrefix){
     return nativeFetch.call(this,input,{...init,headers}).then(response=>{follow(response.headers.get('X-Preview-Scenario'));return response;});
   };
 }
-function previewTransferOutbox(run,sample) {
+function previewTransferOutbox(run,sample,defaultAccountId) {
   const marker='uvel-preview-support-transfer', previous=JSON.parse(sessionStorage.getItem(marker)||'null');
-  if(previous?.run===run&&previous?.key===sample?.key||!previous&&!sample)return;
-  const outboxKey='support-human-outbox:user:900001', pendingKey='support-pending-commands:user:900001:canonical-v1:conversations';
-  const outbox=JSON.parse(sessionStorage.getItem(outboxKey)||'{}'), pending=JSON.parse(localStorage.getItem(pendingKey)||'{}');
-  if(previous) {
-    delete outbox['conversation:'+previous.conversationNo];
-    localStorage.removeItem('support-human-send:user:900001:'+previous.key);
-    localStorage.removeItem('support-human-send:user:900001:'+previous.slot);
-    const retainedKey='support-human-pending:user:900001';
-    const retained=JSON.parse(localStorage.getItem(retainedKey)||'{}');
-    delete retained['conversation:'+previous.conversationNo];
-    if(Object.keys(retained).length)localStorage.setItem(retainedKey,JSON.stringify(retained));
-    else localStorage.removeItem(retainedKey);
-    if(pending[previous.slot]===previous.key)delete pending[previous.slot];
+  if(previous?.run===run&&previous?.key===sample?.key&&previous?.accountId===sample?.accountId||!previous&&!sample)return;
+  function update(row,add) {
+    const account='user:'+(row.accountId??defaultAccountId);
+    const outboxKey='support-human-outbox:'+account, pendingKey='support-pending-commands:'+account+':canonical-v1:conversations';
+    const outbox=JSON.parse(sessionStorage.getItem(outboxKey)||'{}'), pending=JSON.parse(localStorage.getItem(pendingKey)||'{}');
+    const slot='conversation:'+row.conversationNo;
+    if(add) {
+      outbox[slot]={text:'',failedSend:{text:row.text,kind:'unknown',settled:false,retryable:true,attempts:1}};
+      pending[row.slot]=row.key;
+    } else {
+      delete outbox[slot];
+      localStorage.removeItem('support-human-send:'+account+':'+row.key);
+      localStorage.removeItem('support-human-send:'+account+':'+row.slot);
+      const retainedKey='support-human-pending:'+account;
+      const retained=JSON.parse(localStorage.getItem(retainedKey)||'{}');
+      delete retained[slot];
+      if(Object.keys(retained).length)localStorage.setItem(retainedKey,JSON.stringify(retained));
+      else localStorage.removeItem(retainedKey);
+      if(pending[row.slot]===row.key)delete pending[row.slot];
+    }
+    sessionStorage.setItem(outboxKey,JSON.stringify(outbox));
+    localStorage.setItem(pendingKey,JSON.stringify(pending));
   }
-  if(sample&&!sample.committed&&!sample.rejected) {
-    outbox['conversation:'+sample.conversationNo]={text:'',failedSend:{text:sample.text,kind:'unknown',settled:false,retryable:true,attempts:1}};
-    pending[sample.slot]=sample.key;
-  }
-  sessionStorage.setItem(outboxKey,JSON.stringify(outbox));
-  localStorage.setItem(pendingKey,JSON.stringify(pending));
-  sessionStorage.setItem(marker,JSON.stringify(sample?{run,key:sample.key,conversationNo:sample.conversationNo,slot:sample.slot}:null));
+  if(previous)update(previous,false);
+  if(sample&&!sample.committed&&!sample.rejected)update(sample,true);
+  sessionStorage.setItem(marker,JSON.stringify(sample?{run,key:sample.key,conversationNo:sample.conversationNo,slot:sample.slot,accountId:sample.accountId}:null));
 }
-const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+');'
-  +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(state.supportTransferSample??null)+');</script>';
+function selectedSupportAccount(url) {
+  const accountId=previewSelectedAccountId(state);
+  if(!accountId)return null;
+  if(state.messageState==='transferred')
+    fixtureFor(new URL('/api/app/support/conversations/cursor',url),{method:()=> 'GET',accountId});
+  return supportStateFor(state,accountId);
+}
+function scenarioSeed(url) {
+  const sample=state.messageState==='transferred'?selectedSupportAccount(url)?.supportTransferSample:null;
+  return '<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+');'
+    +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(sample??null)+','+JSON.stringify(demoAccountId)+');</script>';
+}
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
 const recoveryReads = new Set(['/api/me/notification-preferences', '/api/vouchers', '/api/app/wallet/bills/summary']);
-const modeledWrite=/^\/(auth\/users\/(refresh|logout|login)|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|devices\/activate|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/security\/account-deletion(?:\/cancel)?|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
+const modeledWrite=/^\/(auth\/users\/(refresh|logout|login)|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|devices\/activate|device\/\d+\/deactivate|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/security\/account-deletion(?:\/cancel)?|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
 const server=http.createServer(async(req,res)=>{
   // A write belongs to the scenario it started in: one whose body arrives after a scenario change is refused, and so
   // is any request from a page of another scenario (checked below).
@@ -161,6 +185,8 @@ const server=http.createServer(async(req,res)=>{
         let raw='';for await(const chunk of req)raw+=chunk;const update=JSON.parse(raw||'{}');
         if(update.resetPin){checkoutFlow.pin.state.password=null;checkoutFlow.pin.state.version=0;checkoutFlow.pin.state.attempts=5;checkoutFlow.pin.state.lockedUntil=null;}
         if(typeof update.dropNextPayment==='boolean')checkoutFlow.pin.state.dropNextPayment=update.dropNextPayment;
+        if(update.observePayments===true)checkoutFlow.observePayments();
+        if(update.delayNextCreate===true)checkoutFlow.delayCreate();
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,setupWrites:checkoutFlow.pin.state.setupWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }
@@ -171,12 +197,13 @@ const server=http.createServer(async(req,res)=>{
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
-        const paymentMode=()=>state.paymentState==='read-error'?state.paymentBeforeReadError:state.paymentState;
-        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,wasPaymentMode=paymentMode(),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,
+          wasPaymentMode=demoPaymentScenario(state),wasMissing=demoPaymentIntentMissing(state),
+          wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
         if(update.reset){
-          const accountCreatedAt=state.accountCreatedAt;
+          const {accountCreatedAt,supportConversationSequence}=state;
           for(const key of Object.keys(state))delete state[key];
-          Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
+          Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt,supportConversationSequence});
         }
         state.previewFactsAt??=startedAt;
         updatePreviewHomeDisplay(state,update,Date.now());
@@ -187,16 +214,15 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.quotaPaused==='boolean')state.quotaPaused=update.quotaPaused;
         if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
         if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
-        if(update.messageState==='transferred'&&state.messageState!=='transferred')state.supportReadbackState='missing';
-        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         // Physical stock can run out while a payment quote is open, independently of E1.
         if(update.outOfStockProductNo===null)delete state.outOfStockProductNo;
         else if(typeof update.outOfStockProductNo==='string'&&demoProducts(state).some(product=>
           product.id===update.outOfStockProductNo&&product.inventoryMode==='FINITE')){
           state.outOfStockProductNo=update.outOfStockProductNo;
         }
-        if(state.paymentState==='read-error')state.paymentBeforeReadError=wasPaymentMode;
-        else delete state.paymentBeforeReadError;
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
+        const paymentMode=demoPaymentScenario(state);
         if(state.dataState==='empty')state.withdrawLimitState='open';
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
@@ -204,12 +230,12 @@ const server=http.createServer(async(req,res)=>{
         if(update.stakingOpenState){delete state.stakingAttempts;delete state.stakingStatusReads;}
         longContentUnavailable=normalizeDemoLongContent(state);
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
-        // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
+        // trade-ins, trial and payment intents go, and the scene seeds the new fleet. Entering or leaving the empty
         // account (dataState=empty), the low-balance account or a near-deadline sample (paymentState=low-balance, urgent,
         // late) is one too. Presentation knobs keep them.
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
-        const scenarioChange=state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode())!==accountPayment(wasPaymentMode);
+        const scenarioChange=state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -218,8 +244,8 @@ const server=http.createServer(async(req,res)=>{
         // Saved payout addresses and their OTP belong to the account scenario too.
         if(scenarioChange&&state.bankDemo){Object.assign(state.bankDemo,{quotes:{},orders:{},commands:{},addresses:{}});delete state.bankDemo.addressOtp;}
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
-        else if(scenarioChange&&paymentMode()==='low-balance')state.walletBalance=820.64;
-        else if((update.reset||scenarioChange)&&state.dataState!=='empty'&&paymentMode()==='reward-clawback-debt')seedDemoRewardClawback(state,Date.now());
+        else if(scenarioChange&&paymentMode==='low-balance')state.walletBalance=820.64;
+        else if((update.reset||scenarioChange)&&state.dataState!=='empty'&&paymentMode==='reward-clawback-debt')seedDemoRewardClawback(state,Date.now());
         const recoverySelection = demoOptions.withdrawRecoveryState.find(([value]) => value === update.withdrawRecoveryState);
         if (recoverySelection || update.reset || scenarioChange) {
           state.withdrawRecoveryState = recoverySelection?.[0] ?? 'off';
@@ -229,7 +255,6 @@ const server=http.createServer(async(req,res)=>{
           state.scenarioEpoch=++scenarioEpoch;
           checkoutFlow?.syncScenario();
         }
-        if(update.paymentState==='intent-missing')checkoutFlow?.removeUnpaidIntents();
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.
@@ -268,9 +293,16 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         if ('bankState' in update) updateDemoBankWithdrawals(state, Date.now());
-        if (update.reset || scenarioChange) seedLongBankOrder(state, now);
-        realtime.stateChanged(update);
-        if('supportReadbackState' in update)setTransferSampleOutcome(state);
+        if (update.reset || scenarioChange) {
+          demoFleetFacts(url,locale,state);
+          seedLongBankOrder(state, now);
+        }
+        realtime.stateChanged(update,previewSelectedAccountId(state));
+        if(demoOptions.supportReadbackState.some(([value])=>value===update.supportReadbackState)){
+          const supportAccount=selectedSupportAccount(url);
+          if(supportAccount)setTransferSampleOutcome(supportAccount,update.supportReadbackState);
+        }
+        checkoutFlow?.selectPaymentMode(wasMissing);
         if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
@@ -279,7 +311,8 @@ const server=http.createServer(async(req,res)=>{
       const options=state.dataState==='empty'
         ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}
         : demoOptions;
-      return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed,
+      const supportReadbackState=selectedSupportAccount(url)?.supportReadbackState??'missing';
+      return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed,supportReadbackState,
         disabledLongOptions:disabledLongOptions(state),
         ...(longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})});
     }
@@ -320,7 +353,7 @@ const server=http.createServer(async(req,res)=>{
       if(checkoutFlow?.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
         if(staleWrite())return refuseStale();
-        const response=checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
+        const response=await checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         if(response.drop){res.destroy();return;}
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
       }
@@ -329,7 +362,6 @@ const server=http.createServer(async(req,res)=>{
         const response=trialPin.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
       }
-      if(url.pathname==='/auth/users/refresh')return sendJson(res,{code:0,message:'OK',data:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:{userId:900001,countryCode:'+86',phone:'13800000000',nickname:'Alex',onboardingComplete:true}}});
       const withdrawalRequest = handlesWithdrawalRequest(url.pathname, req.method);
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
       const modeledBankTopup=req.method==='POST'&&/^\/api\/app\/deposits\/vietqr\/intents(?:\/[^/]+\/cancel)?$/.test(url.pathname);
@@ -394,8 +426,17 @@ const server=http.createServer(async(req,res)=>{
     const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
     const savedAttempt=path.extname(file)==='.html'?authDemo.savedAttempt():null;
     const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
-    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed()+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed(url)+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
+// QA can pause the provider clock and use POST /__checkout/state to observe on demand.
+if(checkoutFlow&&process.env.DEMO_PAYMENT_AUTO_OBSERVE!=='0'){
+  const observer=setInterval(()=>{
+    try { checkoutFlow.observePayments(); }
+    catch(error) { console.error('Preview payment observation failed:',error.message); }
+  },1000);
+  observer.unref();
+  server.once('close',()=>clearInterval(observer));
+}
 server.listen(port,'127.0.0.1',()=>console.log('UVEL simulation: http://127.0.0.1:'+server.address().port+'/preview'));

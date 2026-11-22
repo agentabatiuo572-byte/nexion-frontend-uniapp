@@ -5,7 +5,7 @@
   Detailed specs, progress, queue proof and Notify CTA stay collapsed by default.
 -->
 <template>
-  <view ref="cardRef" class="nx-glass-card relative overflow-hidden" :style="rootStyle">
+  <view ref="cardRef" class="nx-glass-card locked-card relative overflow-hidden" :style="rootStyle">
     <!-- aurora drift bg (paused off screen or while the page is hidden) -->
     <view ref="auroraRef" aria-hidden class="locked-card__aurora" :class="{ 'is-paused': !auroraLoop.running.value }" />
     <!-- 24px grid overlay -->
@@ -20,7 +20,7 @@
         </view>
         <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" :aria-expanded="detailsOpen" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
-            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
+            <text class="locked-card__eyebrow">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
               <view class="grid place-items-center" :style="toggleStyle">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
@@ -32,18 +32,20 @@
             <text class="block mt-1 line-clamp-2" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
             <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
               <text style="color: var(--v5-ink-2)">{{ gpuText }}</text>
-              <text style="color: var(--v5-ink-4)">·</text>
-              <text style="color: var(--v5-ink-2)">{{ vramText }}</text>
+              <template v-if="props.product.productType !== 'SHARE'">
+                <text style="color: var(--v5-ink-4)">·</text>
+                <text style="color: var(--v5-ink-2)">{{ vramText }}</text>
+              </template>
             </view>
           </view>
         </view>
       </view>
 
-      <!-- Bottom row — Notify + queue social proof -->
-      <view v-if="detailsOpen" class="mt-3 flex items-center" style="gap: 10px">
-        <view class="flex-1 inline-flex items-center justify-center" :style="notifyBtnStyle" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path :d="serverSubscribed ? 'm5 12 4 4L19 6' : 'M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'" /><path v-if="!serverSubscribed" d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          <text>{{ notifyBusy || notificationStatus === 'loading' ? t.store.coLoading : notificationStatus === 'error' ? t.ui.retry : t.store.lockedNotifyMe }}</text>
+      <!-- Card footer: the notify action is a text action (03 §3.1 P-67 .nx-card-action), kept on the solid card. -->
+      <view v-if="detailsOpen" class="nx-card-footer locked-card__footer">
+        <view class="nx-card-action locked-card__notify" role="button" tabindex="0" :aria-pressed="serverSubscribed" :aria-disabled="notifyBusy || notificationStatus === 'loading'" :aria-busy="notifyBusy || notificationStatus === 'loading'" :aria-label="t.store.lockedNotifyMe" @click.stop="handleNotify">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="serverSubscribed ? 'm5 12 4 4L19 6' : 'M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'" /><path v-if="!serverSubscribed" d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          <text>{{ notifyBusy ? t.store.coLoading : t.store.lockedNotifyMe }}</text>
         </view>
       </view>
     </view>
@@ -62,6 +64,7 @@ import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { productCopy, specText } from "@/lib/product-copy";
 
@@ -70,8 +73,8 @@ const app = useApp();
 const t = useT();
 const locale = useLocaleStore();
 const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
-const gpuText = computed(() => specText(t.value, props.product.gpu, "-"));
-const vramText = computed(() => specText(t.value, props.product.vram, "-", "vram"));
+const gpuText = computed(() => specText(t.value, props.product.gpu, "—"));
+const vramText = computed(() => specText(t.value, props.product.vram, "—", "vram"));
 
 const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: number }> = {
   P3: { current: 1, total: 3, pct: 33 },
@@ -129,25 +132,28 @@ async function reloadNotificationState(): Promise<void> {
       notificationStatus.value = "error";
     }
   } catch {
-    // Status is a best-effort hydration. The CTA remains available and only
-    // a confirmed mutation can move it to the subscribed state.
     if (requestIsCurrent(scope, epoch, accountKey, runScope, productNo)) notificationStatus.value = "error";
   }
 }
 
+useAutoRecovery({
+  active: () => cardInView.value || detailsOpen.value,
+  failed: () => notificationStatus.value === "error",
+  retry: reloadNotificationState,
+  repeatMs: 30_000,
+  quiet: false,
+});
+
 async function handleNotify() {
   if (notifyBusy.value || notificationStatus.value === "loading") return;
+  if (notificationStatus.value !== "ready") {
+    toast.error(t.value.authOtp.errorServiceUnavailable);
+    return;
+  }
   const scope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   const accountKey = scope.accountKey;
   const productNo = props.product.id;
-  if (notificationStatus.value !== "ready") {
-    const reading = reloadNotificationState();
-    const epoch = notificationEpoch;
-    await reading;
-    if (requestIsCurrent(scope, epoch, accountKey, runScope, productNo) && notificationStatus.value === "error") toast.error(t.value.authOtp.errorServiceUnavailable);
-    return;
-  }
   // A mutation also advances the local request epoch so an older GET (or a
   // previous mutation) cannot overwrite its confirmed state for this account.
   const epoch = ++notificationEpoch;
@@ -201,9 +207,10 @@ function toggleDetails() {
   if (detailsOpen.value && notificationStatus.value === "idle") void reloadNotificationState();
 }
 
-const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
+// A solid content card (01 §1.1.2): surface fill, the default surface radius; light adds the light shadow (scoped CSS).
+const rootStyle: CSSProperties = {
+  background: "var(--v5-surface)",
+  borderRadius: "var(--ui-radius-surface)",
 };
 
 const lockBoxStyle: CSSProperties = {
@@ -238,7 +245,6 @@ const toggleBaseStyle: CSSProperties = {
   height: "28px",
   borderRadius: "999px",
   color: "var(--v5-brand-2-ink)",
-  background: "var(--v5-brand-2-soft)",
   transition: "transform 160ms ease",
 };
 const toggleStyle = computed<CSSProperties>(() => ({
@@ -246,13 +252,11 @@ const toggleStyle = computed<CSSProperties>(() => ({
   transform: detailsOpen.value ? "rotate(180deg)" : "rotate(0deg)",
 }));
 
+// The product name is the card's display title (10 §10.1 展示标题, 26/34 at 390), read from the role variables.
 const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
+  font: "var(--ui-type-display-title-weight) var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-v5)",
   color: "var(--v5-ink)",
-  letterSpacing: "-0.018em",
-  lineHeight: 1.2,
+  letterSpacing: "-0.02em",
 };
 
 const barFillStyle = computed<CSSProperties>(() => ({
@@ -263,42 +267,16 @@ const barFillStyle = computed<CSSProperties>(() => ({
   willChange: "width",
 }));
 
-const notifyBtnStyle: CSSProperties = {
-  gap: "6px",
-  minHeight: "44px",
-  height: "42px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  border: "1px solid var(--v5-border)",
-  color: "var(--v5-ink-2)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "13px",
-};
-
 
 </script>
 <style scoped>
-.locked-card__aurora {
-  position: absolute; inset: -20%; pointer-events: none; opacity: .7; filter: blur(10px);
-  background:
-    radial-gradient(40% 50% at 85% 15%, var(--v5-brand-2-soft) 0%, transparent 60%),
-    radial-gradient(35% 45% at 15% 85%, var(--v5-tech-cyan-soft) 0%, transparent 60%);
-  animation: v5-aurora-drift 14s ease-in-out infinite;
-}
-.locked-card__aurora.is-paused, .nx-chassis[data-scrolling="true"] .locked-card__aurora { animation-play-state: paused; }
-/* Lock-dot heartbeat: a pre-drawn halo animated by transform/opacity only retraces the former 0→8px box-shadow
-   pulse (50% → 0 cyan by 70%); a copy of the dot drawn above it keeps the halo outside the dot, as a shadow was. */
-.locked-card__dot::before { content: ""; position: absolute; inset: -10px; border-radius: 50%; background: rgb(12, 196, 214); opacity: 0; transform: scale(.3333); animation: locked-card-dot-pulse 2.4s ease-in-out infinite; }
+/* The coming-soon card is a neutral solid content card (01 §1.1.2): no board marks it as a focal block, so it carries no
+   corner light and no grid; the decorative layers stay in the markup but do not render. In-card icon controls have no fill. */
+[data-theme="light"] .locked-card { box-shadow: var(--v5-glass-shadow); }
+.locked-card__aurora, .locked-card__grid { display: none; }
+/* The lock dot is a static mark: only live state loops (07 §7.1, design-rules Motion). */
 .locked-card__dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--v5-tech-cyan); border: 2px solid var(--v5-surface); }
-.locked-card__dot.is-paused::before, .nx-chassis[data-scrolling="true"] .locked-card__dot::before { animation-play-state: paused; }
-@keyframes locked-card-dot-pulse { 0% { opacity: .5; transform: scale(.3333); } 70%, 100% { opacity: 0; transform: none; } }
-/* Grid lines follow ink so the texture shows on the themed card surface in both themes. */
-.locked-card__grid {
-  position: absolute; inset: 0; pointer-events: none; background-size: 24px 24px;
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px);
-}
-@media (prefers-reduced-motion: reduce) { .locked-card__aurora, .locked-card__dot::before { animation: none; } }
+/* Eyebrow: label role 12/16 at 500 in the coral ink, interface font (10 §10.1; Mono is for codes and live numbers, 01 §1.2). */
+.locked-card__eyebrow { color: var(--v5-brand-2-ink); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
+.locked-card__footer { margin-top: 12px; }
 </style>

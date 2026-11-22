@@ -1,9 +1,10 @@
 import { computed, reactive, watch, type Ref } from "vue";
+import { isApiRefusal } from "@/api/errors";
 import { purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { remoteAccountScope, type RemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
-export type PurchaseEligibilityStatus = "idle" | "loading" | "ready" | "error";
+export type PurchaseEligibilityStatus = "idle" | "loading" | "ready" | "unavailable" | "error";
 
 export interface PurchaseEligibilityState {
   status: PurchaseEligibilityStatus;
@@ -60,13 +61,14 @@ export function createPurchaseEligibilityStore(
     const requestScope: RemoteAccountRequest = scope.snapshot();
     const key = keyFor(requestScope.accountKey, normalized);
     const entry = state(normalized);
-    if (!force && entry.status === "ready") return Promise.resolve(entry.eligible);
+    if (!force && (entry.status === "ready" || entry.status === "unavailable")) {
+      return Promise.resolve(entry.eligible);
+    }
     const existing = inFlight.get(key);
     if (!force && existing) return existing;
 
     entry.status = "loading";
     entry.eligible = false;
-    entry.snapshot = null;
     entry.error = "";
     const request = api.get(normalized)
       .then((snapshot) => {
@@ -79,9 +81,13 @@ export function createPurchaseEligibilityStore(
       })
       .catch((error: unknown) => {
         if (!scope.isCurrent(requestScope) || inFlight.get(key) !== request) return false;
+        if (isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
+          entry.snapshot = null;
+          entry.status = "unavailable";
+          return false;
+        }
         entry.status = "error";
         entry.eligible = false;
-        entry.snapshot = null;
         entry.error = error instanceof Error ? error.message : "PURCHASE_ELIGIBILITY_UNAVAILABLE";
         return false;
       })
@@ -106,7 +112,7 @@ export const purchaseEligibilityStore = createPurchaseEligibilityStore(
 );
 
 /**
- * UI adapter used by cards and detail. In mock mode it stays idle and never
+ * UI adapter used by cards, detail and quota. In mock mode it stays idle and never
  * triggers a request; callers continue to use their local demo gate there.
  * Detail reads immediately; catalog cards supply their actual visibility.
  */
@@ -124,7 +130,20 @@ export function bindPurchaseEligibility(
   active: Ref<boolean> | (() => boolean) = () => true,
 ) {
   const product = computed(() => typeof productNo === "function" ? productNo() : productNo.value);
-  const eligibility = computed(() => store.state(product.value));
+  const eligibility = computed(() => {
+    const entry = store.state(product.value);
+    const status = entry.status;
+    // Keep the actionable snapshot fresh. The conditions page can retain the
+    // presentation for this account and SKU while a fresh decision is pending.
+    return {
+      ...entry,
+      status: status === "unavailable" ? "error" as const : status,
+      error: status === "unavailable" ? "PRODUCT_NOT_AVAILABLE" : entry.error,
+      unavailable: status === "unavailable",
+      snapshot: status === "ready" ? entry.snapshot : null,
+      displaySnapshot: entry.snapshot,
+    };
+  });
   const readActive = computed(() => typeof active === "function" ? active() : active.value);
 
   // `watch` is intentionally kept out of the store so a shared cache does not

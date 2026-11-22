@@ -8,21 +8,19 @@
     </CheckoutResult>
     <template v-else>
       <view v-if="keepRecoveryTarget" class="promotion-notice checkout-keep-recovery" role="status"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:keepRecoveryOperation==='replace'?(keepResumeAllowed?t.tradein.recoveryResumable:t.tradein.recoveryChecking):keepResumeAllowed?t.tradein.keepRecoveryResumable:t.tradein.keepRecoveryChecking }}</text></view>
-      <text v-if="displayQuote||order" class="checkout-review-title">{{ order?.paymentStatus==='PENDING' ? p.pending : p.confirmOrder }}</text>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
-      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
-      <view v-if="catalogReadFailed" class="promotion-notice" role="alert"><text>{{ t.store.catalogErrorBody }}</text><PromotionAction class="promotion-link" role="button" tabindex="0" :aria-disabled="busy" @click="loadQuote"><text>{{ t.store.catalogRetry }}</text></PromotionAction></view>
+      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
-          <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" /></view>
-          <view class="promotion-grow"><text class="checkout-item-name">{{ selectedItemName(item) }}</text><text class="promotion-copy">{{ p.quantity }} · {{ item.quantity }}</text>
+          <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl&&!brokenImages.includes(item.productNo)" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" @error="brokenImages.push(item.productNo)" /></view>
+          <view class="promotion-grow"><text class="checkout-item-name">{{ selectedItemName(item) }}</text>
             <CheckoutAmount v-if="displayQuote||order" class="checkout-line-price" :value="itemSubtotal(item)" currency="USD" />
           </view>
-          <view class="checkout-item-quantity" :aria-label="selectedItemName(item)+' · '+p.quantity">
-            <view class="checkout-item-quantity-button" data-testid="checkout-item-decrease" role="button" :tabindex="canChangeQuantity(item.productNo,-1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,-1)" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.productNo,-1)" @keydown.enter.prevent="changeQuantity(item.productNo,-1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,-1,$event)"><NxIcon name="minus" /></view>
+          <view class="checkout-item-quantity-row"><text class="promotion-copy">{{ p.quantity }}</text><view class="checkout-item-quantity" :aria-label="selectedItemName(item)+' · '+p.quantity">
+            <view class="checkout-item-quantity-button" data-testid="checkout-item-decrease" role="button" :tabindex="canChangeQuantity(item.productNo,-1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,-1)" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.productNo,-1)" @keydown.enter.prevent="changeQuantity(item.productNo,-1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,-1,$event)"><NxIcon name="minus" :size="20" /></view>
             <text class="checkout-item-quantity-value" aria-live="polite">{{ item.quantity }}</text>
-            <view class="checkout-item-quantity-button" data-testid="checkout-item-increase" role="button" :tabindex="canChangeQuantity(item.productNo,1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,1)" :aria-label="t.uiChrome.increaseQty" @click="changeQuantity(item.productNo,1)" @keydown.enter.prevent="changeQuantity(item.productNo,1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,1,$event)"><NxIcon name="plus" /></view>
-          </view>
+            <view class="checkout-item-quantity-button" data-testid="checkout-item-increase" role="button" :tabindex="canChangeQuantity(item.productNo,1)?0:-1" :aria-disabled="!canChangeQuantity(item.productNo,1)" :aria-label="t.uiChrome.increaseQty" @click="changeQuantity(item.productNo,1)" @keydown.enter.prevent="changeQuantity(item.productNo,1,$event)" @keydown.space.prevent="changeQuantity(item.productNo,1,$event)"><NxIcon name="plus" :size="20" /></view>
+          </view></view>
         </view>
       </view>
       <view v-if="displayQuote||order||eventVoucherId" class="checkout-section" data-testid="checkout-discounts">
@@ -139,7 +137,7 @@ import { promotionApi,deviceE3Api,purchaseEligibilityApi,sessionVault } from '@/
 import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api';
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { PromotionItem } from '@/api/promotion-api';
-import { validatePromotionItems } from '@/api/promotion-api';
+import { checkoutQuoteBlock, validatePromotionItems, type CheckoutQuoteBlock } from '@/api/promotion-api';
 import type { RewardDisclosure,Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
@@ -157,11 +155,11 @@ import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCh
 import { acquireAccountCommandKey,readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { registerCheckoutLeaveGuard } from '@/lib/promotion-leave-guard';
 import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadline-clock';
-import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
+import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
 import { litePromotion } from '@/lib/promotion-landing';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { onPurchaseRecordReleased, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
+import { onPurchaseRecordReleased, pendingOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute } from '@/lib/advisor-chat-route';
@@ -228,7 +226,10 @@ function itemSubtotal(item:{productNo:string;quantity:number;subtotalUsdt?:strin
   if(item.subtotalUsdt!==undefined)return item.subtotalUsdt;
   return (order.value?receiptQuote.value:displayQuote.value)?.items.find(line=>line.productNo===item.productNo&&line.quantity===item.quantity)?.subtotalUsdt;
 }
-const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=ref(false),error=ref(''),activityConflict=ref(false),termsOpen=ref(false);
+const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),writeBusy=ref(false),error=ref(''),activityConflict=ref(false),termsOpen=ref(false);
+const quoteRead=ref<number|null>(null);
+const busy=computed(()=>writeBusy.value||quoteRead.value!==null);
+const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
 const paymentSheetOpen=ref(false),paymentConfirming=ref(false),leaving=ref(false);
 const paymentEntryChecking=ref(false);
 const eventVoucherId=props.voucherId?.trim()??'';
@@ -257,6 +258,8 @@ function voucherCondition(def:VoucherDef):string {
 const selection=ref(props.items.map(({productNo,quantity})=>({productNo,quantity})));
 // Lite gates fresh purchases only; an explicit retry of the frozen original command keeps its own items and key.
 const liteSelectionAllowed=computed(()=>selection.value.every(item=>isLiteProduct(getProduct(item.productNo)??{id:item.productNo})));
+// A product image that fails to load is dropped, so its art column collapses like the single-item card's.
+const brokenImages=ref<string[]>([]);
 const tradein=useTradeinSheet();
 const keepRecovery=shallowRef<CheckoutCapacityRecovery|null>(null);
 const keepRecoveryTarget=computed(() => keepRecovery.value?.target ?? null);
@@ -274,7 +277,7 @@ function openKeepResume(): boolean {
   const resume = checkoutKeepResume?.value;
   return !!resume && keepResumeAllowed.value && recoverKeepBeforeNewPurchase(true, resume);
 }
-function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume):boolean {
+function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume, showRecovery=true):boolean {
   // Original orders and commands always recover before any new purchase gate.
   if(props.orderNo||session.record.order||session.record.pending)return false;
   const previous=keepRecoveryTarget.value;
@@ -298,7 +301,7 @@ function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume)
     catch{if (resume) return false;}
     keepRecovery.value=recovery;
     freshQuoteReady.value=false;quoteFresh.value=false;quotePresentation.value=null;
-    if(reopen||previous!==productNo)tradein.showKeepRecovery(productNo as DeviceKind);
+    if(showRecovery&&(reopen||previous!==productNo))tradein.showKeepRecovery(productNo as DeviceKind);
     return true;
   }
   if (!resume) keepRecovery.value = null;
@@ -325,6 +328,7 @@ async function changeQuantity(productNo:string,delta:-1|1,event?:KeyboardEvent):
   if(event?.repeat||!canChangeQuantity(productNo,delta))return;
   const next=selection.value.map(item=>item.productNo===productNo?{...item,quantity:item.quantity+delta}:item);
   validatePromotionItems(next);
+  quoteBlock.value=null;
   selection.value=next;
   await loadQuote();
 }
@@ -346,7 +350,7 @@ watch(quotePresentationKey,()=>{
   quotePresentation.value=null;freshQuoteReady.value=false;receivedAt=null;quoteFresh.value=false;readGeneration++;
 },{flush:'sync'});
 watch(()=>locale.code,()=>{
-  if(!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
+  if(quoteBlock.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
   if(busy.value)refreshOnIdle=true;else void loadQuote();
 },{flush:'post'});
 function updateClock(){
@@ -362,36 +366,55 @@ async function loadOrderClock(){
   const fleet=await deviceE3Api.fleet();if(!readCurrent(read)||generation!==clockGeneration)return;
   orderClock={serverNow:fleet.serverNow,at:sampledAt};updateClock();
 }
-const catalogReadFailed=computed(()=>freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&productCatalogState.status==='error');
-const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&(liteSelectionAllowed.value||session.retryOriginal)&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
+watch(()=>productCatalogState.status,status=>{
+  if(status==='error'&&current()&&visible.value&&freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&!quoteBlock.value){
+    quoteBlock.value='unavailable';
+  }
+});
+const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!quoteBlock.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&(liteSelectionAllowed.value||session.retryOriginal)&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
 const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
-async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';activityConflict.value=false;try{await action();}catch(cause){if(current()){
+function showOperationError(cause:unknown){
   const rejection=orderPaymentRejection(cause,locale.code);
   if(rejection)error.value=rejection;
   else{const message=asApiError(cause).message;activityConflict.value=message==='PROMOTION_EXCLUSIVE_ACTIVITY_CONFLICT';error.value=activityConflict.value?p.value.activityConflictNote:message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'?p.value.disabledNote:message.includes('CAPACITY_UNAVAILABLE')?p.value.capacityUnavailable:message==='PROMOTION_ACCOUNT_UNAVAILABLE'?p.value.accountUnavailable:message.includes('QUOTE_EXPIRED')||message.includes('QUOTE_INPUT_CHANGED')?p.value.quoteExpired:message.includes('INSUFFICIENT')?p.value.balanceInsufficient:p.value.errorNote;}
-}}finally{if(current()){busy.value=false;revision.value++;updateClock();}}}
-async function loadQuote(){
+}
+async function run(action:()=>Promise<void>){
+  if(busy.value||!current())return;
+  writeBusy.value=true;error.value='';activityConflict.value=false;
+  try{await action();}catch(cause){if(current())showOperationError(cause);}
+  finally{if(current()){writeBusy.value=false;revision.value++;updateClock();}}
+}
+let foregroundQuoteAt = -Infinity;
+async function loadQuote(recheckCapacity=false,foreground=false){
+  const block=quoteBlock.value;
+  if(block&&block!=='unavailable'&&!(recheckCapacity&&block==='capacity'))return;
   if(busy.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
-  if(recoverKeepBeforeNewPurchase())return;
+  if(!foreground&&recoverKeepBeforeNewPurchase())return;
+  if(foreground)foregroundQuoteAt=Date.now();
   // A failed later read invalidates the successful catalog promise saved at mount.
   if(productCatalogState.status==='error')catalogRefresh=null;
   const generation=++readGeneration,inputKey=quotePresentationKey();
+  quoteRead.value=generation;error.value='';activityConflict.value=false;
   if(quotePresentation.value?.key!==inputKey){quotePresentation.value=null;promotion.value=null;}
-  voucherOpen.value=false;freshQuoteReady.value=false;promotionReceivedAt=null;termsOpen.value=false;receivedAt=null;quoteFresh.value=false;
-  await run(async()=>{
-    try{session.invalidateQuote();revision.value++;}catch(cause){quotePresentation.value=null;throw cause;}
-    // Publishing the catalog invalidates voucher reads. Quote only after this
-    // checkout's catalog refresh has finished, as with its wallet read.
-    catalogRefresh??=refreshProductCatalog(true);
-    const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
-    if(!catalogReady)catalogRefresh=null;
-    if(!readCurrent(generation))return;
-    if(!catalogReady){quotePresentation.value=null;promotion.value=null;throw new Error('PRODUCT_CATALOG_UNAVAILABLE');}
+  if(!foreground){voucherOpen.value=false;freshQuoteReady.value=false;promotionReceivedAt=null;termsOpen.value=false;receivedAt=null;quoteFresh.value=false;}
+  try{
+    if(!foreground){
+      try{session.invalidateQuote();revision.value++;}catch(cause){quotePresentation.value=null;throw cause;}
+      // Publishing the catalog invalidates voucher reads. Quote only after this
+      // checkout's catalog refresh has finished, as with its wallet read.
+      catalogRefresh??=refreshProductCatalog(true);
+      const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
+      if(!readCurrent(generation))return;
+      if(!catalogReady){
+        catalogRefresh=null;quotePresentation.value=null;promotion.value=null;quoteBlock.value='unavailable';
+        return;
+      }
+    }
     if(!liteSelectionAllowed.value)throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
     const sampledAt=readTrustedMonotonicNowMs();
-    if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
+    if(!foreground&&props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
       if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?litePromotion(value):null;promotionReceivedAt=sampledAt;updateClock();}
     }).catch(()=>{});
     try{
@@ -418,7 +441,7 @@ async function loadQuote(){
         }
         return {quote:best,voucherId:id};
       };
-      if(eventVoucherId){
+      if(!foreground&&eventVoucherId){
         eventVoucherStatus.value='loading';
         const refreshed=await voucher.refreshRemote();if(!readCurrent(generation))return;
         if(!refreshed)throw new Error('VOUCHER_STATE_UNAVAILABLE');
@@ -434,7 +457,11 @@ async function loadQuote(){
           }
         }
       }
-      if(eventVoucherId){
+      if(foreground){
+        const previous=session.record.quote;
+        const selectedActivity=previous?.activityId??(eventVoucherId?promotion.value?.activityId??null:activityId);
+        result=await promotionApi.quote(requestedItems,selectedActivity,selectedId,false);
+      }else if(eventVoucherId){
         result=await promotionApi.quote(requestedItems,activityId,voucherId.value,false);
         selectedId=eventVoucherId;
       }else{
@@ -453,7 +480,7 @@ async function loadQuote(){
       // (same items) for the user to confirm; an explicitly chosen phone-gift campaign is
       // refused like a phone SKU selection. Rewards are never edited out of a server quote.
       const givesPhone=(q:typeof result)=>q.expectedRewards.some(row=>row.reward.type==='DEVICE'&&!isLiteProduct(getProduct(row.reward.giftProductNo)??{id:row.reward.giftProductNo}));
-      if(givesPhone(result)&&!eventVoucherId&&!props.activityId){
+      if(!foreground&&givesPhone(result)&&!eventVoucherId&&!props.activityId){
         // A chosen voucher stays; otherwise the vouchers are weighed again, since one that lost to the campaign may now be best.
         const autoVoucher=!manualVoucher()&&requestedItems.length===1;
         result=await promotionApi.quote(requestedItems,null,autoVoucher?null:selectedId,false);
@@ -466,10 +493,28 @@ async function loadQuote(){
       if(result.items.length!==requestedItems.length||requestedItems.some(item=>!result.items.some(line=>line.productNo===item.productNo&&line.quantity===item.quantity)))throw new Error('QUOTE_INPUT_CHANGED');
       if(givesPhone(result))throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
       voucherId.value=selectedId;
+      quoteBlock.value=null;
       session.setQuote(result,selectedId);quotePresentation.value={key:quotePresentationKey(),quote:result};freshQuoteReady.value=true;receivedAt=sampledAt;revision.value++;updateClock();
-    }catch(cause){if(readCurrent(generation)){if(!(cause instanceof ApiError&&cause.kind==='network')){quotePresentation.value=null;promotion.value=null;}throw cause;}}
-  });
+    }catch(cause){
+      if(!readCurrent(generation))return;
+      if(!(cause instanceof ApiError&&cause.kind==='network')){quotePresentation.value=null;promotion.value=null;}
+      quoteBlock.value=checkoutQuoteBlock(cause);
+      if(quoteBlock.value){if(foreground){freshQuoteReady.value=false;quoteFresh.value=false;}return;}
+      throw cause;
+    }
+  }catch(cause){
+    if(readCurrent(generation))showOperationError(cause);
+  }finally{
+    if(quoteRead.value===generation)quoteRead.value=null;
+  }
 }
+useAutoRecovery({
+  active:()=>visible.value&&current()&&auth.isAuthenticated,
+  failed:()=>quoteBlock.value==='unavailable',
+  retry:loadQuote,
+  repeatMs:30_000,
+  quiet:false,
+});
 async function claimEventVoucher(){
   if(!eventVoucherId||eventVoucherStatus.value!=='claimable'||busy.value||!visible.value||!current()||openedOriginal||session.record.pending||order.value)return;
   const generation=readGeneration;
@@ -492,6 +537,7 @@ async function selectVoucher(id:string|null){
   if(!voucherOpen.value||!current()||!visible.value||openedOriginal||props.orderNo||busy.value||session.record.pending||order.value||unknown.value)return;
   if(id!==null&&!voucherOptions.value.some(option=>option.def.id===id))return;
   try{session.selectVoucher(id);}catch{error.value=p.value.errorNote;return;}
+  if(voucherId.value!==id)quoteBlock.value=null;
   voucherId.value=id;voucherOpen.value=false;await loadQuote();
 }
 async function createOrder(){if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;await run(()=>session.create());if(canPay.value&&current()&&visible.value){paymentSheetOpen.value=true;void confirmPayment();}}
@@ -587,20 +633,20 @@ async function confirmPayment(){
   }
 }
 let recoveryReadGeneration=-1;
-function recover():Promise<boolean>{
+function recover(foreground=false):Promise<boolean>{
   if(!current()||!visible.value||busy.value)return Promise.resolve(false);
   if(recoveryRead.value){
     // Back can arrive while the foreground read is checking this same order.
     if(recoveryReadGeneration===readGeneration)return recoveryRead.value;
     // A read from before the page was hidden cannot answer for this visit: read again once it ends.
-    return recoveryRead.value.then(()=>recover());
+    return recoveryRead.value.then(()=>recover(foreground));
   }
   if(session.busy)return Promise.resolve(false);
   recoveryReadGeneration=readGeneration;
-  recoveryRead.value=readCheckout().finally(()=>{recoveryRead.value=null;});
+  recoveryRead.value=readCheckout(foreground).finally(()=>{recoveryRead.value=null;});
   return recoveryRead.value;
 }
-async function readCheckout():Promise<boolean>{
+async function readCheckout(foreground=false):Promise<boolean>{
   const generation=readGeneration;
   recoveryGeneration=generation;
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
@@ -613,7 +659,7 @@ async function readCheckout():Promise<boolean>{
     revision.value++;
     const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
     // If recovery was part of Back, let that navigation finish.
-    if (openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
+    if (!foreground && openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
       && (!props.orderNo || props.orderNo !== order.value?.orderNo)) {
       const requestedHref = props.orderNo
         ? '/pages/store/checkout?orderNo=' + encodeURIComponent(props.orderNo)
@@ -622,7 +668,7 @@ async function readCheckout():Promise<boolean>{
     }
     const reopenPurchase = ordinaryMultiItemEntry && canStartNew.value && !session.record.quote?.activityId
       && !order.value?.rewards?.length && unpaidOrderEnded;
-    if (reopenPurchase) {
+    if (!foreground && reopenPurchase) {
       // The replacement quote has its own read generation.
       recoveryGeneration=null;
       await Promise.all([startNewPurchase(),refreshWallet(true)]);
@@ -631,7 +677,7 @@ async function readCheckout():Promise<boolean>{
     await loadOrderClock();
     if(!readCurrent(generation))return false;
     if(order.value?.paymentStatus==='PAID')await readActivation();
-    else if(!clockOnly)await refreshWallet(true,true);
+    else if(!clockOnly&&!foreground)await refreshWallet(true,true);
     return readCurrent(generation)&&!unknown.value;
   }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
   finally{recoveryGeneration=null;}
@@ -709,8 +755,8 @@ async function requestLeave():Promise<boolean>{
   if(nativeBackApproved||paymentLeaveApproved)return true;
   // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
   const pending=session.record.pending;
-  if(pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)return !busy.value&&!paymentConfirming.value;
-  if(!current()||!visible.value||busy.value||paymentConfirming.value||leaving.value)return false;
+  if(pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)return !writeBusy.value&&!paymentConfirming.value;
+  if(!current()||!visible.value||writeBusy.value||paymentConfirming.value||leaving.value)return false;
   if(!session.record.order&&!session.record.pending)return true;
   leaving.value=true;paymentSheetOpen.value=false;
   try{
@@ -728,7 +774,7 @@ async function requestLeave():Promise<boolean>{
 }
 function allowAuxiliaryNavigation():Promise<boolean>{
   // Recharge and legal links are auxiliary navigation, not checkout cancel.
-  return Promise.resolve(!busy.value&&!paymentConfirming.value&&!leaving.value);
+  return Promise.resolve(!writeBusy.value&&!paymentConfirming.value&&!leaving.value);
 }
 function routeLeavesPurchase(path:string):boolean{
   return /\/(?:pages\/)?store(?:\/store|\/detail|\/bundle)?(?:\?|$)/.test(path);
@@ -742,9 +788,35 @@ function back():boolean{
   void requestLeave().then(ok=>{if(ok&&current()){nativeBackApproved=true;navBack('/store');}});
   return true;
 }
-function hide(){
+let foregroundPaymentSignature:string|undefined;
+function pauseBrowserTab(){
   if(walletTimer){clearInterval(walletTimer);walletTimer=undefined;}
+  paymentSheetOpen.value=false;termsOpen.value=false;voucherOpen.value=false;
+  useUI().clearConfirmsBy(paymentDialogOwner);
+}
+function resumeBrowserTab(){if(current()&&visible.value)startWalletTimer();}
+function refreshForegroundReview():boolean{
+  if(!current()||!visible.value||!auth.isAuthenticated||purchaseReadBusy())return false;
+  try{
+    const changed=session.restoreForegroundRecovery();
+    const signature=order.value?JSON.stringify(pendingOrderPayment(account,order.value.orderNo)):undefined;
+    const paymentChanged=signature!==foregroundPaymentSignature;
+    foregroundPaymentSignature=signature;
+    if(changed||paymentChanged){
+      revision.value++;
+      if(session.record.pending||session.record.order)void recover(true);
+      return true;
+    }
+    if(session.record.pending||session.record.order||props.orderNo)return true;
+    // The checkout host automatically reads any original command found here.
+    if(!recoverKeepBeforeNewPurchase(false,undefined,false))void loadQuote(true,true);
+  }catch{recoveryReadFailed.value=true;}
+  return true;
+}
+function hide(){
+  pauseBrowserTab();
   visible.value=false;quotePresentation.value=null;readGeneration++;walletGeneration++;resultGeneration++;resultReading.value=false;paymentSheetOpen.value=false;walletState.value='idle';refreshOnIdle=false;termsOpen.value=false;voucherOpen.value=false;promotion.value=null;promotionReceivedAt=null;
+  quoteRead.value=null;
   useUI().clearConfirmsBy(paymentDialogOwner);
   if(current()&&!session.record.pending&&!session.record.order){
     freshQuoteReady.value=false;receivedAt=null;quoteFresh.value=false;
@@ -754,11 +826,12 @@ function hide(){
   disposeGuard?.();disposeGuard=null;
 }
 function show(){
+  const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
   visible.value=true;nativeBackApproved=false;paymentLeaveApproved=false;if(!current())return;
   startWalletTimer();
   if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(allowAuxiliaryNavigation);
   if(busy.value){refreshOnIdle=true;return;}
-  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);void loadQuote();}
+  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);if(!quoteBlock.value||recheckCapacity)void loadQuote(recheckCapacity);}
 }
 watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible.value&&current())show();}});
 const footer = computed(() => {
@@ -766,18 +839,21 @@ const footer = computed(() => {
   const rawAmount = order.value?.amountUsdt ?? displayQuote.value?.amountUsdt;
   const currency='USD' as const,amount=formatCheckoutReviewAmount(rawAmount,currency,{unit:true}),amountValue=rawAmount;
   if (order.value?.paymentStatus === 'PENDING') return { amount, amountValue, currency, label: p.value.pay, disabled: rawAmount==null||!canPay.value||leaving.value||paymentConfirming.value||paymentEntryChecking.value, action: pay };
-  if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder };
+  if (!order.value && quoteBlock.value === 'capacity') return { amount, amountValue, currency,
+    label: t.value.myDevices.inventoryTitle, disabled: !visible.value||leaving.value,
+    action: () => navTo('/pages/me/devices'), note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
+  if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder, note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
   return null;
 });
-const backDisabled=computed(()=>busy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
+const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
 const resultVisible = computed(() => order.value?.paymentStatus === 'PAID');
-defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
+defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{
     if(!visible.value||!current()||loading.value||busy.value||paymentConfirming.value||paymentSheetOpen.value||leaving.value||termsOpen.value||voucherOpen.value||voucherLoading.value)return;
     if(walletState.value!=='loading')void refreshWallet(true);
-    if(!session.record.order&&!session.record.pending)void loadQuote();
+    if(Date.now()-foregroundQuoteAt>=30_000&&!quoteBlock.value&&!session.record.order&&!session.record.pending)void loadQuote();
   },30000);
 }
 onMounted(async()=>{
@@ -806,13 +882,15 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .promotion-main--result { padding-bottom:var(--ui-space-inset); min-height:calc(100dvh - var(--nx-overlay-top) - var(--ui-space-section-gap) * 3); box-sizing:border-box; }
 /* Pending keep result: description role (10.1) in the auxiliary ink, one sentence per line, no query button (03 §3.5.2). */
 .checkout-keep-recovery text { display:block; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); white-space:pre-line; text-wrap:balance; }
-.checkout-review-title { display:block; margin:var(--v5-space-2) 0; font:var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); color:var(--v5-ink); }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:22px; background:var(--ui-content-surface); }
 .checkout-section { min-width:0; }
 .checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); }
-.checkout-product-line { display:grid; grid-template-columns:68px minmax(0,1fr); align-items:center; gap:var(--ui-space-row-y) var(--ui-space-inset); padding:var(--ui-space-section) var(--ui-space-inset); border-color:color-mix(in srgb,var(--v5-border) 40%,transparent); }
-.checkout-product-art { display:grid; place-items:center; width:68px; height:68px; border-radius:16px; overflow:hidden; }
-.checkout-product-art .promotion-image { width:74px; height:74px; }
+/* Same product summary as checkout.vue: device image as the main visual, quantity on its own full-width row. */
+.checkout-product-line { --checkout-art:120px; --checkout-art-h:76px; --checkout-art-image:128px; display:grid; grid-template-columns:var(--checkout-art) minmax(0,1fr); align-items:center; gap:0 var(--v5-space-3); padding:var(--ui-space-inset-hero) var(--ui-space-inset-hero) var(--v5-space-1); border-color:color-mix(in srgb,var(--v5-border) 40%,transparent); }
+.checkout-product-art { position:relative; width:var(--checkout-art); height:var(--checkout-art-h); }
+.checkout-product-art .promotion-image { position:absolute; left:50%; top:50%; width:var(--checkout-art-image); height:var(--checkout-art-image); transform:translate(-50%, -57%); pointer-events:none; }
+.checkout-product-line:has(> .checkout-product-art:empty) { grid-template-columns:minmax(0,1fr); }
+.checkout-product-art:empty { display:none; }
 .checkout-discount-row { display:flex; align-items:center; gap:var(--ui-space-inline); min-height:64px; box-sizing:border-box; padding:var(--ui-space-inline) var(--ui-space-inset); border-bottom:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-discount-row:last-child { border-bottom:0; }
 .checkout-discount-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); color:var(--v5-ink-2); }
@@ -847,17 +925,21 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-fees .promotion-summary { box-sizing:border-box; align-items:center; min-height:calc(var(--ui-space-inset) * 3); font-variant-numeric:tabular-nums; border-bottom:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-fees .promotion-summary:last-child { border-bottom:0; }
 .checkout-fees .promotion-summary > :last-child { max-width:65%; }
-.checkout-item-name { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
-.checkout-line-price { display:block; margin-top:6px; line-height:1.5; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.checkout-item-name { display:block; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
+.checkout-line-price { display:block; margin-top:var(--v5-space-2); font-size:var(--ui-type-list-title); line-height:var(--ui-type-list-title-lh); }
+.checkout-line-price :deep(.checkout-amount__symbol) { font-size:max(12px, .55em); }
 .checkout-voucher-options { display:flex; flex-direction:column; gap:var(--ui-space-inline); }
 .checkout-voucher-option { align-items:flex-start; flex-direction:column; gap:6px; text-align:left; }
 .checkout-voucher-options [aria-pressed="true"] { background:var(--v5-brand-soft); box-shadow:inset 0 0 0 1px var(--v5-brand); }
-.checkout-item-quantity { grid-column:2; justify-self:start; display:inline-flex; align-items:center; border:1px solid var(--v5-border); border-radius:999px; background:var(--ui-content-surface-2); }
-.checkout-item-quantity-button { display:grid; place-items:center; width:44px; min-height:44px; border-radius:999px; font:400 18px/20px var(--font-v5); cursor:pointer; }
-.checkout-item-quantity-button[aria-disabled="true"] { opacity:.35; cursor:default; }
+.checkout-item-quantity-row { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:52px; margin-top:var(--v5-space-4); border-top:1px solid var(--v5-border); }
+.checkout-item-quantity-row .promotion-copy { line-height:var(--ui-type-list-subtitle-lh); }
+/* 20px glyphs in 44px targets: pull the row right so the + stroke, not its hit area, meets the divider end. */
+.checkout-item-quantity { display:flex; flex:none; align-items:center; margin-right:-16px; }
+.checkout-item-quantity-button { display:grid; place-items:center; width:44px; min-height:44px; border-radius:999px; color:var(--v5-ink); cursor:pointer; }
+.checkout-item-quantity-button[aria-disabled="true"] { opacity:.5; cursor:default; }
 .checkout-item-quantity-button:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
-.checkout-item-quantity-value { min-width:24px; text-align:center; font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
+.checkout-item-quantity-value { min-width:24px; text-align:center; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); font-variant-numeric:tabular-nums; }
 .promotion-summary.total { min-height:55px; box-sizing:border-box; }
-@media(min-width:390px) { .checkout-product-line { grid-template-columns:68px minmax(0,1fr) auto; }.checkout-item-quantity { grid-column:3;grid-row:1; }.checkout-item-quantity-value { min-width:20px; } }
+@media(max-width:374px) { .checkout-product-line { --checkout-art:104px; --checkout-art-h:66px; --checkout-art-image:112px; } }
 @media(prefers-reduced-motion:reduce) { .promotion-action:active { transform:none; } }
 </style>

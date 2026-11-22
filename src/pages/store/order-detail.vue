@@ -116,12 +116,12 @@
           </view>
           <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
           <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
-          <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`−${summaryMoney(order.discount)}`" brand />
-          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="`−${summaryMoney(order.tradeInCredit ?? 0)}`" brand />
+          <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="discountMoney(order.discount)" brand />
+          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="discountMoney(order.tradeInCredit ?? 0)" brand />
           <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
-          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="`−${summaryMoney(order.promoDiscountUSD ?? 0)}`" brand />
-          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`−${summaryMoney(order.trialOffsetUSD ?? 0)}`" brand />
-          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="`−${summaryMoney(order.earlyDiscountUSD ?? 0)}`" brand />
+          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="discountMoney(order.promoDiscountUSD ?? 0)" brand />
+          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="discountMoney(order.trialOffsetUSD ?? 0)" brand />
+          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="discountMoney(order.earlyDiscountUSD ?? 0)" brand />
           <DetailRow v-if="summaryPaid" :label="paymentCopy.payable" :value="summaryMoney(order.total, true)" />
           <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" brand />
           <template v-if="order.status === 'refunded'">
@@ -155,7 +155,7 @@
       <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
-          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
+          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
@@ -186,6 +186,7 @@ import { commerceOrderAmount, commerceOrderHasPayment, commerceOrderTitle, comme
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+import { formatCheckoutReviewAmount } from "@/lib/checkout-review-amount";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
 import { ref, computed, watch, nextTick, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
@@ -239,6 +240,7 @@ const auth = useAuth();
 
 const id = ref("");
 const autoPayRequested = ref(false);
+let automaticPaymentDiscovery = true;
 let pendingPaymentIntentAccount = '';
 // FEAT-TRIAL05: `?result=trial` (set by checkout) opens the purchase result once; the order view is one tap away.
 const showTrialResult = ref(false);
@@ -261,13 +263,16 @@ function captureDetailScope(): DetailRequestScope {
   return { pageEpoch: detailEpoch, orderNo: id.value, accountScope: captureAccountScope(), runtimeScope: captureRuntimeRevision() };
 }
 
-function isCurrentDetailScope(scope: DetailRequestScope): boolean {
+function isCurrentDetailVisit(scope: DetailRequestScope): boolean {
   return detailMounted
     && detailVisible
     && detailEpoch === scope.pageEpoch
     && id.value === scope.orderNo
-    && isCurrentAccountScope(scope.accountScope)
-    && isCurrentRuntimeRevision(scope.runtimeScope);
+    && isCurrentAccountScope(scope.accountScope);
+}
+
+function isCurrentDetailScope(scope: DetailRequestScope): boolean {
+  return isCurrentDetailVisit(scope) && isCurrentRuntimeRevision(scope.runtimeScope);
 }
 
 onLoad((options) => {
@@ -279,6 +284,7 @@ onLoad((options) => {
   const from = o.from ?? (queryMatchesOrder && query.getAll("from").length === 1 ? query.get("from") : "");
   showTrialResult.value = (o.result ?? (queryMatchesOrder && query.getAll("result").length === 1 ? query.get("result") : "")) === "trial";
   autoPayRequested.value = (o.pay ?? (queryMatchesOrder && query.getAll('pay').length === 1 ? query.get('pay') : '')) === '1';
+  automaticPaymentDiscovery = (o.readback ?? (queryMatchesOrder ? query.get('readback') : null)) !== '1';
   orderOrigin.value = from === "me" || from === "store" ? from : "";
   ordersBackHref.value = orderOrigin.value ? `/store/orders?from=${orderOrigin.value}` : "/store/orders";
   preserveOrderOriginInH5();
@@ -325,7 +331,7 @@ async function refreshOrderWallet(): Promise<boolean> {
     if (sequence === walletRefreshSequence) walletRefreshing.value = false;
   }
 }
-async function refreshOrder() {
+async function refreshOrder(discoverPayment = true) {
   if (!remoteApiEnabled || !detailVisible || !id.value.trim() || !remoteOrderBoundAccount.value) return;
   void revalidateProductCatalog();
   if (remoteOrderRefreshing.value && activeRemoteOrderScope
@@ -343,7 +349,7 @@ async function refreshOrder() {
       if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
         orderPresentation.value = result ?? null;
         remoteOrderError.value = false;
-        if (result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
+        if (automaticPaymentDiscovery && discoverPayment && result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
             && !refusedPayment.value && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
           paymentLookupScope = scope;
           await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, result.productName,
@@ -561,8 +567,13 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
     const action=readOrderAction(accountKey,id.value);orderAction.value=action;orderCommandUnavailable.value=false;
     if (!action || refusedPayment.value) { resumePaymentAllowed.value=false;return; }
     if (action.kind==='cancel') {
-      if (retryCancel) await orders.cancelOrderRemote(action.orderNo);
+      const outcome = retryCancel ? await orders.cancelOrderRemoteResult(action.orderNo) : null;
       if (!isCurrentDetailScope(scope)) return;
+      if (outcome === 'payment-in-progress') {
+        restoreOrderAction();
+        showCancelPaymentRefusal();
+        return;
+      }
       await refreshOrder();
       if (!isCurrentDetailScope(scope)) return;
       if (!remoteOrderError.value&&liveOrder.value&&liveOrder.value.status!=='placed') clearOrderAction(accountKey,action.orderNo,action.key);
@@ -805,31 +816,74 @@ async function handleCancel() {
   if (externalPayment.value) { cancelBlocked.value = true; return; }
   if (!cancellable.value) return;
   const scope = captureDetailScope();
+  const baseUrl = apiRuntimeConfig?.baseUrl;
+  const sameOrder = () => isCurrentDetailVisit(scope)
+    && !orderEnvironmentInvalidated.value && apiRuntimeConfig?.baseUrl === baseUrl;
   const cancelAttempt = ++cancelAttemptSequence;
   cancellingOrder.value = true;
   try {
     const ok = await uiConfirm({
       title: t.value.orders.cancelOrder,
       message: t.value.orders.cancelConfirm,
+      confirmLabel: t.value.orders.cancelOrder,
       danger: true,
       icon: "warn",
     });
-    if (!ok || !canCancelCurrentOrder() || !isCurrentDetailScope(scope) || !liveOrder.value) return;
-    const orderNo = liveOrder.value.id;
-    const cancelled = remoteApiEnabled
-      ? await orders.cancelOrderRemote(orderNo)
-      : orders.cancelOrder(orderNo);
-    if (!isCurrentDetailScope(scope)) return;
+    if (!ok || !sameOrder()) return;
+    if (remoteApiEnabled && !await recheckOrderBeforeCancel(sameOrder)) return;
+    if (!sameOrder()) return;
+    if (externalPayment.value) { cancelBlocked.value = true; return; }
+    if (!canCancelCurrentOrder()) return;
+    const outcome = await orders.cancelOrderRemoteResult(scope.orderNo);
+    if (!sameOrder()) return;
     restoreOrderAction();
-    if (cancelled) {
+    if (outcome === 'payment-in-progress') {
+      showCancelPaymentRefusal();
+    } else if (outcome === 'cancelled') {
       toast.warn(t.value.orders.cancelDoneToast);
     } else {
       toast.warn(t.value.orders.cancelPendingServer);
     }
   } catch {
-    restoreOrderAction();toast.warn(recoveryCopy.value.cancelPending);
+    if (sameOrder()) { restoreOrderAction(); toast.warn(recoveryCopy.value.cancelPending); }
   } finally {
     if (cancelAttempt === cancelAttemptSequence) cancellingOrder.value = false;
+  }
+}
+
+async function recheckOrderBeforeCancel(sameOrder: () => boolean): Promise<boolean> {
+  // Get an order projection initiated after confirmation, then check this order's current intent.
+  if (remoteOrderRefreshing.value) await remoteOrderRead;
+  if (!sameOrder()) return false;
+  await refreshOrder(false);
+  const order = liveOrder.value;
+  if (!sameOrder() || order?.status !== 'placed' || remoteOrderError.value) return false;
+  const scope = captureDetailScope();
+  const current = () => sameOrder() && isCurrentDetailScope(scope) && liveOrder.value?.status === 'placed';
+  const payment = await discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, order.productName, current);
+  if (!current()) return false;
+  if (payment === 'active' || externalPayment.value) {
+    paymentNotice.value = '';
+    cancelBlocked.value = true;
+    return false;
+  }
+  if (payment === 'unavailable') {
+    paymentLookupScope = null;
+    remoteOrderError.value = true;
+    return false;
+  }
+  return true;
+}
+
+function showCancelPaymentRefusal(): void {
+  paymentNotice.value = '';
+  cancelBlocked.value = true;
+  // A second device can start a payment between the fresh check and the cancel POST.
+  const scope = captureDetailScope();
+  const order = liveOrder.value;
+  if (order?.status === 'placed' && !externalPayment.value) {
+    void discoverOrderPayment(scope.accountScope.accountKey, scope.orderNo, order.productName,
+      () => isCurrentDetailScope(scope) && liveOrder.value?.status === 'placed');
   }
 }
 
@@ -955,7 +1009,7 @@ async function runPaymentNoticeAction(): Promise<void> {
   noticeCancelFailed.value = false;
   if (orderAction.value?.kind === 'cancel') {
     await recoverOrderAction(true);
-    if (!isCurrentDetailScope(scope)) return;
+    if (!isCurrentDetailScope(scope) || !paymentNotice.value) return;
     if (liveOrder.value?.status === 'cancelled') paymentNotice.value = '';
     else noticeCancelFailed.value = true;
     return;
@@ -963,10 +1017,12 @@ async function runPaymentNoticeAction(): Promise<void> {
   if (!canCancelCurrentOrder()) { paymentNotice.value = ''; return; }
   cancellingOrder.value = true;
   try {
-    const cancelled = await orders.cancelOrderRemote(id.value);
+    if (!await recheckOrderBeforeCancel(() => isCurrentDetailScope(scope)) || !canCancelCurrentOrder()) return;
+    const outcome = await orders.cancelOrderRemoteResult(id.value);
     if (!isCurrentDetailScope(scope)) return;
     restoreOrderAction();
-    if (cancelled) paymentNotice.value = '';
+    if (outcome === 'payment-in-progress') showCancelPaymentRefusal();
+    else if (outcome === 'cancelled') paymentNotice.value = '';
     else noticeCancelFailed.value = true;
   } catch {
     if (isCurrentDetailScope(scope)) { restoreOrderAction(); noticeCancelFailed.value = true; }
@@ -1096,6 +1152,10 @@ const usdt = (value: number | string) => `${formatAmount(value)} USDT`;
 function summaryMoney(value: number | string, unit = false): string {
   if (!unit) return formatAmount(value);
   return order.value && commerceOrderAmount(order.value).currency === 'USDT' ? usdt(value) : `$${formatAmount(value)}`;
+}
+// Deduction rows read −$50.00 as on checkout (the same formatter); USDT-paid orders keep the unit like their subtotal and total rows.
+function discountMoney(value: number): string {
+  return formatCheckoutReviewAmount(value, order.value ? commerceOrderAmount(order.value).currency : 'USD', { discount: true, unit: true });
 }
 const trialRewardText = computed(() => {
   const reward = order.value?.trialReward;

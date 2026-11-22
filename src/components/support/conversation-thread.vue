@@ -448,11 +448,12 @@ const positionInset = computed(() => (props.topInset || 0) + historyPrefixHeight
 let scrollGeneration = 0, scrollTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingTailGeneration: number | undefined;
 let lastScrollTop = 0;
+let scrollRevision = 0, nativeScrollEnd: number | undefined;
 let followingTail = true, measuredViewportHeight = 0;
 const HISTORY_MEASURE_MS = 500;
 let positionTimer: ReturnType<typeof setTimeout> | undefined, historyDisposed = false;
-let preparedHistory: { id: string; prefix: number; inset: number; owner: string; host: unknown; root: unknown } | null = null;
-type PositionAdjustment = { owner: string; host: unknown; root: unknown; top: number; inset: number; tail: boolean; id?: string; prefix?: number; anchor?: { id: string; offset: number };
+let preparedHistory: { id: string; prefix: number; inset: number; owner: string; host: unknown; root: unknown; atEnd: boolean; scrollRevision: number } | null = null;
+type PositionAdjustment = { owner: string; host: unknown; root: unknown; top: number; inset: number; tail: boolean; id?: string; prefix?: number; resumeTail?: boolean; anchor?: { id: string; offset: number };
   expiresAt: number; settled: Promise<boolean>; settle: (applied: boolean) => void };
 let pendingPosition: PositionAdjustment | null = null;
 let historyPreparation = 0;
@@ -622,32 +623,45 @@ function cancelScroll(keepPosition = false) {
   pendingTailGeneration = undefined;
   if (!keepPosition) settlePosition();
 }
-function invalidateHistoryPosition() { cancelScroll(); preparedHistory = null; historyAnchor = null; historyPreparation++; }
+function invalidateHistoryPosition() { cancelScroll(); preparedHistory = null; historyAnchor = null; nativeScrollEnd = undefined; historyPreparation++; }
 onScopeDispose(() => { historyDisposed = true; invalidateHistoryPosition(); });
 onHide(invalidateHistoryPosition);
 watch(() => [historyOwner(), listHost.value, listRoot()], invalidateHistoryPosition, { flush: 'sync' });
 function scroller(): HTMLElement | undefined {
   const host = listRoot();
   if (!host?.querySelectorAll) return;
+  const scrollView = host.querySelector('.uni-scroll-view-content')?.parentElement;
+  if (scrollView) return scrollView;
   return [host, ...Array.from(host.querySelectorAll('*'))].find(node =>
     (node as HTMLElement).scrollHeight - (node as HTMLElement).clientHeight > 4) as HTMLElement | undefined;
+}
+function scrollEnd(node: HTMLElement): number { return Math.max(0, node.scrollHeight - node.clientHeight); }
+function atScrollEnd(top: number, end: number): boolean { return end - top < 1; }
+function atObservedScrollEnd(): boolean {
+  const node = scroller();
+  return node ? atScrollEnd(node.scrollTop, scrollEnd(node))
+    : nativeScrollEnd !== undefined && atScrollEnd(lastScrollTop, nativeScrollEnd);
 }
 function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: number } }) {
   if (stopPreviewPreparation) { nativePreviewReading = null; clearPreviewRowHeights(); }
   pendingTailGeneration = undefined;
+  const node = scroller(), top = node?.scrollTop ?? event.detail.scrollTop;
   // The delayed echo of our own pin (same scrollTop) can arrive after late content has grown the list;
   // measuring it against the new height would wrongly mark the reader as having left the tail.
-  const echo = event.detail.scrollTop === lastScrollTop;
+  const echo = top === lastScrollTop;
   // Observe gestures without turning delayed App scroll events back into scroll commands.
-  if (pendingPosition) pendingPosition.top += event.detail.scrollTop - lastScrollTop;
-  lastScrollTop = event.detail.scrollTop;
-  const node = scroller();
+  if (pendingPosition) pendingPosition.top += top - lastScrollTop;
+  lastScrollTop = top;
   // A real gesture ends any pending history restoration anchor.
-  if (!echo) historyAnchor = null;
-  if (echo) { /* keep followingTail */ }
-  else if (node) followingTail = node.scrollHeight - node.clientHeight - node.scrollTop <= 24;
-  else if (event.detail.scrollHeight !== undefined && measuredViewportHeight > 0)
-    followingTail = event.detail.scrollHeight - measuredViewportHeight - lastScrollTop <= 24;
+  if (!echo) { historyAnchor = null; scrollRevision++; }
+  if (!node && event.detail.scrollHeight !== undefined && measuredViewportHeight > 0)
+    nativeScrollEnd = Math.max(0, event.detail.scrollHeight - measuredViewportHeight);
+  if (!echo && !preparedHistory) {
+    // An upward gesture ends follow even if it leaves only a small gap.
+    if (node) followingTail = atScrollEnd(top, scrollEnd(node));
+    else if (event.detail.scrollHeight !== undefined && measuredViewportHeight > 0 && nativeScrollEnd !== undefined)
+      followingTail = atScrollEnd(top, nativeScrollEnd);
+  }
   if (threadVisible.value && nativePreviewReading?.returning) {
     nativePreviewReading.top = lastScrollTop; nativePreviewReading.inset = positionInset.value; nativePreviewReading.tail = followingTail;
   }
@@ -673,19 +687,24 @@ function visibleMessageAnchor(node: HTMLElement): { id: string; offset: number }
   }
   return null;
 }
-function measurePrefix(firstId: string, done: (height: number | null) => void) {
+function measurePrefix(firstId: string, done: (height: number | null, scroll?: { top: number; end: number }) => void) {
   const root = listRoot(), host = listHost.value, owner = historyOwner();
-  const finish = (height: number | null) => done(!historyDisposed && threadVisible.value && host === listHost.value
-    && root === listRoot() && owner === historyOwner() && height !== null && Number.isFinite(height) ? height : null);
+  const finish = (height: number | null, scroll?: { top: number; end: number }) => done(
+    !historyDisposed && threadVisible.value && host === listHost.value && root === listRoot()
+      && owner === historyOwner() && height !== null && Number.isFinite(height) ? height : null, scroll);
   try {
     const content = root?.querySelector?.('.nx-conv-content'), first = root?.querySelector?.('#' + messageRowId(firstId));
     if (content && first) { finish(first.getBoundingClientRect().top - content.getBoundingClientRect().top); return; }
     if (typeof uni === 'undefined' || !uni.createSelectorQuery) { finish(null); return; }
     const query = uni.createSelectorQuery().in(threadInstance);
     query.select('.nx-conv-content').boundingClientRect(); query.select('#' + messageRowId(firstId)).boundingClientRect();
+    query.select('.nx-conv-list').fields({ size: true, scrollOffset: true }, () => {});
     query.exec(rows => {
-      const [body, anchor] = (Array.isArray(rows) ? rows : []) as UniApp.NodeInfo[];
-      finish(typeof body?.top === 'number' && typeof anchor?.top === 'number' ? anchor.top - body.top : null);
+      const [body, anchor, viewport] = (Array.isArray(rows) ? rows : []) as UniApp.NodeInfo[];
+      const { height, scrollTop, scrollHeight } = viewport ?? {};
+      const scroll = typeof height === 'number' && height > 0 && typeof scrollTop === 'number' && typeof scrollHeight === 'number'
+        ? { top: scrollTop, end: Math.max(0, scrollHeight - height) } : undefined;
+      finish(typeof body?.top === 'number' && typeof anchor?.top === 'number' ? anchor.top - body.top : null, scroll);
     });
   } catch { finish(null); }
 }
@@ -696,6 +715,12 @@ async function prepareHistoryPrepend(): Promise<boolean> {
   const current = () => !historyDisposed && threadVisible.value && preparation === historyPreparation
     && owner === historyOwner() && host === listHost.value && root === listRoot();
   if (!current()) return false;
+  const node = scroller();
+  const wasAtEnd = node ? atScrollEnd(node.scrollTop, scrollEnd(node)) : undefined;
+  const revision = scrollRevision;
+  // This reader asked for history. Cancel a queued pin before waiting for an in-progress layout adjustment.
+  followingTail = false;
+  clearTimeout(scrollTimer);
   // The parent finishes its data request before the native post-layout callback.
   // Wait for that bounded transaction; never erase its unpaid prefix delta.
   if (pendingPosition && !await pendingPosition.settled) return false;
@@ -706,18 +731,33 @@ async function prepareHistoryPrepend(): Promise<boolean> {
   return new Promise<boolean>(resolve => {
     let finished = false;
     const timeout = setTimeout(() => { finished = true; resolve(false); }, HISTORY_MEASURE_MS);
-    measurePrefix(id, prefix => {
+    measurePrefix(id, (prefix, scroll) => {
       if (finished) return;
       finished = true;
       clearTimeout(timeout);
       const valid = typeof prefix === 'number' && Number.isFinite(prefix) && current()
         && props.messages[0]?.id === id && inset === positionInset.value;
-      if (valid) preparedHistory = { id, prefix: prefix as number, inset, owner, host, root };
+      if (valid) preparedHistory = { id, prefix: prefix as number, inset, owner, host, root,
+        atEnd: wasAtEnd ?? (!!scroll && atScrollEnd(scroll.top, scroll.end)), scrollRevision: revision };
       resolve(valid);
     });
   });
 }
-defineExpose({ prepareHistoryPrepend });
+function finishHistoryPrepend() {
+  const prepared = preparedHistory;
+  preparedHistory = null;
+  if (!prepared?.atEnd || prepared.scrollRevision !== scrollRevision) return;
+  if (scroller()) {
+    followingTail = atObservedScrollEnd();
+    return;
+  }
+  const preparation = historyPreparation;
+  measurePrefix(prepared.id, (prefix, scroll) => {
+    if (prefix !== null && scroll && preparation === historyPreparation && prepared.scrollRevision === scrollRevision)
+      followingTail = atScrollEnd(scroll.top, scroll.end);
+  });
+}
+defineExpose({ prepareHistoryPrepend, finishHistoryPrepend });
 function scrollToEnd() {
   cancelScroll(); const ticket = scrollGeneration;
   pendingTailGeneration = ticket;
@@ -751,8 +791,8 @@ function beginPosition(previousInset: number, node?: HTMLElement): PositionAdjus
   return { owner: historyOwner(), host: listHost.value, root: listRoot(), top: node?.scrollTop ?? lastScrollTop, inset: previousInset,
     // A new layout can precede the first queued tail placement. Its old DOM
     // position is not evidence that the user chose to read earlier history.
-    tail: (followingTail && pendingTailGeneration === scrollGeneration)
-      || (node ? node.scrollHeight - node.clientHeight - node.scrollTop <= 24 : followingTail),
+    tail: followingTail && (pendingTailGeneration === scrollGeneration
+      || !node || node.scrollHeight - node.clientHeight - node.scrollTop <= 24),
     expiresAt: Date.now() + HISTORY_MEASURE_MS, settled, settle };
 }
 function preservePosition(previousInset: number, firstId?: string) {
@@ -764,8 +804,10 @@ function preservePosition(previousInset: number, firstId?: string) {
   const adjustment = pendingPosition ?? beginPosition(previousInset, node);
   if (firstId && !adjustment.id) {
     let prefix: number | null = null;
-    if (preparedHistory?.id === firstId && preparedHistory.owner === owner && preparedHistory.host === host && preparedHistory.root === root)
+    if (preparedHistory?.id === firstId && preparedHistory.owner === owner && preparedHistory.host === host && preparedHistory.root === root) {
       prefix = preparedHistory.prefix + adjustment.inset - preparedHistory.inset;
+      adjustment.resumeTail = preparedHistory.atEnd;
+    }
     // H5 can capture the still-unpatched DOM synchronously. Normalize its
     // header/prefix space to the transaction's original inset.
     if (node) measurePrefix(firstId, value => { prefix = value === null ? null : value + adjustment.inset - previousInset; });
@@ -778,6 +820,8 @@ function preservePosition(previousInset: number, firstId?: string) {
     }
     preparedHistory = null;
     if (prefix === null || !Number.isFinite(prefix)) { cancelScroll(); return; }
+    // A prepend preserves the reading anchor even when the old viewport was near the tail.
+    followingTail = false;
     adjustment.id = firstId; adjustment.prefix = prefix;
   }
   cancelScroll(true); pendingPosition = adjustment;
@@ -790,19 +834,24 @@ function preservePosition(previousInset: number, firstId?: string) {
   // releases the transaction without guessing a delta or moving a history reader.
   positionTimer = setTimeout(() => { if (pendingPosition === adjustment && ticket === scrollGeneration) settlePosition(); },
     Math.max(0, adjustment.expiresAt - Date.now()));
-  const apply = (delta: number) => {
+  const apply = (delta: number, nativeEnd?: number) => {
     if (!current() || !Number.isFinite(delta)) return;
     const nextTop = preservedConversationTop(adjustment.top, delta), target = scroller();
     // Native props only react to a changed value. Rearm a repeated restoration
     // at the observed position only when issuing that command, never on gestures.
     if (!target && scrollTop.value === nextTop && lastScrollTop !== nextTop) {
       scrollTop.value = lastScrollTop;
-      void nextTick(() => apply(delta));
+      void nextTick(() => apply(delta, nativeEnd));
       return;
     }
     settlePosition(true);
     if (target) target.scrollTop = nextTop;
-    scrollTop.value = nextTop; lastScrollTop = nextTop;
+    lastScrollTop = target?.scrollTop ?? nextTop;
+    scrollTop.value = lastScrollTop;
+    if (adjustment.id) {
+      const end = target ? scrollEnd(target) : nativeEnd;
+      followingTail = adjustment.resumeTail === true && end !== undefined && atScrollEnd(lastScrollTop, end);
+    }
     scheduleBubblePositions();
   };
   void nextTick(() => {
@@ -810,9 +859,9 @@ function preservePosition(previousInset: number, firstId?: string) {
     if (adjustment.id && adjustment.prefix !== undefined) {
       const anchored = anchoredDelta(adjustment.top);
       if (anchored !== null) { apply(anchored); return; }
-      measurePrefix(adjustment.id, prefix => {
+      measurePrefix(adjustment.id, (prefix, scroll) => {
         if (!current()) return;
-        if (prefix !== null && Number.isFinite(prefix)) apply(prefix - adjustment.prefix!);
+        if (prefix !== null && Number.isFinite(prefix)) apply(prefix - adjustment.prefix!, scroll?.end);
         else settlePosition();
       });
     } else if (adjustment.tail && followingTail) { settlePosition(true); scrollToEnd(); }
@@ -827,7 +876,11 @@ watch(
     if (reveal !== previous[2]) { if (!resumeNativePreviewReading()) scrollToEnd(); return; }
     if (inset !== previous[4]) historyPreparation++;
     const change = conversationScrollChange(previous[0], ids);
-    if (change === 'prepend' || pendingPosition || inset !== previous[4])
+    // Receipt catch-up can return older rows together with a new incoming message.
+    const caughtUpToNewTail = change === 'prepend' && !preparedHistory
+      && ids[ids.length - 1] !== previous[0][previous[0].length - 1];
+    if (caughtUpToNewTail && followingTail && !pendingPosition && atObservedScrollEnd()) scrollToEnd();
+    else if (change === 'prepend' || pendingPosition || inset !== previous[4])
       preservePosition(previous[4], change === 'prepend' ? previous[0][0] : undefined);
     else if ((change === 'append' || (typing && !previous[1])) && followingTail) scrollToEnd();
   },
@@ -945,7 +998,7 @@ onScopeDispose(() => composerResizeObserver?.disconnect());
 watch(() => [inputHeight.value, showInputLength.value, inputOverLimit.value, composerVisible.value,
   props.attachRetry, props.imageLabels?.retryPolicy, props.inputLimitHint, props.timeLocale], () => {
   const node = scroller();
-  const atTail = node ? node.scrollHeight - node.clientHeight - node.scrollTop <= 24 : followingTail;
+  const atTail = followingTail && (!node || node.scrollHeight - node.clientHeight - node.scrollTop <= 24);
   // Native fallback is ready immediately; layout measurement replaces it with
   // the exact input, counter and safe-area height once the bridge responds.
   composerSpace.value = inputHeight.value + 62 + (showInputLength.value ? 36 : 0) + (inputOverLimit.value ? 36 : 0) + (props.attachRetry ? 44 : 0);

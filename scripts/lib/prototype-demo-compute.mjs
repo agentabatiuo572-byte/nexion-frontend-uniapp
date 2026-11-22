@@ -7,6 +7,7 @@ import { demoBatchPage, demoReceiptPage, demoSimulatedReceiptFields, demoSimulat
 
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
 const cycleMs = 60000;
+const isShareDevice = type => ['SHARE','CLOUD_SHARE'].includes(type);
 const maxBatchItems = 200;
 export function demoComputeFacts(state,now,fleetDevices) {
   const mode=state.computeState,simulated=mode==='cycles',pending=['pending','blocked'].includes(mode);
@@ -20,7 +21,7 @@ export function demoComputeFacts(state,now,fleetDevices) {
   const describe=(snapshot,startedAt,postedAt,taskNo,receiptNo,batchNo,deliveryCycle)=>({
     deviceId:snapshot.device.id,taskNo,receiptNo,taskClass:'IG',amount:Number(snapshot.amount),nex:0,startedAt,
     completedAt:startedAt+cycleMs,postedAt,batchNo,deliveryCycle,client:'UVEL',
-    model:snapshot.device.deviceType==='CLOUD'?'Cloud reward':'SDXL',
+    model:isShareDevice(snapshot.device.deviceType)?'Cloud reward':'SDXL',
   });
 
   for(const device of fleet){
@@ -30,7 +31,7 @@ export function demoComputeFacts(state,now,fleetDevices) {
       snapshots[device.id]={device:structuredClone(device),deliveryCycle,startedAt,
         completedStartedAt:deliveryCycle?startedAt:anchor-600000,
         amount:device.monthlyTargetActive?(device.dailyUsdt*60/86400).toFixed(6)
-          :({CLOUD:'0.000032',PHONE:'0.100000',MOBILE:'0.200000'}[device.deviceType]??'0.023456')};
+          :isShareDevice(device.deviceType)?'0.000032':({PHONE:'0.100000',MOBILE:'0.200000'}[device.deviceType]??'0.023456')};
     }
     if(device.activatedAt===null)continue;
     const snapshot=snapshots[device.id];
@@ -105,7 +106,7 @@ export function computeDemo(url, state, request, now, facts) {
         settlementStatus:'POSTED',settlementBatchNo:null,settledAt:posted.postedAt,configVersion:posted.configVersion,
         proofNonce:null,proofExpiresAt:null,pausedAt:null,pausedSeconds:0};
     }
-    const type=deviceType(deviceId),cloud=type==='CLOUD';
+    const type=deviceType(deviceId),cloud=isShareDevice(type);
     const taskName=['PHONE','MOBILE'].includes(type)?type+' task cycle':cloud?'Cloud Share reward cycle':'Image generation cycle';
     const snapshot=snapshots[deviceId],history=status==='COMPLETED';
     const start=posted?.startedAt??(history?snapshot.completedStartedAt:snapshot.startedAt);
@@ -156,7 +157,7 @@ export function computeDemo(url, state, request, now, facts) {
   const receipts = postedTasks.map(posted => {
     const {deviceId}=posted;
     const done=task(deviceId,'COMPLETED',posted);
-    return { ...done, receiptNo:posted.receiptNo, deviceInstanceNo: instance(deviceId), deviceName: deviceName(deviceId), deviceType: deviceType(deviceId), deviceGpu: byId.get(deviceId).gpuModel, vramTotalGb: byId.get(deviceId).vramTotalGb,
+    return { ...done, receiptNo:posted.receiptNo, deviceInstanceNo: instance(deviceId), deviceName: deviceName(deviceId), deviceType: deviceType(deviceId), deviceGpu: byId.get(deviceId).gpuModel, vramTotalGb: isShareDevice(deviceType(deviceId)) ? null : byId.get(deviceId).vramTotalGb,
       rewardNex: 0, earningStatus: 'POSTED', proofHash: simulated ? null : 'a'.repeat(64),
       durationSec: posted.durationSec??60,...(posted.simulation&&demoSimulatedReceiptFields(posted)) };
   });

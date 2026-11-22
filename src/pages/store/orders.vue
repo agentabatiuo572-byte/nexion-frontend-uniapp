@@ -34,7 +34,7 @@
           v-for="o in filteredOrders"
           :key="o.id"
           class="order-card"
-          :class="{ 'order-card--pending nx-tint': o.kind === 'commerce' && o.status === 'placed' }"
+          :class="{ 'order-card--pending': o.kind === 'commerce' && o.status === 'placed', 'nx-tint': o.id === tintedPendingId }"
           :role="o.kind === 'genesis' ? undefined : 'button'"
           :tabindex="o.kind === 'genesis' ? undefined : 0"
           :aria-label="o.kind === 'genesis' ? undefined : orderCardLabel(o)"
@@ -174,6 +174,8 @@ function orderCategory(order: OrderListItem): Exclude<OrderFilter, "all"> {
 }
 const filteredOrders = computed(() => statusFilter.value === "all" ? orderList.value : orderList.value.filter(order => orderCategory(order) === statusFilter.value));
 const pendingCount = computed(() => orderList.value.filter(order => orderCategory(order) === "pending").length);
+// One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
+const tintedPendingId = computed(() => filteredOrders.value.find(order => order.kind === "commerce" && order.status === "placed")?.id);
 // Minutes left on an unpaid order's server deadline; null once it lapses or when unknown.
 const nowSeconds = useNow();
 function pendingCloseMinutes(order: OrderListItem): number | null {
@@ -456,12 +458,13 @@ const browseBtnStyle: CSSProperties = {
 .orders-filter__badge { min-width: 18px; height: 18px; box-sizing: border-box; margin-left: 1px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); font: 600 11px/18px var(--font-v5); }
 /* Order cards (DS-28): solid surface, machine art as the anchor; the pending card adds one faint warning glow. */
 .orders-list { display: flex; flex-direction: column; gap: var(--ui-space-card-gap); margin: 0 16px; }
-.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); cursor: pointer; }
+.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); }
+/* Only what opens a page shows a pointer: the whole commerce card, or the Genesis card's main row. */
+.order-card[role="button"], .order-card__row[role="button"] { cursor: pointer; }
 .order-card:not(.nx-tint) { background: var(--v5-content-surface); }
 [data-theme="light"] .order-card:not(.nx-tint) { box-shadow: var(--v5-glass-shadow); }
-/* Awaiting payment: tinted warning (it used to be a corner glow). */
-.order-card--pending { --nx-tint: var(--v5-warning); }
-.order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+/* Awaiting payment: tinted warning on the first such card only (it used to be a corner glow). */
+.order-card--pending { --nx-tint: var(--v5-warning); }.order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .order-card__row { display: flex; gap: 14px; }
 /* The machine is the card's main visual, with no box around it. The art keeps clear margin around the machine and its disc
    (machines span 31–83% of the art's height, racks up to 91% of its width), so a 104px art fills the 96px slot and sits 7px
@@ -484,7 +487,7 @@ const browseBtnStyle: CSSProperties = {
 .order-card__code-value { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 /* Genesis: the order-number row sits under the tappable row, aligned with the text column; its copy button has a 44px target and does not open the card. */
 .order-card__code--copy { align-items: center; min-height: 44px; margin: 4px 0 -10px; padding-left: 110px; cursor: default; }
-.order-card__code--copy :deep(.copy-code-button) { width: 44px; height: 44px; margin: 0 -10px 0 0; }
+.order-card__code--copy :deep(.copy-code-button) { width: 44px; height: 44px; margin: 0 -10px 0 auto; }
 .order-card__row[role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
 /* Narrow screens: the amount drops to its own right-aligned line instead of clipping. */
 .order-card__bottom { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: auto; }

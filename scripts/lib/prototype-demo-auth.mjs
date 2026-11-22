@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { accountDemo } from './prototype-demo-account.mjs';
+import { clearPreviewAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
 
 export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',registrationState:'normal',phoneBindingState:'normal',savedAttemptState:'none'};
 export const authDemoOptions = {
@@ -37,7 +38,7 @@ export function createAuthDemo(state) {
   const receipt=code=>({sponsorCode:code?.startsWith('NX')?code:null,sponsorDisplayName:code?.startsWith('NX')?'M•••':null,sourceEnvironment:'PRODUCTION',giftStatus:'PENDING_REVIEW',giftUsdt:5,giftNex:20});
   function session(user,registrationReceipt) {
     state.authState='signed-in';state.authUser=user;
-    return ok({accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user,...(registrationReceipt?{registrationReceipt}:{})});
+    return ok({accessToken:issuePreviewAccessToken(state,user.userId),refreshToken:null,tokenType:'Bearer',user,...(registrationReceipt?{registrationReceipt}:{})});
   }
   return {
     trace,
@@ -51,11 +52,10 @@ export function createAuthDemo(state) {
       const user=registration?{...existing,userId:900002,phone:'13800000001',onboardingComplete:false}:existing;
       if(registration)Object.assign(attempt,{authMethod:'REGISTRATION',authReference:user.countryCode+':'+user.phone,
         context:{countryCode:user.countryCode,phone:user.phone,language:'en',sponsorCode:null,challengeNo:'REG-'+randomBytes(16).toString('hex')}});
-      attempts.set(attempt.loginAttemptId,{...attempt,response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',
-        user,...(registration?{registrationReceipt:receipt(null)}:{})}});
+      attempts.set(attempt.loginAttemptId,{...attempt,response:{user,...(registration?{registrationReceipt:receipt(null)}:{})}});
       return attempt;
     },
-    reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();delete state.authUser;delete state.captchaInvalidReturned;},
+    reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();delete state.authUser;clearPreviewAccessToken(state);delete state.captchaInvalidReturned;},
     // Only the paths modelled below; any other /auth/users/* request (e.g. the linked-provider read) falls
     // through to the App fixture instead of being answered AUTH_PREVIEW_NOT_MODELLED.
     handles(path){return MODELLED_AUTH.test(path)||path.startsWith('/api/auth/captcha/')||['/api/app/security/phone/challenge','/api/app/security/phone','/api/app/security/two-factor/challenge','/api/app/security/two-factor'].includes(path);},
@@ -64,8 +64,13 @@ export function createAuthDemo(state) {
       if(method==='POST'&&path!=='/auth/users/refresh') {
         trace.push({path,installationId:headers['x-nexgrid-installation-id']??'',clientSurface:headers['x-nexgrid-client-surface']??'',executionSupported:headers['x-nexgrid-execution-supported']??'',refreshMode:headers['x-nexion-refresh-mode']??'',captchaTicketPresent:!!body.captchaTicket,sponsorCode:body.sponsorCode??null,attemptId:headers['x-nexgrid-login-attempt-id']??null});
       }
-      if(path==='/auth/users/refresh')return state.authState==='signed-in'?session(state.authUser??existing):fail(401,'USER_REFRESH_TOKEN_REQUIRED');
-      if(['/auth/users/logout','/auth/users/session/discard'].includes(path)){state.authState='signed-out';delete state.authUser;return ok(null);}
+      if(path==='/auth/users/refresh')
+        return state.authState==='signed-in'&&(!headers.authorization||previewAccountId(state,headers))
+          ? session(state.authUser??existing) : fail(401,'USER_REFRESH_TOKEN_REQUIRED');
+      if(['/auth/users/logout','/auth/users/session/discard'].includes(path)){
+        if(headers.authorization&&!previewAccountId(state,headers))return fail(401,'AUTH_REQUIRED');
+        state.authState='signed-out';delete state.authUser;clearPreviewAccessToken(state);return ok(null);
+      }
       if(/^\/auth\/users\/login\/attempts\/[^/]+\/recover$/.test(path)) {
         const attempt=attempts.get(path.split('/').at(-2));
         if(!attempt)return fail(401,'LOGIN_ATTEMPT_RECOVERY_INVALID');
@@ -76,8 +81,7 @@ export function createAuthDemo(state) {
           ||attempt.executionSupported!==body.executionSupported||String(attempt.executionSupported)!==headers['x-nexgrid-execution-supported']
           ||attempt.authMethod!==body.authMethod||attempt.authReference!==body.authReference)return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
         if(attempt.waitForReplay&&!attempt.replayed)return fail(503,'PREVIEW_RECOVERY_UNAVAILABLE');
-        state.authState='signed-in';state.authUser=attempt.response.user;
-        return ok(attempt.response);
+        return session(attempt.response.user,attempt.response.registrationReceipt);
       }
       if(path==='/api/app/security/two-factor/challenge') {
         if(!state.authUser?.phone)return fail(422,'USER_PHONE_REQUIRED');
@@ -143,7 +147,7 @@ export function createAuthDemo(state) {
           if(state.oauthState==='lost-issued')attempts.set(headers['x-nexgrid-login-attempt-id'],{
             recoveryProof:headers['x-nexgrid-login-recovery-key'],installationId:headers['x-nexgrid-installation-id'],
             executionSupported:false,authMethod:'OAUTH',authReference:flow.provider+':'+flow.flowId,waitForReplay:true,
-            response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:existing}});
+            response:{user:existing}});
           // A gateway failure is deterministic here; a destroyed socket may be
           // transparently retried by Chromium before the UI observes the loss.
           return fail(504,'PREVIEW_COMPLETE_RESPONSE_LOST');

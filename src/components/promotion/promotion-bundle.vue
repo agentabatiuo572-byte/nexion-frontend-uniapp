@@ -5,7 +5,6 @@
       <text v-if="!scopeId||activity" class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
       <text v-if="scopeId&&(contextStatus==='loading'||contextStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
       <text v-if="scopeId && !activity && contextStatus === 'error'" class="promotion-copy">—</text>
-      <text v-if="scopeId&&activity&&contextStatus==='ready'&&!available" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
     </view>
     <view v-if="singleActivityProduct" class="promotion-flat" data-testid="single-activity-guidance"><text class="promotion-copy">{{ commerceCopy(locale.code).singleActivity }}</text><view class="promotion-action primary" role="button" tabindex="0" @click="openSingleProduct" @keydown.enter.prevent="openSingleProduct" @keydown.space.prevent="openSingleProduct"><text>{{ commerceCopy(locale.code).singlePurchase }}</text></view></view>
     <template v-else-if="!scopeId||activity">
@@ -25,7 +24,7 @@
               <view role="button" :aria-label="t.uiChrome.increaseQty" :tabindex="totalUnits>=100?-1:0" :aria-disabled="totalUnits>=100" @click="changeQuantity(item.productNo,1)"><NxIcon name="plus" /></view>
             </view>
           </view>
-          <view class="bundle-remove" role="button" tabindex="0" :aria-label="t.promotion.removeSelection+' · '+nameFor(item.productNo)" @click="remove(item.productNo)">×</view>
+          <view class="bundle-remove" role="button" tabindex="0" :aria-label="t.promotion.removeSelection+' · '+nameFor(item.productNo)" @click="remove(item.productNo)"><NxIcon name="close" :size="20" /></view>
         </view>
       </view>
     </view>
@@ -40,38 +39,38 @@
     </view>
     <view class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.expected }}</text>
-      <text v-if="quoteStatus==='loading'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-      <text v-else-if="quoteStatus==='error'" class="promotion-copy" role="alert">{{ t.promotion.errorNote }}</text>
-      <text v-else-if="!quote" class="promotion-copy">{{ t.promotion.awaitingQuote }}</text>
       <template v-if="quote">
         <RewardRows :expected="quote.expectedRewards" :lines="quote.items" />
         <text v-for="(warning,index) in quote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text>
-        <text v-if="quote.eligibility!=='ELIGIBLE'" class="promotion-notice">{{ t.promotion.disabledNote }}</text>
-        <view class="promotion-summary"><text>{{ t.promotion.subtotal }}</text><text>{{ formatAmount(quote.subtotalUsdt) }} USDT</text></view>
-        <view class="promotion-summary"><text>{{ t.promotion.discount }}</text><text>{{ formatAmount(quote.discountUsdt) }} USDT</text></view>
-        <view class="promotion-summary total"><text>{{ t.promotion.total }}</text><text>{{ formatAmount(quote.amountUsdt) }} USDT</text></view>
+        <view class="promotion-summary"><text>{{ t.promotion.subtotal }}</text><CheckoutAmount :value="quote.subtotalUsdt" currency="USD" /></view>
+        <view class="promotion-summary"><text>{{ t.promotion.discount }}</text><text class="bundle-discount">{{ formatCheckoutReviewAmount(quote.discountUsdt,'USD',{discount:true,unit:true}) }}</text></view>
+        <view class="promotion-summary total"><text>{{ t.promotion.total }}</text><CheckoutAmount :value="quote.amountUsdt" currency="USD" /></view>
       </template>
       <text class="promotion-copy">{{ t.promotion.rewardNote }}</text>
     </view>
-    <view v-if="activity" class="promotion-link" role="button" tabindex="0" @click="termsOpen=true"><text>{{ t.promotion.rulesLink }}</text></view>
-    <view v-if="!signedIn" class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ t.promotion.signIn }}</text></view>
-    <view v-else class="promotion-action" role="button" :tabindex="canQuote?0:-1" :aria-disabled="!canQuote" @click="refreshQuote"><text>{{ t.promotion.quote }}</text></view>
-    <text v-if="selection.length<2" class="promotion-copy">{{ t.promotion.selectTwo }}</text>
-    <view class="promotion-action primary" role="button" :tabindex="canContinue?0:-1" :aria-disabled="!canContinue" @click="continueCheckout"><text>{{ t.promotion.continue }}</text></view>
-    <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionStoreHref(scopeId))"><text>{{ t.promotion.buyMore }}</text></view>
+    <view v-if="activity" class="promotion-link bundle-link" role="button" tabindex="0" @click="termsOpen=true" @keydown.enter.prevent="termsOpen=true" @keydown.space.prevent="termsOpen=true"><text class="nx-after-chevron">{{ t.promotion.rulesLink }}</text></view>
+    <view class="promotion-link bundle-link" role="button" tabindex="0" @click="navTo(promotionStoreHref(scopeId))" @keydown.enter.prevent="navTo(promotionStoreHref(scopeId))" @keydown.space.prevent="navTo(promotionStoreHref(scopeId))"><text class="nx-after-chevron">{{ t.promotion.buyMore }}</text></view>
     <PromotionTerms :open="termsOpen" :title="localized(activity?.title,locale.code)" :terms="ruleTerms" :disclosures="promotionDisclosures(activity)" @close="termsOpen=false" />
     </template>
-    <view v-if="scopeId" class="promotion-link" role="button" tabindex="0" @click="clearScope"><text>{{ activity?t.promotion.ordinary:t.promotion.allProducts }}</text></view>
+    <view v-if="scopeId" class="promotion-link bundle-link" role="button" tabindex="0" @click="clearScope" @keydown.enter.prevent="clearScope" @keydown.space.prevent="clearScope"><text class="nx-after-chevron">{{ activity?t.promotion.ordinary:t.promotion.allProducts }}</text></view>
+    <!-- Keeps the last link clear of the page's bottom action tray (04 §4.0): an invisible copy of the tray's rows. -->
+    <view v-if="footer" class="bundle-bar-space" aria-hidden="true">
+      <text v-if="footer.note" class="bundle-bar-space__note">{{ footer.note }}</text>
+      <template v-if="footer.signedIn"><text class="bundle-bar-space__text">{{ t.promotion.quote }}</text><text class="bundle-bar-space__cta">{{ footer.continueLabel }}</text></template>
+      <text v-else class="bundle-bar-space__cta">{{ t.promotion.signIn }}</text>
+    </view>
   </view>
 </template>
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
+import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
+import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount } from "@/lib/amount-display";
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
 import { commerceCopy } from '@/lib/commerce-review';
 import { promotionApi,sessionVault } from '@/api/runtime';
+import { checkoutQuoteBlock,type CheckoutQuoteBlock } from '@/api/promotion-api';
 import type { Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
 import { useApp } from '@/store/app';
@@ -83,7 +82,7 @@ import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { catalogProductImageUrl } from '@/lib/product-image';
 import { productTaskLevelsText } from '@/lib/product-copy';
-import { localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
+import { checkoutQuoteBlockCopy,localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
 import { createPromotionReadFence,isEntryQuoteFresh,restoreEntrySelection,promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionDisclosures,promotionStoreHref,validEntryItems,type EntryItem,type EntrySelectionDraft } from '@/lib/promotion-entry';
@@ -95,7 +94,9 @@ const app=useApp(),locale=useLocaleStore(),t=useT(),phase=useProductPhase();
 const scopeId=ref(props.activityId),selection=ref<EntryItem[]>([]),termsOpen=ref(false);
 const {activity,status:contextStatus,available,refresh:refreshContext}=usePromotionContext(scopeId);
 const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'>('idle');
-const fence=createPromotionReadFence();let visible=true;
+const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
+const capacityRecheckPending=ref(false);
+const fence=createPromotionReadFence();const visible=ref(true);
 const clockNow=()=>typeof performance!=='undefined'?performance.now():Date.now();
 let quoteReceivedAt=0;let expiryTimer:ReturnType<typeof setInterval>|null=null;
 const storageKey='growth-promotion-selection:'+props.activityId;
@@ -128,33 +129,81 @@ const singleActivityProduct=computed(()=>{if(!scopeId.value||!available.value||c
 function openSingleProduct(){if(singleActivityProduct.value)void navTo(promotionDetailHref(singleActivityProduct.value.id,scopeId.value));}
 const suggestions=computed(()=>catalog.value.filter(product=>!selection.value.some(item=>item.productNo===product.id)&&product.productType!=='SHARE'&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(product.id))));
 const productsReady=computed(()=>catalogStatus.value==='ready'&&selection.value.every(item=>{const product=productFor(item.productNo);return product&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(item.productNo));}));
-const canQuote=computed(()=>signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value)&&quoteStatus.value!=='loading');
+const canReadQuote=computed(()=>visible.value&&signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
+const canQuote=computed(()=>canReadQuote.value&&quoteStatus.value!=='loading'&&!quoteBlock.value);
 const canContinue=computed(()=>canQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE');
-function invalidate(){fence.invalidate();quote.value=null;quoteStatus.value='idle';}
+const canOpenDevices=computed(()=>visible.value&&signedIn.value&&quoteBlock.value==='capacity');
+useAutoRecovery({
+  active:()=>visible.value,
+  failed:()=>quoteBlock.value==='unavailable'&&canReadQuote.value,
+  retry:refreshQuote,
+  repeatMs:30_000,
+  quiet:false,
+});
+function invalidate(preserveBlock=false){
+  fence.invalidate();
+  quote.value=null;
+  quoteStatus.value='idle';
+  if(!preserveBlock){quoteBlock.value=null;capacityRecheckPending.value=false;}
+}
 watch(selection,()=>{invalidate();writeAccountRow(storageKey,app.accountKey,{items:selection.value,entryItems:props.initialItems});},{deep:true,flush:'sync'});
-watch([scopeId,()=>activity.value?.version,()=>locale.code],()=>{invalidate();termsOpen.value=false;},{flush:'sync'});
+watch([()=>activity.value?.version,()=>locale.code],()=>{invalidate(true);termsOpen.value=false;},{flush:'sync'});
 watch([()=>app.accountKey,()=>app.accountBindingEpoch],()=>{invalidate();termsOpen.value=false;restore();});
 function add(productNo:string){if(selection.value.length>=8||totalUnits.value>=100||!suggestions.value.some(product=>product.id===productNo))return;selection.value=[...selection.value,{productNo,quantity:1}];}
 function remove(productNo:string){selection.value=selection.value.filter(item=>item.productNo!==productNo);}
 function changeQuantity(productNo:string,delta:number){const item=selection.value.find(entry=>entry.productNo===productNo);if(!item||item.quantity+delta<1||totalUnits.value+delta>100)return;selection.value=selection.value.map(entry=>entry.productNo===productNo?{...entry,quantity:entry.quantity+delta}:entry);}
 function clearScope(){invalidate();void navTo(promotionStoreHref());}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(promotionBundleHref(scopeId.value,selection.value)));}
-async function refreshQuote(){
-  if(!canQuote.value)return;
+async function refreshQuote(recheckCapacity=false){
+  const block=quoteBlock.value;
+  if(block&&block!=='unavailable'&&!(recheckCapacity&&block==='capacity'))return;
+  if(!canReadQuote.value||quoteStatus.value==='loading')return;
   const ticket=fence.next(),identity=`${app.accountKey}:${app.accountBindingEpoch}`,chosen=selection.value.map(item=>({...item}));
   quote.value=null;quoteStatus.value='loading';
   try{
     const result=await promotionApi.quote(chosen,scopeId.value||null);
-    if(!visible||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
-    quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
-  }catch{if(visible&&fence.current(ticket))quoteStatus.value='error';}
+    if(!visible.value||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
+    quoteBlock.value=null;quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
+  }catch(cause){
+    if(!visible.value||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
+    quoteBlock.value=checkoutQuoteBlock(cause);
+    quoteStatus.value=quoteBlock.value?'idle':'error';
+  }
 }
+// The page renders these states and actions in its existing tray.
+const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
+  note:scopeId.value&&contextStatus.value==='ready'&&!available.value?localized(activity.value?.eligibilityMessage,locale.code)||t.value.promotion.disabled
+    :checkoutQuoteBlockCopy(quoteBlock.value,t.value)||(quoteStatus.value==='loading'?t.value.promotion.loading
+      :quoteStatus.value==='error'?t.value.promotion.errorNote
+      :selection.value.length<2?t.value.promotion.selectTwo
+      :quote.value&&quote.value.eligibility!=='ELIGIBLE'?t.value.promotion.disabledNote
+      :signedIn.value&&!quote.value&&quoteStatus.value==='idle'?t.value.promotion.awaitingQuote:''),
+  signedIn:signedIn.value,canQuote:canQuote.value,canContinue:canOpenDevices.value||canContinue.value,
+  continueLabel:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.promotion.continue,
+  quote:requestQuote,continue:continueCheckout,signIn,
+});
+defineExpose({footer});
+function requestQuote(){if(canQuote.value)void refreshQuote();}
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
-function continueCheckout(){if(!freshQuote()){invalidate();return;}if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));}
+function continueCheckout(){
+  if(canOpenDevices.value){void navTo('/pages/me/devices');return;}
+  if(!quote.value)return;
+  if(!freshQuote()){invalidate();return;}
+  if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
+}
 onMounted(()=>{expiryTimer=setInterval(()=>{if(quote.value&&!freshQuote())invalidate();},1000);});
-onHide(()=>{visible=false;invalidate();termsOpen.value=false;});
-onShow(()=>{visible=true;invalidate();});
-onBeforeUnmount(()=>{visible=false;fence.invalidate();if(expiryTimer)clearInterval(expiryTimer);});
+onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;});
+onShow(()=>{
+  const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
+  visible.value=true;invalidate(true);
+  if(recheckCapacity)capacityRecheckPending.value=true;
+});
+watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQuote.value,ready=>{
+  if(!ready)return;
+  capacityRecheckPending.value=false;
+  void refreshQuote(true);
+},{flush:'post'});
+onBeforeUnmount(()=>{visible.value=false;fence.invalidate();if(expiryTimer)clearInterval(expiryTimer);});
 </script>
 <style src="./promotion.css"></style>
 <style scoped>
@@ -168,4 +217,15 @@ onBeforeUnmount(()=>{visible=false;fence.invalidate();if(expiryTimer)clearInterv
 .promotion-action { position:relative;isolation:isolate;overflow:hidden; }
 .promotion-action text { position:relative;z-index:1; }
 @media(max-width:340px){.promotion-image{width:52px;height:52px}.promotion-row{gap:9px}}
+/* Entries to the next layer are text links: 13/18, 500, secondary ink with a trailing chevron (03 §3.1, §3.9). */
+/* Same discount format as the checkout summary that follows: minus sign, brand, tabular figures. */
+.bundle-discount { color:var(--v5-brand); font-variant-numeric:tabular-nums; }
+.bundle-link { align-self:flex-start; color:var(--v5-ink-3); font:500 13px/18px var(--font-v5); }
+/* Same rows and widths as the tray (12px page sides vs 16 here); the page already ends 20 (gap) + 28 + 40 below the
+   last link, so this adds the rest of tray + 22 + 16 (04 §4.0). */
+.bundle-bar-space { visibility:hidden; display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 -4px -50px; padding:8px; }
+.bundle-bar-space__note { flex:1 1 100%; padding:4px 12px 0; font:var(--ui-type-meta-weight,400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:break-word; text-wrap:pretty; }
+.bundle-bar-space__text,.bundle-bar-space__cta { flex:1 1 auto; box-sizing:border-box; min-height:48px; padding:14px 20px; font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space:nowrap; }
+.bundle-bar-space__text { padding-inline:12px; }
+.bundle-bar-space__cta { padding-right:46px; } /* 20 + the 6 gap and 20 arrow the real button always carries */
 </style>

@@ -58,16 +58,20 @@ export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
 
 export const ACCOUNT_DELETION_REASON_MAX_LENGTH = 255;
 export type AccountDeletionReasonValidation =
-  | { ok: true }
-  | { ok: false; code: "ACCOUNT_DELETION_REASON_INVALID" };
+  | { ok: true; length: number }
+  | { ok: false; length: number; code: "ACCOUNT_DELETION_REASON_INVALID" };
 
-export function validateAccountDeletionReason(reason: string): AccountDeletionReasonValidation {
+export function normalizeAccountDeletionReason(reason: string): string {
   // Match Java StringUtils.hasText and String.trim, which use different whitespace sets.
   const hasText = /[^\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]/.test(reason);
-  const trimmed = hasText ? reason.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "") : "";
-  return trimmed.length <= ACCOUNT_DELETION_REASON_MAX_LENGTH
-    ? { ok: true }
-    : { ok: false, code: "ACCOUNT_DELETION_REASON_INVALID" };
+  return hasText ? reason.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "") : "";
+}
+
+export function validateAccountDeletionReason(reason: string): AccountDeletionReasonValidation {
+  const length = normalizeAccountDeletionReason(reason).length;
+  return length <= ACCOUNT_DELETION_REASON_MAX_LENGTH
+    ? { ok: true, length }
+    : { ok: false, length, code: "ACCOUNT_DELETION_REASON_INVALID" };
 }
 
 let idempotencySequence = 0;

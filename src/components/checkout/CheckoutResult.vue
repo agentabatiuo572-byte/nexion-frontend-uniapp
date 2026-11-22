@@ -43,7 +43,7 @@ import { useT } from '@/i18n/use-t';
 import { purchasePaymentCopy } from '@/lib/purchase-payment-copy';
 import CheckoutAmount from './CheckoutAmount.vue';
 // 'failed' is a server-confirmed provisioning failure (order PAID + PROVISIONING_FAILED); 'error' is only a read-back that has not succeeded yet.
-const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
+const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number | null; currency?: 'USD' | 'USDT'; error?: string }>();
 const emit = defineEmits<{ (event: 'devices'): void; (event: 'support'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));

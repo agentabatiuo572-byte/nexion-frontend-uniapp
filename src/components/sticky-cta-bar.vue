@@ -14,6 +14,7 @@
 <template>
   <view v-if="cta" class="scb-outer" :style="outerStyle">
     <view class="scb-bar nx-glass-bar">
+      <text v-if="cta.note" class="scb-note nx-tray-note" role="status">{{ cta.note }}</text>
       <view class="scb-info nx-tray-copy">
         <!-- Eyebrow — explicitly labels the number as PRICE so it isn't
              confused with yield/earnings shown elsewhere on the page. -->
@@ -97,6 +98,9 @@ function onTap() {
   align-items: center;
   flex-wrap: wrap;
 }
+.scb-note {
+  flex: 1 1 100%;
+}
 .scb-info {
   flex: 1 1 auto;
   min-width: 0;
@@ -120,7 +124,7 @@ function onTap() {
   color: var(--v5-ink-3);
 }
 .scb-price-num {
-  font: 600 26px/32px var(--font-amount);
+  font: 500 26px/32px var(--font-amount);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
@@ -147,7 +151,7 @@ function onTap() {
   stroke: currentColor;
 }
 .scb-cta-t {
-  font: 500 15px/20px var(--font-v5);
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
   color: var(--v5-on-brand);
   white-space: normal;
 }

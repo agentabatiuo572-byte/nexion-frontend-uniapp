@@ -10,6 +10,15 @@ export type CheckoutTradeinRecovery = Pointer & { tradeinQuote: CanonicalTradein
 type Row = { orders: Record<string, Pointer> };
 const terminal = new Set(["activated", "inventory", "cancelled", "expired", "refunded", "chargeback"]);
 
+/** A current local pointer can select the original B60 query, never prove the order exists. */
+export function readCheckoutOrderPointer(accountKey: string, productNo: string): Pick<Pointer, "orderNo" | "commandKey"> | null {
+  const pointer = readAccountRow<Row>(KEY, accountKey, true)?.orders?.[productNo];
+  if (!pointer || pointer.productNo !== productNo || pointer.tradeinQuote
+      || typeof pointer.orderNo !== "string" || !pointer.orderNo.trim()
+      || typeof pointer.commandKey !== "string" || !pointer.commandKey.trim()) return null;
+  return { orderNo: pointer.orderNo, commandKey: pointer.commandKey };
+}
+
 export function rememberCheckoutOrder(accountKey: string, pointer: Pointer): void {
   const row = readAccountRow<Row>(KEY, accountKey, true);
   if (row?.orders?.[pointer.productNo]?.tradeinQuote
@@ -25,22 +34,39 @@ export function rememberCheckoutOrder(accountKey: string, pointer: Pointer): voi
 export function forgetCheckoutOrder(accountKey: string, productNo: string, orderNo: string): void {
   const row = readAccountRow<Row>(KEY, accountKey);
   if (row?.orders?.[productNo]?.orderNo !== orderNo) return;
+  // A failed cleanup only retains the safe read-only recovery route.
+  removeCheckoutPointer(accountKey, row, productNo);
+}
+
+function removeCheckoutPointer(accountKey: string, row: Row, productNo: string): boolean {
   const orders = { ...row.orders };
   delete orders[productNo];
-  // A failed cleanup only retains the safe read-only recovery route.
-  writeAccountRow(KEY, accountKey, { orders });
+  return writeAccountRow(KEY, accountKey, { orders });
 }
 
 /** Pending RETIRE requests survive refresh with their original source version and key. */
 export function readCheckoutTradein(accountKey: string, productNo: string): CheckoutTradeinRecovery | null {
-  const pointer = readAccountRow<Row>(KEY, accountKey, true)?.orders?.[productNo];
+  // #ifdef H5
+  // uni.getStorageSync returns an empty string on browser storage errors.
+  // Check access before treating an empty trade-in lookup as no original record.
+  if (typeof window !== "undefined") {
+    try { window.localStorage.getItem(KEY); }
+    catch { throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE"); }
+  }
+  // #endif
+  const row = readAccountRow<Row>(KEY, accountKey, true);
+  if (!row) return null;
+  const pointer = row.orders?.[productNo];
   if (!pointer?.tradeinQuote) return null;
   const quote = pointer.tradeinQuote;
   if (pointer.productNo !== productNo || quote.targetProductNo !== productNo
       || (pointer.tradeinCommandSubmitted !== undefined && typeof pointer.tradeinCommandSubmitted !== 'boolean')
-      || !pointer.commandKey || !pointer.intent || !Number.isSafeInteger(quote.sourceRowVersion)
+      || typeof pointer.commandKey !== "string" || !pointer.commandKey.trim()
+      || typeof pointer.intent !== "string" || !pointer.intent.trim() || !Number.isSafeInteger(quote.sourceRowVersion)
       || quote.sourceRowVersion < 0 || !["ACTIVE", "INACTIVE"].includes(quote.targetDeviceStatus)) {
-    throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+    // The payment API can recover any in-flight order from the next purchase attempt.
+    if (!removeCheckoutPointer(accountKey, row, productNo)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+    return null;
   }
   return pointer as CheckoutTradeinRecovery;
 }
@@ -63,24 +89,26 @@ export function finishCheckoutTradein(accountKey: string, pointer: CheckoutTrade
   if (readCheckoutTradein(accountKey, pointer.productNo)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
 }
 
+type OrderRecoveryResult = "absent" | "handled" | "navigation-failed";
+
 /** Recovery only navigates to the original server order; it never creates or pays. */
 export async function recoverCheckoutOrder(accountKey: string, productNo: string, deps: {
   list: OrderApi["list"]; isCurrent(): boolean; isCurrentAccount(): boolean; navigate(url: string): Promise<boolean>;
-}): Promise<boolean> {
+}): Promise<OrderRecoveryResult> {
   const pointer = readAccountRow<Row>(KEY, accountKey)?.orders?.[productNo];
   if (pointer?.tradeinQuote) {
     if (deps.isCurrent()) await deps.navigate(`/pages/store/checkout?product=${encodeURIComponent(productNo)}`);
-    return true;
+    return "handled";
   }
-  if (!pointer || pointer.productNo !== productNo || typeof pointer.orderNo !== "string" || !pointer.orderNo.trim()) return false;
-  if (!deps.isCurrent()) return true;
+  if (!pointer || pointer.productNo !== productNo || typeof pointer.orderNo !== "string" || !pointer.orderNo.trim()) return "absent";
+  if (!deps.isCurrent()) return "handled";
   let found: CanonicalOrder | undefined;
   try {
     let cursor: string | null = null;
     const visited = new Set<string>();
     do {
       const page: CanonicalOrderList = await deps.list(cursor, 100);
-      if (!deps.isCurrent()) return true;
+      if (!deps.isCurrent()) return "handled";
       found = page.orders.find((order) => order.orderNo === pointer.orderNo);
       if (found) break;
       cursor = page.nextCursor ?? null;
@@ -88,15 +116,16 @@ export async function recoverCheckoutOrder(accountKey: string, productNo: string
       visited.add(cursor);
     } while (cursor);
   } catch { /* The canonical order page offers a read-only retry during outages. */ }
-  if (!deps.isCurrent()) return true;
+  if (!deps.isCurrent()) return "handled";
   const navigated = await deps.navigate(`/pages/store/order-detail?id=${encodeURIComponent(pointer.orderNo)}`);
+  if (!navigated) return "navigation-failed";
   // Successful navigation may already have unloaded checkout. Retire only the
   // same account generation and receipt, never a newer recovery pointer.
   const current = readAccountRow<Row>(KEY, accountKey)?.orders?.[productNo];
-  if (navigated && deps.isCurrentAccount() && found?.productNo === productNo && found.quantity === 1 && terminal.has(found.canonicalStatus)
+  if (deps.isCurrentAccount() && found?.productNo === productNo && found.quantity === 1 && terminal.has(found.canonicalStatus)
       && current?.orderNo === pointer.orderNo && current.commandKey === pointer.commandKey && current.intent === pointer.intent) {
     releaseAccountCommandKey(COMMANDS_KEY, accountKey, pointer.intent, pointer.commandKey);
     forgetCheckoutOrder(accountKey, productNo, pointer.orderNo);
   }
-  return true;
+  return "handled";
 }

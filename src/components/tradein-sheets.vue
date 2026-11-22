@@ -51,6 +51,7 @@
 
     <view class="nx-glass-sheet tis-panel" @click.stop>
       <view class="tis-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="hide"  @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
+        <LiquidGlass :radius="22" tone="control" />
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
@@ -58,8 +59,8 @@
       <template v-if="capacityRecovery || capacityRecoveryUnavailable || keepRecoveryError">
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
-        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
-        <view v-if="capacityResumeAllowed" class="tis-secondary" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-secondary-text">{{ recoveryCopy.resume }}</text></view>
+        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatGroupedAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }}&nbsp;USDT</text>
+        <view v-if="capacityResumeAllowed" class="tis-cta" :class="{ 'tis-cta-disabled': capacityRecoveryBusy }" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'choice'">
@@ -100,10 +101,11 @@
           <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onPickTarget(p.id)"  @keydown.enter.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /></svg>
             <text class="tis-opt-text">{{ p.label }}</text>
+            <!-- Each target opens its confirm step: a list entry, so a trailing chevron (03 §3.1). -->
+            <svg class="tis-opt-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </view>
         </view>
         <text v-if="retireView.statusText" class="tis-disclaimer" role="status" :aria-busy="retireView.loading">{{ retireView.statusText }}</text>
-        <view v-if="retireView.retry" class="tis-secondary" role="button" tabindex="0" @click="retryRemoteRetireTargets" @keydown.enter.prevent="retryRemoteRetireTargets" @keydown.space.prevent="retryRemoteRetireTargets"><text class="tis-secondary-text">{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
@@ -111,16 +113,19 @@
 
       <!-- ─────────── 2. tradein — 置换确认(去结算) ─────────── -->
       <template v-else-if="state.kind === 'tradein' && purchaseRecovery !== 'none'">
-        <view class="tis-head"><text :id="titleId" class="tis-title">{{ t.tradein.recoveryPending }}</text></view>
-        <text v-if="purchaseRecovery === 'error'" class="tis-disclaimer" role="alert">{{ t.tradein.errPleaseRetry }}</text>
-        <view class="tis-cta" :style="ctaHalo" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
+        <view class="tis-head">
+          <text :id="titleId" class="tis-title">{{ purchaseRecovery === 'error' ? t.tradein.retireTitle : t.tradein.recoveryPending }}</text>
+          <!-- The recovery record could not be read yet: it is re-read automatically (03 §3.5.2), so only say so, no button. -->
+          <text v-if="purchaseRecovery === 'error'" class="tis-status" role="status" aria-busy="true">{{ t.tradein.recoveryReading }}</text>
+        </view>
+        <view v-if="purchaseRecovery === 'pending'" class="tis-cta" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && remoteApiEnabled && purchaseMessage === 'error'">
         <view class="tis-head" role="status" :aria-busy="purchaseStatus === 'loading' || purchaseStatus === 'idle'">
           <text :id="titleId" class="tis-title">{{ purchaseStatus === 'loading' || purchaseStatus === 'idle' ? t.store.purchaseEligibilityLoading : t.store.purchaseEligibilityError }}</text>
         </view>
-        <view v-if="purchaseStatus === 'error' || purchaseStatus === 'ready'" class="tis-cta" :style="ctaHalo" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ t.store.purchaseEligibilityRetry }}</text></view>
+        <view v-if="purchaseStatus === 'error' || purchaseStatus === 'ready'" class="nx-card-recovery-action" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text>{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && tradeinView">
@@ -154,15 +159,13 @@
         </view>
 
         <PurchaseEligibilityPanel v-if="remoteApiEnabled" class="tis-purchase" :status="purchaseStatus" :snapshot="purchaseSnapshot" :blocking-only="purchaseBlocked" />
-        <text v-if="purchaseConfirmed && remoteApiEnabled && canonicalQuote && !canonicalQuote.sufficientFunds" class="tis-disclaimer">{{ fmt(t.tradein.purchaseFundsGap, { amount: formatAmount(canonicalQuote.walletShortfallUsdt) }) }}</text>
+        <text v-if="purchaseConfirmed && remoteApiEnabled && canonicalQuote && !canonicalQuote.sufficientFunds" class="tis-disclaimer">{{ fmt(t.tradein.purchaseFundsGap, { amount: formatGroupedAmount(canonicalQuote.walletShortfallUsdt) }) }}</text>
 
-        <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ tradeinView.placementHint }}</text>
-        <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ t.tradein.sheetDisclaimer }}</text>
+        <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ tradeinView.note }}</text>
 
-        <view class="tis-cta" :class="{ 'tis-cta-disabled': purchaseActionDisabled }" :style="ctaHalo" role="button" :tabindex="purchaseActionDisabled ? -1 : 0" :aria-disabled="purchaseActionDisabled" :aria-busy="purchaseActionBusy" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
+        <view class="tis-cta" :class="{ 'tis-cta-disabled': purchaseActionDisabled }" role="button" :tabindex="purchaseActionDisabled ? -1 : 0" :aria-disabled="purchaseActionDisabled" :aria-busy="purchaseActionBusy" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
           <text class="tis-cta-text">{{ purchaseActionText }}</text>
         </view>
-        <view v-if="remoteApiEnabled && purchaseMessage === 'quotaDepleted'" class="tis-ghost" role="button" tabindex="0" @click="refreshTradeinPurchaseEligibility" @keydown.enter.prevent="onKeyboardActivate($event, refreshTradeinPurchaseEligibility)" @keydown.space.prevent="onKeyboardActivate($event, refreshTradeinPurchaseEligibility)"><text class="tis-ghost-text">{{ t.store.purchaseEligibilityRetry }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
@@ -197,7 +200,7 @@
         </view>
         <view
           v-if="!remoteApiEnabled || (state.kind === 'replace' && state.canonicalCapacityQuote?.decision === 'CAPACITY_AVAILABLE')"
-          class="tis-secondary"
+          class="tis-secondary nx-frosted-button"
           :class="{ 'tis-cta-disabled': replaceView.insufficient || confirming }"
           role="button"
           :tabindex="replaceView.insufficient || confirming ? -1 : 0"
@@ -219,7 +222,6 @@
       <template v-else-if="state.kind === 'retire' || state.kind === 'tradein' || state.kind === 'replace'">
         <view class="tis-head">
           <text :id="titleId" class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
-          <text class="tis-subtitle">{{ t.tradein.errPleaseRetry }}</text>
         </view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
@@ -242,7 +244,7 @@
             <text class="tis-cta-text">{{ t.tradein.retireBlockViewTask }}</text>
           </view>
           <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-            <text class="tis-ghost-text">{{ t.tradein.retireBlockOk }}</text>
+            <text class="tis-ghost-text">{{ t.ui.close }}</text>
           </view>
         </template>
         <template v-else>
@@ -266,7 +268,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { reportCheckoutKeepResumeKey, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
 import { useTradeinSheet } from "@/store/tradein-sheet";
@@ -291,6 +293,7 @@ import { apiClient, apiRuntimeConfig, deviceE3Api, orderApi, purchaseEligibility
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import PurchaseEligibilityPanel from "@/components/store/purchase-eligibility-panel.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import type { CanonicalCapacityReplaceQuote, CanonicalTradeinConfig, CanonicalTradeinQuote } from "@/api/device-e3-api";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { isProductAvailable } from "@/store/product-availability";
@@ -387,6 +390,7 @@ const capacityRecoveryBusy = ref(false);
 const capacityReadBusy = ref(false);
 const capacityPageShown = ref(true);
 let capacityRecoveryGeneration = 0;
+let checkoutCapacityRead: { accountKey: string; target: string; at: number } | undefined;
 const capacityResumeKey = ref<string | null>(null);
 const capacityResumeAllowed = computed(() => capacityResumeKey.value !== null && capacityRecovery.value?.key === capacityResumeKey.value);
 const reportCheckoutKeepResume = inject(reportCheckoutKeepResumeKey, null);
@@ -435,10 +439,25 @@ useAutoRecovery({
     && (!!props.checkoutCapacityTarget || (state.value.kind !== 'none'
       && !!(capacityRecovery.value || capacityRecoveryUnavailable.value || keepRecoveryError.value))),
   retry: () => recoverCapacityPurchase(false),
+  // Reopening the browser tab must not restart the original payment lookup.
+  retryNotBefore: () => checkoutCapacityRead?.target === props.checkoutCapacityTarget
+    && checkoutCapacityRead?.accountKey === app.accountKey ? checkoutCapacityRead.at + 30_000 : 0,
   repeatMs: 15_000,
 });
 const quoteRequestGeneration = ref(0);
 const quoteLoading = ref(false);
+const retireTargetRead = ref<{ sourceId: string; targetKind: DeviceKind; price: number } | null>(null);
+useAutoRecovery({
+  active: () => props.active && state.value.kind === "retire",
+  failed: () => retireTargetRead.value !== null,
+  retry: async () => {
+    const target = retireTargetRead.value;
+    if (!target) return;
+    const device = app.devices.find(row => row.id === target.sourceId);
+    if (device) await openTradeinQuote(device, target.targetKind, target.price);
+  },
+  repeatMs: 30_000,
+});
 const purchaseSnapshot = ref<PurchaseEligibilitySnapshot | null>(null);
 // One opening request is handed to the confirmation watcher once; retries and checkout always read again.
 let purchaseOpeningRead: {
@@ -483,7 +502,6 @@ const purchaseConfirmed = computed(() => !remoteApiEnabled || purchaseMessage.va
 const purchaseActionBusy = computed(() => confirming.value || remoteApiEnabled && (purchaseStatus.value === "loading" || !props.active));
 const purchaseActionDisabled = computed(() => purchaseActionBusy.value || remoteApiEnabled && purchaseMessage.value === "quotaDepleted");
 const purchaseActionText = computed(() => purchaseRecovery.value === "pending" ? t.value.tradein.purchaseResume
-  : purchaseRecovery.value === "error" ? t.value.store.purchaseEligibilityRetry
   : !remoteApiEnabled || purchaseMessage.value === "eligible"
   ? tradeinView.value?.ctaText ?? ""
   : purchaseStatus.value === "loading" || purchaseStatus.value === "idle" ? t.value.store.purchaseEligibilityLoading
@@ -502,11 +520,20 @@ function readTradeinRecovery(): "none" | "pending" | "error" {
   return purchaseRecovery.value;
 }
 
-useAutoRecovery({ failed: () => props.active && state.value.kind === "tradein" && purchaseReadFailed.value && purchaseStatus.value === "error", retry: refreshTradeinPurchaseEligibility });
-async function refreshTradeinPurchaseEligibility(): Promise<boolean> {
-  if (readTradeinRecovery() !== "none") return false;
+useAutoRecovery({
+  active: () => props.active && state.value.kind === "tradein",
+  failed: () => purchaseRecovery.value === "error"
+    || (purchaseRecovery.value === "none" && purchaseReadFailed.value && purchaseStatus.value === "error"),
+  retry: refreshTradeinPurchaseEligibility,
+  repeatMs: 30_000,
+});
+async function refreshTradeinPurchaseEligibility(recovery = readTradeinRecovery()): Promise<boolean> {
+  if (recovery !== "none" || !remoteApiEnabled || !purchaseMounted) return false;
   const key = purchaseScopeKey.value;
-  if (!remoteApiEnabled || !key || !purchaseMounted) return false;
+  if (!key) {
+    purchaseStatus.value = "error";
+    return false;
+  }
   const request = ++purchaseReadGeneration;
   const account = captureAccountScope();
   const origin = { ...apiRuntimeConfig };
@@ -553,8 +580,7 @@ watch([purchaseScopeKey, state, () => app.accountKey, () => app.accountBindingEp
   confirming.value = false;
   if (readTradeinRecovery() !== "none") { purchaseOpeningRead = null; return; }
   if (remoteApiEnabled && props.active && state.value.kind === "tradein") {
-    if (purchaseScopeKey.value) void refreshTradeinPurchaseEligibility();
-    else purchaseStatus.value = "error";
+    void refreshTradeinPurchaseEligibility("none");
   } else purchaseOpeningRead = null;
 }, { flush: "sync" });
 function restoreTradeinAfterConditions(): void {
@@ -594,6 +620,7 @@ watch([state, () => props.active, () => apiRuntimeConfig.environment, () => apiR
 }], () => {
   quoteRequestGeneration.value++;
   quoteLoading.value = false;
+  retireTargetRead.value = null;
 }, { flush: "sync" });
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   quoteRequestGeneration.value += 1;
@@ -606,6 +633,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   remoteRetireRequest += 1;
   capacityCommandKey.value = null;
   quoteLoading.value = false;
+  retireTargetRead.value = null;
   // app.bindAccount is followed by the global account rebind in the same stack.
   void nextTick(() => loadCanonicalTradeinConfig());
 }, { flush: "sync" });
@@ -667,10 +695,6 @@ function previewCredit(oldDevice: Device, targetPriceUsdt: number): number {
   );
 }
 
-const ctaHalo = computed(() => ({
-  boxShadow: "0 0 24px color-mix(in oklab, var(--v5-brand) 35%, transparent)",
-}));
-
 function hide() {
   purchaseReturn = null;
   quoteRequestGeneration.value += 1;
@@ -705,7 +729,7 @@ const choiceSources = computed(() => {
         ? `${deviceName(t.value, d)} · ${t.value.tradein.remoteQuoteCreditLabel}`
         : fmt(t.value.tradein.choiceTradeInOption, {
         name: deviceName(t.value, d),
-        credit: formatAmount(previewCredit(d, s.newPrice)),
+        credit: formatGroupedAmount(previewCredit(d, s.newPrice)),
       }),
     }));
 });
@@ -729,7 +753,16 @@ async function openTradeinQuote(oldDevice: Device, targetKind: DeviceKind, newPr
     && app.devices.find(device => device.id === oldDevice.id)?.rowVersion === sourceRowVersion;
   try {
     // Recover an existing command before starting a new quote or qualification read.
-    if (readCheckoutTradein(app.accountKey, targetKind)) {
+    let original;
+    try {
+      original = readCheckoutTradein(app.accountKey, targetKind);
+    } catch (error) {
+      if (openingState.kind !== "retire") throw error;
+      retireTargetRead.value = { sourceId: oldDevice.id, targetKind, price: newPrice };
+      return;
+    }
+    retireTargetRead.value = null;
+    if (original) {
       sheet.showTradein(oldDevice.id, targetKind, newPrice);
       return;
     }
@@ -845,15 +878,7 @@ async function loadRemoteRetireTargets() {
   if (!remoteApiEnabled || !props.active || !purchaseMounted || current.kind !== "retire") return;
   const config = canonicalTradeinConfig.value;
   const source = app.devices.find((device) => device.id === current.oldDeviceId);
-  if (!config || !source || productCatalogState.status !== "ready") {
-    remoteRetireEligibleTargets.value = new Set();
-    if (!config) void loadCanonicalTradeinConfig(true);
-    return;
-  }
-  if (!config.enabled) {
-    remoteRetireEligibleTargets.value = new Set();
-    return;
-  }
+  if (!config?.enabled || !source || productCatalogState.status !== "ready") return;
 
   const request = ++remoteRetireRequest;
   const requestScope = captureAccountScope();
@@ -864,7 +889,9 @@ async function loadRemoteRetireTargets() {
     && isCurrentAccountScope(requestScope) && key === remoteRetireLoadKey.value && state.value === current
     && requestOrigin.environment === apiRuntimeConfig.environment && requestOrigin.baseUrl === apiRuntimeConfig.baseUrl;
   const paid = source.paidPriceUsdt ?? 0;
-  const candidates = PRODUCTS.filter((product) => !config.requireHigherPrice || product.price > paid);
+  const candidates = PRODUCTS.filter(product => product.productType === "DEVICE"
+    && (!config.requireHigherPrice || product.price > paid));
+  remoteRetireLoadError.value = false;
   remoteRetirePending.value = candidates.length > 0;
   await Promise.allSettled(candidates.map(async ({ id }) => {
     try {
@@ -872,7 +899,11 @@ async function loadRemoteRetireTargets() {
       if (!requestIsCurrent()) return;
       if (eligibility.targetProductNo !== id) { remoteRetireLoadError.value = true; return; }
       if (!eligibility.enabled || !eligibility.eligible || !eligibility.sources.some((candidate) => candidate.eligible
-        && candidate.sourceDeviceId === Number(current.oldDeviceId))) return;
+        && candidate.sourceDeviceId === Number(current.oldDeviceId))) {
+        remoteRetireEligibleTargets.value.delete(id);
+        remoteRetirePayables.value.delete(id);
+        return;
+      }
       remoteRetireEligibleTargets.value = new Set([...remoteRetireEligibleTargets.value, id]);
       // Each authorized row appears immediately. A pending/failed quote stays "—".
       const quote = await deviceE3Api.quote(Number(current.oldDeviceId), id);
@@ -896,18 +927,22 @@ async function loadRemoteRetireTargets() {
   }
 }
 
-function retryRemoteRetireTargets() {
-  if (!remoteApiEnabled || !props.active || !purchaseMounted || state.value.kind !== "retire" || remoteRetirePending.value) return;
-  if (!canonicalTradeinConfig.value || productCatalogState.status !== "ready") {
-    if (!canonicalTradeinConfig.value) void loadCanonicalTradeinConfig(true);
-    if (productCatalogState.status !== "ready") void refreshProductCatalog();
-    return;
-  }
-  remoteRetireEligibleTargets.value = new Set();
-  remoteRetirePayables.value = new Map();
-  remoteRetireLoadError.value = false;
-  void loadRemoteRetireTargets();
-}
+useAutoRecovery({
+  active: () => remoteApiEnabled && props.active && state.value.kind === "retire",
+  failed: () => canonicalTradeinConfigStatus.value === "error" || productCatalogState.status === "error"
+    || (!remoteRetirePending.value && remoteRetireLoadError.value),
+  async retry() {
+    if (remoteRetireLoadError.value && !remoteRetirePending.value) {
+      await loadRemoteRetireTargets();
+      return;
+    }
+    await Promise.all([
+      canonicalTradeinConfigStatus.value === "error" ? loadCanonicalTradeinConfig(true) : undefined,
+      productCatalogState.status === "error" ? refreshProductCatalog() : undefined,
+    ]);
+  },
+  repeatMs: 30_000,
+});
 
 watch([remoteRetireLoadKey, state], () => {
   remoteRetireRequest++;
@@ -926,7 +961,7 @@ const retireView = computed(() => {
     const failed = productCatalogState.status === "error" || canonicalTradeinConfigStatus.value === "error";
     return {
       subtitle: failed ? t.value.store.purchaseEligibilityError : t.value.store.purchaseEligibilityLoading,
-      targets: [], loading: !failed, retry: failed, statusText: "",
+      targets: [], loading: !failed, statusText: "",
     };
   }
   const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
@@ -936,7 +971,7 @@ const retireView = computed(() => {
   // 「仅限更高价」与「已上架 ∨ 抢先购窗口」均为运营可配规则,消费 flag 不硬编码。
   const targets = PRODUCTS.filter(
     (p) =>
-      (!remoteApiEnabled || canonicalTradeinConfig.value?.enabled) &&
+      p.productType === "DEVICE" && (!remoteApiEnabled || canonicalTradeinConfig.value?.enabled) &&
       (!(remoteApiEnabled ? canonicalTradeinConfig.value?.requireHigherPrice !== false : TRADEIN_LADDER_RULES.requireHigherPrice) || p.price > paid) &&
       (remoteApiEnabled
         ? remoteRetireEligibleTargets.value.has(p.id)
@@ -946,12 +981,13 @@ const retireView = computed(() => {
     const early = !!p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase)
       && (!remoteApiEnabled || canonicalTradeinConfig.value?.earlyAccessEnabled === true);
     const remotePayable = remoteRetirePayables.value.get(p.id);
+    // Display values carry their own $ and ≈, so a pending or failed quote reads a bare 「—」 (01 §1.2).
     const net = remoteApiEnabled
-      ? (remotePayable == null ? "—" : formatAmount(remotePayable))
-      : formatAmount(Math.max(0, p.price - previewCredit(device, p.price)));
+      ? (remotePayable == null ? "—" : `≈$${formatGroupedAmount(remotePayable)}`)
+      : `≈$${formatGroupedAmount(Math.max(0, p.price - previewCredit(device, p.price)))}`;
     const base = fmt(t.value.tradein.retireTargetOption, {
       name: p.name,
-      price: formatAmount(p.price),
+      price: `$${formatGroupedAmount(p.price)}`,
       net,
     });
     return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
@@ -961,7 +997,6 @@ const retireView = computed(() => {
       : remoteApiEnabled && remoteRetirePending.value ? t.value.store.purchaseEligibilityLoading
       : remoteApiEnabled && remoteRetireLoadError.value ? t.value.store.purchaseEligibilityError : t.value.tradein.retireNoTargets,
     targets, loading: remoteApiEnabled && remoteRetirePending.value,
-    retry: remoteApiEnabled && !remoteRetirePending.value && remoteRetireLoadError.value,
     statusText: !remoteApiEnabled || !targets.length ? "" : remoteRetirePending.value ? t.value.store.purchaseEligibilityLoading
       : remoteRetireLoadError.value ? t.value.store.purchaseEligibilityError : "",
   };
@@ -1005,17 +1040,19 @@ const tradeinView = computed(() => {
     }),
     // 只给设备名——内部 id 是工程标识,禁止渲染(页面文案禁字段名/枚举值)。
     oldDeviceText: oldDevice.name,
-    earned: formatAmount(earned),
+    earned: formatGroupedAmount(earned),
     bandText: remoteQuote
       ? fmt(t.value.tradein.remoteQuoteBandLabel, { pct: remoteQuote.creditRatePct })
       : band
       ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
       : "—",
-    credit: formatAmount(credit),
-    placementHint: (remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null)
-      ? t.value.tradein.inheritActiveHint : t.value.tradein.inheritInventoryHint,
-    estNet: formatAmount(estNet),
-    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatAmount(estNet) }),
+    credit: formatGroupedAmount(credit),
+    // What happens to the old device, then the credit rule, as one paragraph (no space after 。 in Chinese).
+    note: [(remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null)
+      ? t.value.tradein.inheritActiveHint : t.value.tradein.inheritInventoryHint, t.value.tradein.sheetDisclaimer]
+      .join(locale.code === "zh" ? "" : " "),
+    estNet: formatGroupedAmount(estNet),
+    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet) }),
   };
 });
 
@@ -1096,7 +1133,7 @@ const replaceView = computed(() => {
       warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
       lowestText: fmt(t.value.tradein.replaceLowestText, {
         name: s.canonicalCapacityQuote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
-        earn: "—",
+        earn: "—", // unknown today's earnings stay a bare dash (01 §1.2)
       }),
       insufficient: false, // The shared payment selector checks wallet balance; external methods remain available.
       replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
@@ -1110,7 +1147,7 @@ const replaceView = computed(() => {
     warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
     lowestText: fmt(t.value.tradein.replaceLowestText, {
       name: lowest.name,
-      earn: formatAmount(lowest.todayEarnings),
+      earn: `$${formatGroupedAmount(lowest.todayEarnings)}`,
     }),
     insufficient,
     replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
@@ -1167,7 +1204,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
   if (readOnlyCurrent) capacityReadBusy.value=true;
   else capacityRecoveryBusy.value=true;
   try {
-    let original=readCapacityPending(scope.accountKey);
+    let original=readCapacityPending(scope.accountKey, props.checkoutCapacityTarget ?? undefined);
     // Background recovery cannot create/replay a command, even if the saved row was released.
     if (readOnlyCurrent&&!original) return;
     if (!original) {
@@ -1235,6 +1272,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         commandKey:()=>{const saved=readCapacityPending(scope.accountKey);const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};writeCapacityPending(scope.accountKey,original);return key;},
         onReplacementRefused: reason => {
           if (!current() || !props.active) return;
+          if (effectiveOperation === 'replace') sheet.replacementPaymentRefusal = { targetProductNo: target, reason };
           capacityCommandKey.value = null;
           savedCapacity.value = null;
           capacityResumeKey.value = null;
@@ -1278,6 +1316,7 @@ async function recoverCapacityPurchase(resume=false):Promise<void> {
       return;
     }
     capacityRecoveryUnavailable.value=false;
+    if (target && !resume) checkoutCapacityRead = { accountKey: scope.accountKey, target, at: Date.now() };
     const result = await runCanonicalCapacityPurchase(pending.operation,pending.quote,(pending.quote?pending.quote.targetProductNo:pending.targetProductNo) as DeviceKind,resume,resume?undefined:current);
     if (result === "cleared" && target && current()) emit("checkout-capacity-cleared", target);
   } catch { if(current())capacityRecoveryUnavailable.value=true; }
@@ -1446,7 +1485,7 @@ function onReplace() {
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatGroupedAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1592,7 +1631,7 @@ function onKeepBuy() {
     // 新机已落盘(addDevice 只在落盘成功时给 id),撤销也必须落盘;撤不掉登记待对账(审计 R8 P1:直写内存不落盘 → 白得一台)
 
     if (!app.discardSpawnedDevice(newId)) reportStuckFunds(app.captureMoney(), newId, "device");
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatGroupedAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1704,7 +1743,7 @@ function onForce() {
     app.patchDevice(lowest.id, { currentTask: taskSnapshot });
     // persist-verdict-ok: 回滚里的再激活失败 = 旧机留在库存,设备页可手动激活;不再追补偿
     app.activateDevice(lowest.id, reservedSlots.value);
-    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: formatGroupedAmount(app.user.usdtBalance < 0 ? s.newPrice - app.user.usdtBalance : s.newPrice) }));
     confirming.value = false;
     return;
   }
@@ -1725,7 +1764,7 @@ function onForce() {
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => props.active && state.value.kind !== "none"
-  && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none")), ".tis-root", hide);
+  && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none")), ".tis-root", hide, true);
 
 
 </script>
@@ -1776,11 +1815,15 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   width: 44px; /* 44×44 点按区(移动端最小触控标准;PR-D 债 #4) */
   height: 44px;
   border-radius: 999px;
-  background: var(--v5-surface-2);
+  isolation: isolate;
   display: grid;
   place-items: center;
   z-index: 2;
   transition: opacity 0.15s;
+}
+/* The close control is the shared neutral glass circle (03 §3.1 关闭); the glyph sits above the glass layer. */
+.tis-close svg {
+  position: relative;
 }
 /* 《08》§2:尺寸早就补到 44 了,但按下反馈一直缺 */
 .tis-close:active {
@@ -1795,11 +1838,15 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-title {
   display: block;
-  font-family: var(--font-v5);
-  font-size: var(--ui-type-hero-title);
-  font-weight: 600;
+  font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);
   color: var(--v5-ink);
-  line-height: 1.3;
+}
+.tis-status {
+  display: block;
+  margin-top: 4px;
+  font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);
+  color: var(--v5-ink-2);
+  text-wrap: pretty;
 }
 .tis-subtitle {
   display: block;
@@ -1830,12 +1877,17 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-opt-ico {
   flex-shrink: 0;
 }
+.tis-opt-chev {
+  flex-shrink: 0;
+  color: var(--v5-ink-4);
+}
+/* Option rows carry a name and price: list title role, content-row weight (10 §10.1). */
 .tis-opt-text {
   flex: 1;
   min-width: 0;
-  font-size: var(--ui-type-list-subtitle);
+  font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);
   color: var(--v5-ink);
-  line-height: 1.4;
+  overflow-wrap: break-word;
 }
 /* detail card (tradein / replace sheets) */
 .tis-card {
@@ -1875,10 +1927,11 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
 }
+/* Field name muted, value in the main ink (01 §1.1.1 pairing 1). */
 .tis-row-value {
   font-size: 13px;
   font-weight: 500;
-  color: var(--v5-ink-2);
+  color: var(--v5-ink);
 }
 .tis-num {
   font-variant-numeric: tabular-nums;
@@ -1888,7 +1941,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-row-emph {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--v5-ink);
 }
 .tis-hr {
@@ -1918,33 +1971,39 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-cta:active {
   transform: scale(0.98);
 }
+/* Resuming the original payment is the recovery sheet's one forward action: primary L under its order line (03 §3.1). */
+.tis-card-line + .tis-cta {
+  margin-top: 16px;
+}
 .tis-cta-disabled {
   opacity: 0.5;
 }
 .tis-cta-text {
   text-align: center;
-  font-family: var(--font-v5);
-  font-size: var(--ui-type-button);
-  font-weight: 600;
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
   color: var(--v5-on-brand);
 }
+/* Secondary actions are the shared neutral glass L (03 §3.1); the material comes from .nx-frosted-button. */
 .tis-secondary {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 8px 20px;
   margin-top: 8px;
   border-radius: 999px;
-  background: var(--v5-surface-2);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .tis-secondary:active {
-  opacity: 0.7;
+  transform: scale(0.98);
 }
 .tis-secondary-text {
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink-2);
+  text-align: center;
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-ink);
 }
+/* Cancel and close are text buttons: brand text at the button role (03 §3.1). */
 .tis-ghost {
   width: 100%;
   min-height: 44px;
@@ -1957,9 +2016,8 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   opacity: 0.7;
 }
 .tis-ghost-text {
-  font-size: var(--ui-type-list-subtitle);
-  font-weight: 400;
-  color: var(--v5-ink-3);
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-brand);
 }
 .tis-warn-ghost {
   width: 100%;
@@ -1973,10 +2031,10 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-warn-ghost:active {
   opacity: 0.7;
 }
+/* A destructive choice only swaps the text to the error colour (03 §3.1). */
 .tis-warn-ghost-text {
-  font-size: var(--ui-type-list-subtitle);
-  font-weight: 400;
-  color: var(--v5-warning-ink);
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-danger);
 }
 /* block sheet header */
 .tis-block-head {
