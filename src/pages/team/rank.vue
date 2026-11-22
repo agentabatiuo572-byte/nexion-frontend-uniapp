@@ -26,7 +26,7 @@
             </view>
               </view>
             </view>
-            <view class="rank-upcoming"><text class="rank-caption">{{ upcomingBenefitsTitle }}</text><view class="rank-perk-tags"><NxTag v-for="perk in upcomingBenefits" :key="perk.key" tone="uvt">{{ perk.label }} {{ perk.value }}</NxTag></view><text v-if="upcomingPeerNotice" class="rank-caption rank-upcoming__notice">{{ upcomingPeerNotice }}</text><view v-if="prog.next.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
+            <view class="rank-upcoming"><text class="rank-caption">{{ upcomingBenefitsTitle }}</text><view class="rank-perk-tags"><NxTag v-for="perk in upcomingBenefits" :key="perk.key" wrap :tone="perk.key === 'peerBonus' && !vState.capabilities.peer ? 'unavailable' : 'uvt'">{{ perk.label }} {{ perk.value }}</NxTag></view><text v-if="upcomingPeerNotice" class="rank-caption rank-upcoming__notice">{{ upcomingPeerNotice }}</text><view v-if="prog.next.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
             <NxButton class="rank-invite" variant="primary" :label="designCopy.rankUpInvite" @click="go('/pages/team/team?intent=share')"><text>{{ designCopy.rankUpInvite }}</text><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></NxButton>
           </view>
         </view>
@@ -241,7 +241,7 @@ const upcomingBenefits = computed(() => {
 // omitted from the increases. Full conditions, benefits and rewards stay below.
 const upcomingPeerNotice = computed(() => prog.value.next && prog.value.next.peerBonus > 0 && !vState.capabilities.peer
   && hasVisibleIncrease.value && upcomingBenefitKeys.value && !upcomingBenefitKeys.value.includes('peerBonus')
-  ? `${t.value.rank.chips.peer} · ${fmt(t.value.rank.chips.peerNotDispatched, { n: formatHowNumber(prog.value.next.peerBonus * 100, locale.code) })}` : '');
+  ? `${t.value.rank.chips.peer} ${fmt(t.value.rank.chips.peerNotDispatched, { n: formatHowNumber(prog.value.next.peerBonus * 100, locale.code) })}` : '');
 useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry: () => vState.refreshCanonicalVRank() });
 </script>
 
