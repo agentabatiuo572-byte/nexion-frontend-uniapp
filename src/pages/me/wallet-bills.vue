@@ -67,9 +67,9 @@
               @keydown.enter.prevent="openBill(b)"
               @keydown.space.prevent="openBill(b)"
             >
-              <view class="bills-row__icon" :style="iconChipStyle(b.type)">
-                <BillTypeIcon :type="b.type" :color="typeColor(b.type)" />
-              </view>
+              <NxIconTile class="bills-row__icon" :tone="BILL_TILE[b.type]" size="s">
+                <BillTypeIcon :type="b.type" color="currentColor" />
+              </NxIconTile>
               <view class="bills-row__copy">
                 <view class="bills-row__title-row">
                   <text class="bills-row__title">{{ typeLabel(b.type) }}</text>
@@ -111,7 +111,7 @@
       <view class="nx-glass-sheet nx-sheet-slide-up bills-sheet" role="dialog" aria-modal="true" :aria-label="typeLabel(detail.type)" data-testid="bills-detail">
         <view class="bills-sheet__handle" aria-hidden="true" />
         <view class="bills-sheet__head">
-          <view class="bills-sheet__icon" :style="iconChipStyle(detail.type)"><BillTypeIcon :type="detail.type" :color="typeColor(detail.type)" /></view>
+          <NxIconTile class="bills-sheet__icon" :tone="BILL_TILE[detail.type]" size="l"><BillTypeIcon :type="detail.type" color="currentColor" /></NxIconTile>
           <text class="bills-sheet__type">{{ typeLabel(detail.type) }}</text>
           <view class="bills-sheet__amount" :class="{ 'bills-sheet__amount--in': !isDebit(detail) }">
             <text class="nx-num-amount">{{ isDebit(detail) ? "−" : "+" }}{{ fmtAmount(detail) }}</text>
@@ -145,6 +145,7 @@ import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import GlassSegments from "@/components/glass-segments.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
@@ -292,6 +293,7 @@ function splitAmount(value: number): { whole: string; cents: string } {
 }
 
 const TYPE_COLOR = WALLET_BILL_TYPE_COLOR;
+const BILL_TILE = { earn: "teal", refer: "coral", bonus: "amber", topup: "device", withdraw: "muted", purchase: "purple", refund: "teal", swap: "purple", verification: "teal", stake: "amber", unstake: "muted", achievement: "amber", clawback: "sky", other: "muted" } as const;
 function typeColor(type: BillType): string {
   return TYPE_COLOR[type];
 }
