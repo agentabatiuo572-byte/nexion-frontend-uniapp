@@ -2329,6 +2329,7 @@ export const fil: Messages = {
     specPower: "Power",
     specUptime: "SLA sa uptime",
     specWarranty: "Warranty",
+    specWarrantyDuration: "Warranty (buwan)",
     specWarrantyMonths: "{n} buwan",
     specWarrantyYears: "{n} taon",
     specShareVramNotApplicable: "Hindi naaangkop",

@@ -2329,6 +2329,7 @@ export const ms: Messages = {
     specPower: "Kuasa",
     specUptime: "SLA masa operasi",
     specWarranty: "Waranti",
+    specWarrantyDuration: "Waranti (bulan)",
     specWarrantyMonths: "{n} bulan",
     specWarrantyYears: "{n} tahun",
     specShareVramNotApplicable: "Tidak berkenaan",

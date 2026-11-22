@@ -2329,6 +2329,7 @@ export const id: Messages = {
     specPower: "Daya",
     specUptime: "SLA uptime",
     specWarranty: "Garansi",
+    specWarrantyDuration: "Garansi (bulan)",
     specWarrantyMonths: "{n} bulan",
     specWarrantyYears: "{n} tahun",
     specShareVramNotApplicable: "Tidak berlaku",

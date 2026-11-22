@@ -2329,6 +2329,7 @@ export const uz: Messages = {
     specPower: "Quvvat sarfi",
     specUptime: "Onlayn vaqt ulushi (SLA)",
     specWarranty: "Kafolat",
+    specWarrantyDuration: "Kafolat (oy)",
     specWarrantyMonths: "{n} oy",
     specWarrantyYears: "{n} yil",
     specShareVramNotApplicable: "Tatbiq etilmaydi",
