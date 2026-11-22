@@ -44,7 +44,7 @@ export function beginDelayedDemoH4EventCommand(url,method,state,headers,now) {
   return {record,owner,receipt};
 }
 
-function recordEventCommand(record,key,admittedReceipt,execute) {
+function recordEventCommand(record,key,operation,admittedReceipt,execute) {
   if(!key)return execute();
   const receipts=record.commandReceipts??={};
   const previous=receipts[key];
@@ -56,7 +56,11 @@ function recordEventCommand(record,key,admittedReceipt,execute) {
     return result;
   } catch(error) {
     if(Number.isInteger(error.status)&&error.status>=400&&error.status<600) {
-      receipts[key]={status:'FAILED',error:{code:error.status,message:error.message}};
+      // Managed join and claim throw and roll back. Reminder stores its availability refusal in the original response.
+      const failure=operation==='reminder'
+        ? {code:error.status,message:error.message}
+        : {code:500,message:'EVENT_COMMAND_FAILED'};
+      receipts[key]={status:'FAILED',error:failure};
     }
     throw error;
   }
@@ -480,7 +484,7 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
       progressValue:event.progressValue,targetValue:event.targetValue,rewards:rewards(rules),results:[],myRewardAmount:null,
       userStatus:event.userStatus,claimKeys,voucher,reminderSubscribed:record.reminders.includes(code)};
   }
-  if(commandOperations.includes(action))return recordEventCommand(record,eventCommandReceiptKey(owner,id,action,commandKey),request.delayedEvent?.receipt,()=>{
+  if(commandOperations.includes(action))return recordEventCommand(record,eventCommandReceiptKey(owner,id,action,commandKey),action,request.delayedEvent?.receipt,()=>{
     if(action==='join'){
       if(!ongoing)reject('EVENT_NOT_OPEN');
       if(!record.joined.includes(code))record.joined.push(code);
