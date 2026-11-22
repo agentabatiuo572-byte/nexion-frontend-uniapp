@@ -4521,7 +4521,7 @@ export const ru: Messages = {
       peer: "За равный ранг",
       pool: "Пул наград команды",
       votes: "голосов",
-      peerNotDispatched: "За равный ранг {n}% · пока закрыто",
+      peerNotDispatched: "{n}% · пока закрыто",
     },
     cond: {
       selfBuy: "Свои покупки ≥ ${n}",

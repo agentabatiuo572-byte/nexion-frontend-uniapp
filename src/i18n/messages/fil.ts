@@ -4521,7 +4521,7 @@ export const fil: Messages = {
       peer: "Reward sa parehong rank",
       pool: "Incentive pool ng team",
       votes: "boto",
-      peerNotDispatched: "Reward sa parehong rank {n}% · hindi pa bukas",
+      peerNotDispatched: "{n}% · hindi pa bukas",
     },
     cond: {
       selfBuy: "Sariling bili ≥ ${n}",
