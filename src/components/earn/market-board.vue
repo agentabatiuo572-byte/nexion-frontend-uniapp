@@ -58,7 +58,8 @@
           <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text></view>
           <view class="earn-ranking-value">
             <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
-            <view class="earn-ranking-value__track" aria-hidden="true"><view v-viz-inview class="earn-ranking-value__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
+            <!-- Decorative (the amount is read); aria-valuenow is the shared bar's state hook: no fill when unknown, no head dot at 0. -->
+            <view class="earn-ranking-value__track nx-progress" aria-hidden="true" :aria-valuenow="d.dailyEarn === null ? undefined : Math.round(rankShare(d))"><view v-viz-inview class="nx-progress__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
           </view>
         </view>
       </view>
@@ -239,10 +240,8 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* Same thin, quiet bar as the shared progress style (.nx-progress): 3px ink-8% track, hue 12%→60% fill, small head dot. */
-.earn-ranking-value__track { position: relative; width: 96px; height: 3px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
-.earn-ranking-value__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent), color-mix(in srgb, var(--v5-tech-cyan) 60%, transparent)); }
-.earn-ranking-value__fill::after { content: ""; position: absolute; top: 50%; right: -2.5px; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: color-mix(in srgb, var(--v5-tech-cyan) 85%, var(--v5-surface)); }
+/* The bar is the shared thin progress (.nx-progress in tokens.css); the ranking only sets its width and the device hue. */
+.earn-ranking-value__track { width: 96px; --nx-progress-hue: var(--v5-tech-cyan); }
 @media (max-width: 374px) {
   .earn-market__tile { padding: 10px 8px 8px; }
   .earn-market__price { font-size: 13px; line-height: 18px; }
