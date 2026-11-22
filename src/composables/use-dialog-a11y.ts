@@ -157,8 +157,38 @@ function scheduleRestore(order: number, run: () => void, drop: () => void): void
 // and Tab, is the only part of the page a screen reader can reach (everything beside its ancestor path is inert), and
 // takes focus when it opens; closing it hands focus back inside the layer below (03 §3.5). A layer whose root is not on
 // screen (a dialog left open in a hidden tab) never counts as the top.
-type Layer = { order: number; root: () => HTMLElement | null | undefined };
+type Layer = { order: number; root: () => HTMLElement | null | undefined; close?: () => void };
 const openLayers: Layer[] = [];
+
+// #ifdef H5
+// Browser back on H5 answers the top layer first (02.7, 03 §3.5), as Esc does, through the same close callback and so the
+// same guards (a submitting payment PIN stays). The layer adds no history entry of its own: back has already moved the
+// browser to the previous entry, so the pop is kept from vue-router and uni (which would drop the page) and the page's
+// own entry is put back in its place. A layer closed by code therefore leaves nothing behind in the history, and the
+// next back leaves the page as usual. uni.navigateBack from the app is not a user back and passes through. The native
+// App keeps registerNativeDialog for its back button.
+let pageEntry: { state: unknown; href: string } | null = null;
+let appBackAt = 0;
+let browserBackGuarded = false;
+const rememberPageEntry = () => { pageEntry = { state: history.state, href: location.href }; };
+/** Called once at app start, before the router exists: listeners on window run in the order they were added (whatever
+ *  the capture flag), and vue-router's own popstate listener must not see a back that a layer answered. */
+export function installBrowserBackGuard(): void {
+  if (browserBackGuarded || typeof window === "undefined") return;
+  browserBackGuarded = true;
+  uni.addInterceptor("navigateBack", { invoke() { appBackAt = Date.now(); } });
+  window.addEventListener("popstate", (ev) => {
+    const top = topLayer();
+    if (!top?.el || document.hidden || !pageEntry || Date.now() - appBackAt < 1_000) {
+      setTimeout(() => { if (openLayers.length) rememberPageEntry(); }, 0);
+      return;
+    }
+    ev.stopImmediatePropagation();
+    history.pushState(pageEntry.state, "", pageEntry.href);
+    top.layer.close?.();
+  }, true);
+}
+// #endif
 const dropLayer = (layer: Layer) => { const index = openLayers.indexOf(layer); if (index >= 0) openLayers.splice(index, 1); };
 function topLayer(): { layer: Layer; el: HTMLElement | null } | null {
   for (let i = openLayers.length - 1; i >= 0; i--) {
@@ -378,7 +408,7 @@ export function useDialogA11y(
   // order and redraws its pay button): its test id, else its role and accessible name.
   let previousTrace: Trace | null = null;
   let openedAt = 0;
-  const layer: Layer = { order: 0, root: () => rootEl() };
+  const layer: Layer = { order: 0, root: () => rootEl(), close };
   // Closed only because a newer layer took over (a notice over the payment page): the trigger is kept for its return.
   let paused = false;
   // Only a layer that really opened hands focus back (the immediate watch runs the closed branch on mount).
@@ -497,6 +527,9 @@ export function useDialogA11y(
       openedAt = ++openSeq;
       layer.order = openedAt;
       openLayers.push(layer);
+      // #ifdef H5
+      rememberPageEntry();
+      // #endif
       document.addEventListener("keydown", onKeydown, true);
       await nextTick();
       // 焦点必须真的移进来:不移的话读屏用户不知道弹层开了,键盘用户按 Tab 时
