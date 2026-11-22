@@ -16,7 +16,7 @@
          of a freshly-laid-out bubble). Programmatic positioning is immediate:
          a UniApp content transition can otherwise commit an obsolete target later. -->
     <scroll-view ref="listHost" scroll-y class="nx-conv-list" :scroll-top="scrollTop" :scroll-into-view="scrollAnchor" :scroll-with-animation="false" :show-scrollbar="false" @scroll="onThreadScroll">
-      <view class="nx-conv-content" :style="{ paddingTop: (topInset || 0) + 'px', paddingBottom: closed ? (closedSpace ? closedSpace + 16 + 'px' : 'calc(var(--nx-tray-clearance) + 32px)') : composerVisible ? (composerMeasured ? composerSpace + 'px' : 'calc(' + composerSpace + 'px + env(safe-area-inset-bottom))') : undefined }">
+      <view class="nx-conv-content" :style="{ paddingTop: (topInset || 0) + 'px', paddingBottom: closed ? (closedSpace ? closedSpace + 16 + 'px' : 'calc(var(--nx-tray-bottom) + 148px)') : composerVisible ? (composerMeasured ? composerSpace + 'px' : 'calc(' + composerSpace + 'px + env(safe-area-inset-bottom))') : undefined }">
       <view v-if="$slots['history-prefix']" class="nx-conv-history-prefix" :class="{ 'nx-conv-history-prefix--measured': historyPrefixMeasured }" :style="{ height: historyPrefixMeasured ? historyPrefixHeight + 'px' : undefined }">
         <view ref="historyPrefixHost" class="nx-conv-history-content"><slot name="history-prefix" /></view>
       </view>
@@ -999,6 +999,7 @@ watch(composerHost, observeComposer, { flush: 'post' });
 onMounted(observeComposer);
 onScopeDispose(() => composerResizeObserver?.disconnect());
 // The read-only tray floats over the thread like the composer; the thread keeps its height clear plus 16 (04 §4.0).
+// Until it is measured (and where native layout reads are late) the reserve assumes a three-line note: 8 + 124 + 16.
 const closedHost = ref<unknown>(null), closedSpace = ref(0);
 let closedResizeObserver: ResizeObserver | undefined;
 function measureClosed() {
