@@ -38,9 +38,12 @@
           <view v-if="result.rewardAmount != null" class="event-row"><text>{{ detail.event.kind === 'regional' ? copy.regionPrize : copy.prize }}</text><text>{{ formatUsd(result.rewardAmount, 'detail') }}</text></view>
         </view>
       </view>
-      <text v-if="commandError" class="event-copy" role="alert">{{ copy.pending }}</text>
-      <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
-      <NxButton v-else-if="action" class="event-navigate" variant="primary" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
+      <text v-if="commandError && !action" class="event-copy" role="alert">{{ copy.pending }}</text>
+      <view v-if="action" class="event-bar nx-glass-bar">
+        <text v-if="commandError" class="nx-tray-note" role="alert">{{ copy.pending }}</text>
+        <NxButton v-if="action==='open'" variant="primary" size="large" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
+        <NxButton v-else variant="primary" size="large" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
+      </view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
   </view></AppChassis>
@@ -156,7 +159,12 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-progress > view { position:relative; height:100%; border-radius:inherit; background:linear-gradient(90deg, color-mix(in srgb, var(--v5-brand) 12%, transparent), color-mix(in srgb, var(--v5-brand) 70%, transparent)); }
 .event-progress > view::after { content:""; position:absolute; top:50%; right:-3px; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
-.event-navigate { margin-top:16px; width:100%; }
+/* The main action floats in the shared bottom bar (04 §4.0); the content clears it: 48 + 22 + 16 for the lone button,
+   the tray's own height + 38 once the pending note sits above it. */
+.event-detail:has(> .event-bar) { padding-bottom:calc(48px + var(--nx-tray-bottom) + 16px); }
+.event-detail:has(> .event-bar > .nx-tray-note) { padding-bottom:calc(92px + 38px); }
+.event-bar { position:absolute; z-index:36; display:flex; flex-direction:column; }
+.event-bar > .nx-button { width:100%; }
 .event-rule-paragraph { display:block; }
 .event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:break-word; }
 .event-row.event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2);font:var(--ui-type-long-form-weight) var(--ui-type-long-form)/var(--ui-type-long-form-lh) var(--font-v5); }
