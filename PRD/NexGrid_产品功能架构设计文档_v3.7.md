@@ -1540,7 +1540,7 @@ Cloud Share variant:Cloud Share 是数字份额(`productType=SHARE`,`inventoryMo
 | Share 旧日区间 | `price × shareYieldMin/Max ÷ 100 ÷ 365 × qty` |
 | Share UVT 日值 | `dailyEarnNEX × qty` |
 
-金额先按源值合计再格式化：月值沿用两位小数金额展示，Share 日区间两端都是两位小数。不将显示舍入后的值重新参与估算。设备列表仍消费服务端已含产能的 `dailyUsdt`，沿用 App 现有还原满产能再投影流程，不再次乘产能。
+金额先按源值合计再格式化：月值沿用两位小数金额展示，Share 日区间两端按两位小数显示，两端显示相同时只显示一个值；商品卡、商品详情和组合购买一致。不将显示舍入后的值重新参与估算。设备列表仍消费服务端已含产能的 `dailyUsdt`，沿用 App 现有还原满产能再投影流程，不再次乘产能。
 
 #### 7.2.2 LiveSocialProof 实时购买动态
 
