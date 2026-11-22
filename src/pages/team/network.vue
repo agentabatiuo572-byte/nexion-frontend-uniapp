@@ -265,7 +265,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-orbit__center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 999px; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 16%, transparent), transparent); }
 .network-orbit__you { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand); }
 .network-orbit__center:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.network-orbit__dot { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 999px; box-shadow: 0 0 0 3px var(--v5-surface); font: 600 10px/1 var(--font-v5); color: var(--v5-on-brand); }
+.network-orbit__dot { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 999px; box-shadow: 0 0 0 3px var(--v5-surface); font: 500 10px/1 var(--font-v5); color: var(--v5-on-brand); }
 .network-orbit__dot--inner { width: 26px; height: 26px; margin: -13px 0 0 -13px; }
 .network-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--v5-space-2) var(--v5-space-3); padding-top: var(--ui-space-row-y); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 .network-legend__item { display: flex; align-items: center; gap: 5px; }
