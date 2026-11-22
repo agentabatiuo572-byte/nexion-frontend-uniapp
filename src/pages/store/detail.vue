@@ -784,12 +784,11 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   const color =
     tone === "success" ? "var(--v5-brand)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
   return {
-    fontFamily: "var(--font-v5)",
-    fontSize: "20px",
-    fontWeight: 600,
+    fontFamily: "var(--font-metric)",
+    fontSize: "var(--ui-type-metric-value)",
+    lineHeight: "var(--ui-type-metric-value-lh)",
+    fontWeight: "var(--ui-type-metric-value-weight)",
     color,
-    letterSpacing: "-0.018em",
-    lineHeight: 1,
     marginTop: "4px",
   };
 }
