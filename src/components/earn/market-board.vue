@@ -235,7 +235,8 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-row__art { position: relative; width: 48px; height: 40px; }
 .earn-ranking-row__art :deep(.device-art__image) { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; transform: translate(-50%, -50%); pointer-events: none; }
 .earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
-.earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A long name (the phone row in kk, ru…) wraps in full instead of being cut (03 §3.6.1); the row grows with it. */
+.earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Same thin, quiet bar as the shared progress style (.nx-progress): 3px ink-8% track, hue 12%→60% fill, small head dot. */
