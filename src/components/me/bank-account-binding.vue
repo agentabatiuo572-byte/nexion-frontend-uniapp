@@ -326,7 +326,8 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .otp-send[aria-disabled="true"] { opacity: .5; }
 .review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 16px; border-bottom: 1px solid var(--v5-border); color: var(--v5-ink-3); font: 400 14px/20px var(--font-v5); overflow-wrap: break-word; }
 .review-row:last-child { border-bottom: 0; }
-/* The holder name gives way first and wraps; the label keeps whole words. */
+/* The holder name gives way first and wraps; the label keeps its own width (up to 60% of the row) so it stays on one line beside a long name. */
+.review-row:not(.review-row--code) > text:first-child { flex: none; max-width: 60%; }
 .review-row > text:last-child { min-width: 0; }
 /* The new account is checked digit by digit: its own full line under the label, wrapping evenly (03 §3.6.1). */
 .review-row--code { flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; padding-block: 12px; }
