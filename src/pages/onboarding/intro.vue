@@ -378,7 +378,7 @@ function goPrivacy() {
 }
 .intro-lang-row__native {
   font-size: var(--ui-type-list-title);
-  font-weight: 550;
+  font-weight: 500;
   color: var(--v5-ink);
 }
 .intro-lang-row__en {

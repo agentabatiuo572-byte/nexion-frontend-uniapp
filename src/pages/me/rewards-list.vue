@@ -395,8 +395,8 @@ function notchStyle(top: boolean): CSSProperties {
     background: "var(--v5-bg)",
   } as CSSProperties;
 }
-const ticketNameStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", fontWeight: 550, color: "var(--v5-ink)" };
-const ticketNameExpiredStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", fontWeight: 550, color: "var(--v5-ink-3)" };
+const ticketNameStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", fontWeight: 500, color: "var(--v5-ink)" };
+const ticketNameExpiredStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", fontWeight: 500, color: "var(--v5-ink-3)" };
 const recordGroups = computed(() => {
   const groups: {month: string; rows: Bill[]}[] = [];
   for (const bill of visibleRecords.value) {

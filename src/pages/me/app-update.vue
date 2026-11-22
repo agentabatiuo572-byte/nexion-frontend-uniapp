@@ -121,15 +121,15 @@ async function act() {
 
 <style scoped>
 .update-page { height: 100vh; box-sizing: border-box; padding-top: var(--status-bar-height); display: flex; flex-direction: column; background: var(--v5-bg); color: var(--v5-ink); font-family: var(--font-v5); }
-.update-header { position: relative; flex: none; display: flex; justify-content: center; align-items: center; min-height: 54px; padding: 0 52px; font-weight: 650; font-size: 18px; }
+.update-header { position: relative; flex: none; display: flex; justify-content: center; align-items: center; min-height: 54px; padding: 0 52px; font-weight: 600; font-size: 18px; }
 .update-back { position: absolute; left: 16px; top: 7px; padding: 0; width: 40px; height: 40px; line-height: 34px; font-size: 32px; border-radius: 50%; color: var(--v5-ink); background: var(--v5-surface-2); }
 .update-scroll { min-height: 0; height: 0; flex: 1; }
 .update-body { padding: 8px 18px 24px; }
 .update-hero { display: flex; flex-direction: column; align-items: center; padding: 15px 0 24px; gap: 4px; color: var(--v5-ink-3); font-size: 13px; }
 .update-hero image { height: 56px; width: 56px; margin-bottom: 8px; }
-.update-version { color: var(--v5-ink); font-size: 34px; font-weight: 650; }
+.update-version { color: var(--v5-ink); font-size: 34px; font-weight: 600; }
 .update-panel { display: flex; flex-direction: column; gap: 10px; border-radius: 18px; background: var(--v5-surface-2); padding: 17px; margin-bottom: 12px; }
-.update-heading { font-weight: 650; font-size: 17px; }
+.update-heading { font-weight: 600; font-size: 17px; }
 .update-description { display: block; color: var(--v5-ink-2); line-height: 1.5; font-size: 15px; white-space: pre-line; overflow-wrap: break-word; }
 .update-row { display: flex; justify-content: space-between; gap: 14px; font-size: 14px; color: var(--v5-ink-2); }
 .update-actions,.update-sheet { flex: none; padding: 12px 18px calc(16px + env(safe-area-inset-bottom)); }
