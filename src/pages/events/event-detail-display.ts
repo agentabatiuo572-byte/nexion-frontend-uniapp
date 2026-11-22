@@ -40,6 +40,9 @@ const eventRefusals: Record<string, EventCommandFailure> = {
   HOSTING_CENTERS_UNAVAILABLE: "notRun", EVENT_CLAIM_CONFLICT: "notRun", EVENT_REMINDER_DELIVERY_CONFLICT: "notRun",
   H4_EVENT_GIFT_QUANTITY_INVALID: "generic", H4_EVENT_GIFT_SOURCE_REQUIRED: "generic", H4_EVENT_CLAIM_KEY_INVALID: "generic",
   H4_EVENT_TICKET_RULE_INVALID: "generic", H4_EVENT_TICKET_QUANTITY_INVALID: "generic", EVENT_BADGE_GRANT_CONFLICT: "generic", REWARD_TYPE_UNSUPPORTED: "generic",
+  // The legacy claim's wallet credit: a lock conflict can go through on another try; the rest need the reward fixed.
+  USER_WALLET_CONFLICT: "notRun", REWARD_LEDGER_CONFLICT: "notRun", REWARD_AMOUNT_INVALID: "generic", USER_WALLET_NOT_FOUND: "generic",
+  B1_COVERAGE_DATA_UNAVAILABLE: "generic", B1_COVERAGE_BELOW_REDLINE: "generic", EARNINGS_RELEASE_ENTRY_INVALID: "generic",
 };
 export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "joined" | "notOpen" | "notEligible" | "budget" | "stock" | "slots" | "account" | "reminder" | "notRun" | "generic";
 /** "unknown" only when the command may have run (network loss, timeout, gateway 5xx, unreadable reply); otherwise the reason to show. */
