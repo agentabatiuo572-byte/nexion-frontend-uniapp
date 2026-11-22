@@ -8,7 +8,7 @@
       </view>
       <view v-else-if="conditionsOnly" class="quota-content">
         <text class="quota-headline">{{ focusedProductName }}</text>
-        <PurchaseEligibilityPanel :status="conditionEligibility.displaySnapshot ? 'ready' : conditionEligibility.status" :snapshot="conditionEligibility.displaySnapshot" />
+        <PurchaseEligibilityPanel hide-title :status="conditionEligibility.displaySnapshot ? 'ready' : conditionEligibility.status" :snapshot="conditionEligibility.displaySnapshot" />
       </view>
       <view v-else-if="!focusedTierPresent" class="quota-content quota-state">
         <text class="quota-headline">{{ focusedProductName }}</text>

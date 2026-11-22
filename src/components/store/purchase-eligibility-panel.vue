@@ -1,6 +1,7 @@
 <template>
   <view class="purchase-panel" :class="{ 'purchase-panel--blocking': blockingOnly }" aria-live="polite" :aria-busy="status === 'loading'">
-    <text v-if="!blockingOnly" class="purchase-panel__title">{{ t.store.purchaseEligibilityProductPolicy }}</text>
+    <!-- hideTitle: a page whose header already says 商品购买资格 (team/quota conditions) does not repeat it (06 §6.1). -->
+    <text v-if="!blockingOnly && !hideTitle" class="purchase-panel__title">{{ t.store.purchaseEligibilityProductPolicy }}</text>
     <text v-if="!blockingOnly || message !== 'ineligible'" class="purchase-panel__note" :role="message === 'error' ? 'alert' : 'status'">{{ statusText }}</text>
     <template v-if="status === 'ready' && snapshot && message !== 'error'">
       <!-- Once eligible, every rule already holds: no "must be met" wording, and a policy with no facts to show folds away (06 §6.1, zentao #29). -->
@@ -34,7 +35,7 @@ import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
 import { useDataVisibility } from "@/store/data-visibility";
 import QuotaConditionBar from "@/components/team/quota-condition-bar.vue";
-const props = defineProps<{ status: PurchaseEligibilityRequestStatus; snapshot: PurchaseEligibilitySnapshot | null; blockingOnly?: boolean }>();
+const props = defineProps<{ status: PurchaseEligibilityRequestStatus; snapshot: PurchaseEligibilitySnapshot | null; blockingOnly?: boolean; hideTitle?: boolean }>();
 const t = useT();
 const locale = useLocaleStore();
 const visibility = useDataVisibility();
@@ -78,6 +79,7 @@ function conditionRatio(condition: PurchaseEligibilityCondition): number {
 .purchase-panel__row { display:flex; justify-content:space-between; align-items:baseline; gap:8px 16px; flex-wrap:wrap; }
 .purchase-panel__condition { margin-top:12px; }
 .purchase-panel__values { margin-left:auto; color:var(--v5-ink); font-variant-numeric:tabular-nums; text-align:right; }
+.purchase-panel > .purchase-panel__note:first-child,
 .purchase-panel--blocking .purchase-panel__policy:first-child,
 .purchase-panel--blocking .purchase-panel__condition:first-child { margin-top:0; }
 </style>
