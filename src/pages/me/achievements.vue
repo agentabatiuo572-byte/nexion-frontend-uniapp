@@ -579,7 +579,7 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
 
 /* Approved growth board geometry and material. */
  .achievement-track { padding:18px 16px 14px; min-height:117.5px; box-sizing:border-box; }.achievement-track__rail { height:56px; margin-top:10px; }
-.achievement-streak { font-weight:600; color:var(--v5-ink); }.achievement-row:not(.achievement-row--badge) { min-height:60px; padding:8px 16px !important; box-sizing:border-box; }
+.achievement-streak { font-weight:500; color:var(--v5-ink); }.achievement-row:not(.achievement-row--badge) { min-height:60px; padding:8px 16px !important; box-sizing:border-box; }
 .achievement-row--locked { opacity:.55; }.achievement-row--badge { padding:14px 6px 12px; min-height:115px; box-sizing:border-box; }
 .achievement-row--badge > view:first-child { box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-brand) 40%,transparent); }
 .achievement-row--badge.achievement-row--locked > view:first-child { box-shadow:none; }
