@@ -21,7 +21,7 @@
         <text class="event-heading">{{ copy.rules }}</text>
         <view v-for="row in ruleRows" :key="row.label" class="event-row" :class="{'event-rule-paragraph':[copy.labels.description,copy.labels.terms].includes(row.label)}"><text>{{ row.label }}</text><text>{{ row.value }}</text></view>
       </view>
-      <view v-if="detail.event.kind !== 'regional' && detail.targetValue > 0" class="event-section event-section--plain">
+      <view v-if="hasMeasuredProgress" class="event-section event-section--plain">
         <view class="event-row"><text class="event-subheading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
         <view class="event-progress" role="progressbar" :aria-label="copy.progress" :aria-valuenow="Math.min(detail.progressValue, detail.targetValue)" :aria-valuemin="0" :aria-valuemax="detail.targetValue"><view v-viz-inview class="nx-viz-grow" :style="{ width: `${Math.min(100, detail.progressValue / detail.targetValue * 100)}%` }" /></view>
       </view>
@@ -84,6 +84,10 @@ const copy = computed(() => eventDetailCopy[uiLocale(locale.code)]);
 const uiT = useT();
 const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
+// Progress is drawn only from a measured value (04 §4.0). Promotion and voucher events (rules.promotionActivityId /
+// rules.voucherId) report eligibility, not progress: the server sends a 0 / 1 placeholder, as it does before any event
+// starts; regional events rank by region instead.
+const hasMeasuredProgress = computed(() => { const { event, rules, targetValue } = detail.value!; return event.kind !== "regional" && event.state !== "upcoming" && !rules.promotionActivityId && !rules.voucherId && targetValue > 0; });
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
 const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);
 // The button is only unavailable while the shown state is a stale snapshot (a failed read); a read in progress does not
