@@ -94,7 +94,7 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-art__target-shadow { position:absolute; right:6px; bottom:8px; width:150px; height:22px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--ui-lime-soft) 45%,transparent),transparent); }
 .upgrade-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:4px; }
 .upgrade-comparison__label { display:block; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
-.upgrade-comparison__value { display:block; margin-top:2px; font:600 16px/22px var(--font-metric); font-variant-numeric:tabular-nums; }
+.upgrade-comparison__value { display:block; margin-top:2px; font:var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric:tabular-nums; }
 .upgrade-comparison__value--target { color:var(--v5-brand); }
 .upgrade-note { display:block; margin-top:10px; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .upgrade-spotlight .upgrade-action { display:flex; margin-top:14px; min-height:44px; padding:0; }

@@ -147,12 +147,12 @@
           <view class="flex items-center min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <text class="truncate">{{ t.store.detYourPhone }}</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">{{ phoneDailyEarnText }}</text>
+            <text class="tabular-nums" style="font-family: var(--font-metric); font-weight: 500; color: var(--v5-brand)">{{ phoneDailyEarnText }}</text>
           </view>
           <view class="shrink-0" style="font-size: 12px; line-height: 0; color: var(--v5-ink-4)" aria-hidden="true"><NxIcon name="arrow-left-right" /></view>
           <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-brand)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
+            <text class="tabular-nums" style="font-family: var(--font-metric); font-weight: 500">${{ dailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
           <text v-if="speedup > 0" class="shrink-0" :style="vsMultChipStyle">{{ estimateLabel }} {{ speedup }}×</text>
         </view>
@@ -840,12 +840,11 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   const color =
     tone === "success" ? "var(--v5-brand)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
   return {
-    fontFamily: "var(--font-v5)",
-    fontSize: "20px",
-    fontWeight: 600,
+    fontFamily: "var(--font-metric)",
+    fontSize: "var(--ui-type-metric-value)",
+    lineHeight: "var(--ui-type-metric-value-lh)",
+    fontWeight: "var(--ui-type-metric-value-weight)",
     color,
-    letterSpacing: "-0.018em",
-    lineHeight: 1,
     marginTop: "4px",
   };
 }
