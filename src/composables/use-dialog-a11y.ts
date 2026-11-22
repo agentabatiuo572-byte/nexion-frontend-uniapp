@@ -179,7 +179,11 @@ export function installBrowserBackGuard(): void {
   uni.addInterceptor("navigateBack", { invoke() { appBackAt = Date.now(); } });
   window.addEventListener("popstate", (ev) => {
     const top = topLayer();
-    if (!top?.el || document.hidden || !pageEntry || Date.now() - appBackAt < 1_000) {
+    // Only a step back from the layer's own page entry: a forward press, or a pop that lands elsewhere, passes as before.
+    const landed = (ev.state as { position?: unknown } | null)?.position;
+    const from = (pageEntry?.state as { position?: unknown } | null)?.position;
+    const back = typeof landed !== "number" || typeof from !== "number" || landed < from;
+    if (!top?.el || document.hidden || !pageEntry || !back || Date.now() - appBackAt < 1_000) {
       setTimeout(() => { if (openLayers.length) rememberPageEntry(); }, 0);
       return;
     }
