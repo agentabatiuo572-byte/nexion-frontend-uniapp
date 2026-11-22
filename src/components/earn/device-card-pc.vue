@@ -205,8 +205,8 @@
       </view>
       <view class="flex items-end justify-between">
         <view class="flex items-baseline" style="gap: 4px">
-          <text class="tabular-nums" style="font-family: var(--font-metric); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">{{ visibility.mask(live.effectiveTops.toFixed(1)) }}</text>
-          <text style="font-size: 12px; font-weight: 600; color: var(--v5-ink-3)">{{ t.onboarding.phoneComputeUnit }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-metric); font-size: 34px; line-height: 1; font-weight: 500; color: var(--v5-brand); letter-spacing: -0.014em">{{ visibility.mask(live.effectiveTops.toFixed(1)) }}</text>
+          <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ t.onboarding.phoneComputeUnit }}</text>
         </view>
         <svg v-if="!visibility.hidden" width="110" height="28" viewBox="0 0 110 28" preserveAspectRatio="none" fill="none">
           <polyline :points="sparkPoints" fill="none" stroke="var(--v5-brand)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -356,8 +356,8 @@
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
         <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
              与卡内 −$锁定日产 / 未解锁潜在收益(仍 warning=Pending)语义不同,不可混用。 -->
-        <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-success-ink); letter-spacing: -0.014em">{{ visibility.mask(formatUsd(device.todayEarnings)) }}</text>
-        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 600">
+        <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 34px; line-height: 1; font-weight: 500; color: var(--v5-success-ink); letter-spacing: -0.014em">{{ visibility.mask(formatUsd(device.todayEarnings)) }}</text>
+        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">
           <text style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-success) 75%, transparent)">+</text>
           <text>{{ visibility.mask(formatAmount(device.todayEarningsNEX)) }} UVT</text>
         </view>

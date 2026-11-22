@@ -271,7 +271,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-condition__name { min-width:0;overflow-wrap:break-word; }
 .rank-condition__value { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0 4px;max-width:100%;margin-left:auto;font-variant-numeric:tabular-nums;color:var(--v5-ink-3);text-align:right; }
 .rank-condition__current,.rank-condition__target { white-space:nowrap; }
-.rank-condition__current { color:var(--v5-ink);font-weight:600; }
+.rank-condition__current { color:var(--v5-ink);font-weight:500; }
 .rank-progress-track { overflow:hidden;height:6px;border-radius:999px;background:var(--v5-surface-3);margin-top:8px; }
 .rank-progress-track > view { height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--v5-brand-deep),var(--ui-lime-soft));box-shadow:0 0 10px var(--v5-brand-border); }
 .rank-condition__gap { display:block;margin-top:6px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
@@ -307,13 +307,13 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-detail-hint,.rank-reward-note { display:block;margin-top:8px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-perk-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px; }
 .rank-perk { display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--v5-border);border-radius:12px;background:var(--ui-perk); }
-.rank-perk-value { font:600 14px/20px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
+.rank-perk-value { font:500 14px/20px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
 .rank-reward-item + .rank-reward-item { margin-top:12px; }
 .rank-reward-summary { display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;color:var(--v5-nex); }
 .rank-reward-title { display:block;font:600 var(--ui-type-section)/22px var(--font-v5); }
-.rank-reward-amount { display:block;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
+.rank-reward-amount { display:block;font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
 .rank-reward-description { display:block;margin-top:2px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
-.rank-reward { display:block;margin-top:2px;font:600 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-nex);overflow-wrap:break-word; }
+.rank-reward { display:block;margin-top:2px;font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-nex);overflow-wrap:break-word; }
 .rank-actions { margin-top:18px;border-top:1px solid var(--v5-border); }.rank-actions :deep(.nx-list-row) { padding-inline:0;border-bottom:1px solid var(--v5-border); }
 .rank-action-icon { width:32px;height:32px;display:grid;place-items:center;color:var(--v5-ink-2); }
 .rank-state { padding:32px 0;color:var(--v5-ink-2); }.rank-state text { display:block;margin-top:var(--ui-space-row-y); }
@@ -325,12 +325,12 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-rings { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px; }
 .rank-condition--ring { display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:0;text-align:center;min-width:0; }
 .rank-condition--ring .rank-condition__heading { flex-direction:column;align-items:center;gap:0;font-size:12px;line-height:16px; }
-.rank-condition--ring .rank-condition__name { font-weight:600;color:var(--v5-ink); }
+.rank-condition--ring .rank-condition__name { font-weight:500;color:var(--v5-ink); }
 .rank-condition--ring .rank-condition__value { justify-content:center;margin-left:0;font:500 11px/14px var(--font-metric); }
 .rank-condition--ring .rank-condition__gap { margin-top:0;font-size:11px;line-height:14px; }
 .rank-ring { display:grid;place-items:center;width:80px;height:80px;margin-top:0;border-radius:999px;background:conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%),var(--v5-surface-3) 0); }
 .rank-progress-track.rank-ring > .rank-ring__hole { display:grid;place-items:center;width:66px;height:66px;border-radius:999px;background:var(--v5-surface);box-shadow:none; }
-.rank-ring__value { font:600 15px/18px var(--font-metric);color:var(--v5-ink); }
+.rank-ring__value { font:500 15px/18px var(--font-metric);color:var(--v5-ink); }
 .rank-upcoming { padding:12px 14px;border-radius:16px;background:color-mix(in srgb,var(--v5-nex) 10%,var(--v5-surface-2)); }
 .rank-ladder { display:flex;gap:6px;overflow-x:auto;padding:4px 2px 2px;border:0;border-radius:0;background:transparent;scrollbar-width:none; }
 .rank-ladder::-webkit-scrollbar { display:none; }
@@ -339,7 +339,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 /* A rank can be wider than 56px when its status word is long (fil, id, kk, ms); the track scrolls sideways, so the item grows instead of its label running into the next one. */
 .rank-row-heading { flex-direction:column;align-items:center;gap:4px;min-width:56px;width:auto;min-height:88px;padding:6px 6px;border-radius:16px; }
 .rank-row-heading[aria-expanded="true"] { background:color-mix(in srgb,var(--v5-ink) 6%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-ink) 12%,transparent); }
-.rank-row-title { font:600 12px/16px var(--font-metric);text-align:center; }
+.rank-row-title { font:500 12px/16px var(--font-metric);text-align:center; }
 .rank-row-sub { margin-top:0;font:500 10px/12px var(--font-v5);text-align:center;white-space:nowrap; }
 .rank-ladder-row[data-status="locked"] .rank-row-heading :deep(.team-rank-emblem) { opacity:.55; }
 .rank-details { margin-top:12px;padding:20px;border-radius:28px;background:var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
@@ -348,9 +348,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-identity { flex-wrap:wrap;column-gap:8px;row-gap:10px;margin-bottom:14px; }
 .rank-identity__emblem { margin-right:8px; }
 .rank-identity__copy { flex:1 1 auto; }
-.rank-current-name { margin-top:0;font:700 36px/40px var(--font-metric);color:var(--v5-brand); }
+.rank-current-name { margin-top:0;font:600 36px/40px var(--font-metric);color:var(--v5-brand); }
 .rank-next-heading { flex:none;align-self:flex-start;margin-left:auto;display:flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:999px;background:var(--v5-surface-2); }
-.rank-next-heading .rank-next-title,.rank-next-heading .rank-caption { font:600 12px/16px var(--font-v5);color:var(--v5-ink-2); }
+.rank-next-heading .rank-next-title,.rank-next-heading .rank-caption { font:500 12px/16px var(--font-v5);color:var(--v5-ink-2); }
 .rank-condition--ring .rank-condition__gap { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
 .rank-condition--ring { position:relative; }
 .rank-sr { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
@@ -361,10 +361,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-ladder-row + .rank-ladder-row::after { content:"";position:absolute;left:-6px;top:26px;width:6px;height:2px;background:var(--v5-surface-3); }
 .rank-ladder-row[data-status="done"] + .rank-ladder-row::after,.rank-ladder-row[data-status="current"]::after { background:var(--v5-brand); }
 .rank-ladder-row[data-status="done"] .rank-row-sub { color:var(--v5-ink-3); }
-.rank-perk-value { font:600 22px/26px var(--font-metric);color:var(--v5-brand); }
+.rank-perk-value { font:500 22px/26px var(--font-metric);color:var(--v5-brand); }
 .rank-perk + .rank-perk .rank-perk-value { color:var(--v5-nex); }
 .rank-reward-item { --nx-tint:var(--v5-warning);padding:14px;border-radius:16px; }
 .rank-reward-summary { justify-content:space-between; }
-.rank-reward-title { font:600 13px/18px var(--font-v5);color:var(--v5-ink); }
-.rank-reward-amount { font:600 16px/20px var(--font-metric);color:var(--v5-nex-ink); }
+.rank-reward-title { font:500 13px/18px var(--font-v5);color:var(--v5-ink); }
+.rank-reward-amount { font:500 16px/20px var(--font-metric);color:var(--v5-nex-ink); }
 </style>

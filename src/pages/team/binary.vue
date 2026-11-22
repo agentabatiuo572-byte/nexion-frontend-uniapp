@@ -411,7 +411,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-record-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 12px; color: var(--ui-device-ink); background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); }
 .binary-recent-source { min-width: 0; flex: 1; }
 .binary-record-name { display: block; font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; overflow-wrap: break-word; margin-bottom: var(--v5-space-1); }
-.binary-record-value { font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 600; overflow-wrap: break-word; }
+.binary-record-value { font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; overflow-wrap: break-word; }
 .binary-record-uvt { color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); overflow-wrap: break-word; }
 .reward-match-amount { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: var(--v5-space-1); max-width: 48%; }
 [role="button"]:focus-visible, [role="link"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
