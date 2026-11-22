@@ -111,7 +111,7 @@
               <GoalProgressBar :pct="goalPct(g.targetUSDT)" />
               <view class="flex items-center justify-between" style="margin-top:6px"><text :style="goalFootMutedStyle">${{ formatAmount(lifeTimeEarnings) }} / ${{ formatAmount(g.targetUSDT) }}</text><text :style="goalFootPctStyle">{{ goalPct(g.targetUSDT).toFixed(0) }}%</text></view>
             </view>
-            <view class="goal-delete nx-frosted-button grid place-items-center" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: formatAmount(g.targetUSDT) })" @click="remove(g.id)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg></view>
+            <view class="goal-delete grid place-items-center" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: formatAmount(g.targetUSDT) })" @click="remove(g.id)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg></view>
           </view>
         </view>
       </view>
