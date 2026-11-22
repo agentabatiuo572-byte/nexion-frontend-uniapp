@@ -48,8 +48,8 @@ const props = defineProps<{ authority: StoreYieldAuthority }>();
 const authority = computed(() => props.authority);
 const baseName = computed(() => t.value.store.ladderPhone);
 const multiplierText = computed(() => props.authority.multiplier === null ? '—' : `${props.authority.multiplier}×`);
-const phoneNexText = computed(() => `+${storefrontNex(authority.value.phone)} UVT`);
-const entryNexText = computed(() => `+${storefrontNex(authority.value.entry)} UVT`);
+const phoneNexText = computed(() => `+${storefrontNex(authority.value.phone)}\u00A0UVT`);
+const entryNexText = computed(() => `+${storefrontNex(authority.value.entry)}\u00A0UVT`);
 const phoneNexFullText = computed(() => `+${storefrontNexFull(authority.value.phone)}${t.value.store.vsPerDay}`);
 const entryNexFullText = computed(() => `+${storefrontNexFull(authority.value.entry)}${t.value.store.vsPerDay}`);
 
