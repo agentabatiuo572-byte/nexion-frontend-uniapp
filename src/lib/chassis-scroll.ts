@@ -1,3 +1,8 @@
+import type { InjectionKey, Ref } from "vue";
+
+/** True while the chassis content is scrolling (reported by its renderjs scroller on App and H5). */
+export const CHASSIS_SCROLLING: InjectionKey<Readonly<Ref<boolean>>> = Symbol("nx-chassis-scrolling");
+
 export function resolveChassisScrollElement(raw: unknown, fallback: () => HTMLElement | null): HTMLElement | null {
   const candidate = raw && typeof raw === "object" && "$el" in raw
     ? (raw as { $el?: unknown }).$el : raw;

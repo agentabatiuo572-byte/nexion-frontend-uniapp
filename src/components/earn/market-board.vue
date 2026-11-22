@@ -19,14 +19,34 @@
       <view class="earn-price-index" lang="en">
         <text class="earn-market__caption">{{ en.market.priceIndex }}</text>
         <text v-if="!priceIndex.length" class="earn-market__status">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
-        <view v-else class="earn-market__grid">
-          <view v-for="w in priceIndex" :key="w.code" class="earn-market__tile">
+        <!-- Three fixed tiles. With more than three workloads, tile i owns workloads i, i+3, … and every
+             ROTATE_MS each tile cross-fades to its next one (staggered), like a quote screen. Screen readers
+             get the full list once; the rotating faces are hidden from them. -->
+        <view
+          v-else
+          ref="rotationRef"
+          class="earn-market__board"
+          role="group"
+          :aria-label="en.market.priceIndex"
+          :tabindex="rotating ? 0 : undefined"
+          @touchstart="held = true"
+          @touchend="held = false"
+          @touchcancel="held = false"
+          @focusin="focused = true"
+          @focusout="focused = false"
+        >
+          <view class="nx-sr-only" role="list"><text v-for="w in priceIndex" :key="w.code" role="listitem">{{ spokenWorkload(w) }}</text></view>
+          <view class="earn-market__grid" aria-hidden="true">
+          <view v-for="(slot, i) in slots" :key="i" class="earn-market__tile" :style="{ '--earn-market-stagger': `${i * 140}ms` }">
+          <view v-for="(w, k) in slot" :key="w.code" class="earn-market__face" :class="{ 'earn-market__face--on': k === step % slot.length }">
             <text class="earn-market__name">{{ workloadCopy(w).name }}</text>
             <text class="earn-market__unit">{{ workloadCopy(w).unit }}</text>
             <text class="earn-market__price">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
             <text class="earn-market__delta" :class="w.delta === null ? undefined : arrow(w)" :style="{ color: arrowColor(w) }"><text v-if="w.delta !== null && Math.abs(w.delta) > 0.05" class="nx-sr-only">{{ w.delta > 0 ? "+" : "−" }}</text>{{ w.delta === null ? "—" : `${Math.abs(w.delta).toFixed(1)}%` }}</text>
             <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} <text class="earn-market__flagship-delta" :class="trendClass(w.flagshipDelta)"><text v-if="trendClass(w.flagshipDelta)" class="nx-sr-only">{{ w.flagshipDelta > 0 ? "+" : "−" }}</text>{{ Math.abs(w.flagshipDelta).toFixed(1) }}%</text></text>
             <view v-if="w.spark.length > 1" class="earn-market__spark"><svg data-native-svg class="earn-market-spark" width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="sparkPoints(w.spark)" fill="none" :stroke="arrowColor(w)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" /></svg></view>
+          </view>
+          </view>
           </view>
         </view>
       </view>
@@ -63,7 +83,7 @@
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
-import { computed } from "vue";
+import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import type { DeviceKind, TaskCategory } from "@/store/types";
 import { useApp } from "@/store/app";
@@ -72,6 +92,8 @@ import { compactMarketUnit, marketWorkloadCopy } from "@/lib/workload-label";
 import { en } from "@/i18n/messages/en";
 import { getProductMedia } from "@/lib/product-media";
 import DeviceArt from "@/components/device-art.vue";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
+import { CHASSIS_SCROLLING } from "@/lib/chassis-scroll";
 
 const PHONE_ART = "/static/img/home-glass-20260928/phone.webp";
 
@@ -118,6 +140,26 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
+// Tile i shows workloads i, i+3, …; one shared step advances every tile. Faces are keyed by code, so a new
+// summary read patches the numbers in place and the rotation keeps its position.
+const ROTATE_MS = 6000;
+const slots = computed(() => [0, 1, 2].map((i) => priceIndex.value.filter((_, j) => j % 3 === i)).filter((slot) => slot.length));
+const rotating = computed(() => priceIndex.value.length > 3);
+const step = ref(0);
+const held = ref(false);
+const focused = ref(false);
+const scrolling = inject(CHASSIS_SCROLLING, ref(false));
+const { elRef: rotationRef, running: inView } = useLoopsInView(".earn-market__board");
+// Off screen, hidden page, scrolling, touch or focus pause the rotation (WCAG 2.2.2). Reduced motion keeps the
+// first faces in CSS, so the App's logic layer needs no media query.
+const rotationActive = computed(() => rotating.value && inView.value && !scrolling.value && !held.value && !focused.value);
+// Every resume waits a full period before the next swap.
+let rotationTimer: ReturnType<typeof setInterval> | undefined;
+watch(rotationActive, (active) => {
+  clearInterval(rotationTimer);
+  rotationTimer = active ? setInterval(() => { step.value += 1; }, ROTATE_MS) : undefined;
+}, { immediate: true });
+onBeforeUnmount(() => clearInterval(rotationTimer));
 const workloadCopy = (row: WorkloadPrice) => {
   const copy = marketWorkloadCopy(en, row.code, row.name, row.unit);
   return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
@@ -126,6 +168,13 @@ const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share" && row.kind !== "phone").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
 
+function spokenWorkload(w: WorkloadPrice): string {
+  const copy = workloadCopy(w);
+  const sign = (delta: number) => delta > 0.05 ? "+" : delta < -0.05 ? "−" : "";
+  const delta = w.delta === null ? "—" : `${sign(w.delta)}${Math.abs(w.delta).toFixed(1)}%`;
+  const flagship = w.flagshipDelta === null ? "" : `, ${en.market.flagshipRow} ${sign(w.flagshipDelta)}${Math.abs(w.flagshipDelta).toFixed(1)}%`;
+  return `${copy.name} ${copy.unit}: ${w.price === null ? "—" : formatUsd(w.price, "detail")}, ${delta}${flagship}`;
+}
 function arrow(w: WorkloadPrice): string {
   return w.delta !== null && w.delta > 0.05 ? "nx-before-arrow-up" : w.delta !== null && w.delta < -0.05 ? "nx-before-arrow-down" : "nx-before-arrow-right";
 }
@@ -172,7 +221,17 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__caption--plain { letter-spacing: 0; text-transform: none; }
 .earn-market__status { display: block; padding: 10px 0; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.earn-market__tile { display: flex; flex-direction: column; min-width: 0; padding: 10px 10px 8px; border-radius: 14px; background: var(--v5-surface-2); }
+.earn-market__board:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 16px; }
+/* Every face of a tile shares one grid cell, so the tile keeps the tallest face's height while they swap. */
+.earn-market__tile { display: grid; min-width: 0; padding: 10px 10px 8px; border-radius: 14px; background: var(--v5-surface-2); }
+.earn-market__face { grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0; opacity: 0; visibility: hidden; transform: translateY(4px);
+  transition: opacity 200ms ease var(--earn-market-stagger, 0ms), transform 200ms ease var(--earn-market-stagger, 0ms), visibility 0s linear calc(200ms + var(--earn-market-stagger, 0ms)); }
+.earn-market__face--on { opacity: 1; visibility: visible; transform: none;
+  transition: opacity 280ms ease calc(200ms + var(--earn-market-stagger, 0ms)), transform 280ms cubic-bezier(0.16, 1, 0.3, 1) calc(200ms + var(--earn-market-stagger, 0ms)), visibility 0s; }
+@media (prefers-reduced-motion: reduce) {
+  .earn-market__face { transition: none; opacity: 0; visibility: hidden; }
+  .earn-market__face:first-child { opacity: 1; visibility: visible; transform: none; }
+}
 [data-theme="light"] .earn-market__tile { background: var(--v5-bg); }
 .earn-market__name { font: 500 11px/14px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-market__unit { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
