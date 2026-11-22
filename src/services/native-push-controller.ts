@@ -13,6 +13,7 @@ export function validNativePushToken(value: NativePushToken, platform: "android"
 export interface NativePushPort {
   platform: "android" | "ios";
   appVersion: string;
+  apnsTopic?: string;
   installationId(): string;
   bindingToken(): string;
   permission(request: boolean): Promise<PushPermission>;
@@ -45,6 +46,8 @@ const ROUTES: Record<string, readonly string[]> = {
   "/pages/me/wallet-withdraw-tracking": ["id"],
   "/pages/support/chat": ["cid"],
   "/pages/me/trial": [],
+  "/pages/team/team": [],
+  "/pages/earn/earn": [],
   "/pages/earn/device-detail": ["id"],
 };
 export function safePushRoute(value: unknown): value is string {
@@ -105,10 +108,11 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
       }, snapshot, captured);
       if (!current(snapshot, captured) || pending !== click) return;
       if (!port.canNavigate()) { retryAllowed = true; return; }
-      if (result.notificationId !== click.id || !safePushRoute(result.route)) { pending = null; return; }
+      if (result.notificationId !== click.id || (result.route !== "" && !safePushRoute(result.route))) { pending = null; return; }
       const key = `${snapshot.user.userId}:${click.id}`;
       if (!opened.has(key)) {
-        if (!await port.navigate(result.route) || !current(snapshot, captured)) return;
+        if (result.route && !await port.navigate(result.route)) { retryAllowed = true; return; }
+        if (!current(snapshot, captured)) return;
         opened.add(key);
       }
       const id = installation(snapshot);
@@ -149,7 +153,8 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
       const token = port.bindingToken();
       await authenticatedRequest({ path: `/api/me/push-installations/${encodeURIComponent(id)}`, method: "PUT",
         headers: { "X-Push-Binding-Token": token },
-        body: { clientId, provider, platform: port.platform, permission, appVersion: port.appVersion } }, snapshot, captured);
+        body: { clientId, provider, platform: port.platform, permission, appVersion: port.appVersion,
+          apnsTopic: port.apnsTopic } }, snapshot, captured);
       if (current(snapshot, captured)) {
         registered = key;
         if (tokenRevision === capturedTokenRevision) port.registrationUnavailable?.(false);
@@ -180,7 +185,7 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
     // A cold click before refresh is retained only for this boot's first authenticated identity.
     if (pending && next?.accessToken && pending.userId === undefined) pending.userId = next.user.userId;
     blocked = false;
-    if (next?.accessToken) void sync(true);
+    if (next?.accessToken) { void sync(true); void flush(); }
   }
   return {
     revoke, sessionChanged, flush, sync,

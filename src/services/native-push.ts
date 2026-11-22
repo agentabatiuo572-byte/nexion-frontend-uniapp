@@ -6,6 +6,7 @@ import { getDeviceId } from "@/lib/device-id";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { hasCheckoutLeaveGuard } from "@/lib/promotion-leave-guard";
 import { navTo } from "@/lib/route";
+import { readHostPackage } from "./test-resource-update";
 import { jpushPrivacyCopy } from "@/i18n/native-push";
 import { useLocaleStore } from "@/store/locale";
 import { createNativePushController, validNativePushToken, type NativePushToken, type PushPermission } from "./native-push-controller";
@@ -154,6 +155,7 @@ export function installNativePush(options: { client: ApiClient; vault: SessionVa
   };
   controller = createNativePushController(options.client, options.vault, {
     platform, appVersion: plus.runtime.version || "1.0.0", installationId: getDeviceId,
+    apnsTopic: platform === "ios" && readHostPackage(platform) === "ai.uvel.app.test" ? "ai.uvel.app.test" : undefined,
     bindingToken() {
       const stored = uni.getStorageSync(proofKey);
       if (typeof stored === "string" && /^[a-f0-9]{64}$/.test(stored)) return stored;

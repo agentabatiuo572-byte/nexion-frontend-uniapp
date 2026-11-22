@@ -141,17 +141,18 @@ object NativePushBridge {
         val id = validId(message.data["notificationId"]) ?: return
         emit(JSONObject().put("type", "received").put("notificationId", id))
         // Notification+data messages in background are displayed by FCM; this callback is foreground.
-        // Data-only messages are unsupported: backend always sends generic notification+data.
-        if (message.notification == null) return
+        val alert = message.notification ?: return
         createChannel(ctx)
         if (Build.VERSION.SDK_INT >= 33 && ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val intent = Intent(ctx, UvelPushClickActivity::class.java)
             .setData(Uri.parse("uvel-push://notification/" + Uri.encode(id))).putExtra("notificationId", id)
         val pending = PendingIntent.getActivity(ctx, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val body = genericNotificationBody(message.notification?.body)
+        val configured = message.data["displayCopy"] == "configured"
+        val title = if (configured) alert.title ?: "UVEL" else "UVEL"
+        val body = if (configured && alert.body != null) alert.body else genericNotificationBody(alert.body)
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(ctx, CHANNEL) else Notification.Builder(ctx)
         val icon = ctx.applicationInfo.icon.takeIf { it != 0 } ?: android.R.drawable.ic_dialog_info
-        val notification = builder.setSmallIcon(icon).setContentTitle("UVEL").setContentText(body)
+        val notification = builder.setSmallIcon(icon).setContentTitle(title).setContentText(body)
             .setContentIntent(pending).setAutoCancel(true).setVisibility(Notification.VISIBILITY_PRIVATE).build()
         (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(id, 0, notification)
     }
