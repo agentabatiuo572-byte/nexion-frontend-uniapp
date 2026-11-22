@@ -543,7 +543,7 @@ async function pay(){
       const eligibility=await Promise.all([...new Set(items.map(item=>item.productNo))].map(productNo=>purchaseEligibilityApi.get(productNo)))
         .catch(()=>null);
       updateClock();if(!entryCurrent()||payWindow.value!==true)return;
-      if(!eligibility){error.value=flowCopy.value.queryFailed;return;}
+      if(!eligibility){error.value=t.value.store.purchaseEligibilityError;return;}
       if(eligibility.some(item=>!item.eligible)){blocked=t.value.store.gateBlockedToast;error.value=blocked;return;}
       ready=true;
     });
