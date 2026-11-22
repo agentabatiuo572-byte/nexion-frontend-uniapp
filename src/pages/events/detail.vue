@@ -74,7 +74,8 @@ import { navTo, takeNavigationQuery } from "@/lib/route";
 import { displayDeadline } from "@/lib/promotion-display";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
-import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref } from "./event-detail-display";
+import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref, eventCommandFailure } from "./event-detail-display";
+import { toast } from "@/store/ui";
 import { uiLocale, serverLanguage } from "@/i18n";
 
 const app = useApp(), locale = useLocaleStore(), api = createEventDetailApi(apiClient);
@@ -139,11 +140,18 @@ async function run() {
       if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
     } else await eventsApi.join(code, `h4-event-join:${code}`);
     if (current()) { busy.value = false; await load(); }
-  } catch {
-    // The outcome is unknown even if this page is gone: a fleet read started during the claim may predate the device.
+  } catch (cause) {
+    // The outcome may be unknown even if this page is gone: a fleet read started during the claim may predate the device.
     // Invalidate it, then read again so a warehouse already on screen does not keep the pre-claim fleet.
     if (deviceClaim) { app.invalidateRemoteFleet(fleetRequest); void app.refreshRemoteFleet(fleetRequest, { coalesce: true }); }
-    if (current()) { busy.value = false; commandError.value = true; unconfirmedAction = selectedAction; await load(); }
+    if (!current()) return;
+    busy.value = false;
+    // Only an unknown outcome is confirmed by reading (03 §3.5.2); a refusal or a 503 from the server is a result: say why
+    // once (03 §3.5.1 toast) and leave the action available. The read shows the event as it now stands.
+    const failure = eventCommandFailure(cause);
+    if (failure === "unknown") { commandError.value = true; unconfirmedAction = selectedAction; }
+    else toast.error(failure === "claimed" ? copy.value.eligibility.CLAIMED : failure === "notEligible" ? copy.value.eligibility.NOT_ELIGIBLE : copy.value.failed[failure]);
+    await load();
   }
 }
 onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/pages/events/detail")); code = String(options?.id ?? query.get("id") ?? "").trim(); reset(); if (visible) void load(); });
