@@ -163,6 +163,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-ap
 import { onLoad, onBackPress, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
+import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
@@ -724,7 +725,9 @@ onLoad((options) => {
 onMounted(() => {
   if (nativePhoneAvailable && (isLogin.value || (!isRecal.value && !resumeDeferred.value))) phase.value = "calibrating";
 });
-onBackPress(() => { leaveConnect(); return true; });
+// A dialog on the page (the replacement confirm) takes this press first (02 §2.7.1).
+const dialogHoldsBack = useDialogBackHeld();
+onBackPress((event) => { if (!dialogHoldsBack(event)) leaveConnect(); return true; });
 onUnmounted(() => {
   mounted = false;
   useUI().clearConfirmsBy(confirmOwner);

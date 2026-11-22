@@ -490,14 +490,15 @@ function pageWaitLandings(): (() => Element | null | undefined)[] {
  *              (断网遮罩只有「重试」一条路),给它接上 Esc 等于凭空造出一个
  *              用户以为处理了、其实什么都没处理的出口。不传则 Esc 不做任何事,
  *              但 Tab 陷阱与焦点归还照常。
- * @param nativeBack 在当前原生页面启用 Android 返回键,仅取消最上层可见弹层。
+ * @param nativeBack 在当前原生页面启用 Android 返回键,仅取消最上层可见弹层。默认开启:能关的弹层都先吃掉系统返回
+ *             (02 §2.7、03 §3.5),close 里的提交守卫照旧;只有确有理由不接系统返回的弹层才显式传 false 并写明原因。
  * @param nativePriority 全局遮罩的既有视觉层级;同级弹层按打开顺序处理。
  */
 export function useDialogA11y(
   open: Ref<boolean>,
   root: string | (() => HTMLElement | null | undefined),
   close?: () => void,
-  nativeBack = false,
+  nativeBack = true,
   nativePriority = 0,
 ): void {
   // #ifdef APP-PLUS
