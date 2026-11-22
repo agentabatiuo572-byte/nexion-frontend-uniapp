@@ -5259,7 +5259,6 @@ export const fil: Messages = {
   ref: {
     invitedYou: "inimbitahan ka",
     welcomeGift: "Isang beses na regalo",
-    welcomeGiftSub: "Tingnan sa resibo ng registration ang status ng regalo. Hindi kailangang bumili ng device.",
     perks: {
       gift: "${usd}\u00A0USDT + {nex}\u00A0UVT na regalo sa pag-sign up",
       day1: "I-calibrate at i-activate ang compute ng phone sa app",

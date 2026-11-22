@@ -4906,7 +4906,6 @@ openSeaErrorPool: {
   ref: {
     invitedYou: "đã mời bạn",
     welcomeGift: "Quà chào mừng một lần",
-    welcomeGiftSub: "Trạng thái quà được ghi trên xác nhận đăng ký. Không cần mua thiết bị.",
     perks: {
       gift: "Quà đăng ký ${usd}\u00A0USDT + {nex}\u00A0UVT",
       day1: "Hiệu chỉnh và bật tính toán trên ứng dụng điện thoại",

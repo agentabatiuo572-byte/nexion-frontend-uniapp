@@ -5259,7 +5259,6 @@ export const uz: Messages = {
   ref: {
     invitedYou: "taklif qildi",
     welcomeGift: "Bir martalik sovgʻa",
-    welcomeGiftSub: "Sovgʻa holatini roʻyxatdan oʻtish tasdigʻida koʻring. Qurilma sotib olish shart emas.",
     perks: {
       gift: "${usd}\u00A0USDT + {nex}\u00A0UVT sovgʻa",
       day1: "Telefon ilovasida telefon quvvatini kalibrlang va faollashtiring",

@@ -5259,7 +5259,6 @@ export const id: Messages = {
   ref: {
     invitedYou: "mengundang Anda",
     welcomeGift: "Hadiah selamat datang satu kali",
-    welcomeGiftSub: "Cek status hadiah di bukti pendaftaran Anda. Tanpa perlu membeli perangkat.",
     perks: {
       gift: "Hadiah daftar ${usd}\u00A0USDT + {nex}\u00A0UVT",
       day1: "Kalibrasi dan aktifkan komputasi ponsel di aplikasi ponsel",

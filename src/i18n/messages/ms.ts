@@ -5259,7 +5259,6 @@ export const ms: Messages = {
   ref: {
     invitedYou: "menjemput anda",
     welcomeGift: "Hadiah alu-aluan sekali",
-    welcomeGiftSub: "Semak resit pendaftaran anda untuk status hadiah. Tidak perlu membeli peranti.",
     perks: {
       gift: "Hadiah daftar ${usd}\u00A0USDT + {nex}\u00A0UVT",
       day1: "Tentukur dan aktifkan pengkomputeran telefon dalam app telefon",

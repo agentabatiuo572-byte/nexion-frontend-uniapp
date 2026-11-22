@@ -5001,7 +5001,6 @@ openSeaErrorPool: {
   ref: {
     invitedYou: "invited you",
     welcomeGift: "One-time welcome gift",
-    welcomeGiftSub: "Check your registration receipt for the gift status. No device purchase needed.",
     perks: {
       gift: "${usd}\u00A0USDT + {nex}\u00A0UVT signup gift",
       day1: "Calibrate and activate phone compute in the phone app",
