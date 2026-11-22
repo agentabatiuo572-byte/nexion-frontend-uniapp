@@ -18,8 +18,11 @@
           <CheckoutRow :label="t.voucher.checkoutRowLabel" :value="pendingCreateTerms.voucher" :code="pendingCreateTerms.voucherCode" class="checkout-fee" />
         </view>
       </view>
-      <view v-else-if="keepCheckoutTarget" class="checkout-page-center" role="status">
-        <text class="checkout-page-state">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : keepRecoveryOperation === 'replace' ? (keepResumeAllowed ? t.tradein.recoveryResumable : t.tradein.recoveryChecking) : keepResumeAllowed ? t.tradein.keepRecoveryResumable : t.tradein.keepRecoveryChecking }}</text>
+      <!-- Original purchase state (03 §3.6.1 结果头): the result, which purchase it is, what not to do. No query button (03 §3.5.2). -->
+      <view v-else-if="keepCheckoutTarget" class="checkout-page-center checkout-keep-state" :class="{ 'checkout-keep-state--float': keepResumeAllowed, 'checkout-keep-state--tray': keepCheckoutReadError && !keepResumeAllowed }">
+        <NxResultHead tone="warning" :icon="keepCheckoutReadError ? 'alert' : 'clock'" :title="keepRecoveryNotice.title" :description="keepRecoveryProduct ? capacityOrderLine(keepRecoveryProduct) : keepRecoveryNotice.note">
+          <text v-if="keepRecoveryProduct" class="checkout-keep-note">{{ keepRecoveryNotice.note }}</text>
+        </NxResultHead>
       </view>
       <view v-else-if="remoteTradeinRecoveryError" class="checkout-recovery-state nx-empty--page" role="status">
         <text>{{ t.tradein.recoveryChecking }}</text>
@@ -255,6 +258,11 @@
       <view v-if="promotionRoute ? promotionCheckout?.keepResumeAllowed : keepResumeAllowed" class="checkout-sticky checkout-sticky--single nx-glass-bar">
         <NxButton variant="primary" :disabled="tradein.state.kind === 'keep-recovery'" :label="purchaseRecoveryCopy(locale.code).resume" @click="promotionRoute ? promotionCheckout?.openKeepResume() : openKeepResume()" />
       </view>
+      <!-- The original purchase cannot be identified: payment stays blocked, the ways out are the orders list and support (04 §4.0 tray). -->
+      <view v-if="(promotionRoute ? promotionCheckout?.keepRecoveryTarget && promotionCheckout.keepRecoveryReadError && !promotionCheckout.keepResumeAllowed : keepCheckoutTarget && keepCheckoutReadError && !keepResumeAllowed)" class="checkout-sticky checkout-sticky--exits nx-glass-bar">
+        <NxButton variant="secondary" :label="t.tradein.recoveryContactSupport" :busy="recoverySupportOpening" @click="openRecoverySupport" />
+        <NxButton variant="primary" :label="t.tradein.recoveryViewOrders" @click="navTo('/pages/store/orders')" />
+      </view>
       <view v-if="!promotionRoute && (originalOrderNavigationFailed || pendingCreateTerms) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
         <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
@@ -283,7 +291,7 @@ import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
-import { checkoutKeepResumeKey, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
+import { capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, originalCapacityCheckoutHref, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute } from '@/lib/advisor-chat-route';
 import { useConversations } from '@/store/conversations';
@@ -457,7 +465,17 @@ const app = useApp();
 const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string}&VoucherEntryContext)|null>(null);
 const keepCheckoutRecovery = shallowRef<(CheckoutCapacityRecovery & { accountKey: string }) | null>(null);
 const keepCheckoutTarget = computed(() => keepCheckoutRecovery.value?.target ?? null);
-const keepCheckoutReadError = computed(() => keepCheckoutRecovery.value?.commandKey === null);
+const capacityUnreadableTarget = shallowRef<string | null>(null);
+provide(checkoutCapacityUnreadableTargetKey, capacityUnreadableTarget);
+const keepCheckoutReadError = computed(() => keepCheckoutRecovery.value?.commandKey === null || (
+  keepCheckoutTarget.value !== null && keepCheckoutTarget.value === capacityUnreadableTarget.value
+));
+const keepRecoveryProduct = computed(() => {
+  const original = keepCheckoutRecovery.value;
+  return original?.accountKey === app.accountKey && original.operation && !keepCheckoutReadError.value
+    ? { productName: original.productName, payableUsdt: original.payableUsdt }
+    : null;
+});
 const keepRecoveryOperation = computed(() => keepCheckoutRecovery.value?.operation ?? null);
 const checkoutKeepResume = shallowRef<CheckoutKeepResume | null>(null);
 provide(checkoutKeepResumeKey, checkoutKeepResume);
@@ -467,7 +485,8 @@ const keepResumeAllowed = computed(() => {
   return !!resume && recovery?.accountKey === app.accountKey
     && resume.target === recovery.target && resume.commandKey === recovery.commandKey && resume.operation === recovery.operation;
 });
-defineExpose({ keepRecoveryOperation, keepResumeAllowed, openKeepResume });
+const keepRecoveryNotice = computed(() => capacityRecoveryNotice(t.value, keepCheckoutReadError.value, keepRecoveryOperation.value, keepResumeAllowed.value));
+defineExpose({ keepRecoveryOperation, keepRecoveryProduct, keepResumeAllowed, openKeepResume });
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
@@ -750,7 +769,7 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false, resu
         tradein.showCanonicalReplace(target as DeviceKind, pending.quote.payableUsdt, pending.quote);
         return true;
       }
-      recovery = { target, commandKey: pending.key, operation: pending.operation };
+      recovery = { ...describeCapacityOriginal(pending, t.value), commandKey: pending.key, operation: pending.operation };
     }
     catch {
       if (resume) return false;
@@ -1343,11 +1362,17 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'foreground
       checkoutOnboardingRequired.value = false;
       checkoutCapacityTradeinRejection.value = undefined;
       if (mode === 'interactive' && hasVoucher.value) return;
+      if (mode === 'interactive' && recoverCapacityBeforePurchase([kind], true)) return true;
       const sourceIds = eligibility?.sources.filter((source) => source.eligible)
         .map((source) => String(source.sourceDeviceId)) ?? [];
       if (quote.decision === "REPLACE_REQUIRED") {
         tradeinAvailable.value = true;
         if (mode !== 'interactive') return true;
+        const recoveryHref = originalCapacityCheckoutHref(requestScope.accountKey);
+        if (recoveryHref) {
+          void navReplace(recoveryHref);
+          return true;
+        }
         if (eligibility?.eligible && sourceIds.length > 0) {
           tradein.showChoice(kind, p.price, sourceIds);
         } else {
@@ -1487,6 +1512,14 @@ function contactResultSupport() {
   const orderNo = completedOrder.value?.id;
   if (!orderNo) return;
   uni.setClipboardData({ data: orderNo, success: async () => { if (!pageAlive) return; const route = await advisorChatRoute(conversations); if (pageAlive) void navTo(route); } });
+}
+// Support from the unreadable original-purchase state: there is no order number to copy, only the chat to open.
+const recoverySupportOpening = ref(false);
+async function openRecoverySupport() {
+  if (recoverySupportOpening.value) return;
+  recoverySupportOpening.value = true;
+  try { const route = await advisorChatRoute(conversations); if (pageAlive) void navTo(route); }
+  finally { recoverySupportOpening.value = false; }
 }
 const checkoutResultReading = ref(false);
 async function refreshCheckoutResult() {
@@ -2654,6 +2687,12 @@ async function submitRemoteOrder(): Promise<void> {
       throw new Error("E3_TRADEIN_QUOTE_REQUIRED");
     }
     if (tradeinContext) {
+      const recoveryHref = originalCapacityCheckoutHref(submissionScope.accountKey);
+      if (recoveryHref) {
+        confirming = false;
+        void navReplace(recoveryHref);
+        return;
+      }
       const recovery: CheckoutTradeinRecovery = { productNo: p.id, orderNo: "", intent: remoteOrderIntent(),
         commandKey: remoteOrderKey(), tradeinQuote: { ...tradeinContext.canonicalQuote! }, tradeinCommandSubmitted: false };
       rememberCheckoutOrder(submissionScope.accountKey, recovery);
@@ -3794,6 +3833,8 @@ button.checkout-policy-link::after { border:0; }
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }
 .checkout-sticky--single :deep(.nx-button) { flex:1 1 auto; }
+/* Two exits share the row; if a long language still wraps, each button takes the full width (03 §3.6.1). */
+.checkout-sticky--exits :deep(.nx-button) { flex:1 1 auto; }
 .checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }
 .checkout-summary-total :deep(.checkout-amount) { font-size:var(--ui-type-section); }
 /* Whole-page pending result (03 §3.4, §3.5.2): one centred status, no query button; short-body role (10.1). */
@@ -3813,6 +3854,10 @@ button.checkout-policy-link::after { border:0; }
 .checkout-page-center { flex:1 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:var(--v5-space-5); text-align:center; }
 /* With the floating 重新提交 button the group centres in the space above it (button 48 + offset 22 + gap 16). */
 .checkout-content:has(.checkout-original-open--action) { padding-bottom:calc(48px + var(--nx-tray-bottom, 22px) + 16px); }
+/* The original-purchase state centres above its bottom action: the lone 继续本笔支付, or the 联系客服／查看订单 tray (04 §4.0). */
+.checkout-content:has(.checkout-keep-state--float) { padding-bottom:calc(48px + var(--nx-tray-bottom, 22px) + 16px); }
+.checkout-content:has(.checkout-keep-state--tray) { padding-bottom:var(--nx-tray-clearance); }
+.checkout-keep-note { display:block; max-width:320px; margin-top:var(--v5-space-1); color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap:pretty; }
 .checkout-capacity-notice { display:block; margin:var(--v5-space-2) 2px 0; }
 /* Receipt write failure is a solid content card: title, one caption line, in-place retry bottom-right (DS 01 §1.1.2, 03 §3.1). */
 .checkout-receipt-failure { margin:var(--ui-space-card-gap) var(--v5-space-4) 0; padding:var(--ui-space-inset); }
