@@ -25,7 +25,7 @@
 
       <view v-else-if="catalogStatus === 'error'" class="checkout-page-center">
         <text class="checkout-page-state">{{ t.store.catalogErrorTitle }}</text>
-        <NxButton variant="text" size="small" :label="t.leaderboard.retry" @click="refreshVisibleCheckout(true)" />
+        <NxButton variant="text" size="small" :label="t.ui.reload" @click="refreshVisibleCheckout(true)" />
       </view>
 
       <view v-else-if="trialQuoteScreenUnavailable" class="text-center" role="status" style="padding: var(--v5-space-6) var(--v5-space-4)">
