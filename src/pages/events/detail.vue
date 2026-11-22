@@ -154,6 +154,11 @@ async function load() {
         if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
         commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
         void forgetPendingEventCommand(app.accountKey, code);
+      } else if (unconfirmedAction && eventDetailAction(value) !== unconfirmedAction) {
+        // The event no longer offers that action (ended, claimed, no longer open to join or remind): nothing is left to
+        // confirm, so the note and the record go.
+        commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
+        void forgetPendingEventCommand(app.accountKey, code);
       }
     }
   } catch (cause) { if (current()) { error.value = true; if (!isTransientReadFailure(cause)) detail.value = null; } }
@@ -175,7 +180,7 @@ async function run() {
   // Recorded before sending, as checkout does, so a reload while the result is unknown still confirms it. The record only
   // restores the confirming note; the fixed idempotency key keeps a resend safe without it, so a storage failure does not
   // block the command.
-  void rememberPendingEventCommand(account, code, { action: selectedAction, key: commandKey, claimKey: selectedAction === "claim" ? claimKey : "" });
+  void rememberPendingEventCommand(account, code, { action: selectedAction, key: commandKey, claimKey: selectedAction === "claim" ? claimKey : "", at: Date.now() });
   try {
     if (selectedAction === "remind") await api.remind(code, commandKey);
     else if (selectedAction === "claim") {
