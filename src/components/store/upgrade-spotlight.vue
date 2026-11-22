@@ -13,8 +13,10 @@
       <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">${{ formatGroupedAmount(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
       <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">${{ formatGroupedAmount(target.dailyEarn) }}{{ t.store.cardPerDaySuffix }}</text></view>
     </view>
-    <text class="upgrade-note">{{ t.store.cardYouEarn }}</text>
-    <NxButton class="upgrade-action" variant="secondary" size="medium" :label="copy.details" @click="open" />
+    <view class="upgrade-footer">
+      <text class="upgrade-note">{{ t.store.cardYouEarn }}</text>
+      <NxButton class="upgrade-action" variant="secondary" size="medium" :label="copy.details" @click="open" />
+    </view>
   </view>
 </template>
 <script setup lang="ts">
@@ -96,9 +98,10 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-comparison__label { display:block; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .upgrade-comparison__value { display:block; margin-top:2px; font:var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric:tabular-nums; }
 .upgrade-comparison__value--target { color:var(--v5-brand); }
-.upgrade-note { display:block; margin-top:10px; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
-.upgrade-spotlight .upgrade-action { display:flex; margin-top:14px; min-height:44px; padding:0; }
-.upgrade-action :deep(.nx-button__surface) { min-height:44px; }
+/* Card action (03 §3.1): neutral glass M at the bottom right, the note beside it; the button drops below, still right-aligned, when the row is too narrow. */
+.upgrade-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 12px; margin-top:10px; }
+.upgrade-note { flex:1 1 120px; min-width:0; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
+.upgrade-spotlight .upgrade-action { margin-left:auto; }
 @keyframes upgrade-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .upgrade-art__target--ready { animation-play-state:paused; }
 @media(max-width:350px) { .upgrade-art__base { left:0; width:min(84px,34%); }.upgrade-art__target { width:min(136px,50%); }.upgrade-art__arrow { left:42%; width:42px; height:29px; } }
