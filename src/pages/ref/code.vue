@@ -17,7 +17,7 @@
 
       <!-- [FEAT-SHARE4] 异常2:本机已登录 → 提示条 + CTA 变「进入」,不重复领礼 -->
       <view v-if="authed" :style="alreadyBarStyle">
-        <text>{{ rewardEnabled ? t.ref.alreadyBar : t.ref.alreadyBarNoReward }}</text>
+        <text>{{ giftShown ? t.ref.alreadyBar : t.ref.alreadyBarNoReward }}</text>
       </view>
 
       <!-- Sponsor hero([FEAT-SHARE4] 异常1:无码/非法码 → 整块隐藏;已登录也隐藏,
@@ -40,7 +40,7 @@
       </view>
 
       <!-- Gift hero: every new account gets the newcomer gift, so it follows the gated reward config with or without a code. -->
-      <view v-if="rewardEnabled" class="nx-glass-card text-center relative overflow-hidden" :style="giftCardStyle">
+      <view v-if="giftShown" class="nx-glass-card text-center relative overflow-hidden" :style="giftCardStyle">
         <text class="block" :style="giftLabelStyle">{{ t.ref.welcomeGift }}</text>
         <view class="flex items-baseline justify-center" style="gap: 6px; margin-top: 8px">
           <text :style="giftAmountStyle">${{ formatAmount(giftUsdt) }}</text>
@@ -60,8 +60,8 @@
 
       <!-- CTA(已登录 → 进入 UVEL,隐藏注册入口;异常2) -->
       <view v-if="!authed && referralCta === 'referral'" class="ref-cta nx-frosted-button w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister"  @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
-        <svg v-if="rewardEnabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
-        <text style="margin: 0 8px">{{ rewardEnabled ? fmt(t.ref.claimCta, { usd: formatAmount(giftUsdt), nex: formatAmount(giftNex) }) : t.ref.joinCta }}</text>
+        <svg v-if="giftShown" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
+        <text style="margin: 0 8px">{{ giftShown ? fmt(t.ref.claimCta, { usd: formatAmount(giftUsdt), nex: formatAmount(giftNex) }) : t.ref.joinCta }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
       <view v-else-if="!authed && referralCta === 'ordinary'" class="ref-cta nx-frosted-button w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister"  @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
@@ -142,7 +142,7 @@ import { useConfig } from "@/store/config";
 import { usePublishedNetworkStats } from "@/composables/use-published-network-stats";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
-import { visibleReferralGift } from "@/lib/referral-reward-gate";
+import { newcomerSubtitleKind, visibleReferralGift } from "@/lib/referral-reward-gate";
 import { referralCtaMode, resolveReferralAttributionCode, type ReferralPreviewState } from "@/lib/referral-preview-state";
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
@@ -163,6 +163,8 @@ const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
 // 新人礼包不再需要邀请人：金额单源派生自已过 H8 闸门的 platform config（远程模式已合并 /api/config/referral-rewards）。
 const giftUsdt = computed(() => localGift.value.usdtAmount);
 const giftNex = computed(() => localGift.value.nexAmount);
+// Same gate as the register page: an open gift with both amounts at 0 promises nothing, so the page treats it as no gift.
+const giftShown = computed(() => newcomerSubtitleKind(rewardEnabled.value, giftUsdt.value, giftNex.value) === "amount");
 const referralCta = computed(() => remotePreviewState.value === "loading" ? "ordinary" : referralCtaMode(remoteApiEnabled, remotePreviewState.value));
 const referralAttribution = computed(() => resolveReferralAttributionCode(
   remoteApiEnabled,
@@ -253,7 +255,7 @@ const ALL_PERKS: { key: PerkKey; icon: string; tint: string }[] = [
   { key: "sponsor", icon: USERS_SVG, tint: "var(--v5-tech-cyan)" },
 ];
 // The inviter perk is a promise about a friend inviter, so it needs a confirmed friend code.
-const perks = computed(() => ALL_PERKS.filter((perk) => (rewardEnabled.value || perk.key !== "gift")
+const perks = computed(() => ALL_PERKS.filter((perk) => (giftShown.value || perk.key !== "gift")
   && (perk.key !== "sponsor" || remotePreview.value?.kind === "USER")));
 function perkLabel(k: PerkKey): string {
   const s = t.value.ref.perks[k];
