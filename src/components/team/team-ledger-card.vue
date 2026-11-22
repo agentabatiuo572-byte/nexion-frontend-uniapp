@@ -123,7 +123,7 @@ export default countUpView;
 .team-ledger__value { font: 600 12px/16px var(--font-metric); color: var(--v5-ink); }
 .team-ledger__feedback { display: grid; pointer-events: none; }
 .team-ledger__feedback-item { grid-area: 1 / 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 12px; visibility: hidden; pointer-events: none; color: var(--v5-ink-3); font: 400 12px/1.5 var(--font-v5); }
-.team-ledger__feedback-item > text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.team-ledger__feedback-item > text { flex: 1; min-width: 0; overflow-wrap: break-word; }
 .team-ledger__feedback-item.is-active { visibility: visible; pointer-events: auto; }
 .team-ledger__retry { flex: none; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--v5-brand); font: 600 13px/20px var(--font-v5); white-space: nowrap; cursor: pointer; }
 .team-ledger__retry:active { opacity: .7; }

@@ -232,8 +232,8 @@ const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(na
 const trial = useFreeTrial();
 onShow(() => {
   app.setTaskReadPageVisible("device-inventory", true);
-  void trial.refreshVisible();
-  if (remoteApiEnabled) void app.refreshRemoteFleet(undefined, { coalesce: true });
+  void trial.refreshVisible(false, true);
+  if (remoteApiEnabled) void app.ensureRemoteFleet();
 });
 onHide(() => app.setTaskReadPageVisible("device-inventory", false));
 const trialPresentation = useTrialPresentation();
@@ -248,14 +248,17 @@ const inventoryError = computed(() => !inventoryReady.value && (app.remoteFleetS
   || trial.authorityStatus === "error"
   || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")));
 const inventoryLoading = computed(() => !inventoryReady.value && !inventoryError.value);
-async function retryInventory() {
-  await Promise.all([refreshRemoteFleetAfterCatalog(app.accountKey), trial.poll(Date.now())]);
+async function retryInventory(retryTransientAssignments = false) {
+  await Promise.all([refreshRemoteFleetAfterCatalog(app.accountKey, retryTransientAssignments), trial.poll(Date.now())]);
 }
 useAutoRecovery({
   failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && trial.authorityStatus !== "loading"
     && productCatalogState.status !== "loading" && (app.remoteFleetStatus === "error" || trial.authorityStatus === "error"
+      || app.remoteAssignmentStatus === "error"
+      || (app.remoteFleetHasSnapshot && !app.remoteAssignmentHasSnapshot && app.remoteAssignmentStatus === "idle")
       || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")),
   retry: retryInventory,
+  retryOnPullOrReconnect: () => retryInventory(true),
 });
 
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));

@@ -1,7 +1,7 @@
 <template>
   <NxSheet :open="open" :title="title || t.promotion.rules" @close="emit('close')">
     <view v-for="(entry,index) in uniqueDisclosures" :key="index" class="promotion-rule-section">
-      <text class="promotion-title">{{ localized(entry.title,locale.code) }}</text>
+      <text class="promotion-title promotion-title--section">{{ localized(entry.title,locale.code) }}</text>
       <DisclosureDetails :disclosure="entry" />
     </view>
     <view v-for="rule in rules" :key="rule.id" class="promotion-rule-section"><text class="promotion-copy" style="white-space:pre-wrap">{{ rule.text }}</text></view>

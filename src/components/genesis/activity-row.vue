@@ -123,8 +123,8 @@ const timeStyle: CSSProperties = {
 
 <style scoped>
 .genesis-activity-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; }
-.genesis-activity-value { min-width: 0; max-width: 120px; overflow-wrap: anywhere; }
+.genesis-activity-value { min-width: 0; max-width: 120px; overflow-wrap: break-word; }
 .genesis-activity-time-row { grid-column: 2 / -1; min-width: 0; }
-.genesis-activity-description, .genesis-activity-time { white-space: normal; overflow-wrap: anywhere; }
+.genesis-activity-description, .genesis-activity-time { white-space: normal; overflow-wrap: break-word; }
 .genesis-activity-time { min-width: 0; }
 </style>

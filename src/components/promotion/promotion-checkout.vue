@@ -83,17 +83,16 @@
           <view class="promotion-summary"><text>{{ p.discount }}</text><text class="checkout-discount-value">{{ formatDiscount(summary.discountUsdt) }}</text></view>
           <view class="promotion-summary total"><text>{{ p.total }}</text><CheckoutAmount :value="summary.amountUsdt" currency="USD" /></view>
         </view>
-        <view v-if="order ? order.paymentStatus==='PENDING'&&order.payBy : promotion?.endsAt" class="promotion-row"><text aria-hidden="true">◷</text><view class="promotion-grow"><text class="promotion-copy">{{ order ? p.payBy : p.deadline }}</text><text class="promotion-copy">{{ displayDeadline(order?.payBy??promotion!.endsAt,locale.code) }}</text></view></view>
+        <view v-if="order ? order.paymentStatus==='PENDING'&&order.payBy : promotion?.endsAt" class="promotion-row"><NxIcon class="promotion-row__icon" name="clock" :size="18" /><view class="promotion-grow"><text class="promotion-copy">{{ order ? p.payBy : p.deadline }}</text><text class="promotion-copy">{{ displayDeadline(order?.payBy??promotion!.endsAt,locale.code) }}</text></view></view>
       </view>
       <view v-if="displayQuote?.warnings.length" class="promotion-notice"><text v-for="(warning,index) in displayQuote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text></view>
       <template v-if="auth.isAuthenticated">
         <template v-if="order">
           <text class="promotion-copy">{{ p.orderNo }} · {{ order.orderNo }}</text>
-          <text class="promotion-title">{{ order.paymentStatus==='REFUNDED' ? p.refunded : order.paymentStatus==='PENDING' ? p.pending : order.paymentStatus==='CANCELLED' ? p.rewardCancelled : order.paymentStatus==='EXPIRED' ? t.orders.statusExpired : p.unavailable }}</text>
+          <text class="promotion-title promotion-title--section">{{ order.paymentStatus==='REFUNDED' ? p.refunded : order.paymentStatus==='PENDING' ? p.pending : order.paymentStatus==='CANCELLED' ? p.rewardCancelled : order.paymentStatus==='EXPIRED' ? t.orders.statusExpired : p.unavailable }}</text>
           <text v-if="order.paymentStatus==='PENDING'&&payWindow!==true" class="promotion-notice">{{ p.unknown }}</text>
 
           <view class="promotion-link" role="button" tabindex="0" @click="viewOrder"><text>{{ p.viewOrder }}</text></view>
-          <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
         </template>
         <template v-else-if="!unknown">
           <text v-if="quote&&!quoteFresh" class="promotion-notice">{{ p.quoteExpired }}</text>
@@ -194,6 +193,8 @@ const account=app.accountKey,epoch=app.accountBindingEpoch;let alive=true,readGe
 const readCurrent=(generation:number)=>current()&&visible.value&&generation===readGeneration;
 const recoveryRead=shallowRef<Promise<boolean>|null>(null);
 const recoveryReadFailed=ref(false);
+const paymentEligibilityReadFailed=ref(false);
+const paymentEligibilityRecoveryBusy=ref(false);
 let recoveryGeneration:number|null=null;
 const TABLE=PROMOTION_CHECKOUT_TABLE;
 let storageReadable=true;let records:Record<string,PromotionCheckoutRecord>={};
@@ -213,6 +214,7 @@ const resultSettled=computed(()=>resultState.value==='activated'||resultState.va
 let resultGeneration=0;
 watch(()=>order.value?.orderNo,()=>{
   resultGeneration++;resultReading.value=false;resultState.value='processing';resultError.value='';
+  paymentEligibilityReadFailed.value=false;
 },{flush:'sync'});
 const receiptQuote=computed(()=>order.value?.promotionQuoteId===quote.value?.quoteId?quote.value:null);
 const summary=computed(()=>order.value?{
@@ -368,7 +370,7 @@ watch(()=>productCatalogState.status,status=>{
   }
 });
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!quoteBlock.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
-const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
+const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!paymentEligibilityRecoveryBusy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
 function showOperationError(cause:unknown){
@@ -517,6 +519,30 @@ async function createOrder(){if(!current()||!visible.value||leaving.value||recov
 const paymentDialogOwner=`promotion-payment:${Date.now()}:${Math.random()}`;
 // Photo signatures can renew while payment terms stay the same.
 function orderItemSignature(items:OrderReceipt['items']){return JSON.stringify(items?.map(({imageUrl,...line})=>line));}
+function paymentEntryFence(expected:OrderReceipt):()=>boolean {
+  const generation=readGeneration,runtime=captureRuntimeRevision(),sessionRevision=sessionVault.revision();
+  const signature=JSON.stringify([expected.orderNo,expected.amountUsdt,expected.payBy,orderItemSignature(expected.items)]);
+  return ()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
+    &&(sessionVault.revision()===sessionRevision||sessionVault.isRefreshContinuation(sessionRevision))
+    &&session.confirmed&&!session.unknown&&order.value?.paymentStatus==='PENDING'
+    &&JSON.stringify([order.value.orderNo,order.value.amountUsdt,order.value.payBy,orderItemSignature(order.value.items)])===signature;
+}
+async function checkPaymentEligibility(expected:OrderReceipt,entryCurrent:()=>boolean){
+  const productNos=[...new Set((expected.items??[]).map(item=>item.productNo))];
+  const results=await Promise.allSettled(productNos.map(productNo=>purchaseEligibilityApi.get(productNo)));
+  updateClock();if(!entryCurrent()||payWindow.value!==true)return;
+  const blocks=results.map(item=>item.status==='rejected'
+    ?checkoutQuoteBlock(item.reason,'eligibility')
+    :item.value.eligible?null:checkoutQuoteBlock(item.value.decisionCode,'eligibility'));
+  const reason=blocks.find(block=>block&&block!=='unavailable')??null;
+  const rejected=results.some(item=>item.status==='rejected');
+  const blocked=reason?checkoutQuoteBlockCopy(reason,t.value)
+    :!rejected&&results.some(item=>item.status==='fulfilled'&&!item.value.eligible)?t.value.store.gateBlockedToast:'';
+  paymentEligibilityReadFailed.value=!blocked&&blocks.includes('unavailable');
+  if(blocked||rejected)error.value=blocked||t.value.store.purchaseEligibilityError;
+  else if(error.value===t.value.store.purchaseEligibilityError)error.value='';
+  return {ready:!blocked&&!rejected,blocked};
+}
 async function pay(){
   updateClock();if(paymentEntryChecking.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
   if(session.externalPaymentRefused){
@@ -531,22 +557,14 @@ async function pay(){
     const recovered=await recover();
     if(recoveryReadFailed.value&&current()&&visible.value)error.value=flowCopy.value.queryFailed;
     if(!recovered||!canPay.value||!current()||!visible.value)return;
-    const expectedOrder=order.value,generation=readGeneration,runtime=captureRuntimeRevision(),sessionRevision=sessionVault.revision();
+    const expectedOrder=order.value;
     if(!expectedOrder)return;
-    const signature=JSON.stringify([expectedOrder.orderNo,expectedOrder.amountUsdt,expectedOrder.payBy,orderItemSignature(expectedOrder.items)]);
-    const entryCurrent=()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
-      &&(sessionVault.revision()===sessionRevision||sessionVault.isRefreshContinuation(sessionRevision))
-      &&session.confirmed&&!session.unknown&&order.value?.paymentStatus==='PENDING'
-      &&JSON.stringify([order.value.orderNo,order.value.amountUsdt,order.value.payBy,orderItemSignature(order.value.items)])===signature;
+    const entryCurrent=paymentEntryFence(expectedOrder);
     let ready=false,blocked='';
     await run(async()=>{
-      const items=(expectedOrder.items??[]).map(({productNo,quantity})=>({productNo,quantity}));
-      const eligibility=await Promise.all([...new Set(items.map(item=>item.productNo))].map(productNo=>purchaseEligibilityApi.get(productNo)))
-        .catch(()=>null);
-      updateClock();if(!entryCurrent()||payWindow.value!==true)return;
-      if(!eligibility){error.value=flowCopy.value.queryFailed;return;}
-      if(eligibility.some(item=>!item.eligible)){blocked=t.value.store.gateBlockedToast;error.value=blocked;return;}
-      ready=true;
+      const result=await checkPaymentEligibility(expectedOrder,entryCurrent);
+      ready=result?.ready??false;
+      blocked=result?.blocked??'';
     });
     if(ready&&entryCurrent()&&canPay.value){paymentSheetOpen.value=true;void confirmPayment();}
     else if(blocked&&entryCurrent()&&canCancel.value){
@@ -685,7 +703,22 @@ async function readActivation(){
   finally{if(generation===resultGeneration)resultReading.value=false;}
 }
 const purchaseReadBusy=()=>loading.value||busy.value||session.busy||!!recoveryRead.value||resultReading.value
-  ||walletState.value==='loading'||paymentConfirming.value||paymentEntryChecking.value||paymentSheetOpen.value||leaving.value||voucherLoading.value;
+  ||walletState.value==='loading'||paymentConfirming.value||paymentEntryChecking.value||paymentEligibilityRecoveryBusy.value
+  ||paymentSheetOpen.value||leaving.value||voucherLoading.value;
+useAutoRecovery({
+  failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&paymentEligibilityReadFailed.value
+    &&session.confirmed&&!unknown.value&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true,
+  retry:async()=>{
+    const expected=order.value;
+    if(!expected)return;
+    paymentEligibilityRecoveryBusy.value=true;
+    try{await checkPaymentEligibility(expected,paymentEntryFence(expected));}
+    finally{paymentEligibilityRecoveryBusy.value=false;}
+  },
+  retryNotBefore:()=>Math.max(0,...(order.value?.items??[]).map(item=>purchaseEligibilityApi.readCooldownUntil(item.productNo))),
+  repeatMs:30_000,
+  quiet:false,
+});
 useAutoRecovery({
   failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!session.retryOriginal
     &&(unknown.value||recoveryReadFailed.value||!!order.value&&!session.confirmed
@@ -818,6 +851,10 @@ const footer = computed(() => {
     label: t.value.myDevices.inventoryTitle, disabled: !visible.value||leaving.value,
     action: () => navTo('/pages/me/devices'), note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
   if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder, note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
+  // Original order refunded, cancelled or expired: 再买一单 is the page's main action, so it sits in the bottom bar (04 §4.0)
+  // as a lone floating button; the old order's amount is not this purchase's total, so the bar shows no amount.
+  if (order.value.paymentStatus !== 'PAID' && !openedOriginal && !props.orderNo && props.items.length && canStartNew.value)
+    return { amount, amountValue, currency, amountless: true, label: p.value.buyAgain, disabled: busy.value||leaving.value, action: startNewPurchase };
   return null;
 });
 const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
@@ -869,8 +906,8 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-discount-row { display:flex; align-items:center; gap:var(--ui-space-inline); min-height:64px; box-sizing:border-box; padding:var(--ui-space-inline) var(--ui-space-inset); border-bottom:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-discount-row:last-child { border-bottom:0; }
 .checkout-discount-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); color:var(--v5-ink-2); }
-.checkout-discount-title { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
-.checkout-discount-description { display:block; margin-top:2px; font:400 13px/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
+.checkout-discount-title { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:break-word; }
+.checkout-discount-description { display:block; margin-top:2px; font:400 13px/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .checkout-discount-chevron { flex:none; color:var(--v5-ink-4); }
 .checkout-voucher-row { gap:12px; color:var(--v5-ink); }
 .checkout-voucher-row[aria-disabled="true"] { opacity:.45; }
@@ -885,13 +922,13 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-rewards :deep(.promotion-copy) { margin-top:2px; font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); }
 .checkout-reward-terms { margin:0 16px 0 64px; }
 .checkout-discount-value { color:var(--v5-brand); font-variant-numeric:tabular-nums; }
-.checkout-discount-row .checkout-discount-value { flex-shrink:0; max-width:45%; overflow-wrap:anywhere; text-align:right; font:600 15px/20px var(--font-v5); }
+.checkout-discount-row .checkout-discount-value { flex-shrink:0; max-width:45%; overflow-wrap:break-word; text-align:right; font:600 15px/20px var(--font-v5); }
 .checkout-wallet { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:var(--ui-space-inline); padding:var(--ui-space-inset); }
 .checkout-wallet-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:var(--ui-radius-icon); color:var(--v5-brand); background:var(--ui-content-surface-2); }
 .checkout-wallet-details { min-width:0; }
 .checkout-wallet-balance { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--v5-space-1) var(--v5-space-2); margin-top:var(--v5-space-1); }
-.checkout-wallet-label,.checkout-wallet-state { font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
-.checkout-wallet-amount { font-size:var(--ui-type-list-title); font-weight:600; line-height:1.5; color:var(--v5-ink); overflow-wrap:anywhere; }
+.checkout-wallet-label,.checkout-wallet-state { font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
+.checkout-wallet-amount { font-size:var(--ui-type-list-title); font-weight:600; line-height:1.5; color:var(--v5-ink); overflow-wrap:break-word; }
 .checkout-wallet-topup { display:flex; align-items:center; justify-content:flex-end; gap:var(--v5-space-1); min-width:44px; min-height:44px; color:var(--v5-brand); font:500 var(--ui-type-list-subtitle)/18px var(--font-v5); cursor:pointer; }
 .checkout-wallet-topup svg { flex:none; }
 .checkout-wallet-topup:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }

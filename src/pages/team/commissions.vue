@@ -67,14 +67,14 @@
                 <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
                 <view v-for="code in eventCodes(e)" :key="code.label" class="commission-code"><text class="commission-code__label">{{ code.label }}</text><NxCodeValue class="commission-code__value" :value="code.value" :label="code.label" /></view>
               </view>
-              <view class="text-right" style="max-width: 48%; overflow-wrap: anywhere">
+              <view class="text-right" style="max-width: 48%; overflow-wrap: break-word">
                 <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>
                 <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'uvt')">{{ commissionNexLabel(e) }}</text>
                 <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
                 <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success-ink)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
                 <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
-                <text v-else-if="e.status === 'frozen'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-brand-2-ink)', marginTop: '2px' }">{{ t.commissions.frozenTag }}</text>
-                <text v-else-if="e.status === 'reversed'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ t.commissions.reversedTag }}</text>
+                <text v-else-if="e.status === 'frozen'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ t.commissions.frozenTag }}</text>
+                <text v-else-if="e.status === 'reversed'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-danger)', marginTop: '2px' }">{{ t.commissions.reversedTag }}</text>
                 <text v-else-if="e.status === 'rejected'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-danger)', marginTop: '2px' }">{{ t.commissions.rejectedTag }}</text>
                 <text v-else-if="e.status === 'waiting_calculation'" class="block" style="font-size: 12px; color: var(--v5-warning-ink)">{{ t.directReferral.waitingCalculation }}</text>
                 <text v-else-if="e.status === 'recovery_pending'" class="block" style="font-size: 12px; color: var(--v5-warning-ink)">{{ t.directReferral.recoveryPending }}</text>

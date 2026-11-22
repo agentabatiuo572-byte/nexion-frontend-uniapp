@@ -1,7 +1,7 @@
 import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { computed, ref, watch } from "vue";
-import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
+import { runForegroundStoreRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { apiRuntimeConfig, earnConfigApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import type { EarnPhoneTiers, EarnTaskRoute } from "@/api/earn-config-api";
 import { applyCanonicalPhoneTierYields } from "@/mock/phone-tiers";
@@ -40,7 +40,7 @@ sessionVault.subscribe?.((_previous, _next, continuation) => { if (!continuation
 if (remoteApiEnabled) applyCanonicalPhoneTierYields([]);
 
 export function ensureEarnConfig(): Promise<boolean> {
-  return runPassiveTabRead("earn-config", () => inFlight ?? refreshEarnConfig(), undefined,
+  return runForegroundStoreRead("earn-config", () => inFlight ?? refreshEarnConfig(), undefined,
     () => status.value === "ready", 60_000);
 }
 

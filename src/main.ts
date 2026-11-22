@@ -12,6 +12,7 @@ import { useTheme } from "./store/theme";
 // #endif
 // #ifdef H5
 import PageLoadError from "./components/page-load-error.vue";
+import { installBrowserBackGuard } from "./composables/use-dialog-a11y";
 // #endif
 import { mountSpec7DevBridge } from "@/lib/spec7-dev-bridge";
 import { mountAuthOtpDevBridge } from "@/store/auth-otp";
@@ -39,6 +40,10 @@ const UNIAPP_RUNTIME_MARKER = "NEXGRID_UNIAPP_RUNTIME_20260809_V1";
 const ShellHost = { render: () => null };
 
 export function createApp() {
+  // #ifdef H5
+  // Before the router is created: browser back closes the top open layer first (02.7).
+  installBrowserBackGuard();
+  // #endif
   // #ifdef APP-PLUS
   reportNativeSessionTiming("CREATE_APP_ENTER");
   // #endif

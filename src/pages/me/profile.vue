@@ -226,7 +226,7 @@ function refreshProfileForCurrentAccount() {
   if (!sessionVault.read()?.accessToken) return;
   void refreshPayoutForCurrentAccount();
   void loadProfileCandidates();
-  void loadRemoteProfile();
+  void loadRemoteProfile(true);
   void refreshVRankForCurrentAccount();
 }
 
@@ -475,7 +475,7 @@ async function handleSave() {
 
 const profileReadFailed = ref(false);
 const profileReadPending = ref(false);
-async function loadRemoteProfile() {
+async function loadRemoteProfile(passive = false) {
   const pageScope = profilePageFence.capture("profile");
   const scope = captureAccountScope();
   const accountKey = auth.accountId;
@@ -483,8 +483,9 @@ async function loadRemoteProfile() {
   profileReadFailed.value = false;
   profileReadPending.value = true;
   try {
-    const projection = await profileApi.profile();
+    const projection = await (passive ? profile.ensureRemoteProfile() : profile.refreshRemoteProfile());
     if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
+    if (!projection) { profileReadFailed.value = true; return; }
     name.value = reconcileProfileEdit(profile.displayName, name.value, projection.nickname);
     profile.projectServerNickname(projection.nickname);
     avatarUrl.value = projection.avatarUrl;
@@ -492,7 +493,6 @@ async function loadRemoteProfile() {
     changeIntervalDays.value = projection.changeIntervalDays;
     nicknameChangeAvailableAt.value = projection.nicknameChangeAvailableAt;
     avatarChangeAvailableAt.value = projection.avatarChangeAvailableAt;
-    profile.projectServerAvatar(projection);
   } catch {
     if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
     profileReadFailed.value = true;

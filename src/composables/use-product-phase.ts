@@ -1,9 +1,8 @@
-import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { computed, type ComputedRef } from "vue";
 import { useApp } from "@/store/app";
 import { getPhaseParams, PHASES, resolveActivePhase, type PhaseParams } from "@/store/product-phase";
 import { remoteApiEnabled } from "@/api/runtime";
-import { refreshServerProductPhase, serverProductPhaseState } from "@/store/server-product-phase";
+import { ensureServerProductPhase, serverProductPhaseState } from "@/store/server-product-phase";
 
 /**
  * Ported from Nexion-prototype/lib/hooks/use-product-phase.ts.
@@ -19,7 +18,7 @@ import { refreshServerProductPhase, serverProductPhaseState } from "@/store/serv
 export function useProductPhase(): ComputedRef<PhaseParams> {
   const app = useApp();
   if (remoteApiEnabled && serverProductPhaseState.status !== "ready") {
-    void runPassiveTabRead("product-phase", () => refreshServerProductPhase());
+    void ensureServerProductPhase();
   }
   return computed(() => {
     if (!remoteApiEnabled) return resolveActivePhase(app.user.joinedAt);

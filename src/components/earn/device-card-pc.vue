@@ -28,7 +28,6 @@
       aria-modal="true"
       :aria-label="displayName"
       @click="closeMenu"
-      @keydown="onMenuKeydown"
     >
       <!-- Mobile action sheet: handle, device header, grouped actions, separate cancel. -->
       <view class="nx-glass-sheet nx-action-sheet nx-sheet-slide-up" @click.stop>
@@ -53,7 +52,7 @@
             <svg v-if="tradeinRow.tradeinCtaLabel" class="nx-action-sheet__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </view>
         </view>
-        <view class="nx-action-sheet__cancel" role="button" tabindex="0" @click="closeMenu" @keydown="onMenuKeydown"><LiquidGlass :radius="24" tone="control" /><text>{{ t.earn.quickMenu.cancel }}</text></view>
+        <view class="nx-action-sheet__cancel" role="button" tabindex="0" @click="closeMenu" @keydown.enter.prevent="closeMenu" @keydown.space.prevent="closeMenu"><LiquidGlass :radius="24" tone="control" /><text>{{ t.earn.quickMenu.cancel }}</text></view>
       </view>
     </view>
     <!-- 有任务时的取消激活三选一(等完成 / 强制 / 返回),就地弹出;拦截触摸,长按不穿透到卡片。 -->
@@ -205,8 +204,8 @@
       </view>
       <view class="flex items-end justify-between">
         <view class="flex items-baseline" style="gap: 4px">
-          <text class="tabular-nums" style="font-family: var(--font-metric); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">{{ visibility.mask(live.effectiveTops.toFixed(1)) }}</text>
-          <text style="font-size: 12px; font-weight: 600; color: var(--v5-ink-3)">{{ t.onboarding.phoneComputeUnit }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-metric); font-size: 34px; line-height: 1; font-weight: 500; color: var(--v5-brand); letter-spacing: -0.014em">{{ visibility.mask(live.effectiveTops.toFixed(1)) }}</text>
+          <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ t.onboarding.phoneComputeUnit }}</text>
         </view>
         <svg v-if="!visibility.hidden" width="110" height="28" viewBox="0 0 110 28" preserveAspectRatio="none" fill="none">
           <polyline :points="sparkPoints" fill="none" stroke="var(--v5-brand)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -356,8 +355,8 @@
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
         <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
              与卡内 −$锁定日产 / 未解锁潜在收益(仍 warning=Pending)语义不同,不可混用。 -->
-        <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-success-ink); letter-spacing: -0.014em">{{ visibility.mask(formatUsd(device.todayEarnings)) }}</text>
-        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 600">
+        <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 34px; line-height: 1; font-weight: 500; color: var(--v5-success-ink); letter-spacing: -0.014em">{{ visibility.mask(formatUsd(device.todayEarnings)) }}</text>
+        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">
           <text style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-success) 75%, transparent)">+</text>
           <text>{{ visibility.mask(formatAmount(device.todayEarningsNEX)) }} UVT</text>
         </view>
@@ -398,7 +397,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
-import { computed, nextTick, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { advanceMonotonicHighWater, deadlineRemainingDays, deadlineRemainingMs, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { useApp } from "@/store/app";
@@ -418,7 +417,7 @@ import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSID
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
 import { useTradeinStrip } from "@/composables/use-tradein-strip";
-import { useDialogScrollLock } from "@/composables/use-dialog-a11y";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
 import { canShowLivePhoneHashpower, computeLiveHashpower, isDeviceOnline, deviceOnlineState } from "@/lib/hashpower";
@@ -461,7 +460,6 @@ useVisibleInterval(() => {
 onHide(() => { onPressEnd(); closeMenu(); });
 onUnmounted(() => {
   onPressEnd();
-  if (typeof document !== "undefined") document.removeEventListener("keydown", onDocumentMenuKeydown, true);
 });
 
 const KIND_ICON_PATHS: Partial<Record<DeviceKind, string>> = {
@@ -749,9 +747,10 @@ const menuOpen = ref(false);
 const deactivation = useDeviceDeactivation();
 const tradein = useTradeinStrip(() => menuOpen.value);
 const tradeinRow = computed(() => tradein.tradeinStrip(props.device));
-useDialogScrollLock(menuOpen);
+// One layer stack for the quick menu (03 §3.5, 02 §2.7): focus in and back, Tab kept inside, Esc, browser back and the
+// Android back key close it, and the page does not scroll under it.
+useDialogA11y(menuOpen, () => cardRoot()?.querySelector<HTMLElement>(".nx-device-quick-menu"), closeMenu, true);
 const pressFiredMenu = ref(false);
-let navigatingToStatistics = false;
 let longPress: ReturnType<typeof setTimeout> | null = null;
 function cardRoot(): HTMLElement | undefined {
   if (typeof document === "undefined") return undefined;
@@ -764,48 +763,6 @@ function openMenu() {
 function closeMenu() {
   menuOpen.value = false;
 }
-function onMenuKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeMenu();
-    return;
-  }
-  trapMenuFocus(event);
-}
-function onDocumentMenuKeydown(event: KeyboardEvent) {
-  if (menuOpen.value) onMenuKeydown(event);
-}
-function trapMenuFocus(event: KeyboardEvent) {
-  if (event.key !== "Tab") return;
-  const items = Array.from(cardRoot()?.querySelectorAll<HTMLElement>(".nx-device-quick-menu [tabindex='0']") ?? [])
-    .filter((element) => element.offsetParent !== null);
-  if (!items.length || typeof document === "undefined") return;
-  const current = items.indexOf(document.activeElement as HTMLElement);
-  if (event.shiftKey && current <= 0) {
-    event.preventDefault();
-    event.stopPropagation();
-    items[items.length - 1].focus();
-  } else if (!event.shiftKey && (current < 0 || current === items.length - 1)) {
-    event.preventDefault();
-    event.stopPropagation();
-    items[0].focus();
-  }
-}
-watch(menuOpen, async (open) => {
-  if (typeof document !== "undefined") {
-    document.removeEventListener("keydown", onDocumentMenuKeydown, true);
-    if (open) document.addEventListener("keydown", onDocumentMenuKeydown, true);
-  }
-  await nextTick();
-  if (!open && navigatingToStatistics) { navigatingToStatistics = false; return; }
-  const root = cardRoot();
-  if (!root) return;
-  const target = open
-    ? root.querySelector<HTMLElement>(".nx-device-quick-menu [tabindex='0']")
-    : root.querySelector<HTMLElement>(props.detailPage ? ".device-management-heading [role='button']" : props.stage ? ".earn-stage__more" : ".nx-device-card__header");
-  target?.focus();
-});
 function onPressStart() {
   if (longPress) clearTimeout(longPress);
   pressFiredMenu.value = false;
@@ -831,7 +788,6 @@ function onRowTap() {
   emit("toggle");
 }
 function goStatsMenu() {
-  navigatingToStatistics = true;
   closeMenu();
   if (props.detailPage) emit('statistics');
   else navTo(`/pages/earn/device-detail?id=${encodeURIComponent(props.device.id)}&section=statistics`);
@@ -911,7 +867,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .nx-action-sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px var(--nx-overlay-bottom); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; font-family: var(--font-v5); }
 .nx-action-sheet__handle { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 18%, transparent); align-self: center; }
 .nx-action-sheet__head { display: flex; flex-direction: column; gap: 2px; padding: 4px 4px 0; }
-.nx-action-sheet__title { color: var(--v5-ink); font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: var(--ui-type-section-weight); overflow-wrap: anywhere; }
+.nx-action-sheet__title { color: var(--v5-ink); font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: var(--ui-type-section-weight); overflow-wrap: break-word; }
 .nx-action-sheet__meta { display: flex; align-items: center; gap: 6px; color: var(--v5-ink-3); font-size: var(--ui-type-description); line-height: var(--ui-type-description-lh); }
 .nx-action-sheet__dot { width: 6px; height: 6px; flex: none; border-radius: 999px; background: var(--v5-success); }
 .nx-action-sheet__group { border-radius: 20px; background: var(--v5-surface-2); overflow: hidden; }
@@ -939,24 +895,24 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-device-art :deep(.hf-computer) { width: 52px; height: 56px; }
 .earn-device-art :deep(.hf-computer svg) { width: 38px; height: 38px; }
 .earn-device-meta { flex: 1; min-width: 0; }
-.earn-device-name { display: block; font: 600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.earn-device-status { margin-top: 4px; line-height: 1.45; overflow-wrap: anywhere; }
+.earn-device-name { display: block; font: 600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.earn-device-status { margin-top: 4px; line-height: 1.45; overflow-wrap: break-word; }
 .nx-device-status-label { font-size:clamp(11px,3.08vw,12px); }
 .device-status-online::before { content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:var(--v5-success); vertical-align:1px; }
 .nx-device-card__numbers { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 152px; }
 .earn-device-amount { text-align: right; min-width: 0; }
 .earn-device-amount-label { display: block; font: 400 clamp(11px,3.08vw,12px)/1.4 var(--font-v5); color: var(--v5-ink-3); }
-.earn-device-value { display: block; margin-top: 4px; font: 600 clamp(13px,3.85vw,15px)/1.3 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.earn-device-value { display: block; margin-top: 4px; font: 600 clamp(13px,3.85vw,15px)/1.3 var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .nx-device-card__details { animation: earn-detail-in .2s ease-out; }
 .device-management-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px; }
 .device-section-title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/22px var(--font-v5);color:var(--v5-ink); }
 .device-statistics { padding:20px;border-block:1px solid var(--v5-border);scroll-margin-top:76px; }
 .device-statistics:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
 .device-statistics__values { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-block:16px; }
-.device-statistics__amount { font:600 24px/32px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+.device-statistics__amount { font:500 24px/32px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
 .device-statistics__label { color:var(--v5-ink-3);font:400 12px/18px var(--font-v5); }
 .device-statistics__status { display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding-top:12px;font:500 13px/18px var(--font-v5); }
-.device-statistics__scope { margin-top:12px;color:var(--v5-ink-3);font:400 12px/18px var(--font-v5);overflow-wrap:anywhere; }
+.device-statistics__scope { margin-top:12px;color:var(--v5-ink-3);font:400 12px/18px var(--font-v5);overflow-wrap:break-word; }
 @keyframes earn-detail-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .nx-device-card__details { animation: none; } }
 .nx-device-card__spec { flex: 1 1 160px; min-width: min(100%, 160px); line-height: 1.35; }
@@ -980,7 +936,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__body { position: relative; animation: none; }
 .earn-stage__top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 18px; }
 .earn-stage__id { min-width: 0; }
-.earn-stage__name { display: block; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.earn-stage__name { display: block; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .earn-stage__status { display: flex; align-items: center; gap: 6px; margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .earn-stage__dot.nx-online-dot { background: var(--v5-success); }
@@ -1017,7 +973,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__value { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-stage__value--ok { color: var(--v5-success-ink); }
 .earn-stage__value--nex { color: var(--v5-nex-ink); }
-.earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: anywhere; }
+.earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: break-word; }
 .earn-stage__recent { position: relative; margin: 6px 18px 0; }
 .earn-stage__recent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: var(--v5-space-2); min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); cursor: pointer; text-align: right; }

@@ -149,7 +149,7 @@ function go(href: string) {
   font-size: 34px;
   font-weight: 600;
   line-height: 1.04;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .entry-body {

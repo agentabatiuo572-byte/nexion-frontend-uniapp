@@ -303,7 +303,7 @@ const askLabelStyle: CSSProperties = {
   letterSpacing: "0.04em",
 };
 const askPriceStyle: CSSProperties = {
-  overflowWrap: "anywhere",
+  overflowWrap: "break-word",
   marginTop: "2px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
@@ -314,7 +314,7 @@ const askPriceStyle: CSSProperties = {
 };
 const listedAgoStyle: CSSProperties = {
   whiteSpace: "normal",
-  overflowWrap: "anywhere",
+  overflowWrap: "break-word",
   lineHeight: 1.5,
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

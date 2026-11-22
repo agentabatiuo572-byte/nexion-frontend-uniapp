@@ -1,5 +1,7 @@
 import { ApiError } from "@/api/errors";
 
+export const READ_RECOVERY_DELAYS_MS = [3_000, 10_000, 30_000] as const;
+
 function isAuthorizationDenial(cause: ApiError): boolean {
   return cause.status === 401 || cause.status === 403 || cause.code === 401 || cause.code === 403;
 }

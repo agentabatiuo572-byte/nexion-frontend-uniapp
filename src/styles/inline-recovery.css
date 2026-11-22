@@ -8,7 +8,7 @@
 .nx-inline-recovery__copy {
   min-width: 0;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .nx-inline-recovery__action {
   display: inline-flex;
