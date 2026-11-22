@@ -8,14 +8,16 @@
       <text v-if="message !== 'eligible' && visiblePolicies.length > 1" class="purchase-panel__note">{{ t.tradein.purchasePoliciesAll }}</text>
       <view v-for="(policy, index) in visiblePolicies" :key="`${policy.policy}-${index}`" class="purchase-panel__policy">
         <view v-if="!blockingOnly" class="purchase-panel__row"><text class="purchase-panel__title">{{ policy.policy === 'E1' ? t.tradein.purchaseProductPolicy : t.tradein.purchaseHardwarePolicy }}</text><text>{{ policy.eligible ? t.tradein.purchaseMet : policy.conditions.length ? t.tradein.purchaseUnmet : t.store.purchaseEligibilityError }}</text></view>
-        <text v-if="!policy.eligible && policy.conditions.some(condition => !isQuota(condition) && !condition.met) && policy.conditions.filter(condition => !isQuota(condition)).length > (blockingOnly ? 1 : 0)" class="purchase-panel__note">{{ policy.mode === 'EITHER' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
+        <!-- The unlock note is a reason only while the unlock itself is unmet: ALL with any condition short, EITHER with none met. -->
+        <text v-if="!policy.eligible && !unlockMet(policy) && policy.conditions.filter(condition => !isQuota(condition)).length > (blockingOnly ? 1 : 0)" class="purchase-panel__note">{{ policy.mode === 'EITHER' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
         <view v-for="condition in policy.conditions.filter(condition => !isQuota(condition))" :key="condition.kind" class="purchase-panel__condition">
           <view class="purchase-panel__row"><text>{{ conditionLabel(condition) }}</text><text class="purchase-panel__values">{{ conditionValues(condition) }}</text></view>
           <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
           <text class="purchase-panel__note">{{ condition.met ? t.tradein.purchaseMet : fmt(t.tradein.purchaseGap, { amount: condition.kind === 'rank' ? visibility.mask(fmt(t.tradein.purchaseRanks, { n: condition.gap })) : conditionAmount(condition, condition.gap, true) }) }}</text>
         </view>
-        <!-- Quota is an independent remaining-capacity check, never part of EITHER unlock conditions. -->
-        <text v-if="!blockingOnly && !policy.eligible && policy.conditions.some(isQuota)" class="purchase-panel__note">{{ policy.conditions.some(condition => condition.kind === 'monthlyQuota') ? t.tradein.purchaseMonthlyQuotaRequired : t.tradein.purchaseQuotaRequired }}</text>
+        <!-- Quota is an independent remaining-capacity check, never part of EITHER unlock conditions. Its note names the allowance
+             that is really used up; an allowance with room left is shown as the fact it is (06 §6.1, review F09). -->
+        <text v-if="!blockingOnly && !policy.eligible && policy.conditions.some(condition => isQuota(condition) && !condition.met)" class="purchase-panel__note">{{ policy.conditions.some(condition => condition.kind === 'monthlyQuota' && !condition.met) ? t.tradein.purchaseMonthlyQuotaRequired : t.tradein.purchaseQuotaRequired }}</text>
         <view v-for="condition in policy.conditions.filter(isQuota)" :key="condition.kind" class="purchase-panel__condition">
           <view class="purchase-panel__row"><text>{{ conditionLabel(condition) }}</text><text class="purchase-panel__values">{{ conditionValues(condition) }}</text></view>
           <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" :depleted="!condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
@@ -52,6 +54,10 @@ const statusText = computed(() => props.status === "idle" || props.status === "l
   : t.value.store.purchaseEligibilityError);
 function isQuota(condition: PurchaseEligibilityCondition): boolean {
   return condition.kind === "lifetimeQuota" || condition.kind === "monthlyQuota";
+}
+function unlockMet(policy: PurchaseEligibilitySnapshot["policies"][number]): boolean {
+  const unlock = policy.conditions.filter(condition => !isQuota(condition));
+  return policy.mode === "EITHER" ? unlock.some(condition => condition.met) : unlock.every(condition => condition.met);
 }
 function conditionLabel(condition: PurchaseEligibilityCondition): string {
   return t.value.tradein.purchaseConditions[condition.kind];
