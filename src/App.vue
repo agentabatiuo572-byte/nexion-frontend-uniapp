@@ -462,6 +462,9 @@ function installForegroundReadSignals() {
       if (!wasAllowed && canRunBusinessLoops()) maintainRemoteSession(true);
       const reconnected = online && !wasOnline;
       if (reconnected) {
+        // #ifdef APP-PLUS
+        refreshNativePush();
+        // #endif
         const locale = useLocaleStore().code;
         const i18n = useI18nRuntime();
         // A failed resource already has a reconnect retry in useAutoRecovery.
@@ -1306,7 +1309,7 @@ onLaunch(() => {
   installTabSnapshotLifecycle(sessionVault, () => ({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl, locale: useLocaleStore().code }));
   // #ifdef APP-PLUS
   installNativePush({ client: apiClient, vault: sessionVault,
-    canNavigate: () => canRefreshRemoteAccount(useAuth())
+    canNavigate: () => appReadOnline.value && canRefreshRemoteAccount(useAuth())
       && !!readCurrentRoute() && !isAuthWhitelisted(readCurrentRoute()) && !isStaticReviewRoute(readCurrentRoute()),
     received: () => { if (foregroundReadAllowed() && canRefreshRemoteAccount(useAuth())) void useNotifications().refreshRemote(); },
   });

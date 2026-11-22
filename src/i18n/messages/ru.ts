@@ -3410,6 +3410,7 @@ export const ru: Messages = {
     loadEarlier: "Загрузить ранние сообщения",
     sessionTransferred: "Этот чат передан и больше не принимает ответы. Начните новый чат.",
     sessionTransferredOpenCurrent: "Этот чат передан и больше не принимает ответы. Продолжите общение в текущем чате.",
+    sessionDisconnected: "Отключено",
     title: "Чаты",
     back: "Назад",
     typeAdvisor: "Персональная поддержка",

@@ -264,6 +264,9 @@ export function supportDemo(url,locale,state,request) {
       state.supportReadbackState='missing';
     }
     const detail=state.supportConversations[0];
+    // Transferred with no writable successor: the thread is read-only and the user starts a new conversation.
+    if(scenario==='transferred-restart')detail.writeState={canReply:false,writableConversationNo:null};
+    else delete detail.writeState;
     // Leaving the unassigned welcome returns the conversation to the demo advisor.
     if(scenario!=='welcome-unassigned'&&!detail.conversation.ownerAgentId)Object.assign(detail.conversation,{ownerAgentId:'1',ownerAgentName:'Demo support'});
     state.supportHistory=['history','timeline'].includes(scenario)||scenario==='incoming'&&state.supportHistory;

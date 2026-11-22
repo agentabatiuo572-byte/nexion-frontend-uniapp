@@ -12,4 +12,5 @@
     </service>
     <activity android:name="uts.sdk.modules.uvelNativePush.UvelPushClickActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
   </application>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 </manifest>
