@@ -1,7 +1,7 @@
 <template>
   <view ref="loopRef" class="upgrade-spotlight" :class="{ 'nx-loops-paused': !loops.running.value }" :data-images-ready="baseReady && targetReady">
     <text class="upgrade-eyebrow">{{ copy.upgrade }}</text>
-    <view class="upgrade-title"><text class="upgrade-title__base">{{ base.name }}</text><text class="upgrade-title__target">→ {{ target.name }}</text></view>
+    <view class="upgrade-title"><text class="upgrade-title__base">{{ base.name }}</text><view class="upgrade-title__target"><NxIcon class="upgrade-title__arrow" name="arrow-right" /><text>{{ target.name }}</text></view></view>
     <view class="upgrade-art" aria-hidden="true">
       <view v-if="baseReady" class="upgrade-art__base-shadow" />
       <CatalogMachineImage class="upgrade-art__base" v-bind="baseImageProps" />
@@ -29,6 +29,7 @@ import { useLocaleStore } from '@/store/locale';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { navTo } from '@/lib/route';
 import NxButton from '@/components/ui/nx-button.vue';
+import NxIcon from '@/components/ui/nx-icon.vue';
 import type { Device } from '@/store/types';
 import { getLifecycleSummary } from '@/store/device-lifecycle';
 import { uiLocale } from '@/i18n';
@@ -81,7 +82,8 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-eyebrow { display:block; font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--ui-lime-soft); }
 .upgrade-title { margin-top:6px; overflow-wrap:break-word; }
 .upgrade-title__base { display:block; color:var(--v5-ink-2); font:500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
-.upgrade-title__target { display:block; margin-top:4px; color:var(--v5-brand); font:600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
+.upgrade-title__target { display:flex; align-items:center; gap:6px; margin-top:4px; color:var(--v5-brand); font:600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
+.upgrade-title__arrow { flex:none; }
 .upgrade-art { position:relative; height:118px; margin-top:6px; }
 .upgrade-art__base { position:absolute; left:10px; bottom:10px; width:min(96px,34%); aspect-ratio:1; opacity:.75; }
 .upgrade-art__target { position:absolute; right:0; bottom:6px; width:min(150px,50%); aspect-ratio:1; }

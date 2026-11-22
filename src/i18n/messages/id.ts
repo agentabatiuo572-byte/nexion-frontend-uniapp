@@ -2543,7 +2543,7 @@ export const id: Messages = {
     ladderProV2: "Box Pro v2",
     ladderRack: "Rack P1",
     ladderRackP2: "Rack P2",
-    ladderYou: "←Anda",
+    ladderYou: "Anda",
     perDay: "/hari",
     vsPerDay: "/hari",
     cardYouEarn: "Perkiraan pendapatan harian",

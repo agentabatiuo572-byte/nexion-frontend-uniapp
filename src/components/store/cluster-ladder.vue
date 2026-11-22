@@ -18,7 +18,7 @@
       >
         <view class="ladder-label" :style="labelStyle(tier)">
           <text class="ladder-name">{{ (tier.label) }}</text>
-          <text v-if="tier.you" class="ladder-you">{{ t.store.ladderYou }}</text>
+          <view v-if="tier.you" class="ladder-you"><NxIcon name="arrow-left" /><text>{{ t.store.ladderYou }}</text></view>
         </view>
         <view class="ladder-track">
           <view class="ladder-fill" :style="barStyle(tier, index)" />
@@ -37,6 +37,7 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import SectionHeader from "./section-header.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { storefrontUsd, storefrontUsdFull, type StoreYieldAuthority, type StoreYieldLadderRow } from "@/lib/store-yield-authority";
 
 const t = useT();
@@ -119,7 +120,7 @@ function yieldColor(tier: Tier): string {
 .ladder-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 92px; align-items: center; column-gap: var(--ui-space-inline); min-height: 32px; }
 .ladder-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--v5-space-1); min-width: 0; }
 .ladder-name { white-space: nowrap; }
-.ladder-you { white-space: nowrap; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand-2-ink); }
+.ladder-you { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand-2-ink); }
 .ladder-track { position: relative; height: 6px; overflow: hidden; border-radius: 999px; background: var(--v5-surface-3); }
 .ladder-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; }
 .ladder-yield { overflow: hidden; text-align: right; white-space: nowrap; font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; }

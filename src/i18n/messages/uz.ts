@@ -2543,7 +2543,7 @@ export const uz: Messages = {
     ladderProV2: "Box Pro v2",
     ladderRack: "Rack P1",
     ladderRackP2: "Rack P2",
-    ladderYou: "←siz",
+    ladderYou: "siz",
     perDay: "/kun",
     vsPerDay: "/kun",
     cardYouEarn: "Taxminiy kunlik daromad",
