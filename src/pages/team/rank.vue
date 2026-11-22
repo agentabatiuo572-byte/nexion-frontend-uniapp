@@ -268,7 +268,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-next-title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/20px var(--font-v5);overflow-wrap:break-word; }
 .rank-condition { margin-top:14px; }
 .rank-condition__heading { display:flex;justify-content:space-between;align-items:baseline;gap:6px 12px;flex-wrap:wrap;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-2); }
-.rank-condition__name { min-width:0;overflow-wrap:break-word; }
+.rank-condition__name { min-width:0;max-width:100%;overflow-wrap:break-word; }
 .rank-condition__value { display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0 4px;max-width:100%;margin-left:auto;font-variant-numeric:tabular-nums;color:var(--v5-ink-3);text-align:right; }
 .rank-condition__current,.rank-condition__target { white-space:nowrap; }
 .rank-condition__current { color:var(--v5-ink);font-weight:500; }
@@ -324,7 +324,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-next-progress { padding-top:0;border-top:0; }
 .rank-rings { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px; }
 .rank-condition--ring { display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:0;text-align:center;min-width:0; }
-.rank-condition--ring .rank-condition__heading { flex-direction:column;align-items:center;gap:0;font-size:var(--ui-type-meta);line-height:var(--ui-type-meta-lh); }
+.rank-condition--ring .rank-condition__heading { flex-direction:column;align-items:center;gap:0;max-width:100%;font-size:var(--ui-type-meta);line-height:var(--ui-type-meta-lh); }
 .rank-condition--ring .rank-condition__name { font-weight:500;color:var(--v5-ink); }
 .rank-condition--ring .rank-condition__value { justify-content:center;margin-left:0;font:500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); }
 .rank-condition--ring .rank-condition__gap { margin-top:0;font-size:var(--ui-type-meta);line-height:var(--ui-type-meta-lh); }
