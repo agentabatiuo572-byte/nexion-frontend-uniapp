@@ -13,6 +13,8 @@ export interface StickyCTAPayload {
   /** Price string; a leading "$" is split into a small dim prefix. */
   amount: string;
   amountSubtext?: string;
+  /** A reason or status shown above the button (04 §4.0 .nx-tray-note), e.g. why the button is disabled. */
+  note?: string;
   quantity?: { value: number; min: number; max: number; decrease: () => void; increase: () => void };
   buttonLabel: string;
   /** Disabled CTA remains visible but never navigates or vibrates. */

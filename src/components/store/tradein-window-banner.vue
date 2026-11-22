@@ -57,7 +57,7 @@ async function refreshRemoteBest(): Promise<void> {
   remoteBest.value = null;
   try {
     const candidates: BannerQuote[] = [];
-    for (const product of PRODUCTS.filter((item) => isProductAvailable(item, phase.value))) {
+    for (const product of PRODUCTS.filter(item => item.productType === "DEVICE" && isProductAvailable(item, phase.value))) {
       const eligibility = await deviceE3Api.eligibility(product.id);
       if (accountKey !== app.accountKey) return;
       const source = eligibility.sources.find((item) => item.eligible);
@@ -95,7 +95,7 @@ const mockBest = computed<BannerQuote | null>(() => {
     if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) continue;
     const targets = PRODUCTS.filter(
       (p) =>
-        (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+        p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
         (isProductAvailable(p, phase.value)
           || (p.available === undefined
             && isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value))),

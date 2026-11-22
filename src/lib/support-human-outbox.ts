@@ -76,7 +76,7 @@ function parseComposer(key: string, value: unknown): HumanComposer | undefined {
   if (!failed && saved.retainDraft === true && text) return { ...draft, failedSend: null, retainDraft: true };
   if (!failed || typeof failed.text !== "string" || !Number.isSafeInteger(failed.attempts)
       || (failed.attachmentId !== undefined && typeof failed.attachmentId !== "string")) return;
-  const rejected = key.startsWith("conversation:") && (failed.peerChanged === true || failed.replyRejected === true)
+  const rejected = (failed.replyRejected === true || (key.startsWith("conversation:") && failed.peerChanged === true))
     && failed.settled === true && failed.kind === "failed" && failed.retryable === false;
   if (!rejected && (failed.settled !== false || failed.kind !== "unknown" || failed.retryable !== true)) return;
   const commandKey = validHumanCommandKey(key, failed.commandKey) ? failed.commandKey : undefined;

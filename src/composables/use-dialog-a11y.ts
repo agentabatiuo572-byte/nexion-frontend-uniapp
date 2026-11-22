@@ -7,6 +7,9 @@ import { onBackPress, onShow as onPageShow, onHide as onPageHide } from "@dcloud
 type Dialog = { close?: () => void; priority: number };
 type DialogPage = { stack: Dialog[]; visible: boolean; backRegistered: boolean };
 const dialogPages = new WeakMap<object, DialogPage>();
+// Back presses a dialog answered. Uni runs every onBackPress handler of the page on one press, so a page's own handler
+// asks here (or whether a dialog is still open) to know the press was not meant for leaving the page.
+const backTaken = new WeakSet<object>();
 
 export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
   // Uni invokes page hooks on the page root, not on a nested sheet component.
@@ -48,6 +51,7 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
       const top = dialogs.stack.reduce<Dialog | undefined>((current, entry) =>
         !current || entry.priority >= current.priority ? entry : current, undefined);
       if (!top) return false;
+      backTaken.add(event);
       // A retry-only overlay has no cancel action; never close a lower dialog.
       top.close?.();
       return true;
@@ -55,6 +59,20 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
   }
 }
 // #endif
+
+/** For a page with its own onBackPress: true when this press belongs to a dialog on the page (02.7 top layer first), so
+ *  the page keeps its leave logic for the next press. Works whichever handler Uni runs first. */
+export function useDialogBackHeld(): (event: object) => boolean {
+  let held = (_event: object) => false;
+  // #ifdef APP-PLUS
+  const owner = getCurrentInstance()?.root;
+  held = (event) => {
+    const page = owner ? dialogPages.get(owner) : undefined;
+    return backTaken.has(event) || !!page && page.backRegistered && page.visible && page.stack.length > 0;
+  };
+  // #endif
+  return held;
+}
 
 /**
  * AppChassis provides this. Dialogs render inside the page's own scroller, so without it a drag on
@@ -82,6 +100,235 @@ export function useDialogScrollLock(open: Ref<boolean>): void {
     release = isOpen && isShown ? acquireScrollLock() : null;
   }, { immediate: true, flush: "sync" });
   onBeforeUnmount(() => { release?.(); release = null; });
+}
+
+const shown = (el: Element) => el.isConnected && el.getClientRects().length > 0;
+// The last element that held focus. A trigger that is redrawn as the dialog opens (the checkout pay button turns busy
+// while the order is created) has already let focus fall to <body> by the time the open watch runs.
+let lastFocus: HTMLElement | SVGElement | null = null;
+let tracking = false;
+// When the dialog last handed focus back to the page; a control removed soon after (a card moving once its action
+// finished) must not leave focus on <body>.
+let restoredAt = 0;
+function trackFocus(): void {
+  if (tracking || typeof document === "undefined") return;
+  tracking = true;
+  document.addEventListener("focusin", (ev) => {
+    if (ev.target instanceof HTMLElement || ev.target instanceof SVGElement) lastFocus = ev.target;
+  }, true);
+  // The focused control was removed or hidden (not an ordinary blur such as a tap on empty space): inside an open layer
+  // focus goes to that layer, and right after a dialog closed it goes to the page's next reasonable place (03 §3.5).
+  document.addEventListener("focusout", (ev) => {
+    const left = ev.target instanceof Element ? ev.target : null;
+    setTimeout(() => {
+      // A hidden page has no focus moved for it, in a layer or on the page.
+      if (document.hidden) return;
+      const active = document.activeElement;
+      const top = topLayer();
+      // While a layer is open focus stays in it (a removed control, a tap on a persistent sheet's scrim or on empty
+      // space): back to the layer root, not its first field, so no keyboard opens.
+      if (top?.el) {
+        if (!active || active === document.body || !top.el.contains(active)) focusFirst([() => landingSpot(top.el)]);
+        return;
+      }
+      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left))) return;
+      if (Date.now() - restoredAt < 5_000) {
+        const landing = focusFirst(fallbacks(null, null));
+        if (landing) settleOnLanding(landing);
+      }
+    }, 0);
+  }, true);
+}
+// Dialogs that close in the same tick (a notice over the payment page, both closed by one exit) return focus once:
+// the one opened first owns the trigger; the ones stacked on it drop theirs.
+let openSeq = 0;
+const closing: { order: number; run: () => void; drop: () => void }[] = [];
+function scheduleRestore(order: number, run: () => void, drop: () => void): void {
+  closing.push({ order, run, drop });
+  if (closing.length > 1) return;
+  void nextTick(() => {
+    const batch = closing.splice(0).sort((a, b) => a.order - b.order);
+    batch[0]?.run();
+    batch.slice(1).forEach((entry) => entry.drop());
+  });
+}
+// Dialogs open on this document, in opening order. Each one listens on the document, so a stacked pair would both see
+// one key press (stopPropagation cannot stop another listener on the same node). The top shown layer alone answers Esc
+// and Tab, is the only part of the page a screen reader can reach (everything beside its ancestor path is inert), and
+// takes focus when it opens; closing it hands focus back inside the layer below (03 §3.5). A layer whose root is not on
+// screen (a dialog left open in a hidden tab) never counts as the top.
+type Layer = { order: number; root: () => HTMLElement | null | undefined };
+const openLayers: Layer[] = [];
+const dropLayer = (layer: Layer) => { const index = openLayers.indexOf(layer); if (index >= 0) openLayers.splice(index, 1); };
+function topLayer(): { layer: Layer; el: HTMLElement | null } | null {
+  for (let i = openLayers.length - 1; i >= 0; i--) {
+    const el = openLayers[i].root() ?? null;
+    if (!el || shown(el)) return { layer: openLayers[i], el };
+  }
+  return null;
+}
+const inertByUs = new Set<Element>();
+// Live regions (the toast host) stay readable over a dialog; inert set by someone else is left alone.
+const KEEP_READABLE = "script, style, link, template, [aria-live]";
+const FOCUSABLE = '[tabindex]:not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href]';
+const CAN_FOCUS = 'a[href], button, input, select, textarea, [tabindex]';
+// A layer's own tap-to-close scrim sits beside its root (NxSheet, the payment method sheet): an aria-hidden surface with no
+// controls of its own. It is part of that layer, so it stays clickable; its persistent / busy guard stays in its handler.
+const ownScrim = (el: Element) => el.getAttribute("aria-hidden") === "true" && !el.querySelector(CAN_FOCUS);
+function syncInert(): void {
+  if (typeof document === "undefined") return;
+  inertByUs.forEach((el) => el.removeAttribute("inert"));
+  inertByUs.clear();
+  const top = topLayer()?.el;
+  for (let node: Element | null = top ?? null; node && node !== document.body && node.parentElement; node = node.parentElement) {
+    for (const sibling of Array.from(node.parentElement.children)) {
+      if (sibling === node || sibling.hasAttribute("inert") || sibling.matches(KEEP_READABLE) || (node === top && ownScrim(sibling))) continue;
+      sibling.setAttribute("inert", "");
+      inertByUs.add(sibling);
+    }
+  }
+}
+/** One test for every focus target (the trigger, its replacement, a Tab stop, a fallback): on screen and not
+ *  visibility-hidden, focusable, not inert, not disabled. */
+function canTake(el: Element | null | undefined): el is HTMLElement | SVGElement {
+  if (!(el instanceof HTMLElement || el instanceof SVGElement) || el === document.body) return false;
+  if (!shown(el) || el.closest("[inert]") || el.getAttribute("aria-disabled") === "true" || (el as HTMLButtonElement).disabled) return false;
+  return getComputedStyle(el).visibility === "visible" && el.matches(CAN_FOCUS);
+}
+type Candidate = Element | null | undefined | (() => Element | null | undefined);
+/** How a trigger is found again once the page redrew it while the dialog was open (a re-read redraws the order
+ *  detail tray): its test id; its slot, a page class only it carried when the dialog opened (`order-hero__pay`), which
+ *  holds while a busy label changes its name; else its role, name and first class. Shared component, variant and state
+ *  classes (`nx-button`, `nx-button--primary`, `is-active`) never make a slot: after a redraw they match other controls. */
+type Trace = { testid: string | null; role: string | null; name: string; cls: string | null; slot: string | null; area: string };
+const SHARED_CLASS = /--|^is-|^nx-|^uni-/;
+/** The region a control sits in (a dialog, the bottom bar, the page), so a copy found elsewhere is not taken for it. */
+function areaOf(el: Element): string {
+  const area = el.closest('[aria-modal="true"], .nx-glass-bar');
+  return area ? (area.id ? "#" + area.id : area.classList[0] ?? area.tagName) : "page";
+}
+function traceOf(el: HTMLElement | SVGElement): Trace {
+  const slot = Array.from(el.classList).find((c) => !SHARED_CLASS.test(c) && document.getElementsByClassName(c).length === 1) ?? null;
+  return { testid: el.getAttribute("data-testid"), role: el.getAttribute("role"), name: accessibleName(el), cls: el.classList[0] ?? null, slot, area: areaOf(el) };
+}
+/** The trigger's redrawn copies inside scope (or the page), best match first. A test id or slot match counts only when
+ *  it is the one control on screen with it, in the same role and region. */
+function replacements(trace: Trace | null, scope: HTMLElement | null): HTMLElement[] {
+  if (!trace) return [];
+  const within: ParentNode = scope ?? document;
+  const all = (selector: string) => Array.from(within.querySelectorAll<HTMLElement>(selector));
+  const verified = (found: HTMLElement[]) => {
+    const onScreen = found.filter((el) => el.isConnected && shown(el));
+    const [only] = onScreen;
+    return onScreen.length === 1 && (!trace.role || only.getAttribute("role") === trace.role) && areaOf(only) === trace.area ? [only] : [];
+  };
+  const list: HTMLElement[] = [];
+  if (trace.testid) list.push(...verified(all(`[data-testid="${CSS.escape(trace.testid)}"]`)));
+  if (trace.slot) list.push(...verified(all(`.${CSS.escape(trace.slot)}`)));
+  if (trace.name) {
+    const same = trace.role ? `[role="${CSS.escape(trace.role)}"]` : '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea';
+    // Same name and same first class: a redrawn copy of the control, not another control that happens to share its name.
+    for (const el of all(same)) if (accessibleName(el) === trace.name && (!trace.cls || el.classList.contains(trace.cls))) list.push(el);
+  }
+  return [...new Set(list)];
+}
+/** A trigger still on screen that is only disabled for the moment: not removed, hidden or inert. */
+const onlyDisabled = (el: Element) => el.isConnected && shown(el) && !el.closest("[inert]") && getComputedStyle(el).visibility === "visible"
+  && (el.getAttribute("aria-disabled") === "true" || (el as HTMLButtonElement).disabled === true);
+/** A page may hand the trigger back only once the layer has fully closed, or after redrawing it (order detail turns
+ *  「继续支付」 back on after the payment sheet is gone). Focus already sits on a fallback (`landing`); while the trigger,
+ *  or its redrawn copy, is busy (aria-busy: the page is still working and will release it) or only briefly disabled,
+ *  move focus to it once it can take focus, but only while focus is still on that landing: a user who moved on (Tab,
+ *  a tap, a new layer) or a hidden page is left alone. If it goes away, or stays disabled without being busy, focus
+ *  stays on the landing. */
+function waitForTrigger(find: () => Element | null, landing: Element | null, done: () => void): void {
+  let idle = 0;
+  let total = 0;
+  const timer = setInterval(() => {
+    total += 1;
+    const active = document.activeElement;
+    const untouched = landing ? active === landing : !active || active === document.body;
+    const el = find();
+    if (!untouched || document.hidden) { clearInterval(timer); return; }
+    if (el && canTake(el)) { clearInterval(timer); el.focus(); return; }
+    if (el?.getAttribute("aria-busy") !== "true") idle += 1;
+    // A disabled trigger that is not busy gets a second; a busy one is waited for, with a cap so no timer outlives a
+    // control that never comes back.
+    if (el && onlyDisabled(el) && idle < 20 && total < 300) return;
+    clearInterval(timer);
+    done();
+  }, 50);
+}
+/** Focus the first candidate that can take it and really does; otherwise go on down the list. */
+function focusFirst(candidates: Candidate[]): HTMLElement | SVGElement | null {
+  for (const candidate of candidates) {
+    const el = typeof candidate === "function" ? candidate() : candidate;
+    if (!canTake(el)) continue;
+    el.focus();
+    if (document.activeElement === el) return el;
+  }
+  return null;
+}
+const firstFocusable = (scope: ParentNode): HTMLElement | null =>
+  Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).find(canTake) ?? null;
+/** A heading, the main region or a layer root takes focus through tabindex -1, which keeps it out of the Tab order. */
+function landingSpot(el: HTMLElement | null | undefined): HTMLElement | null {
+  if (!el || !shown(el) || el.closest("[inert]")) return null;
+  // Given back on blur: a lasting tabindex would make later taps on empty space focus this element.
+  // It is not a control, so no focus ring around a whole sheet or page; real controls keep theirs.
+  if (!el.hasAttribute("tabindex")) {
+    el.setAttribute("tabindex", "-1");
+    el.style.outline = "none";
+    el.addEventListener("blur", () => { el.removeAttribute("tabindex"); el.style.removeProperty("outline"); }, { once: true });
+  }
+  return el;
+}
+/** Focus something real inside el: its first usable control, else el itself. */
+function focusInside(el: HTMLElement): void {
+  if (el.contains(document.activeElement) && canTake(document.activeElement)) return;
+  focusFirst([() => firstFocusable(el), () => landingSpot(el)]);
+}
+const MAIN_REGION = '[role="main"], main, uni-page-body';
+// The sub-page header title (either header component): the page's own title when the content draws no heading of its
+// own (03 §3.5).
+const PAGE_TITLE = '.spv-title, .nx-nav-title';
+/** Focus that fell back to the page's main region moves on to its heading or bottom-bar action once the page draws one
+ *  (a result page renders its head just after the payment dialog closes), unless the user has moved on. */
+function settleOnLanding(landing: Element): void {
+  if (!landing.matches(MAIN_REGION) && !landing.matches(PAGE_TITLE)) return;
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    if (document.activeElement !== landing || tries > 10 || document.hidden) { clearInterval(timer); return; }
+    const better = fallbacks(null, null).map((next) => () => { const el = next(); return el && el !== landing && !el.matches(MAIN_REGION) && !el.matches(PAGE_TITLE) ? el : null; });
+    if (focusFirst(better)) clearInterval(timer);
+  }, 150);
+}
+const accessibleName = (el: Element) => (el.getAttribute("aria-label") || el.textContent || "").trim();
+
+/** Where focus goes when the trigger cannot take it, in order: the trigger's replacement (same test id, else same role,
+ *  name and first class); inside a layer still open below, its first control, else its root; with no layer left, the
+ *  page's bottom-bar action, the visible heading, the page title, the main region. Never <body>. */
+function fallbacks(trace: Trace | null, scope: HTMLElement | null): (() => Element | null | undefined)[] {
+  const list: (() => Element | null | undefined)[] = replacements(trace, scope).map((el) => () => el);
+  if (scope) return [...list, () => firstFocusable(scope), () => landingSpot(scope)];
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse()) list.push(() => el);
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(PAGE_TITLE))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION))) list.push(() => landingSpot(el));
+  return list;
+}
+
+/** Where focus waits on the page while the trigger is still busy: something that only says where the user is (the
+ *  content heading, else the sub-page title), never another action such as 取消订单 that a screen reader would
+ *  announce as the next step; the bar actions and the main region only when the page has no title. */
+function pageWaitLandings(): (() => Element | null | undefined)[] {
+  const list: (() => Element | null | undefined)[] = [];
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(PAGE_TITLE))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse()) list.push(() => el);
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION))) list.push(() => landingSpot(el));
+  return list;
 }
 
 /**
@@ -125,7 +372,18 @@ export function useDialogA11y(
   registerNativeDialog(open, close, nativeBack, nativePriority);
   // #endif
   useDialogScrollLock(open);
+  trackFocus();
   let previousFocus: HTMLElement | SVGElement | null = null;
+  // How to find the trigger again when the page re-rendered it while the dialog was open (a fresh checkout creates the
+  // order and redraws its pay button): its test id, else its role and accessible name.
+  let previousTrace: Trace | null = null;
+  let openedAt = 0;
+  const layer: Layer = { order: 0, root: () => rootEl() };
+  // Closed only because a newer layer took over (a notice over the payment page): the trigger is kept for its return.
+  let paused = false;
+  // Only a layer that really opened hands focus back (the immediate watch runs the closed branch on mount).
+  let wasOpen = false;
+  const forget = () => { previousFocus = null; previousTrace = null; };
 
   const rootEl = (): HTMLElement | null | undefined =>
     typeof root === "string"
@@ -141,11 +399,14 @@ export function useDialogA11y(
     // 🔴 用 getClientRects 判可见,不用 offsetParent:`position: fixed` 元素的 offsetParent
     // **恒为 null**(除非祖先有 transform),而弹层里恰恰常有 fixed 的吸底操作条 ——
     // 拿 offsetParent 过滤会把它们整批当成"隐藏"剔掉,Tab 就再也停不到确认按钮上。
-    return Array.from(root_.querySelectorAll<HTMLElement>(sel)).filter((x) => x.getClientRects().length > 0);
+    // Same test as every other focus target: visibility:hidden still has a rect, and inert / aria-disabled controls are no Tab stop.
+    return Array.from(root_.querySelectorAll<HTMLElement>(sel)).filter(canTake);
   }
 
   function onKeydown(ev: KeyboardEvent): void {
     if (!open.value) return;
+    const top = topLayer();
+    if (top && top.layer !== layer) return;
     if (ev.key === "Escape") {
       if (!close) return;   // 没有取消语义的弹层:别吃掉 Esc,更别假装关掉了
       ev.preventDefault();
@@ -169,6 +430,49 @@ export function useDialogA11y(
     }
   }
 
+  /** 关闭后把焦点还回触发它的那个控件,否则焦点回到文档开头,用户要重新 Tab 一遍。
+   *  触发控件已被重绘或藏起时,回到同一位置的新控件,再不行落到页面主操作或可见标题(03 §3.5)。 */
+  function restore(): void {
+    if (!wasOpen) return;
+    wasOpen = false;
+    const top = topLayer();
+    // A layer opened after this one is on screen: this one was only paused. Keep its trigger and leave focus up there.
+    if (top && top.layer.order > openedAt) {
+      paused = true;
+      if (top.el && !document.hidden) focusInside(top.el);
+      return;
+    }
+    // Otherwise focus goes back inside the layer still open below, if any, else to the page.
+    const scope = top?.el ?? null;
+    const inScope = (el: Element | null | undefined) => !!el && (!scope || scope.contains(el));
+    const active = document.activeElement;
+    // A parent dialog closing in the same step may already have restored focus; move it only when it is really lost.
+    const settled = canTake(active) && inScope(active);
+    const trigger = inScope(previousFocus) ? previousFocus : null;
+    const trace = previousTrace;
+    previousFocus = null;
+    previousTrace = null;
+    // A hidden page (the app sent to the background) does not have focus moved for it.
+    if (document.hidden) return;
+    const find = () => (trigger?.isConnected ? trigger : replacements(trace, scope)[0] ?? null);
+    const current = settled ? null : find();
+    if (!(current && !canTake(current) && onlyDisabled(current))) {
+      const back = focusFirst([() => trigger, ...(settled ? [] : fallbacks(trace, scope))]);
+      restoredAt = Date.now();
+      if (back) settleOnLanding(back);
+      return;
+    }
+    // The trigger, or the copy the page redrew in its place, is still there and only disabled for now. Focus never
+    // waits on <body>: it lands at once on the next fallback (the trigger and its copies skipped), and goes on to the
+    // trigger once that can take it, unless the user has moved on meanwhile (03 §3.5).
+    // On the page the wait lands on a title, not on another action; inside a layer below, its usual order applies.
+    const copies = new Set<Element | null>([trigger, current, ...replacements(trace, scope)]);
+    const candidates = scope ? fallbacks(trace, scope) : pageWaitLandings();
+    const landing = focusFirst(candidates.map((next) => () => { const el = next(); return el && !copies.has(el) ? el : null; }));
+    restoredAt = Date.now();
+    waitForTrigger(find, landing, () => { if (landing) settleOnLanding(landing); });
+  }
+
   function detach(): void {
     if (typeof document === "undefined") return;
     // capture 阶段:要赶在层内控件自己的 handler 之前拿到 Tab/Esc。
@@ -178,24 +482,49 @@ export function useDialogA11y(
   watch(open, async (isOpen) => {
     if (typeof document === "undefined") return;
     detach();
+    dropLayer(layer);
     if (isOpen) {
-      previousFocus = document.activeElement instanceof HTMLElement || document.activeElement instanceof SVGElement ? document.activeElement : null;
+      const active = document.activeElement;
+      const candidate = active instanceof HTMLElement && active !== document.body || active instanceof SVGElement ? active : lastFocus;
+      const modal = candidate?.closest('[aria-modal="true"]');
+      // Back from a pause, focus sits in the layer that is about to go: keep the trigger recorded before the pause.
+      if (!(paused && (previousFocus || previousTrace) && (!candidate || modal && modal !== rootEl()))) {
+        previousFocus = candidate;
+        previousTrace = previousFocus && previousFocus !== document.body ? traceOf(previousFocus) : null;
+      }
+      paused = false;
+      wasOpen = true;
+      openedAt = ++openSeq;
+      layer.order = openedAt;
+      openLayers.push(layer);
       document.addEventListener("keydown", onKeydown, true);
       await nextTick();
       // 焦点必须真的移进来:不移的话读屏用户不知道弹层开了,键盘用户按 Tab 时
       // 焦点还在背景的触发按钮上,第一下 Tab 就走去了背景的下一个控件。
-      focusables()[0]?.focus();
+      // A layer that is still animating in may have no control on screen yet: try for a few frames, then take the root.
+      for (let frame = 0; frame < 6 && open.value; frame++) {
+        const top = topLayer();
+        if (top && top.layer.order > openedAt) break; // a newer layer already took over
+        syncInert();
+        const el = rootEl();
+        if (el && (firstFocusable(el) || frame === 5)) { focusInside(el); break; }
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      }
       return;
     }
-    await nextTick();
-    // 关闭后把焦点还回触发它的那个控件,否则焦点回到文档开头,用户要重新 Tab 一遍。
-    previousFocus?.focus();
-    previousFocus = null;
+    syncInert();
+    if (wasOpen) scheduleRestore(openedAt, restore, forget);
   // immediate:有些弹层不是靠自身的 v-if 开关,而是**整个组件被父级 v-if 挂载**
   // (captcha-slider 就是这样)。它们的 open 恒为 true,不给 immediate 的话 watch
   // 永远不触发,焦点管理一次都不会生效。对 open 初值为 false 的弹层,immediate 只会
-  // 走一次"关闭"分支,而那时 previousFocus 是 null,无副作用。
+  // 走一次"关闭"分支,不参与真正关闭的焦点归还队列。
   }, { immediate: true });
 
-  onBeforeUnmount(detach);
+  // A dialog removed by its parent's v-if while still open (open stays true) is closing too: return focus the same way.
+  onBeforeUnmount(() => {
+    detach();
+    dropLayer(layer);
+    syncInert();
+    if (open.value && (previousFocus || previousTrace)) scheduleRestore(openedAt, restore, forget);
+  });
 }

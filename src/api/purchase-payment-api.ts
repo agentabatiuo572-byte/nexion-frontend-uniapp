@@ -125,6 +125,10 @@ export function createPurchasePaymentApi(client: ApiClient) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents/${encodeURIComponent(intentNo)}` })); }
       catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
     },
+    async snapshot(intentNo: string) {
+      try { return parsePurchaseIntent(await client.request({ path: `${base}-intents/snapshots/${encodeURIComponent(intentNo)}` })); }
+      catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
+    },
     async activeByOrder(orderNo: string): Promise<string | null> {
       const data = object(await client.request({ path: `${base}-intents/by-order/${encodeURIComponent(orderNo)}` }));
       if (data.orderNo !== orderNo) throw invalid();

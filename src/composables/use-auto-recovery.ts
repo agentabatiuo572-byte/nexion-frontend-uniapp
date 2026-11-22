@@ -9,6 +9,7 @@ import { useApp } from "@/store/app";
 export function useAutoRecovery(options: {
   failed: () => boolean;
   retry: () => Promise<unknown>;
+  active?: () => boolean;
   repeatMs?: number;
   repeatWhile?: () => boolean;
   retryNotBefore?: () => number;
@@ -24,6 +25,7 @@ export function useAutoRecovery(options: {
   let retryAt = 0;
   let disposed = false;
   let release = () => {};
+  const isActive = () => shown.value && (options.active?.() ?? true);
 
   function clearTimer() {
     clearTimeout(timer);
@@ -33,13 +35,13 @@ export function useAutoRecovery(options: {
   const retryWait = () => Math.max(retryAt, options.retryNotBefore?.() ?? 0) - Date.now();
 
   function schedule(delay = delays[attempts] ?? (options.repeatWhile?.() === false ? undefined : options.repeatMs)) {
-    if (disposed || timer !== undefined || inFlight || !shown.value || !foregroundReadAllowed()
+    if (disposed || timer !== undefined || inFlight || !isActive() || !foregroundReadAllowed()
       || !options.failed() || delay === undefined) return;
     const epoch = app.accountBindingEpoch;
     const account = app.accountKey;
     timer = setTimeout(() => {
       timer = undefined;
-      if (disposed || !shown.value || !foregroundReadAllowed()
+      if (disposed || !isActive() || !foregroundReadAllowed()
         || epoch !== app.accountBindingEpoch || account !== app.accountKey) return;
       const wait = retryWait();
       if (wait > 0) { schedule(wait); return; }
@@ -50,7 +52,7 @@ export function useAutoRecovery(options: {
 
   function attempt(): Promise<boolean> {
     if (inFlight) return inFlight;
-    if (disposed || !shown.value || !foregroundReadAllowed()) return Promise.resolve(false);
+    if (disposed || !isActive() || !foregroundReadAllowed()) return Promise.resolve(false);
     if (!options.failed()) return Promise.resolve(true);
     const wait = retryWait();
     if (wait > 0) { schedule(wait); return Promise.resolve(false); }
@@ -59,7 +61,7 @@ export function useAutoRecovery(options: {
     const current = () => !disposed && epoch === app.accountBindingEpoch && account === app.accountKey;
     // Defer dispatch so the shared promise exists before reactive store updates can reenter.
     inFlight = Promise.resolve().then(async () => {
-      if (!current() || !shown.value || !foregroundReadAllowed()) return false;
+      if (!current() || !isActive() || !foregroundReadAllowed()) return false;
       try {
         await options.retry();
         return current() && !options.failed();
@@ -93,24 +95,33 @@ export function useAutoRecovery(options: {
     schedule();
   }
 
-  function show() {
-    shown.value = true;
+  function updateActive(delay?: number) {
     release();
+    if (!isActive()) {
+      clearTimer();
+      clearTimeout(settleTimer);
+      return;
+    }
     release = registerPageRecovery({
       failed: options.failed, pending: () => inFlight !== null, retry,
       // Conditional repeats also serve ordinary failed reads when pull is available.
       quiet: options.quiet ?? (options.repeatMs !== undefined && options.repeatWhile === undefined),
     });
     attempts = 0;
+    schedule(delay);
+  }
+  function show() {
+    shown.value = true;
     // Foreground/reconnect reads are jittered separately from normal backoff.
-    schedule(300 + Math.random() * 700);
+    updateActive(300 + Math.random() * 700);
   }
   onShow(show);
   // On an ordinary page a component mounted after the page showed gets no show hook.
   if (!inject(TAB_LIFECYCLE, null)) onMounted(show);
-  onHide(() => { shown.value = false; clearTimer(); release(); });
+  onHide(() => { shown.value = false; updateActive(); });
+  if (options.active) watch(options.active, () => updateActive());
   watch(options.failed, failed => {
-    if (inFlight) return; // loading during our own attempt must not renew the budget.
+    if (inFlight || !isActive()) return; // loading during our own attempt must not renew the budget.
     clearTimeout(settleTimer);
     if (failed) schedule();
     // A read from elsewhere also turns failed() off, so only a recovery that holds renews the budget.

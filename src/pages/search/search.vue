@@ -41,7 +41,7 @@
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
         <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
-        <view class="nx-search-help active:opacity-75" role="button" tabindex="0"
+        <view class="nx-search-help nx-frosted-button" role="button" tabindex="0"
           @click="openHelp" @keydown.enter.prevent="openHelp" @keydown.space.prevent="openHelp">
           <text>{{ t.me.helpFaq }}</text>
         </view>
@@ -75,7 +75,7 @@
       <!-- Results -->
       <view v-if="searchResultState.body === 'results'" class="mx-4 mt-3 space-y-3">
         <view v-for="grp in groupedList" :key="grp.group">
-          <text class="block font-mono-tabular" :style="groupLabelStyle">{{ groupLabel(grp.group) }}</text>
+          <text class="block" :style="groupLabelStyle">{{ groupLabel(grp.group) }}</text>
           <view :style="resultCardStyle">
             <view
               v-for="(h, i) in grp.hits"
@@ -87,10 +87,10 @@
               @keydown.enter.prevent="openHit(h)" @keydown.space.prevent="openHit(h)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ h.label }}</text>
-                <text v-if="h.sublabel" class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ h.sublabel }}</text>
+                <text class="block nx-search-row__title">{{ h.label }}</text>
+                <text v-if="h.sublabel" class="block nx-search-row__sub">{{ h.sublabel }}</text>
               </view>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
+              <NxIcon class="shrink-0 nx-search-row__chev" name="chevron-right" :size="16" />
             </view>
           </view>
         </view>
@@ -102,11 +102,12 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navTo } from "@/lib/route";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
@@ -119,17 +120,18 @@ import { PRODUCTS } from "@/mock/products";
 import type { Product } from "@/mock/products";
 import { productCopy, specRow, specText } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
-import { remoteApiEnabled } from "@/api/runtime";
+import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import type { SupportFaq } from "@/domain/support";
 import { readPublishedFaqs } from "@/store/published-content";
 import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
+import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { searchStakingRateSummary } from "@/lib/search-staking-rate";
 import { resolveSearchResultState, type SearchRemoteStatus } from "@/lib/search-source-state";
 import { beginNavigationAttempt, completeNavigationAttempt } from "@/lib/navigation-attempt";
 import { fmt } from "@/i18n/format";
 import { searchCopyFor } from "./search-copy";
-import { serverLanguage } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
 
 type Group = "route" | "device" | "product" | "member" | "faq" | "help";
 interface Hit {
@@ -153,6 +155,7 @@ const q = ref("");
 let searchSourceReadEpoch = 0;
 const publishedFaqs = ref<SupportFaq[]>([]);
 const publishedFaqStatus = ref<SearchRemoteStatus>("idle");
+const tradeinSearchEnabled = ref(false);
 const searchReading = ref(false);
 useAutoRecovery({ failed: () => remoteApiEnabled && !searchReading.value && [productCatalogState.status, network.remoteStatus, app.remoteFleetStatus, publishedFaqStatus.value].includes("error"), retry: retrySearchSources });
 let publishedFaqReadEpoch = 0;
@@ -176,22 +179,33 @@ async function refreshPublishedFaqs(force = false): Promise<void> {
   }
 }
 
+async function refreshTradeinSearchAvailability(isCurrent: () => boolean): Promise<void> {
+  try {
+    const tradeinConfig = await runPassiveTabRead("tradein-config", () => deviceE3Api.tradeinConfig());
+    if (isCurrent()) tradeinSearchEnabled.value = tradeinConfig.enabled;
+  } catch {
+    if (isCurrent()) tradeinSearchEnabled.value = false;
+  }
+}
+
 async function refreshSearchSources(force = false, forceFaqs = false): Promise<void> {
   if (!remoteApiEnabled) return;
   const readEpoch = ++searchSourceReadEpoch;
+  tradeinSearchEnabled.value = false;
   searchReading.value = true;
   try {
     const accountKey = app.accountKey;
     const accountEpoch = app.accountBindingEpoch;
+    const isCurrent = () => readEpoch === searchSourceReadEpoch
+      && accountKey === app.accountKey && accountEpoch === app.accountBindingEpoch;
     // A successful catalogue read advances the runtime revision. Do not start
     // E3 fleet work under the revision it is about to invalidate.
     await refreshProductCatalog(force);
-    if (readEpoch !== searchSourceReadEpoch
-      || accountKey !== app.accountKey
-      || accountEpoch !== app.accountBindingEpoch) return;
+    if (!isCurrent()) return;
     await Promise.allSettled([
       refreshPublishedFaqs(forceFaqs), network.refreshCanonicalNetwork(),
       force ? app.refreshRemoteFleet() : app.ensureRemoteFleet(), staking.syncRemote(),
+      refreshTradeinSearchAvailability(isCurrent),
     ]);
   } finally { if (readEpoch === searchSourceReadEpoch) searchReading.value = false; }
 }
@@ -221,13 +235,13 @@ const searchableProducts = computed(() => !remoteApiEnabled ? PRODUCTS
 function productSearchDetail(p: Product): string {
   if (!remoteApiEnabled) return productCopy(t.value, p).tagline;
   const gpu = specRow(t.value.store.specGpu, p.gpu);
-  const vram = specRow(t.value.store.specVram, p.vram);
+  // A Cloud Share shows no video memory.
+  const vram = p.productType === "SHARE" ? null : specRow(t.value.store.specVram, p.vram);
   return [gpu && specText(t.value, gpu.v), vram && specText(t.value, vram.v, undefined, "vram")]
     .filter(Boolean).join(" · ");
 }
 
-// Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
-// only the key→href binding stays here.
+// Static route/FAQ catalog. Display copy comes from search.routes / search.faqEntries.
 type RouteKey = keyof typeof t.value.search.routes;
 type FaqKey = keyof typeof t.value.search.faqEntries;
 
@@ -271,15 +285,21 @@ const FAQ: ReadonlyArray<{ key: FaqKey; href: string }> = [
   { key: "nex", href: "/pages/me/wallet-nex" },
 ];
 
+const TRADEIN_SEARCH_ALIASES: Partial<Record<LocaleCode, readonly string[]>> = {
+  zh: ["退役", "抵扣升级"],
+  vi: ["thu cũ đổi mới", "thu cũ"],
+};
+
 const results = computed<Hit[]>(() => {
   const query = q.value.trim().toLowerCase();
   if (!query) return [];
   const out: Hit[] = [];
-  // 过滤跑在当前语言的译文上,不是英文字面量 —— 换语言后搜索词跟着换语言可搜。
+  // 搜索当前语言的译文，升级置换也匹配该语言的旧称。
   const routeCopy = t.value.search.routes;
   const faqCopy = t.value.search.faqEntries;
   for (const r of ROUTES) {
     if (r.key === "staking" && !config.isEnabled("stakingVisible")) continue;
+    if (r.key === "tradeIn" && !tradeinSearchEnabled.value) continue;
     const c = routeCopy[r.key];
     const sublabel = r.key === "staking"
       ? searchStakingRateSummary({
@@ -289,7 +309,9 @@ const results = computed<Hit[]>(() => {
         formatApy: (apy) => fmt(t.value.home.quickStakeApyFormat, { n: apy }),
       })
       : c.sub;
-    if (c.label.toLowerCase().includes(query) || sublabel.toLowerCase().includes(query)) {
+    const matchesTradeinAlias = r.key === "tradeIn"
+      && TRADEIN_SEARCH_ALIASES[locale.code]?.some((alias) => alias.includes(query));
+    if (c.label.toLowerCase().includes(query) || sublabel.toLowerCase().includes(query) || matchesTradeinAlias) {
       out.push({ group: "route", label: c.label, sublabel, href: r.href });
     }
   }
@@ -300,7 +322,7 @@ const results = computed<Hit[]>(() => {
       out.push({
         group: "product",
         label: p.name,
-        sublabel: `$${formatAmount(p.price)}${detail ? ` · ${detail}` : ""}`,
+        sublabel: `$${formatGroupedAmount(p.price)}${detail ? ` · ${detail}` : ""}`,
         href: `/pages/store/detail?id=${p.id}`,
       });
     }
@@ -434,11 +456,11 @@ const navigationErrorStyle: CSSProperties = {
 };
 const navigationErrorTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
 const navigationRetryStyle: CSSProperties = { color: "var(--v5-brand)" };
+// Group label: note role in the interface face, no tracking (01 §1.2: no 0.14–0.18em spacing, Mono only for codes).
 const groupLabelStyle: CSSProperties = {
   marginBottom: "6px",
   paddingLeft: "2px",
-  fontSize: "12px",
-  letterSpacing: "0.16em",
+  font: "var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5)",
   color: "var(--v5-ink-3)",
 };
 // Transparent hairline group (earnings-ledger idiom): border-top opens the
@@ -480,14 +502,41 @@ function rowStyle(isLast: boolean): CSSProperties {
 .nx-search-row:active {
   background: var(--v5-surface-2);
 }
+/* Brand glass S (03 §3.1): 32px capsule, compact button role; the shared frosted material supplies fill and rim. */
 .nx-search-help {
+  --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent);
+  --ui-button-ink: var(--v5-brand);
+  --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface));
   width: max-content;
+  min-height: 32px;
+  box-sizing: border-box;
   margin: 14px auto 0;
-  padding: 9px 14px;
+  padding: 7px 12px;
   border-radius: 999px;
-  background: var(--v5-brand-soft);
-  color: var(--v5-brand);
-  font-size: 13px;
-  font-weight: 600;
+  font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5);
+}
+.nx-search-help:active {
+  transform: scale(.98);
+}
+/* Result rows: list title role at the content-row weight, at most two lines before the ellipsis (03 §3.6.1);
+   the chevron marks an entry into the next level (03 §3.1). */
+.nx-search-row__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);
+  color: var(--v5-ink);
+}
+.nx-search-row__sub {
+  margin-top: 2px;
+  overflow-wrap: break-word;
+  font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);
+  color: var(--v5-ink-3);
+}
+/* NxIcon renders a bare svg without this component's scope attribute, so the rule reaches it through the row. */
+.nx-search-row :deep(.nx-search-row__chev) {
+  color: var(--v5-ink-4);
 }
 </style>

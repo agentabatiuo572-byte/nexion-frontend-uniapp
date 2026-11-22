@@ -157,9 +157,15 @@ export interface CreateOrderRequest {
   idempotencyKey: string;
 }
 
+export type OrderCreateCommand =
+  | { status: "PROCESSING" | "NOT_FOUND" | "UNKNOWN" | "UNAVAILABLE" }
+  | { status: "FAILED"; code: number; message: string }
+  | { status: "SUCCEEDED"; orderNo: string };
+
 export interface OrderApi {
   list(beforeOrderNo?: string | null, pageSize?: number): Promise<CanonicalOrderList>;
   create(request: CreateOrderRequest): Promise<CreatedOrder>;
+  createCommand(idempotencyKey: string): Promise<OrderCreateCommand>;
   cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
   pay(orderNo: string, idempotencyKey: string, authorization?: import('./payment-password-api').PaymentPasswordAuthorization): Promise<PaidOrderReceipt>;
 }
@@ -531,6 +537,48 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
           voucherId: request.voucherId ?? null,
         },
       }));
+    },
+
+    async createCommand(idempotencyKey): Promise<OrderCreateCommand> {
+      // Match the write endpoint's Java String.trim() key rules.
+      const key = idempotencyKey.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, "");
+      if (!key || key.length > 128) return invalid();
+      const notFound = { status: 404, code: 404, message: "ORDER_CREATE_COMMAND_NOT_FOUND" };
+      try {
+        return await client.request<OrderCreateCommand>({
+          path: "/api/orders/commands",
+          idempotencyKey: key,
+          acceptedResponses: [notFound],
+          parseResponseData(value, status): OrderCreateCommand {
+            const payload = record(value);
+            if (payload.idempotencyKey !== key) return invalid();
+            if (status === 404 && payload.status === "NOT_FOUND" && payload.canRetrySameKey === true) {
+              return { status: "NOT_FOUND" };
+            }
+            if (status !== 200 || payload.operation !== "ORDER_CREATE" || payload.canRetrySameKey !== false) return invalid();
+            if ((payload.status === "PROCESSING" || payload.status === "UNKNOWN") && payload.order === null && payload.error === null) {
+              return { status: payload.status };
+            }
+            if (payload.status === "FAILED" && payload.order === null) {
+              const failure = record(payload.error);
+              const code = integer(failure.code, 400);
+              if (code > 599) return invalid();
+              return { status: "FAILED", code, message: nonEmptyString(failure.message) };
+            }
+            if (payload.status === "SUCCEEDED" && payload.error === null) {
+              const order = record(payload.order);
+              nonEmptyString(order.orderStatus);
+              return { status: "SUCCEEDED", orderNo: nonEmptyString(order.orderNo) };
+            }
+            return invalid();
+          },
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.kind === "http" && error.status === 404 && error.message !== notFound.message) {
+          return { status: "UNAVAILABLE" };
+        }
+        throw error;
+      }
     },
 
     async cancel(orderNo, idempotencyKey): Promise<CancelledOrder> {

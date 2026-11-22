@@ -239,6 +239,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
@@ -304,6 +305,7 @@ const publicOnly=computed(()=>{void app.accountKey;void app.accountBindingEpoch;
 const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId, true);
 useAutoRecovery({ failed: () => promotionStatus.value === "error", retry: () => refreshPromotion() });
 const catalogRetrying = ref(false);
+const stickyPageVisible = ref(true);
 let detailPageVisible = false;
 let detailObservationEpoch = 0;
 let detailFactsEpoch = 0;
@@ -322,10 +324,6 @@ async function refreshDetailFacts(): Promise<void> {
   await refreshProductCatalog(true);
   await nextTick();
   if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
-  if (remoteApiEnabled && (eligibility.value.status === "error"
-    || eligibility.value.status === "ready" && purchaseEligibilityMessage.value === "error")) {
-    void retryEligibility();
-  }
   await Promise.all([
     remoteApiEnabled ? app.refreshRemoteFleet(app.captureRemoteAccountRequest(), { coalesce: true }) : Promise.resolve(true),
     earnConfig.refresh(),
@@ -439,11 +437,20 @@ const isLocked = computed(() => {
 // Per-user purchase gate — local V-rank/team snapshots are mock-only. Remote
 // mode consumes only the account-scoped server eligibility response.
 const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(product);
-const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => product.value?.id ?? "");
+const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(
+  () => product.value?.id ?? "",
+  () => stickyPageVisible.value && foregroundReadAllowed(),
+);
 const purchaseEligibilityMessage = computed(() => resolvePurchaseEligibilityMessage(
   eligibility.value.status,
   eligibility.value.snapshot,
 ));
+useAutoRecovery({
+  active: () => stickyPageVisible.value,
+  failed: () => remoteApiEnabled && !stockUnavailable.value && (eligibility.value.status === "error"
+    || eligibility.value.status === "ready" && purchaseEligibilityMessage.value === "error"),
+  retry: retryEligibility,
+});
 const purchaseGate = computed(() => remoteApiEnabled
   ? {
       gated: true,
@@ -471,8 +478,13 @@ useSetPageHeader(() => ({
 
 // ── derived ROI math (mirrors page.tsx + _client.tsx) ──
 const qty = ref(1);
+// Single-device checkout can request a server replacement quote at capacity.
+const singleDeviceCheckout = computed(() => product.value?.productType === "DEVICE"
+  && !activityId.value && !voucherContext.value.voucherId);
 const maxQuantity = computed(() => Math.min(activityId.value ? 100 : 6,
-  remoteApiEnabled && app.remoteSlotsUsed != null ? Math.max(0, app.slotCap - app.remoteSlotsUsed) : Infinity));
+  remoteApiEnabled && app.remoteSlotsUsed != null
+    ? Math.max(singleDeviceCheckout.value ? 1 : 0, app.slotCap - app.remoteSlotsUsed)
+    : Infinity));
 watch(maxQuantity, max => { if (max > 0 && qty.value > max) qty.value = max; });
 const openFaq = ref(0);
 
@@ -499,12 +511,14 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
   const p = product.value;
   if (!p) return [];
   const s = t.value.store;
+  // A Cloud Share is a share of pooled compute, so it shows no video memory or power (user 2026-11-21).
   const months = warrantyMonths(p.warranty);
+  const share = p.productType === "SHARE";
   return [
-    { k: s.specGpu, v: specText(t.value, p.gpu, "-") },
-    { k: s.specVram, v: specText(t.value, p.vram, "-", "vram") },
-    { k: s.specPower, v: specText(t.value, p.power, "-", "power") },
-    { k: s.specOnlineRate, v: specText(t.value, p.uptime, "-") },
+    { k: s.specGpu, v: specText(t.value, p.gpu, "—") },
+    share ? null : { k: s.specVram, v: specText(t.value, p.vram, "—", "vram") },
+    share ? null : { k: s.specPower, v: specText(t.value, p.power, "—", "power") },
+    { k: s.specOnlineRate, v: specText(t.value, p.uptime, "—") },
     months === undefined ? specRow(s.specWarranty, p.warranty) : { k: s.specWarrantyDuration, v: months },
   ].filter((r): r is SpecRow => r !== null);
 });
@@ -606,7 +620,6 @@ function toggleFaq(i: number) {
 // product/qty resolve; cached deactivation and Uni unload also clear this page's CTA.
 const sticky = useStickyCTA();
 const stickyOwner = Symbol("store-detail");
-const stickyPageVisible = ref(true);
 sticky.activate(stickyOwner);
 function publishStickyCTA() {
     if (!stickyPageVisible.value || (remoteApiEnabled && catalogStatus.value !== "ready")) {
@@ -645,9 +658,9 @@ function publishStickyCTA() {
       sticky.show({
         href: `/pages/store/detail?id=${product.value.id}`,
         amount: `${priceText.value}`,
-        buttonLabel: eligibility.value.status === "loading" || eligibility.value.status === "idle"
-          ? t.value.store.purchaseEligibilityLoading
-          : t.value.store.cardBuyNow,
+        // Loading and silent recovery read the same to the user: the reason sits above the disabled button (03 §3.1, 04 §4.0).
+        note: t.value.store.purchaseEligibilityLoading,
+        buttonLabel: t.value.store.cardBuyNow,
         disabled: true,
         showTabBar: false,
       }, stickyOwner);
@@ -702,13 +715,6 @@ function publishStickyCTA() {
 watch(
   [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext],
   publishStickyCTA,
-  { immediate: true },
-);
-watch(
-  () => remoteApiEnabled && stickyPageVisible.value
-    && (eligibility.value.status === "error"
-      || eligibility.value.status === "ready" && purchaseEligibilityMessage.value === "error"),
-  (failed, wasFailed) => { if (failed && !wasFailed) toast.error(t.value.store.purchaseEligibilityError); },
   { immediate: true },
 );
 function showDetailStickyCTA() {

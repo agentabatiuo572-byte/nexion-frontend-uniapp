@@ -43,8 +43,7 @@
           <text class="nx-btn__label nx-btn__label--ghost">{{ topConfirm.cancelLabel || t.ui.cancel }}</text>
         </view>
         <view
-          class="nx-btn active:opacity-85"
-          :class="topConfirm.danger ? 'nx-btn--danger' : 'nx-btn--primary'"
+          class="nx-btn nx-btn--primary active:opacity-85"
           role="button"
           tabindex="0"
           @click="ui.resolveConfirm(topConfirm.id, true)"
@@ -157,7 +156,7 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);
   color: var(--v5-ink-2);
   white-space: pre-line;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 /* Primary on top, quiet cancel below. Cancel stays first in the DOM, so a money confirm still opens with focus on it. */
 .nx-modal__actions {
@@ -176,8 +175,9 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   padding: 10px 14px;
   border-radius: var(--v5-radius-full);
 }
+/* The confirm's main action is always the solid primary type (03 §3.1, §3.5); a destructive confirm says so in its
+   title and copy, not with a red fill outside the four button types. `danger` stays in the confirm API for callers. */
 .nx-btn--primary { background: var(--v5-brand); }
-.nx-btn--danger { background: var(--v5-danger); }
 .nx-btn--ghost { min-height: 44px; background: transparent; }
 /* Detail confirm (P-45): the same centred dialog with a badge and recessed rows. */
 .nx-modal--detail { padding: 24px 20px 12px; }
@@ -192,8 +192,8 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 [data-theme="light"] .nx-modal__rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .nx-modal__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
 .nx-modal__row + .nx-modal__row { border-top: 1px solid var(--v5-border); }
-.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: anywhere; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
-.nx-modal__v { min-width: 0; overflow-wrap: anywhere; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
+.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
 .nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
 .nx-modal--detail .nx-modal__actions { margin-top: 20px; }
 .nx-btn__label {
@@ -204,7 +204,6 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   overflow-wrap: break-word;
   color: var(--v5-on-brand);
 }
-.nx-btn--danger .nx-btn__label { color: #fff; }
-/* Cancel is visually subordinate to the primary CTA (UVEL conversion rule). */
-.nx-btn__label--ghost { color: var(--v5-ink-3); }
+/* The secondary exit is a text button under the primary: brand text, no container (03 §3.1, §3.5 居中确认框). */
+.nx-btn__label--ghost { color: var(--v5-brand); }
 </style>

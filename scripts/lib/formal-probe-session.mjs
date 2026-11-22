@@ -1,7 +1,7 @@
 import { unseenWithdrawalAttempt } from "./prototype-demo-withdraw-recovery.mjs";
 import { installProbeConversationRealtime, probeConversationReadFixture } from "./probe-conversation-realtime.mjs";
 
-export async function installFormalProbeSession(page, { authenticated = true, responseFor } = {}) {
+export async function installFormalProbeSession(page, { authenticated = true, responseFor, realtimeAccount } = {}) {
   if (authenticated) {
     await page.addInitScript((snapshot) => {
       localStorage.setItem("nexgrid-auth-v1", JSON.stringify({ type: "object", data: snapshot }));
@@ -103,5 +103,5 @@ export async function installFormalProbeSession(page, { authenticated = true, re
         : { code: 401, message: "AUTH_REQUIRED", data: null }),
     });
   });
-  await installProbeConversationRealtime(page, { authenticated });
+  await installProbeConversationRealtime(page, { authenticated, resolveAccount: realtimeAccount });
 }

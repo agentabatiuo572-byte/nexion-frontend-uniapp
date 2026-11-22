@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PurchaseEligibilityCondition, PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
-import { resolvePurchaseEligibilityMessage, type PurchaseEligibilityRequestStatus } from "@/lib/purchase-eligibility-copy";
+import { monthlyQuotaExhausted, resolvePurchaseEligibilityMessage, type PurchaseEligibilityRequestStatus } from "@/lib/purchase-eligibility-copy";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -46,7 +46,8 @@ const visiblePolicies = computed(() => !props.blockingOnly ? props.snapshot?.pol
 const statusText = computed(() => props.status === "idle" || props.status === "loading" ? t.value.store.purchaseEligibilityLoading
   : message.value === "eligible" ? t.value.tradein.purchaseEligible
   : message.value === "ineligible" ? t.value.store.purchaseEligibilityIneligible
-  : message.value === "quotaDepleted" ? t.value.tradein.purchaseQuotaDepleted : t.value.store.purchaseEligibilityError);
+  : message.value === "quotaDepleted" ? (monthlyQuotaExhausted(props.snapshot) ? t.value.store.purchaseMonthlyQuotaDepleted : t.value.tradein.purchaseQuotaDepleted)
+  : t.value.store.purchaseEligibilityError);
 function isQuota(condition: PurchaseEligibilityCondition): boolean {
   return condition.kind === "lifetimeQuota" || condition.kind === "monthlyQuota";
 }
@@ -67,8 +68,8 @@ function conditionRatio(condition: PurchaseEligibilityCondition): number {
 }
 </script>
 <style scoped>
-.purchase-panel { margin:12px 0; padding:12px; border-radius:12px; background:var(--v5-surface-2); color:var(--v5-ink-2); font:400 12px/1.6 var(--font-v5); overflow-wrap:anywhere; }
-.purchase-panel__title { font-weight:600; color:var(--v5-ink); }
+.purchase-panel { margin:12px 0; padding:12px; border-radius:12px; background:var(--v5-surface-2); color:var(--v5-ink-2); font:400 12px/1.6 var(--font-v5); overflow-wrap:break-word; }
+.purchase-panel__title { font-weight:500; color:var(--v5-ink); }
 .purchase-panel__note { display:block; margin-top:6px; color:var(--v5-ink-3); }
 .purchase-panel__policy { margin-top:16px; }
 .purchase-panel__row { display:flex; justify-content:space-between; align-items:baseline; gap:8px 16px; flex-wrap:wrap; }

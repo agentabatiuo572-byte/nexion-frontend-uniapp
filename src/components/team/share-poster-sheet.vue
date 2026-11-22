@@ -26,15 +26,13 @@
       <view class="ps-stage">
         <!-- 画布(随面板 v-if 挂载/销毁;draw 后导出预览图,自身移出视口不占布局) -->
         <canvas canvas-id="sharePosterCv" id="sharePosterCv" class="ps-canvas" />
-        <view v-if="genState === 'ready'" class="ps-preview">
+        <view v-if="genState === 'ready'" class="ps-preview" role="img" :aria-label="posterRewardLine">
           <image :src="imgSrc" mode="widthFix" class="ps-preview__img" />
         </view>
         <view v-else-if="genState === 'failed'" class="ps-fail">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <text class="ps-fail__t">{{ t.share.genFailed }}</text>
-          <view tabindex="0" class="ps-fail__btn nx-frosted-button active:opacity-80" role="button"  @click="regenerate"  @keydown.enter.prevent="regenerate" @keydown.space.prevent="regenerate">
-            <text class="ps-fail__btn-t">{{ t.share.retry }}</text>
-          </view>
+          <NxButton class="ps-fail__btn" variant="secondary" size="small" :label="t.share.retry" @click="regenerate" />
         </view>
         <view v-else class="ps-skeleton">
           <text class="ps-skeleton__t">{{ t.share.generating }}</text>
@@ -44,8 +42,8 @@
       <!-- 模板轮播(yield 无设备自动隐藏,异常3) -->
       <GlassSegments :model-value="tpl" :options="templateOptions" surface="open" class="ps-thumbs" :label="t.share.posterTitle" @select="pickTpl" />
 
-      <view class="ps-reward">
-        <text class="ps-reward__t">{{ posterRewardLine }}</text>
+      <view v-if="!welcomeGiftAvailable || rewardEffectiveAtText" class="ps-reward">
+        <text v-if="!welcomeGiftAvailable" class="ps-reward__t">{{ posterRewardLine }}</text>
         <text v-if="rewardEffectiveAtText" class="ps-reward__t">{{ rewardEffectiveAtText }}</text>
       </view>
 
@@ -56,20 +54,8 @@
         </view>
       </view>
 
-      <!-- 渠道行:保存 / 复制 + 链接渠道(与渠道面板同一 intent 实现) -->
-      <view class="ps-chrow">
-        <view class="ps-ch"   :aria-disabled="genState !== 'ready'" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="saveImage"  @keydown.enter.prevent="saveImage" @keydown.space.prevent="saveImage">
-          <view class="ps-ch__ic ps-ch__ic--hl">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /><path d="m7 10 5 5 5-5" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg>
-          </view>
-          <text class="ps-ch__lb">{{ t.share.saveImage }}</text><svg class="ps-ch__arrow" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg>
-        </view>
-        <view class="ps-ch"   :aria-disabled="genState !== 'ready'" :class="{ 'ps-ch--off': genState !== 'ready' }" role="button" :tabindex="genState === 'ready' ? 0 : -1" @click="copyLinkAction"  @keydown.enter.prevent="copyLinkAction" @keydown.space.prevent="copyLinkAction">
-          <view class="ps-ch__ic ps-ch__ic--hl">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-          </view>
-          <text class="ps-ch__lb">{{ t.share.copyLink }}</text><svg class="ps-ch__arrow" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg>
-        </view>
+      <!-- 链接渠道(与渠道面板同一 intent 实现);保存 / 复制在底部固定操作区 -->
+      <view v-if="linkChannels.length" class="ps-chrow">
         <view
           v-for="c in linkChannels"
           :key="c.key"
@@ -87,9 +73,14 @@
           <view class="ps-ch__ic">
             <view v-html="channelIcon(c.key)" />
           </view>
-          <text class="ps-ch__lb">{{ channelLabel(c.key) }}</text><svg class="ps-ch__arrow" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg>
+          <text class="ps-ch__lb">{{ channelLabel(c.key) }}</text><NxIcon v-if="c.intentType === 'web'" class="ps-ch__arrow" name="arrow-up-right" :size="18" />
         </view>
       </view>
+      </view>
+      <!-- Main actions stay on screen under the scrolling poster (03 §3.5): copy is the neutral glass, save the one primary. -->
+      <view class="ps-foot">
+        <NxButton class="ps-foot__btn" variant="secondary" :disabled="genState !== 'ready'" :label="t.share.copyLink" @click="copyLinkAction" />
+        <NxButton class="ps-foot__btn" variant="primary" :disabled="genState !== 'ready'" :label="t.share.saveImage" @click="saveImage" />
       </view>
     </view>
   </view>
@@ -98,6 +89,8 @@
 <script setup lang="ts">
 import { formatDisplayDate, formatDisplayDateTime } from "@/lib/display-date";
 import LiquidGlass from '@/components/liquid-glass.vue';
+import NxButton from '@/components/ui/nx-button.vue';
+import NxIcon from '@/components/ui/nx-icon.vue';
 import { useLocaleStore } from '@/store/locale';
 import { teamLogicCopy } from '@/i18n/team-logic-copy';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
@@ -116,6 +109,7 @@ import { toast } from "@/store/ui";
 import { activateChannel, buildShareLink, copyText, currentShareReferralCode, notifyUnavailableShareLink, visibleChannels } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { canvasFontStack, canvasFontsReady } from "@/lib/canvas-font";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -322,6 +316,8 @@ function ts(): string {
 
 function paint(link: string, myToken: number) {
   const ctx = uni.createCanvasContext("sharePosterCv", inst?.proxy);
+  // The family stays for the whole poster; fitText / wrapText only change the size.
+  ctx.font = `normal 400 10px ${canvasFontStack()}`;
   const bg = ctx.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, "#242629"); bg.addColorStop(1, "#101113");
   ctx.setFillStyle(bg); ctx.fillRect(0, 0, W, H);
@@ -408,7 +404,9 @@ function regenerate() {
       if (myToken !== genToken || !props.open) return;
       // 标先备好再画:paint 是同步的,中途插异步会打乱绘制顺序。
       // 异步回来要重新核 token —— 这期间用户可能已经切模板/关面板(沿用既有防竞态口径)。
-      void Promise.all([ensureBrandLogo(), ensureInviteArt()]).then(() => {
+      // The faces this language's poster text needs (e.g. Inter Vietnamese) load before drawing.
+      const fontText = `${JSON.stringify(t.value.share)} ${logicCopy.value.posterYieldCap} ${copy.value.inviteFriends} ${profile.displayName ?? ""} 0123456789`;
+      void Promise.all([ensureBrandLogo(), ensureInviteArt(), canvasFontsReady(fontText)]).then(() => {
         if (myToken !== genToken || !props.open || link !== buildShareLink()) return;
         try {
           paint(link, myToken);
@@ -548,11 +546,17 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-mask { position: fixed; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); z-index: 8000; }
 .ps-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--nx-glass-fill); border: none; display: flex; flex-direction: column; max-height: min(92vh, calc(100vh - var(--nx-overlay-top))); overflow: hidden; box-sizing: border-box; animation: ps-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ps-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+/* border: none above outranks the shared sheet outline, so forced colours get it back here. */
+@media (forced-colors: active) { .ps-sheet { border: 1px solid CanvasText; } }
 .ps-grab { flex-shrink: 0; width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: var(--ui-space-row-y) auto 0; }
 .ps-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: var(--ui-space-row-y) 20px; }
 /* The safe-area inset sits inside the scroller, so the list scrolls down to the screen edge instead of being cut by an opaque band. */
-.ps-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: calc(8px + var(--nx-overlay-safe-bottom)); }
-.ps-head__t { font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-ink); }
+.ps-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: var(--ui-space-inset); }
+/* Fixed action band under the scroller; it carries the safe-area inset so the sheet colour runs to the screen edge. */
+.ps-foot { flex: none; display: flex; gap: var(--ui-space-inline, 8px); padding: 12px 20px calc(12px + var(--nx-overlay-safe-bottom)); border-top: 1px solid var(--v5-border); }
+.ps-foot { flex-wrap: wrap; }
+.ps-foot .ps-foot__btn { flex: 1 1 0; }
+.ps-head__t { font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); color: var(--v5-ink); }
 /* 44×44 点按区(移动端最小触控标准,对齐 tradein-ladder-sheet 既有修法)。 */
 .ps-head__x { position: relative; isolation: isolate; flex: none; width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
 .ps-head__x svg { position: relative; }
@@ -565,25 +569,27 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-skeleton { aspect-ratio: 3 / 4; border-radius: 16px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
 .ps-skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--v5-ink) 5%, transparent), transparent); animation: ps-shim 1.1s infinite; }
 @keyframes ps-shim { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-.ps-skeleton__t { font-size: 12px; color: var(--v5-ink-4); }
+.ps-skeleton__t { font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .ps-fail { aspect-ratio: 3 / 4; border-radius: 16px; background: var(--v5-surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ui-space-row-y); }
 .ps-fail__t { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
-.ps-fail__btn { position: relative; isolation: isolate; min-height: 44px; padding: 0 18px; border-radius: 9999px; display: flex; align-items: center; }
-.ps-fail__btn-t { position: relative; font: 600 13px/20px var(--font-v5); color: var(--v5-ink); }
 .ps-thumbs { margin: var(--ui-space-inline) 16px 0; }
 .ps-reward { margin-top: var(--ui-space-row-y); text-align: center; padding: 0 16px; }
-.ps-reward__t { display: block; line-height: 1.6; overflow-wrap: anywhere; font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty; }
+.ps-reward__t { display: block; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; color: var(--v5-ink-3); text-wrap: pretty; }
 .ps-toggle { display: flex; align-items: center; justify-content: space-between; margin: var(--ui-space-row-y) 18px 0; min-height: 44px; }
-.ps-toggle__lb { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); }
+/* A settings row: list title at the menu-row weight (03 §3.5, 10 §10.1). */
+.ps-toggle__lb { flex: 1; min-width: 0; overflow-wrap: break-word; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .ps-sw { flex: none; width: 44px; height: 26px; border-radius: 9999px; background: var(--v5-surface-3); position: relative; transition: background 0.18s; }
 .ps-sw--on { background: var(--v5-brand); }
 .ps-sw__knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 9999px; background: var(--v5-surface); transition: left 0.18s; }
 .ps-sw--on .ps-sw__knob { left: 21px; }
-.ps-chrow { margin: var(--ui-space-inset) 20px 10px; }
+.ps-chrow { margin: var(--ui-space-inset) 20px 0; }
 .ps-ch { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 58px; padding: var(--ui-space-row-y) 0; border-top: 1px solid var(--v5-border); color: var(--v5-ink); }
-.ps-ch--off { opacity: .4; cursor: default; }
+.ps-ch--off { opacity: .5; cursor: default; }
 .ps-ch__ic,.ps-ch__arrow { flex: none; display: flex; align-items: center; justify-content: center; }
-.ps-ch__lb { flex: 1; min-width: 0; font: 500 14px/1.5 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+/* Action rows read as menu rows (list title, 400); only a channel that opens an outside site carries the external arrow (03 §3.1). */
+.ps-ch__lb { flex: 1; min-width: 0; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+/* NxIcon renders a bare svg without this component's scope attribute, so the colour reaches it through the row. */
+.ps-ch :deep(.ps-ch__arrow) { flex: none; color: var(--v5-ink-4); }
 .ps-sheet [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .ps-sheet,.ps-skeleton::after { animation: none; } .ps-sw,.ps-sw__knob { transition: none; } }
 </style>

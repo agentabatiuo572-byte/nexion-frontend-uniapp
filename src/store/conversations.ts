@@ -241,10 +241,16 @@ export const useConversations = defineStore("conversations", () => {
           const expiresAt = marker?.expiresAt ?? copy?.failed.expiresAt ?? failed.expiresAt
             ?? ((time > 0 && time <= now ? time : now) + HUMAN_PENDING_TTL_MS);
           const migrated = { ...failed, commandKey, expiresAt };
-          if (expiresAt <= now) expireHumanSend(account, key, migrated);
-          else if (!marker && !copy) writeRetainedHumanSend(account, key, saved, migrated);
-          // The source may outlive the copy, including after its result is confirmed.
+          // Record the original deadline before exposing a copy that may be settled independently.
           if (!marker) writeHumanStorage(markerKey, { commandKey, expiresAt }, true);
+          if (expiresAt <= now) expireHumanSend(account, key, migrated);
+          else if (!marker && !copy) {
+            try { writeRetainedHumanSend(account, key, saved, migrated); }
+            catch (cause) {
+              writeHumanStorage(markerKey, null, true);
+              throw cause;
+            }
+          }
           if (expiresAt > now) scheduleHumanExpiry(expiresAt);
         } catch { continue; }
         if (!durable && saved.text) rows[key] = { ...saved, failedSend: null, retainDraft: true };
@@ -297,8 +303,9 @@ export const useConversations = defineStore("conversations", () => {
       for (const { composerKey, saved, failed } of retainedHumanSends(account)) {
         if (failed.expiresAt! <= now) continue;
         const draft = drafts[composerKey], previous = draft?.failedSend;
-        if (failed.settled && draft?.text) continue;
-        if (previous?.settled || (!failed.settled && (previous?.expiresAt ?? 0) > failed.expiresAt!)) continue;
+        // Like in an open thread, an unresolved send takes priority over an editable rejection.
+        if (failed.settled && (draft?.text || previous)) continue;
+        if (!failed.settled && previous && !previous.settled && previous.expiresAt! > failed.expiresAt!) continue;
         drafts[composerKey] = { ...saved, text: draft?.text ?? "" };
       }
     } catch { /* The tab's drafts can still be restored. */ }
@@ -357,7 +364,7 @@ export const useConversations = defineStore("conversations", () => {
   }
 
   function withNextRetainedSend(key: string, value: HumanComposer, retired?: FailedHumanSend | null): HumanComposer {
-    if (value.failedSend || !key.startsWith("conversation:")) return value;
+    if (value.failedSend) return value;
     try {
       const excluded = retired && humanSendStorageKey(accountKeyValue, key, retired);
       const rows = retainedHumanSends(accountKeyValue)
@@ -445,14 +452,20 @@ export const useConversations = defineStore("conversations", () => {
     const pendingKey = scope.pending.get(humanSendSlot(key, failed));
     return !failed.commandKey || failed.commandKey === pendingKey ? pendingKey : undefined;
   }
+  function hasIndexedHumanSend(key: string, failed: FailedHumanSend): boolean {
+    try {
+      const indexedKey = restorePending(accountKeyValue, pendingRunId).get(humanSendSlot(key, failed));
+      return !!indexedKey && (!failed.commandKey || failed.commandKey === indexedKey);
+    } catch { return false; }
+  }
   function matchesReplyRejection(result: SupportCommandResult | null, id: string, key: string): result is Extract<SupportCommandResult, { kind: 'reply-rejected' }> {
     return result?.kind === 'reply-rejected' && result.conversationNo === id
       && result.idempotencyKey === key && result.clientMessageId === key;
   }
-  function applyPendingReplyRejection(scope: CommandScope, fingerprint: string, id: string, key: string,
+  function applyPendingReplyRejection(scope: CommandScope, fingerprint: string, composerKey: string, key: string,
       retained?: HumanComposer): boolean {
     if (humanWritesBlocked) return false;
-    const composerKey = `conversation:${id}`, current = humanComposers.value[composerKey];
+    const current = humanComposers.value[composerKey];
     const matches = (saved?: HumanComposer) => {
       const failed = saved?.failedSend;
       return !!failed && !failed.settled && humanSendSlot(composerKey, failed) === fingerprint
@@ -472,7 +485,7 @@ export const useConversations = defineStore("conversations", () => {
     if (rejected.expiresAt !== undefined) writeRetainedHumanSend(accountKeyValue, key, composer, rejected);
     if (!show) return;
     // Leave a durable refusal queued while the user works on the next draft.
-    if (rejected.expiresAt !== undefined && (composer.text || composer.imageDraft))
+    if (rejected.expiresAt !== undefined)
       saveComposer(key, withNextRetainedSend(key, { ...composer, failedSend: null, retainDraft: true }));
     else saveComposer(key, { ...composer, failedSend: rejected });
   }
@@ -485,7 +498,7 @@ export const useConversations = defineStore("conversations", () => {
     const result = await readCommandResult(scope, key);
     if (!active() || !scopeIsCurrent(scope) || scope.pending.get(fingerprint) !== pendingKey
         || scope.inFlight.has(fingerprint)) return null;
-    if (matchesReplyRejection(result, id, key) && applyPendingReplyRejection(scope, fingerprint, id, key)) return { status: 'rejected', key };
+    if (matchesReplyRejection(result, id, key) && applyPendingReplyRejection(scope, fingerprint, `conversation:${id}`, key)) return { status: 'rejected', key };
     if (result?.kind !== "conversation" || result.conversation.id !== id) return null;
     applyPendingConversation(scope, fingerprint, key, result.conversation);
     return { status: 'sent', key };
@@ -618,7 +631,10 @@ export const useConversations = defineStore("conversations", () => {
     if (!scopeIsCurrent(scope)) return Promise.resolve(null);
     const reads = readbacks, existing = reads.get(key);
     if (existing) return existing;
-    const promise = supportApi.commandResult(key).finally(() => {
+    const promise: Promise<SupportCommandResult | null> = supportApi.commandResult(key).then(
+      result => reads.get(key) === promise ? result : null,
+      cause => { if (reads.get(key) === promise) throw cause; return null; },
+    ).finally(() => {
       if (reads.get(key) === promise) reads.delete(key);
     });
     reads.set(key, promise);
@@ -654,6 +670,10 @@ export const useConversations = defineStore("conversations", () => {
     };
   }
   function startTargetKey(scope: SnapshotScope, key: string) { return `support-start-target:${scope.accountKey}:${scope.runId}:${key}`; }
+  function matchesReusedStart(scope: SnapshotScope, key: string, id: string): boolean {
+    try { return startTargetStorage().getItem(startTargetKey(scope, key)) === JSON.stringify(id); }
+    catch { return false; }
+  }
   function matchesHumanStart(scope: SnapshotScope, type: string, key: string, conversation: Conversation) {
     try {
       const target: unknown = JSON.parse(startTargetStorage().getItem(startTargetKey(scope, key)) || "null");
@@ -694,7 +714,7 @@ export const useConversations = defineStore("conversations", () => {
     return supportApi.replyConversation(current, text, key, attachmentId);
   }
 
-  async function command<T>(intent: string, action: (key: string) => Promise<T>, recover?: (key: string) => Promise<T | null>, expectedAccount?: AccountScope, policy?: { gate?: () => boolean; recovery?: { scope: CommandScope; key: string }; replyKey?: string }, onKey?: (key: string) => void): Promise<T> {
+  async function command<T>(intent: string, action: (key: string) => Promise<T>, recover?: (key: string, scope: CommandScope) => Promise<T | null>, expectedAccount?: AccountScope, policy?: { gate?: () => boolean; recovery?: { scope: CommandScope; key: string }; replyKey?: string }, onKey?: (key: string) => void): Promise<T> {
     const scope = await commandScope();
     if (expectedAccount && (expectedAccount.epoch !== scope.epoch || expectedAccount.accountKey !== scope.accountKey)) {
       throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
@@ -745,6 +765,8 @@ export const useConversations = defineStore("conversations", () => {
         }
         if (!originalKey && policy?.gate && !policy.gate())
           throw new Error("SUPPORT_CATEGORY_UNAVAILABLE");
+        // A read started before this write cannot answer for this attempt.
+        readbacks.delete(key);
         const operation = action(key);
         const result = await (humanSend ? awaitMessageOutcome(operation, MESSAGE_ACK_TIMEOUT_MS) : operation);
         if (!scopeIsCurrent(scope)) throw new Error("SUPPORT_ACCOUNT_SCOPE_CHANGED");
@@ -756,7 +778,7 @@ export const useConversations = defineStore("conversations", () => {
         if (recover && mustReadBack(cause) && !(userClear && isConversationUserClearRejected(cause)) && scopeIsCurrent(scope)) {
           let adopted: T | null = null;
           try {
-            const recovery = recover(key);
+            const recovery = recover(key, scope);
             adopted = await (humanSend ? awaitMessageOutcome(recovery, MESSAGE_READBACK_TIMEOUT_MS) : recovery);
           } catch (readbackError) {
             if (readbackError instanceof SupportReplyRejected && scopeIsCurrent(scope) && scope.pending.get(fingerprint) === key) {
@@ -1056,8 +1078,18 @@ export const useConversations = defineStore("conversations", () => {
           applyPendingConversation(scope, fingerprint, key, result.conversation);
           if (retained) retireHumanSend(scope.accountKey, retained.composerKey, retained.failed);
         }
-        if (result.kind === 'reply-rejected' && matchesReplyRejection(result, result.conversationNo, key))
-          applyPendingReplyRejection(scope, fingerprint, result.conversationNo, key, retained?.saved);
+        if (result.kind === 'reply-rejected' && matchesReplyRejection(result, result.conversationNo, key)) {
+          const replyKey = `conversation:${result.conversationNo}`;
+          const reused = matchesReusedStart(scope, key, result.conversationNo);
+          const composerKey = retained?.composerKey ?? (reused
+            ? Object.keys(humanComposers.value).find(candidate => {
+              const failed = humanComposers.value[candidate]?.failedSend;
+              return candidate.startsWith("start:") && failed && humanSendSlot(candidate, failed) === fingerprint;
+            })
+            : replyKey);
+          if (composerKey && (composerKey === replyKey || (reused && composerKey.startsWith("start:"))))
+            applyPendingReplyRejection(scope, fingerprint, composerKey, key, retained?.saved);
+        }
       } catch (cause) {
         // A recorded refusal is terminal; other read failures leave the original command unknown.
         if (isConversationUserClearRejected(cause) && scopeIsCurrent(scope) && !retained
@@ -1086,8 +1118,11 @@ export const useConversations = defineStore("conversations", () => {
     try {
       conversation = await command(intent,
         key => originalScope ? dispatchStart(type, openingText, key, attachmentId, originalScope, !!originalKey)
-          : supportApi.startConversation(type, openingText, key, attachmentId), async key => {
-          const result = await supportApi.commandResult(key);
+          : supportApi.startConversation(type, openingText, key, attachmentId), async (key, scope) => {
+          const result = await readCommandResult(scope, key);
+          if (result?.kind === "reply-rejected" && matchesReplyRejection(result, result.conversationNo, key)
+              && matchesReusedStart(scope, key, result.conversationNo))
+            throw new SupportReplyRejected(result.businessCode, result.businessReason);
           return result?.kind === "conversation" && (!originalScope || matchesHumanStart(originalScope, type, key, result.conversation))
             ? result.conversation : null;
         }, account, createPolicy, onDispatch);
@@ -1111,8 +1146,8 @@ export const useConversations = defineStore("conversations", () => {
     let conversation: Conversation;
     try {
       conversation = await command(`conversation-reply:${id}:${attachmentId ?? "text"}:${text.trim()}`,
-        key => supportApi.replyConversation(current, text, key, attachmentId), async key => {
-          const result = await supportApi.commandResult(key);
+        key => supportApi.replyConversation(current, text, key, attachmentId), async (key, scope) => {
+          const result = await readCommandResult(scope, key);
           if (matchesReplyRejection(result, id, key)) throw new SupportReplyRejected(result.businessCode, result.businessReason);
           return result?.kind === "conversation" ? result.conversation : null;
         }, account, { replyKey: originalKey }, onDispatch);
@@ -1162,5 +1197,5 @@ export const useConversations = defineStore("conversations", () => {
     }).catch(() => undefined);
   }
 
-  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,settleHumanComposer,resumeRetainedSend,recordHumanDispatch,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,pendingHumanSendKey,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
+  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,settleHumanComposer,resumeRetainedSend,recordHumanDispatch,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,pendingHumanSendKey,hasIndexedHumanSend,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
 });
