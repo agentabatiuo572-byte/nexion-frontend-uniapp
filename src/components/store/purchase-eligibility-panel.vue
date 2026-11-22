@@ -8,7 +8,7 @@
       <text v-if="message !== 'eligible' && visiblePolicies.length > 1" class="purchase-panel__note">{{ t.tradein.purchasePoliciesAll }}</text>
       <view v-for="(policy, index) in visiblePolicies" :key="`${policy.policy}-${index}`" class="purchase-panel__policy">
         <view v-if="!blockingOnly" class="purchase-panel__row"><text class="purchase-panel__title">{{ policy.policy === 'E1' ? t.tradein.purchaseProductPolicy : t.tradein.purchaseHardwarePolicy }}</text><text>{{ policy.eligible ? t.tradein.purchaseMet : policy.conditions.length ? t.tradein.purchaseUnmet : t.store.purchaseEligibilityError }}</text></view>
-        <text v-if="!policy.eligible && policy.conditions.filter(condition => !isQuota(condition)).length > (blockingOnly ? 1 : 0)" class="purchase-panel__note">{{ policy.mode === 'EITHER' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
+        <text v-if="!policy.eligible && policy.conditions.some(condition => !isQuota(condition) && !condition.met) && policy.conditions.filter(condition => !isQuota(condition)).length > (blockingOnly ? 1 : 0)" class="purchase-panel__note">{{ policy.mode === 'EITHER' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
         <view v-for="condition in policy.conditions.filter(condition => !isQuota(condition))" :key="condition.kind" class="purchase-panel__condition">
           <view class="purchase-panel__row"><text>{{ conditionLabel(condition) }}</text><text class="purchase-panel__values">{{ conditionValues(condition) }}</text></view>
           <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
