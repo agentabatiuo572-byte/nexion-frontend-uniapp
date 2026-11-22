@@ -14,7 +14,7 @@
         <text v-if="feedback" class="checkout-payment__error" role="alert">{{ feedback }}</text>
         <text v-else class="checkout-payment__note">{{ copy.paymentHint }}</text>
         <NxButton v-if="amountReadable && balanceReadable && !enoughBalance" :label="copy.topup" variant="text" :disabled="busy" @click="emit('topup')" />
-        <NxButton :label="busy || submitted ? copy.paying : copy.confirmPayment" variant="primary" :busy="busy || submitted" :disabled="!canConfirm" @click="confirm" />
+        <NxButton :label="copy.confirmPayment" :busy-label="copy.paying" variant="primary" :busy="busy || submitted" :disabled="!canConfirm" @click="confirm" />
       </view>
     </template>
   </NxSheet>

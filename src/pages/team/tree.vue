@@ -147,7 +147,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .tree-stat { --accent: var(--v5-ink); display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--ui-space-inline); border-radius: 20px; --nx-tint: var(--accent); }
 .tree-stat > text:first-child, .tree-stat .tree-total > text { overflow: hidden; font: 600 22px/28px var(--font-metric); color: var(--accent); white-space: nowrap; text-overflow: ellipsis; }
 .tree-stat--brand { --accent: var(--v5-brand); }
-.tree-stat > text.tree-points { max-width: 100%; overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.tree-stat > text.tree-points { max-width: 100%; overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: break-word; }
 .tree-stat--cyan { --accent: var(--ui-device-ink); }
 .tree-stat__label { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .tree-search { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; padding: 0 var(--ui-space-inset); border-radius: 999px; color: var(--v5-ink-3); background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border), inset 0 3px 6px -2px rgba(255,255,255,.18); }
@@ -157,7 +157,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .tree-self-root { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 60px; color: var(--v5-ink-3); }
 .tree-self-root__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .tree-self-root__name { font-size: 14px; font-weight: 600; color: var(--v5-ink); }
-.tree-self-root__meta { font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.tree-self-root__meta { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); overflow-wrap: break-word; }
 .tree-self-root__chev { flex: none; color: var(--v5-ink-4); }
 .tree-rosters :deep(.tree-roster--direct .member-row) { position: relative; padding-left: 40px; border-top: 0; }
 .tree-rosters :deep(.tree-roster--direct .member-row)::before { content: ""; position: absolute; left: 19px; top: 0; bottom: 0; width: 2px; background: color-mix(in srgb, var(--v5-brand) 35%, transparent); }

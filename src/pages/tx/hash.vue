@@ -28,7 +28,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
           <text :style="confirmedStyle">{{ w.confirmed }}</text>
         </view>
-        <text class="block" :style="hashStyle">{{ hash }}</text>
+        <NxCodeValue class="tx-hero-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
         <view class="flex items-center active:opacity-70" :style="copyBtnStyle" role="button" tabindex="0" :aria-label="copyButtonText" @click.stop="copyHash">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           <text>{{ copyButtonText }}</text>
@@ -259,7 +259,6 @@ const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
 };
 const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-success-ink)" };
-const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
 // Nested copy chip — soft surface-2 fill lifts it off the surface hero, no border.
 const copyBtnStyle: CSSProperties = {
   marginTop: "8px",
@@ -300,7 +299,7 @@ const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-typ
 
 <style scoped>
 /* The retained hash stays fully visible: its own full-width monospace block, wrapping evenly (NxCodeValue full); the copy button below copies it. */
-.tx-retained-hash { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); user-select: text; }
+.tx-retained-hash, .tx-hero-hash { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); user-select: text; }
 .tx-bills-link { display: flex !important; justify-content: center; }
 [role="button"][aria-disabled="true"] { opacity: 0.5; }
 [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }

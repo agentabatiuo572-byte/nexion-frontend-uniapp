@@ -178,7 +178,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__unit { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-market__price { margin-top: 8px; font: 500 15px/20px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-market__delta { font: 500 11px/14px var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.earn-market__flagship { margin-top: 2px; font: 500 11px/14px var(--font-v5); color: var(--v5-warning-ink); overflow-wrap: anywhere; }
+.earn-market__flagship { margin-top: 2px; font: 500 11px/14px var(--font-v5); color: var(--v5-warning-ink); overflow-wrap: break-word; }
 .earn-market__flagship-delta { font: 500 11px/14px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Sparklines sit on the tile floor so a taller tile (flagship line) keeps them aligned. The App draws the SVG
    through NxNativeSvg (v-html), so the SVG's own style reaches it through :deep() on this real wrapper. */

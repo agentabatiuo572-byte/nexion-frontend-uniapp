@@ -3,7 +3,7 @@
     <text class="promotion-copy" style="white-space:pre-wrap;margin-top:12px">{{ localized(disclosure.benefitDescription,locale.code) }}</text>
     <view v-if="disclosure.deviceRights" class="promotion-entitlements" role="list"><view v-for="(sentence,index) in rights" :key="index" class="disclosure-right" role="listitem"><text aria-hidden="true">·</text><text>{{ sentence }}</text></view></view>
     <text v-if="terms" class="promotion-copy" style="white-space:pre-wrap;margin-top:12px">{{ terms }}</text>
-    <text class="promotion-title" style="margin-top:16px;font-size:var(--ui-type-body)">{{ t.promotion.returnPolicy }}</text><text class="promotion-copy" style="white-space:pre-wrap">{{ localized(disclosure.refundTerms,locale.code) }}</text>
+    <text class="promotion-title promotion-title--sub" style="margin-top:16px">{{ t.promotion.returnPolicy }}</text><text class="promotion-copy" style="white-space:pre-wrap">{{ localized(disclosure.refundTerms,locale.code) }}</text>
   </view>
 </template>
 <script setup lang="ts">
@@ -43,5 +43,5 @@ const rights=computed(()=>{
 <style scoped>
 .promotion-entitlements { margin-top:12px; }
 .disclosure-right { display:flex; align-items:flex-start; gap:8px; padding:6px 0; color:var(--v5-ink-2); font:400 14px/22px var(--font-v5); }
-.disclosure-right > :last-child { min-width:0; overflow-wrap:anywhere; }
+.disclosure-right > :last-child { min-width:0; overflow-wrap:break-word; }
 </style>

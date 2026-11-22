@@ -48,5 +48,5 @@ function goAll() {
 [data-theme="light"] .earnings-ledger__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .earnings-ledger__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; box-sizing: content-box; }
 .earnings-ledger__row + .earnings-ledger__row { border-top: 1px solid var(--v5-border); }
-.earnings-ledger__status { min-width: 0; font: 400 14px/20px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.earnings-ledger__status { min-width: 0; font: 400 14px/20px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 </style>

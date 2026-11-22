@@ -17,10 +17,10 @@ function activate(event?: Event) { if (!props.disabled && !(event as KeyboardEve
 .nx-list-row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; }
 .nx-list-row__leading { display: grid; place-items: center; flex: none; width: 36px; color: var(--v5-ink-2); }
 .nx-list-row__copy { flex: 1; min-width: 0; }
-.nx-list-row__title { display: block; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: anywhere; }
+.nx-list-row__title { display: block; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .nx-list-row__title--content { font-weight: var(--ui-type-list-title-weight); }
-.nx-list-row__subtitle { display: block; margin-top: 2px; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
-.nx-list-row__value { max-width: 38%; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); text-align: right; overflow-wrap: anywhere; }
+.nx-list-row__subtitle { display: block; margin-top: 2px; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.nx-list-row__value { max-width: 38%; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); text-align: right; overflow-wrap: break-word; }
 .nx-list-row__chevron { flex: none; color: var(--v5-ink-4); transition: transform .2s ease; }
 .nx-list-row__chevron--open { transform: rotate(180deg); }
 @media (max-width: 374px) {

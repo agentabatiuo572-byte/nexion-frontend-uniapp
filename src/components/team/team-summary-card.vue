@@ -30,7 +30,7 @@ function open(){if(canOpen.value)emit('open');}
 <style scoped>
 .team-summary { container: team-summary / inline-size; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); color: var(--v5-ink); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .team-summary__header { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; min-height: 24px; gap: 4px; }
-.team-summary__title { min-width: 0; overflow-wrap: anywhere; font: 600 14px/20px var(--font-v5); }
+.team-summary__title { min-width: 0; overflow-wrap: break-word; font: 600 14px/20px var(--font-v5); }
 .team-summary__arrow { flex: none; font-size: 18px; color: var(--v5-ink-4); }
 .team-summary__body { --team-art-size: 64px; display: flex; flex-direction: column; flex: 1; justify-content: flex-end; }
 .team-summary__body :deep(.team-art) { position: absolute; top: 30px; right: -10px; opacity: .9; pointer-events: none; }
@@ -38,13 +38,13 @@ function open(){if(canOpen.value)emit('open');}
 .team-summary__number { display: block; max-width: 100%; font: 600 32px/36px var(--font-metric); font-size: clamp(18px, calc(100cqi / var(--team-summary-count-units)), 32px); font-variant-numeric: tabular-nums; white-space: nowrap; overflow-x: auto; }
 .team-summary__label { flex: none; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
 .team-summary__direct { position: relative; display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
-.team-summary__direct > text { min-width: 0; overflow-wrap: anywhere; }
+.team-summary__direct > text { min-width: 0; overflow-wrap: break-word; }
 .team-summary__team { margin-left: 4px; }
 .team-summary__team > text { color: var(--v5-ink); font: 600 12px/16px var(--font-metric); }
 .team-summary__direct > text:nth-child(2) { max-width: 100%; white-space: nowrap; overflow-x: auto; color: var(--ui-device-ink); font: 600 12px/16px var(--font-metric); }
 .team-summary__number,.team-summary__direct > text:last-child { overflow-y: hidden; scrollbar-width: none; }
 .team-summary__number::-webkit-scrollbar,.team-summary__direct > text:last-child::-webkit-scrollbar { display: none; }
-.team-summary__empty,.team-summary__status { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.team-summary__empty,.team-summary__status { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 13px; line-height: 1.5; overflow-wrap: break-word; }
 .team-summary__status .team-summary__action { font: 600 13px/20px var(--font-v5); }
 .team-summary[role='link'] { cursor: pointer; }
 .team-summary:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }

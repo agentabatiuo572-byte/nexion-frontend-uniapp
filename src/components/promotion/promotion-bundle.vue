@@ -1,7 +1,7 @@
 <template>
   <view class="promotion promotion-main" data-testid="promotion-bundle">
     <view>
-      <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : !scopeId?t.promotion.bundle:contextStatus==='ready'?t.promotion.disabled:contextStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
+      <text class="promotion-title promotion-title--section">{{ activity ? localized(activity.title,locale.code) : !scopeId?t.promotion.bundle:contextStatus==='ready'?t.promotion.disabled:contextStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
       <text v-if="!scopeId||activity" class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
       <text v-if="scopeId&&(contextStatus==='loading'||contextStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
       <text v-if="scopeId && !activity && contextStatus === 'error'" class="promotion-copy">—</text>
@@ -207,7 +207,7 @@ onBeforeUnmount(()=>{visible.value=false;fence.invalidate();if(expiryTimer)clear
 </script>
 <style src="./promotion.css"></style>
 <style scoped>
-.bundle-name { display:block;font-size:var(--ui-type-card-title);font-weight: var(--ui-type-card-title-weight);overflow-wrap:anywhere; }
+.bundle-name { display:block;font-size:var(--ui-type-card-title);font-weight: var(--ui-type-card-title-weight);overflow-wrap:break-word; }
 .bundle-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;width:max-content;max-width:100%;margin-top:var(--ui-space-row-y);overflow:hidden; }
 .bundle-stepper view,.bundle-add,.bundle-remove { min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:20px; }
 .bundle-stepper view { background:var(--v5-surface-2); }

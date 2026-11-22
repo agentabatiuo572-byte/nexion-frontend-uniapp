@@ -45,7 +45,7 @@
     <view v-else-if="phase === 'fail'" class="nx-glass-card text-center" :style="centerCardStyle">
       <view :style="failIconStyle"><text style="font-size: 32px">⚠️</text></view>
       <text class="block" :style="failTitleStyle">{{ t.topupChrome.payDeclined }}</text>
-      <text class="block font-mono-tabular break-all" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">{{ t.topupChrome.payDeclinedReason }}</text>
+      <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2); overflow-wrap: break-word">{{ t.topupChrome.payDeclinedReason }}</text>
       <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">{{ t.topupChrome.contactIssuer }}</text>
       <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retry"  @keydown.enter.prevent="retry" @keydown.space.prevent="retry"><text>{{ t.ui.retry }}</text></view>
     </view>

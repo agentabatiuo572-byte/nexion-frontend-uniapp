@@ -1360,7 +1360,7 @@ useAutoRecovery({
   font-weight: 600;
   font-size: 17px;
   line-height: 1.3;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   letter-spacing: -0.008em;
   color: var(--v5-ink);
 }
@@ -1398,12 +1398,12 @@ useAutoRecovery({
 .cp-back { overflow: visible; }
 .cp-back > svg { position: relative; z-index: 1; }
 .cp-history-error { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; padding:7px 16px; text-align:start; color:var(--v5-ink-3); font-size:12px; }
-.cp-history-error > text { min-width:0; overflow-wrap:anywhere; }
+.cp-history-error > text { min-width:0; overflow-wrap:break-word; }
 .cp-history-error > .cp-history-text-action { min-width:44px; padding-inline:0; white-space:nowrap; font:600 13px/20px var(--font-v5); }
 .cp-history-text-action { display:flex; align-items:center; justify-content:center; min-height:44px; padding:0 16px; box-sizing:border-box; border:0; background:transparent; color:var(--v5-ink-2); font-size:13px; text-align:center; cursor:pointer; }
 .cp-history-text-action[aria-disabled="true"] { opacity:.5; cursor:default; }
 .cp-history-text-action:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
-.cp-role-t { overflow-wrap: anywhere; }
+.cp-role-t { overflow-wrap: break-word; }
 @media (prefers-reduced-motion: reduce) { .cp-dot { animation: none; } }
 </style>
 

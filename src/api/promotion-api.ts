@@ -10,17 +10,24 @@ export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_MET
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
 export type CheckoutQuoteBlock = 'outOfStock' | 'soldOut' | 'monthlyQuota' | 'purchaseConditions' | 'productMissing' | 'capacity' | 'unavailable';
-export function checkoutQuoteBlock(cause: unknown): CheckoutQuoteBlock | null {
-  if (isApiRefusal(cause, 404, 'PRODUCT_NOT_AVAILABLE')
+export function checkoutQuoteBlock(cause: unknown, source: 'quote' | 'eligibility' = 'quote'): CheckoutQuoteBlock | null {
+  // Eligibility can report a denial in a successfully read snapshot or in an API error.
+  const decision = typeof cause === 'string' ? cause : null;
+  if (isApiRefusal(cause, 404, 'PRODUCT_NOT_AVAILABLE')) return source === 'eligibility' ? 'productMissing' : 'outOfStock';
+  if (decision === 'PRODUCT_NOT_AVAILABLE' || decision === 'PRODUCT_NOT_RELEASED') return 'productMissing';
+  if (decision === 'PRODUCT_OUT_OF_STOCK' || isApiRefusal(cause, 409, 'PRODUCT_OUT_OF_STOCK')
       || isApiRefusal(cause, 409, 'BUNDLE_PRODUCT_NOT_AVAILABLE')) return 'outOfStock';
-  if (isApiRefusal(cause, 409, 'F4B_MONTHLY_QUOTA_EXHAUSTED')) return 'monthlyQuota';
-  if (isApiRefusal(cause, 409, 'PURCHASE_GATE_SOLD_OUT')) return 'soldOut';
-  if (isApiRefusal(cause, 409, 'F4B_REQUIREMENTS_NOT_MET', 'PURCHASE_GATE_NOT_MET')) return 'purchaseConditions';
+  if (decision === 'F4B_MONTHLY_QUOTA_EXHAUSTED' || isApiRefusal(cause, 409, 'F4B_MONTHLY_QUOTA_EXHAUSTED')) return 'monthlyQuota';
+  if (decision === 'PURCHASE_GATE_SOLD_OUT' || isApiRefusal(cause, 409, 'PURCHASE_GATE_SOLD_OUT')) return 'soldOut';
+  if (decision === 'F4B_REQUIREMENTS_NOT_MET' || decision === 'PURCHASE_GATE_NOT_MET'
+      || isApiRefusal(cause, 409, 'F4B_REQUIREMENTS_NOT_MET', 'PURCHASE_GATE_NOT_MET')
+      || isApiRefusal(cause, 403, 'PURCHASE_GATE_NOT_MET')) return 'purchaseConditions';
   if (isApiRefusal(cause, 409, 'CAPACITY_REPLACEMENT_REQUIRED')) return 'capacity';
   if (isApiRefusal(cause, 404, 'PROMOTION_RESOURCE_NOT_FOUND')) return 'productMissing';
   if (cause instanceof ApiError) {
     const status = cause.kind === 'http' ? cause.status : cause.kind === 'business' ? cause.code : undefined;
-    if ((cause.kind === 'network' && cause.retryable) || status === 408 || (status ?? 0) >= 500) return 'unavailable';
+    if ((cause.kind === 'network' && cause.retryable) || status === 408 || (status ?? 0) >= 500
+        || (source === 'eligibility' && cause.kind === 'http' && status === 429)) return 'unavailable';
   }
   return null;
 }

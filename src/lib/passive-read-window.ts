@@ -6,7 +6,7 @@ let writeRevision = 0;
 export const capturePassiveWriteRevision = () => writeRevision;
 export function invalidatePassiveTabReads(): void { writeRevision += 1; }
 
-type Attempt = { resource: string; visit: number; retryUntil: number | null; receivedAt: number | null; pending: boolean; cached: boolean; hasCache?: () => boolean; promise: Promise<unknown> };
+type Attempt = { resource: string; visit: number; startedAt: number; retryUntil: number | null; receivedAt: number | null; pending: boolean; cached: boolean; hasCache?: () => boolean; promise: Promise<unknown> };
 export function createPassiveReadWindow(now = () => Date.now(), activations = createPageReadController(now)) {
   let activeScope = "", scopeVersion = 0;
   let executing: { scope: string; version: number; key: string; attempt: Attempt; rawClaimed: boolean } | null = null;
@@ -30,8 +30,8 @@ export function createPassiveReadWindow(now = () => Date.now(), activations = cr
       else attempts.delete(key);
     }
   }
-  function track<T>(resource: string, promise: Promise<T>, hasCache?: () => boolean): Attempt {
-    const attempt: Attempt = { resource, visit: activations.snapshot().visit, retryUntil: null, receivedAt: null, pending: true, cached: false, hasCache, promise };
+  function track<T>(resource: string, promise: Promise<T>, hasCache?: () => boolean, startedAt = now()): Attempt {
+    const attempt: Attempt = { resource, visit: activations.snapshot().visit, startedAt, retryUntil: null, receivedAt: null, pending: true, cached: false, hasCache, promise };
     void promise.then(value => {
       attempt.pending = false;
       attempt.cached = value !== false && value !== null && (value !== undefined || !!hasCache) && (!hasCache || hasCache());
@@ -44,22 +44,22 @@ export function createPassiveReadWindow(now = () => Date.now(), activations = cr
     });
     return attempt;
   }
-  function remember<T>(scope: string, resource: string, promise: Promise<T>, query?: unknown, _attemptedAt?: number, hasCache?: () => boolean): Promise<T> {
+  function remember<T>(scope: string, resource: string, promise: Promise<T>, query?: unknown, attemptedAt?: number, hasCache?: () => boolean): Promise<T> {
     const key = keyOf(resource, query);
     if (scope === activeScope && ownsDispatch(key)) return promise;
     // A nested manual read already replaced this outer dispatch; do not restore it.
     if (executing?.key === key && scope === activeScope && attempts.has(key)) return promise;
     selectScope(scope);
-    attempts.set(key, track(resource, promise, hasCache));
+    attempts.set(key, track(resource, promise, hasCache, attemptedAt));
     return promise;
   }
-  function run<T>(scope: string, resource: string, read: () => Promise<T>, query?: unknown, hasCache?: () => boolean, maxAgeMs = 5_000): Promise<T> {
+  function run<T>(scope: string, resource: string, read: () => Promise<T>, query?: unknown, hasCache?: () => boolean, maxAgeMs = 5_000, minIntervalMs = 0): Promise<T> {
     selectScope(scope);
     const key = keyOf(resource, query), previous = attempts.get(key);
     const activation = activations.snapshot();
     const reusable = previous?.cached && (!previous.hasCache || previous.hasCache());
     const fresh = reusable && previous.receivedAt !== null && now() - previous.receivedAt < maxAgeMs;
-    if (previous && (previous.pending || (previous.retryUntil !== null ? now() < previous.retryUntil
+    if (previous && (previous.pending || now() - previous.startedAt < minIntervalMs || (previous.retryUntil !== null ? now() < previous.retryUntil
       : fresh || (maxAgeMs === 5_000 && activation.protected && reusable)
         || (!previous.cached && previous.visit === activation.visit && previous.receivedAt !== null && now() - previous.receivedAt < 1_000)))) {
       previous.visit = activation.visit;

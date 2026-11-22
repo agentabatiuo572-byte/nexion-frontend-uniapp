@@ -17,7 +17,7 @@
       </view>
     </view>
     <view v-if="createError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
-      <text class="block break-all" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger)">{{ createError }}</text>
+      <text class="block" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger); overflow-wrap: break-word">{{ createError }}</text>
       <view v-if="createRecovery" class="nx-bank-setup-recovery active-press" role="button" tabindex="0"
         @click="goCreateRecovery" @keydown.enter.prevent="goCreateRecovery" @keydown.space.prevent="goCreateRecovery"
         style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)">

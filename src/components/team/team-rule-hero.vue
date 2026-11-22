@@ -34,8 +34,8 @@ function jump(id: string) {
 /* Published guides have no intro line; centre the title on the art instead of leaving a gap. */
 .team-rule-hero__heading--plain { align-items: center; }
 .team-rule-hero__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.team-rule-hero__title { color: var(--v5-ink); font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); text-wrap: balance; overflow-wrap: anywhere; }
-.team-rule-hero__intro { color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); white-space: pre-line; text-wrap: pretty; overflow-wrap: anywhere; }
+.team-rule-hero__title { color: var(--v5-ink); font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); text-wrap: balance; overflow-wrap: break-word; }
+.team-rule-hero__intro { color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); white-space: pre-line; text-wrap: pretty; overflow-wrap: break-word; }
 .team-rule-hero__art { --team-art-size: var(--team-guide-art-size); flex: 0 0 var(--team-guide-art-size); }
 .team-rule-hero__nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 /* Neutral glass S buttons: 32px surface, 44px hit area. */

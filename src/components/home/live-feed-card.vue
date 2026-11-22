@@ -202,7 +202,7 @@ function goAll() {
 .nx-home-feed-heading { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);min-height:44px; }
 .nx-home-feed-identity { display:flex;align-items:center;gap:10px;min-width:0; }
 .nx-home-feed-mark { display:flex;align-items:center;justify-content:center;flex:none;width:30px;height:30px;border-radius:50%;background:color-mix(in srgb,var(--v5-brand) 10%,transparent);color:var(--v5-brand); }
-.nx-home-feed-title { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:anywhere; }
+.nx-home-feed-title { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:break-word; }
 .nx-home-feed-tabs { flex:0 0 90px;width:90px;height:26px;min-width:0;padding:2px;gap:1px; }
 .nx-home-feed-tabs :deep(.nx-glass-option) { min-height:22px;padding:0; }
 .nx-home-feed-tabs :deep(.nx-glass-option::after) { content:"";position:absolute;inset:-11px 0; }

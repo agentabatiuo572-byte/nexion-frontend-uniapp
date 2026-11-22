@@ -543,7 +543,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-field { display: block; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .lp-tag-icon { margin-right: 4px; flex: none; }
-.lp-title { display: block; margin-top: 12px; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); overflow-wrap: anywhere; }
+.lp-title { display: block; margin-top: 12px; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .lp-subtitle { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-section { display: block; margin-top: var(--ui-space-section-gap); }
 .lp-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -576,7 +576,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 
 /* Shared icon rows */
 .lp-lines { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
-.lp-line, .lp-note { display: flex; align-items: flex-start; gap: 10px; font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
+.lp-line, .lp-note { display: flex; align-items: flex-start; gap: 10px; font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .lp-note { margin-top: 16px; }
 .lp-note--tight { margin-top: 8px; }
 .lp-note__stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -622,7 +622,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-rule__row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
 .lp-rule__art { position: relative; flex: none; width: 48px; height: 48px; display: grid; place-items: center; }
 .lp-rule__copy { flex: 1; min-width: 0; }
-.lp-rule__name { display: block; margin-top: 2px; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.lp-rule__name { display: block; margin-top: 2px; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .lp-rule__name--gift { font-weight: var(--ui-type-card-title-weight); color: var(--v5-brand); }
 .lp-rule__qty { flex: none; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-rule__tear { position: relative; margin: 0 16px; border-top: 1.5px dashed var(--v5-border-strong); }
@@ -633,7 +633,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-rule__cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--v5-border); border-radius: 0 0 var(--ui-radius-surface) var(--ui-radius-surface); background: var(--v5-surface-2); }
 .lp-rule__cell { min-width: 0; padding: 12px 12px 12px 16px; }
 .lp-rule__cell + .lp-rule__cell { padding-left: 12px; }
-.lp-rule__value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.lp-rule__value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 
 /* Reward coins: UVT purple stays a flat identifier (01.1.2); the glyph is white in both themes, as on the wallet coins. */
 .lp-coin { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; color: white; font: 500 22px/1 var(--font-amount); font-variant-numeric: tabular-nums; box-shadow: inset 0 2px 4px color-mix(in srgb, white 35%, transparent), inset 0 -3px 6px color-mix(in srgb, black 18%, transparent); }
@@ -651,7 +651,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-rights__long { font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); color: var(--v5-ink); }
 .lp-rights__effective { display: block; margin-top: 6px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-rights__cell { min-width: 0; padding: 14px; border-radius: 20px; }
-.lp-rights__value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.lp-rights__value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .lp-rights__flags { grid-column: span 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 20px; }
 .lp-rights__flag { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 14px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); }
 .lp-rights__flag:nth-child(n+3) { padding-top: 0; }
@@ -664,7 +664,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-ticket__label { display: block; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-ticket__value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 6px; min-width: 0; }
 .lp-ticket__amount { font-size: 64px; line-height: 64px; }
-.lp-ticket__unit { font: var(--ui-type-list-title-weight) var(--ui-type-card-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.lp-ticket__unit { font: var(--ui-type-list-title-weight) var(--ui-type-card-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .lp-amount--m { font-size: 48px; line-height: 52px; }
 .lp-amount--s { font-size: 36px; line-height: 40px; }
 .lp-countdown { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; padding-top: 12px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
@@ -682,7 +682,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .lp-step { min-width: 0; padding: 14px 12px; border-radius: 18px; }
 .lp-step__number { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-jet-mono); }
-.lp-step__title { display: block; margin-top: 12px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.lp-step__title { display: block; margin-top: 12px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .lp-step__note { display: block; margin-top: 4px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 
 /* Product cards: 104px art on first purchase, 100px on repurchase. */
@@ -691,7 +691,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-product__art > .lp-fill { inset: 4px; }
 .lp--repurchase .lp-product__art > .lp-fill { inset: 6px; }
 .lp-product__copy { flex: 1; min-width: 0; }
-.lp-product__name { display: block; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.lp-product__name { display: block; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .lp-product__tagline { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-product__tag { margin-top: 8px; }
 .lp-product__chevron { flex: none; color: var(--v5-ink-4); }
@@ -726,7 +726,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-slab__solo--muted .lp-target__image { max-width: 100%; }
 .lp-slab__solo--muted .lp-slab__text { flex: 0 1 auto; }
 .lp-slab__solo--muted .lp-target__image { filter: grayscale(.6); }
-.lp-slab__text { flex: 1; min-width: 0; font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
+.lp-slab__text { flex: 1; min-width: 0; font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .lp-slab__foot { display: block; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--v5-border); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
 
 /* Bottom action bar (DS-30), shared soft glass: the last line sits about 30px above it. */

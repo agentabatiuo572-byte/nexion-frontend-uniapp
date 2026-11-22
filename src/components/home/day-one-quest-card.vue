@@ -85,7 +85,7 @@
       </view>
     </view>
 
-    <NxButton v-if="remoteApiEnabled && !questUnavailable && !claimState.empty && (claimState.claimCode || quest.dayOneClaiming)" class="newcomer-task__claim" variant="brand" size="medium" :disabled="!props.active" :busy="quest.dayOneClaiming" :label="quest.dayOneClaiming ? t.home.dayOneClaiming : t.home.dayOneClaimReward" @click="onClaim" />
+    <NxButton v-if="remoteApiEnabled && !questUnavailable && !claimState.empty && (claimState.claimCode || quest.dayOneClaiming)" class="newcomer-task__claim" variant="brand" size="medium" :disabled="!props.active" :busy="quest.dayOneClaiming" :label="t.home.dayOneClaimReward" :busy-label="t.home.dayOneClaiming" @click="onClaim" />
     <view v-if="expanded && observationNotices.length" class="newcomer-task__observation">
       <view v-for="notice in observationNotices" :key="notice.task.id" class="newcomer-task__observation-item">
         <text role="status">{{ notice.task.label }} · {{ observationMessage(notice.reason) }}</text>

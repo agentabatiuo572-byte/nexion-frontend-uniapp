@@ -542,7 +542,7 @@ function aLabelStyle(ul: boolean): CSSProperties {
 function aDescStyle(ul: boolean): CSSProperties {
   return { fontSize: "12px", marginTop: "2px", lineHeight: 1.375, color: "var(--v5-ink-3)" };
 }
-const aWhenStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px", lineHeight: 1.5, whiteSpace: "normal", overflowWrap: "anywhere" };
+const aWhenStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px", lineHeight: 1.5, whiteSpace: "normal", overflowWrap: "break-word" };
 function rewardStyle(ul: boolean): CSSProperties {
   return { fontFamily: "var(--font-metric)", fontSize: "13px", fontWeight: 500, color: ul ? "var(--v5-nex-ink)" : "var(--v5-ink-3)" };
 }

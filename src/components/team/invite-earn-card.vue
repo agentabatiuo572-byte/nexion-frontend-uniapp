@@ -158,7 +158,7 @@ onUnmounted(stopRuntimeRefresh);
 .invite-card__art :deep(.team-art) { width: 100%; height: auto; aspect-ratio: 4 / 3; }
 /* Pills sit above the title; each keeps a 44px hit area around a 28px pill. */
 .invite-card__header { position: relative; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 12px; margin-top: -8px; }
-.invite-card__title { min-width: 0; max-width: 62%; font: 600 17px/24px var(--font-v5); overflow-wrap: anywhere; }
+.invite-card__title { min-width: 0; max-width: 62%; font: 600 17px/24px var(--font-v5); overflow-wrap: break-word; }
 .invite-card__header-actions { display: flex; align-items: center; gap: var(--v5-space-2); }
 .invite-card__history,.invite-card__rules { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 10px; color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); cursor: pointer; white-space: nowrap; }
 .invite-card__history::before,.invite-card__rules::before { content: ''; position: absolute; inset: 8px 0; z-index: -1; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
@@ -169,7 +169,7 @@ onUnmounted(stopRuntimeRefresh);
 .invite-card__amount { font: 600 40px/44px var(--font-amount); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--v5-brand); }
 .invite-card__unit { font: 600 16px/20px var(--font-metric); color: var(--v5-brand); }
 .invite-card__descriptions { display: grid; align-self: stretch; min-height: 18px; }
-.invite-card__description { grid-area: 1 / 1; display: none; visibility: hidden; font: 400 12px/1.5 var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.invite-card__description { grid-area: 1 / 1; display: none; visibility: hidden; font: 400 12px/1.5 var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .invite-card__description:first-child { display: block; }
 .invite-card__description.is-active { display: block; visibility: visible; }
 .invite-card__description > text { display: block; }
