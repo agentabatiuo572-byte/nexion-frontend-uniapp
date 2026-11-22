@@ -21,14 +21,14 @@
       <view class="genesis-tier-card">
         <view v-if="!tiers.length" class="genesis-tier" style="min-height:132px"><text>—</text></view>
         <view v-for="tr in tiers" :key="tr.id" class="genesis-tier" :class="{ 'genesis-tier--sold': tr.state === 'sold' }">
-          <view class="genesis-gold-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2-10 5 10 5 10-5-10-5ZM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></view>
+          <NxIconTile tone="amber" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2-10 5 10 5 10-5-10-5ZM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></NxIconTile>
           <view class="flex-1 min-w-0"><view class="flex items-center" style="gap:6px"><text class="genesis-subtitle">{{ t.genesis.tier[tr.labelKey] }}</text><text v-if="tr.state === 'current' && dockActive" class="genesis-tier-chip">{{ t.genesis.tier.live }}</text><text v-else-if="tr.state === 'sold'" class="genesis-caption">{{ t.genesis.tier.soldOut }}</text></view><text class="genesis-tier-meta">{{ tr.state === 'current' && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal.toLocaleString(locale.code) }) }}</text></view>
           <view class="genesis-tier-price"><text class="genesis-amount"><text class="genesis-currency">$</text>{{ tr.priceText.split('.')[0] }}<text class="genesis-decimal">.{{ tr.priceText.split('.')[1] || '00' }}</text></text><text v-if="tr.state === 'current'" class="genesis-current">{{ t.genesis.tier.current }}</text></view>
         </view>
       </view>
       <view class="genesis-section"><text>{{ t.genesis.value.title }}</text></view>
-      <view class="genesis-perks"><view v-for="p in PERKS" :key="p.name" class="genesis-perk"><view class="genesis-gold-icon genesis-perk-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="p.path"/></svg></view><text class="genesis-subtitle">{{ p.name }}</text><text class="genesis-perk-desc">{{ p.desc }}</text></view></view>
-      <view class="genesis-market-entry" :role="marketplaceEntryBlocked ? undefined : 'button'" :tabindex="marketplaceEntryBlocked ? -1 : 0" :aria-disabled="marketplaceEntryBlocked ? 'true' : undefined" :aria-label="marketplaceEntryBlocked ? undefined : t.genesis.viewMarketplace" @click="openMarketplaceEntry"><view class="genesis-gold-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9h18l-2-5H5zM5 9v11h14V9M9 20v-6h6v6"/></svg></view><view class="flex-1 min-w-0"><text class="genesis-subtitle block">{{ t.genesis.secLiveMarket }}</text><text class="genesis-caption block" style="margin-top:2px">{{ marketplaceEntryLabel }}</text></view><svg v-if="!marketplaceEntryBlocked" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg></view>
+      <view class="genesis-perks"><view v-for="p in PERKS" :key="p.name" class="genesis-perk"><NxIconTile tone="amber" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="p.path"/></svg></NxIconTile><text class="genesis-subtitle">{{ p.name }}</text><text class="genesis-perk-desc">{{ p.desc }}</text></view></view>
+      <view class="genesis-market-entry" :role="marketplaceEntryBlocked ? undefined : 'button'" :tabindex="marketplaceEntryBlocked ? -1 : 0" :aria-disabled="marketplaceEntryBlocked ? 'true' : undefined" :aria-label="marketplaceEntryBlocked ? undefined : t.genesis.viewMarketplace" @click="openMarketplaceEntry"><NxIconTile tone="amber" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9h18l-2-5H5zM5 9v11h14V9M9 20v-6h6v6"/></svg></NxIconTile><view class="flex-1 min-w-0"><text class="genesis-subtitle block">{{ t.genesis.secLiveMarket }}</text><text class="genesis-caption block" style="margin-top:2px">{{ marketplaceEntryLabel }}</text></view><svg v-if="!marketplaceEntryBlocked" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg></view>
       <view v-if="liveMarket.length" class="grid grid-cols-2" style="gap:10px;margin-top:12px"><NftCard v-for="n in liveMarket" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago"/></view>
       <view class="genesis-section"><text>{{ t.genesis.faq.title }}</text></view>
       <view class="genesis-faq"><view v-for="k in faqKeys" :key="k" class="genesis-faq-row"><view class="genesis-faq-question" role="button" tabindex="0" :aria-expanded="expandedFaq === k" @click="expandedFaq = expandedFaq === k ? null : k"><text>{{ t.genesis.faq[k] }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" :style="{ transform: expandedFaq === k ? 'rotate(180deg)' : 'none' }"><path d="m6 9 6 6 6-6"/></svg></view><text v-if="expandedFaq === k" class="genesis-faq-answer">{{ faqAnswer(k) }}</text></view></view>
@@ -46,6 +46,7 @@ import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NftCard from "@/components/genesis/nft-card.vue";
@@ -369,7 +370,6 @@ function goMarketplace() {
 .genesis-tier { display:flex; align-items:center; gap:var(--v5-space-3); padding:var(--v5-space-4); }
 .genesis-tier + .genesis-tier { border-top:1px solid var(--v5-border); }
 .genesis-tier--sold { opacity:.6; }
-.genesis-gold-icon { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:var(--ui-radius-icon); background:var(--genesis-soft); color:var(--v5-genesis-gold); }
 .genesis-subtitle { font-size:15px; line-height:22px; font-weight:500; }
 .genesis-tier-meta { display:inline; color:var(--v5-ink-3); font:400 12px/16px var(--font-metric); }
 .genesis-tier-chip { border-radius:6px; padding:1px 5px; color:var(--v5-genesis-gold); background:var(--genesis-soft); font-size:10px; }
@@ -380,7 +380,6 @@ function goMarketplace() {
 .genesis-current { display:block; margin-top:2px; color:var(--v5-genesis-gold); font-size:12px; line-height:16px; }
 .genesis-perks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--v5-space-3); }
 .genesis-perk { min-height:132px; padding:var(--v5-space-4); }
-.genesis-perk-icon { width:40px; height:40px; }
 .genesis-perk .genesis-subtitle { display:block; margin-top:var(--v5-space-3); }
 .genesis-perk-desc { display:block; margin-top:0; color:var(--v5-ink-3); font-size:12px; line-height:18px; }
 .genesis-market-entry { display:flex; align-items:center; gap:var(--v5-space-3); padding:14px 16px; margin-top:var(--v5-space-3); }
