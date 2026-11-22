@@ -548,7 +548,7 @@ function goPrivacy() {
 }
 .cta-secondary__t {
   font-size: var(--ui-type-button);
-  font-weight: 600;
+  font-weight: var(--ui-type-button-weight);
   color: var(--v5-ink);
 }
 .intro-terms {
