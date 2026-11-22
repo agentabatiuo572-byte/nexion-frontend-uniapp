@@ -801,7 +801,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 
 /* Product cards: 104px art on first purchase, 100px on repurchase. */
 /* Device rows sit open on the page (no card, no image well): the machine stands on its own floor light, rows split by a hairline. */
-.lp-product { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); cursor: pointer; }
+.lp-product { display: flex; align-items: center; gap: var(--ui-space-inset); padding: var(--ui-space-card-gap) 0; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); cursor: pointer; }
 .lp-section-head + .lp-product { margin-top: 4px; border-top: 0; }
 .lp-product__art { position: relative; flex: none; width: 128px; height: 120px; }
 .lp-product__art::before { content: ''; position: absolute; left: 12px; right: 12px; bottom: 8px; height: 18px; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-tech-cyan) 18%, transparent), transparent 70%); }
@@ -868,7 +868,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 }
 
 /* Referral hero, open on the page floor (no card): the reward leads on the left, the gift machine with its bow stands on a floor light on the right. Coral is the activity hue, amber the reward (01 §1.1.2). */
-.lp-gift { position: relative; min-height: 212px; margin-top: 12px; }
+.lp-gift { position: relative; min-height: 212px; margin-top: var(--ui-space-card-gap); }
 .lp-glow--coral { right: -90px; top: -40px; width: 300px; height: 300px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-brand-2) var(--lp-glow), transparent), transparent 64%); }
 .lp-glow--gold { left: -90px; top: 10px; width: 260px; height: 260px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-warning) var(--lp-glow), transparent), transparent 64%); }
 .lp-gift__art { position: absolute; right: -8px; top: 6px; width: 188px; height: 188px; pointer-events: none; }
@@ -881,7 +881,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-gift--ended .lp-gift__art { opacity: .55; filter: grayscale(.7); }
 
 /* Step track: nodes joined by a 2px line. Done steps fill brand with a check, the current step is a brand ring; lines into reached steps grow once (07 §7.1.1). */
-.lp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; }
+.lp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--ui-space-inset); }
 .lp-track__step { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
 .lp-track__rail { display: flex; align-items: center; width: 100%; height: 28px; }
 .lp-track__line { flex: 1; height: 2px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); overflow: hidden; }
@@ -897,7 +897,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-track__note { display: block; margin-top: 2px; padding: 0 4px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 
 /* Bundle rule flow: device on its floor → dashed path → reward coin, then the counting facts on one hairline row. */
-.lp-flow-group { margin-top: 12px; }
+.lp-flow-group { margin-top: var(--ui-space-card-gap); }
 .lp-flow-group + .lp-flow-group { margin-top: 24px; }
 .lp-flow { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); align-items: start; }
 .lp-flow__end { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
@@ -912,14 +912,14 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-flow__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-flow__path { display: flex; align-items: center; height: 104px; color: var(--v5-ink-3); }
 .lp-flow__dash { flex: 1; margin-right: -4px; border-top: 1.5px dashed var(--v5-border-strong); }
-.lp-flow__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.lp-flow__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--ui-space-inset); padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .lp-flow__fact { min-width: 0; padding: 0 12px; }
 .lp-flow__fact:first-child { padding-left: 0; }
 .lp-flow__fact + .lp-flow__fact { border-left: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .lp-flow__fact-value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 @media (prefers-reduced-motion: reduce) { .lp-track__fill.is-on { animation: none; } }
 /* PROTOTYPE: bundle stage. The reward leads at the top; up to three listed devices share one floor, the middle one largest. */
-.lp-combo { position: relative; height: 272px; margin-top: 20px; }
+.lp-combo { position: relative; height: 272px; margin-top: var(--ui-space-section); }
 .lp-combo__reward { position: absolute; left: 0; top: 4px; z-index: 1; }
 .lp-combo__value { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
 .lp-combo__amount { font-size: 48px; line-height: 52px; }
