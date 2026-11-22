@@ -1,6 +1,7 @@
 import { useLocaleStore } from "@/store/locale";
 import { DICTS } from "./use-t";
 import { uiLocale, type LocaleCode } from "./index";
+import { formatGroupedAmount } from "@/lib/amount-display";
 
 /**
  * Tiny string interpolator for i18n keys with placeholders.
@@ -28,7 +29,8 @@ export function openSlotsTemplate(s: string, open: number): string {
 export function fmtMoney(value: number | null | undefined, detail = false): string {
   if (value == null || !Number.isFinite(value)) return "-";
   if (!detail && value !== 0 && Math.abs(value) < 0.01) return value < 0 ? "−<$0.01" : "<$0.01";
-  return `${value < 0 ? "−" : ""}$${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: detail ? 4 : 2 })}`;
+  // String-based: the App runtime ignores toLocaleString fraction options. Two decimals (detail: up to four), grouped.
+  return `${value < 0 ? "−" : ""}$${formatGroupedAmount(Math.abs(value), detail ? 4 : 2)}`;
 }
 
 const RATE_UNIT = { zh: "天", en: "day", vi: "ngày", id: "hari", ms: "hari", fil: "araw", ru: "день", kk: "күн", uz: "kun" };
