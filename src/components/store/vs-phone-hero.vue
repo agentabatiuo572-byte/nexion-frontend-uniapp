@@ -14,7 +14,7 @@
            the card, while the same device reads 「你的手机」 on Home / Earn / inventory. -->
       <view>
         <text class="block" :style="deviceStyle">{{ baseName }}</text>
-        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdFull(authority.phone)" :style="phoneNumStyle">
+        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsd(authority.phone)" :style="phoneNumStyle">
           <text>{{ storefrontUsd(authority.phone) }}</text><text :style="unitStyle">{{ t.store.vsPerDay }}</text>
         </view>
         <!-- 「/天」后缀恒用弱化色(与本卡美元侧同档 ink-4),不跟数字的强调色走 -->
@@ -28,7 +28,7 @@
       <!-- S1 -->
       <view class="text-right">
         <text class="block" :style="deviceStyle">{{ t.store.ladderS1 }}</text>
-        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdFull(authority.entry)" :style="s1NumStyle">
+        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsd(authority.entry)" :style="s1NumStyle">
           <text>{{ storefrontUsd(authority.entry) }}</text><text :style="unitStyle">{{ t.store.vsPerDay }}</text>
         </view>
         <view class="block mt-1 min-w-0 overflow-hidden nx-num-metric whitespace-nowrap" :aria-label="entryNexFullText" style="font-size: 12px; color: var(--v5-brand); font-weight: 500"><text>{{ entryNexText }}</text><text :style="subUnitStyle">{{ t.store.vsPerDay }}</text></view>
@@ -41,7 +41,7 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { storefrontNex, storefrontNexFull, storefrontUsd, storefrontUsdFull, type StoreYieldAuthority } from "@/lib/store-yield-authority";
+import { storefrontNex, storefrontNexFull, storefrontUsd, type StoreYieldAuthority } from "@/lib/store-yield-authority";
 
 const t = useT();
 const props = defineProps<{ authority: StoreYieldAuthority }>();
