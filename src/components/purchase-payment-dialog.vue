@@ -237,7 +237,8 @@
     :icon="notice.icon" :tone="notice.tone" :busy="s.busy" @primary="notice.onPrimary" @secondary="notice.onSecondary" />
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { ownsCheckoutCapacityPaymentKey, type OwnsCheckoutCapacityPayment } from '@/components/checkout/checkout-keep-resume';
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import NxButton from '@/components/ui/nx-button.vue';
@@ -280,8 +281,15 @@ const pending = computed(() => records.value.filter(row => !payment.resumeDismis
 function openPending() { if (pending.value.length === 1) void payment.resume(pending.value[0]); else void navTo('/pages/store/orders'); }
 // Unfinished payments are read while a page that can show the bar is visible (03 §3.5.2), closed rows included: an ended
 // payment leaves the bar, and a closed one returns when its status changes.
-const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.length > 0);
-function readResumeRows() { const accountKey = app.accountKey; void refreshPendingPayments(accountKey, () => resumeWatched.value && app.accountKey === accountKey && foregroundReadAllowed()); }
+const ownsCheckoutCapacityPayment = inject(ownsCheckoutCapacityPaymentKey, null);
+const canReadResumeRow: OwnsCheckoutCapacityPayment = row => !ownsCheckoutCapacityPayment?.(row);
+const resumeWatched = computed(() => props.showResume && active.value && !s.open && unsettled.value.some(canReadResumeRow));
+function readResumeRows() {
+  const accountKey = app.accountKey;
+  // A newly visible page settles its recovery owner before the floating host reads.
+  void nextTick(() => refreshPendingPayments(accountKey,
+    () => resumeWatched.value && app.accountKey === accountKey && foregroundReadAllowed(), canReadResumeRow));
+}
 useVisibleInterval(readResumeRows, 15000, () => resumeWatched.value);
 // The bar floats 12px above what sits at the bottom of the page, the tab bar, the floating support button or the
 // page's action tray, so it never covers or touches them (02: nothing covers the support button); their heights differ by page and state, so they are measured while the bar shows.
