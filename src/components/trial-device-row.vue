@@ -140,8 +140,9 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__identity > .trial-device-row__name { min-width:0; max-width:100%; overflow-wrap:break-word; }
 .trial-device-row--inventory .trial-device-row__identity > .trial-device-row__status { flex-basis:100%; margin-top:0; }
 .trial-device-row--inventory .trial-device-row__time > text { overflow-wrap:break-word; }
-.trial-device-row--inventory .trial-device-row__art { width:84px; height:72px; overflow:visible; }
-.trial-device-row--inventory .trial-device-row__image { width:78px; height:64px; margin-top:-4px; }
+/* Same art band as the warehouse device cards: the square catalog image spans the column, the band is the machine's height. */
+.trial-device-row--inventory .trial-device-row__art { width:100px; height:56px; overflow:visible; }
+.trial-device-row--inventory .trial-device-row__image { position:absolute; left:0; top:50%; width:100px; height:100px; transform:translateY(-56%); pointer-events:none; }
 .trial-device-row--inventory .trial-device-row__name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__remaining { font:500 15px/20px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__body { padding:0; }
@@ -178,7 +179,8 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 [role="button"]:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
 .trial-device-row__heading:focus-visible { outline-offset:-2px; }
 @media (max-width:374px) {
-  .trial-device-row--inventory .trial-device-row__art,.trial-device-row--inventory .trial-device-row__image { width:56px; height:56px; margin-top:0; }
+  .trial-device-row--inventory .trial-device-row__art { width:84px; height:48px; }
+  .trial-device-row--inventory .trial-device-row__image { width:84px; height:84px; }
 }
 @media (max-width:350px) {
   .trial-device-row--earn .trial-device-row__heading { padding:12px; gap:6px; }
