@@ -510,11 +510,11 @@ export const useApp = defineStore("app", () => {
     invalidateRemoteTaskAssignments();
     void syncRemoteTaskAssignments();
   }
-  function invalidateRemoteTaskAssignments(): void {
+  function invalidateRemoteTaskAssignments(resetVisibleReadWindow = true): void {
     taskAssignmentReadEpoch += 1;
     taskAssignmentSnapshot = null;
     taskAssignmentSnapshotInFlight = null;
-    visibleTaskReadAfter = 0;
+    if (resetVisibleReadWindow) visibleTaskReadAfter = 0;
   }
   async function pauseLocalPhoneRuntimeBeforeSignOut(): Promise<void> {
     setRemoteTaskForeground(false);
@@ -897,7 +897,7 @@ export const useApp = defineStore("app", () => {
   }
 
   function stopInventoryTaskRead(): void {
-    invalidateRemoteTaskAssignments();
+    invalidateRemoteTaskAssignments(false);
     if (remoteAssignmentStatus.value === "loading") {
       remoteAssignmentStatus.value = remoteAssignmentHasSnapshot.value ? "ready" : "idle";
     }
