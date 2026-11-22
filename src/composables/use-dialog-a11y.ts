@@ -10,6 +10,12 @@ const dialogPages = new WeakMap<object, DialogPage>();
 // Back presses a dialog answered. Uni runs every onBackPress handler of the page on one press, so a page's own handler
 // asks here (or whether a dialog is still open) to know the press was not meant for leaving the page.
 const backTaken = new WeakSet<object>();
+// Back handlers this module put on each page root. Uni keeps every page's onBackPress on the root, so more handlers than
+// these means the page has its own, and the page decides what a back press does (header mirror below).
+const moduleHandlers = new WeakMap<object, number>();
+const countModuleHandler = (owner: object) => moduleHandlers.set(owner, (moduleHandlers.get(owner) ?? 0) + 1);
+type HeaderMirror = { action: (() => (() => void) | null) | null };
+const headerMirrors = new WeakMap<object, HeaderMirror>();
 
 export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
   // Uni invokes page hooks on the page root, not on a nested sheet component.
@@ -42,6 +48,7 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
   // One handler per page avoids Uni invoking several sheet callbacks on one press.
   if (nativeBack && !dialogs.backRegistered) {
     dialogs.backRegistered = true;
+    countModuleHandler(owner);
     onPageShow(() => { dialogs.visible = true; }, owner);
     onPageHide(() => { dialogs.visible = false; }, owner);
     onBackPress(event => {
@@ -72,6 +79,41 @@ export function useDialogBackHeld(): (event: object) => boolean {
   };
   // #endif
   return held;
+}
+
+/**
+ * The page header's back or close, done by the system back button too (02 §2.7.3). Only when the page is alone on the
+ * stack (a redirect or cold open; with history the system pops the page as usual), no dialog takes this press, and the
+ * page has no onBackPress of its own (then the page decides). `action` returns what the header's back or close does
+ * now, or null when the header shows neither. One header per page counts: the last one mounted.
+ */
+export function useHeaderSystemBack(action: () => (() => void) | null): void {
+  // #ifdef APP-PLUS
+  const owner = getCurrentInstance()?.root;
+  if (!owner) return;
+  const held = useDialogBackHeld();
+  let mirror = headerMirrors.get(owner);
+  if (!mirror) {
+    const created: HeaderMirror = { action: null };
+    mirror = created;
+    headerMirrors.set(owner, created);
+    countModuleHandler(owner);
+    onBackPress(event => {
+      if (event.from !== "backbutton" || held(event)) return false;
+      const hooks = (owner as unknown as { onBackPress?: unknown[] }).onBackPress ?? [];
+      if (hooks.length > (moduleHandlers.get(owner) ?? 0)) return false;
+      let pages = 0;
+      try { pages = getCurrentPages().length; } catch { return false; }
+      const run = pages === 1 ? created.action?.() : null;
+      if (!run) return false;
+      run();
+      return true;
+    }, owner);
+  }
+  const current = mirror;
+  current.action = action;
+  onBeforeUnmount(() => { if (current.action === action) current.action = null; });
+  // #endif
 }
 
 /**
