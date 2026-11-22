@@ -995,7 +995,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-stk__a, .dly-stk__b { position: absolute; left: 8px; top: 3px; width: 38px; height: 50px; border-radius: 10px; }
 .dly-stk__a { transform: rotate(-10deg) translateX(-4px); background: color-mix(in srgb, var(--v5-brand-2) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-brand-2) 26%, transparent); }
 .dly-stk__b { display: grid; place-items: center; transform: rotate(6deg) translateX(4px); background: color-mix(in srgb, var(--v5-brand-2) 20%, var(--v5-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-brand-2) 45%, transparent); color: var(--v5-brand-2); }
-.dly-stk__n { position: absolute; right: -4px; bottom: -2px; display: grid; place-items: center; min-width: 22px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--v5-ink); color: var(--v5-bg); font: 500 11px/14px var(--font-metric); }
+.dly-stk__n { position: absolute; right: -4px; bottom: -2px; display: grid; place-items: center; min-width: 22px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--v5-ink); color: var(--v5-bg); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); }
 .dly-svt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .dly-svt__h { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); }
 .dly-svb-hit { flex: none; display: flex; align-items: center; min-height: 44px; cursor: pointer; }

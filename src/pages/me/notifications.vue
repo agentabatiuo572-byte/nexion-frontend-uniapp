@@ -435,7 +435,7 @@ watch(filter, value => {
 /* A long title keeps whole words: the 重要 tag drops below it instead of squeezing the title mid-word. */
 .message-center .notification-heading { flex-wrap:wrap;gap:2px var(--v5-space-2); }
 .message-center .notification-title { font-size:14px; line-height:20px; overflow-wrap:break-word; }
-.message-center .notification-preview { margin-top:2px; font-size:12.5px; line-height:18px; }
+.message-center .notification-preview { margin-top:2px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
 .message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
 .message-center .notification-time { font-size:12px; line-height:16px; }
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }

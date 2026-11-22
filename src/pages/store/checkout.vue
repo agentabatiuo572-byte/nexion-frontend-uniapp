@@ -3681,7 +3681,7 @@ const doneBtnStyle: CSSProperties = {
 .checkout-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--v5-space-2); margin:0 16px; }
 .checkout-step-track { height:3px; border-radius:999px; background:var(--v5-surface-3); }
 .checkout-step-fill { height:100%; border-radius:inherit; }
-.checkout-step-label { display:block; margin-top:var(--v5-space-2); font:400 12.5px/18px var(--font-v5); color:var(--v5-ink-3); }
+.checkout-step-label { display:block; margin-top:var(--v5-space-2); font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .checkout-step-label--active { color:var(--v5-brand); font-weight:600; }
 .checkout-group { position:relative; overflow:hidden; border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); }
 /* Product summary: the device image is the card's main visual, copy beside it; quantity is its own full-width row
@@ -3754,7 +3754,7 @@ button.checkout-quantity-button::after {border:0;}
 /* Text buttons are their label line; the gaps keep each 44px target clear of its neighbour's. */
 .checkout-capacity-actions { display:flex; flex-wrap:wrap; align-items:center; gap:26px var(--v5-space-4); margin-top:var(--v5-space-2); }
 .checkout-capacity-links { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:26px var(--v5-space-4); margin-left:auto; }
-.checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 12.5px/20px var(--font-v5); color:var(--v5-ink-3); text-align:center; }
+.checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); text-align:center; }
 .checkout-legal-link { display:inline; color:var(--v5-brand); cursor:pointer; }
 .checkout-legal-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:2px; }
 .checkout-policy-notice { margin-top:var(--v5-space-3); font:400 var(--ui-type-list-subtitle)/20px var(--font-v5); color:var(--v5-ink-2); overflow-wrap:break-word; }

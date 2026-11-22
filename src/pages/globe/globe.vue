@@ -146,7 +146,7 @@
             </view>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.globe.superComputeCenter }}</text>
           </view>
-          <view class="shrink-0 text-right"><text class="block tabular-nums" :style="regionRateStyle">{{ r.jobsPerHour?.toLocaleString() ?? '—' }}</text><text class="block" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.globe.jobsPerHour }}</text></view>
+          <view class="shrink-0 text-right"><text class="block tabular-nums" :style="regionRateStyle">{{ r.jobsPerHour?.toLocaleString() ?? '—' }}</text><text class="block" style="font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3)">{{ t.globe.jobsPerHour }}</text></view>
         </view>
       </view>
 
