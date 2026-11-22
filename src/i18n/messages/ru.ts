@@ -3237,6 +3237,8 @@ export const ru: Messages = {
     confirmPassword: "Повторите новый пароль",
     twoFactorCurrentPassword: "Текущий пароль для 2FA",
     twoFactorPasswordRequired: "Введите текущий пароль.",
+    twoFactorCodeWrong: "Неверный код. Проверьте его и введите снова.",
+    twoFactorCodeResent: "Новый код отправлен на {phone}. Предыдущий код больше не действует.",
     deletionPassword: "Текущий пароль для удаления аккаунта",
     deletionReasonLabel: "Причина удаления (необязательно)",
     deletionReasonPlaceholder: "Расскажите, почему уходите, — это поможет нам стать лучше",

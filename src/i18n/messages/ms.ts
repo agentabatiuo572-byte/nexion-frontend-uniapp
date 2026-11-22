@@ -3237,6 +3237,8 @@ export const ms: Messages = {
     confirmPassword: "Sahkan kata laluan baharu",
     twoFactorCurrentPassword: "Kata laluan semasa 2FA",
     twoFactorPasswordRequired: "Sila masukkan kata laluan semasa anda.",
+    twoFactorCodeWrong: "Kod salah. Semak dan masukkan semula.",
+    twoFactorCodeResent: "Kod baharu telah dihantar ke {phone}. Kod sebelumnya tidak sah lagi.",
     deletionPassword: "Kata laluan semasa untuk padam akaun",
     deletionReasonLabel: "Sebab pemadaman (pilihan)",
     deletionReasonPlaceholder: "Beritahu kami sebabnya supaya kami boleh menambah baik",
