@@ -18,7 +18,7 @@ import { isProductAvailable } from "@/store/product-availability";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { originalCapacityCheckoutHref } from "@/components/checkout/checkout-keep-resume";
 import { navTo } from "@/lib/route";
-import { toast } from "@/store/ui";
+import { confirm } from "@/store/ui";
 
 // ── FEAT-DEV02 升级置换条 ──────────────────────────────────────────────
 // 设备仓库行与赚取页设备操作面板共用同一资格判定与 retire 入口。
@@ -176,7 +176,11 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
       const href = originalCapacityCheckoutHref(app.accountKey);
       if (href) { void navTo(href); return; }
     } catch {
-      toast.warn(t.value.tradein.errPleaseRetry);
+      // The result of the user's own earlier purchase is unknown (03 §3.5.1 决定): a centred confirm whose way out is the
+      // orders list; it does not continue the purchase.
+      void confirm({ title: t.value.tradein.recoveryUnreadableTitle, message: t.value.tradein.recoveryUnreadableBody, icon: "warn",
+        confirmLabel: t.value.tradein.recoveryViewOrders, cancelLabel: t.value.tradein.sheetCancel })
+        .then(view => { if (view) void navTo("/pages/store/orders"); });
       return;
     }
     // 激活中且任务运行:阻断层(完成后可下架,查看任务/知道了),不硬拆(规格

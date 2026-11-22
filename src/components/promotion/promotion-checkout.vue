@@ -7,7 +7,15 @@
       <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action" role="button" :tabindex="done&&resultSettled?0:-1" :aria-disabled="busy" :aria-hidden="!(done&&resultSettled)" :style="{visibility:done&&resultSettled?'visible':'hidden'}" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
     <template v-else>
-      <view v-if="keepRecoveryTarget" class="promotion-notice checkout-keep-recovery" role="status"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:keepRecoveryOperation==='replace'?(keepResumeAllowed?t.tradein.recoveryResumable:t.tradein.recoveryChecking):keepResumeAllowed?t.tradein.keepRecoveryResumable:t.tradein.keepRecoveryChecking }}</text></view>
+      <!-- Original purchase state: a page-floor hint (icon + text, no card, no stripe) above the products: the result, which purchase it is, what not to do. -->
+      <view v-if="keepRecoveryTarget" class="checkout-keep-recovery" role="status">
+        <svg class="checkout-keep-recovery__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><template v-if="keepRecoveryReadError"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></template><template v-else><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></template></svg>
+        <view class="promotion-grow">
+          <text class="checkout-keep-recovery__title">{{ keepRecoveryNotice.title }}</text>
+          <text v-if="keepRecoveryProduct">{{ capacityOrderLine(keepRecoveryProduct) }}</text>
+          <text>{{ keepRecoveryNotice.note }}</text>
+        </view>
+      </view>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
       <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
@@ -128,7 +136,7 @@ import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import { computed,inject,ref,shallowRef,watch,onMounted,onBeforeUnmount } from 'vue';
-import { capacityCheckoutHref, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, type CheckoutCapacityRecovery, type CheckoutKeepResume } from '@/components/checkout/checkout-keep-resume';
+import { capacityCheckoutHref, capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, type CheckoutCapacityRecovery, type CheckoutKeepResume } from '@/components/checkout/checkout-keep-resume';
 // #ifdef H5
 import { onBeforeRouteLeave } from 'vue-router';
 // #endif
@@ -280,6 +288,7 @@ const keepResumeAllowed = computed(() => {
   return !!resume && current() && visible.value && auth.isAuthenticated
     && resume.target === recovery?.target && resume.commandKey === recovery.commandKey && resume.operation === recovery.operation;
 });
+const keepRecoveryNotice = computed(() => capacityRecoveryNotice(t.value, keepRecoveryReadError.value, keepRecoveryOperation.value, keepResumeAllowed.value));
 function openKeepResume(): boolean {
   const resume = checkoutKeepResume?.value;
   if (!resume || !keepResumeAllowed.value || tradein.state.kind === 'keep-recovery') return false;
@@ -878,7 +887,7 @@ const footer = computed(() => {
 });
 const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
 const resultVisible = computed(() => order.value?.paymentStatus === 'PAID');
-defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
+defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,keepRecoveryReadError,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{
@@ -911,8 +920,11 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 <style scoped>
 .promotion-main { padding-bottom:140px; }
 .promotion-main--result { padding-bottom:var(--ui-space-inset); min-height:calc(100dvh - var(--nx-overlay-top) - var(--ui-space-section-gap) * 3); box-sizing:border-box; }
-/* Pending keep result: description role (10.1) in the auxiliary ink, one sentence per line, no query button (03 §3.5.2). */
-.checkout-keep-recovery text { display:block; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); white-space:pre-line; text-wrap:balance; }
+/* Original purchase state: title in the main ink, order line and note in the description role (01 §1.1.1 pairing 2, 10.1); no query button (03 §3.5.2). */
+.checkout-keep-recovery { display:flex; align-items:flex-start; gap:var(--v5-space-2); }
+.checkout-keep-recovery__icon { flex:none; margin-top:1px; color:var(--v5-warning-ink); }
+.checkout-keep-recovery text { display:block; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap:pretty; }
+.checkout-keep-recovery .checkout-keep-recovery__title { margin-bottom:var(--v5-space-1); color:var(--v5-ink); font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:22px; background:var(--ui-content-surface); }
 .checkout-section { min-width:0; }
 .checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); }

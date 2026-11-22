@@ -56,14 +56,7 @@
       </view>
 
       <!-- ─────────── 1. choice — trade-in or full price ─────────── -->
-      <template v-if="state.kind === 'keep-recovery' && capacityOriginal">
-        <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
-        <text class="tis-card-line">{{ capacityOriginal.productName }} · {{ formatGroupedAmount(capacityOriginal.payableUsdt) }}&nbsp;USDT</text>
-        <!-- Busy keeps the label and the width, adds a spinner and tells assistive tech it is working (03 §3.1). -->
-        <view class="tis-cta" role="button" :tabindex="capacityResumeBusy ? -1 : 0" :aria-disabled="capacityResumeBusy" :aria-busy="capacityResumeBusy" @click="resumeCapacityCommand" @keydown.enter.prevent="resumeCapacityCommand" @keydown.space.prevent="resumeCapacityCommand"><view v-if="capacityResumeBusy" class="tis-cta-spin" aria-hidden="true" /><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
-      </template>
-      <template v-else-if="state.kind === 'choice'">
+      <template v-if="state.kind === 'choice'">
         <view class="tis-head">
           <text :id="titleId" class="tis-title">{{ t.tradein.choiceTitle }}</text>
         </view>
@@ -261,6 +254,14 @@
       </template>
     </view>
   </view>
+  <!-- Resuming the original payment is a 决定 (03 §3.5.1): a centred confirm, one solid action, a text exit, no close glyph.
+       Back / Esc take the text exit; while the original command is being read the action shows busy at full ink.
+       It steps aside while the payment layer it opened is up (that layer sits below z 960), and returns if the user backs out of it. -->
+  <NxNoticeDialog :open="capacitySheetOpen && !!capacityOriginal && !payment.state.open" icon="clock" tone="warning"
+    :title="capacityRecovery?.operation === 'replace' ? t.tradein.recoveryUnpaid : t.tradein.keepRecoveryUnpaid"
+    :body="capacityOriginal ? fmt(t.tradein.recoveryResumeBody, { order: capacityOrderLine(capacityOriginal) }) : ''"
+    :primary="recoveryCopy.resume" :secondary="t.tradein.recoveryLater" :busy="capacityResumeBusy"
+    @primary="resumeCapacityCommand" @secondary="hide" />
 </template>
 
 <script setup lang="ts">
@@ -269,7 +270,8 @@ import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { capacityCheckoutHref, checkoutCapacityUnreadableTargetKey, describeCapacityOriginal, reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import { capacityCheckoutHref, capacityOrderLine, checkoutCapacityUnreadableTargetKey, describeCapacityOriginal, reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
@@ -1871,7 +1873,7 @@ function onForce() {
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 const sheetVisible = computed(() => props.active && state.value.kind !== "none"
-  && (state.value.kind !== "keep-recovery" || capacitySheetOpen.value)
+  && state.value.kind !== "keep-recovery"
   && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none"));
 useDialogA11y(sheetVisible, ".tis-root", hide, true);
 
@@ -2080,25 +2082,8 @@ useDialogA11y(sheetVisible, ".tis-root", hide, true);
 .tis-cta:active {
   transform: scale(0.98);
 }
-/* Resuming the original payment is the recovery sheet's one forward action: primary L under its order line (03 §3.1). */
-.tis-card-line + .tis-cta {
-  margin-top: 16px;
-}
 .tis-cta-disabled {
   opacity: 0.5;
-}
-.tis-cta-spin {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--v5-on-brand) 30%, transparent);
-  border-top-color: var(--v5-on-brand);
-  animation: spin 1s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .tis-cta-spin { animation: none; }
 }
 .tis-cta-text {
   text-align: center;

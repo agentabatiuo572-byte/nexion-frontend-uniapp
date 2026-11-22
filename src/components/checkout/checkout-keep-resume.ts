@@ -3,6 +3,8 @@ import type { PurchaseKind } from "@/api/purchase-payment-api";
 import { remoteApiEnabled } from "@/api/runtime";
 import { readCapacityPending, type CapacityPending } from "@/lib/capacity-command-recovery";
 import { deviceNameByKind } from "@/lib/device-copy";
+import { formatGroupedAmount } from "@/lib/amount-display";
+import type { Messages } from "@/i18n/messages/en";
 import { getProduct } from "@/mock/products";
 import { DEVICE_SPECS } from "@/store/device-types";
 import { refusedPurchasePayment } from "@/store/purchase-payment";
@@ -25,6 +27,19 @@ export function describeCapacityOriginal(original: CapacityPending, t: Parameter
   const kind = target as DeviceKind;
   const productName = getProduct(target)?.name ?? deviceNameByKind(t, kind, DEVICE_SPECS[kind]?.name ?? target);
   return { target, productName, payableUsdt };
+}
+
+/** Which purchase a recovery prompt is about: product · amount, the amount and unit kept on one line (03 §3.6.1). */
+export function capacityOrderLine(order: CheckoutCapacityDetails): string {
+  return `${order.productName} · ${formatGroupedAmount(order.payableUsdt)}\u00A0USDT`;
+}
+
+/** Title (the result) and note (what not to do) for the checkout's original-purchase state; both checkout pages show the same words. */
+export function capacityRecoveryNotice(t: Messages, readError: boolean, operation: CapacityPending["operation"] | null, resumable: boolean) {
+  const c = t.tradein;
+  if (readError) return { title: c.recoveryUnreadableTitle, note: c.recoveryUnreadableNote };
+  if (resumable) return { title: operation === "replace" ? c.recoveryUnpaid : c.keepRecoveryUnpaid, note: c.recoveryNoReorder };
+  return { title: operation === "replace" ? c.recoveryCheckingTitle : c.keepRecoveryCheckingTitle, note: c.recoveryCheckingNote };
 }
 
 export function originalCapacityCheckoutHref(accountKey: string): string | null {
