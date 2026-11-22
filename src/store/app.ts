@@ -68,7 +68,7 @@ import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
-import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
+import { READ_RECOVERY_DELAYS_MS, isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import type { UserSession } from "@/api/contracts";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -514,6 +514,7 @@ export const useApp = defineStore("app", () => {
     taskAssignmentReadEpoch += 1;
     taskAssignmentSnapshot = null;
     taskAssignmentSnapshotInFlight = null;
+    taskAssignmentFailure = null;
     if (resetVisibleReadWindow) visibleTaskReadAfter = 0;
   }
   async function pauseLocalPhoneRuntimeBeforeSignOut(): Promise<void> {
@@ -528,6 +529,12 @@ export const useApp = defineStore("app", () => {
   let taskAssignmentSnapshotInFlight: {
     key: string;
     request: Promise<CanonicalTaskAssignments>;
+  } | null = null;
+  let taskAssignmentFailure: {
+    key: string;
+    after: number;
+    attempts: number;
+    cause: unknown;
   } | null = null;
   let taskAssignmentReadEpoch = 0;
   const remoteFleetRefreshCoordinator = createRemoteFleetRefreshCoordinator();
@@ -855,9 +862,13 @@ export const useApp = defineStore("app", () => {
     });
   }
 
+  function taskAssignmentReadKey(request: RemoteAccountRequest): string {
+    return `${request.accountKey}:${request.epoch}:${remoteTaskForegroundEpoch}:${taskAssignmentReadEpoch}`;
+  }
+
   function readRemoteTaskAssignments(request: RemoteAccountRequest): Promise<CanonicalTaskAssignments> {
     const readEpoch = taskAssignmentReadEpoch;
-    const key = `${request.accountKey}:${request.epoch}:${remoteTaskForegroundEpoch}:${readEpoch}`;
+    const key = taskAssignmentReadKey(request);
     const foregroundEpoch = remoteTaskForegroundEpoch;
     const now = Date.now();
     if (taskAssignmentSnapshot?.key === key
@@ -866,6 +877,8 @@ export const useApp = defineStore("app", () => {
     }
     if (taskAssignmentSnapshotInFlight?.key === key)
       return taskAssignmentSnapshotInFlight.request;
+    const failure = taskAssignmentFailure?.key === key ? taskAssignmentFailure : null;
+    if (failure && now < failure.after) return Promise.reject(failure.cause);
     const requireCurrent = () => {
       if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
       if (foregroundEpoch !== remoteTaskForegroundEpoch) throw new Error("REMOTE_FOREGROUND_CHANGED");
@@ -873,8 +886,16 @@ export const useApp = defineStore("app", () => {
     };
     const pending = taskAssignmentApi.state(true, requireCurrent).then((state) => {
       requireCurrent();
+      taskAssignmentFailure = null;
       taskAssignmentSnapshot = { key, receivedAt: Date.now(), receivedMonotonicAt: readMonotonicNowMs(), state };
       return state;
+    }).catch((cause: unknown) => {
+      requireCurrent();
+      const attempts = Math.min((failure?.attempts ?? 0) + 1, READ_RECOVERY_DELAYS_MS.length);
+      const cooldown = isHttpReadRateLimit(cause) ? (cause.retryAfterMs ?? 30_000) : 0;
+      taskAssignmentFailure = { key, attempts, cause,
+        after: Date.now() + Math.max(READ_RECOVERY_DELAYS_MS[attempts - 1], cooldown) };
+      throw cause;
     }).finally(() => {
       if (taskAssignmentSnapshotInFlight?.request === pending) taskAssignmentSnapshotInFlight = null;
     });
@@ -898,16 +919,22 @@ export const useApp = defineStore("app", () => {
     }
   }
 
-  function rememberTaskAssignments(request: RemoteAccountRequest, state: CanonicalTaskAssignments): CanonicalTaskAssignments {
-    if (lastConfirmedAssignments?.state === state) return state;
-    if (lastConfirmedAssignments?.request.accountKey === request.accountKey
-      && lastConfirmedAssignments.request.epoch === request.epoch
-      && lastConfirmedAssignments.state.serverNow > state.serverNow) return lastConfirmedAssignments.state;
-    lastConfirmedAssignments = { request: { ...request }, state,
-      receivedMonotonicAt: taskAssignmentSnapshot?.state === state ? taskAssignmentSnapshot.receivedMonotonicAt : readMonotonicNowMs() };
-    visibleTaskReadAfter = (taskAssignmentSnapshot?.state === state ? taskAssignmentSnapshot.receivedAt : Date.now()) + VISIBLE_TASK_READ_MS;
-    nativePhoneTaskRecoveryDeviceId.value = null;
-    return state;
+  function projectTaskAssignments(base: Device[], request: RemoteAccountRequest, state: CanonicalTaskAssignments): void {
+    const previous = lastConfirmedAssignments?.request.accountKey === request.accountKey
+      && lastConfirmedAssignments.request.epoch === request.epoch ? lastConfirmedAssignments.state : null;
+    const confirmed = previous && previous.serverNow > state.serverNow ? previous : state;
+    if (confirmed !== previous) {
+      lastConfirmedAssignments = { request: { ...request }, state: confirmed,
+        receivedMonotonicAt: taskAssignmentSnapshot?.state === confirmed ? taskAssignmentSnapshot.receivedMonotonicAt : readMonotonicNowMs() };
+    }
+    devices.value = applyRemoteAssignments(base, confirmed);
+    if (confirmed !== previous) {
+      visibleTaskReadAfter = Date.now() + VISIBLE_TASK_READ_MS;
+      nativePhoneTaskRecoveryDeviceId.value = null;
+    }
+    remoteAssignmentHasSnapshot.value = true;
+    remoteAssignmentStatus.value = "ready";
+    remoteAssignmentError.value = "";
   }
 
   // All visible task pages share one account read window and in-flight request.
@@ -922,16 +949,18 @@ export const useApp = defineStore("app", () => {
     await remotePhoneRuntimeReportTail;
     if (!remoteTaskForeground || !taskReadPages.size || foregroundEpoch !== remoteTaskForegroundEpoch
       || !remoteAccountEpoch.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return;
+    if (taskAssignmentFailure?.key === taskAssignmentReadKey(request) && Date.now() < taskAssignmentFailure.after) return;
     const readEpoch = taskAssignmentReadEpoch;
     try {
       const state = await readRemoteTaskAssignments(request);
       if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch
         || readEpoch !== taskAssignmentReadEpoch || !remoteAccountEpoch.isCurrent(request)
         || !isCurrentRuntimeRevision(runScope) || Date.now() < visibleTaskReadAfter) return;
-      devices.value = applyRemoteAssignments(devices.value, rememberTaskAssignments(request, state));
-      remoteAssignmentHasSnapshot.value = true;
-      remoteAssignmentStatus.value = "ready";
-      remoteAssignmentError.value = "";
+      if (!remoteFleetHasSnapshot.value) {
+        if (remoteFleetStatus.value === "idle") await ensureRemoteFleet();
+        return;
+      }
+      projectTaskAssignments(devices.value, request, state);
       await Promise.allSettled([
         ensureRemoteFleet(),
         refreshHomeTruth(request),
@@ -1184,12 +1213,17 @@ export const useApp = defineStore("app", () => {
           remoteAssignmentStatus.value = "error";
           remoteAssignmentError.value = assignmentResult.reason instanceof Error
             ? assignmentResult.reason.message : "TASK_ASSIGNMENT_STATE_UNAVAILABLE";
-        } else if (assignmentReadCurrent && assignmentResult.status === "fulfilled") {
-          remoteAssignmentStatus.value = "ready";
-          remoteAssignmentHasSnapshot.value = true;
-          rememberTaskAssignments(request, assignmentResult.value);
         }
-        if (fleetResult.status === "rejected") throw fleetResult.reason;
+        if (fleetResult.status === "rejected") {
+          if (assignmentReadCurrent && assignmentResult.status === "fulfilled") {
+            if (remoteFleetHasSnapshot.value && isTransientReadFailure(fleetResult.reason)) {
+              projectTaskAssignments(devices.value, request, assignmentResult.value);
+            } else {
+              remoteAssignmentStatus.value = "idle";
+            }
+          }
+          throw fleetResult.reason;
+        }
         const fleet = fleetResult.value;
         slotCap.value = fleet.slotCap;
         if (fleet.devices.length > 0) installCanonicalLifecycleConfig(fleet.capacitySchedule);
@@ -1203,11 +1237,12 @@ export const useApp = defineStore("app", () => {
             && lastConfirmedAssignments.request.epoch === request.epoch
             ? lastConfirmedAssignments.state
             : null;
-        const nextDevices = confirmedAssignments
-          ? applyRemoteAssignments(canonicalDevices, confirmedAssignments)
-          : canonicalDevices;
-        devices.value = nextDevices;
-        syncDeviceRuntime(nextDevices, true);
+        if (assignmentReadCurrent && assignmentResult.status === "fulfilled") {
+          projectTaskAssignments(canonicalDevices, request, assignmentResult.value);
+        } else {
+          devices.value = confirmedAssignments ? applyRemoteAssignments(canonicalDevices, confirmedAssignments) : canonicalDevices;
+        }
+        syncDeviceRuntime(devices.value, true);
         user.value = {
           ...user.value,
           joinedAt: fleet.userJoinedAt,
@@ -1292,6 +1327,7 @@ export const useApp = defineStore("app", () => {
       lastConfirmedAssignments = null;
       taskAssignmentSnapshot = null;
       taskAssignmentSnapshotInFlight = null;
+      taskAssignmentFailure = null;
       remoteTaskSyncAfter = 0;
       visibleTaskReadAfter = 0;
       invalidateRemoteFleet();

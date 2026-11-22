@@ -716,7 +716,9 @@ useAutoRecovery({
     try{await checkPaymentEligibility(expected,paymentEntryFence(expected));}
     finally{paymentEligibilityRecoveryBusy.value=false;}
   },
+  retryNotBefore:()=>Math.max(0,...(order.value?.items??[]).map(item=>purchaseEligibilityApi.readCooldownUntil(item.productNo))),
   repeatMs:30_000,
+  quiet:false,
 });
 useAutoRecovery({
   failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!session.retryOriginal

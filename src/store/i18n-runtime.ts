@@ -48,6 +48,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
   const status = ref<Partial<Record<LocaleCode, I18nRuntimeStatus>>>({});
   const error = ref<Partial<Record<LocaleCode, string>>>({});
   const retryableError = ref<Partial<Record<LocaleCode, boolean>>>({});
+  const confirmedLocales = ref(new Set<LocaleCode>());
   const inFlight = new Map<LocaleCode, Promise<void>>();
   let prepared = false;
 
@@ -67,6 +68,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
   async function refresh(locale: LocaleCode, force = false): Promise<void> {
     prepare();
     if (!remoteApiEnabled) {
+      confirmedLocales.value.delete(locale);
       status.value[locale] = "fallback";
       return;
     }
@@ -82,6 +84,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
         bundles.value[locale] = { ...bundle.messages };
         fetchedAt.value[locale] = now;
         error.value[locale] = "";
+        confirmedLocales.value.add(locale);
         status.value[locale] = "ready";
         retryableError.value[locale] = false;
         const cached = loadCache();
@@ -89,9 +92,11 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
         saveCache(cached);
       })
       .catch((cause: unknown) => {
+        const transient = isTransientReadFailure(cause);
+        if (!transient) confirmedLocales.value.delete(locale);
         error.value[locale] = cause instanceof Error ? cause.message : "I18N_BUNDLE_UNAVAILABLE";
         status.value[locale] = bundles.value[locale] ? "stale" : "fallback";
-        retryableError.value[locale] = isTransientReadFailure(cause);
+        retryableError.value[locale] = transient;
       })
       .finally(() => {
         if (inFlight.get(locale) === request) inFlight.delete(locale);
@@ -102,10 +107,8 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
 
   function messages(locale: LocaleCode): Readonly<Record<string, string>> {
     prepare();
-    // A cache is only an optimization. Until this locale is freshly confirmed by
-    // the service, callers must use the bundled dictionary rather than present
-    // stale remote wording as current policy content.
-    return status.value[locale] === "ready" ? bundles.value[locale] ?? {} : {};
+    // Only a bundle confirmed in this session can survive a temporary refresh failure.
+    return confirmedLocales.value.has(locale) ? bundles.value[locale] ?? {} : {};
   }
 
   function ensure(locale: LocaleCode): Promise<void> {
