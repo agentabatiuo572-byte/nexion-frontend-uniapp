@@ -9,6 +9,20 @@ const date=ms=>new Date(ms).toISOString();
 const reject=(message,status=409)=>{throw Object.assign(new Error(message),{status});};
 const commandOperations=['join','claim','reminder'];
 const readCommandKey=headers=>(headers['idempotency-key']||headers['Idempotency-Key'])?.trim();
+const isRejectionCode=code=>Number.isInteger(code)&&code>=400&&code<500;
+const isReasonCode=message=>typeof message==='string'&&/^[A-Z][A-Z0-9_]{0,127}$/.test(message);
+
+function isSavedReminderRefusal(error) {
+  return isRejectionCode(error?.code)
+    && ['EVENT_REMINDER_NOT_AVAILABLE','USER_NOT_FOUND_OR_INACTIVE'].includes(error.message);
+}
+
+function projectCommandReceipt(receipt) {
+  if(receipt.status!=='FAILED')return receipt;
+  const code=isRejectionCode(receipt.error?.code)?receipt.error.code:500;
+  const message=code!==500&&isReasonCode(receipt.error?.message)?receipt.error.message:'EVENT_COMMAND_FAILED';
+  return {status:'FAILED',error:{code,message}};
+}
 
 function eventCommandReceiptKey(owner,eventId,operation,key) {
   return owner&&key ? JSON.stringify([owner,eventId,operation,key]) : null;
@@ -25,7 +39,7 @@ export function demoH4EventCommandResponse(url,method,state,headers) {
   if(!key)reject('IDEMPOTENCY_KEY_REQUIRED',422);
   if(key.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
   const receipt=state.h4Events?.commandReceipts?.[eventCommandReceiptKey(owner,eventId,operation,key)];
-  return receipt ? {code:0,message:'OK',data:receipt} : {code:404,message:'EVENT_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND'}};
+  return receipt ? {code:0,message:'OK',data:projectCommandReceipt(receipt)} : {code:404,message:'EVENT_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND'}};
 }
 
 // Opt-in at the loopback request boundary so the receipt can be read while the write is in flight.
@@ -49,19 +63,21 @@ function recordEventCommand(record,key,operation,admittedReceipt,execute) {
   const receipts=record.commandReceipts??={};
   const previous=receipts[key];
   if(previous?.status==='SUCCEEDED')return previous.result;
+  // A reminder availability refusal is a saved response. Managed rollbacks keep their reason for readback and can retry.
+  if(previous?.status==='FAILED'&&operation==='reminder'&&isSavedReminderRefusal(previous.error)) {
+    reject(previous.error.message,previous.error.code);
+  }
   if(previous?.status==='PROCESSING'&&previous!==admittedReceipt)reject('IDEMPOTENCY_REQUEST_IN_PROGRESS');
   try {
     const result=execute();
     receipts[key]={status:'SUCCEEDED',result};
     return result;
   } catch(error) {
-    if(Number.isInteger(error.status)&&error.status>=400&&error.status<600) {
-      // Managed join and claim throw and roll back. Reminder stores its availability refusal in the original response.
-      const failure=operation==='reminder'
-        ? {code:error.status,message:error.message}
-        : {code:500,message:'EVENT_COMMAND_FAILED'};
-      receipts[key]={status:'FAILED',error:failure};
-    }
+    const failure={code:error?.status,message:error?.message};
+    const saved=operation==='reminder'
+      ? isSavedReminderRefusal(failure)
+      : isRejectionCode(failure.code)&&isReasonCode(failure.message);
+    receipts[key]=saved?{status:'FAILED',error:failure}:{status:'FAILED'};
     throw error;
   }
 }
