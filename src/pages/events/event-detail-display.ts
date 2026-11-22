@@ -32,8 +32,16 @@ export function eventDetailHref(detail: EventDetail): string {
 const eventRefusals: Record<string, EventCommandFailure> = {
   EVENT_NOT_CLAIMABLE: "notClaimable", EVENT_ALREADY_CLAIMED: "claimed", EVENT_NOT_OPEN: "notOpen", EVENT_REGION_NOT_ELIGIBLE: "notEligible",
   EVENT_BUDGET_EXHAUSTED: "budget", COVERAGE_REDLINE: "generic", EVENT_REMINDER_NOT_AVAILABLE: "reminder",
+  // The other refusals join, claim and the managed claim save with their receipt (backend 44d03004): gift stock, the
+  // user's device slots, the account, a platform pool that can take the command later, and rule or data conflicts.
+  EVENT_ALREADY_JOINED: "joined", H4_EVENT_NOT_ACTIVE: "notOpen", H4_EVENT_NOT_ELIGIBLE: "notClaimable", H4_EVENT_PURCHASE_REQUIRED: "notClaimable",
+  H4_EVENT_GIFT_STOCK_UNAVAILABLE: "stock", H4_EVENT_GIFT_PRODUCT_UNAVAILABLE: "stock", H4_EVENT_DEVICE_CAPACITY_UNAVAILABLE: "slots",
+  H4_EVENT_ACCOUNT_UNAVAILABLE: "account", USER_NOT_FOUND_OR_INACTIVE: "account",
+  HOSTING_CENTERS_UNAVAILABLE: "notRun", EVENT_CLAIM_CONFLICT: "notRun", EVENT_REMINDER_DELIVERY_CONFLICT: "notRun",
+  H4_EVENT_GIFT_QUANTITY_INVALID: "generic", H4_EVENT_GIFT_SOURCE_REQUIRED: "generic", H4_EVENT_CLAIM_KEY_INVALID: "generic",
+  H4_EVENT_TICKET_RULE_INVALID: "generic", H4_EVENT_TICKET_QUANTITY_INVALID: "generic", EVENT_BADGE_GRANT_CONFLICT: "generic", REWARD_TYPE_UNSUPPORTED: "generic",
 };
-export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "notOpen" | "notEligible" | "budget" | "reminder" | "notRun" | "generic";
+export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "joined" | "notOpen" | "notEligible" | "budget" | "stock" | "slots" | "account" | "reminder" | "notRun" | "generic";
 /** "unknown" only when the command may have run (network loss, timeout, gateway 5xx, unreadable reply); otherwise the reason to show. */
 export function eventCommandFailure(cause: unknown): EventCommandFailure {
   const error = asApiError(cause);
