@@ -17,7 +17,7 @@
         <text v-if="!blockingOnly && !policy.eligible && policy.conditions.some(isQuota)" class="purchase-panel__note">{{ policy.conditions.some(condition => condition.kind === 'monthlyQuota') ? t.tradein.purchaseMonthlyQuotaRequired : t.tradein.purchaseQuotaRequired }}</text>
         <view v-for="condition in policy.conditions.filter(isQuota)" :key="condition.kind" class="purchase-panel__condition">
           <view class="purchase-panel__row"><text>{{ conditionLabel(condition) }}</text><text class="purchase-panel__values">{{ conditionValues(condition) }}</text></view>
-          <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
+          <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" :depleted="!condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
           <text class="purchase-panel__note">{{ fmt(t.tradein.purchaseRemaining, { amount: conditionAmount(condition, condition.gap, true) }) }}</text>
         </view>
       </view>
