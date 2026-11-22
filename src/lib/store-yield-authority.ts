@@ -40,7 +40,7 @@ const LADDER_PRODUCT_IDS = {
 
 function productAmount(products: readonly Product[], productId: string): YieldAmount | null {
   const candidates = products.filter((product) => product.id === productId
-    && Number.isFinite(product.dailyEarn) && product.dailyEarn > 0
+    && Number.isFinite(product.dailyEarn) && product.dailyEarn >= 0
     && Number.isFinite(product.dailyEarnNEX) && product.dailyEarnNEX >= 0);
   if (candidates.length !== 1) return null;
   return { usd: candidates[0].dailyEarn, nex: candidates[0].dailyEarnNEX };
@@ -71,7 +71,7 @@ export function buildStoreYieldAuthority(
     ladder: rows.map(([id, amount]) => ({
       id,
       amount,
-      widthPct: amount && maximum > 0 ? Math.max(1, Math.round((amount.usd / maximum) * 100)) : 0,
+      widthPct: amount && amount.usd > 0 && maximum > 0 ? Math.max(1, Math.round((amount.usd / maximum) * 100)) : 0,
     })),
   };
 }
