@@ -15,11 +15,10 @@
           v-for="item in COUNTRIES"
           :key="item.code"
           class="cc-row"
-          :class="{ 'cc-row--selected': item.code === modelValue, 'cc-row--disabled': !item.selectable }"
+          :class="{ 'cc-row--selected': item.code === modelValue }"
           role="option"
-          :tabindex="item.selectable ? 0 : -1"
+          tabindex="0"
           :aria-selected="item.code === modelValue"
-          :aria-disabled="!item.selectable"
           @click="select(item)"
           @keydown="onRowKeydown($event, item)"
         >
@@ -91,17 +90,16 @@ function countryName(iso: PhoneCountryProfile["iso"]): string {
   }
 }
 
-type CountryRow = { iso: PhoneCountryProfile["iso"]; code: string; name: string; selectable: boolean };
+type CountryRow = { iso: PhoneCountryProfile["iso"]; code: string; name: string };
 
-const COUNTRIES = computed<CountryRow[]>(() => PHONE_COUNTRIES.map((item) => ({
+// Only open regions are listed; closed ones are not shown at all.
+const COUNTRIES = computed<CountryRow[]>(() => PHONE_COUNTRIES.filter((item) => item.selectable).map((item) => ({
   iso: item.iso,
   code: item.dialCode,
   name: countryName(item.iso),
-  selectable: item.selectable,
 })));
 
 function select(item: CountryRow) {
-  if (!item.selectable) return;
   emit("select", item.code);
   emit("close");
 }
@@ -121,16 +119,16 @@ function select(item: CountryRow) {
 /* Close is the shared neutral glass circle (03 §3.1 关闭／取消), as on the other sheets. */
 .cc-head__close { position: relative; isolation: isolate; flex: none; width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
 .cc-head__close svg { position: relative; }
-.cc-list { flex: none; min-height: 0; height: calc(min(74vh, 620px, 100vh - var(--nx-overlay-top)) - 72px); padding: 0 16px; box-sizing: border-box; scrollbar-width: none; }
+/* The list grows with its rows up to the cap, so one open region gives a short sheet. */
+.cc-list { flex: none; min-height: 0; max-height: calc(min(74vh, 620px, 100vh - var(--nx-overlay-top)) - 72px); padding: 0 16px; box-sizing: border-box; scrollbar-width: none; }
 .cc-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
 /* The bottom inset scrolls with the list, so rows run to the screen edge instead of stopping above an opaque band. */
 .cc-list__end { height: var(--nx-overlay-bottom); }
 .cc-row { min-height: 56px; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
-.cc-row:not(.cc-row--disabled):active { opacity: 0.7; }
+.cc-row:active { opacity: 0.7; }
 .cc-row + .cc-row { border-top: 1px solid var(--v5-border); }
 .cc-row--selected { background: color-mix(in srgb, var(--v5-brand) 10%, transparent); }
 .cc-row--selected + .cc-row { border-top-color: transparent; }
-.cc-row--disabled { cursor: not-allowed; opacity: 0.38; }
 .cc-row__identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
 .cc-row__iso { flex: 0 0 30px; height: 24px; border-radius: 7px; background: var(--v5-surface-2); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-v5); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: var(--v5-ink-3); }
 .cc-row__name { font-size: var(--ui-type-list-title); font-weight: 500; color: var(--v5-ink-2); }

@@ -13,7 +13,7 @@ const localPreview = !import.meta.env.VITE_NEXGRID_API_BASE_URL?.trim()
   && ["127.0.0.1", "localhost", "[::1]"].includes(browserLocation.hostname);
 const vietnamOnly = import.meta.env.MODE === "production" && !localPreview;
 
-/** Order follows the selector. Unsupported countries stay visible and disabled. */
+/** Order follows the selector, which lists only selectable countries. */
 export const PHONE_COUNTRIES: readonly PhoneCountryProfile[] = [
   { iso: "VN", dialCode: "+84", example: "0912 345 678", pattern: /^0?[35789]\d{8}$/, selectable: true },
   { iso: "CN", dialCode: "+86", example: "138 0013 8000", pattern: /^1[3-9]\d{9}$/, selectable: !vietnamOnly },
