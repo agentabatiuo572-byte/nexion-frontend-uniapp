@@ -203,7 +203,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
 .earn-market__updated { display: inline-flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); }
-.earn-market__card { padding: 14px 14px 6px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.earn-market__card { padding: 14px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .earn-market__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 /* The board's caption line box sits 4.5px lower than its 14px line height. */
 .earn-market__caption { display: block; padding-top: 4.5px; font: 500 11px/14px var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
@@ -227,24 +227,35 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__spark { height: 22px; margin-top: auto; padding-top: 6px; box-sizing: content-box; line-height: 0; }
 .earn-market__spark :deep(.earn-market-spark) { display: block; width: 100%; height: 100%; overflow: visible; }
 .earn-market__rank { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border); }
-.earn-ranking-row { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) 96px; align-items: center; gap: 8px; min-height: 44px; }
+.earn-ranking-row { display: grid; grid-template-columns: 22px 48px minmax(0, 1fr) 96px; align-items: center; gap: 8px; min-height: 48px; }
 .earn-ranking-row--link { cursor: pointer; }
 .earn-ranking-row--link:active { opacity: .7; }
 .earn-ranking-row--link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .earn-ranking-row__no { font: 500 12px/16px var(--font-metric); color: var(--v5-ink-3); }
-.earn-ranking-row__art { width: 28px; height: 24px; }
+/* The catalog art leaves about 40% empty around the machine: the square image is drawn larger than its 48×40 cell and
+   its transparent margins overlap the row gaps, so the machine itself reads at about 34px. */
+.earn-ranking-row__art { position: relative; width: 48px; height: 40px; }
+.earn-ranking-row__art :deep(.device-art__image) { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; transform: translate(-50%, -50%); pointer-events: none; }
 .earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
 .earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.earn-ranking-value__track { position: relative; width: 96px; height: 3px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
-.earn-ranking-value__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: color-mix(in srgb, var(--v5-tech-cyan) 60%, transparent); }
+/* Same thin, quiet bar as the shared progress style (.nx-progress): 3px ink-8% track, hue 12%→60% fill, small head dot. */
+.earn-ranking-value__track { position: relative; width: 96px; height: 3px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.earn-ranking-value__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent), color-mix(in srgb, var(--v5-tech-cyan) 60%, transparent)); }
+.earn-ranking-value__fill::after { content: ""; position: absolute; top: 50%; right: -2.5px; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: color-mix(in srgb, var(--v5-tech-cyan) 85%, var(--v5-surface)); }
 @media (max-width: 374px) {
   .earn-market__tile { padding: 10px 8px 8px; }
   .earn-market__price { font-size: 13px; line-height: 18px; }
 }
+@media (max-width: 374px) {
+  .earn-ranking-row { grid-template-columns: 22px 40px minmax(0, 1fr) 88px; }
+  .earn-ranking-row__art { width: 40px; height: 36px; }
+  .earn-ranking-row__art :deep(.device-art__image) { width: 52px; height: 52px; }
+  .earn-ranking-value__track { width: 88px; }
+}
 @media (max-width: 350px) {
-  .earn-ranking-row { grid-template-columns: 22px 28px minmax(0, 1fr) 84px; }
+  .earn-ranking-row { grid-template-columns: 22px 40px minmax(0, 1fr) 84px; }
   .earn-ranking-value__track { width: 84px; }
 }
 </style>
