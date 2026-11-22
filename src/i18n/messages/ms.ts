@@ -4834,7 +4834,7 @@ export const ms: Messages = {
     all: "Semua",
     events: "rekod",
     orderPrefix: "Pesanan $",
-    coolingTag: "Dikreditkan dalam {n} hari",
+    coolingTag: "Dikreditkan dalam {n}\u00A0hari",
     readyTag: "Dikreditkan",
     withdrawnTag: "Dikeluarkan",
     frozenTag: "Dibekukan",

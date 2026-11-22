@@ -4834,7 +4834,7 @@ export const kk: Messages = {
     all: "Барлығы",
     events: "жазба",
     orderPrefix: "Тапсырыс $",
-    coolingTag: "{n} күннен кейін түседі",
+    coolingTag: "{n}\u00A0күннен кейін түседі",
     readyTag: "Түсті",
     withdrawnTag: "Шығарылды",
     frozenTag: "Бұғатталды",
