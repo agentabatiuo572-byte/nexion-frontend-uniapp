@@ -111,7 +111,7 @@
           :class="sessionWriteDimmed ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
           :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled" :data-disabled-reason="sessionWriteUnavailableReason"
           :aria-label="withReadReason(t.security.revokeAll, remoteSecurityReadFailed)" @click="handleRevokeAll">
-          <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
+          <text class="nx-reverse-action">{{ t.security.revokeAll }}</text>
         </view>
       </view>
       <view v-if="securityPresentation?.nextCursor" class="mx-4 flex items-center justify-center" :style="loadMoreRowStyle"
@@ -1746,14 +1746,6 @@ const revokeBtnStyle: CSSProperties = {
 const revokeAllRowStyle: CSSProperties = {
   minHeight: "52px",
   borderTop: "1px solid var(--v5-border)",
-};
-// Signing out every other device is a reverse action (user): quiet secondary-ink text; the confirm stays.
-const revokeAllLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-text-link)",
-  lineHeight: "var(--ui-type-text-link-lh)",
-  fontWeight: 400,
-  color: "var(--v5-ink-3)",
 };
 const loadMoreRowStyle: CSSProperties = { minHeight: "44px", marginTop: "var(--v5-space-1)" };
 const loadMoreLabelStyle: CSSProperties = {
