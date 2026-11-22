@@ -157,7 +157,7 @@
       <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
-          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
+          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />

@@ -66,7 +66,7 @@
         <view v-if="receiptWriteFailure && !activeSession" class="checkout-group checkout-receipt-failure nx-step-in" role="status">
           <text class="checkout-receipt-failure__title">{{ t.errors.billMissingTitle }}</text>
           <text class="checkout-receipt-failure__body">{{ t.errors.billMissingMsg }}</text>
-          <view class="checkout-receipt-failure__actions"><NxButton variant="text" size="small" :label="receiptRetrying ? t.store.catalogLoadingTitle : t.ui.retry" :busy="receiptRetrying" @click="retryReceiptWrite" /></view>
+          <view class="checkout-receipt-failure__actions"><NxButton variant="text" size="small" :label="t.ui.retry" :busy-label="t.store.catalogLoadingTitle" :busy="receiptRetrying" @click="retryReceiptWrite" /></view>
         </view>
 
         <!-- Review uses the existing quote, redemption and explicit confirmation flow. -->
