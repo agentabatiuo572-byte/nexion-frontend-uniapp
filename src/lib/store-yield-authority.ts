@@ -1,6 +1,6 @@
 import type { EarnPhoneTier } from "@/api/earn-config-api";
 import type { Product } from "@/mock/products";
-import { formatAmount } from "./amount-display";
+import { formatGroupedAmount } from "./amount-display";
 
 export interface YieldAmount {
   usd: number;
@@ -40,7 +40,7 @@ const LADDER_PRODUCT_IDS = {
 
 function productAmount(products: readonly Product[], productId: string): YieldAmount | null {
   const candidates = products.filter((product) => product.id === productId
-    && Number.isFinite(product.dailyEarn) && product.dailyEarn > 0
+    && Number.isFinite(product.dailyEarn) && product.dailyEarn >= 0
     && Number.isFinite(product.dailyEarnNEX) && product.dailyEarnNEX >= 0);
   if (candidates.length !== 1) return null;
   return { usd: candidates[0].dailyEarn, nex: candidates[0].dailyEarnNEX };
@@ -71,31 +71,20 @@ export function buildStoreYieldAuthority(
     ladder: rows.map(([id, amount]) => ({
       id,
       amount,
-      widthPct: amount && maximum > 0 ? Math.max(1, Math.round((amount.usd / maximum) * 100)) : 0,
+      widthPct: amount && amount.usd > 0 && maximum > 0 ? Math.max(1, Math.round((amount.usd / maximum) * 100)) : 0,
     })),
   };
 }
 
+// Per-device daily estimates are not statistic totals: shown in full, grouped, never K/M (01 §1.2, 03 §3.6).
 export function storefrontUsd(amount: YieldAmount | null): string {
-  if (!amount) return "—";
-  if (amount.usd >= 1_000_000_000) return `$${formatAmount(amount.usd / 1_000_000_000)}B`;
-  if (amount.usd >= 1_000_000) return `$${formatAmount(amount.usd / 1_000_000)}M`;
-  if (amount.usd >= 1_000) return `$${formatAmount(amount.usd / 1_000)}K`;
-  return `$${formatAmount(amount.usd)}`;
-}
-
-export function storefrontUsdFull(amount: YieldAmount | null): string {
-  return amount ? `$${formatAmount(amount.usd)}` : "—";
+  return amount ? `$${formatGroupedAmount(amount.usd)}` : "—";
 }
 
 export function storefrontNex(amount: YieldAmount | null): string {
-  if (!amount) return "—";
-  if (amount.nex >= 1_000_000_000) return `${formatAmount(amount.nex / 1_000_000_000)}B`;
-  if (amount.nex >= 1_000_000) return `${formatAmount(amount.nex / 1_000_000)}M`;
-  if (amount.nex >= 1_000) return `${formatAmount(amount.nex / 1_000)}K`;
-  return formatAmount(amount.nex);
+  return amount ? formatGroupedAmount(amount.nex) : "—";
 }
 
 export function storefrontNexFull(amount: YieldAmount | null): string {
-  return amount ? `${formatAmount(amount.nex)}\u00A0UVT` : "— UVT";
+  return amount ? `${formatGroupedAmount(amount.nex)}\u00A0UVT` : "— UVT";
 }

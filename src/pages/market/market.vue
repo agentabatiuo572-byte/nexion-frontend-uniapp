@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, nextTick, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -156,7 +156,7 @@ const nexDirection = computed(() => nex.value.change24h > 0 ? "nx-before-caret-u
 const athDeltaPct = computed(() => nex.value.ath > 0 ? ((nex.value.priceUSD - nex.value.ath) / nex.value.ath) * 100 : 0);
 
 function fmtPrice(n: number): string {
-  if (n >= 1000) return `${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  if (n >= 1000) return formatGroupedAmount(Math.round(n), "full");
   if (n >= 1) return `${n.toFixed(2)}`;
   if (n >= 0.01) return `${n.toFixed(3)}`;
   return `${n.toFixed(4)}`;

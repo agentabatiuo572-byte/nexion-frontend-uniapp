@@ -87,7 +87,7 @@
       <text class="product-compact-tagline">{{ copy.tagline }}</text>
       <text v-if="copy.taskLevels" class="product-compact-levels">{{ copy.taskLevels }}</text>
       <view class="product-compact-bottom">
-        <text class="product-compact-price">{{ fmtMoney(product.price).replace(/\.00$/, '') }}</text>
+        <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.label }} · <text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
@@ -99,7 +99,7 @@
         <text class="block font-mono-tabular" :style="priceEyebrowStyle">{{ t.store.cardPriceLabel }}</text>
         <view class="tabular-nums flex items-baseline" :style="priceRowStyle">
           <text style="font-size: var(--ui-type-list-title); color: var(--v5-ink-3); font-weight: 500">$</text>
-          <text style="font-family: var(--font-amount); font-size: 26px; font-weight: 600">{{ priceText }}</text>
+          <text style="font-family: var(--font-amount); font-size: 26px; font-weight: 500">{{ priceText }}</text>
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
@@ -114,7 +114,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
@@ -123,7 +123,7 @@ import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { computeTradeInCredit } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
-import { fmt, fmtMoney } from "@/i18n/format";
+import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
@@ -304,8 +304,8 @@ const dailyEstimate = computed(() => productDailyEstimateRange(props.product));
 const dailyEarnText = computed(() => {
   const estimate = dailyEstimate.value;
   if (!estimate) return "";
-  if (!isShare.value) return formatAmount(estimate.low);
-  const low = formatAmount(estimate.low, 6), high = formatAmount(estimate.high, 6);
+  if (!isShare.value) return formatGroupedAmount(estimate.low);
+  const low = formatGroupedAmount(estimate.low), high = formatGroupedAmount(estimate.high);
   return low === high ? low : `${low}–${high}`;
 });
 const compactEstimate = computed(() => {
@@ -313,10 +313,10 @@ const compactEstimate = computed(() => {
     const value = dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—";
     return { label: t.value.bundle.estimatedDaily, value, ariaLabel: `${t.value.bundle.estimatedDaily} · ${value}` };
   }
-  const daily = fmtMoney(props.product.dailyEarn);
+  const daily = `$${formatGroupedAmount(props.product.dailyEarn)}`;
   return {
     label: estimateLabel.value,
-    value: `${daily.replace(/\.00$/, "")}${t.value.store.cardPerDaySuffix}`,
+    value: `${daily}${t.value.store.cardPerDaySuffix}`,
     ariaLabel: `${t.value.store.cardYouEarn} · ${daily}${t.value.store.cardPerDaySuffix}`,
   };
 });
@@ -324,7 +324,7 @@ const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: forma
 const tradeCreditText = computed(() =>
   fmt(t.value.store.cardTradeCredit, { n: formatAmount(bestTradeinCredit.value) }),
 );
-const priceText = computed(() => fmtMoney(props.product.price).replace(/^\$/, ""));
+const priceText = computed(() => formatGroupedAmount(props.product.price));
 const stockHintText = computed(() => fmt(t.value.store.cardStockCompact, { n: props.product.stock ?? 0 }));
 
 function goDetail() {
@@ -553,7 +553,7 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .product-compact-levels { display:block; margin-top:6px; font:400 12px/17px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
-.product-compact-price { color:var(--v5-ink); font:600 16px/21px var(--font-v5); }
+.product-compact-price { color:var(--v5-ink); font:500 16px/21px var(--font-amount); font-variant-numeric:tabular-nums; }
 .product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
 /* The rate and its "/day" never split across lines. */
 .product-compact-estimate__value { white-space:nowrap; }

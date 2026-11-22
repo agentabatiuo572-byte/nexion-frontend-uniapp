@@ -220,7 +220,8 @@ import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { refreshProductCatalog } from '@/store/product-catalog';
 import { useT } from '@/i18n/use-t';
-import { fmt, fmtMoney } from '@/i18n/format';
+import { fmt } from '@/i18n/format';
+import { formatGroupedAmount } from '@/lib/amount-display';
 import { landingCopy } from '@/i18n/promotion-landing';
 import { ambassadorCount } from '@/i18n/ambassador';
 import { navReplace, navTo, takeNavigationQuery } from '@/lib/route';
@@ -266,7 +267,7 @@ const readIdentity = () => `${app.accountKey}:${app.accountBindingEpoch}:${local
 // Catalog names follow the signed-in session; reading the account keys keeps them reactive.
 function productName(sku: string): string { void app.accountKey; void app.accountBindingEpoch; return activity.value ? landingProductName(activity.value, sku) : sku; }
 function productImage(sku: string): string | undefined { return activity.value?.productImages?.[sku]; }
-const priceText = (price: number) => fmtMoney(price).replace(/^\$/, '').replace(/\.00$/, '');
+const priceText = (price: number) => formatGroupedAmount(price);
 // Long published amounts step down before they could clip (01.2).
 function amountSize(amount: string, hero = false) { return amount.length > 6 ? 'lp-amount--s' : amount.length > 4 || (hero && amount.length > 3) ? 'lp-amount--m' : ''; }
 const capText = (limit: PublicPurchaseRule['maxGroups']) => limit.mode === 'LIMITED' ? fmt(c.value.capValue, { n: limit.value }) : c.value.unlimited;
