@@ -1135,8 +1135,8 @@ async function toggleTwoFactor(value: boolean, resend = false) {
     twoFactorCodeError.value = "";
     twoFactorPasswordError.value = "";
     twoFactorResent.value = resend;
+    // The code field and its 「验证码已发送至…」 line are the result; no toast repeats it (03 §3.5.1, review I02).
     startTwoFactorTimers(challenge.expiresInSeconds);
-    toast.success(t.value.addrRebind.otpSendCta);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     // Only a real session loss (the client's auth kind) ends the account state. A 401 CURRENT_PASSWORD_INVALID is the
