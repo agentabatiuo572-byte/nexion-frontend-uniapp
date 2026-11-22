@@ -44,6 +44,12 @@ export function eventCommandFailure(cause: unknown): EventCommandFailure {
   if (error.kind === "http" && error.status === 503 && error.code === 503) return "notRun";
   return isAmbiguousEnvelopeOutcome(error) ? "unknown" : "generic";
 }
+/** The event detail read answered that the event does not exist (404 + EVENT_NOT_FOUND): nothing on it can be confirmed. */
+export function isEventNotFound(cause: unknown): boolean {
+  const error = asApiError(cause);
+  const status = error.kind === "business" ? error.code : error.status;
+  return error.message === "EVENT_NOT_FOUND" && (error.kind === "business" || error.kind === "http") && status === 404;
+}
 export function eventDetailAction(detail: EventDetail): "join" | "claim" | "open" | "remind" | null {
   if (detail.eligible && detail.userStatus === "CLAIMABLE") return "claim";
   if (detail.enabled && detail.event.state === "upcoming" && !detail.reminderSubscribed) return "remind";
