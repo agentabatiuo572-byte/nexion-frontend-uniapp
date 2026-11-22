@@ -83,17 +83,16 @@
           <view class="promotion-summary"><text>{{ p.discount }}</text><text class="checkout-discount-value">{{ formatDiscount(summary.discountUsdt) }}</text></view>
           <view class="promotion-summary total"><text>{{ p.total }}</text><CheckoutAmount :value="summary.amountUsdt" currency="USD" /></view>
         </view>
-        <view v-if="order ? order.paymentStatus==='PENDING'&&order.payBy : promotion?.endsAt" class="promotion-row"><text aria-hidden="true">◷</text><view class="promotion-grow"><text class="promotion-copy">{{ order ? p.payBy : p.deadline }}</text><text class="promotion-copy">{{ displayDeadline(order?.payBy??promotion!.endsAt,locale.code) }}</text></view></view>
+        <view v-if="order ? order.paymentStatus==='PENDING'&&order.payBy : promotion?.endsAt" class="promotion-row"><NxIcon class="promotion-row__icon" name="clock" :size="18" /><view class="promotion-grow"><text class="promotion-copy">{{ order ? p.payBy : p.deadline }}</text><text class="promotion-copy">{{ displayDeadline(order?.payBy??promotion!.endsAt,locale.code) }}</text></view></view>
       </view>
       <view v-if="displayQuote?.warnings.length" class="promotion-notice"><text v-for="(warning,index) in displayQuote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text></view>
       <template v-if="auth.isAuthenticated">
         <template v-if="order">
           <text class="promotion-copy">{{ p.orderNo }} · {{ order.orderNo }}</text>
-          <text class="promotion-title">{{ order.paymentStatus==='REFUNDED' ? p.refunded : order.paymentStatus==='PENDING' ? p.pending : order.paymentStatus==='CANCELLED' ? p.rewardCancelled : order.paymentStatus==='EXPIRED' ? t.orders.statusExpired : p.unavailable }}</text>
+          <text class="promotion-title promotion-title--section">{{ order.paymentStatus==='REFUNDED' ? p.refunded : order.paymentStatus==='PENDING' ? p.pending : order.paymentStatus==='CANCELLED' ? p.rewardCancelled : order.paymentStatus==='EXPIRED' ? t.orders.statusExpired : p.unavailable }}</text>
           <text v-if="order.paymentStatus==='PENDING'&&payWindow!==true" class="promotion-notice">{{ p.unknown }}</text>
 
           <view class="promotion-link" role="button" tabindex="0" @click="viewOrder"><text>{{ p.viewOrder }}</text></view>
-          <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
         </template>
         <template v-else-if="!unknown">
           <text v-if="quote&&!quoteFresh" class="promotion-notice">{{ p.quoteExpired }}</text>
@@ -569,7 +568,7 @@ async function pay(){
       const eligibility=await Promise.all([...new Set(items.map(item=>item.productNo))].map(productNo=>purchaseEligibilityApi.get(productNo)))
         .catch(()=>null);
       updateClock();if(!entryCurrent()||payWindow.value!==true)return;
-      if(!eligibility){error.value=flowCopy.value.queryFailed;return;}
+      if(!eligibility){error.value=t.value.store.purchaseEligibilityError;return;}
       if(eligibility.some(item=>!item.eligible)){blocked=t.value.store.gateBlockedToast;error.value=blocked;return;}
       ready=true;
     });
@@ -843,6 +842,10 @@ const footer = computed(() => {
     label: t.value.myDevices.inventoryTitle, disabled: !visible.value||leaving.value,
     action: () => navTo('/pages/me/devices'), note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
   if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder, note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
+  // Original order refunded, cancelled or expired: 再买一单 is the page's main action, so it sits in the bottom bar (04 §4.0)
+  // as a lone floating button; the old order's amount is not this purchase's total, so the bar shows no amount.
+  if (order.value.paymentStatus !== 'PAID' && !openedOriginal && !props.orderNo && props.items.length && canStartNew.value)
+    return { amount, amountValue, currency, amountless: true, label: p.value.buyAgain, disabled: busy.value||leaving.value, action: startNewPurchase };
   return null;
 });
 const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);

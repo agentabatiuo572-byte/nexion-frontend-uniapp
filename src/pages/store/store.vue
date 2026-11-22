@@ -7,7 +7,7 @@
           <text v-if="activity" class="promotion-badge">{{ t.promotion.activityProducts }}</text>
           <view class="promotion-link" role="button" tabindex="0" @click="clearPromotion"><text>{{ activity?t.promotion.scopeClear:t.promotion.allProducts }}</text></view>
         </view>
-        <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
+        <text class="promotion-title promotion-title--section">{{ activity ? localized(activity.title,locale.code) : promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
         <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
         <text v-else-if="promotionStatus==='error'" class="promotion-copy">—</text>
         <text v-else-if="activity&&promotionStatus==='ready'&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>

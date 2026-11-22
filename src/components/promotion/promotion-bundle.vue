@@ -1,7 +1,7 @@
 <template>
   <view class="promotion promotion-main" data-testid="promotion-bundle">
     <view>
-      <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : !scopeId?t.promotion.bundle:contextStatus==='ready'?t.promotion.disabled:contextStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
+      <text class="promotion-title promotion-title--section">{{ activity ? localized(activity.title,locale.code) : !scopeId?t.promotion.bundle:contextStatus==='ready'?t.promotion.disabled:contextStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
       <text v-if="!scopeId||activity" class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
       <text v-if="scopeId&&(contextStatus==='loading'||contextStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
       <text v-if="scopeId && !activity && contextStatus === 'error'" class="promotion-copy">—</text>

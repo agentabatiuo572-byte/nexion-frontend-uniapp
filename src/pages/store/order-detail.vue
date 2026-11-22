@@ -36,18 +36,20 @@
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
         <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices" @support="contactOrderSupport" v-slot="{ done }">
-        <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
-        <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
+        <!-- "Running" is the end of the replay: it waits, in place, for the head to reach 设备已激活 so both tell one progress. -->
+        <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">{{ resultRunningText }}</text>
+        <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit nx-tint" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
-          <view v-if="resultOrder.trialReward.usdt > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUsdt }}</text><text class="trial-result-usdt">+{{ formatAmount(resultOrder.trialReward.usdt) }} USDT</text></view>
-          <view v-if="resultOrder.trialReward.nex > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUvt }}</text><text class="trial-result-uvt">+{{ formatAmount(resultOrder.trialReward.nex) }} UVT</text></view>
+          <view v-if="resultOrder.trialReward.usdt > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUsdt }}</text><text class="trial-result-usdt">+{{ formatAmount(resultOrder.trialReward.usdt) }}<text class="trial-result-unit">{{ '\u00A0USDT' }}</text></text></view>
+          <view v-if="resultOrder.trialReward.nex > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUvt }}</text><text class="trial-result-uvt">+{{ formatAmount(resultOrder.trialReward.nex) }}<text class="trial-result-unit">{{ '\u00A0UVT' }}</text></text></view>
         </view>
         <view v-if="showTrialResult && orderSaved > 0" class="trial-result-summary">
           <view class="trial-result-line"><text>{{ purchaseCopy.resultSaved }}</text><text class="trial-result-saved">{{ resultSavings }}</text></view>
         </view>
         <!-- The exit keeps its place but stays hidden and untouchable until the result animation has finished. -->
         <view class="trial-result-actions" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">
-          <view class="trial-result-secondary active:opacity-85" role="button" tabindex="0" :aria-label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false"><text>{{ purchaseCopy.resultOrder }}</text></view>
+          <!-- The second exit is the shared neutral glass L (03 §3.1), not a page-private outlined pill. -->
+          <NxButton variant="secondary" :label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false" />
         </view>
         </CheckoutResult>
       </view>
@@ -155,7 +157,7 @@
       <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
-          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
+          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
@@ -752,7 +754,8 @@ const dataCenterLabel = computed(() => {
   const name = dc.toLowerCase();
   if (name === "frankfurt" || name === "frankfurt dc") return t.value.store.coDcFrankfurt;
   if (name === "singapore" || name === "singapore dc") return t.value.store.coDcSingapore;
-  return dc;
+  // Chinese runs straight into a Chinese place name; a Latin name the server sends as is keeps a space on each side.
+  return locale.code === "zh" ? ` ${dc} ` : dc;
 });
 const dynamicHint = computed(() => {
   const o = order.value;
@@ -1290,16 +1293,19 @@ const sectionLabelStyle: CSSProperties = {
 .trial-result-icon { width:64px;height:64px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand); }
 .trial-result-title { font-size:var(--ui-type-page-title);line-height:var(--ui-type-page-title-lh);font-weight:600;color:var(--v5-ink); }
 .trial-result-body { display:block;text-align:center;font-size:var(--ui-type-body);line-height:var(--ui-type-body-lh);color:var(--v5-ink-2);overflow-wrap:break-word; }
-.trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l);background:color-mix(in srgb, var(--v5-brand) 10%, transparent);border:1px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); }
-.trial-result-credit-label { font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);font-weight:600;color:var(--v5-ink-2); }
+/* Credited rewards: the shared tinted card (01 §1.1.2 整体底色, brand hue, soft inner rim), no hard stroke. */
+.trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l); }
+/* The card's heading takes the subheading role in main ink (10.1, 01 §1.1.1); amounts stay 500 (01 §1.2), the unit is the
+   12/16 auxiliary part of the amount, joined by a no-break space (01 §1.2, 06 §6.2), and UVT text uses nex-ink (01 §1.1.1). */
+.trial-result-credit-label { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);color:var(--v5-ink); }
 .trial-result-row, .trial-result-line { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);color:var(--v5-ink-3); }
-.trial-result-row > text:last-child { font-size:var(--ui-type-list-title);line-height:var(--ui-type-list-title-lh);font-weight:600;font-variant-numeric:tabular-nums; }
+.trial-result-row > text:last-child { font-size:var(--ui-type-list-title);line-height:var(--ui-type-list-title-lh);font-weight:var(--ui-type-list-title-weight);font-variant-numeric:tabular-nums; }
+.trial-result-unit { font-size:var(--ui-type-meta);line-height:var(--ui-type-meta-lh);font-weight:inherit;color:var(--v5-ink-3); }
 .trial-result-usdt, .trial-result-saved { color:var(--v5-brand); }
-.trial-result-uvt { color:var(--v5-nex); }
+.trial-result-uvt { color:var(--v5-nex-ink); }
 .trial-result-summary { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-3) var(--v5-space-4);border-radius:var(--v5-radius-l);background:var(--v5-surface); }
 .trial-result-line > text:last-child { color:var(--v5-ink-2);font-variant-numeric:tabular-nums; }
 .trial-result-actions { display:flex;flex-direction:column;gap:var(--v5-space-3);margin-top:var(--v5-space-2); }
-.trial-result-primary, .trial-result-secondary { display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--v5-radius-full);font-size:var(--ui-type-button);line-height:var(--ui-type-button-lh);font-weight:600; }
+.trial-result-primary { display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--v5-radius-full);font-size:var(--ui-type-button);line-height:var(--ui-type-button-lh);font-weight:600; }
 .trial-result-primary { background:var(--v5-brand);color:var(--v5-on-brand); }
-.trial-result-secondary { border:1px solid var(--v5-border-strong);color:var(--v5-ink); }
 </style>
