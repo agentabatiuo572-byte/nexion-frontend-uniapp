@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
@@ -87,10 +87,11 @@ const copy = computed(() => eventDetailCopy[uiLocale(locale.code)]);
 const uiT = useT();
 const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
-// Progress is drawn only from a measured value (04 §4.0). Promotion and voucher events (rules.promotionActivityId /
-// rules.voucherId) report eligibility, not progress: the server sends a 0 / 1 placeholder, as it does before any event
-// starts; regional events rank by region instead.
-const hasMeasuredProgress = computed(() => { const { event, rules, targetValue } = detail.value!; return event.kind !== "regional" && event.state !== "upcoming" && !rules.promotionActivityId && !rules.voucherId && targetValue > 0; });
+// Progress is drawn only from a measured value (04 §4.0). Only referral, onboarding and the reinvest bonus count real
+// progress; the other kinds (promotion, voucher, boost, wheel) get a 0 / 1 placeholder from the server, as every event
+// does before it starts, and regional events rank by region instead.
+const MEASURED_PROGRESS_KINDS: readonly string[] = ["referral", "onboarding"];
+const hasMeasuredProgress = computed(() => { const { event, targetValue } = detail.value!; return event.state !== "upcoming" && targetValue > 0 && (MEASURED_PROGRESS_KINDS.includes(event.kind) || code === "evt-reinvest-bonus"); });
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
 const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);
 // The button is only unavailable while the shown state is a stale snapshot (a failed read); a read in progress does not
@@ -112,17 +113,23 @@ const readyToContinue = computed(() => detail.value!.eligibilityReason === "READ
 const statusTone = computed(() => readyToContinue.value ? "neutral" : eligibilityTone[detail.value!.eligibilityReason]);
 const statusLabel = computed(() => readyToContinue.value ? copy.value.readyToContinue : copy.value.eligibility[detail.value!.eligibilityReason]);
 const statusTag = ref<{ $el?: HTMLElement } | null>(null);
-// When the bar leaves (claim confirmed, reminder set) the focused button is gone: land focus on the status the action
-// changed instead of the document (03 §3.5, 07 §7.2). Focus elsewhere is left alone.
+// When the user's own action removes the bar (claim confirmed, reminder set) the button they used is gone: land focus on
+// the status that action changed instead of the document (03 §3.5, 07 §7.2), without scrolling (03 §3.4). A bar that
+// leaves because of a background read (a confirming read, a pull) moves nothing.
+let userActed = false;
 watch(action, (next, prev) => {
-  if (!prev || next || typeof document === "undefined") return;
+  if (!prev || next || !userActed || typeof document === "undefined") return;
+  userActed = false;
   if (document.activeElement && document.activeElement !== document.body) return;
-  statusTag.value?.$el?.focus();
+  statusTag.value?.$el?.focus({ preventScroll: true });
 }, { flush: "post" });
 let code = "", visible = false, generation = 0;
 let unconfirmedAction: "join" | "claim" | "remind" | null = null;
+// The claim key a claim with an unknown outcome used: a tiered event (the reinvest bonus) stays claimable after one tier,
+// so the claim is confirmed once that key has left claimKeys, not only by CLAIMED.
+let unconfirmedClaimKey = "";
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
-function reset() { generation += 1; detail.value = null; error.value = false; commandError.value = false; unconfirmedAction = null; busy.value = false; }
+function reset() { generation += 1; detail.value = null; error.value = false; commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = ""; busy.value = false; }
 async function load() {
   if (!visible) return;
   const request = ++generation, scope = identity();
@@ -133,10 +140,10 @@ async function load() {
     const value = await api.detail(code, language.value);
     if (current()) {
       detail.value = value;
-      if ((unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && value.userStatus === "CLAIMED") || (unconfirmedAction === "remind" && value.reminderSubscribed)) {
+      if ((unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && (value.userStatus === "CLAIMED" || (!!unconfirmedClaimKey && !(value.claimKeys ?? []).includes(unconfirmedClaimKey)))) || (unconfirmedAction === "remind" && value.reminderSubscribed)) {
         // A claim confirmed only by this read lost its receipt; a device it issued still has to reach the fleet.
         if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
-        commandError.value = false; unconfirmedAction = null;
+        commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
       }
     }
   } catch (cause) { if (current()) { error.value = true; if (!isTransientReadFailure(cause)) detail.value = null; } }
@@ -149,7 +156,8 @@ async function run() {
   if (error.value) return;
   const scope = identity(), request = generation;
   const current = () => visible && request === generation && scope === identity();
-  busy.value = true; commandError.value = false;
+  busy.value = true; commandError.value = false; userActed = true;
+  const claimKey = detail.value.claimKeys?.[0] ?? "";
   const fleetRequest = selectedAction === "claim" ? app.captureRemoteAccountRequest() : undefined;
   const deviceClaim = selectedAction === "claim" && detail.value.rewards.some((reward) => reward.type === "DEVICE");
   try {
@@ -170,9 +178,15 @@ async function run() {
     // Only an unknown outcome is confirmed by reading (03 §3.5.2); a refusal or a 503 from the server is a result: say why
     // once (03 §3.5.1 toast) and leave the action available. The read shows the event as it now stands.
     const failure = eventCommandFailure(cause);
-    if (failure === "unknown") { commandError.value = true; unconfirmedAction = selectedAction; }
-    else toast.error(failure === "claimed" ? copy.value.eligibility.CLAIMED : failure === "notEligible" ? copy.value.eligibility.NOT_ELIGIBLE : copy.value.failed[failure]);
+    if (failure === "unknown") { commandError.value = true; unconfirmedAction = selectedAction; unconfirmedClaimKey = selectedAction === "claim" ? claimKey : ""; }
+    // Already claimed is the outcome the user wanted, not an error.
+    else if (failure === "claimed") toast.info(copy.value.eligibility.CLAIMED);
+    else toast.error(failure === "notEligible" ? copy.value.eligibility.NOT_ELIGIBLE : copy.value.failed[failure]);
     await load();
+  } finally {
+    // Only the change this action makes may move focus; later background reads do not.
+    await nextTick();
+    userActed = false;
   }
 }
 onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/pages/events/detail")); code = String(options?.id ?? query.get("id") ?? "").trim(); reset(); if (visible) void load(); });
