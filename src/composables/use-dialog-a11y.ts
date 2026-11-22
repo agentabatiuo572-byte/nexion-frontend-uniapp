@@ -174,7 +174,10 @@ type LayerEntry = { id: number; layer: Layer };
 const layerEntries: LayerEntry[] = [];
 let entrySeq = 0;
 let currentMarker: number | null = null;
-let ignorePops = 0;
+// Pops this guard caused itself, each with the layer entry it expected to start from ("any" for a correcting step).
+const ignoredPops: (number | "any")[] = [];
+// Router state (current, position) of page entries replaced away from under a layer entry.
+const stalePageEntries: { current: unknown; position: unknown }[] = [];
 let appBackAt = 0;
 let browserBackGuarded = false;
 const markerOf = (state: unknown): number | null => {
@@ -195,7 +198,7 @@ function releaseLayerEntry(layer: Layer): void {
   const [entry] = layerEntries.splice(index, 1);
   setTimeout(() => {
     if (markerOf(history.state) !== entry.id) return;
-    ignorePops += 1;
+    ignoredPops.push(entry.id);
     history.back();
   }, 0);
 }
@@ -208,13 +211,39 @@ export function installBrowserBackGuard(): void {
   // Every entry the router or a layer pushes or replaces tells us whether the browser now sits on a layer entry.
   const push = history.pushState.bind(history), replace = history.replaceState.bind(history);
   history.pushState = (state, title, url) => { push(state, title, url); currentMarker = markerOf(state); };
-  history.replaceState = (state, title, url) => { replace(state, title, url); currentMarker = markerOf(state); };
+  history.replaceState = (state, title, url) => {
+    const before = history.state as { __nxLayer?: unknown; current?: unknown; position?: unknown } | null;
+    let next = state;
+    // The router replaced the page while a layer entry was current (a tab switch or reset started from inside a layer).
+    // The new page's entry is not a layer entry; the page entry and layer entries left below it belong to a page that is
+    // gone, and are stepped over on the way back.
+    if (markerOf(before) !== null && state && typeof state === "object" && (state as { current?: unknown }).current !== before?.current) {
+      stalePageEntries.push({ current: before?.current, position: before?.position });
+      const { __nxLayer: _layer, ...rest } = state as Record<string, unknown>;
+      next = rest;
+    }
+    replace(next, title, url);
+    currentMarker = markerOf(next);
+  };
   uni.addInterceptor("navigateBack", { invoke() { appBackAt = Date.now(); } });
   window.addEventListener("popstate", (ev) => {
     const from = currentMarker;
     const landed = markerOf(ev.state);
     currentMarker = landed;
-    if (ignorePops > 0) { ignorePops -= 1; ev.stopImmediatePropagation(); return; }
+    if (ignoredPops.length) {
+      const expected = ignoredPops.shift();
+      ev.stopImmediatePropagation();
+      // A navigation pushed its entry between the step back and the browser carrying it out, so the step went back over
+      // that navigation instead of over the layer entry: go forward to it again, unseen by the router.
+      if (expected !== "any" && from !== expected) { ignoredPops.push("any"); history.forward(); }
+      return;
+    }
+    const landedState = ev.state as { current?: unknown; position?: unknown } | null;
+    if (landedState && stalePageEntries.some((entry) => entry.current === landedState.current && entry.position === landedState.position)) {
+      ev.stopImmediatePropagation();
+      history.back();
+      return;
+    }
     // The pop did not start on a layer entry: an ordinary page step for the router.
     if (from === null) return;
     ev.stopImmediatePropagation();
