@@ -5,7 +5,7 @@
 ## 身份与环境
 
 - 保留 DCloud 国际应用 `UVELProduction`，DCloud AppID 为 `__UNI__G77FFD9D`；Android 使用 FCM，iOS 使用 APNs，不需要开通 UniPush/UniCloud，不使用旧 CID。
-- TEST 与正式共用 Android 包名/iOS Bundle ID `ai.uvel.app`、Firebase 项目 `uvel-test-push` 和获准推送凭据。iOS TEST 使用 TestFlight 分发签名及 **Production APNs**，topic 为 `ai.uvel.app`；开发签名的 Sandbox 包不能冒用该环境。
+- Android 继续使用包名 `ai.uvel.app` 和 Firebase 项目 `uvel-test-push`。从 iOS TEST 构建 `2026112301` 起，极光应用使用 `UVEL TEST`，Bundle ID 和 APNs topic 均为 `ai.uvel.app.test`。iOS 正式包使用极光应用 `UVEL` 和 Bundle ID `ai.uvel.app`。两个 iOS 包均使用 Production APNs。
 - 业务 API、数据库、会话、消息队列和启停开关仍按环境独立。构建时明确注入 `VITE_NEXGRID_API_BASE_URL`；共用标识/凭据不提供跨后端令牌互斥，切换环境前需在线撤销旧绑定并退出登录。同包名不能并存，TEST 验收只面向已获准安装。
 
 ## 客户端与打包
@@ -18,7 +18,7 @@
    ```
 
    该脚本只生成四项公开 Firebase XML 资源，冷启动也需要这些资源；服务账号 JSON 私钥不得进入客户端。Android 保留 minSdk 23、targetSdk 33 或以上、通知权限、渠道 `uvel_notifications`，以及插件声明的 Firebase Messaging / Google Play services base 依赖。设备需有实际可用的 GMS 和网络，不能仅凭品牌判断。
-3. 保留插件 `utssdk/app-ios/UTS.entitlements` 的 `aps-environment=production`；如需重新生成，仅在 stage 执行 `node src/uni_modules/uvel-native-push/configure-ios.mjs production`。使用匹配 `ai.uvel.app`、推送能力和 Production 环境的证书/profile；不修改描述文件冒充分发签名。
+3. 保留插件 `utssdk/app-ios/UTS.entitlements` 的 `aps-environment=production`。按当前构建环境选取与该 Bundle ID 匹配的苹果推送证书和签名描述文件。
 4. 用真实匹配的 App/UTS 编译器和原生 SDK 重建完整包或自定义基座，本轮验证基线为 **5.33**。不得伪改版本元数据或忽略 Runtime 版本检查。获准 HBuilder CLI 的形式为 `publish app --type appResource --project <stage>`、`pack --config <私有签名JSON路径>`；分平台配置，密码不放命令行。遇到云配额限制先停止，不自行重试、切换账号或付费；用户另行明确授权时，仅执行授权的操作与次数。
 5. 核对实际生成的 Kotlin/Swift、持续回调 keepAlive、原生 SDK 类/Hook，以及最终包的包名、签名、最低系统、compiler/runtime 版本和 TEST API。iOS 还需核对签名 entitlement/profile；源码或 JS 构建成功不等于原生编译、签名包或手机验收成功。iOS 分发包通过获准 TestFlight 流程安装。
 
@@ -68,5 +68,5 @@ FCM 服务账号所属项目必须与客户端和目标项目一致；APNs 私�
 ## iOS 极光构建配置
 
 - 在隔离 iOS stage 解压极光官方 JPush iOS 6.3.0 安装包，运行 `node src/uni_modules/uvel-native-push/configure-jpush-ios.mjs <stage目录> <极光SDK解压目录> <AppKey文件>`。AppKey 文件由 UVEL 极光应用控制台提供。脚本在 stage 注入 Info.plist、极光隐私清单和原生库所需的 Objective-C 模块定义。
-- JCore 使用锁定的 5.6.0-noidfa。构建配置设置 `VITE_UVEL_JPUSH_ENABLED=true`，沿用 `ai.uvel.app`、TEST API、Production APNs 和 Apple Distribution 描述文件。极光 Master Secret 与 APNs 私钥只用于服务端或极光控制台。
+- JCore 使用 5.6.0-noidfa。TEST 构建设置 `VITE_UVEL_JPUSH_ENABLED=true`，从 `UVEL TEST` 取 AppKey 并连接 `https://api-test.uvel.ai`。交付前从已签名 IPA 读取 `UvelJPushAppKey`、`CFBundleIdentifier`、苹果签名权限和内嵌描述文件，与测试应用逐项比对。极光 Master Secret 与 APNs 私钥仅供服务端或极光控制台使用。
 - iOS 新装或升级首次打开时由用户主动选择。用户同意且开启系统通知后，现有推送模块才初始化极光。已有 iOS 业务通知继续使用 APNs，Android 继续使用 FCM。
