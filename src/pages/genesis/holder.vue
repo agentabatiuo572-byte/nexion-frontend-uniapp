@@ -858,7 +858,6 @@ const noteStyle: CSSProperties = {
 .gh-holding + .gh-holding { border-top: 1px solid var(--v5-border); }
 .gh-holding-icon { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--v5-radius-s); color: var(--v5-genesis-gold); background: color-mix(in srgb, var(--v5-genesis-gold) 12%, transparent); }
 .gh-holding-body { flex: 1; min-width: 0; }
-.gh-id { font-family: var(--font-jet-mono); font-size: var(--v5-type-caption); font-weight: 500; overflow-wrap: break-word; }
 .gh-amount { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-note); line-height: var(--ui-type-note-lh); overflow-wrap: break-word; }
 .gh-icon-button { display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: var(--v5-radius-full); flex-shrink: 0; color: var(--v5-ink-3); background: var(--v5-surface-2); }
 .gh-perk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--v5-space-6); row-gap: var(--v5-space-5); padding: var(--v5-space-5); }
