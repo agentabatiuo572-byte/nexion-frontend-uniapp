@@ -92,7 +92,7 @@
           </view>
           <view class="trust-summary">
             <view v-for="metric in financialMetrics" :key="metric.key" class="trust-summary__cell">
-              <text class="trust-summary__value">{{ metric.value }}</text>
+              <NxTickNumber class="trust-summary__value" :text="metric.value" />
               <text class="trust-summary__label">{{ metric.label }}</text>
             </view>
           </view>
@@ -186,6 +186,7 @@ import { trustCenterCopy } from "@/i18n/trust-center";
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
