@@ -15,7 +15,7 @@
         <view v-if="hash" style="margin-top: 16px">
           <text class="block" :style="holdBodyStyle">{{ recoveryCopy.txHashLabel }}</text>
           <NxCodeValue class="tx-retained-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
-          <NxButton class="tx-hash-copy" variant="text" size="small" :label="copyButtonText" @click="copyHash" />
+          <view class="tx-hash-copy"><NxButton variant="text" size="small" :label="copyButtonText" @click="copyHash" /></view>
         </view>
         <view class="tx-bills-link" role="link" tabindex="0" :style="copyBtnStyle" @click="viewBills" @keydown.enter.prevent="viewBills"><text>{{ recoveryCopy.viewBills }}</text></view>
       </view>
@@ -29,7 +29,7 @@
           <text :style="confirmedStyle">{{ w.confirmed }}</text>
         </view>
         <NxCodeValue class="tx-hero-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
-        <NxButton class="tx-hash-copy" variant="text" size="small" :label="copyButtonText" @click="copyHash" />
+        <view class="tx-hash-copy"><NxButton variant="text" size="small" :label="copyButtonText" @click="copyHash" /></view>
         <view class="grid grid-cols-3 text-center" style="gap: 8px; margin-top: 12px">
           <Stat :label="w.block" :value="`#${blockNumber.toLocaleString()}`" />
           <Stat :label="w.confirmations" :value="String(confirmations)" tint="var(--v5-success)" />
