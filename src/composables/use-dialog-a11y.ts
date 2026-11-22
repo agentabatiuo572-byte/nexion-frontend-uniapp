@@ -129,7 +129,7 @@ function trackFocus(): void {
         if (!active || active === document.body || !top.el.contains(active)) focusFirst([() => landingSpot(top.el)]);
         return;
       }
-      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left)) || waitingForTrigger) return;
+      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left)) || document.hidden) return;
       if (Date.now() - restoredAt < 5_000) {
         const landing = focusFirst(fallbacks(null, null));
         if (landing) settleOnLanding(landing);
@@ -195,21 +195,34 @@ function canTake(el: Element | null | undefined): el is HTMLElement | SVGElement
 }
 type Candidate = Element | null | undefined | (() => Element | null | undefined);
 /** How a trigger is found again once the page redrew it while the dialog was open (a re-read redraws the order
- *  detail tray): its test id; its slot, a class only it carried when the dialog opened (`order-hero__pay`), which
- *  holds while a busy label changes its name; else its role, name and first class. */
-type Trace = { testid: string | null; role: string | null; name: string; cls: string | null; slot: string | null };
-function traceOf(el: HTMLElement | SVGElement): Trace {
-  const slot = Array.from(el.classList).find((c) => document.getElementsByClassName(c).length === 1) ?? null;
-  return { testid: el.getAttribute("data-testid"), role: el.getAttribute("role"), name: accessibleName(el), cls: el.classList[0] ?? null, slot };
+ *  detail tray): its test id; its slot, a page class only it carried when the dialog opened (`order-hero__pay`), which
+ *  holds while a busy label changes its name; else its role, name and first class. Shared component, variant and state
+ *  classes (`nx-button`, `nx-button--primary`, `is-active`) never make a slot: after a redraw they match other controls. */
+type Trace = { testid: string | null; role: string | null; name: string; cls: string | null; slot: string | null; area: string };
+const SHARED_CLASS = /--|^is-|^nx-|^uni-/;
+/** The region a control sits in (a dialog, the bottom bar, the page), so a copy found elsewhere is not taken for it. */
+function areaOf(el: Element): string {
+  const area = el.closest('[aria-modal="true"], .nx-glass-bar');
+  return area ? (area.id ? "#" + area.id : area.classList[0] ?? area.tagName) : "page";
 }
-/** The trigger's redrawn copies inside scope (or the page), best match first. */
+function traceOf(el: HTMLElement | SVGElement): Trace {
+  const slot = Array.from(el.classList).find((c) => !SHARED_CLASS.test(c) && document.getElementsByClassName(c).length === 1) ?? null;
+  return { testid: el.getAttribute("data-testid"), role: el.getAttribute("role"), name: accessibleName(el), cls: el.classList[0] ?? null, slot, area: areaOf(el) };
+}
+/** The trigger's redrawn copies inside scope (or the page), best match first. A test id or slot match counts only when
+ *  it is the one control on screen with it, in the same role and region. */
 function replacements(trace: Trace | null, scope: HTMLElement | null): HTMLElement[] {
   if (!trace) return [];
   const within: ParentNode = scope ?? document;
   const all = (selector: string) => Array.from(within.querySelectorAll<HTMLElement>(selector));
+  const verified = (found: HTMLElement[]) => {
+    const onScreen = found.filter((el) => el.isConnected && shown(el));
+    const [only] = onScreen;
+    return onScreen.length === 1 && (!trace.role || only.getAttribute("role") === trace.role) && areaOf(only) === trace.area ? [only] : [];
+  };
   const list: HTMLElement[] = [];
-  if (trace.testid) list.push(...all(`[data-testid="${CSS.escape(trace.testid)}"]`));
-  if (trace.slot) list.push(...all(`.${CSS.escape(trace.slot)}`));
+  if (trace.testid) list.push(...verified(all(`[data-testid="${CSS.escape(trace.testid)}"]`)));
+  if (trace.slot) list.push(...verified(all(`.${CSS.escape(trace.slot)}`)));
   if (trace.name) {
     const same = trace.role ? `[role="${CSS.escape(trace.role)}"]` : '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea';
     // Same name and same first class: a redrawn copy of the control, not another control that happens to share its name.
@@ -220,32 +233,28 @@ function replacements(trace: Trace | null, scope: HTMLElement | null): HTMLEleme
 /** A trigger still on screen that is only disabled for the moment: not removed, hidden or inert. */
 const onlyDisabled = (el: Element) => el.isConnected && shown(el) && !el.closest("[inert]") && getComputedStyle(el).visibility === "visible"
   && (el.getAttribute("aria-disabled") === "true" || (el as HTMLButtonElement).disabled === true);
-// Restores waiting for their trigger; the shared focusout fallback stays out of their way meanwhile.
-let waitingForTrigger = 0;
 /** A page may hand the trigger back only once the layer has fully closed, or after redrawing it (order detail turns
- *  「继续支付」 back on after the payment sheet is gone). Wait while the trigger, or its redrawn copy, is busy (aria-busy:
- *  the page is still working and will release it) or only briefly disabled; land on it once it can take focus. If it
- *  goes away, or stays disabled without being busy, take the fallback order. If focus moves meanwhile (the user, a
- *  new layer, the page hidden), leave it there. */
-function waitForTrigger(find: () => Element | null, scope: HTMLElement | null, land: (el: Element | null) => void): void {
-  waitingForTrigger += 1;
+ *  「继续支付」 back on after the payment sheet is gone). Focus already sits on a fallback (`landing`); while the trigger,
+ *  or its redrawn copy, is busy (aria-busy: the page is still working and will release it) or only briefly disabled,
+ *  move focus to it once it can take focus, but only while focus is still on that landing: a user who moved on (Tab,
+ *  a tap, a new layer) or a hidden page is left alone. If it goes away, or stays disabled without being busy, focus
+ *  stays on the landing. */
+function waitForTrigger(find: () => Element | null, landing: Element | null, done: () => void): void {
   let idle = 0;
   let total = 0;
   const timer = setInterval(() => {
     total += 1;
     const active = document.activeElement;
-    // The layer below holding focus on its own root (the shared focusout keeps focus in it) is still waiting too.
-    const moved = !!active && active !== document.body && active !== scope || document.hidden;
+    const untouched = landing ? active === landing : !active || active === document.body;
     const el = find();
-    const ready = !!el && canTake(el);
-    const waiting = !!el && !ready && onlyDisabled(el);
+    if (!untouched || document.hidden) { clearInterval(timer); return; }
+    if (el && canTake(el)) { clearInterval(timer); el.focus(); return; }
     if (el?.getAttribute("aria-busy") !== "true") idle += 1;
     // A disabled trigger that is not busy gets a second; a busy one is waited for, with a cap so no timer outlives a
     // control that never comes back.
-    if (!moved && waiting && idle < 20 && total < 300) return;
+    if (el && onlyDisabled(el) && idle < 20 && total < 300) return;
     clearInterval(timer);
-    waitingForTrigger -= 1;
-    if (!moved) land(ready ? el : null);
+    done();
   }, 50);
 }
 /** Focus the first candidate that can take it and really does; otherwise go on down the list. */
@@ -287,7 +296,7 @@ function settleOnLanding(landing: Element): void {
   let tries = 0;
   const timer = setInterval(() => {
     tries += 1;
-    if (document.activeElement !== landing || tries > 10) { clearInterval(timer); return; }
+    if (document.activeElement !== landing || tries > 10 || document.hidden) { clearInterval(timer); return; }
     const better = fallbacks(null, null).map((next) => () => { const el = next(); return el && el !== landing && !el.matches(MAIN_REGION) && !el.matches(PAGE_TITLE) ? el : null; });
     if (focusFirst(better)) clearInterval(timer);
   }, 150);
@@ -415,7 +424,7 @@ export function useDialogA11y(
     // A layer opened after this one is on screen: this one was only paused. Keep its trigger and leave focus up there.
     if (top && top.layer.order > openedAt) {
       paused = true;
-      if (top.el) focusInside(top.el);
+      if (top.el && !document.hidden) focusInside(top.el);
       return;
     }
     // Otherwise focus goes back inside the layer still open below, if any, else to the page.
@@ -428,17 +437,23 @@ export function useDialogA11y(
     const trace = previousTrace;
     previousFocus = null;
     previousTrace = null;
-    const land = (ready: Element | null = null) => {
-      const back = focusFirst([() => ready, () => trigger, ...(settled ? [] : fallbacks(trace, scope))]);
+    // A hidden page (the app sent to the background) does not have focus moved for it.
+    if (document.hidden) return;
+    const find = () => (trigger?.isConnected ? trigger : replacements(trace, scope)[0] ?? null);
+    const current = settled ? null : find();
+    if (!(current && !canTake(current) && onlyDisabled(current))) {
+      const back = focusFirst([() => trigger, ...(settled ? [] : fallbacks(trace, scope))]);
       restoredAt = Date.now();
       if (back) settleOnLanding(back);
-    };
-    // The trigger, or the copy the page redrew in its place, is still there and only disabled for now: wait for it
-    // before taking the fallback order (03 §3.5).
-    const find = () => (trigger?.isConnected ? trigger : replacements(trace, scope).find((el) => shown(el)) ?? null);
-    const current = settled ? null : find();
-    if (current && !canTake(current) && onlyDisabled(current)) waitForTrigger(find, scope, land);
-    else land();
+      return;
+    }
+    // The trigger, or the copy the page redrew in its place, is still there and only disabled for now. Focus never
+    // waits on <body>: it lands at once on the next fallback (the trigger and its copies skipped), and goes on to the
+    // trigger once that can take it, unless the user has moved on meanwhile (03 §3.5).
+    const copies = new Set<Element | null>([trigger, current, ...replacements(trace, scope)]);
+    const landing = focusFirst(fallbacks(trace, scope).map((next) => () => { const el = next(); return el && !copies.has(el) ? el : null; }));
+    restoredAt = Date.now();
+    waitForTrigger(find, landing, () => { if (landing) settleOnLanding(landing); });
   }
 
   function detach(): void {
