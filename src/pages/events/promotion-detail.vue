@@ -555,13 +555,22 @@ const barSummary = computed(() => {
 });
 
 function openTerms() { termsOpen.value = true; }
+// The page scrolls inside the chassis, not the document: jump the way the rule pages do (H5 DOM, App page WebView).
+function scrollToDevices() {
+  if (typeof document !== 'undefined') { document.getElementById('lp-devices')?.scrollIntoView({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
+  // #ifdef APP-PLUS
+  const pages = getCurrentPages();
+  const page = pages[pages.length - 1] as unknown as { $getAppWebview?: () => { evalJS: (code: string) => void } };
+  page?.$getAppWebview?.().evalJS("var t=document.getElementById('lp-devices');if(t){t.scrollIntoView({block:'start',behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}");
+  // #endif
+}
 // Back from the poster (saved, copied or shared), the progress is read again.
 function closePoster() { posterOpen.value = false; void loadReferral(); }
 function act() {
   if (!bar.value || bar.value.disabled) return;
   if (bar.value.share) { posterOpen.value = true; return; }
   // Several devices: the list on this page is where one is picked.
-  if (bar.value.devices) { uni.pageScrollTo({ selector: '#lp-devices', offsetTop: -88, duration: 300 }); return; }
+  if (bar.value.devices) { scrollToDevices(); return; }
   if (bar.value.href) navTo(bar.value.href);
 }
 async function load() {
@@ -651,6 +660,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-section { display: block; margin-top: var(--ui-space-section-gap); }
 .lp-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .lp-section-head--start { justify-content: flex-start; gap: 6px; }
+/* The fixed header covers the top of the scroller; a jump to the device list stops below it. */
+#lp-devices { scroll-margin-top: 96px; }
 .lp-section-title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
 .lp-section-note { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-count { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
