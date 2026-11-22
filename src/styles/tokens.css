@@ -956,8 +956,10 @@ body {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
 }
+/* Fill backwards only: a mask kept at its filled end state stays an isolated group, so the sheet inside it blurs only
+   the flat scrim and the 2% its near-opaque fill lets through shows the page text behind it sharp (BUG-614). */
 .nx-sheet-fade-in {
-  animation: nx-sheet-fade-in 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: nx-sheet-fade-in 240ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
 }
 .nx-sheet-slide-up {
   animation: nx-sheet-slide-up 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
