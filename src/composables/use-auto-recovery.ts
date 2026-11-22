@@ -1,7 +1,7 @@
 import { inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { TAB_LIFECYCLE, onShow, onHide } from "@/composables/use-tab-page-lifecycle";
 import { ApiError } from "@/api/errors";
-import { foregroundReadAllowed } from "@/lib/foreground-read";
+import { appReadOnline, foregroundReadAllowed } from "@/lib/foreground-read";
 import { registerPageRecovery } from "@/lib/active-page-refresh";
 import { READ_RECOVERY_DELAYS_MS as delays } from "@/lib/remote-read-failure";
 import { useApp } from "@/store/app";
@@ -10,6 +10,7 @@ import { useApp } from "@/store/app";
 export function useAutoRecovery(options: {
   failed: () => boolean;
   retry: () => Promise<unknown>;
+  retryOnPullOrReconnect?: () => Promise<unknown>;
   active?: () => boolean;
   repeatMs?: number;
   repeatWhile?: () => boolean;
@@ -34,7 +35,10 @@ export function useAutoRecovery(options: {
 
   const retryWait = () => Math.max(retryAt, options.retryNotBefore?.() ?? 0) - Date.now();
 
-  function schedule(delay: number | undefined = delays[attempts] ?? (options.repeatWhile?.() === false ? undefined : options.repeatMs)) {
+  function schedule(
+    delay: number | undefined = delays[attempts] ?? (options.repeatWhile?.() === false ? undefined : options.repeatMs),
+    read?: () => Promise<unknown>,
+  ) {
     if (disposed || timer !== undefined || inFlight || !isActive() || !foregroundReadAllowed()
       || !options.failed() || delay === undefined) return;
     const epoch = app.accountBindingEpoch;
@@ -46,11 +50,11 @@ export function useAutoRecovery(options: {
       const wait = retryWait();
       if (wait > 0) { schedule(wait); return; }
       attempts += 1;
-      void attempt();
+      void attempt(read);
     }, Math.max(delay === options.repeatMs ? delay : delay * (0.85 + Math.random() * 0.3), retryWait()));
   }
 
-  function attempt(): Promise<boolean> {
+  function attempt(read = options.retry): Promise<boolean> {
     if (inFlight) return inFlight;
     if (disposed || !isActive() || !foregroundReadAllowed()) return Promise.resolve(false);
     if (!options.failed()) return Promise.resolve(true);
@@ -63,7 +67,7 @@ export function useAutoRecovery(options: {
     inFlight = Promise.resolve().then(async () => {
       if (!current() || !isActive() || !foregroundReadAllowed()) return false;
       try {
-        await options.retry();
+        await read();
         return current() && !options.failed();
       } catch (cause) {
         // This boundary owns read recovery; commands must never be passed here.
@@ -84,7 +88,7 @@ export function useAutoRecovery(options: {
   function retry(): Promise<boolean> {
     clearTimer();
     attempts = 0;
-    return attempt();
+    return attempt(options.retryOnPullOrReconnect);
   }
 
   /** A newly confirmed command can require a readback after a previous read exhausted its budget. */
@@ -132,9 +136,13 @@ export function useAutoRecovery(options: {
     clearTimer();
     schedule();
   });
-  watch(foregroundReadAllowed, (allowed, wasAllowed) => {
+  watch([foregroundReadAllowed, appReadOnline], ([allowed, online], [wasAllowed, wasOnline]) => {
+    if (allowed === wasAllowed) return;
     clearTimer();
-    if (allowed && !wasAllowed) { attempts = 0; schedule(300 + Math.random() * 700); }
+    if (allowed) {
+      attempts = 0;
+      schedule(300 + Math.random() * 700, online && !wasOnline ? options.retryOnPullOrReconnect : undefined);
+    }
   });
   watch(() => app.accountBindingEpoch, () => {
     clearTimer(); attempts = 0; retryAt = 0;
