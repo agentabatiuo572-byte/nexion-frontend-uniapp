@@ -1238,7 +1238,9 @@ const sectionLabelStyle: CSSProperties = {
 .order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
 .order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
 /* Paired buttons share a card row, so they take the M side padding (16px) to fit two labels. */
-.order-hero__cancel { --ui-button-ink: var(--v5-danger); }
+/* Cancelling is a reverse action (user): a short quiet text at the tray's left, so 继续支付 is the one clear action. */
+.order-sticky > .order-hero__cancel { flex: 0 0 auto; }
+.order-sticky .order-hero__cancel, .order-sticky.nx-glass-bar > .order-hero__cancel.nx-button--secondary :deep(.nx-button__surface) { color: var(--v5-ink-3); font: 400 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
 /* Progress track: 24px steps joined by 2px segments; done segments grow in (DS-29). */
 .order-track { display: grid; margin-top: 20px; }
 .order-track__step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; text-align: center; }

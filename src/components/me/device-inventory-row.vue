@@ -24,8 +24,8 @@
         <view class="device-inventory-row__task-name"><text class="device-inventory-row__label">{{ t.earn.currentTask }}</text><text class="device-inventory-row__task-value">{{ visibility.mask(device.currentTask.type) }}</text></view>
         <text class="device-inventory-row__pct font-mono-tabular">{{ visibility.mask(progressPct == null ? '—' : `${progressPct}%`) }}</text>
       </view>
-      <view class="device-inventory-row__bar" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
-        <view v-if="!visibility.hidden && progressPct != null" class="device-inventory-row__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
+      <view class="device-inventory-row__bar nx-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
+        <view v-if="!visibility.hidden && progressPct != null" class="device-inventory-row__fill nx-progress__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
       </view>
     </view>
     <view v-else-if="active && (!remoteApiEnabled || device.kind !== 'phone')" class="device-inventory-row__task device-inventory-row__task--idle">
@@ -199,9 +199,13 @@ async function chooseMenu(action: "toggle" | "tradein") {
 
 <style scoped>
 .device-inventory-row { position: relative; min-width: 0; padding: 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); box-shadow: var(--v5-glass-shadow); }
-.device-inventory-row__head { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
-.device-inventory-row__art { position: relative; display: grid; place-items: center; width: 84px; height: 72px; }
-.device-inventory-row__image { display: block; width: 78px; height: 64px; margin-top: -4px; }
+/* The device is the card's visual anchor: the catalog art leaves about 40% empty around the machine, so the square
+   image is as wide as the art column (the Rack's 87%-wide body still fits) and the column is only as tall as the
+   machine; the transparent margins overlap the card padding. The column bleeds 12px into that padding so the name
+   column keeps its width. */
+.device-inventory-row__head { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.device-inventory-row__art { position: relative; display: grid; place-items: center; width: 100px; height: 56px; margin-left: -12px; }
+.device-inventory-row__image { position: absolute; left: 0; top: 50%; display: block; width: 100px; height: 100px; transform: translateY(-56%); pointer-events: none; }
 .device-inventory-row__art--inactive .device-inventory-row__image { filter: grayscale(.85); opacity: .55; }
 .device-inventory-row__identity { min-width: 0; }
 .device-inventory-row__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
@@ -223,8 +227,8 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__task-value { overflow-wrap: break-word; }
 .device-inventory-row__task-name .device-inventory-row__label { margin-right: 6px; }
 .device-inventory-row__pct { font: 500 12px/16px var(--font-metric, var(--font-jet-mono)); }
-.device-inventory-row__bar { position: relative; height: 4px; margin-top: 10px; overflow: hidden; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); }
-.device-inventory-row__fill { height: 100%; border-radius: inherit; background: var(--v5-brand); transition: width .6s linear; }
+.device-inventory-row__bar { margin-top: 10px; }
+.device-inventory-row__fill { transition: width .6s linear; }
 .device-inventory-row__task--idle { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .device-inventory-row__wait { width: 14px; height: 14px; flex: none; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed var(--v5-ink-3); }
 .device-inventory-row__pending { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
@@ -249,9 +253,9 @@ async function chooseMenu(action: "toggle" | "tradein") {
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @keyframes device-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
 @media (max-width: 374px) {
-  .device-inventory-row__head { grid-template-columns: 68px minmax(0, 1fr) auto; gap: 10px; }
-  .device-inventory-row__art { width: 68px; height: 60px; }
-  .device-inventory-row__image { width: 66px; height: 54px; }
+  .device-inventory-row__head { grid-template-columns: 76px minmax(0, 1fr) auto; gap: 10px; }
+  .device-inventory-row__art { width: 84px; height: 48px; margin-left: -8px; }
+  .device-inventory-row__image { width: 84px; height: 84px; }
 }
 @media (prefers-reduced-motion: reduce) { .device-inventory-row__eq > view { animation: none; } .device-inventory-row__fill { transition: none; } }
 /* 更多: a bare 20px icon, no fill, rim or stroke (user), in the card's secondary-icon ink like the ⓘ beside it, in a 44px
@@ -274,7 +278,8 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__menu-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 /* Menu rows use the list-title role at 400 (03 §3.5); a destructive action only swaps its text to the error colour (03 §3.1). */
 .device-inventory-row__menu-label { flex: 1; min-width: 0; color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
-.device-inventory-row__menu-row--danger .device-inventory-row__menu-label { color: var(--v5-danger); }
+/* Deactivating is a reverse action: it lives in this menu in neutral text; only its confirm dialog uses the error colour. */
+.device-inventory-row__menu-row--danger .device-inventory-row__menu-label { color: var(--v5-ink); }
 .device-inventory-row__menu-desc { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .device-inventory-row__menu-chevron { display: flex; flex: none; color: var(--v5-ink-4); }
 </style>

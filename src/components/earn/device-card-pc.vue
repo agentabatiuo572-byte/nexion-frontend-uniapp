@@ -115,8 +115,8 @@
       <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.type) }}</text>
       <TaskV2Status :task="task" :paused="phoneTaskExpired" />
       <view class="flex items-center gap-3" style="margin-top: 10px">
-        <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
-          <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress h-full nx-viz-grow" :style="progressBarStyle" />
+        <view class="flex-1 nx-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
+          <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress nx-progress__fill nx-viz-grow" :style="progressBarStyle" />
         </view>
         <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-2)">{{ progressLabel }}</text>
       </view>
@@ -290,8 +290,8 @@
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
       <view class="mt-3 flex items-center gap-3">
-        <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
-          <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress h-full nx-viz-grow" :style="progressBarStyle" />
+        <view class="flex-1 nx-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
+          <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress nx-progress__fill nx-viz-grow" :style="progressBarStyle" />
         </view>
         <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressLabel }}</text>
       </view>
@@ -844,7 +844,6 @@ const warnIconStyle: CSSProperties = {
 };
 const progressBarStyle = computed<CSSProperties>(() => ({
   width: `${progressPct.value ?? 0}%`,
-  background: "color-mix(in srgb, var(--v5-brand) 40%, transparent)",
   transition: "width 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
 }));
 function togglePillStyle(on: boolean): CSSProperties {

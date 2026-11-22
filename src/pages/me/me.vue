@@ -43,7 +43,7 @@
 
       <!-- Sign out -->
       <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signOutStyle" data-me-action="sign-out" role="button" tabindex="0" :aria-label="t.me.signOut" @click="handleSignOut"  @keydown.enter.prevent="handleSignOut" @keydown.space.prevent="handleSignOut">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
         <text style="margin-left: 6px">{{ t.me.signOut }}</text>
       </view>
 
@@ -668,14 +668,14 @@ const signOutStyle: CSSProperties = {
   marginTop: "24px",
   height: "44px",
   padding: "0 18px",
-  // 《03》§4 零 border。⚠️ 不要换成 --v5-danger-soft 底:danger 文字压在 danger-soft 上
-  // 亮主题实测 3.73:1 反而不达 AA(surface 底是 4.71)。零 border 已达成,底色不必动。
-  background: "var(--v5-surface)",
-  color: "var(--v5-danger)",
+  // Signing out is a reverse action (user): a plain page-bottom row in the secondary ink, no fill and no red.
+  background: "transparent",
+  color: "var(--v5-ink-3)",
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "var(--ui-type-list-title)",
+  fontWeight: 400,
+  fontSize: "var(--ui-type-text-link)",
+  lineHeight: "var(--ui-type-text-link-lh)",
   letterSpacing: "-0.005em",
 };
 

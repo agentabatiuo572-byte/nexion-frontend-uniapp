@@ -125,8 +125,8 @@
       <!-- ───── Danger zone ───── -->
       <view class="nx-glass-card mx-4 security-danger" :style="[cardStyle, groupGap]">
         <view class="flex items-center" :class="deletionPending ? 'opacity-50' : 'active:opacity-90'" :style="rowStyle" role="button" :tabindex="deletionPending ? -1 : 0" :aria-disabled="deletionPending ? 'true' : 'false'" @click="openDeletionSheet">
-          <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+          <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-surface-3)')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
           </view>
           <view class="flex-1 min-w-0">
             <text class="block" :style="dangerLabelStyle" :class="{ 'security-danger-label--pending': deletionPending }">{{ t.security.deleteAccount }}</text>
@@ -1747,20 +1747,25 @@ const revokeAllRowStyle: CSSProperties = {
   minHeight: "52px",
   borderTop: "1px solid var(--v5-border)",
 };
+// Signing out every other device is a reverse action (user): quiet secondary-ink text; the confirm stays.
 const revokeAllLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-body)",
-  color: "var(--v5-danger)",
+  fontSize: "var(--ui-type-text-link)",
+  lineHeight: "var(--ui-type-text-link-lh)",
+  fontWeight: 400,
+  color: "var(--v5-ink-3)",
 };
 const loadMoreRowStyle: CSSProperties = { minHeight: "44px", marginTop: "var(--v5-space-1)" };
 const loadMoreLabelStyle: CSSProperties = {
   font: "var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5)",
   color: "var(--v5-brand)",
 };
+// Account deletion is a reverse action (user): the page's last row in neutral text and icon; the sheet and its
+// confirm dialog carry the consequence.
 const dangerLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "var(--ui-type-body)",
-  color: "var(--v5-danger)",
+  color: "var(--v5-ink)",
 };
 
 
