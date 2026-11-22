@@ -46,7 +46,6 @@
           <text :style="giftAmountStyle">${{ formatAmount(giftUsdt) }}</text>
           <text :style="giftNexStyle">+ {{ formatAmount(giftNex) }} UVT</text>
         </view>
-        <text class="ref-gift-sub block" :style="giftSubStyle">{{ t.ref.welcomeGiftSub }}</text>
       </view>
 
       <!-- What you get -->
@@ -60,20 +59,20 @@
       </view>
 
       <!-- CTA(已登录 → 进入 UVEL,隐藏注册入口;异常2) -->
-      <view v-if="!authed && referralCta === 'referral'" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister"  @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
-        <svg v-if="rewardEnabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
+      <view v-if="!authed && referralCta === 'referral'" class="ref-cta nx-frosted-button w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister"  @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
+        <svg v-if="rewardEnabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         <text style="margin: 0 8px">{{ rewardEnabled ? fmt(t.ref.claimCta, { usd: formatAmount(giftUsdt), nex: formatAmount(giftNex) }) : t.ref.joinCta }}</text>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
-      <view v-else-if="!authed && referralCta === 'ordinary'" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister"  @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
+      <view v-else-if="!authed && referralCta === 'ordinary'" class="ref-cta nx-frosted-button w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister"  @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
         <text style="margin: 0 8px">{{ t.register.create }}</text>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
       <view v-if="remoteApiEnabled && remotePreviewState === 'unavailable' && !requestedCode" class="ref-preview-status" role="status"><text>{{ recoveryCopy.referralInvalid }}</text></view>
       <view v-else-if="remoteApiEnabled && (remotePreviewState === 'unavailable' || remotePreviewState === 'loading')" class="ref-preview-status" role="status" :aria-busy="remotePreviewState === 'loading'"><text>{{ remotePreviewState === 'loading' ? recoveryCopy.referralLoading : '—' }}</text></view>
-      <view v-if="authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp"  @keydown.enter.prevent="enterApp" @keydown.space.prevent="enterApp">
+      <view v-if="authed" class="ref-cta nx-frosted-button w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp"  @keydown.enter.prevent="enterApp" @keydown.space.prevent="enterApp">
         <text style="margin: 0 8px">{{ t.ref.enterApp }}</text>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
 
       <view v-if="!authed" class="ref-signin-row" style="margin-top: 8px">
@@ -328,7 +327,6 @@ const giftCardStyle: CSSProperties = {
 const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-brand)" };
 const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "56px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const giftNexStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", color: "var(--v5-nex)", fontWeight: 600, lineHeight: 1 };
-const giftSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "8px", lineHeight: 1.625 };
 const perksCardStyle: CSSProperties = { marginBottom: "12px", overflow: "hidden" };
 function perkRowStyle(divider: boolean): CSSProperties {
   return { gap: "10px", padding: "10px 12px", borderBottom: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none" };
@@ -344,9 +342,8 @@ const ctaStyle: CSSProperties = {
   boxSizing: "border-box",
   padding: "8px 12px",
   marginLeft: "auto",
+  marginRight: "auto",
   borderRadius: "999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
   fontSize: "13px",
@@ -388,8 +385,8 @@ const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", display: "inl
 </script>
 
 <style scoped>
-/* Balanced so a narrow screen never leaves one word alone on the last line of the gift note. */
-.ref-gift-sub { text-wrap: balance; }
+/* Brand liquid glass (03 §3.1), centred under the cards: the shared frosted capsule with a 14% brand fill and brand ink. */
+.ref-cta { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); }
 .ref-signin-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 6px; }
 .ref-preview-status { display: flex; align-items: center; gap: 12px; padding: 16px 0; font-size: 13px; line-height: 1.55; color: var(--v5-ink-3); }
 .ref-preview-status > text { flex: 1; }
