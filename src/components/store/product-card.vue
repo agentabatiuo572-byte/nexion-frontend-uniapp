@@ -85,7 +85,7 @@
       <text v-if="copy.taskLevels" class="product-compact-levels">{{ copy.taskLevels }}</text>
       <view class="product-compact-bottom">
         <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
-        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.label }} · <text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
+        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label }} · </text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
     </view>
@@ -540,6 +540,8 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-estimate { margin-left:auto; text-align:right; font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
 /* The rate and its "/day" never split across lines. */
 .product-compact-estimate__value { white-space:nowrap; }
+/* Field name in the auxiliary colour, the figure in brand (01 §1.1.1 rules 1 and 4). */
+.product-compact-estimate__label { color:var(--v5-ink-3); }
 .product-compact-status { display:block; margin-top:8px; font:400 12px/17px var(--font-v5); color:var(--v5-warning-ink); }
 .product-card--compact:nth-child(2n) .product-art { animation-delay:-1.1s; }
 .product-card--compact:nth-child(3n) .product-art { animation-delay:-2.2s; }
