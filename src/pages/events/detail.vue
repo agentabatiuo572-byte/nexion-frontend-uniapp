@@ -207,7 +207,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commandError.value && !loadi
 .event-bar-space { height:calc(48px + var(--nx-tray-bottom) + 16px); }
 .event-bar-space--note { height:auto; padding:12px 16px calc(8px + 48px + 8px + var(--nx-tray-bottom) + 16px); visibility:hidden; }
 .event-bar-space__note { display:block; font:var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:break-word; text-wrap:pretty; }
-.event-bar { position:absolute; z-index:36; display:flex; flex-direction:column; }
+.event-bar { position:absolute; z-index:36; display:flex; flex-direction:column; animation:event-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
+@keyframes event-bar-in { from { transform:translateY(100%); } to { transform:none; } }
+@media (prefers-reduced-motion: reduce) { .event-bar { animation:none; } }
 .event-bar > .nx-button { width:100%; }
 .event-rule-paragraph { display:block; }
 .event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:break-word; }
