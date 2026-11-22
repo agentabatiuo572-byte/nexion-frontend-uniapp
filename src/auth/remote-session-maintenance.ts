@@ -1,6 +1,7 @@
 import { apiClient, sessionVault } from "@/api/runtime";
 import type { SessionSnapshot } from "@/api/session-vault";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
+import { useProfile } from "@/store/profile";
 
 const carrierStartedAt = Date.now();
 let observedRevision = -1;
@@ -44,7 +45,7 @@ export function maintainRemoteSession(validate = false): void {
   const renew = now >= renewAt && now >= retryAt;
   if (inFlight || (!renew && !validate) || !sessionVault.read()?.accessToken) return;
   if (renew) retryAt = now + 15_000;
-  const request = (renew ? apiClient.refreshSession(revision) : apiClient.request({ path: "/api/app/profile" }))
+  const request = (renew ? apiClient.refreshSession(revision) : useProfile().ensureAvatar())
     .catch(() => { /* The API client applies server rejections. Network failures can be retried. */ })
     .finally(() => { if (inFlight === request) inFlight = null; });
   inFlight = request;
