@@ -9,14 +9,17 @@ import { useAuth } from "@/store/auth";
  * here as well. Development fleet reads still wait for the catalog; production
  * fleet reads remain independent. A missing/stale session stays fail-closed.
  */
-export async function refreshRemoteFleetAfterCatalog(accountKey: string): Promise<boolean> {
+export async function refreshRemoteFleetAfterCatalog(accountKey: string, retryTransientAssignments = false): Promise<boolean> {
   const auth = useAuth();
   const serverSession = sessionVault.read();
   if (!serverSession || !auth.isAuthenticated || auth.accountId !== accountKey
       || accountKey !== `user:${serverSession.user.userId}`) {
     return false;
   }
+  const app = useApp();
+  const request = app.captureRemoteAccountRequest();
+  if (request.accountKey !== accountKey) return false;
   if (apiRuntimeConfig.environment !== "dev") void refreshProductCatalog();
   if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
-  return useApp().refreshRemoteFleet(undefined, { coalesce: true });
+  return app.refreshRemoteFleet(request, { coalesce: true, retryTransientAssignments });
 }
