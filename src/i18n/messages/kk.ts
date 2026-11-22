@@ -932,7 +932,7 @@ export const kk: Messages = {
     onGridNow: "қазір",
     onGridMap: "Карта",
     onGridOnline: "онлайн түйін",
-    networkPulseTitle: "Желі пульсі",
+    platformStatsTitle: "Платформа деректері",
     networkLive: "тікелей",
     networkEstimatedDevices: "Болжамды онлайн",
     networkGlobalGrid: "Әлемдік желі · тікелей",

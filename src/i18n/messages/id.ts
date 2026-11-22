@@ -932,7 +932,7 @@ export const id: Messages = {
     onGridNow: "sekarang",
     onGridMap: "Peta",
     onGridOnline: "node online",
-    networkPulseTitle: "Denyut jaringan",
+    platformStatsTitle: "Data platform",
     networkLive: "Live",
     networkEstimatedDevices: "Perkiraan online",
     networkGlobalGrid: "Jaringan global · live",

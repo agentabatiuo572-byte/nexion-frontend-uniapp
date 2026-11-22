@@ -932,7 +932,7 @@ export const uz: Messages = {
     onGridNow: "hozir",
     onGridMap: "Xarita",
     onGridOnline: "onlayn tugun",
-    networkPulseTitle: "Tarmoq holati",
+    platformStatsTitle: "Platforma maʼlumotlari",
     networkLive: "jonli",
     networkEstimatedDevices: "Taxminan onlayn",
     networkGlobalGrid: "Global tarmoq · jonli",

@@ -932,7 +932,7 @@ export const fil: Messages = {
     onGridNow: "ngayon",
     onGridMap: "Mapa",
     onGridOnline: "online na node",
-    networkPulseTitle: "Pulso ng network",
+    platformStatsTitle: "Datos ng platform",
     networkLive: "live",
     networkEstimatedDevices: "Tinatayang online",
     networkGlobalGrid: "Global na grid · live",
