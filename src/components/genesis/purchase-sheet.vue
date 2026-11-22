@@ -102,7 +102,7 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { ref, computed, watch, nextTick, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
