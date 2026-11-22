@@ -749,18 +749,21 @@ const dataCenterLabel = computed(() => {
   const name = dc.toLowerCase();
   if (name === "frankfurt" || name === "frankfurt dc") return t.value.store.coDcFrankfurt;
   if (name === "singapore" || name === "singapore dc") return t.value.store.coDcSingapore;
-  // Chinese runs straight into a Chinese place name; a Latin name the server sends as is keeps a space on each side.
-  return locale.code === "zh" ? ` ${dc} ` : dc;
+  return dc;
 });
+// The place inside a sentence. Each language's template carries its own spacing; Chinese runs straight into a Chinese
+// name (「已在东京开始运行」) and keeps a space on each side of a Latin one (「已在 Tokyo 开始运行」).
+const dataCenterInText = computed(() =>
+  locale.code === "zh" && !/[\u3400-\u9fff\uf900-\ufaff]/.test(dataCenterLabel.value) ? ` ${dataCenterLabel.value} ` : dataCenterLabel.value);
 const dynamicHint = computed(() => {
   const o = order.value;
   if (!o) return "";
   if (!o.dataCenter?.trim()) return o.status === "provisioning" ? commerceCopy(locale.code).provisioningLocationPending : commerceCopy(locale.code).activatedLocationPending;
   const tmpl = o.status === "provisioning" ? t.value.orders.provisioningHint : t.value.orders.activatedHint;
-  return tmpl.replace("{dc}", () => dataCenterLabel.value);
+  return tmpl.replace("{dc}", () => dataCenterInText.value);
 });
 const activatedHint = computed(() =>
-  !order.value ? "" : !order.value.dataCenter?.trim() ? commerceCopy(locale.code).activatedLocationPending : t.value.orders.activatedHint.replace("{dc}", () => dataCenterLabel.value),
+  !order.value ? "" : !order.value.dataCenter?.trim() ? commerceCopy(locale.code).activatedLocationPending : t.value.orders.activatedHint.replace("{dc}", () => dataCenterInText.value),
 );
 
 // One line under the title: the countdown while unpaid, otherwise the result the
@@ -1173,7 +1176,7 @@ const resultRunningText = computed(() => {
   const current = order.value;
   const device = current ? commerceOrderTitle(current, locale.code) : "";
   return current?.dataCenter?.trim()
-    ? fmt(purchaseCopy.value.resultRunning, { device, dc: dataCenterLabel.value })
+    ? fmt(purchaseCopy.value.resultRunning, { device, dc: dataCenterInText.value })
     : fmt(purchaseCopy.value.resultRunningNoDc, { device });
 });
 

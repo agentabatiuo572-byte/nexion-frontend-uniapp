@@ -4828,7 +4828,7 @@ export const id: Messages = {
     all: "Semua",
     events: "catatan",
     orderPrefix: "Pesanan $",
-    coolingTag: "Masuk dalam {n} hari",
+    coolingTag: "Masuk dalam {n}\u00A0hari",
     readyTag: "Masuk",
     withdrawnTag: "Sudah ditarik",
     frozenTag: "Dibekukan",

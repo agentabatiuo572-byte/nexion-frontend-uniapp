@@ -378,7 +378,7 @@ function goPrivacy() {
 }
 .intro-lang-row__native {
   font-size: var(--ui-type-list-title);
-  font-weight: 550;
+  font-weight: 500;
   color: var(--v5-ink);
 }
 .intro-lang-row__en {
@@ -594,12 +594,12 @@ function goPrivacy() {
     margin-top: 12px;
     padding: 7px 10px;
     gap: 6px;
-    font-size: 11px;
+    font-size: var(--ui-type-note);
   }
   .intro-hero :deep(.home-display-item) { gap: 4px; }
   .intro-cta { padding-top: 20px; gap: 8px; }
   .cta-primary, .cta-secondary { height: 44px; flex-shrink: 0; }
-  .intro-terms { font-size: 11px; }
+  .intro-terms { font-size: var(--ui-type-note); }
 }
 @media (max-height: 620px) {
   .intro-orb-area { padding-top: 44px; }

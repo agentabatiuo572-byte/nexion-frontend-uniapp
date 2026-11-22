@@ -4518,7 +4518,7 @@ export const ru: Messages = {
       direct: "За покупки друзей",
       peer: "За равный ранг",
       pool: "Пул наград команды",
-      votes: "голосов",
+      votes: "голос|голоса|голосов",
       peerNotDispatched: "{n}% · пока закрыто",
     },
     cond: {
@@ -4828,7 +4828,7 @@ export const ru: Messages = {
     all: "Все",
     events: "записей",
     orderPrefix: "Заказ $",
-    coolingTag: "Зачисление через {n} дн.",
+    coolingTag: "Зачисление через {n}\u00A0дн.",
     readyTag: "Зачислено",
     withdrawnTag: "Выведено",
     frozenTag: "Заморожено",

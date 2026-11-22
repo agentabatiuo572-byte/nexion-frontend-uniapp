@@ -672,7 +672,7 @@ const sortOptions = computed(() => [
 .marketplace-hero > .grid { margin-top:14px!important; padding:var(--v5-space-3); gap:0!important; border-radius:var(--v5-radius-m); background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent), inset 0 0 0 1px var(--v5-border); }
 .marketplace-hero > .grid > view { padding:0 4px; min-width:0; }
 .marketplace-hero > .grid > view + view { padding-left:10px; border-left:1px solid var(--v5-border); }
-.marketplace-hero > .grid > view > text:first-child { display:block; font:500 11px/14px var(--font-metric)!important; letter-spacing:.02em!important; color:var(--v5-ink-3)!important; }
+.marketplace-hero > .grid > view > text:first-child { display:block; font:500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric)!important; letter-spacing:.02em!important; color:var(--v5-ink-3)!important; }
 .marketplace-hero > .grid > view > text:nth-child(2) { margin-top:6px!important; font:500 16px/20px var(--font-metric)!important; color:var(--v5-ink)!important; }
 .marketplace-closed { display:flex; align-items:center; gap:var(--v5-space-2); margin-top:var(--v5-space-4); padding-top:14px; border-top:1px solid var(--v5-border); }
 .marketplace-lock { display:grid; place-items:center; flex:none; width:28px; height:28px; border-radius:50%; background:var(--v5-surface-3); color:var(--v5-ink-2); }

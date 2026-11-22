@@ -133,7 +133,7 @@ const buyBtnStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontWeight: 550,
+  fontWeight: 500,
   fontSize: "13px",
   letterSpacing: "-0.005em",
 };

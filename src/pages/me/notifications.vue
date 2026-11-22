@@ -73,6 +73,7 @@ import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { useNotifications, type Notification } from "@/store/notifications";
 import { navTo, navBack, takeNavigationQuery } from "@/lib/route";
+import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
 import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
 import { useApp } from "@/store/app";
@@ -349,6 +350,8 @@ const filterOptions = computed(() => visibleFilterIds.value.map(value => {
 }));
 
 import { advanceMessageHeader, createMessageHeaderState } from "@/lib/message-header-scroll";
+// Alone on the stack, the system back does what the header back does (02 §2.7.3).
+useHeaderSystemBack(() => () => navBack('/pages/me/me'));
 const headerState = ref(createMessageHeaderState());
 const headerFocused = ref(false);
 const headerInstance = getCurrentInstance();
@@ -435,7 +438,7 @@ watch(filter, value => {
 /* A long title keeps whole words: the 重要 tag drops below it instead of squeezing the title mid-word. */
 .message-center .notification-heading { flex-wrap:wrap;gap:2px var(--v5-space-2); }
 .message-center .notification-title { font-size:14px; line-height:20px; overflow-wrap:break-word; }
-.message-center .notification-preview { margin-top:2px; font-size:12.5px; line-height:18px; }
+.message-center .notification-preview { margin-top:2px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
 .message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
 .message-center .notification-time { font-size:12px; line-height:16px; }
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }

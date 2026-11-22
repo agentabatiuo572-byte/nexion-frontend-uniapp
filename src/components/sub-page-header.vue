@@ -68,6 +68,7 @@ import { useMessageDrawer } from "@/store/message-drawer";
 import { useT } from "@/i18n/use-t";
 import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
+import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
 // noBack: a status page in a payment flow shows no back control; the page offers its own way on.
@@ -137,6 +138,8 @@ function goBack() {
   if (props.backAction) { props.backAction(); return; }
   navBack(props.back);
 }
+// Alone on the stack, the system back does what this back control does (02 §2.7.3).
+useHeaderSystemBack(() => props.noBack ? null : goBack);
 function goBell() {
   drawer.show();
 }

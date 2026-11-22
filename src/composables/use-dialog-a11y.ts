@@ -10,6 +10,12 @@ const dialogPages = new WeakMap<object, DialogPage>();
 // Back presses a dialog answered. Uni runs every onBackPress handler of the page on one press, so a page's own handler
 // asks here (or whether a dialog is still open) to know the press was not meant for leaving the page.
 const backTaken = new WeakSet<object>();
+// Back handlers this module put on each page root. Uni keeps every page's onBackPress on the root, so more handlers than
+// these means the page has its own, and the page decides what a back press does (header mirror below).
+const moduleHandlers = new WeakMap<object, number>();
+const countModuleHandler = (owner: object) => moduleHandlers.set(owner, (moduleHandlers.get(owner) ?? 0) + 1);
+type HeaderMirror = { action: (() => (() => void) | null) | null };
+const headerMirrors = new WeakMap<object, HeaderMirror>();
 
 export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
   // Uni invokes page hooks on the page root, not on a nested sheet component.
@@ -42,6 +48,7 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
   // One handler per page avoids Uni invoking several sheet callbacks on one press.
   if (nativeBack && !dialogs.backRegistered) {
     dialogs.backRegistered = true;
+    countModuleHandler(owner);
     onPageShow(() => { dialogs.visible = true; }, owner);
     onPageHide(() => { dialogs.visible = false; }, owner);
     onBackPress(event => {
@@ -72,6 +79,41 @@ export function useDialogBackHeld(): (event: object) => boolean {
   };
   // #endif
   return held;
+}
+
+/**
+ * The page header's back or close, done by the system back button too (02 §2.7.3). Only when the page is alone on the
+ * stack (a redirect or cold open; with history the system pops the page as usual), no dialog takes this press, and the
+ * page has no onBackPress of its own (then the page decides). `action` returns what the header's back or close does
+ * now, or null when the header shows neither. One header per page counts: the last one mounted.
+ */
+export function useHeaderSystemBack(action: () => (() => void) | null): void {
+  // #ifdef APP-PLUS
+  const owner = getCurrentInstance()?.root;
+  if (!owner) return;
+  const held = useDialogBackHeld();
+  let mirror = headerMirrors.get(owner);
+  if (!mirror) {
+    const created: HeaderMirror = { action: null };
+    mirror = created;
+    headerMirrors.set(owner, created);
+    countModuleHandler(owner);
+    onBackPress(event => {
+      if (event.from !== "backbutton" || held(event)) return false;
+      const hooks = (owner as unknown as { onBackPress?: unknown[] }).onBackPress ?? [];
+      if (hooks.length > (moduleHandlers.get(owner) ?? 0)) return false;
+      let pages = 0;
+      try { pages = getCurrentPages().length; } catch { return false; }
+      const run = pages === 1 ? created.action?.() : null;
+      if (!run) return false;
+      run();
+      return true;
+    }, owner);
+  }
+  const current = mirror;
+  current.action = action;
+  onBeforeUnmount(() => { if (current.action === action) current.action = null; });
+  // #endif
 }
 
 /**
@@ -179,6 +221,8 @@ let currentPosition: unknown;
 const positionOf = (state: unknown): unknown => (state as { position?: unknown } | null)?.position;
 // Pops this guard caused itself, each with the layer entry it expected to start from ("any" for a correcting step).
 const ignoredPops: (number | "any")[] = [];
+// Gone layer entries this guard has just stepped forward over in a row (see the forward step in the popstate listener).
+let forwardChain = 0;
 // Router state (current, position) of page entries replaced away from under a layer entry.
 const stalePageEntries: { current: unknown; position: unknown }[] = [];
 let appBackAt = 0;
@@ -253,23 +297,29 @@ export function installBrowserBackGuard(): void {
       history.back();
       return;
     }
-    // A forward step onto a layer entry whose layer is gone (it was closed by back or by code, and the browser kept the
-    // entry as a forward entry): there is nothing to reopen. Step back to where the user was, unseen by the router, so
-    // the route stays and the next back does one thing. Forward is a later router position, or on the same page a
-    // layer entry above the one left (a page entry sits below its layer entries).
-    if (landed !== null && !layerEntries.some((entry) => entry.id === landed)) {
-      const forward = typeof landedPosition === "number" && typeof fromPosition === "number" && landedPosition !== fromPosition
-        ? landedPosition > fromPosition
-        : from === null || landed > from;
-      if (forward) {
-        ev.stopImmediatePropagation();
-        ignoredPops.push(landed);
-        history.back();
-        return;
-      }
+    const gone = (marker: number | null) => marker !== null && !layerEntries.some((entry) => entry.id === marker);
+    const crossPage = typeof landedPosition === "number" && typeof fromPosition === "number" && landedPosition !== fromPosition;
+    // A forward step on the same page onto a layer entry whose layer is gone (it was closed by back or by code, and the
+    // browser kept the entry as a forward entry): there is nothing to reopen. Unseen by the router, keep going forward to
+    // the next real entry (a page navigated to from inside the layer); with none, step back to where the user was, so the
+    // route stays and the next back does one thing. On the same page a forward step lands on a layer entry above the one
+    // left (a page entry sits below its layer entries). A step to another page's entry (the history menu,
+    // history.go(2)) is the router's, whatever entry it lands on.
+    if (gone(landed) && !crossPage && (from === null || landed! > from)) {
+      ev.stopImmediatePropagation();
+      forwardChain = forwardChain > 0 && gone(from) ? forwardChain + 1 : 1;
+      const navigation = (window as { navigation?: { canGoForward?: boolean } }).navigation;
+      if (navigation?.canGoForward !== false) { history.forward(); return; }
+      // Nothing real after them: back over every gone entry stepped onto, to the entry the user left.
+      ignoredPops.push(landed!);
+      history.go(-forwardChain);
+      forwardChain = 0;
+      return;
     }
-    // The pop did not start on a layer entry: an ordinary page step for the router.
-    if (from === null) return;
+    forwardChain = 0;
+    // The pop did not start on a live layer entry: an ordinary page step for the router. That includes a forward step off
+    // a gone layer entry to a later page (the step above, or the browser's own forward).
+    if (from === null || (gone(from) && crossPage && (landedPosition as number) > (fromPosition as number))) return;
     ev.stopImmediatePropagation();
     // Entries above where the browser landed have been popped (one, for a single back).
     const popped = layerEntries.filter((entry) => landed === null || entry.id > landed);
@@ -482,14 +532,15 @@ function pageWaitLandings(): (() => Element | null | undefined)[] {
  *              (断网遮罩只有「重试」一条路),给它接上 Esc 等于凭空造出一个
  *              用户以为处理了、其实什么都没处理的出口。不传则 Esc 不做任何事,
  *              但 Tab 陷阱与焦点归还照常。
- * @param nativeBack 在当前原生页面启用 Android 返回键,仅取消最上层可见弹层。
+ * @param nativeBack 在当前原生页面启用 Android 返回键,仅取消最上层可见弹层。默认开启:能关的弹层都先吃掉系统返回
+ *             (02 §2.7、03 §3.5),close 里的提交守卫照旧;只有确有理由不接系统返回的弹层才显式传 false 并写明原因。
  * @param nativePriority 全局遮罩的既有视觉层级;同级弹层按打开顺序处理。
  */
 export function useDialogA11y(
   open: Ref<boolean>,
   root: string | (() => HTMLElement | null | undefined),
   close?: () => void,
-  nativeBack = false,
+  nativeBack = true,
   nativePriority = 0,
 ): void {
   // #ifdef APP-PLUS
