@@ -1747,10 +1747,13 @@ const revokeAllRowStyle: CSSProperties = {
   minHeight: "52px",
   borderTop: "1px solid var(--v5-border)",
 };
+// Signing out every other device is a reverse action (user): quiet secondary-ink text; the confirm stays.
 const revokeAllLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-body)",
-  color: "var(--v5-danger)",
+  fontSize: "var(--ui-type-text-link)",
+  lineHeight: "var(--ui-type-text-link-lh)",
+  fontWeight: 400,
+  color: "var(--v5-ink-3)",
 };
 const loadMoreRowStyle: CSSProperties = { minHeight: "44px", marginTop: "var(--v5-space-1)" };
 const loadMoreLabelStyle: CSSProperties = {
