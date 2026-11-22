@@ -32,16 +32,23 @@ const eventRefusals: Record<string, EventCommandFailure> = {
   EVENT_NOT_CLAIMABLE: "notClaimable", EVENT_ALREADY_CLAIMED: "claimed", EVENT_NOT_OPEN: "notOpen", EVENT_REGION_NOT_ELIGIBLE: "notEligible",
   EVENT_BUDGET_EXHAUSTED: "budget", COVERAGE_REDLINE: "generic", EVENT_REMINDER_NOT_AVAILABLE: "reminder",
 };
-export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "notOpen" | "notEligible" | "budget" | "reminder" | "generic";
+export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "notOpen" | "notEligible" | "budget" | "reminder" | "notRun" | "generic";
 /** "unknown" only when the command may have run (network loss, timeout, gateway 5xx, unreadable reply); otherwise the reason to show. */
 export function eventCommandFailure(cause: unknown): EventCommandFailure {
   const error = asApiError(cause);
   const status = error.kind === "business" ? error.code : error.status;
   const refusal = eventRefusals[error.message];
   if (refusal && (error.kind === "business" || error.kind === "http") && status !== undefined && status >= 400 && status < 500) return refusal;
-  // A 503 the app server returned itself (its envelope carries the code) means the command was not run.
-  if (error.kind === "http" && error.status === 503 && error.code === 503) return "generic";
+  // A 503 the app server returned itself (its envelope carries the code) means the command was not run: say so and
+  // that the same action can be tried again (06 §6.1).
+  if (error.kind === "http" && error.status === 503 && error.code === 503) return "notRun";
   return isAmbiguousEnvelopeOutcome(error) ? "unknown" : "generic";
+}
+/** The event detail read answered that the event does not exist (404 + EVENT_NOT_FOUND): nothing on it can be confirmed. */
+export function isEventNotFound(cause: unknown): boolean {
+  const error = asApiError(cause);
+  const status = error.kind === "business" ? error.code : error.status;
+  return error.message === "EVENT_NOT_FOUND" && (error.kind === "business" || error.kind === "http") && status === 404;
 }
 export function eventDetailAction(detail: EventDetail): "join" | "claim" | "open" | "remind" | null {
   if (detail.eligible && detail.userStatus === "CLAIMABLE") return "claim";
