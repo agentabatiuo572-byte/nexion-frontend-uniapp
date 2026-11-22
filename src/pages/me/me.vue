@@ -111,7 +111,7 @@ import { subscribeRuntimeRevision } from "@/api/order-api";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { settleRemoteMeLoaders } from "@/lib/remote-me-refresh";
 import { revalidateProductCatalog } from "@/store/product-catalog";
-import { earningsReleaseStatus, ensureEarningsReleaseStatus } from "@/store/earning-release";
+import { earningsReleaseStatus, ensureEarningsReleaseStatus, refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { compiledResourceVersion, formatResourceVersion, readNativeResourceVersion } from "@/lib/app-version";
 
 const versionFooter = ref("UVEL");
@@ -392,7 +392,7 @@ async function refreshRemoteTrial() {
   return trial.refreshVisible(true);
 }
 
-async function refreshRemoteMe() {
+async function refreshRemoteMe(explicit = false) {
   if (!remoteApiEnabled || !remoteMeActive.value || !foregroundReadAllowed()) return;
   await settleRemoteMeLoaders([
     ["profile-avatar", () => profile.ensureAvatar()],
@@ -403,7 +403,8 @@ async function refreshRemoteMe() {
       await revalidateProductCatalog();
       await Promise.all([
         app.remoteFleetStatus !== "error" ? app.ensureRemoteFleet() : undefined,
-        earningsReleaseStatus.value !== "error" ? ensureEarningsReleaseStatus() : undefined,
+        earningsReleaseStatus.value === "error" ? undefined
+          : explicit ? refreshEarningsReleaseStatus() : ensureEarningsReleaseStatus(),
       ]);
     }],
     ["funds", refreshRemoteFunds],
@@ -431,15 +432,15 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (remoteApiEnabled && remoteMeActive.value && foregroundReadAllowed()) void refreshVisibleMe();
 });
 let releaseActiveRefresh = () => {};
-async function refreshVisibleMe() {
+async function refreshVisibleMe(explicit = false) {
   if (!remoteMeActive.value || !foregroundReadAllowed()) return;
-  await Promise.allSettled([refreshPaymentPassword(), refreshRemoteMe()]);
+  await Promise.allSettled([refreshPaymentPassword(), refreshRemoteMe(explicit)]);
 }
 onShow(() => {
   meEntryReadPending = true;
   remoteMeActive.value = true;
   releaseActiveRefresh();
-  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleMe);
+  releaseActiveRefresh = registerActivePageRefresh(() => refreshVisibleMe(true));
 });
 watch([remoteMeActive, foregroundReadAllowed], ([active, allowed]) => {
   if (!active || !allowed || !meEntryReadPending) return;
@@ -456,7 +457,6 @@ onHide(() => {
 const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled) return;
   invalidatePassiveTabRead("orders");
-  invalidatePassiveTabRead("earning-release");
   remoteOrdersRequest += 1;
   if (remoteMeActive.value && foregroundReadAllowed() && binarySessionReady({
     remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
@@ -464,7 +464,6 @@ const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
     sessionUserId: sessionVault.read()?.user.userId ?? null,
   })) {
     void refreshRemoteOrders(true);
-    void ensureEarningsReleaseStatus().catch(() => undefined);
   }
 });
 onUnmounted(() => {
