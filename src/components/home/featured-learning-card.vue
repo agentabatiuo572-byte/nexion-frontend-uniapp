@@ -95,7 +95,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { v
 .learning-progress-label { margin-right:auto; font-size:12px; color:var(--v5-ink-3); }
 .learning-action { font-size:12px; font-weight:600; color:var(--v5-brand); }
 .learning-card--mission { box-shadow:var(--v5-glass-shadow); display: flex; align-items: center; gap: 14px; padding: var(--v5-space-4); background: var(--v5-surface); }
-.learning-card__body { min-width: 0; flex: 1; }.learning-card--mission :deep(.growth-progress__center) { font: 500 11px/14px var(--font-metric); }
+.learning-card__body { min-width: 0; flex: 1; }.learning-card--mission :deep(.growth-progress__center) { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); }
 .learning-card--mission .learning-title { margin-top: var(--v5-space-1) !important; font: 600 16px/22px var(--font-v5); }.learning-card--mission .learning-meta { margin-top: 2px; line-height:16.5px; }
 .learning-card--mission .learning-progress, .learning-card--mission .learning-progress-label { display: none; }.learning-card--mission .learning-footer { margin-top: var(--v5-space-2); }
 /* Text beside the action while it fits in about two lines; when the action would squeeze it narrower than 128px (long

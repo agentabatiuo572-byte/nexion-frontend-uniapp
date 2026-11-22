@@ -660,7 +660,7 @@ useAutoRecovery({
 .team-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); }
 .team-section-meta { font: 400 12px/1.4 var(--font-v5); color: var(--v5-ink-3); }
 .team-estimate { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-.team-estimate__label { font: 400 11px/1.4 var(--font-v5); color: var(--v5-ink-3); }
+.team-estimate__label { font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 /* Reward cards (P-41): flat surface with a faint accent tint, accent icon and a mini visual. */
 .team-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-inline); }
 .team-bento__card { --accent: var(--v5-brand); position: relative; display: flex; flex-direction: column; gap: var(--ui-space-inline); min-width: 0; min-height: 168px; box-sizing: border-box; padding: var(--ui-space-inset); overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
@@ -713,7 +713,7 @@ useAutoRecovery({
 .team-bento__ring-value { font: 600 15px/18px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 /* "Unlocks at V2" is words, not a figure: text face at 12px so a long word (ru «откроется») fits the 68px hole whole. */
 .team-bento__ring-value--text { font: 600 12px/16px var(--font-v5); }
-.team-bento__ring-label { font: 500 11px/14px var(--font-v5); color: var(--v5-ink-3); }
+.team-bento__ring-label { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .team-bento__pool .team-estimate { align-items: flex-start; gap: 2px; }
 /* More tools: four glass icon buttons in one row. */
 .team-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--v5-space-2); }

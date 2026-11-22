@@ -547,7 +547,7 @@ const gateMetaStyle: CSSProperties = {
 .product-card--compact .product-art-entry { display:flex; align-items:center; justify-content:center; padding:0; }
 .product-card--compact .product-art { position:relative !important; inset:auto !important; width:min(172px,100%) !important; height:auto !important; aspect-ratio:1; max-width:172px; margin:0; animation-name:product-compact-float; animation-duration:4.2s; }
 @keyframes product-compact-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
-.product-card--compact .product-ribbon { top:0 !important; left:0 !important; padding:2px 9px !important; border-radius:0 0 6px 0 !important; background:var(--v5-brand) !important; color:var(--v5-on-brand) !important; font:500 11px/16px var(--font-v5) !important; }
+.product-card--compact .product-ribbon { top:0 !important; left:0 !important; padding:2px 9px !important; border-radius:0 0 6px 0 !important; background:var(--v5-brand) !important; color:var(--v5-on-brand) !important; font:var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5) !important; }
 .product-compact-body { flex:1; display:flex; flex-direction:column; padding:10px 14px 14px; }
 .product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
 .product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }

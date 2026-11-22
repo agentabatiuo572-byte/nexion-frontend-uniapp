@@ -88,10 +88,10 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__image-badge { position:absolute; right:2px; top:2px; padding:1px 2px; border-radius:4px; background:var(--v5-brand); color:var(--v5-on-brand); font:500 9px/11px var(--font-v5); white-space:nowrap; }
 .trial-device-row__identity { min-width:0; flex:1; }
 .trial-device-row__name { display:block; font:600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); overflow-wrap:break-word; }
-.trial-device-row__status { display:block; margin-top:4px; color:var(--v5-ink-3); font:400 clamp(11px,3.08vw,12px)/18px var(--font-v5); }
+.trial-device-row__status { display:block; margin-top:4px; color:var(--v5-ink-3); font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .trial-device-row__status--online::before { content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:var(--v5-success); vertical-align:1px; }
 .trial-device-row__summary { display:flex; align-items:center; gap:8px; min-width:0; max-width:152px; }
-.trial-device-row__time { min-width:0; text-align:right; color:var(--v5-ink-3); font:400 clamp(11px,3.08vw,12px)/1.4 var(--font-v5); }
+.trial-device-row__time { min-width:0; text-align:right; color:var(--v5-ink-3); font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-device-row__time > text { display:block; overflow-wrap:break-word; }
 .trial-device-row__remaining { margin-top:4px; color:var(--v5-ink); font:600 clamp(12px,3.6vw,14px)/1.35 var(--font-v5); font-variant-numeric:tabular-nums; }
 .trial-device-row__chevron { display:grid; place-items:center; flex:none; width:28px; height:28px; border-radius:var(--v5-radius-full); background:var(--v5-surface-2); color:var(--v5-ink-3); }
@@ -103,7 +103,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__progress { height:5px; margin-top:8px; overflow:hidden; border-radius:var(--v5-radius-full); background:var(--v5-surface-3); }
 .trial-device-row__progress > view { height:100%; border-radius:inherit; background:var(--v5-brand); }
 .trial-device-row__estimate { margin-top:6px; }
-.trial-device-row__note { display:block; margin-top:8px; font:400 11px/17px var(--font-v5); color:var(--v5-ink-3); }
+.trial-device-row__note { display:block; margin-top:8px; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .trial-device-row__actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 8px; margin-top:8px; }
 /* Keep the mobile hit area while the visible pill remains a compact 32px. */
 .trial-device-row__actions > view { position:relative; display:inline-flex; flex:0 1 auto; align-items:center; justify-content:center; min-height:44px; max-width:100%; box-sizing:border-box; padding:8px 12px; border-radius:var(--v5-radius-full); font:500 clamp(12px,3.34vw,13px)/18px var(--font-v5); text-align:center; }
@@ -184,11 +184,11 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
   .trial-device-row--earn .trial-device-row__art,.trial-device-row--earn .trial-device-row__image { width:44px; }
   .trial-device-row__summary { gap:4px; max-width:112px; }
   .trial-device-row--home .trial-device-row__summary { gap:4px; max-width:92px; }
-  .trial-device-row--home .trial-device-row__time { font-size:11px; line-height:1.2; }
+  .trial-device-row--home .trial-device-row__time { font-size:var(--ui-type-meta); line-height:var(--ui-type-meta-lh); }
   .trial-device-row--home .trial-device-row__remaining { font-size:12px; line-height:1.2; }
   .trial-device-row--home .trial-device-row__name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .trial-device-row--home .trial-device-row__status { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .trial-device-row--inventory .trial-device-row__time { font-size:11px; line-height:1.2; }
+  .trial-device-row--inventory .trial-device-row__time { font-size:var(--ui-type-meta); line-height:var(--ui-type-meta-lh); }
   .trial-device-row--inventory .trial-device-row__remaining { font-size:12px; line-height:1.2; }
 }
 @media (prefers-reduced-motion:reduce) { .trial-device-row__chevron svg { transition:none; } .trial-device-row__progress > view { animation:none; } }

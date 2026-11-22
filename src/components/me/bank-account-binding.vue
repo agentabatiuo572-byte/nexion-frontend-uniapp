@@ -399,7 +399,7 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .rule-text { color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
 .steps2 { display: flex; align-items: center; gap: 10px; margin: -4px 4px 0; }
 .steps2__on { display: inline-flex; align-items: center; gap: 8px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); }
-.steps2__i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-brand); color: var(--v5-on-brand); font: 600 11px/1 var(--font-metric); }
+.steps2__i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 var(--ui-type-meta)/1 var(--font-metric); }
 .steps2__ln { flex: 1; height: 2px; border-radius: 2px; background: var(--v5-surface-3); }
 .steps2__off { width: 10px; height: 10px; border-radius: 50%; background: var(--v5-ink-4); }
 /* Change/first form: label above, input in a recessed well (the .field height contract stays 44px inside). */

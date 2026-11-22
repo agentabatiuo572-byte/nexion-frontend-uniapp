@@ -1102,7 +1102,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-fact > .nx-bank-k { padding-top: 3px; }
 .nx-bank-fact + .nx-bank-fact { padding-left: 12px; border-left: 1px solid var(--v5-border); }
 .nx-bank-fact__v { display: block; margin-top: 4px; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: 400 11px/16px var(--font-metric); white-space: nowrap; }
+.nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
 .nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-bank-hint > svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
 /* Hosted payment: countdown ring on the glass slab, order summary card. */

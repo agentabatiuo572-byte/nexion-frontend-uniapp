@@ -15,7 +15,7 @@ import { computed, type CSSProperties } from "vue";
 const props = defineProps<{ label: string; value: string; big?: boolean }>();
 
 const valueStyle = computed<CSSProperties>(() => ({
-  fontSize: props.big ? "18px" : "13.5px",
+  fontSize: props.big ? "18px" : "var(--ui-type-list-subtitle)",
   fontWeight: props.big ? 600 : 500,
   // big total stays full ink; normal rows use ink/90 (source).
   color: props.big ? "var(--v5-ink)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
