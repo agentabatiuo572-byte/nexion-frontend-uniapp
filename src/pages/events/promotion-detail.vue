@@ -59,7 +59,8 @@
             <view class="lp-rule__row">
               <view class="lp-rule__art">
                 <CatalogMachineImage v-if="ticket.giftSku" class="lp-fill" :sku="ticket.giftSku" :image-url="productImage(ticket.giftSku)" :scope-key="activity.activityId + ':' + ticket.id + ':gift'" />
-                <view v-else class="lp-coin lp-coin--small" :class="ticket.parts.asset === 'UVT' ? 'lp-coin--uvt' : 'lp-coin--usdt'" aria-hidden="true"><text>{{ ticket.parts.asset === 'UVT' ? 'U' : '$' }}</text></view>
+                <view v-else-if="ticket.parts.asset === 'UVT'" class="lp-uvt lp-uvt--small"><UvtCoin /></view>
+                <view v-else class="lp-coin lp-coin--small lp-coin--usdt" aria-hidden="true"><text>$</text></view>
               </view>
               <view class="lp-rule__copy"><text class="lp-field">{{ ticket.getLabel }}</text><text class="lp-rule__name lp-rule__name--gift">{{ ticket.getName }}</text></view>
               <text v-if="ticket.getQty" class="lp-rule__qty">{{ ticket.getQty }}</text>
@@ -109,7 +110,8 @@
               </view>
             </view>
             <view class="lp-ticket__stub">
-              <view v-if="firstTicket.parts.asset !== 'DEVICE'" class="lp-coin" :class="[firstTicket.muted ? 'lp-coin--muted' : firstTicket.parts.asset === 'UVT' ? 'lp-coin--uvt' : 'lp-coin--usdt', { 'lp-pop': !firstTicket.muted }]" aria-hidden="true"><svg v-if="firstTicket.parts.asset === 'UVT'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 6v6.5a4.5 4.5 0 0 0 9 0V6" /></svg><text v-else>$</text></view>
+              <view v-if="firstTicket.parts.asset === 'UVT'" class="lp-uvt" :class="{ 'lp-pop': !firstTicket.muted }"><UvtCoin :muted="firstTicket.muted" /></view>
+              <view v-else-if="firstTicket.parts.asset !== 'DEVICE'" class="lp-coin" :class="[firstTicket.muted ? 'lp-coin--muted' : 'lp-coin--usdt', { 'lp-pop': !firstTicket.muted }]" aria-hidden="true"><text>$</text></view>
               <view v-else-if="firstTicket.giftSku" class="lp-ticket__gift lp-pop"><CatalogMachineImage class="lp-fill" :sku="firstTicket.giftSku" :image-url="productImage(firstTicket.giftSku)" :scope-key="activity.activityId + ':first-gift'" /></view>
               <text v-if="firstTicket.muted" class="lp-ticket__unavailable">{{ c.notAvailable }}</text>
               <view v-else class="lp-ticket__limit"><text class="lp-field">{{ c.perPerson }}</text><text class="lp-ticket__limit-value">{{ firstTicket.limit }}</text></view>
@@ -169,7 +171,7 @@
               </view>
               <view class="lp-flow__path"><view class="lp-flow__dash" /><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg></view>
               <view class="lp-flow__end">
-                <view class="lp-flow__art lp-flow__art--reward"><view class="lp-flow__floor lp-flow__floor--reward" /><CatalogMachineImage v-if="ticket.giftSku" class="lp-fill" :sku="ticket.giftSku" :image-url="productImage(ticket.giftSku)" :scope-key="activity.activityId + ':' + ticket.id + ':gift'" /><view v-else class="lp-coin lp-pop" :class="ticket.parts.asset === 'UVT' ? 'lp-coin--uvt' : 'lp-coin--usdt'"><text>{{ ticket.parts.asset === 'UVT' ? 'U' : '$' }}</text></view></view>
+                <view class="lp-flow__art lp-flow__art--reward"><view class="lp-flow__floor lp-flow__floor--reward" /><CatalogMachineImage v-if="ticket.giftSku" class="lp-fill" :sku="ticket.giftSku" :image-url="productImage(ticket.giftSku)" :scope-key="activity.activityId + ':' + ticket.id + ':gift'" /><view v-else-if="ticket.parts.asset === 'UVT'" class="lp-uvt lp-uvt--flow lp-pop"><UvtCoin /></view><view v-else class="lp-coin lp-pop lp-coin--usdt"><text>$</text></view></view>
                 <view v-if="ticket.parts.asset !== 'DEVICE'" class="lp-flow__reward"><text class="lp-amount lp-flow__amount">{{ ticket.parts.asset === 'DISCOUNT' ? '−' : '+' }}{{ ticket.parts.amount }}</text><text class="lp-flow__unit" :class="{ 'lp-unit--uvt': ticket.parts.asset === 'UVT' }">{{ ticket.parts.unit }}</text></view>
                 <text v-else class="lp-flow__name">{{ ticket.getName }}</text>
                 <text class="lp-flow__meta">{{ ticket.getLabel }}</text>
@@ -275,6 +277,7 @@ import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
 import PromotionTerms from '@/components/promotion/promotion-terms.vue';
 import SharePosterSheet from '@/components/team/share-poster-sheet.vue';
+import UvtCoin from '@/components/ui/uvt-coin.vue';
 import { useDataVisibility } from '@/store/data-visibility';
 import { promotionApi, remoteApiEnabled, sessionVault } from '@/api/runtime';
 import type { PublicPromotion, PublicPurchaseRule, ReferralProgress } from '@/api/promotion-contracts';
@@ -756,6 +759,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 /* Reward coins: UVT purple stays a flat identifier (01.1.2); the glyph is white in both themes, as on the wallet coins. */
 .lp-coin { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; color: white; font: 500 22px/1 var(--font-amount); font-variant-numeric: tabular-nums; box-shadow: inset 0 2px 4px color-mix(in srgb, white 35%, transparent), inset 0 -3px 6px color-mix(in srgb, black 18%, transparent); }
 .lp-coin--small { width: 40px; height: 40px; font-size: 17px; }
+/* UVT rewards use the shared UVT coin (uvt-coin.vue), sized here. */
+.lp-uvt { position: relative; flex: none; width: 52px; height: 52px; }
+.lp-uvt--small { width: 40px; height: 40px; }
+.lp-uvt--flow { width: 64px; height: 64px; }
 .lp-coin--uvt { background: var(--v5-nex); }
 .lp-coin--usdt { background: var(--v5-warning); }
 .lp-coin--muted { background: var(--v5-surface-3); color: var(--v5-ink-4); box-shadow: none; }
