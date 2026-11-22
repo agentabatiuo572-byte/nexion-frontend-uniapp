@@ -31,10 +31,10 @@
       </view>
 
       <view v-if="!claimState.empty" style="margin-top: 10px">
-        <view v-if="!missionLayout && !liteGroupUnavailable" ref="elRef" style="height: 6px; border-radius: var(--v5-radius-full); overflow: hidden; background: var(--v5-surface-2); position: relative">
+        <view v-if="!missionLayout" ref="elRef" style="height: 6px; border-radius: var(--v5-radius-full); overflow: hidden; background: var(--v5-surface-2); position: relative">
           <view v-if="!visibility.hidden" :style="barStyle" />
         </view>
-        <view v-if="missionLayout && !liteGroupUnavailable" class="newcomer-task__segments" role="progressbar" :aria-label="t.home.dayOneFirstDayReward" :aria-valuenow="visibility.hidden || questUnavailable ? undefined : completedCount" aria-valuemin="0" :aria-valuemax="total">
+        <view v-if="missionLayout" class="newcomer-task__segments" role="progressbar" :aria-label="t.home.dayOneFirstDayReward" :aria-valuenow="visibility.hidden || questUnavailable ? undefined : completedCount" aria-valuemin="0" :aria-valuemax="total">
           <view v-for="(_, segment) in tasks" :key="segment" :class="{'newcomer-task__segment--done': !visibility.hidden && !questUnavailable && segment < completedCount}" :style="{animationDelay: segment * 40 + 'ms'}" />
         </view>
         <view class="newcomer-task__progress-copy" style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
@@ -49,7 +49,7 @@
 
       <!-- 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 12+12 -->
       <text v-if="claimState.empty" class="block" style="margin-top:var(--v5-space-3);color:var(--v5-ink-3);font-size:var(--ui-type-list-subtitle)">{{ t.home.dayOneNoActiveTasks }}</text>
-      <view v-if="expanded && !claimState.empty && !liteGroupUnavailable" style="margin-top: var(--v5-space-6); display: flex; flex-direction: column; gap: var(--v5-space-1)">
+      <view v-if="expanded && !claimState.empty" style="margin-top: var(--v5-space-6); display: flex; flex-direction: column; gap: var(--v5-space-1)">
         <text v-if="!missionLayout && remoteApiEnabled && !questUnavailable && !claimState.unverified && !claimState.claimed && !dayOneExpired" class="newcomer-task__reward-hint">{{ t.home.dayOneCompleteAllHint }}</text>
         <view
           v-for="task in tasks"
@@ -73,7 +73,8 @@
           </view>
           <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
             <text class="truncate" :style="labelStyle(task)">{{ task.label }}</text>
-            <text :style="catStyle(task)">{{ task.cat }}</text>
+            <NxTag v-if="task.appOnly && !isDone(task)" :label="t.home.dayOneAppOnlyTag" />
+            <text v-else :style="catStyle(task)">{{ task.cat }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -81,6 +82,14 @@
               <path d="M9 18l6-6-6-6" />
             </svg>
           </view>
+        </view>
+      </view>
+      <!-- Lite: tasks the web cannot do stay in the list; finishing them needs the App. -->
+      <view v-if="expanded && appOnlyPending" class="nx-card-footer newcomer-task__app">
+        <text class="nx-card-footer__note">{{ t.home.dayOneAppOnlyNote }}</text>
+        <view v-if="appDownloadHref" class="nx-card-action" role="link" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
+          @click="openAppDownload" @keydown.enter.prevent="openAppDownload">
+          <text class="nx-after-external">{{ t.home.dayOneAppDownload }}</text>
         </view>
       </view>
     </view>
@@ -129,6 +138,8 @@
 import { isLiteQuest } from "@/lib/lite-scope";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import { appDownloadUrl } from "@/lib/app-download-url";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { isStakingVisibilityRoute, navTo } from "@/lib/route";
@@ -162,6 +173,8 @@ interface QuestTask {
    *  brand 随主题翻转 → 必须配同样翻转的 on-brand。用错会在某一主题糊掉。 */
   onColor: string;
   eligible: boolean;
+  /** Lite: a phone task the web cannot do; it is listed but finished in the App. */
+  appOnly?: boolean;
 }
 
 const visibility = useDataVisibility();
@@ -212,8 +225,7 @@ const remoteTasks = computed<QuestTask[]>(() => {
     { color: "var(--v5-brand)", onColor: "var(--v5-on-brand)" },
   ];
   return dayOneRows.value
-    .filter((row) => isLiteQuest(row)
-      && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(row.actionRoute)))
+    .filter((row) => stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(row.actionRoute))
     .map((row, index) => ({
       id: row.questCode,
       order: index + 1,
@@ -222,16 +234,13 @@ const remoteTasks = computed<QuestTask[]>(() => {
       href: row.actionRoute,
       cat: categoryLabel(row.category),
       eligible: row.eligible,
+      appOnly: !isLiteQuest(row),
       ...palette[index % palette.length],
     }));
 });
-// Lite: a Day-One group that still contains web-unavailable (phone) tasks cannot be completed or claimed here.
-const liteGroupUnavailable = computed(() => remoteApiEnabled && quest.remoteStatus === "ready"
-  && dayOneRows.value.some((row) => !isLiteQuest(row)));
-const questUnavailable = computed(() => remoteApiEnabled && (quest.remoteStatus !== "ready" || liteGroupUnavailable.value));
+const questUnavailable = computed(() => remoteApiEnabled && quest.remoteStatus !== "ready");
 const questLoadError = computed(() => remoteApiEnabled && quest.remoteStatus === "error");
-const unavailableLabel = computed(() => liteGroupUnavailable.value ? t.value.home.dayOneLiteUnavailable
-  : questLoadError.value ? t.value.home.dayOneUnavailable : t.value.home.dayOneLoading);
+const unavailableLabel = computed(() => questLoadError.value ? t.value.home.dayOneUnavailable : t.value.home.dayOneLoading);
 const tasks = computed<QuestTask[]>(() => selectHomeQuestRows(
   remoteApiEnabled,
   quest.remoteStatus === "ready",
@@ -290,7 +299,6 @@ const taskCountText = computed(() => questUnavailable.value
   : fmt(t.value.home.dayOneTaskCount, { n: visibility.mask(total.value) }));
 const toggleLabel = computed(() => questLoadError.value
   ? t.value.home.dayOneRetryLoad
-  : liteGroupUnavailable.value ? t.value.home.dayOneUnavailable
   : questUnavailable.value ? t.value.home.dayOneLoading
   : expanded.value ? t.value.home.dayOneHideTasks : viewTasksText.value);
 const rewardText = computed(() => {
@@ -325,7 +333,14 @@ function onClaim() {
 }
 
 function isActionable(task: QuestTask) {
-  return task.eligible && !dayOneExpired.value && !isDone(task);
+  return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task);
+}
+
+const appOnlyPending = computed(() => !dayOneExpired.value && tasks.value.some((task) => task.appOnly && task.eligible && !isDone(task)));
+const appDownloadHref = computed(() => appDownloadUrl(stakingDisplay.config.share.appDownload.officialUrl));
+function openAppDownload() {
+  if (!props.active || !appDownloadHref.value) return;
+  window.location.assign(appDownloadHref.value);
 }
 
 function onRowTap(task: QuestTask) {
@@ -439,6 +454,7 @@ const toggleStyle: CSSProperties = {
 </script>
 
 <style scoped>
+.newcomer-task__app { margin-top: var(--v5-space-3); }
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
 .newcomer-task__observation-item { margin-top: var(--v5-space-2); }

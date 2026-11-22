@@ -1374,9 +1374,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(now+(state.taskState==='expired'?-1000:5*day)).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
     if(state.scopeState==='mixed' && data.quests.length) {
       const sample=data.quests[0];
+      // The Day-One phone tasks are still to do on the web (Lite lists them and points to the App).
+      const phonePending=['CLAIMED','EXPIRED'].includes(sample.status)?{}:{status:'PENDING'};
       data.quests.push(
-        {...sample,questCode:'connect_phone',name:localized(contentLocale,'连接手机','Connect a phone','Kết nối điện thoại'),actionRoute:'/pages/onboarding/connect'},
-        {...sample,questCode:'activate_phone',name:localized(contentLocale,'激活手机','Activate a phone','Kích hoạt điện thoại'),actionRoute:'/pages/me/devices'},
+        {...sample,questCode:'connect_phone',name:localized(contentLocale,'连接手机','Connect a phone','Kết nối điện thoại'),actionRoute:'/pages/onboarding/connect',...phonePending},
+        {...sample,questCode:'activate_phone',name:localized(contentLocale,'激活手机','Activate a phone','Kích hoạt điện thoại'),actionRoute:'/pages/me/devices',...phonePending},
         {...sample,questCode:'day_one_staking',name:localized(contentLocale,'了解质押','Explore staking','Tìm hiểu staking'),actionRoute:'/pages/staking/staking'},
         {...sample,layer:'WEEKLY_T1',instanceKey:'WEEK:demo',questCode:'weekly_buy_phone',name:localized(contentLocale,'购买手机','Buy a phone','Mua điện thoại'),actionRoute:'/pages/store/store'},
         {...sample,layer:'WEEKLY_T2',instanceKey:'WEEK:demo',questCode:'weekly_staking',name:localized(contentLocale,'每周质押','Weekly staking','Staking hàng tuần'),actionRoute:'/pages/staking/staking'});
