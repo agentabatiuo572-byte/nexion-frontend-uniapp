@@ -2797,7 +2797,7 @@ function resumeCheckoutAfterCapacity(target: string) {
   keepCheckoutRecovery.value = null;
   const sheet = tradein.state;
   if (sheet.kind === "keep-recovery" && sheet.targetKind === target) tradein.hide();
-  refreshVisibleCheckout();
+  refreshVisibleCheckout(false, "read-only");
 }
 const stopCheckoutCapacityRelease = onPurchaseRecordReleased((accountKey, commandKey) => {
   const recovery = keepCheckoutRecovery.value;
@@ -2870,15 +2870,15 @@ function reassertTradeinContext() {
   else tradein.clearApplied(tradeinOwner);
 }
 
-async function resumeReadyCheckout(scope: CheckoutRouteScope, catalogRead: Promise<boolean>) {
+async function resumeReadyCheckout(scope: CheckoutRouteScope, catalogRead: Promise<boolean>, mode: CheckoutLoadMode) {
+  if (mode === "entry" && await resumeServerOrder(scope)) return;
   if (await catalogRead && isCurrentCheckoutRoute(scope) && ordinaryCheckoutInitialized.value
     && !activeSession.value && checkoutCapacityRequired.value) {
     await fireTradeinIntercept();
   }
 }
 
-// True route entry is initialized by onLoad. Visibility refreshes only read.
-function refreshVisibleCheckout(retryCatalog = false) {
+function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "entry") {
   if (activeCheckoutLoad) {
     // An explicit catalog retry may replace the read the initialization owns.
     if (retryCatalog) void refreshProductCatalog(true);
@@ -2890,8 +2890,8 @@ function refreshVisibleCheckout(retryCatalog = false) {
   }
   // An original payment can finish before the ordinary checkout reaches eligibility.
   if (!quantityReady.value || (!ordinaryCheckoutInitialized.value && !activeSession.value)) {
-    void initializeCheckout(beginCheckoutRoute(), "read-only");
-  } else void resumeReadyCheckout(captureCheckoutRoute(), settleProductCatalogRefresh(refreshProductCatalog(true)));
+    void initializeCheckout(beginCheckoutRoute(), mode);
+  } else void resumeReadyCheckout(captureCheckoutRoute(), settleProductCatalogRefresh(refreshProductCatalog(true)), mode);
 }
 
 function showCheckout() {
