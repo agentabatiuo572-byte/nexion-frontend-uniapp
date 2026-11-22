@@ -2,7 +2,8 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { LocaleCode } from "@/i18n";
 import { i18nApi, remoteApiEnabled } from "@/api/runtime";
-import { runForegroundStoreRead } from "@/lib/passive-tab-read";
+import { invalidateBeforePassiveTabRead, rememberPassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 
 export type I18nRuntimeStatus = "fallback" | "loading" | "ready" | "stale";
 
@@ -46,6 +47,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
   const fetchedAt = ref<Partial<Record<LocaleCode, number>>>({});
   const status = ref<Partial<Record<LocaleCode, I18nRuntimeStatus>>>({});
   const error = ref<Partial<Record<LocaleCode, string>>>({});
+  const retryableError = ref<Partial<Record<LocaleCode, boolean>>>({});
   const inFlight = new Map<LocaleCode, Promise<void>>();
   let prepared = false;
 
@@ -72,6 +74,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
     if (!force && status.value[locale] === "ready" && age < CACHE_MAX_AGE_MS) return;
     const pending = inFlight.get(locale);
     if (pending) return pending;
+    invalidateBeforePassiveTabRead("i18n-runtime");
     status.value[locale] = "loading";
     const request = i18nApi.all(locale)
       .then((bundle) => {
@@ -80,6 +83,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
         fetchedAt.value[locale] = now;
         error.value[locale] = "";
         status.value[locale] = "ready";
+        retryableError.value[locale] = false;
         const cached = loadCache();
         cached[locale] = { locale, messages: { ...bundle.messages }, fetchedAt: now };
         saveCache(cached);
@@ -87,12 +91,13 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
       .catch((cause: unknown) => {
         error.value[locale] = cause instanceof Error ? cause.message : "I18N_BUNDLE_UNAVAILABLE";
         status.value[locale] = bundles.value[locale] ? "stale" : "fallback";
+        retryableError.value[locale] = isTransientReadFailure(cause);
       })
       .finally(() => {
         if (inFlight.get(locale) === request) inFlight.delete(locale);
       });
     inFlight.set(locale, request);
-    return request;
+    return rememberPassiveTabRead("i18n-runtime", request, locale, undefined, () => status.value[locale] === "ready");
   }
 
   function messages(locale: LocaleCode): Readonly<Record<string, string>> {
@@ -104,9 +109,10 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
   }
 
   function ensure(locale: LocaleCode): Promise<void> {
-    return runForegroundStoreRead("i18n-runtime", () => refresh(locale, true), locale,
-      () => status.value[locale] === "ready");
+    if (retryableError.value[locale]) return inFlight.get(locale) ?? Promise.resolve();
+    return runPassiveTabRead("i18n-runtime", () => refresh(locale, true), locale,
+      () => status.value[locale] === "ready", 30_000);
   }
 
-  return { bundles, fetchedAt, status, error, prepare, refresh, ensure, messages };
+  return { bundles, fetchedAt, status, error, retryableError, prepare, refresh, ensure, messages };
 });

@@ -2,6 +2,7 @@
 import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { refreshActivePage } from "@/lib/active-page-refresh";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
@@ -78,7 +79,7 @@ import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-ca
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { installFieldNaming } from "@/lib/a11y-field-label";
 import { ensureEarnConfig } from "@/store/earn-config";
-import { ensureServerProductPhase } from "@/store/server-product-phase";
+import { ensureServerProductPhase, refreshServerProductPhase, serverProductPhaseState } from "@/store/server-product-phase";
 import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
 import { useMarket } from "@/store/market";
@@ -459,11 +460,32 @@ function installForegroundReadSignals() {
     if (!remoteApiEnabled) return;
     if (allowed) {
       if (!wasAllowed && canRunBusinessLoops()) maintainRemoteSession(true);
-      runScheduledReads(readCurrentRoute(), online && !wasOnline);
+      const reconnected = online && !wasOnline;
+      if (reconnected) {
+        const locale = useLocaleStore().code;
+        const i18n = useI18nRuntime();
+        // A failed resource already has a reconnect retry in useAutoRecovery.
+        if (!serverProductPhaseState.retryableError) void refreshServerProductPhase(true);
+        if (!i18n.retryableError[locale]) void i18n.refresh(locale, true);
+      }
+      runScheduledReads(readCurrentRoute(), reconnected);
     } else {
       scheduledReadBinding = "";
       stopBusinessLoops();
     }
+  });
+}
+
+if (remoteApiEnabled) {
+  useAutoRecovery({
+    failed: () => serverProductPhaseState.retryableError,
+    retry: () => refreshServerProductPhase(true),
+    quiet: true,
+  });
+  useAutoRecovery({
+    failed: () => useI18nRuntime().retryableError[useLocaleStore().code] === true,
+    retry: () => useI18nRuntime().refresh(useLocaleStore().code, true),
+    quiet: true,
   });
 }
 

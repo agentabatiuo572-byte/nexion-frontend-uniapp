@@ -98,6 +98,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { toast } from "@/store/ui";
 import { dateLocale, fmt } from "@/i18n/format";
 import { commerceOrderAmount, commerceOrderTitle } from "@/lib/commerce-review";
@@ -244,7 +245,10 @@ async function refreshOrders() {
   remoteOrdersResolved.value = true;
   remoteOrdersRefreshing.value = false;
 }
-useAutoRecovery({ failed: () => remoteApiEnabled && !remoteOrdersRefreshing.value && ordersReadFailed.value, retry: refreshOrders });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !remoteOrdersRefreshing.value && (ordersReadFailed.value || orders.failedOrderReadbacks.size > 0),
+  retry: () => ordersReadFailed.value ? refreshOrders() : orders.retryOrderReadbacks(() => ordersPageActive && foregroundReadAllowed()),
+});
 async function loadMoreOrders() {
   if (orders.loadingMore || !orders.nextCursor) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };

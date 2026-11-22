@@ -1,4 +1,5 @@
-import { invalidateBeforePassiveTabRead, invalidatePassiveTabRead, rememberPassiveTabRead, runForegroundStoreRead } from "@/lib/passive-tab-read";
+import { invalidateBeforePassiveTabRead, invalidatePassiveTabRead, rememberPassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { reactive } from "vue";
 import { productPhaseApi, remoteApiEnabled } from "@/api/runtime";
 import type { PhaseId } from "./product-phase";
@@ -10,11 +11,13 @@ export const serverProductPhaseState = reactive<{
   phase: PhaseId | null;
   source: string;
   error: string;
+  retryableError: boolean;
 }>({
   status: remoteApiEnabled ? "loading" : "ready",
   phase: null,
   source: remoteApiEnabled ? "" : "local-account-age",
   error: "",
+  retryableError: false,
 });
 
 let refreshInFlight: Promise<boolean> | null = null;
@@ -29,10 +32,12 @@ export function prepareServerProductPhase(): void {
   serverProductPhaseState.phase = null;
   serverProductPhaseState.source = "";
   serverProductPhaseState.error = "";
+  serverProductPhaseState.retryableError = false;
 }
 
 export function ensureServerProductPhase(): Promise<boolean> {
-  return runForegroundStoreRead("product-phase", () => refreshServerProductPhase(true));
+  if (serverProductPhaseState.retryableError) return refreshInFlight ?? Promise.resolve(false);
+  return runPassiveTabRead("product-phase", () => refreshServerProductPhase(true), undefined, undefined, 30_000);
 }
 
 export function refreshServerProductPhase(force = false): Promise<boolean> {
@@ -52,6 +57,7 @@ export function refreshServerProductPhase(force = false): Promise<boolean> {
       serverProductPhaseState.phase = snapshot.phase;
       serverProductPhaseState.source = snapshot.source;
       serverProductPhaseState.status = "ready";
+      serverProductPhaseState.retryableError = false;
       return true;
     })
     .catch((error: unknown) => {
@@ -60,6 +66,7 @@ export function refreshServerProductPhase(force = false): Promise<boolean> {
       serverProductPhaseState.source = "";
       serverProductPhaseState.status = "error";
       serverProductPhaseState.error = error instanceof Error ? error.message : "PRODUCT_PHASE_UNAVAILABLE";
+      serverProductPhaseState.retryableError = isTransientReadFailure(error);
       return false;
     })
     .finally(() => {
