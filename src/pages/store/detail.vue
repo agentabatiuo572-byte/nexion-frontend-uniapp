@@ -551,8 +551,8 @@ const shareDailyUsdt = computed(() => {
   // Only the server's daily estimate; without one the row shows "—", never a figure derived from an annual rate.
   const estimate = shareDailyEstimate.value;
   return estimate ? {
-    min: formatPlainAmount(estimate.low * qty.value, 6),
-    max: formatPlainAmount(estimate.high * qty.value, 6),
+    min: formatAmount(estimate.low * qty.value),
+    max: formatAmount(estimate.high * qty.value),
   } : null;
 });
 const shareDailyUvtText = computed(() => formatPlainAmount((product.value?.dailyEarnNEX ?? 0) * qty.value, 6));

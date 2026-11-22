@@ -10,8 +10,8 @@
       <CatalogMachineImage class="upgrade-art__target" :class="{ 'upgrade-art__target--ready': targetReady }" v-bind="targetImageProps" />
     </view>
     <view class="upgrade-comparison">
-      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">{{ fmtMoney(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
-      <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">{{ fmtMoney(target.dailyEarn) }}{{ t.store.cardPerDaySuffix }}</text></view>
+      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">${{ formatGroupedAmount(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
+      <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">${{ formatGroupedAmount(target.dailyEarn) }}{{ t.store.cardPerDaySuffix }}</text></view>
     </view>
     <text class="upgrade-note">{{ t.store.cardYouEarn }}</text>
     <NxButton class="upgrade-action" variant="secondary" size="medium" :label="copy.details" @click="open" />
@@ -26,7 +26,7 @@ import { productCatalogState } from '@/store/product-catalog';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
-import { fmtMoney } from '@/i18n/format';
+import { formatGroupedAmount } from '@/lib/amount-display';
 import { navTo } from '@/lib/route';
 import NxButton from '@/components/ui/nx-button.vue';
 import type { Device } from '@/store/types';
