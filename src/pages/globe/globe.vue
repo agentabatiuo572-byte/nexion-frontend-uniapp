@@ -212,9 +212,6 @@ import { appReadForeground, documentReadVisible } from "@/lib/foreground-read";
 import { useIntroMotion } from "@/composables/use-intro-motion";
 // #endif
 import { onHide, onShow } from "@dcloudio/uni-app";
-// #ifdef APP-PLUS
-import { onBackPress } from "@dcloudio/uni-app";
-// #endif
 
 import { globeSimulation, GLOBE_CENTERS } from "@/lib/globe-simulation";
 
@@ -260,13 +257,6 @@ const selected = computed<GlobeRegion | null>({
   get: () => regions.value.find(region => region.id === selectedId.value) ?? null,
   set: region => { selectedId.value = region?.id ?? null; },
 });
-// #ifdef APP-PLUS
-onBackPress(() => {
-  if (!selected.value) return false;
-  selected.value = null;
-  return true;
-});
-// #endif
 const me = computed(() => regions.value.find((r) => r.isYou) ?? null);
 const meX = computed(() => (me.value?.cx ?? 0) * W);
 const meY = computed(() => (me.value?.cy ?? 0) * H);

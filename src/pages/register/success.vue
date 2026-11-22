@@ -131,6 +131,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
+import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
@@ -269,7 +270,10 @@ function continueWeb() {
   // #endif
 }
 // 禁回注册流:返回键视同「继续」(App 端;H5 hash 回退由浏览器承担)。
-onBackPress(() => {
+// A dialog on the page (the global confirm) takes this press first (02 §2.7.1).
+const dialogHoldsBack = useDialogBackHeld();
+onBackPress((event) => {
+  if (dialogHoldsBack(event)) return true;
   continueWeb();
   return true;
 });
