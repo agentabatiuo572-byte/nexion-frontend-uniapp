@@ -69,8 +69,9 @@ const deltaText = computed(() => {
   if (visibility.hidden) return visibility.mask("");
   const value = vsYesterday.value;
   if (value === null) return "—";
-  const [whole, fraction] = Math.abs(value).toFixed(3).split(".");
-  return `${value < 0 ? "−" : "+"}$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${fraction}`;
+  const amount = formatGroupedAmount(Math.abs(value));
+  // A real change that rounds to $0.00 reads as under one cent; a true zero stays $0.00.
+  return `${value < 0 ? "−" : "+"}${value !== 0 && amount === "0.00" ? "<$0.01" : `$${amount}`}`;
 });
 const deltaTone = computed(() => visibility.hidden || vsYesterday.value === null ? "is-none" : vsYesterday.value < 0 ? "is-down" : "is-up");
 

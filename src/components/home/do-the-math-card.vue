@@ -25,8 +25,8 @@
         <view class="dc-stage__floor" />
       </view>
       <view class="dc-legend">
-        <view><text class="dc-legend__name">{{ baseShort }}</text><text class="dc-legend__rate">{{ visibility.mask(formatAmount(calculator.base.dailyUsdt)) }}<text class="dc-legend__unit">/d</text></text></view>
-        <view class="dc-legend--target"><text class="dc-legend__name">{{ calculator.target.name }}</text><text class="dc-legend__rate">{{ formatAmount(calculator.target.dailyUsdt) }}<text class="dc-legend__unit">/d</text></text></view>
+        <view><text class="dc-legend__name">{{ baseShort }}</text><text class="dc-legend__rate">{{ visibility.mask(`$${formatGroupedAmount(calculator.base.dailyUsdt)}`) }}<text class="dc-legend__unit">{{ t.store.cardPerDaySuffix }}</text></text></view>
+        <view class="dc-legend--target"><text class="dc-legend__name">{{ calculator.target.name }}</text><text class="dc-legend__rate">${{ formatGroupedAmount(calculator.target.dailyUsdt) }}<text class="dc-legend__unit">{{ t.store.cardPerDaySuffix }}</text></text></view>
       </view>
       <view class="dc-foot">
         <text class="dc-foot__caption">{{ fmt(generalBase ? t.home.doMathVs : t.home.doMathYour, { base: baseShort }) }}</text>
@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { useDataVisibility } from "@/store/data-visibility";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, getCurrentInstance, onUnmounted, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
