@@ -2,7 +2,7 @@ import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots, type 
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { localized, rewardSummary } from "@/lib/promotion-display";
 import { promotionMachineSlots } from "@/components/catalog-machine-image";
-import { landingKind, promotionLandingHref } from "@/lib/promotion-landing";
+import { activityPageKind, promotionLandingHref } from "@/lib/promotion-landing";
 import { promotionStoreHref } from "@/lib/promotion-entry";
 import { useLocaleStore } from "@/store/locale";
 import { getT } from "@/i18n/use-t";
@@ -41,7 +41,7 @@ export function readHomePromotions(scope: string, authenticated: boolean, force 
           startsAt: item.startsAt, endsAt: item.endsAt, serverTime: item.serverTime, bannerImageUrl: item.bannerImageUrl ?? null,
           kind: rewards.some(row => row.type === "DEVICE") ? "gift" : rewards.some(row => row.type === "DISCOUNT_USDT") ? "coupon" : rewards.length ? "spark" : "plain",
           benefit: reward ? localized(reward.disclosure.benefitDescription, language) || rewardSummary(reward, copy, reward.disclosure.deviceName || (reward.type === "DEVICE" ? reward.giftProductNo : null)) : "",
-          href: landingKind(item) ? promotionLandingHref(item.activityId) : promotionStoreHref(item.activityId), slots: promotionMachineSlots(item) };
+          href: activityPageKind(item) ? promotionLandingHref(item.activityId) : promotionStoreHref(item.activityId), slots: promotionMachineSlots(item) };
       }), page.items[0]?.serverTime ?? null);
       return page;
     })
