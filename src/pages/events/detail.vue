@@ -154,9 +154,10 @@ async function load() {
         if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
         commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
         void forgetPendingEventCommand(app.accountKey, code);
-      } else if (unconfirmedAction && eventDetailAction(value) !== unconfirmedAction) {
-        // The event no longer offers that action (ended, claimed, no longer open to join or remind): nothing is left to
-        // confirm, so the note and the record go.
+      } else if (unconfirmedAction && (eventDetailAction(value) !== unconfirmedAction || !readPendingEventCommand(app.accountKey, code))) {
+        // Nothing is left to confirm when the event no longer offers that action (ended, claimed, no longer open to join or
+        // remind), or when the stored record is gone or a day old: another page instance got the command's result, or it
+        // never ran. The note and the record go; the page keeps the state it just read.
         commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
         void forgetPendingEventCommand(app.accountKey, code);
       }
