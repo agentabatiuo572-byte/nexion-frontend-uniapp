@@ -42,7 +42,7 @@
         <view class="entry-event-actions">
           <!-- The card opens the same page on a tap; the wrapper keeps the button's own click from opening it twice. NxButton
                emits click without an event, so it takes no .stop itself. -->
-          <view class="entry-cta-hit" @click.stop><NxButton class="entry-cta" size="medium" :label="landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
+          <view class="entry-cta-hit" @click.stop><NxButton class="entry-cta" size="medium" :label="localized(activity.title,locale.code)+' · '+landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
         </view>
       </view>
       <!-- Purchase gift, first purchase and repurchase open their own landing page, where the full terms stay a sheet. Like
@@ -67,9 +67,9 @@
         <view v-if="card.kind!=='gift'" class="entry-card__body">
           <view class="entry-card__head"><text class="entry-card__title">{{ localized(activity.title,locale.code) }}</text><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
           <text class="entry-card__note">{{ card.kind==='first' ? (card.discount ? landing.cardFirstNoteDiscount : landing.cardFirstNote) : fmt(landing.cardRepurchaseNote,{name:card.buyName}) }}</text>
-          <view class="entry-cta-hit" @click.stop><NxButton class="entry-cta" size="medium" :label="landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
+          <view class="entry-cta-hit" @click.stop><NxButton class="entry-cta" size="medium" :label="localized(activity.title,locale.code)+' · '+landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
         </view>
-        <view v-else class="entry-cta-hit entry-cta-hit--gift" @click.stop><NxButton class="entry-cta" size="medium" :label="landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
+        <view v-else class="entry-cta-hit entry-cta-hit--gift" @click.stop><NxButton class="entry-cta" size="medium" :label="localized(activity.title,locale.code)+' · '+landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
       </view>
     </view>
     </view></view>
@@ -360,8 +360,10 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__fill { position: absolute; inset: 0; }
 /* 「查看活动」 ends each card: right-aligned under the text, as on the event cards; on the gift card it sits under the
    copy, left of the machines. */
-.entry-card__body > .entry-cta-hit { align-self: flex-end; margin-top: auto; padding-top: 8px; }
-.entry-cta-hit--gift { position: relative; z-index: 1; margin-top: auto; padding-top: 8px; }
+.entry-card__body > .entry-cta-hit { align-self: flex-end; margin-top: auto; }
+.entry-cta-hit--gift { position: relative; z-index: 1; margin-top: auto; }
+/* The gap above the button belongs to the text, so the button's wrapper adds no strip that stops a card tap. */
+.entry-card__note, .entry-card__copy { margin-bottom: 8px; }
 /* The gift card grows with its copy, so a long language pushes the button down instead of under the text. */
 .entry-card--gift { display: flex; flex-direction: column; align-items: flex-start; box-sizing: border-box; min-height: 184px; padding: 20px 0 12px 18px; }
 .entry-card__copy { position: relative; z-index: 1; width: min(176px, 55%); }
