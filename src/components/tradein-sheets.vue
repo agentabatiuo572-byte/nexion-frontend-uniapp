@@ -60,7 +60,8 @@
         <view class="tis-head"><text :id="titleId" class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
         <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatGroupedAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }}&nbsp;USDT</text>
-        <view v-if="capacityResumeAllowed" class="tis-cta" :class="{ 'tis-cta-disabled': capacityRecoveryBusy }" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
+        <!-- Busy keeps the label and the width, adds a spinner and tells assistive tech it is working (03 §3.1). -->
+        <view v-if="capacityResumeAllowed" class="tis-cta" :class="{ 'tis-cta-disabled': capacityResumeBusy }" role="button" :tabindex="capacityResumeBusy ? -1 : 0" :aria-disabled="capacityResumeBusy" :aria-busy="capacityResumeBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><view v-if="capacityResumeBusy" class="tis-cta-spin" aria-hidden="true" /><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'choice'">
@@ -392,6 +393,8 @@ let capacityRecoveryGeneration = 0;
 let checkoutCapacityRead: { accountKey: string; target: string; at: number } | undefined;
 const capacityResumeKey = ref<string | null>(null);
 const capacityResumeAllowed = computed(() => capacityResumeKey.value !== null && capacityRecovery.value?.key === capacityResumeKey.value);
+// recoverCapacityPurchase ignores a tap while either read is running, so the button shows busy for both.
+const capacityResumeBusy = computed(() => capacityRecoveryBusy.value || capacityReadBusy.value);
 const capacityIntentResume = ref<{ commandKey: string; intentNo: string; cutoff: number | null } | null>(null);
 watch(capacityIntentResume, (resume, _previous, cleanup) => {
   if (resume?.cutoff == null || !Number.isFinite(resume.cutoff)) return;
@@ -2001,11 +2004,11 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   height: 1px;
   background: var(--v5-border);
 }
+/* Sheet notes use the description role (10.1 辅助说明: 13/20 at 390, 12/18 at 360). */
 .tis-disclaimer {
   display: block;
-  font-size: 12px;
+  font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);
   color: var(--v5-ink-3);
-  line-height: 1.625;
   margin-bottom: 16px;
 }
 /* CTAs */
@@ -2030,6 +2033,19 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-cta-disabled {
   opacity: 0.5;
+}
+.tis-cta-spin {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--v5-on-brand) 30%, transparent);
+  border-top-color: var(--v5-on-brand);
+  animation: spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tis-cta-spin { animation: none; }
 }
 .tis-cta-text {
   text-align: center;
