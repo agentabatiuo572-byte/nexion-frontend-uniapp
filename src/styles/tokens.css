@@ -135,6 +135,8 @@
 
   --v5-tech-cyan: #0CC4D6;
   --v5-aura-sky: #1E7BE8;       /* DS-32 aura sky */
+  --v5-aura-sky-soft: #E4EFFC;
+  --v5-aura-sky-ink: #175FB5;   /* tag text: aura-sky-soft 5.40 */
   --v5-tech-cyan-soft: #E0F6F9;
   --v5-tech-cyan-border: #9FE0E8;
 
@@ -291,6 +293,7 @@
   --v5-success-ink: #0D7A40;    /* success-soft 4.74 · 页面底 4.80 · 白 5.42 */
   --v5-tech-cyan-ink: #077A85;  /* AA 4.50(base #0CC4D6 = 1.88) */
   --v5-brand-2-ink: #CD3600;    /* AA 4.51(base #FF5A1F = 2.76) */
+  --v5-brand-2-tag-ink: #B42F00; /* tag text: brand-2-soft 5.53 (brand-2-ink is 4.49 there) */
 
   /* 创世节点「奢华金」子调色板(2026-07-23 C1,主人批「修」)。
      原为散落的 #D4AF5A / #F4E5C2 字面量,双主题恒定。在**固定曜石底**(genesis hero)上
@@ -403,6 +406,8 @@
   /* Tech accent — purple, lifted for visibility on dark cards */
   --v5-tech-cyan: #2DD4BF;      /* teal — tech accent / aura (DS-32: no purple) */
   --v5-aura-sky: #4FA8FF;       /* DS-32 aura sky */
+  --v5-aura-sky-soft: rgba(79,168,255,0.20);
+  --v5-aura-sky-ink: #4FA8FF;
   --v5-tech-cyan-soft: rgba(45,212,191,0.20);
   --v5-tech-cyan-border: rgba(45,212,191,0.45);
 
@@ -495,6 +500,7 @@
   --ui-device-ink: #65C9F4;
   --ui-device-soft: #142C38;
   --v5-brand-2-ink: #FF7A3D;
+  --v5-brand-2-tag-ink: #FF7A3D;
   --v5-genesis-gold: #D4AF5A;
   --v5-genesis-gold-hi: #F4E5C2;
 }
