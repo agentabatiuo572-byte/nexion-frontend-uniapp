@@ -185,12 +185,12 @@ async function run() {
   const claimKey = detail.value.claimKeys?.[0] ?? "";
   const fleetRequest = selectedAction === "claim" ? app.captureRemoteAccountRequest() : undefined;
   const deviceClaim = selectedAction === "claim" && detail.value.rewards.some((reward) => reward.type === "DEVICE");
-  const account = app.accountKey;
+  const account = app.accountKey, attempt = Date.now();
   const commandKey = selectedAction === "remind" ? `h4-event-reminder:${code}` : selectedAction === "claim" ? eventClaimCommandKey(code, detail.value.claimKeys) : `h4-event-join:${code}`;
   // Recorded before sending, as checkout does, so a reload while the result is unknown still confirms it. The record only
   // restores the confirming note; the fixed idempotency key keeps a resend safe without it, so a storage failure does not
   // block the command.
-  void rememberPendingEventCommand(account, code, { action: selectedAction, key: commandKey, claimKey: selectedAction === "claim" ? claimKey : "", at: Date.now() });
+  void rememberPendingEventCommand(account, code, { action: selectedAction, key: commandKey, claimKey: selectedAction === "claim" ? claimKey : "", at: attempt });
   try {
     if (selectedAction === "remind") await api.remind(code, commandKey);
     else if (selectedAction === "claim") {
@@ -199,7 +199,8 @@ async function run() {
       const claim = await eventsApi.claim(code, commandKey);
       if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
     } else await eventsApi.join(code, commandKey);
-    void forgetPendingEventCommand(account, code);
+    // Only this attempt's record: a later attempt (after leaving and coming back) owns its own.
+    void forgetPendingEventCommand(account, code, attempt);
     if (current()) { busy.value = false; await load(); }
   } catch (cause) {
     // The outcome may be unknown even if this page is gone: a fleet read started during the claim may predate the device.
@@ -209,7 +210,7 @@ async function run() {
     // once (03 §3.5.1 toast) and leave the action available. The read shows the event as it now stands. A known result
     // needs no confirming later, even if this page is gone.
     const failure = eventCommandFailure(cause);
-    if (failure !== "unknown") void forgetPendingEventCommand(account, code);
+    if (failure !== "unknown") void forgetPendingEventCommand(account, code, attempt);
     if (!current()) return;
     busy.value = false;
     if (failure === "unknown") { commandError.value = true; unconfirmedAction = selectedAction; unconfirmedClaimKey = selectedAction === "claim" ? claimKey : ""; }
