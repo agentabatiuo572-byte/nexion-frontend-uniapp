@@ -31,9 +31,10 @@ function formatPrice(price: number | null): string {
 }
 
 export function presentHomeMarketWorkload(row: AppHomeWorkload, t: Messages): HomeMarketDisplayRow {
+  // Same flat band as the Earn board: within ±0.05% reads as unchanged, without a sign or a trend colour.
   const deltaTone: HomeMarketDeltaTone = row.deltaPct === null
     ? "neutral"
-    : row.deltaPct >= 0 ? "positive" : "negative";
+    : row.deltaPct > 0.05 ? "positive" : row.deltaPct < -0.05 ? "negative" : "neutral";
   const copy = marketWorkloadCopy(t, row.code, row.name, row.unit);
 
   return {
@@ -43,7 +44,7 @@ export function presentHomeMarketWorkload(row: AppHomeWorkload, t: Messages): Ho
     unitText: compactMarketUnit(row.code, copy.unit),
     deltaText: row.deltaPct === null
       ? "—"
-      : `${row.deltaPct >= 0 ? "+" : ""}${row.deltaPct.toFixed(1)}%`,
+      : `${deltaTone === "positive" ? "+" : deltaTone === "negative" ? "−" : ""}${Math.abs(row.deltaPct).toFixed(1)}%`,
     deltaTone,
     sparkline: row.sparkline,
   };
