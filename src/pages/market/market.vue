@@ -17,9 +17,7 @@
           </view>
           <view class="flex items-end justify-between" style="margin-top: 8px">
             <view class="flex items-center" style="gap: 8px">
-              <view class="rounded-full grid place-items-center" :style="nexIconStyle">
-                <text :style="{ fontSize: '15px', fontWeight: 600, color: 'var(--v5-ink)' }">N</text>
-              </view>
+              <view :style="nexIconStyle" aria-hidden="true"><UvtCoin /></view>
               <view>
                 <text class="block font-display" :style="nexPairStyle">UVT / USDT</text>
                 <text class="block" :style="nexSubStyle">UVEL · #{{ nex.rank }}</text>
@@ -83,6 +81,7 @@
 </template>
 
 <script setup lang="ts">
+import UvtCoin from "@/components/ui/uvt-coin.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
@@ -201,7 +200,8 @@ const heroCapStyle: CSSProperties = {
   letterSpacing: "0.16em",
   color: "var(--v5-brand)",
 };
-const nexIconStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-brand)" };
+// The shared UVT coin (uvt-coin.vue) fills this slot.
+const nexIconStyle: CSSProperties = { width: "36px", height: "36px", flex: "none" };
 const nexPairStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const nexSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const nexPriceStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };

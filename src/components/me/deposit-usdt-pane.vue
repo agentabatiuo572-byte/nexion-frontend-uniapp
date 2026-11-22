@@ -95,12 +95,12 @@
       <!-- ── 指引 / 工单入口 ── -->
       <view class="nx-dep-rows nx-dep-links">
         <view class="nx-dep-usdt-guide-link nx-dep-link" role="button" tabindex="0" @click="goGuide">
-          <view class="nx-dep-link__ico nx-dep-link__ico--tech" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg></view>
+          <NxIconTile tone="teal" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg></NxIconTile>
           <text class="nx-dep-link__t">{{ t.topupChrome.howToGetUsdt }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
         <view class="nx-dep-support-link nx-dep-link" role="button" tabindex="0" @click="goSupport">
-          <view class="nx-dep-link__ico nx-dep-link__ico--warn" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" /></svg></view>
+          <NxIconTile tone="amber" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" /></svg></NxIconTile>
           <text class="nx-dep-link__t">{{ t.topupChrome.depositNotArrived }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
@@ -131,9 +131,9 @@
             :tabindex="recordClickable(r) ? 0 : undefined"
             v-on="recordRowOn(r)"
           >
-            <view class="nx-dep-record-row__ico" :class="{ 'nx-dep-record-row__ico--ok': r.status === 'credited' }" aria-hidden="true">
+            <NxIconTile :tone="r.status === 'credited' ? 'teal' : 'muted'" size="m">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7" /></svg>
-            </view>
+            </NxIconTile>
             <view class="nx-dep-record-row__main">
               <text class="nx-dep-record-row__title">{{ rowTitle(r) }}</text>
               <view class="nx-dep-record-row__sub"><text class="nx-dep-record-row__net">{{ netShort(r.channel) }} · </text><NxCodeValue class="nx-dep-record-row__id" :value="r.depositId" :label="t.bills.detailRef" :copyable="!recordClickable(r)" /></view>
@@ -166,6 +166,7 @@ import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useT } from "@/i18n/use-t";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
@@ -671,9 +672,6 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-amount-note { margin-top: 10px; padding: 0 2px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-dep-rows { margin: 16px -2px 0; overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-link { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; color: var(--v5-ink); cursor: pointer; }
-.nx-dep-link__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); }
-.nx-dep-link__ico--tech { background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); }
-.nx-dep-link__ico--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
 .nx-dep-link__t { flex: 1; min-width: 0; font: 400 15px/20px var(--font-v5); }
 .nx-dep-link + .nx-dep-link, .nx-dep-record-row + .nx-dep-record-row { border-top: 1px solid var(--v5-border); }
 .nx-dep-link > svg { flex: none; color: var(--v5-ink-4); }
@@ -682,8 +680,6 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-sec + view > .nx-dep-rows, .nx-dep-sec ~ .nx-dep-rows { margin-top: 0; }
 .nx-dep-record-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; }
 .nx-dep-record-row[role="button"]:active { opacity: .9; }
-.nx-dep-record-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); background: var(--v5-surface-3); color: var(--v5-ink-2); }
-.nx-dep-record-row__ico--ok { background: var(--v5-success-soft); color: var(--v5-success-ink); }
 .nx-dep-record-row__main { flex: 1; min-width: 0; }
 .nx-dep-record-row__title { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
 /* Network, then the deposit id as a long code (one line, middle ellipsis, read in full by screen readers). */

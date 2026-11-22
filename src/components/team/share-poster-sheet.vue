@@ -25,7 +25,7 @@
       <view class="ps-body">
       <view class="ps-stage">
         <!-- 画布(随面板 v-if 挂载/销毁;draw 后导出预览图,自身移出视口不占布局) -->
-        <canvas canvas-id="sharePosterCv" id="sharePosterCv" class="ps-canvas" />
+        <canvas canvas-id="sharePosterCv" id="sharePosterCv" class="ps-canvas" :style="{ width: `${W * canvasScale}px`, height: `${H * canvasScale}px` }" />
         <view v-if="genState === 'ready'" class="ps-preview" role="img" :aria-label="posterRewardLine">
           <image :src="imgSrc" mode="widthFix" class="ps-preview__img" />
         </view>
@@ -298,15 +298,115 @@ function wrapText(ctx: UniApp.CanvasContext, value: string, x: number, y: number
   lines.forEach((line, index) => ctx.fillText(line, x, y + index * lineHeight));
 }
 
+// Scan-critical colours stay dark on the white plate: brand lime reads as "light" to a decoder,
+// so the gradient runs from the brand hue darkened to 6.4:1 on white into ink; lime only appears in the centre mark.
+const QR_GREEN = "#3F6A00";
+const QR_INK = "#121417";
+const QR_BADGE = "#16181B";
+// Alignment-pattern centres for versions 1–10 (ISO/IEC 18004 Annex E); longer codes draw those modules like any other.
+const QR_ALIGN: number[][] = [[], [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]];
+const QR_SYMBOL_SRC = "/static/img/brand/uvel-symbol.png";
+let qrSymbolPath = "";
+function ensureQrSymbol(): Promise<void> {
+  if (qrSymbolPath) return Promise.resolve();
+  return new Promise(resolve => uni.getImageInfo({
+    src: QR_SYMBOL_SRC,
+    success: result => { qrSymbolPath = result.path; resolve(); },
+    fail: () => resolve(),
+  }));
+}
+function canvasPixelRatio(): number {
+  const info = (typeof uni.getWindowInfo === "function" ? uni.getWindowInfo() : uni.getSystemInfoSync()) as { pixelRatio?: number };
+  return typeof info.pixelRatio === "number" && info.pixelRatio >= 1 ? info.pixelRatio : 2;
+}
+// Below 2× a 96px code has about two pixels per module, too few to scan once saved; such screens draw at 2×.
+const canvasScale = canvasPixelRatio() < 2 ? 2 : 1;
+
+/** Clockwise rounded square subpath. */
+function roundRectPath(ctx: UniApp.CanvasContext, x: number, y: number, size: number, r: number) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + size - r, y);
+  ctx.arc(x + size - r, y + r, r, -Math.PI / 2, 0);
+  ctx.lineTo(x + size, y + size - r);
+  ctx.arc(x + size - r, y + size - r, r, 0, Math.PI / 2);
+  ctx.lineTo(x + r, y + size);
+  ctx.arc(x + r, y + size - r, r, Math.PI / 2, Math.PI);
+  ctx.lineTo(x, y + r);
+  ctx.arc(x + r, y + r, r, Math.PI, Math.PI * 1.5);
+  ctx.closePath();
+}
+
 function paintQr(ctx: UniApp.CanvasContext, x: number, y: number, size: number, payload: string) {
-  const qr = qrcode(0, "M");
+  const withMark = Boolean(qrSymbolPath);
+  const qr = qrcode(0, withMark ? "H" : "M");
   qr.addData(payload); qr.make();
-  const n = qr.getModuleCount(), cell = size / (n + 8);
-  // A complete four-module quiet zone stays separate from decoration and text.
-  ctx.setFillStyle("#FFFFFF"); ctx.fillRect(x, y, size, size);
-  ctx.setFillStyle("#000000");
+  const n = qr.getModuleCount(), cell = size / (n + 8), ox = x + 4 * cell, oy = y + 4 * cell;
+  // White plate with the four-module quiet zone; its corner radius stays inside that zone.
+  ctx.setFillStyle("#FFFFFF");
+  ctx.beginPath(); roundRectPath(ctx, x, y, size, 8); ctx.fill();
+  const ink = ctx.createLinearGradient(ox, oy, ox + n * cell, oy + n * cell);
+  ink.addColorStop(0, QR_GREEN); ink.addColorStop(1, QR_INK);
+
+  // The centre mark sits in a round knock-out of 3.6 modules' radius (2–3% of the code; level H corrects 30%),
+  // leaving a one-module white ring around the badge.
+  const mid = n / 2, knockR = withMark ? 3.6 : 0;
+  const inKnock = (r: number, c: number) => Math.hypot(r + .5 - mid, c + .5 - mid) < knockR;
+  const inFinder = (r: number, c: number) => (r < 7 && (c < 7 || c >= n - 7)) || (r >= n - 7 && c < 7);
+  const axis = QR_ALIGN[(n - 17) / 4] ?? [], last = axis[axis.length - 1];
+  const aligns = axis.flatMap(a => axis.map(b => [a, b]))
+    .filter(([a, b]) => !(a === 6 && b === 6) && !(a === 6 && b === last) && !(a === last && b === 6));
+  const inAlign = (r: number, c: number) => aligns.some(([a, b]) => Math.abs(r - a) <= 2 && Math.abs(c - b) <= 2);
+  const skip = (r: number, c: number) => inFinder(r, c) || inKnock(r, c) || inAlign(r, c);
+  const dark = (r: number, c: number) => r >= 0 && c >= 0 && r < n && c < n && !skip(r, c) && qr.isDark(r, c);
+
+  // Connected modules, all in one path and one fill (no seams): a corner rounds only where both of its
+  // neighbours are light, and a light corner between two dark neighbours gets a fillet.
+  const round = cell / 2;
+  ctx.setFillStyle(ink);
+  ctx.beginPath();
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-    if (qr.isDark(r, c)) ctx.fillRect(x + (c + 4) * cell, y + (r + 4) * cell, cell, cell);
+    const px = ox + c * cell, py = oy + r * cell;
+    if (dark(r, c)) {
+      const up = dark(r - 1, c), dn = dark(r + 1, c), lf = dark(r, c - 1), rt = dark(r, c + 1);
+      const [tl, tr, br, bl] = [up || lf ? 0 : round, up || rt ? 0 : round, dn || rt ? 0 : round, dn || lf ? 0 : round];
+      ctx.moveTo(px + tl, py);
+      ctx.lineTo(px + cell - tr, py);
+      if (tr) ctx.arc(px + cell - tr, py + tr, tr, -Math.PI / 2, 0);
+      ctx.lineTo(px + cell, py + cell - br);
+      if (br) ctx.arc(px + cell - br, py + cell - br, br, 0, Math.PI / 2);
+      ctx.lineTo(px + bl, py + cell);
+      if (bl) ctx.arc(px + bl, py + cell - bl, bl, Math.PI / 2, Math.PI);
+      ctx.lineTo(px, py + tl);
+      if (tl) ctx.arc(px + tl, py + tl, tl, Math.PI, Math.PI * 1.5);
+      ctx.closePath();
+    } else if (!skip(r, c)) {
+      const fillet = (cx: number, cy: number, dx: number, dy: number) => {
+        ctx.moveTo(cx, cy); ctx.lineTo(cx + dx * round, cy); ctx.arcTo(cx, cy, cx, cy + dy * round, round); ctx.lineTo(cx, cy); ctx.closePath();
+      };
+      if (dark(r - 1, c) && dark(r, c - 1)) fillet(px, py, 1, 1);
+      if (dark(r - 1, c) && dark(r, c + 1)) fillet(px + cell, py, -1, 1);
+      if (dark(r + 1, c) && dark(r, c + 1)) fillet(px + cell, py + cell, -1, -1);
+      if (dark(r + 1, c) && dark(r, c - 1)) fillet(px, py + cell, 1, -1);
+    }
+  }
+  ctx.fill();
+
+  // Finder (7×7) and alignment (5×5) patterns keep their ring–gap–core structure; only their corners round.
+  const target = (top: number, left: number, span: number, ring: number, gap: number, core: number) => {
+    const tx = ox + left * cell, ty = oy + top * cell;
+    ctx.setFillStyle(ink); ctx.beginPath(); roundRectPath(ctx, tx, ty, span * cell, ring * cell); ctx.fill();
+    ctx.setFillStyle("#FFFFFF"); ctx.beginPath(); roundRectPath(ctx, tx + cell, ty + cell, (span - 2) * cell, gap * cell); ctx.fill();
+    ctx.setFillStyle(ink); ctx.beginPath(); roundRectPath(ctx, tx + 2 * cell, ty + 2 * cell, (span - 4) * cell, core * cell); ctx.fill();
+  };
+  for (const [top, left] of [[0, 0], [0, n - 7], [n - 7, 0]]) target(top, left, 7, 2.3, 1.5, 1);
+  for (const [a, b] of aligns) if (!inKnock(a, b)) target(a - 2, b - 2, 5, 1.5, .8, .5);
+
+  if (withMark) {
+    // Round UVEL badge: the symbol unaltered at its own ratio (11 §11.2) on a dark disc.
+    const radius = (knockR - 1) * cell, cx = ox + mid * cell, cy = oy + mid * cell;
+    ctx.setFillStyle(QR_BADGE); ctx.beginPath(); ctx.moveTo(cx + radius, cy); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+    const sw = radius * 2 * .66, sh = sw * 361 / 490;
+    ctx.drawImage(qrSymbolPath, cx - sw / 2, cy - sh / 2, sw, sh);
   }
 }
 
@@ -316,6 +416,8 @@ function ts(): string {
 
 function paint(link: string, myToken: number) {
   const ctx = uni.createCanvasContext("sharePosterCv", inst?.proxy);
+  // The poster is laid out at 345×460; screens under 2× draw it on a canvas twice that size.
+  ctx.scale(canvasScale, canvasScale);
   // The family stays for the whole poster; fitText / wrapText only change the size.
   ctx.font = `normal 400 10px ${canvasFontStack()}`;
   const bg = ctx.createLinearGradient(0, 0, W, H);
@@ -360,8 +462,9 @@ function paint(link: string, myToken: number) {
     uni.canvasToTempFilePath(
       {
         canvasId: "sharePosterCv",
-        destWidth: 750,
-        destHeight: 1000,
+        // Export at the canvas's own device-pixel size so the QR stays crisp (never below the earlier 2× file).
+        destWidth: Math.round(W * Math.max(2, canvasPixelRatio())),
+        destHeight: Math.round(H * Math.max(2, canvasPixelRatio())),
         fileType: "png",
         success: (res) => {
           if (myToken !== genToken || !props.open || link !== buildShareLink()
@@ -406,7 +509,7 @@ function regenerate() {
       // 异步回来要重新核 token —— 这期间用户可能已经切模板/关面板(沿用既有防竞态口径)。
       // The faces this language's poster text needs (e.g. Inter Vietnamese) load before drawing.
       const fontText = `${JSON.stringify(t.value.share)} ${logicCopy.value.posterYieldCap} ${copy.value.inviteFriends} ${profile.displayName ?? ""} 0123456789`;
-      void Promise.all([ensureBrandLogo(), ensureInviteArt(), canvasFontsReady(fontText)]).then(() => {
+      void Promise.all([ensureBrandLogo(), ensureInviteArt(), ensureQrSymbol(), canvasFontsReady(fontText)]).then(() => {
         if (myToken !== genToken || !props.open || link !== buildShareLink()) return;
         try {
           paint(link, myToken);
@@ -562,7 +665,7 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-head__x svg { position: relative; }
 .ps-stage { position: relative; width: calc(100% - 40px); max-width: 345px; margin: var(--ui-space-row-y) auto 0; }
 /* 离屏画布:保持渲染供 draw/导出,视觉上移出视口 */
-.ps-canvas { position: absolute; left: -9999px; top: 0; width: 345px; height: 460px; }
+.ps-canvas { position: absolute; left: -9999px; top: 0; }
 /* 海报卡恒定深色画稿:边框/投影用固定色不随主题,把卡从 sheet 底上抬起(主人 2026-07-08)。 */
 .ps-preview { border-radius: 16px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 10px 28px rgba(0, 0, 0, .25); }
 .ps-preview__img { width: 100%; display: block; }

@@ -32,7 +32,7 @@
         <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
           <text v-if="index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts)" class="notification-date" role="heading" aria-level="2">{{ dateHeading(n.ts) }}</text>
           <view class="notification-row" role="button" tabindex="0" :aria-label="platformDisplayText(n.title)" :aria-expanded="directNotice(n) ? undefined : expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
-            <view class="notification-icon" :data-category="notificationCategory(n)" aria-hidden="true" v-html="kindIcon(n)" />
+            <NxIconTile class="notification-tile" :tone="CATEGORY_TONES[notificationCategory(n)]" size="m"><view class="notification-glyph" v-html="kindIcon(n)" /></NxIconTile>
             <view class="notification-content"><view class="notification-top"><view class="notification-heading"><text class="notification-title">{{ keepUnits(platformDisplayText(n.title)) }}</text><text v-if="n.priority === 'critical' || n.priority === 'high'" class="notification-important">{{ t.notifs.important }}</text></view></view><text v-if="n.body && expandedId !== n.id" class="notification-preview">{{ keepUnits(platformDisplayText(n.body)) }}</text></view>
 <view class="notification-meta"><text class="notification-time">{{ timeAgo(n.ts) }}</text><view v-if="!n.readAt" class="message-status-dot" aria-hidden="true" /></view>
           </view>
@@ -62,6 +62,7 @@ import { onShow, onHide, onLoad, onResize } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ServiceMessageList from "@/components/support/service-message-list.vue";
 import { useConversations } from "@/store/conversations";
@@ -186,6 +187,7 @@ const filterIds: Filter[] = ["all", "finance", "device", "team", "rewards", "sys
 const visibleFilterIds = computed(() => filterIds);
 const expandedId = ref<string | null>(null);
 const categoryKeys = { finance: "categoryFinance", device: "categoryDevice", team: "kindTeam", rewards: "categoryRewards", system: "kindSystem" } as const;
+const CATEGORY_TONES = { finance: "success", device: "device", team: "coral", rewards: "amber", system: "purple" } as const;
 const categoryIcons: Record<NotificationCategory, string> = {
   finance: '<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7"/><path d="M16 14h.01"/>',
   device: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
@@ -428,13 +430,9 @@ watch(filter, value => {
 .message-center .notification-item--group-first .notification-row { border-top-left-radius:22px; border-top-right-radius:22px; }
 .message-center .notification-item--group-last .notification-row { border-bottom-left-radius:22px; border-bottom-right-radius:22px; }
 .message-center .notification-item:not(.notification-item--group-first) .notification-row { border-top:1px solid var(--v5-border); }
-.message-center .notification-icon { --notice-color:var(--v5-nex); display:flex; align-items:center; justify-content:center; width:40px; height:40px; margin:0; border-radius:var(--ui-radius-icon); background:color-mix(in srgb,var(--notice-color) 16%,transparent); color:var(--notice-color); }
-.message-center .notification-icon :deep(svg) { width:20px; height:20px; }
-.message-center .notification-icon[data-category="finance"] { --notice-color:var(--v5-success-ink); }
-.message-center .notification-icon[data-category="device"] { --notice-color:var(--ui-notification-device-ink); }
-.message-center .notification-icon[data-category="team"] { --notice-color:var(--v5-brand-2-ink); }
-.message-center .notification-icon[data-category="system"] { --notice-color:var(--v5-nex-ink); }
-.message-center .notification-icon[data-category="rewards"] { --notice-color:var(--v5-warning-ink); }
+.message-center .notification-tile { margin:0; }
+.notification-glyph { display:grid; place-items:center; }
+.message-center .notification-tile :deep(svg) { width:20px; height:20px; }
 /* A long title keeps whole words: the 重要 tag drops below it instead of squeezing the title mid-word. */
 .message-center .notification-heading { flex-wrap:wrap;gap:2px var(--v5-space-2); }
 .message-center .notification-title { font-size:14px; line-height:20px; overflow-wrap:break-word; }

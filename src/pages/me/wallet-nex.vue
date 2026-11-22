@@ -54,9 +54,7 @@
         <!-- Quick actions 4-cell -->
         <view class="grid grid-cols-2" style="gap: 8px">
           <view v-for="qc in quickCells" :key="qc.label" class="nx-glass-card" :style="quickCellStyle" role="link" tabindex="0" :aria-label="qc.label" @click="navTo(qc.href)">
-            <view class="grid place-items-center" :style="quickIconStyle(qc.tint)">
-              <view v-html="qc.icon" />
-            </view>
+            <NxIconTile style="margin: 0 auto" :tone="qc.tone" size="s"><view style="display: grid" v-html="qc.icon" /></NxIconTile>
             <text class="block" :style="quickLabelStyle">{{ qc.label }}</text>
           </view>
         </view>
@@ -66,9 +64,7 @@
           <text class="block" :style="cardLabelStyle">{{ t.nexWallet.breakdown.label }}</text>
           <view style="margin-top: 10px; border-top: 1px solid var(--v5-border)">
             <view v-for="(br, i) in breakdownRows" :key="br.label" class="flex items-center" :style="breakdownRowStyle(i)">
-              <view class="grid place-items-center shrink-0" :style="breakdownIconStyle(br.tint)">
-                <view v-html="br.icon" />
-              </view>
+              <NxIconTile :tone="br.tone" size="s"><view style="display: grid" v-html="br.icon" /></NxIconTile>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="breakdownLabelStyle">{{ br.label }}</text>
                 <text v-if="br.hint" class="block" :style="breakdownHintStyle">{{ br.hint }}</text>
@@ -84,7 +80,7 @@
           <view class="grid grid-cols-2" style="gap: 8px">
             <view v-for="tile in useTiles" :key="tile.label" class="nx-glass-card" :style="useTileStyle" role="link" tabindex="0" :aria-label="`${tile.label} · ${tile.sub}`" @click="navTo(tile.href)">
               <view class="flex items-center justify-between">
-                <view v-html="tile.icon" />
+                <NxIconTile :tone="tile.tone" size="s"><view style="display: grid" v-html="tile.icon" /></NxIconTile>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
               </view>
               <text class="block" :style="useTileLabelStyle">{{ tile.label }}</text>
@@ -106,10 +102,10 @@
           <EmptyState v-else-if="activity.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-else :style="activityListStyle">
             <view v-for="(a, i) in activity" :key="a.id" class="flex items-center" :style="activityRowStyle(i)">
-            <view class="grid place-items-center shrink-0" :style="activityIconStyle(a.kind)">
-              <svg v-if="a.kind === 'mining'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v2" /><path d="M12 2v2" /><path d="M17 20v2" /><path d="M17 2v2" /><path d="M2 12h2" /><path d="M2 17h2" /><path d="M2 7h2" /><path d="M20 12h2" /><path d="M20 17h2" /><path d="M20 7h2" /><path d="M7 20v2" /><path d="M7 2v2" /><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="8" y="8" width="8" height="8" rx="1" /></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-            </view>
+            <NxIconTile :tone="a.kind === 'mining' ? 'teal' : 'sky'" size="s">
+              <svg v-if="a.kind === 'mining'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v2" /><path d="M12 2v2" /><path d="M17 20v2" /><path d="M17 2v2" /><path d="M2 12h2" /><path d="M2 17h2" /><path d="M2 7h2" /><path d="M20 12h2" /><path d="M20 17h2" /><path d="M20 7h2" /><path d="M7 20v2" /><path d="M7 2v2" /><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="8" y="8" width="8" height="8" rx="1" /></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+            </NxIconTile>
             <view class="flex-1 min-w-0">
               <!-- Rows open nothing, so the label wraps in full. A code after the last " · " is a long code (decision 6): one line,
                    middle ellipsis, tail visible, copy and screen readers get it whole; it moves under the label when it does not fit. -->
@@ -144,6 +140,7 @@ import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import EmptyState from "@/components/empty-state.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexSparkline from "@/components/me/nex-sparkline.vue";
 import { useT } from "@/i18n/use-t";
@@ -286,26 +283,21 @@ const ICON = {
 };
 
 const quickCells = computed(() => [
-  { href: "/pages/me/wallet-exchange?direction=usdt2nex", icon: tintIcon(ICON.up, "var(--v5-success)"), label: t.value.nexWallet.actions.buy, tint: "var(--v5-success)" },
-  { href: "/pages/me/wallet-exchange?direction=nex2usdt", icon: tintIcon(ICON.down, "var(--v5-brand-2)"), label: t.value.nexWallet.actions.sell, tint: "var(--v5-brand-2)" },
+  { href: "/pages/me/wallet-exchange?direction=usdt2nex", icon: ICON.up, label: t.value.nexWallet.actions.buy, tone: "teal" as const },
+  { href: "/pages/me/wallet-exchange?direction=nex2usdt", icon: ICON.down, label: t.value.nexWallet.actions.sell, tone: "coral" as const },
 ]);
 
 const breakdownRows = computed(() => [
-  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? fmtNum(nexBalance.value, 2) : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)}`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
-  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : fmtNum(pendingNex.value, 2), hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
+  { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? fmtNum(nexBalance.value, 2) : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tone: "sky" as const, icon: ICON.up },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)}`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tone: "teal" as const, icon: ICON.cpu },
+  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : fmtNum(pendingNex.value, 2), hint: "", tone: "amber" as const, icon: ICON.hourglass },
 ]);
 
 const useTiles = computed(() => [
-  { href: "/pages/me/wallet-exchange", icon: tintIcon(ICON.refresh, "var(--v5-success)"), label: t.value.nexWallet.useNex.exchange, sub: t.value.nexWallet.useNex.exchangeSub },
-  { href: "/pages/me/wallet-withdraw-network", icon: tintIcon(ICON.percent, "var(--v5-brand-2)"), label: t.value.nexWallet.useNex.feeOffset, sub: t.value.nexWallet.useNex.feeOffsetSub },
+  { href: "/pages/me/wallet-exchange", icon: ICON.refresh, tone: "teal" as const, label: t.value.nexWallet.useNex.exchange, sub: t.value.nexWallet.useNex.exchangeSub },
+  { href: "/pages/me/wallet-withdraw-network", icon: ICON.percent, tone: "coral" as const, label: t.value.nexWallet.useNex.feeOffset, sub: t.value.nexWallet.useNex.feeOffsetSub },
 ]);
 
-function tintIcon(svg: string, color: string): string {
-  // Replace the lucide default stroke=currentColor in the size-16/14 quick
-  // icons with the tile tint (icons authored with stroke="currentColor").
-  return svg.replace('stroke="currentColor"', `stroke="${color}"`);
-}
 
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px 32px" };
@@ -377,16 +369,6 @@ const quickCellStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "12px",
   textAlign: "center",
 };
-function quickIconStyle(tint: string): CSSProperties {
-  return {
-    width: "32px",
-    height: "32px",
-    margin: "0 auto",
-    borderRadius: "8px",
-    background: `color-mix(in srgb, ${tint} 15%, transparent)`,
-    color: tint,
-  };
-}
 const quickLabelStyle: CSSProperties = {
   marginTop: "6px",
   fontSize: "12px",
@@ -410,16 +392,6 @@ function breakdownRowStyle(i: number): CSSProperties {
     gap: "12px",
     padding: "12px 0",
     borderBottom: i < breakdownRows.value.length - 1 ? "1px solid var(--v5-border)" : "none",
-  };
-}
-function breakdownIconStyle(tint: string): CSSProperties {
-  return {
-    width: "28px",
-    height: "28px",
-    borderRadius: "8px",
-    // Prototype BreakdownRow: `${tint}22` = hex alpha 0x22/255 ≈ 13%, not 22%.
-    background: `color-mix(in srgb, ${tint} 13%, transparent)`,
-    color: tint,
   };
 }
 const breakdownLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
@@ -455,14 +427,6 @@ function activityRowStyle(i: number): CSSProperties {
     gap: "12px",
     padding: "10px 0",
     borderBottom: i < activity.value.length - 1 ? "1px solid var(--v5-border)" : "none",
-  };
-}
-function activityIconStyle(kind: string): CSSProperties {
-  return {
-    width: "32px",
-    height: "32px",
-    borderRadius: "8px",
-    background: kind === "mining" ? "var(--v5-brand-soft)" : "var(--v5-success-soft)",
   };
 }
 const activityLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink)" };

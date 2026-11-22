@@ -59,7 +59,8 @@
             <view class="lp-rule__row">
               <view class="lp-rule__art">
                 <CatalogMachineImage v-if="ticket.giftSku" class="lp-fill" :sku="ticket.giftSku" :image-url="productImage(ticket.giftSku)" :scope-key="activity.activityId + ':' + ticket.id + ':gift'" />
-                <view v-else class="lp-coin lp-coin--small" :class="ticket.parts.asset === 'UVT' ? 'lp-coin--uvt' : 'lp-coin--usdt'" aria-hidden="true"><text>{{ ticket.parts.asset === 'UVT' ? 'U' : '$' }}</text></view>
+                <view v-else-if="ticket.parts.asset === 'UVT'" class="lp-uvt lp-uvt--small"><UvtCoin /></view>
+                <view v-else class="lp-uvt lp-uvt--small"><UsdtCoin /></view>
               </view>
               <view class="lp-rule__copy"><text class="lp-field">{{ ticket.getLabel }}</text><text class="lp-rule__name lp-rule__name--gift">{{ ticket.getName }}</text></view>
               <text v-if="ticket.getQty" class="lp-rule__qty">{{ ticket.getQty }}</text>
@@ -109,7 +110,8 @@
               </view>
             </view>
             <view class="lp-ticket__stub">
-              <view v-if="firstTicket.parts.asset !== 'DEVICE'" class="lp-coin" :class="[firstTicket.muted ? 'lp-coin--muted' : firstTicket.parts.asset === 'UVT' ? 'lp-coin--uvt' : 'lp-coin--usdt', { 'lp-pop': !firstTicket.muted }]" aria-hidden="true"><svg v-if="firstTicket.parts.asset === 'UVT'" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 6v6.5a4.5 4.5 0 0 0 9 0V6" /></svg><text v-else>$</text></view>
+              <view v-if="firstTicket.parts.asset === 'UVT'" class="lp-uvt" :class="{ 'lp-pop': !firstTicket.muted }"><UvtCoin :muted="firstTicket.muted" /></view>
+              <view v-else-if="firstTicket.parts.asset !== 'DEVICE'" class="lp-uvt" :class="{ 'lp-pop': !firstTicket.muted }"><UsdtCoin :muted="firstTicket.muted" /></view>
               <view v-else-if="firstTicket.giftSku" class="lp-ticket__gift lp-pop"><CatalogMachineImage class="lp-fill" :sku="firstTicket.giftSku" :image-url="productImage(firstTicket.giftSku)" :scope-key="activity.activityId + ':first-gift'" /></view>
               <text v-if="firstTicket.muted" class="lp-ticket__unavailable">{{ c.notAvailable }}</text>
               <view v-else class="lp-ticket__limit"><text class="lp-field">{{ c.perPerson }}</text><text class="lp-ticket__limit-value">{{ firstTicket.limit }}</text></view>
@@ -122,6 +124,64 @@
           <view class="lp-steps lp-rise lp-d3">
             <view v-for="(step, index) in steps" :key="step.title" class="lp-step lp-card"><text class="lp-step__number">{{ index + 1 }}</text><text class="lp-step__title">{{ step.title }}</text><text class="lp-step__note">{{ step.note }}</text></view>
           </view>
+        </template>
+
+        <!-- Referral: the inviter's reward leads as an open hero over the gift machine; a step track follows real progress. -->
+        <template v-if="kind === 'referral' && rule && inviteHero">
+          <view class="lp-gift lp-rise lp-d1" :class="{ 'lp-gift--ended': phase === 'ended' }">
+            <template v-if="phase !== 'ended'"><view class="lp-glow lp-glow--coral" aria-hidden="true" /><view class="lp-glow lp-glow--gold" aria-hidden="true" /></template>
+            <view class="lp-gift__art lp-enter-main" aria-hidden="true"><view class="lp-gift__floor" /><CatalogMachineImage class="lp-fill" :sku="rule.productNo" :image-url="productImage(rule.productNo)" :scope-key="activity.activityId + ':invite'" /><image class="lp-gift__bow lp-pop" src="/static/img/team-20261025/gift-bow.png" mode="aspectFit" /></view>
+            <view class="lp-gift__copy">
+              <text class="lp-field">{{ inviteHero.label }}</text>
+              <view class="lp-gift__value"><text class="lp-amount lp-gift__amount" :class="amountSize(inviteHero.parts.amount, true)">{{ inviteHero.parts.amount }}</text><text class="lp-unit" :class="{ 'lp-unit--uvt': inviteHero.parts.asset === 'UVT' }">{{ inviteHero.parts.unit }}</text></view>
+              <text v-if="inviteHero.friend" class="lp-gift__friend">{{ c.friendAlso }}<text class="lp-strong lp-keep">{{ inviteHero.friend }}</text></text>
+            </view>
+          </view>
+          <view v-if="note" class="lp-note lp-rise lp-d2"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
+          <text class="lp-section lp-section-title lp-rise lp-d2">{{ c.referralSteps }}</text>
+          <view class="lp-panel lp-panel--track lp-rise lp-d2"><view class="lp-track" role="list" :aria-label="c.referralSteps">
+            <!-- One continuous line from the first to the last node; the brand part runs to the furthest reached step. -->
+            <view class="lp-track__line" aria-hidden="true"><view class="lp-track__fill" :style="{ transform: 'scaleX(' + trackFill + ')' }" /></view>
+            <view v-for="step in trackSteps" :key="step.title" class="lp-track__step" :class="'lp-track__step--' + step.state" role="listitem" :aria-current="step.state === 'current' ? 'step' : undefined">
+              <view class="lp-track__node" aria-hidden="true">
+                <NxIcon :name="step.icon" :size="20" />
+                <view v-if="step.state === 'done'" class="lp-track__badge"><NxIcon name="check" :size="10" /></view>
+              </view>
+              <text class="lp-track__title">{{ step.title }}</text>
+              <text class="lp-track__note">{{ step.note }}</text>
+            </view>
+          </view></view>
+        </template>
+
+        <!-- Bundle: the listed devices share one lit stage; each rule reads as a flow from device to reward. -->
+        <template v-if="kind === 'bundle'">
+          <view class="lp-combo lp-rise lp-d1" :class="{ 'lp-combo--ended': phase === 'ended' }">
+            <template v-if="phase !== 'ended'"><view class="lp-glow lp-glow--cyan" aria-hidden="true" /><view class="lp-glow lp-glow--amber" aria-hidden="true" /></template>
+            <view v-if="barSummary && !barSummary.price" class="lp-combo__reward"><text class="lp-field">{{ c.rewardLabel }}</text><view class="lp-combo__value"><text class="lp-amount lp-combo__amount">{{ barSummary.amount }}</text><text class="lp-unit" :class="{ 'lp-unit--uvt': barSummary.uvt }">{{ barSummary.unit }}</text></view></view>
+            <view class="lp-combo__floor" aria-hidden="true" />
+            <view v-for="(sku, index) in comboSkus" :key="sku" class="lp-combo__machine lp-enter-main" :class="'lp-combo__machine--' + index + ' lp-combo__machine--of' + comboSkus.length"><CatalogMachineImage class="lp-fill" :sku="sku" :image-url="productImage(sku)" :scope-key="activity.activityId + ':combo-' + index" /></view>
+          </view>
+          <view v-if="note" class="lp-note lp-rise lp-d2"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
+          <text class="lp-section lp-section-title lp-rise lp-d2">{{ c.offerRules }}</text>
+          <view class="lp-panel lp-rise lp-d2"><view v-for="ticket in giftTickets" :key="ticket.id" class="lp-flow-group" role="group" :aria-label="ticket.buyName + ' ' + ticket.buyQty + ' · ' + ticket.getLabel + ' ' + ticket.getName">
+            <view class="lp-flow" aria-hidden="true">
+              <view class="lp-flow__end">
+                <view class="lp-flow__art"><view class="lp-flow__floor" /><CatalogMachineImage class="lp-fill" :sku="ticket.buySku" :image-url="productImage(ticket.buySku)" :scope-key="activity.activityId + ':' + ticket.id + ':buy'" /></view>
+                <text class="lp-flow__name">{{ ticket.buyName }}</text>
+                <text class="lp-flow__meta">{{ c.ticketBuy }} {{ ticket.buyQty }}</text>
+              </view>
+              <view class="lp-flow__path"><view class="lp-flow__dash" /><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg></view>
+              <view class="lp-flow__end">
+                <view class="lp-flow__art lp-flow__art--reward"><view class="lp-flow__floor lp-flow__floor--reward" /><CatalogMachineImage v-if="ticket.giftSku" class="lp-fill" :sku="ticket.giftSku" :image-url="productImage(ticket.giftSku)" :scope-key="activity.activityId + ':' + ticket.id + ':gift'" /><view v-else-if="ticket.parts.asset === 'UVT'" class="lp-uvt lp-uvt--flow lp-pop"><UvtCoin /></view><view v-else class="lp-uvt lp-uvt--flow lp-pop"><UsdtCoin /></view></view>
+                <view v-if="ticket.parts.asset !== 'DEVICE'" class="lp-flow__reward"><text class="lp-amount lp-flow__amount">{{ ticket.parts.asset === 'DISCOUNT' ? '−' : '+' }}{{ ticket.parts.amount }}</text><text class="lp-flow__unit" :class="{ 'lp-unit--uvt': ticket.parts.asset === 'UVT' }">{{ ticket.parts.unit }}</text></view>
+                <text v-else class="lp-flow__name">{{ ticket.getName }}</text>
+                <text class="lp-flow__meta">{{ ticket.getLabel }}</text>
+              </view>
+            </view>
+            <view class="lp-flow__facts">
+              <view v-for="cell in ticket.cells" :key="cell.label" class="lp-flow__fact"><text class="lp-field">{{ cell.label }}</text><text class="lp-flow__fact-value">{{ cell.value }}</text></view>
+            </view>
+          </view></view>
         </template>
 
         <!-- Repurchase: owned devices on a glass slab, then the empty slot to fill. -->
@@ -159,9 +219,9 @@
         </template>
 
         <!-- Eligible devices: each opens the product page with this offer attached. -->
-        <template v-if="kind === 'first' || kind === 'repurchase'">
-          <view class="lp-section lp-section-head lp-section-head--start lp-rise lp-d4"><text class="lp-section-title">{{ kind === 'first' ? c.devicesTitle : c.addableTitle }}</text><text class="lp-count">{{ products.length }}</text></view>
-          <view v-for="item in products" :key="item.sku" class="lp-product lp-card lp-rise lp-d4" role="link" tabindex="0" :aria-label="item.name" @click="navTo(promotionDetailHref(item.sku, activity.activityId))" @keydown.enter.prevent="navTo(promotionDetailHref(item.sku, activity.activityId))">
+        <template v-if="kind === 'first' || kind === 'repurchase' || kind === 'referral' || kind === 'bundle' || (kind === 'gift' && products.length > 1)">
+          <view id="lp-devices" class="lp-section lp-section-head lp-section-head--start lp-rise lp-d4"><text class="lp-section-title">{{ kind === 'repurchase' ? c.addableTitle : kind === 'referral' ? c.friendDevices : c.devicesTitle }}</text><text class="lp-count">{{ products.length }}</text></view>
+          <view class="lp-panel lp-panel--list lp-rise lp-d4"><view v-for="item in products" :key="item.sku" class="lp-product" role="link" tabindex="0" :aria-label="item.name" @click="navTo(promotionDetailHref(item.sku, activity.activityId))" @keydown.enter.prevent="navTo(promotionDetailHref(item.sku, activity.activityId))">
             <view class="lp-product__art"><CatalogMachineImage class="lp-fill" :sku="item.sku" :image-url="productImage(item.sku)" :scope-key="activity.activityId + ':product'" /></view>
             <view class="lp-product__copy">
               <text class="lp-product__name">{{ item.name }}</text>
@@ -170,22 +230,25 @@
               <view v-if="item.tag" class="lp-product__tag"><NxTag :tone="item.tagTone">{{ item.tag }}</NxTag></view>
             </view>
             <svg class="lp-product__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-          </view>
-
-          <text class="lp-section lp-section-title lp-rise lp-d5">{{ kind === 'first' ? c.keyRules : c.conditionsTitle }}</text>
-          <view class="lp-lines lp-rise lp-d5">
+          </view></view>
+        </template>
+        <template v-if="kind === 'first' || kind === 'repurchase' || kind === 'referral' || kind === 'bundle'">
+          <text class="lp-section lp-section-title lp-rise lp-d5">{{ kind === 'repurchase' ? c.conditionsTitle : c.keyRules }}</text>
+          <view class="lp-panel lp-rise lp-d5"><view class="lp-lines">
             <view v-if="kind === 'repurchase'" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="6" rx="1.6" /><rect x="4" y="13" width="16" height="6" rx="1.6" /><path d="M7.5 8h.01M7.5 16h.01" /></svg><text>{{ c.conditionOwn }}</text></view>
             <view v-if="limitSentence" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg><text>{{ limitSentence }}</text></view>
-            <view v-if="kind === 'first' && rewardTerms" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4.5h4.5" /></svg><text>{{ rewardTerms }}</text></view>
+            <view v-if="kind !== 'repurchase' && rewardTerms" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4.5h4.5" /></svg><text>{{ rewardTerms }}</text></view>
             <view class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></svg><text>{{ activityTime }}</text></view>
           </view>
-          <view class="lp-link lp-link--block lp-rise lp-d5" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text class="nx-after-chevron">{{ c.fullRules }}</text></view>
+          <view class="lp-link lp-link--block" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text class="nx-after-chevron">{{ c.fullRules }}</text></view></view>
         </template>
       </view>
       <view class="lp-bar-space" aria-hidden="true" />
     </view>
 
     <PromotionTerms v-if="activity" :open="termsOpen" :title="localized(activity.title, locale.code)" :terms="promotionTermsText(activity, t.promotion, locale.code)" :rules="promotionTermsRules(activity, t.promotion, productName)" :disclosures="promotionDisclosures(activity)" @close="termsOpen = false" />
+
+    <SharePosterSheet v-if="kind === 'referral'" :open="posterOpen" @close="closePoster" />
 
     <template #pageFixed>
       <view v-if="bar" class="lp-bar nx-glass-bar" :class="{ 'lp-bar--wide': bar.wide }">
@@ -214,8 +277,13 @@ import SubPageHeader from '@/components/sub-page-header.vue';
 import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
 import PromotionTerms from '@/components/promotion/promotion-terms.vue';
+import SharePosterSheet from '@/components/team/share-poster-sheet.vue';
+import UvtCoin from '@/components/ui/uvt-coin.vue';
+import UsdtCoin from '@/components/ui/usdt-coin.vue';
+import NxIcon from '@/components/ui/nx-icon.vue';
+import { useDataVisibility } from '@/store/data-visibility';
 import { promotionApi, remoteApiEnabled, sessionVault } from '@/api/runtime';
-import type { PublicPromotion, PublicPurchaseRule } from '@/api/promotion-contracts';
+import type { PublicPromotion, PublicPurchaseRule, ReferralProgress } from '@/api/promotion-contracts';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { refreshProductCatalog } from '@/store/product-catalog';
@@ -227,8 +295,8 @@ import { ambassadorCount } from '@/i18n/ambassador';
 import { navReplace, navTo, takeNavigationQuery } from '@/lib/route';
 import { displayDeadline, localized } from '@/lib/promotion-display';
 import { formatDayMonth, formatDisplayDateTime, formatDisplayTime } from '@/lib/display-date';
-import { createPromotionReadFence, isPromotionActive, promotionDetailHref, promotionDisclosures, promotionStoreHref } from '@/lib/promotion-entry';
-import { landingKind, landingProduct, landingProductName, promotionLandingHref, promotionRemaining, promotionRepurchaseInterval, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
+import { createPromotionReadFence, isPromotionActive, promotionBundleHref, promotionDetailHref, promotionDisclosures, promotionStoreHref } from '@/lib/promotion-entry';
+import { activityPageKind, landingKind, landingProduct, landingProductName, promotionLandingHref, promotionRemaining, promotionRepurchaseInterval, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
 import { productCopy } from '@/lib/product-copy';
 import { getProductMedia } from '@/lib/product-media';
 
@@ -241,7 +309,38 @@ const firstOfferId = ref<string | null>(null);
 const fence = createPromotionReadFence();
 let activityId = '';
 
-const kind = computed(() => activity.value ? landingKind(activity.value) : null);
+const kind = computed(() => activity.value ? activityPageKind(activity.value) : null);
+const posterOpen = ref(false), referral = ref<ReferralProgress | null>(null), referralFailed = ref(false);
+const visibility = useDataVisibility();
+const inviteHero = computed(() => {
+  const a = activity.value, r = rule.value;
+  if (!a || !r) return null;
+  const buyer = rewardParts(a, r.buyerReward);
+  if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward), friend: partsText(buyer) };
+  return { label: c.value.friendGets, parts: buyer, friend: '' };
+});
+// Share of the line in brand colour: up to the furthest step that is done or current (0, half or all).
+const trackFill = computed(() => { const last = trackSteps.value.reduce((at, step, index) => step.state === 'todo' ? at : index, 0); return last / (trackSteps.value.length - 1); });
+// Steps light up from real data only: a friend's first purchase reaches step 2, an issued reward step 3.
+// Whether the member has shared is unknown, so step 1 is never marked done on its own.
+const trackSteps = computed(() => {
+  const r = referral.value, copy = c.value, known = !!r && !visibility.hidden && phase.value === 'active' && !signInNeeded.value;
+  const friends = r?.qualifyingOrders ?? 0, paid = r ? r.ownRewards.filter(item => item.state === 'ISSUED').length : 0;
+  const reached = !known ? -1 : paid > 0 ? 3 : friends > 0 ? 2 : 0;
+  const steps = [
+    { title: copy.stepShare, note: copy.stepShareNote, icon: 'send' as const },
+    { title: copy.stepFriendBuys, note: known ? ambassadorCount(copy.friendsBought, friends) : copy.stepFriendBuysNote, icon: 'bag' as const },
+    { title: copy.stepRewardPaid, note: known && paid > 0 ? ambassadorCount(copy.rewardsPaid, paid) : copy.stepRewardPaidNote, icon: 'gift' as const },
+  ];
+  return steps.map((step, index) => ({ ...step, state: index < reached ? 'done' as const : index === reached ? 'current' as const : 'todo' as const }));
+});
+const comboSkus = computed(() => (activity.value?.productNos ?? []).slice(0, 3));
+async function loadReferral() {
+  const id = activityId;
+  if (kind.value !== 'referral' || !sessionVault.read() || !pageVisible.value) return;
+  try { const value = await promotionApi.referral(id); if (id === activityId && pageVisible.value) { referral.value = value; referralFailed.value = false; } }
+  catch { if (id === activityId) referralFailed.value = true; }
+}
 const repurchaseInterval = computed(() => promotionRepurchaseInterval(activity.value));
 const intervalLine = computed(() => {
   const interval = repurchaseInterval.value, copy = c.value;
@@ -283,19 +382,21 @@ function shortStart(value: string): string {
   return `${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date)} ${time} UTC`;
 }
 
-const navTitle = computed(() => kind.value === 'gift' ? c.value.navGift : kind.value === 'first' ? c.value.navFirst : kind.value === 'repurchase' ? c.value.navRepurchase : c.value.navPending);
+const navTitle = computed(() => kind.value === 'gift' ? c.value.navGift : kind.value === 'first' ? c.value.navFirst : kind.value === 'repurchase' ? c.value.navRepurchase : kind.value === 'referral' ? c.value.navReferral : kind.value === 'bundle' ? c.value.navBundle : c.value.navPending);
 const subtitle = computed(() => {
   const parts = rulePartsOf(), discount = parts?.asset === 'DISCOUNT';
   if (kind.value === 'gift') return discount ? c.value.subtitleGiftDiscount : parts && parts.asset !== 'DEVICE' ? fmt(c.value.subtitleGiftReward, { unit: parts.unit }) : c.value.subtitleGift;
   if (kind.value === 'first') return discount ? c.value.subtitleFirstDiscount : fmt(c.value.subtitleFirst, { unit: parts?.unit ?? '' });
+  if (kind.value === 'referral') return c.value.subtitleReferral;
+  if (kind.value === 'bundle') return fmt(c.value.subtitleBundle, { unit: parts?.unit ?? '' });
   return discount ? c.value.subtitleRepurchaseDiscount : fmt(c.value.subtitleRepurchase, { unit: parts?.unit ?? '' });
 });
 
 const eligibilityTag = computed(() => {
   const a = activity.value, k = kind.value;
   if (!a || !k || phase.value !== 'active') return null;
-  if (a.eligibility === 'ESTIMATE_ELIGIBLE') return { tone: 'success' as const, text: k === 'gift' ? c.value.eligibleGift : k === 'first' ? c.value.eligibleFirst : c.value.eligibleRepurchase };
-  if (a.eligibility === 'INELIGIBLE') return { tone: 'neutral' as const, text: k === 'gift' || (k === 'repurchase' && repurchaseInterval.value) ? c.value.ineligibleGift : k === 'first' ? c.value.ineligibleFirst : c.value.ineligibleRepurchase };
+  if (a.eligibility === 'ESTIMATE_ELIGIBLE') return { tone: 'success' as const, text: k === 'gift' || k === 'referral' || k === 'bundle' ? c.value.eligibleGift : k === 'first' ? c.value.eligibleFirst : c.value.eligibleRepurchase };
+  if (a.eligibility === 'INELIGIBLE') return { tone: 'neutral' as const, text: k === 'gift' || k === 'referral' || k === 'bundle' || (k === 'repurchase' && repurchaseInterval.value) ? c.value.ineligibleGift : k === 'first' ? c.value.ineligibleFirst : c.value.ineligibleRepurchase };
   if (a.eligibility === 'SIGN_IN_REQUIRED') return { tone: 'neutral' as const, text: t.value.promotion.signIn };
   return null;
 });
@@ -315,7 +416,7 @@ const note = computed(() => {
   if (phase.value !== 'active') return null;
   const message = localized(a.eligibilityMessage, locale.code);
   if (message) return { ended: false, text: message };
-  if (refused.value && kind.value !== 'repurchase') return { ended: false, text: kind.value === 'gift' ? c.value.ineligibleNoteGift : c.value.ineligibleNoteFirst };
+  if (refused.value && kind.value !== 'repurchase') return { ended: false, text: kind.value === 'first' ? c.value.ineligibleNoteFirst : c.value.ineligibleNoteGift };
   return null;
 });
 const activityTime = computed(() => activity.value ? fmt(c.value.activityTime, { time: `${formatDisplayDateTime(activity.value.startsAt, locale.code, false, 0)} – ${displayDeadline(activity.value.endsAt, locale.code)}` }) : '');
@@ -403,7 +504,8 @@ const products = computed(() => {
   return a.productNos.map(sku => {
     const product = landingProduct(sku), r = a.rewardRules.find(item => item.productNo === sku) ?? a.rewardRules[0];
     const parts = r ? rewardParts(a, r.buyerReward) : null;
-    const tag = !parts ? '' : parts.asset === 'DISCOUNT' ? partsText(parts) : fmt(kind.value === 'first' ? c.value.firstTag : c.value.repurchaseTag, { reward: partsText(parts) });
+    // Referral, bundle and gift pages name the reward in their hero and rules, so their rows carry no tag.
+    const tag = !parts || (kind.value !== 'first' && kind.value !== 'repurchase') ? '' : parts.asset === 'DISCOUNT' ? partsText(parts) : fmt(kind.value === 'first' ? c.value.firstTag : c.value.repurchaseTag, { reward: partsText(parts) });
     return {
       sku, name: productName(sku), tagline: product ? productCopy(t.value, product, remoteApiEnabled, locale.code).tagline : '', price: product ? priceText(product.price) : '',
       tag, tagTone: parts?.asset === 'UVT' ? 'uvt' as const : 'warning' as const,
@@ -434,18 +536,20 @@ const slab = computed(() => {
   };
 });
 
-type Bar = { wide?: boolean; hint?: string; label: string; variant: 'primary' | 'neutral'; disabled?: boolean; href?: string };
+type Bar = { wide?: boolean; hint?: string; label: string; variant: 'primary' | 'neutral'; disabled?: boolean; href?: string; share?: boolean; devices?: boolean };
 const bar = computed<Bar | null>(() => {
   const a = activity.value, k = kind.value, copy = c.value;
   if (!a || !k) return null;
-  if (phase.value === 'scheduled') return { hint: copy.orderAfterStart, label: copy.notStarted, variant: 'primary', disabled: true };
+  if (phase.value === 'scheduled') return { hint: k === 'referral' ? copy.inviteAfterStart : copy.orderAfterStart, label: copy.notStarted, variant: 'primary', disabled: true };
   if (phase.value === 'ended') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
   if (refused.value) {
     if (k !== 'repurchase' || repurchaseInterval.value !== null) return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
     return firstOfferId.value ? { hint: copy.firstHint, label: copy.seeFirst, variant: 'primary', href: promotionLandingHref(firstOfferId.value) } : { wide: true, label: copy.goStore, variant: 'primary', href: promotionStoreHref() };
   }
+  if (k === 'referral') return signInNeeded.value ? { wide: true, label: c.value.signInInvite, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) } : { wide: true, label: c.value.invite, variant: 'primary', share: true };
+  if (k === 'bundle' && !signInNeeded.value) return { wide: true, label: c.value.buyBundle, variant: 'primary', href: promotionBundleHref(a.activityId) };
   if (signInNeeded.value) return { label: copy.signInBuy, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) };
-  return { label: k === 'gift' ? copy.buyNow : k === 'first' ? copy.firstOrder : copy.addNow, variant: 'primary', href: a.productNos.length === 1 ? promotionDetailHref(a.productNos[0], a.activityId) : promotionStoreHref(a.activityId) };
+  return { label: k === 'gift' ? copy.buyNow : k === 'first' ? copy.firstOrder : copy.addNow, variant: 'primary', ...(a.productNos.length === 1 ? { href: promotionDetailHref(a.productNos[0], a.activityId) } : { devices: true }) };
 });
 // One product shows its name and price; first purchase and multi-product offers lead with the reward.
 const barSummary = computed(() => {
@@ -459,7 +563,24 @@ const barSummary = computed(() => {
 });
 
 function openTerms() { termsOpen.value = true; }
-function act() { if (bar.value?.href && !bar.value.disabled) navTo(bar.value.href); }
+// The page scrolls inside the chassis, not the document: jump the way the rule pages do (H5 DOM, App page WebView).
+function scrollToDevices() {
+  if (typeof document !== 'undefined') { document.getElementById('lp-devices')?.scrollIntoView({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
+  // #ifdef APP-PLUS
+  const pages = getCurrentPages();
+  const page = pages[pages.length - 1] as unknown as { $getAppWebview?: () => { evalJS: (code: string) => void } };
+  page?.$getAppWebview?.().evalJS("var t=document.getElementById('lp-devices');if(t){t.scrollIntoView({block:'start',behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}");
+  // #endif
+}
+// Back from the poster (saved, copied or shared), the progress is read again.
+function closePoster() { posterOpen.value = false; void loadReferral(); }
+function act() {
+  if (!bar.value || bar.value.disabled) return;
+  if (bar.value.share) { posterOpen.value = true; return; }
+  // Several devices: the list on this page is where one is picked.
+  if (bar.value.devices) { scrollToDevices(); return; }
+  if (bar.value.href) navTo(bar.value.href);
+}
 async function load() {
   if (!pageVisible.value) return;
   const ticket = fence.next(), identity = readIdentity(), signedIn = !!sessionVault.read();
@@ -470,8 +591,9 @@ async function load() {
   try {
     const item = await promotionApi.get(activityId, signedIn);
     if (!fence.current(ticket) || identity !== readIdentity()) return;
-    if (!landingKind(item)) { void navReplace(promotionStoreHref(activityId)); return; }
+    if (!activityPageKind(item)) { void navReplace(promotionStoreHref()); return; }
     activity.value = item; readAt.value = Date.now(); now.value = readAt.value; status.value = 'ready';
+    void loadReferral();
     if (item.template === 'REPURCHASE' && item.state === 'ACTIVE' && item.eligibility === 'INELIGIBLE'
       && repurchaseInterval.value === null) void readFirstOffer(ticket, identity, signedIn).catch(() => { /* Without the offer list the store stays the next step. */ });
   } catch (cause) {
@@ -525,6 +647,7 @@ watch([activity, readAt, pageVisible], () => {
 });
 onShow(() => { pageVisible.value = true; void load(); });
 onHide(() => { pageVisible.value = false; fence.invalidate(); termsOpen.value = false; });
+useAutoRecovery({ failed: () => remoteApiEnabled && kind.value === 'referral' && referralFailed.value, retry: loadReferral });
 onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticker !== null) clearInterval(ticker); if (boundary !== null) clearTimeout(boundary); });
 useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value === 'error' && !reading.value, retry: load });
 </script>
@@ -545,6 +668,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-section { display: block; margin-top: var(--ui-space-section-gap); }
 .lp-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .lp-section-head--start { justify-content: flex-start; gap: 6px; }
+/* The fixed header covers the top of the scroller; a jump to the device list stops below it. */
+#lp-devices { scroll-margin-top: 96px; }
 .lp-section-title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
 .lp-section-note { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-count { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
@@ -635,6 +760,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 /* Reward coins: UVT purple stays a flat identifier (01.1.2); the glyph is white in both themes, as on the wallet coins. */
 .lp-coin { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; color: white; font: 500 22px/1 var(--font-amount); font-variant-numeric: tabular-nums; box-shadow: inset 0 2px 4px color-mix(in srgb, white 35%, transparent), inset 0 -3px 6px color-mix(in srgb, black 18%, transparent); }
 .lp-coin--small { width: 40px; height: 40px; font-size: 17px; }
+/* UVT and USDT rewards use the shared token coins (uvt-coin.vue, usdt-coin.vue), sized here. */
+.lp-uvt { position: relative; flex: none; width: 52px; height: 52px; }
+.lp-uvt--small { width: 40px; height: 40px; }
+.lp-uvt--flow { width: 64px; height: 64px; }
 .lp-coin--uvt { background: var(--v5-nex); }
 .lp-coin--usdt { background: var(--v5-warning); }
 .lp-coin--muted { background: var(--v5-surface-3); color: var(--v5-ink-4); box-shadow: none; }
@@ -683,9 +812,12 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-step__note { display: block; margin-top: 4px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 
 /* Product cards: 104px art on first purchase, 100px on repurchase. */
-.lp-product { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 12px 14px 12px 12px; cursor: pointer; }
-.lp-product__art { position: relative; flex: none; width: 112px; height: 112px; border-radius: 16px; background: var(--v5-surface-2); overflow: hidden; }
-.lp-product__art > .lp-fill { inset: 4px; }
+/* Device rows sit open on the page (no card, no image well): the machine stands on its own floor light, rows split by a hairline. */
+.lp-product { display: flex; align-items: center; gap: var(--ui-space-inset); padding: var(--ui-space-card-gap) 0; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); cursor: pointer; }
+.lp-section-head + .lp-product { margin-top: 4px; border-top: 0; }
+.lp-product__art { position: relative; flex: none; width: 128px; height: 120px; }
+.lp-product__art::before { content: ''; position: absolute; left: 12px; right: 12px; bottom: 8px; height: 18px; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-tech-cyan) 18%, transparent), transparent 70%); }
+.lp-product__art > .lp-fill { inset: 0; }
 .lp--repurchase .lp-product__art > .lp-fill { inset: 6px; }
 .lp-product__copy { flex: 1; min-width: 0; }
 .lp-product__name { display: block; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
@@ -747,6 +879,94 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
   .lp-slab.nx-soft-glass { background: var(--v5-surface-2); }
 }
 
+/* Referral hero, open on the page floor (no card): the reward leads on the left, the gift machine with its bow stands on a floor light on the right. Coral is the activity hue, amber the reward (01 §1.1.2). */
+.lp-gift { position: relative; min-height: 212px; margin-top: var(--ui-space-card-gap); }
+.lp-glow--coral { right: -90px; top: -40px; width: 300px; height: 300px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-brand-2) var(--lp-glow), transparent), transparent 64%); }
+.lp-glow--gold { left: -90px; top: 10px; width: 260px; height: 260px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-warning) var(--lp-glow), transparent), transparent 64%); }
+.lp-gift__art { position: absolute; right: -8px; top: 6px; width: 188px; height: 188px; pointer-events: none; }
+.lp-gift__floor { position: absolute; left: 14px; right: 14px; bottom: 10px; height: 22px; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-ink) var(--lp-floor), transparent), transparent 70%); }
+.lp-gift__bow { position: absolute; left: 56%; top: 34%; width: 40%; height: 34%; }
+.lp-gift__copy { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: center; min-height: 212px; max-width: 54%; }
+.lp-gift__value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 4px; }
+.lp-gift__amount { font-size: 64px; line-height: 68px; }
+.lp-gift__friend { display: block; margin-top: 8px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.lp-gift--ended .lp-gift__art { opacity: .55; filter: grayscale(.7); }
+
+/* Content cards (01 §1.1.2 solid): the step track, the rule flow, the device list and the key rules each sit in one card;
+   the reward hero stays open. Nothing nests inside them but rows and hairlines. */
+.lp-panel { margin-top: var(--ui-space-card-gap); padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.lp-panel--list { padding: 4px 16px; }
+.lp-panel--track { padding: var(--ui-space-inset) 4px 14px; }
+.lp-panel .lp-track, .lp-panel .lp-lines, .lp-panel .lp-flow-group { margin-top: 0; }
+.lp-panel > .lp-product:first-child { border-top: 0; }
+.lp-panel .lp-product__art { width: 112px; height: 104px; }
+.lp-panel .lp-link--block { margin-top: var(--ui-space-inset); }
+
+/* Step track: one continuous 2px line behind three 40px icon nodes (send, bag, gift). Done = soft brand disc with a
+   small check badge, current = brand outline with a gentle breathing ring, not reached = neutral disc. Each node sits on
+   a card-coloured backing so the line never shows through it. The brand part of the line grows once (07 §7.1.1). */
+.lp-track { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--ui-space-inset); }
+.lp-track__line { position: absolute; left: calc(100% / 6); right: calc(100% / 6); top: 19px; height: 2px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 10%, var(--v5-surface)); overflow: hidden; }
+.lp-track__fill { position: absolute; inset: 0; background: var(--v5-brand); transform-origin: left center; animation: lp-track-grow 1400ms cubic-bezier(0.16, 1, 0.3, 1) .3s backwards; }
+@keyframes lp-track-grow { from { transform: scaleX(0); } }
+.lp-track__step { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
+.lp-track__node { position: relative; display: grid; place-items: center; width: 40px; height: 40px; box-sizing: border-box; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, var(--v5-surface)); color: var(--v5-ink-3); }
+.lp-track__step--done .lp-track__node { background: color-mix(in srgb, var(--v5-brand) 16%, var(--v5-surface)); color: var(--v5-brand); }
+.lp-track__step--current .lp-track__node { background: color-mix(in srgb, var(--v5-brand) 8%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); color: var(--v5-brand); }
+.lp-track__step--current .lp-track__node::after { content: ''; position: absolute; inset: -1px; border-radius: 999px; border: 1.5px solid var(--v5-brand); opacity: 0; animation: lp-track-breathe 2.4s ease-out infinite; pointer-events: none; }
+@keyframes lp-track-breathe { 0% { transform: scale(1); opacity: .45; } 100% { transform: scale(1.35); opacity: 0; } }
+:global(.nx-chassis[data-page-visible="false"]) .lp-track__node::after, :global(.nx-chassis[data-scrolling="true"]) .lp-track__node::after { animation-play-state: paused; }
+.lp-track__badge { position: absolute; right: -3px; bottom: -3px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); box-shadow: 0 0 0 2px var(--v5-surface); }
+.lp-track__title { display: block; margin-top: 10px; padding: 0 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.lp-track__step--todo .lp-track__title { color: var(--v5-ink-3); }
+.lp-track__note { display: block; margin-top: 2px; padding: 0 4px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+
+/* Bundle rule flow: device on its floor → dashed path → reward coin, then the counting facts on one hairline row. */
+.lp-flow-group { margin-top: var(--ui-space-card-gap); }
+.lp-flow-group + .lp-flow-group { margin-top: 24px; }
+.lp-flow { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); align-items: start; }
+.lp-flow__end { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
+.lp-flow__art { position: relative; display: grid; place-items: center; width: 112px; height: 104px; }
+.lp-flow__floor { position: absolute; left: 12px; right: 12px; bottom: 6px; height: 16px; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-tech-cyan) 20%, transparent), transparent 70%); }
+.lp-flow__floor--reward { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-warning) 22%, transparent), transparent 70%); }
+.lp-flow__art--reward .lp-coin { position: relative; width: 60px; height: 60px; font-size: 26px; }
+.lp-flow__name { display: block; margin-top: 6px; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.lp-flow__meta { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lp-flow__reward { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin-top: 6px; }
+.lp-flow__amount { font-size: 22px; line-height: 26px; }
+.lp-flow__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lp-flow__path { display: flex; align-items: center; height: 104px; color: var(--v5-ink-3); }
+.lp-flow__dash { flex: 1; margin-right: -4px; border-top: 1.5px dashed var(--v5-border-strong); }
+.lp-flow__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--ui-space-inset); padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.lp-flow__fact { min-width: 0; padding: 0 12px; }
+.lp-flow__fact:first-child { padding-left: 0; }
+.lp-flow__fact + .lp-flow__fact { border-left: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.lp-flow__fact-value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+@media (prefers-reduced-motion: reduce) { .lp-track__fill, .lp-track__node::after { animation: none; } }
+/* PROTOTYPE: bundle stage. The reward leads at the top; up to three listed devices share one floor, the middle one largest. */
+.lp-combo { position: relative; height: 272px; margin-top: var(--ui-space-section); }
+.lp-combo__reward { position: absolute; left: 0; top: 4px; z-index: 1; }
+.lp-combo__value { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
+.lp-combo__amount { font-size: 48px; line-height: 52px; }
+.lp-combo__floor { position: absolute; left: 8px; right: 8px; bottom: 14px; height: 26px; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-ink) var(--lp-floor), transparent), transparent 70%); }
+.lp-combo__machine { position: absolute; bottom: 22px; width: 124px; height: 124px; }
+.lp-combo__machine--of3.lp-combo__machine--0 { left: -2px; }
+.lp-combo__machine--of3.lp-combo__machine--1 { left: 50%; bottom: 26px; width: 172px; height: 172px; margin-left: -86px; z-index: 1; }
+.lp-combo__machine--of3.lp-combo__machine--2 { right: -2px; }
+.lp-combo__machine--of2.lp-combo__machine--0 { left: 8%; width: 156px; height: 156px; }
+.lp-combo__machine--of2.lp-combo__machine--1 { right: 8%; width: 156px; height: 156px; }
+.lp-combo__machine--of1 { left: 50%; width: 200px; height: 200px; margin-left: -100px; }
+.lp-combo--ended .lp-combo__machine { opacity: .55; filter: grayscale(.7); }
+@media (max-width: 374px) {
+  .lp-combo { height: 248px; }
+  .lp-combo__machine { width: 108px; height: 108px; }
+  .lp-combo__machine--of3.lp-combo__machine--1 { width: 148px; height: 148px; margin-left: -74px; }
+  .lp-gift__art { width: 156px; height: 156px; top: 22px; }
+  .lp-gift__amount { font-size: 52px; line-height: 56px; }
+  .lp-flow__art { width: 96px; height: 92px; }
+  .lp-flow__path { height: 92px; }
+}
+
 /* UVT units stay purple wherever they sit (01.1.1); declared after the unit roles above. */
 .lp-unit--uvt { color: var(--v5-nex-ink); }
 
@@ -775,7 +995,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
   .lp-stage__gift, .lp-stage--signin .lp-stage__gift, .lp-stage--ended .lp-stage__gift { width: 38%; height: auto; aspect-ratio: 1; }
   .lp-stage__floor { top: calc(.6 * (100vw - 32px) - 16px); }
   .lp-stage__badge.nx-frosted-button { left: 53%; }
-  .lp-product__art { width: 88px; height: 88px; }
+  .lp-product__art { width: 104px; height: 100px; }
   .lp-ticket { grid-template-columns: minmax(0, 1fr) 96px; }
   .lp-ticket__tear { right: 95px; }
   .lp-ticket .lp-notch { right: 86px; }

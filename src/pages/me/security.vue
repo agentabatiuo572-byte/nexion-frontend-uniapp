@@ -38,9 +38,9 @@
       <!-- ───── Password + Two-factor (merged, de-carded group) ───── -->
       <view class="nx-glass-card mx-4 security-credentials" :style="cardStyle">
         <view class="flex items-center active:opacity-90" :style="rowStyle" role="button" tabindex="0" :aria-expanded="editingPwd ? 'true' : 'false'" @click="editingPwd = !editingPwd">
-          <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-          </view>
+          <NxIconTile tone="danger" size="m">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          </NxIconTile>
           <view class="flex-1 min-w-0">
             <text class="block" :style="rowLabelStyle">{{ t.security.passwordTitle }}</text>
             <text class="block" :style="passwordHintStyle">{{ passwordHintLine }}</text>
@@ -49,9 +49,9 @@
         </view>
 
         <view class="flex items-center" :style="rowBorderedStyle">
-          <view class="grid place-items-center shrink-0" :style="iconBox(displayTwoFactorEnabled === true ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="displayTwoFactorEnabled === true ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-          </view>
+          <NxIconTile :tone="displayTwoFactorEnabled === true ? 'teal' : 'muted'" size="m">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+          </NxIconTile>
           <view class="flex-1 min-w-0">
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text><text class="block" :style="rowSubStyle">{{ t.security.twoFactorHint }}</text>
           </view>
@@ -70,7 +70,7 @@
       <view v-if="phoneBound === true" class="nx-glass-card mx-4 security-phone" :style="[cardStyle, groupGap]">
         <view class="flex items-center active:opacity-90" :style="rowStyle" role="button" tabindex="0"
           :aria-expanded="phoneEditing ? 'true' : 'false'" @click="phoneEditing = !phoneEditing">
-          <view class="security-phone-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></view><view class="flex-1 min-w-0">
+          <NxIconTile tone="teal" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></NxIconTile><view class="flex-1 min-w-0">
             <text class="block" :style="rowLabelStyle">{{ t.security.phoneChangeTitle }}</text>
             <text class="block" :style="rowSubStyle">{{ phonePolicy
               ? fmt(t.security.phoneChangeSummary, { days: phonePolicy.windowDays, max: phonePolicy.maxChanges, used: phonePolicy.usedChanges })
@@ -88,14 +88,14 @@
           <text :style="unavailableValueStyle">{{ unknownMark(remoteSecurityReadFailed) }}</text>
         </view>
         <view v-for="(s, i) in displaySessions" :key="s.id" class="flex items-center" :style="i === 0 ? rowStyle : rowBorderedStyle">
-          <view class="grid place-items-center shrink-0" :style="iconBox(s.current ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
+          <NxIconTile :tone="s.current ? 'teal' : 'muted'" size="m">
             <!-- Smartphone -->
-            <svg v-if="deviceIconKind(s.deviceName) === 'phone'" width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
+            <svg v-if="deviceIconKind(s.deviceName) === 'phone'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
             <!-- Tablet -->
-            <svg v-else-if="deviceIconKind(s.deviceName) === 'tablet'" width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><line x1="12" x2="12.01" y1="18" y2="18" /></svg>
+            <svg v-else-if="deviceIconKind(s.deviceName) === 'tablet'" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><line x1="12" x2="12.01" y1="18" y2="18" /></svg>
             <!-- Monitor -->
-            <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
-          </view>
+            <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
+          </NxIconTile>
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="rowLabelStyle">{{ sessionDeviceLabel(s) }}</text>
             <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
@@ -111,7 +111,7 @@
           :class="sessionWriteDimmed ? 'opacity-50' : 'active:scale-[0.98]'" :style="revokeAllRowStyle" role="button"
           :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled" :data-disabled-reason="sessionWriteUnavailableReason"
           :aria-label="withReadReason(t.security.revokeAll, remoteSecurityReadFailed)" @click="handleRevokeAll">
-          <text :style="revokeAllLabelStyle">{{ t.security.revokeAll }}</text>
+          <text class="nx-reverse-action">{{ t.security.revokeAll }}</text>
         </view>
       </view>
       <view v-if="securityPresentation?.nextCursor" class="mx-4 flex items-center justify-center" :style="loadMoreRowStyle"
@@ -125,9 +125,9 @@
       <!-- ───── Danger zone ───── -->
       <view class="nx-glass-card mx-4 security-danger" :style="[cardStyle, groupGap]">
         <view class="flex items-center" :class="deletionPending ? 'opacity-50' : 'active:opacity-90'" :style="rowStyle" role="button" :tabindex="deletionPending ? -1 : 0" :aria-disabled="deletionPending ? 'true' : 'false'" @click="openDeletionSheet">
-          <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
-          </view>
+          <NxIconTile tone="muted" size="m">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+          </NxIconTile>
           <view class="flex-1 min-w-0">
             <text class="block" :style="dangerLabelStyle" :class="{ 'security-danger-label--pending': deletionPending }">{{ t.security.deleteAccount }}</text>
           </view><svg v-if="!deletionPending" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
@@ -242,6 +242,7 @@ import { displayTimestamp, formatDisplayDate, formatDisplayDateTime } from "@/li
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import AccountDeletionReason from "@/components/me/account-deletion-reason.vue";
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
@@ -1580,14 +1581,6 @@ function openDeletionSheet() {
 watch(twoFactorEnabled, (value) => { if (value === requestedTwoFactor.value) twoFactorSheetOpen.value = false; });
 
 // ── styles ──
-function iconBox(bg: string): CSSProperties {
-  return {
-    width: "40px",
-    height: "40px",
-    borderRadius: "var(--ui-radius-icon)",
-    background: bg,
-  };
-}
 
 // De-carded settings group (form b): filled surface, no border. The first group
 // sits at the global 24px header gap (no top margin); groupGap spaces the rest.
@@ -1747,20 +1740,17 @@ const revokeAllRowStyle: CSSProperties = {
   minHeight: "52px",
   borderTop: "1px solid var(--v5-border)",
 };
-const revokeAllLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-body)",
-  color: "var(--v5-danger)",
-};
 const loadMoreRowStyle: CSSProperties = { minHeight: "44px", marginTop: "var(--v5-space-1)" };
 const loadMoreLabelStyle: CSSProperties = {
   font: "var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5)",
   color: "var(--v5-brand)",
 };
+// Account deletion is a reverse action (user): the page's last row in neutral text and icon; the sheet and its
+// confirm dialog carry the consequence.
 const dangerLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "var(--ui-type-body)",
-  color: "var(--v5-danger)",
+  color: "var(--v5-ink)",
 };
 
 
@@ -1784,7 +1774,6 @@ const dangerLabelStyle: CSSProperties = {
 .security-providers :deep([data-provider="Telegram"] path) { fill:var(--ui-telegram-brand); }
 .security-providers :deep(.auth-provider--linked)::before { content:""; position:absolute; z-index:1; top:11.5px; right:11.5px; width:11px; height:11px; background:var(--v5-on-brand); mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 5 4.5 9-9.5'/%3E%3C/svg%3E") center/contain no-repeat; }
 .security-credentials { border-radius:22px 22px 0 0!important; }
-.security-phone-icon { flex:none; display:grid; place-items:center; width:36px; height:36px; border-radius:var(--ui-radius-icon); background:var(--v5-tech-cyan-soft); color:var(--v5-tech-cyan); }
 .security-danger { margin-top:var(--v5-space-8)!important; }
 /* While a request is pending the entry row is not tappable, so its label is muted and it has no chevron. */
 .security-danger-label--pending { color:var(--v5-ink-3)!important; }
@@ -1827,7 +1816,6 @@ const dangerLabelStyle: CSSProperties = {
 .security-providers :deep(.auth-provider-grid) { gap:var(--v5-space-2); }
 .security-providers :deep(.auth-provider__label) { font-size:13px; line-height:18px; color:var(--v5-ink); }
 .security-providers :deep(.auth-provider--linked .auth-provider__status) { color:var(--v5-success-ink); line-height:16px; }
-.security-phone-icon { width:40px; height:40px; }
 </style>
 
 

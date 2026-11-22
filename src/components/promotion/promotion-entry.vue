@@ -11,7 +11,7 @@
       <NxButton class="entry-cta" size="medium" :label="t.promotion.allProducts" icon="arrow-right" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text></NxButton>
     </view>
     <view class="entry-list" :class="{ 'entry-list--home': mode==='home' }"><view class="entry-track" :style="mode==='home' ? { transform: `translateX(-${activeIndex * 100}%)` } : undefined">
-    <view v-for="(activity, index) in items" :key="activity.activityId" :inert="mode==='home' && index!==activeIndex ? true : undefined" :aria-hidden="mode==='home' && index!==activeIndex ? 'true' : undefined" :class="[mode==='home'?'entry-advert':eventLanding(activity)?'entry-landing':'entry-event', 'entry-kind-'+activityKind(activity), { 'entry-advert--banner': mode==='home' && bannerReady(activity), 'nx-tint': tinted }]" :data-color-scheme="theme.resolved" :data-activity-id="activity.activityId" :data-activity-kind="activityKind(activity)">
+    <view v-for="(activity, index) in items" :key="activity.activityId" :inert="mode==='home' && index!==activeIndex ? true : undefined" :aria-hidden="mode==='home' && index!==activeIndex ? 'true' : undefined" :class="[mode==='home'?'entry-advert':eventLanding(activity)?'entry-landing':'entry-event', 'entry-kind-'+activityKind(activity), { 'entry-advert--banner': mode==='home' && bannerReady(activity), 'nx-tint': tinted }]" :data-color-scheme="theme.resolved" :data-activity-id="activity.activityId" :data-activity-kind="activityKind(activity)" @click="openEventCard(activity)">
       <view v-if="mode==='home'" class="entry-advert-target" role="button" :tabindex="active && index===activeIndex ? 0 : -1" :aria-hidden="!active || index!==activeIndex" :aria-label="localized(activity.title,locale.code)+' · '+t.promotion.browse" @click="active && navTo(offerHref(activity))" @keydown.enter.prevent="active && navTo(offerHref(activity))" @keydown.space.prevent="active && navTo(offerHref(activity))" />
       <CatalogMachineImage v-if="mode==='home'&&bannerUrl(activity)" :key="bannerKey(activity)" v-show="bannerReady(activity)" class="entry-artwork" v-bind="bannerImageProps(activity)" />
       <view v-if="mode==='home'&&!bannerReady(activity)&&promoSlots(activity).length" class="entry-product-art" aria-hidden="true"><CatalogMachineImage v-for="slot in promoSlots(activity)" :key="slot.role" :sku="slot.sku" :image-url="slot.imageUrl" :scope-key="activity.activityId+':'+slot.role" :refresh-key="catalogRefreshKey" :class="slot.role==='purchase' ? 'entry-main-image' : 'entry-gift-image'" /></view>
@@ -40,13 +40,14 @@
       <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-footer">
         <text class="entry-deadline">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
         <view class="entry-event-actions">
-          <view class="promotion-link" role="button" tabindex="0" @click="openTerms(activity)" @keydown.enter.prevent="openTerms(activity)" @keydown.space.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }}</text><NxIcon name="chevron-right" /></view>
-          <NxButton class="entry-cta" size="medium" :label="t.promotion.browse" icon="arrow-right" @click="navTo(promotionStoreHref(activity.activityId))"><text>{{ t.promotion.browse }}</text></NxButton>
+          <!-- The card opens the same page on a tap; the wrapper keeps the button's own click from opening it twice. NxButton
+               emits click without an event, so it takes no .stop itself. -->
+          <view class="entry-cta-hit" @click.stop><NxButton class="entry-cta" size="medium" :label="localized(activity.title,locale.code)+' · '+landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
         </view>
       </view>
-      <!-- Purchase gift, first purchase and repurchase open their own landing page; the
-           terms link keeps opening the existing sheet. -->
-      <view v-for="card in landingCards(activity)" :key="card.kind" class="entry-card" :class="'entry-card--'+card.kind" :style="{ animationDelay: (index*0.06+0.06)+'s' }" role="link" tabindex="0" :aria-label="localized(activity.title,locale.code)" @click="navTo(promotionLandingHref(activity.activityId))" @keydown.enter.prevent="navTo(promotionLandingHref(activity.activityId))">
+      <!-- Purchase gift, first purchase and repurchase open their own landing page, where the full terms stay a sheet. Like
+           the event cards they have one entry: the whole card on a tap, and its 「查看活动」 button for the keyboard. -->
+      <view v-for="card in landingCards(activity)" :key="card.kind" class="entry-card" :class="'entry-card--'+card.kind" :style="{ animationDelay: (index*0.06+0.06)+'s' }" @click="navTo(promotionLandingHref(activity.activityId))">
         <template v-if="card.kind==='gift'">
           <view class="entry-card__copy"><text class="entry-card__buy">{{ fmt(landing.cardBuy,{name:card.buyName}) }}</text><text class="entry-card__get">{{ card.discount ? '' : landing.cardGet.split('{reward}')[0] }}<text class="entry-card__keep">{{ card.rewardText }}</text>{{ card.discount ? '' : landing.cardGet.split('{reward}')[1] }}</text></view>
           <view class="entry-card__main"><CatalogMachineImage class="entry-card__fill" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-main'" :refresh-key="catalogRefreshKey" /></view>
@@ -66,9 +67,9 @@
         <view v-if="card.kind!=='gift'" class="entry-card__body">
           <view class="entry-card__head"><text class="entry-card__title">{{ localized(activity.title,locale.code) }}</text><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
           <text class="entry-card__note">{{ card.kind==='first' ? (card.discount ? landing.cardFirstNoteDiscount : landing.cardFirstNote) : fmt(landing.cardRepurchaseNote,{name:card.buyName}) }}</text>
-          <view class="entry-card__link" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text class="nx-after-chevron">{{ t.promotion.rulesLink }}</text></view>
+          <view class="entry-cta-hit" @click.stop><NxButton class="entry-cta" size="medium" :label="localized(activity.title,locale.code)+' · '+landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
         </view>
-        <view v-else class="entry-card__link entry-card__link--corner" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text class="nx-after-chevron">{{ t.promotion.rulesLink }}</text></view>
+        <view v-else class="entry-cta-hit entry-cta-hit--gift" @click.stop><NxButton class="entry-cta" size="medium" :label="localized(activity.title,locale.code)+' · '+landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
       </view>
     </view>
     </view></view>
@@ -109,7 +110,7 @@ import { productImageCacheKey } from '@/lib/product-image-cache';
 import { useLoopsInView } from '@/composables/use-loops-in-view';
 import { getHomePromotions,readHomePromotions } from '@/store/home-promotions';
 import { landingCopy } from '@/i18n/promotion-landing';
-import { landingKind,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
+import { activityPageKind,landingKind,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
 const props=withDefaults(defineProps<{mode?:'home'|'events';activities?:PublicPromotion[];active?:boolean;tinted?:boolean}>(),{mode:'home',active:true,tinted:false});
 // The fallback product art floats only while the entry is on screen and its page is shown.
 const loops=useLoopsInView('.promotion-entry');
@@ -174,7 +175,9 @@ function startAutoplay(){stopAutoplay();if(props.mode==='home'&&props.active&&vi
 const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,publicName):[]);
 const termsText=computed(()=>termsActivity.value?promotionTermsText(termsActivity.value,t.value.promotion,locale.code):'');
 // Purchase gift, first purchase and repurchase have a landing page; other offers keep the store filter.
-function offerHref(activity:EntryPromotion){if ('displayOnly' in activity) return activity.href;return landingKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
+function offerHref(activity:EntryPromotion){if ('displayOnly' in activity) return activity.href;return activityPageKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
+// An event card has one entry: the whole card and its button open the activity page, where the full terms stay a sheet.
+function openEventCard(activity:EntryPromotion){if(props.mode==='events'&&!eventLanding(activity))navTo(promotionLandingHref(activity.activityId));}
 function eventLanding(activity:EntryPromotion){return props.mode==='events'?landingKind(activity):null;}
 function landingCards(activity:EntryPromotion){
   if ('displayOnly' in activity) return [];
@@ -297,7 +300,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 @keyframes promotion-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) :is(.entry-main-image,.entry-gift-image) { animation-play-state: paused; }
 @media(prefers-reduced-motion:reduce) { .entry-main-image,.entry-gift-image { animation: none; } }
-.entry-event { display: grid; grid-template-columns: minmax(0,1fr) 128px; padding: var(--ui-space-section); gap: var(--ui-space-inset) 0; }
+.entry-event { cursor: pointer; display: grid; grid-template-columns: minmax(0,1fr) 128px; padding: var(--ui-space-section); gap: var(--ui-space-inset) 0; }
 .entry-event-copy { position: relative; z-index: 1; grid-column: 1; grid-row: 1; }
 .entry-event-art { display: flex; align-items: center; justify-content: center; grid-column: 2; grid-row: 1; pointer-events: none; }
 .entry-event-art :deep(.team-art) { max-width: none; }
@@ -313,10 +316,10 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .promotion-link { gap: 8px; color: var(--v5-ink-2); }
 /* A text link and its chevron stay on one line; when the title row cannot hold both, the link drops to the right on its own line. */
 .promotion-link { flex: none; }
-.entry-navigation .promotion-link, .entry-event-actions > .entry-cta { margin-left: auto; }
+.entry-navigation .promotion-link, .entry-event-actions > .entry-cta-hit { margin-left: auto; }
 .promotion-link > text { white-space: nowrap; }
 .entry-navigation { flex-wrap: wrap; row-gap: 0; }
-.entry-cta { max-width: 100%; }
+.entry-cta, .entry-cta-hit { max-width: 100%; }
 .entry-event.entry-kind-coupon { grid-template-columns: minmax(0,1fr) 94px; border-radius: 16px; }
 .entry-kind-coupon .entry-event-copy { padding-right: 18px; }
 .entry-kind-coupon .entry-event-art { border-left: 1px dashed var(--v5-border); margin: -20px -20px -16px 0; overflow: hidden; }
@@ -348,12 +351,16 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 /* Landing cards (P-58): plain surfaces, no play-type label, remaining days top right. */
 .entry-landing { display: block; }
 .entry-card { position: relative; display: block; overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); color: var(--v5-ink); cursor: pointer; animation: entry-card-rise .5s cubic-bezier(.2,.8,.2,1) backwards; }
-.entry-card:focus-visible, .entry-card__link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -3px; }
 .entry-card__fill { position: absolute; inset: 0; }
-.entry-card__link { display: inline-flex; align-items: flex-end; align-self: flex-start; box-sizing: border-box; min-height: 44px; margin: auto 0 -13px; padding: 12px 0 13px; font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
-.entry-card__link--corner { position: absolute; left: 8px; bottom: 3px; z-index: 1; margin: 0; padding: 13px 10px; }
-.entry-card--gift { height: 184px; }
-.entry-card__copy { position: absolute; left: 18px; top: 20px; width: min(176px, 52%); }
+/* 「查看活动」 ends each card: right-aligned under the text, as on the event cards; on the gift card it sits under the
+   copy, left of the machines. */
+.entry-card__body > .entry-cta-hit { align-self: flex-end; margin-top: auto; }
+.entry-cta-hit--gift { position: relative; z-index: 1; margin-top: auto; }
+/* The gap above the button belongs to the text, so the button's wrapper adds no strip that stops a card tap. */
+.entry-card__note, .entry-card__copy { margin-bottom: 8px; }
+/* The gift card grows with its copy, so a long language pushes the button down instead of under the text. */
+.entry-card--gift { display: flex; flex-direction: column; align-items: flex-start; box-sizing: border-box; min-height: 184px; padding: 20px 0 12px 18px; }
+.entry-card__copy { position: relative; z-index: 1; width: min(176px, 55%); }
 /* Purchase line stays body/500 and the gift line profile/600 in brand (04.2, 10.2). */
 .entry-card__buy { display: block; font: 500 var(--ui-type-body)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .entry-card__get { display: block; margin-top: 4px; font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); color: var(--v5-brand); overflow-wrap: break-word; }
@@ -388,7 +395,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 @keyframes entry-card-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes entry-card-pop { 0% { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
 @media (max-width:374px) {
-  .entry-card__copy { width: 56%; }
+  .entry-card__copy { width: 59%; }
   .entry-card__main { right: 56px; width: 100px; height: 100px; top: 52px; }
   .entry-card__gift { width: 68px; height: 68px; top: 98px; }
   .entry-card--first { grid-template-columns: 96px minmax(0,1fr); }

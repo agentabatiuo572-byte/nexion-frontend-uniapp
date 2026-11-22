@@ -33,7 +33,8 @@
           <text class="block" :style="titleStyle">{{ ev.title }}</text>
           <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-top: 6px; line-height: 1.375">{{ ev.subtitle }}</text>
         </view>
-        <EventIcon :kind="ev.kind" :size="40" />
+        <NxIconTile v-if="['referral', 'wheel', 'regional', 'boost'].includes(ev.kind)" :tone="ev.kind === 'referral' ? 'sky' : ev.kind === 'wheel' ? 'purple' : ev.kind === 'regional' ? 'coral' : 'amber'" size="l"><EventIcon :kind="ev.kind" :size="26" style="color: inherit" /></NxIconTile>
+        <view v-else style="width: 56px; height: 56px; flex: none"><NxObjectIcon kind="gift" /></view>
       </view>
 
       <!-- REWARD pill -->
@@ -86,6 +87,8 @@
 
 <script setup lang="ts">
 import EventIcon from "./event-icon.vue";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";

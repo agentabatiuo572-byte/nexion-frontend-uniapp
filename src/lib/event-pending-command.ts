@@ -2,8 +2,7 @@ import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage"
 
 // A join, claim or reminder whose result is not known yet, per account and event, so the page confirms it again after a
 // reload or a later visit (03 §3.5.2), as checkout keeps its pending create. Only what identifies the command is kept.
-// A command that never ran never confirms by reading, so a record stops restoring after a day; the idempotency key stays
-// fixed, so a later tap still cannot repeat a command that did run.
+// A receipt may stay unavailable, so confirmation stops after a day. A later tap still uses the same key.
 const KEY = "uvel-event-pending-accounts-v1";
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export interface PendingEventCommand {
@@ -17,12 +16,16 @@ export interface PendingEventCommand {
 }
 type Row = Record<string, PendingEventCommand>;
 
+export function isPendingEventCommandExpired(command: PendingEventCommand, now = Date.now()): boolean {
+  return !(now - command.at <= MAX_AGE_MS);
+}
+
 /** Storage is the boundary: an entry this page did not write, or one older than a day, is removed and reads as none. */
 export function readPendingEventCommand(accountKey: string, code: string, now = Date.now()): PendingEventCommand | null {
   const entry = readAccountRow<Row>(KEY, accountKey)?.[code];
   if (!entry) return null;
   if (!["join", "claim", "remind"].includes(entry.action) || typeof entry.key !== "string" || !entry.key || typeof entry.claimKey !== "string"
-    || typeof entry.at !== "number" || !(now - entry.at <= MAX_AGE_MS)) {
+    || typeof entry.at !== "number" || isPendingEventCommandExpired(entry, now)) {
     forgetPendingEventCommand(accountKey, code);
     return null;
   }

@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
+import { demoAccountId, previewAccountId, previewSelectedAccountId } from './prototype-demo-identity.mjs';
 // Shared facts for the managed activities in the loopback preview.
 const day=86400000;
 const teamCalendar=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -6,6 +7,80 @@ export const demoTeamBusinessDate=at=>teamCalendar.format(at);
 const localized=(locale,zh,en,vi)=>locale==='zh'?zh:locale==='vi'?vi:en;
 const date=ms=>new Date(ms).toISOString();
 const reject=(message,status=409)=>{throw Object.assign(new Error(message),{status});};
+const commandOperations=['join','claim','reminder'];
+const readCommandKey=headers=>(headers['idempotency-key']||headers['Idempotency-Key'])?.trim();
+const isRejectionCode=code=>Number.isInteger(code)&&code>=400&&code<500;
+const isReasonCode=message=>typeof message==='string'&&/^[A-Z][A-Z0-9_]{0,127}$/.test(message);
+
+function isSavedReminderRefusal(error) {
+  return isRejectionCode(error?.code)
+    && ['EVENT_REMINDER_NOT_AVAILABLE','USER_NOT_FOUND_OR_INACTIVE'].includes(error.message);
+}
+
+function projectCommandReceipt(receipt) {
+  if(receipt.status!=='FAILED')return receipt;
+  const code=isRejectionCode(receipt.error?.code)?receipt.error.code:500;
+  const message=code!==500&&isReasonCode(receipt.error?.message)?receipt.error.message:'EVENT_COMMAND_FAILED';
+  return {status:'FAILED',error:{code,message}};
+}
+
+function eventCommandReceiptKey(owner,eventId,operation,key) {
+  return owner&&key ? JSON.stringify([owner,eventId,operation,key]) : null;
+}
+
+export function demoH4EventCommandResponse(url,method,state,headers) {
+  const match=url.pathname.match(/^\/api\/events\/([^/]+)\/commands\/([^/]+)$/);
+  if(!match)return undefined;
+  if(method!=='GET')reject('METHOD_NOT_ALLOWED',405);
+  const owner=previewAccountId(state,headers);
+  if(!owner)reject('AUTH_REQUIRED',401);
+  const eventId=decodeURIComponent(match[1]),operation=match[2],key=readCommandKey(headers);
+  if(!commandOperations.includes(operation))reject('EVENT_COMMAND_OPERATION_UNSUPPORTED',422);
+  if(!key)reject('IDEMPOTENCY_KEY_REQUIRED',422);
+  if(key.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
+  const receipt=state.h4Events?.commandReceipts?.[eventCommandReceiptKey(owner,eventId,operation,key)];
+  return receipt ? {code:0,message:'OK',data:projectCommandReceipt(receipt)} : {code:404,message:'EVENT_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND'}};
+}
+
+// Opt-in at the loopback request boundary so the receipt can be read while the write is in flight.
+export function beginDelayedDemoH4EventCommand(url,method,state,headers,now) {
+  if(method!=='POST'||headers['x-preview-delay-event-command']!=='1')return null;
+  const match=url.pathname.match(/^\/api\/events\/(demo-[^/]+)\/(join|claim|reminder)$/);
+  if(!match)return null;
+  const [,eventId,operation]=match;
+  if(!events.some(([code])=>eventId==='demo-'+code)||state.dataState==='empty'||state.eventState==='empty')return null;
+  const owner=previewAccountId(state,headers),commandKey=readCommandKey(headers);
+  const key=eventCommandReceiptKey(owner,eventId,operation,commandKey);
+  if(!key||commandKey.length>128)return null;
+  const record=scene(state,now),receipts=record.commandReceipts??={};
+  if(receipts[key])return null;
+  const receipt=receipts[key]={status:'PROCESSING'};
+  return {record,owner,receipt};
+}
+
+function recordEventCommand(record,key,operation,admittedReceipt,execute) {
+  if(!key)return execute();
+  const receipts=record.commandReceipts??={};
+  const previous=receipts[key];
+  if(previous?.status==='SUCCEEDED')return previous.result;
+  // A reminder availability refusal is a saved response. Managed rollbacks keep their reason for readback and can retry.
+  if(previous?.status==='FAILED'&&operation==='reminder'&&isSavedReminderRefusal(previous.error)) {
+    reject(previous.error.message,previous.error.code);
+  }
+  if(previous?.status==='PROCESSING'&&previous!==admittedReceipt)reject('IDEMPOTENCY_REQUEST_IN_PROGRESS');
+  try {
+    const result=execute();
+    receipts[key]={status:'SUCCEEDED',result};
+    return result;
+  } catch(error) {
+    const failure={code:error?.status,message:error?.message};
+    const saved=operation==='reminder'
+      ? isSavedReminderRefusal(failure)
+      : isRejectionCode(failure.code)&&isReasonCode(failure.message);
+    receipts[key]=saved?{status:'FAILED',error:failure}:{status:'FAILED'};
+    throw error;
+  }
+}
 
 const rulesByCode={
   upgrade:{promotionActivityId:'demo-promo-0'},
@@ -76,10 +151,19 @@ function scene(state,now) {
   const candidates=['joined','claimable','claimed'].includes(mode)
     ? joinedPresetEvents : mode==='mixed'?['invite']:[];
   const spins=mode==='ended'&&state.wheelState==='open'?[{result:wheelAward(now-2*day,'DAILY',[],true),at:now-2*day,historyOnly:true}]:[];
-  const record=state.h4Events={at:now,joined:[],spins,reminders:[],claims:{}};
-  record.joined=candidates.filter(code=>eventWindow(code,state,now).state!=='upcoming');
+  const record=state.h4Events={at:now,joinedByOwner:{},spins,remindersByOwner:{},claimsByOwner:{}};
+  const joined=candidates.filter(code=>eventWindow(code,state,now).state!=='upcoming');
+  if(joined.length)record.joinedByOwner[presetOwner(state)]=joined;
   return record;
 }
+
+const claimsForOwner=(record,owner)=>owner ? record?.claimsByOwner?.[owner] : undefined;
+// Joins and reminders belong to the signed-in account, as claims and receipts do. Presets and older saved scenes,
+// which kept one list for everyone, belong to the account the preview has selected.
+const presetOwner=state=>previewSelectedAccountId(state)??demoAccountId;
+const joinedFor=(record,owner)=>owner ? record?.joinedByOwner?.[owner]??[] : [];
+const remindersFor=(record,owner)=>owner ? record?.remindersByOwner?.[owner]??[] : [];
+const addFor=(byOwner,owner,code)=>{const list=byOwner[owner]??=[];if(!list.includes(code))list.push(code);};
 
 export function setDemoH4Scene(state,now) {
   delete state.h4Events;
@@ -90,16 +174,31 @@ export function initializeDemoH4State(state,now=Date.now()) {
   // An imported scene uses saved evidence. The panel can still explicitly
   // supply sample spins, referrals and receipts by selecting a new scene.
   const restoreJoinedPreset=!state.h4Events&&state.eventState==='joined';
-  const record=state.h4Events??={at:now,joined:
-    state.eventState==='mixed'&&!state.eventStatuses?.['demo-invite']?['invite']:[],
-    spins:[],reminders:[],claims:{},sampleInvites:false};
-  if(record.legacyClaims?.includes('invite')&&!record.claims.invite)record.sampleInvites=false;
+  const record=state.h4Events??={at:now,joinedByOwner:
+    state.eventState==='mixed'&&!state.eventStatuses?.['demo-invite']?{[presetOwner(state)]:['invite']}:{},
+    spins:[],remindersByOwner:{},claimsByOwner:{},sampleInvites:false};
+  if(!record.joinedByOwner||!record.remindersByOwner){
+    record.joinedByOwner=record.joined?.length?{[presetOwner(state)]:record.joined}:{};
+    record.remindersByOwner=record.reminders?.length?{[presetOwner(state)]:record.reminders}:{};
+    delete record.joined;
+    delete record.reminders;
+  }
+  if(!record.claimsByOwner){
+    // Preserve the old canned gift for the default account. Old keyed claims used a shared award and lack reliable ownership.
+    const preset=record.claims?.invite;
+    record.claimsByOwner=preset&&preset.key===undefined?{[demoAccountId]:{invite:preset}}:{};
+    delete record.claims;
+    for(const [key,receipt] of Object.entries(record.commandReceipts??{})){
+      if(receipt?.status==='SUCCEEDED'&&receipt.result?.rewardType)delete record.commandReceipts[key];
+    }
+  }
+  if(record.legacyClaims?.includes('invite')&&!claimsForOwner(record,demoAccountId)?.invite)record.sampleInvites=false;
   delete record.legacyClaims;
   for(const [code] of events){
     const status=state.eventStatuses?.['demo-'+code];
     const joined=status==='JOINED'||restoreJoinedPreset&&joinedPresetEvents.includes(code);
-    if(joined&&eventWindow(code,state,now).state!=='upcoming'&&!record.joined.includes(code))record.joined.push(code);
-    if(state.reminders?.includes('demo-'+code)&&!record.reminders.includes(code))record.reminders.push(code);
+    if(joined&&eventWindow(code,state,now).state!=='upcoming')addFor(record.joinedByOwner,presetOwner(state),code);
+    if(state.reminders?.includes('demo-'+code))addFor(record.remindersByOwner,presetOwner(state),code);
   }
   // An open legacy scene saved no start time. Its dated spins still anchor
   // that window, but a scheduled wheel has a start and cannot award earlier.
@@ -221,8 +320,8 @@ export function demoH4PromotionWindow(state,now) {
 export function setDemoH4PromotionTiming(state,now) {
   state.promotionTimingAt=now;
   const record=state.h4Events;
-  if(record?.joined.includes('upgrade')&&demoH4PromotionWindow(state,now).state==='upcoming'){
-    record.joined=record.joined.filter(code=>code!=='upgrade');
+  if(record&&demoH4PromotionWindow(state,now).state==='upcoming'){
+    for(const [owner,joined] of Object.entries(record.joinedByOwner??{}))record.joinedByOwner[owner]=joined.filter(code=>code!=='upgrade');
   }
 }
 
@@ -285,7 +384,7 @@ function rewardSummary(rules,locale) {
   return parts.length?parts.join(' + '):localized(locale,'查看活动规则','View event rules','Xem thể lệ');
 }
 
-function project(entry,locale,state,now) {
+function project(entry,locale,state,now,owner) {
   const [code,kind,zh,en,vi,href]=entry,record=scene(state,now),rules=rulesByCode[code];
   const window=eventWindow(code,state,now),wheel=kind==='wheel',trackable=['referral','onboarding','regional'].includes(kind);
   const ongoing=window.state==='ongoing',started=window.state!=='upcoming',spun=wheel&&record.spins.length>0;
@@ -301,9 +400,9 @@ function project(entry,locale,state,now) {
     targetValue=rules.minRank;
     qualified=ongoing&&inWindow&&rank>=targetValue;
   }
-  const claimed=!!record.claims[code];
+  const claimed=!!claimsForOwner(record,owner)?.[code];
   const userStatus=claimed?'CLAIMED':qualified?'CLAIMABLE'
-    :spun||started&&record.joined.includes(code)?'JOINED':'AVAILABLE';
+    :spun||started&&joinedFor(record,owner).includes(code)?'JOINED':'AVAILABLE';
   const eligible=userStatus==='CLAIMABLE'||ongoing&&!rules.voucherId&&(kind!=='onboarding'||inWindow);
   return {code,rules,eligible,event:{
     eventCode:'demo-'+code,kind,state:window.state,title:localized(locale,zh,en,vi),
@@ -314,55 +413,59 @@ function project(entry,locale,state,now) {
   }};
 }
 
-function award(state,code,now,key) {
+function award(state,code,now,owner,key) {
   const rules=rulesByCode[code],record=scene(state,now),deviceIds=[];
   let receipt;
   if(code==='invite'){
     for(let i=0;i<rules.giftQuantity;i++)deviceIds.push(state.deviceSequence=(state.deviceSequence??1000)+1);
     receipt={rewardType:'DEVICE',quantity:rules.giftQuantity,productNo:rules.giftProductNo,
-      receiptId:'DEMO-INVITE-GIFT',instances:deviceIds.map(id=>'DEMO-INVITE-DEVICE-'+id)};
+      receiptId:'DEMO-INVITE-GIFT-'+deviceIds[0],instances:deviceIds.map(id=>'DEMO-INVITE-DEVICE-'+id)};
   }else{
     receipt={rewardType:'UVT',rewardAmount:rules.rewardNex,streakSavers:rules.streakSavers};
   }
   const result={eventId:'demo-'+code,rewardType:receipt.rewardType,rewardAmount:receipt.rewardAmount??receipt.quantity,receipt,badgeCode:null};
-  record.claims[code]={key,at:now,deviceIds,result};
+  const claims=record.claimsByOwner[owner]??={};
+  claims[code]={key,at:now,deviceIds,result};
   return result;
 }
 
-export function demoH4Gift(state) {
-  return state.dataState==='empty'||state.eventState==='empty'?undefined:state.h4Events?.claims.invite;
+export function demoH4Gift(state,owner=previewSelectedAccountId(state)) {
+  return state.dataState==='empty'||state.eventState==='empty'?undefined:claimsForOwner(state.h4Events,owner)?.invite;
 }
 
 export function demoH4GiftQuantity(state,productNo) {
-  const receipt=demoH4Gift(state)?.result.receipt;
-  return receipt?.productNo===productNo?receipt.quantity:0;
+  if(state.dataState==='empty'||state.eventState==='empty')return 0;
+  return Object.values(state.h4Events?.claimsByOwner??{}).reduce((total,claims)=>{
+    const receipt=claims.invite?.result.receipt;
+    return receipt?.productNo===productNo?total+receipt.quantity:total;
+  },0);
 }
 
 const hasGiftStock=(product,rules)=>product?.inventoryMode==='FINITE'&&product.stock>=rules.giftQuantity;
 
 export function seedDemoH4Gift(state,now,freeSlots,products) {
-  const rules=rulesByCode.invite;
-  if(!demoH4Gift(state)&&freeSlots>=rules.giftQuantity
+  const rules=rulesByCode.invite,owner=previewSelectedAccountId(state);
+  if(owner&&!demoH4Gift(state,owner)&&freeSlots>=rules.giftQuantity
       &&hasGiftStock(products.find(product=>product.id===rules.giftProductNo),rules)
       &&inviteCount(state,eventWindow('invite',state,now),now)>=rules.targetInvites){
-    award(state,'invite',now);
+    award(state,'invite',now,owner);
   }
 }
 
 export function demoH4Credits(state,now) {
   if(state.dataState==='empty'||state.eventState==='empty')return [];
-  const {claims,spins}=scene(state,now);
-  const welcome=claims.welcome;
+  const record=scene(state,now);
+  const welcome=claimsForOwner(record,previewSelectedAccountId(state))?.welcome;
   return [
     ...(welcome?[{id:'DEMO-WELCOME',type:'EVENT_REWARD',status:'SUCCESS',amount:welcome.result.rewardAmount,at:welcome.at}]:[]),
-    ...spins.filter(({historyOnly,result})=>!historyOnly&&result.rewardType!=='COUPON').map(({result,at,includedInBalance})=>({
+    ...record.spins.filter(({historyOnly,result})=>!historyOnly&&result.rewardType!=='COUPON').map(({result,at,includedInBalance})=>({
       id:result.spinId,type:'WHEEL_REWARD',status:'POSTED',asset:result.rewardType,amount:result.rewardAmount,at,includedInBalance,
     })),
   ].sort((a,b)=>a.at-b.at);
 }
 
 export function demoH4Savers(state) {
-  return state.h4Events?.claims.welcome?.result.receipt.streakSavers??0;
+  return claimsForOwner(state.h4Events,previewSelectedAccountId(state))?.welcome?.result.receipt.streakSavers??0;
 }
 
 export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotion,products,spinTickets}) {
@@ -378,14 +481,17 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
   if(empty)return {events:[],serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
   const read=action==='detail'||action==='spin/state';
   if(!list&&request.method()!==(read?'GET':'POST'))reject('METHOD_NOT_ALLOWED',405);
-  const commandKey=(request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'])?.trim();
+  const headers=request.headers?.()??{};
+  const owner=request.delayedEvent?.owner??previewAccountId(state,headers);
+  if(commandOperations.includes(action)&&!owner)reject('AUTH_REQUIRED',401);
+  const commandKey=readCommandKey(headers);
   if(action==='claim'||action==='spin'){
     if(!commandKey)reject('IDEMPOTENCY_KEY_REQUIRED',422);
     if(commandKey.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
   }
-  if(list)return {events:events.filter(([,kind])=>kind!=='wheel'||!wheelClosed).map(entry=>project(entry,locale,state,now).event),serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
+  if(list)return {events:events.filter(([,kind])=>kind!=='wheel'||!wheelClosed).map(entry=>project(entry,locale,state,now,owner).event),serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
 
-  const {code,rules,event,eligible}=project(entry,locale,state,now);
+  const {code,rules,event,eligible}=project(entry,locale,state,now,owner);
   const record=scene(state,now),id=event.eventCode,ongoing=event.state==='ongoing';
   if(action==='detail'){
     const promo=ongoing&&rules.promotionActivityId?promotion(rules.promotionActivityId):null;
@@ -405,31 +511,31 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
       : localized(locale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.');
     return {event,rules:code==='weekend'?rules:{...rules,description:event.subtitle,terms},enabled:true,eligible,eligibilityReason,
       progressValue:event.progressValue,targetValue:event.targetValue,rewards:rewards(rules),results:[],myRewardAmount:null,
-      userStatus:event.userStatus,claimKeys,voucher,reminderSubscribed:record.reminders.includes(code)};
+      userStatus:event.userStatus,claimKeys,voucher,reminderSubscribed:remindersFor(record,owner).includes(code)};
   }
-  if(action==='join'){
-    if(!ongoing)reject('EVENT_NOT_OPEN');
-    if(!record.joined.includes(code))record.joined.push(code);
-    return {eventId:id,status:'JOINED'};
-  }
-  if(action==='reminder'){
-    if(event.state!=='upcoming')reject('EVENT_REMINDER_NOT_AVAILABLE');
-    if(!record.reminders.includes(code))record.reminders.push(code);
-    return {eventId:id,status:'SUBSCRIBED'};
-  }
-  if(action==='claim'){
-    const previous=record.claims[code];
+  if(commandOperations.includes(action))return recordEventCommand(record,eventCommandReceiptKey(owner,id,action,commandKey),action,request.delayedEvent?.receipt,()=>{
+    if(action==='join'){
+      if(!ongoing)reject('EVENT_NOT_OPEN');
+      addFor(record.joinedByOwner,owner,code);
+      return {eventId:id,status:'JOINED'};
+    }
+    if(action==='reminder'){
+      if(event.state!=='upcoming')reject('EVENT_REMINDER_NOT_AVAILABLE');
+      addFor(record.remindersByOwner,owner,code);
+      return {eventId:id,status:'SUBSCRIBED'};
+    }
+    const previous=claimsForOwner(record,owner)?.[code];
     if(commandKey&&previous?.key===commandKey)return previous.result;
     if(event.state==='upcoming')reject('EVENT_NOT_OPEN');
     if(previous)reject('EVENT_ALREADY_CLAIMED');
     if(event.userStatus!=='CLAIMABLE')reject('EVENT_NOT_CLAIMABLE');
     if(code==='invite'){
-      const {slotsUsed,slotCap}=fleet();
+      const {slotsUsed,slotCap}=fleet(owner);
       if(slotsUsed+rules.giftQuantity>slotCap)reject('H4_EVENT_DEVICE_CAPACITY_UNAVAILABLE');
       if(!hasGiftStock(products.find(product=>product.id===rules.giftProductNo),rules))reject('H4_EVENT_GIFT_STOCK_UNAVAILABLE');
     }
-    return award(state,code,now,commandKey);
-  }
+    return award(state,code,now,owner,commandKey);
+  });
   const serverDate=date(now).slice(0,10),nextResetAtUtc=date(Date.parse(serverDate)+day);
   const freeAvailable=ongoing&&!record.spins.some(({result})=>result.spinDate===serverDate&&result.sourceType==='DAILY');
   const bonusTickets=ongoing?Math.max(0,spinTickets-record.spins.filter(({result})=>result.sourceType==='BONUS').length):0;

@@ -12,8 +12,8 @@
         <text v-for="(line, i) in intro.lines" :key="i" class="xg-desc xg-ov__line">{{ line }}</text>
       </view>
       <view class="xg-coins" aria-hidden="true">
-        <view class="xg-coin xg-coin--u"><text>U</text></view>
-        <view class="xg-coin xg-coin--t"><text>₮</text></view>
+        <view class="xg-coin xg-coin--u"><UvtCoin /></view>
+        <view class="xg-coin xg-coin--t"><UsdtCoin /></view>
         <svg class="xg-coins__swap" width="28" height="20" viewBox="0 0 28 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h18l-4-4M24 13H6l4 4" /></svg>
       </view>
       <view v-if="directory.length > 1" class="xg-toc" role="navigation" :aria-label="directoryLabel">
@@ -46,6 +46,8 @@
 </template>
 
 <script setup lang="ts">
+import UvtCoin from "@/components/ui/uvt-coin.vue";
+import UsdtCoin from "@/components/ui/usdt-coin.vue";
 import { computed } from "vue";
 
 type Row = { title: string; body?: string };
@@ -84,9 +86,8 @@ function jump(id: string) {
 .xg-coins { position: relative; width: 96px; height: 80px; }
 .xg-coin { position: absolute; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; font: 600 18px/1 var(--font-jet-mono), ui-monospace, monospace;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 6px 10px -6px rgba(255,255,255,.24), 0 8px 18px rgba(0,0,0,.25); }
-.xg-coin--u { left: 2px; top: 4px; background: color-mix(in srgb, var(--v5-nex) 28%, var(--v5-surface-2)); color: var(--v5-nex-ink); }
-.xg-coin--t { right: 2px; bottom: 2px; background: color-mix(in srgb, var(--v5-ink) 12%, var(--v5-surface-2)); color: var(--v5-ink); }
-[data-theme="light"] .xg-coin { box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 6px 10px -6px rgba(255,255,255,.85), 0 8px 18px rgba(0,0,0,.25); }
+.xg-coin--u { left: 2px; top: 4px; }
+.xg-coin--t { right: 2px; bottom: 2px; }
 .xg-coins__swap { position: absolute; left: 34px; top: 30px; color: var(--v5-brand); }
 
 .xg-toc { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
