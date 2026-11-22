@@ -157,7 +157,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .tree-self-root { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 60px; color: var(--v5-ink-3); }
 .tree-self-root__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .tree-self-root__name { font-size: 14px; font-weight: 600; color: var(--v5-ink); }
-.tree-self-root__meta { font-size: 11px; line-height: 1.4; overflow-wrap: break-word; }
+.tree-self-root__meta { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); overflow-wrap: break-word; }
 .tree-self-root__chev { flex: none; color: var(--v5-ink-4); }
 .tree-rosters :deep(.tree-roster--direct .member-row) { position: relative; padding-left: 40px; border-top: 0; }
 .tree-rosters :deep(.tree-roster--direct .member-row)::before { content: ""; position: absolute; left: 19px; top: 0; bottom: 0; width: 2px; background: color-mix(in srgb, var(--v5-brand) 35%, transparent); }

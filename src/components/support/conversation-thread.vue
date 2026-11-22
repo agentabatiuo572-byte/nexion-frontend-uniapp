@@ -1430,7 +1430,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 .nx-conv-compose-field .nx-conv-send { flex-shrink: 0; }
 .nx-conv-compose-field :deep(textarea:focus-within),
 .nx-conv-compose-field .nx-conv-input:focus-within { outline: none; }
-.nx-conv-length { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px 8px; padding:0 0 4px; overflow-wrap:break-word; color:var(--v5-ink-3); font-size:11px; line-height:16px; }
+.nx-conv-length { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px 8px; padding:0 0 4px; overflow-wrap:break-word; color:var(--v5-ink-3); font-size:var(--ui-type-meta); line-height:var(--ui-type-meta-lh); }
 .nx-conv-length--over { color:var(--v5-danger); }
 .nx-conv-closedbar {
   padding: 10px 12px;

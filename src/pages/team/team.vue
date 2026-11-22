@@ -644,7 +644,7 @@ useAutoRecovery({
 .team-rank__identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .team-rank__copy { display: flex; flex-direction: column; min-width: 0; }
 .team-rank__level { font: 700 22px/26px var(--font-metric); color: var(--v5-brand); }
-.team-rank__hint { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.team-rank__hint { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .team-rank__bars { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
 .team-rank__bar { display: grid; grid-template-columns: minmax(28px, max-content) minmax(0, 1fr); align-items: center; gap: 6px; font: 400 10px/12px var(--font-v5); color: var(--v5-ink-3); }
 .team-rank__track { height: 4px; overflow: hidden; border-radius: 999px; background: var(--v5-surface-3); }

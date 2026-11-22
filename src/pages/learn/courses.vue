@@ -214,7 +214,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!error.value && !loading.va
 .course-feature { position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
 .course-feature__label { position: relative; display: block; font-size: 12.5px; font-weight: 500; line-height: 18px; color: var(--ui-lime-soft); }
 .course-feature__name { position: relative; display: block; max-width: 200px; margin-top: 6px; font-size: 19px; font-weight: 600; line-height: 25px; overflow-wrap: break-word; }
-.course-feature__meta { position: relative; margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); overflow-wrap: break-word; }
+.course-feature__meta { position: relative; margin-top: 6px; font-size: var(--ui-type-note); line-height: var(--ui-type-note-lh); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .course-feature__progress { display: flex; align-items: center; gap: 10px; margin-top: var(--v5-space-3); }
 .course-progress { flex: 1; height: 4px; border-radius: var(--v5-radius-full); overflow: hidden; background: var(--ui-course-track); }
 .course-progress > view { height: 100%; background: var(--v5-brand); }

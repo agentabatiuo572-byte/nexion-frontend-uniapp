@@ -659,7 +659,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-next { --nx-tint: var(--v5-brand); position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); }
 .course-next__label { display: block; font-size: 12.5px; font-weight: 500; line-height: 18px; color: var(--v5-brand); }
 .course-next__title { display: block; margin-top: 6px; font-size: 18px; font-weight: 600; line-height: 24px; overflow-wrap: break-word; }
-.course-next__meta { margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); overflow-wrap: break-word; }
+.course-next__meta { margin-top: 6px; font-size: var(--ui-type-note); line-height: var(--ui-type-note-lh); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .course-next__reward { color: var(--learning-reward); font-variant-numeric: tabular-nums; }
 .learning-course .course-next__cta { display: flex; box-sizing: border-box; width: 100%; min-height: 48px; margin-top: var(--v5-space-4); padding: 0; font-size: var(--ui-type-button); font-weight: 600; }
 .course-quiz-result { display:flex;flex-direction:column;gap:var(--v5-space-2);margin-top:var(--v5-space-5);padding-top:20px;border-top:1px solid var(--v5-border); }

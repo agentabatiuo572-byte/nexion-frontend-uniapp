@@ -532,8 +532,8 @@ useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAge
 .agent-tile > :deep(.amb-icon) { margin-bottom: auto; }
 .agent-tile__check { position: absolute; top: 14px; right: 14px; color: var(--v5-brand); }
 .agent-tile__title { display: block; font: var(--ui-type-subheading-weight, 500) 14px/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
-.agent-tile__rule { display: block; margin-top: var(--v5-space-1); font: 400 11px/16px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
-.agent-tile__range { display: block; font: 500 11px/16px var(--font-metric); color: var(--tint-ink); overflow-wrap: break-word; }
+.agent-tile__rule { display: block; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.agent-tile__range { display: block; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--tint-ink); overflow-wrap: break-word; }
 .agent-tile:focus-visible, .agent-path:focus-visible, .agent-link:focus-visible, .agent-preview:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .agent-hint { display: flex; gap: var(--v5-space-2); margin: var(--ui-space-inline) var(--v5-space-4) 0; font: var(--ui-type-note-weight, 400) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .agent-hint > svg { flex: none; margin-top: var(--v5-space-1); }

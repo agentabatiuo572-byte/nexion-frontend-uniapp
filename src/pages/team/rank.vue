@@ -259,7 +259,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-identity__copy { flex:1;min-width:0; }
 .rank-current-level { display:block;padding:0 9px;border:1px solid var(--v5-brand-border);border-radius:999px;background:var(--v5-surface);color:var(--ui-lime-soft);font:600 12.5px/20px var(--font-v5);font-variant-numeric:tabular-nums; }
 .rank-current-name { display:block;margin-top:2px;font:600 26px/32px var(--font-v5);overflow-wrap:break-word; }
-.rank-caption { display:block;font:400 12.5px/1.5 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.rank-caption { display:block;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-rules-link { display:flex;align-items:center;justify-content:flex-end;gap:6px;min-height:44px;margin-top:4px;font:500 13px/1.5 var(--font-v5);color:var(--v5-ink-2);cursor:pointer; }
 .rank-rules-link svg { flex:none; }
 .rank-next-progress { padding-top:16px;border-top:1px solid var(--v5-border); }
@@ -273,7 +273,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-condition__current { color:var(--v5-ink);font-weight:600; }
 .rank-progress-track { overflow:hidden;height:6px;border-radius:999px;background:var(--v5-surface-3);margin-top:8px; }
 .rank-progress-track > view { height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--v5-brand-deep),var(--ui-lime-soft));box-shadow:0 0 10px var(--v5-brand-border); }
-.rank-condition__gap { display:block;margin-top:6px;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.rank-condition__gap { display:block;margin-top:6px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-inherited { border-top:1px solid var(--v5-border);margin-top:18px;padding-top:4px; }
 .rank-inherited__toggle { min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);font-size:12px;color:var(--v5-ink-3);cursor:pointer; }
 .rank-upcoming { margin-top:16px; }
@@ -302,7 +302,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-details { position:relative;padding:2px 16px 18px 64px; }
 .rank-detail-label { display:block;font:600 12.5px/18px var(--font-v5);color:var(--v5-ink-2);margin-bottom:6px; }
 .rank-detail-label--spaced { margin-top:14px; }
-.rank-condition-copy { display:flex;gap:8px;align-items:baseline;margin:0;font:400 13.5px/20px var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
+.rank-condition-copy { display:flex;gap:8px;align-items:baseline;margin:0;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
 .rank-condition-dot { width:5px;height:5px;border-radius:50%;background:var(--v5-ink-3);flex:none;transform:translateY(-2px); }
 .rank-detail-hint,.rank-reward-note { display:block;margin-top:8px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .rank-perk-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px; }
