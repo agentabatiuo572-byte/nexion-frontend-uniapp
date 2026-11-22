@@ -10,8 +10,7 @@ const reject=(message,status=409)=>{throw Object.assign(new Error(message),{stat
 const commandOperations=['join','claim','reminder'];
 const readCommandKey=headers=>(headers['idempotency-key']||headers['Idempotency-Key'])?.trim();
 
-function eventCommandReceiptKey(state,headers,eventId,operation) {
-  const owner=previewAccountId(state,headers),key=readCommandKey(headers);
+function eventCommandReceiptKey(owner,eventId,operation,key) {
   return owner&&key ? JSON.stringify([owner,eventId,operation,key]) : null;
 }
 
@@ -19,12 +18,13 @@ export function demoH4EventCommandResponse(url,method,state,headers) {
   const match=url.pathname.match(/^\/api\/events\/([^/]+)\/commands\/([^/]+)$/);
   if(!match)return undefined;
   if(method!=='GET')reject('METHOD_NOT_ALLOWED',405);
-  if(!previewAccountId(state,headers))reject('AUTH_REQUIRED',401);
+  const owner=previewAccountId(state,headers);
+  if(!owner)reject('AUTH_REQUIRED',401);
   const eventId=decodeURIComponent(match[1]),operation=match[2],key=readCommandKey(headers);
   if(!commandOperations.includes(operation))reject('EVENT_COMMAND_OPERATION_UNSUPPORTED',422);
   if(!key)reject('IDEMPOTENCY_KEY_REQUIRED',422);
   if(key.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
-  const receipt=state.h4Events?.commandReceipts?.[eventCommandReceiptKey(state,headers,eventId,operation)];
+  const receipt=state.h4Events?.commandReceipts?.[eventCommandReceiptKey(owner,eventId,operation,key)];
   return receipt ? {code:0,message:'OK',data:receipt} : {code:404,message:'EVENT_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND'}};
 }
 
@@ -35,20 +35,21 @@ export function beginDelayedDemoH4EventCommand(url,method,state,headers,now) {
   if(!match)return null;
   const [,eventId,operation]=match;
   if(!events.some(([code])=>eventId==='demo-'+code)||state.dataState==='empty'||state.eventState==='empty')return null;
-  const key=eventCommandReceiptKey(state,headers,eventId,operation);
-  if(!key||readCommandKey(headers).length>128)return null;
+  const owner=previewAccountId(state,headers),commandKey=readCommandKey(headers);
+  const key=eventCommandReceiptKey(owner,eventId,operation,commandKey);
+  if(!key||commandKey.length>128)return null;
   const record=scene(state,now),receipts=record.commandReceipts??={};
   if(receipts[key])return null;
-  receipts[key]={status:'PROCESSING'};
-  return record;
+  const receipt=receipts[key]={status:'PROCESSING'};
+  return {record,owner,receipt};
 }
 
-function recordEventCommand(state,record,headers,eventId,operation,execute) {
-  const key=eventCommandReceiptKey(state,headers,eventId,operation);
+function recordEventCommand(record,key,admittedReceipt,execute) {
   if(!key)return execute();
   const receipts=record.commandReceipts??={};
   const previous=receipts[key];
   if(previous?.status==='SUCCEEDED')return previous.result;
+  if(previous?.status==='PROCESSING'&&previous!==admittedReceipt)reject('IDEMPOTENCY_REQUEST_IN_PROGRESS');
   try {
     const result=execute();
     receipts[key]={status:'SUCCEEDED',result};
@@ -433,6 +434,7 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
   const read=action==='detail'||action==='spin/state';
   if(!list&&request.method()!==(read?'GET':'POST'))reject('METHOD_NOT_ALLOWED',405);
   const headers=request.headers?.()??{};
+  const owner=request.delayedEvent?.owner??previewAccountId(state,headers);
   const commandKey=readCommandKey(headers);
   if(action==='claim'||action==='spin'){
     if(!commandKey)reject('IDEMPOTENCY_KEY_REQUIRED',422);
@@ -462,7 +464,7 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
       progressValue:event.progressValue,targetValue:event.targetValue,rewards:rewards(rules),results:[],myRewardAmount:null,
       userStatus:event.userStatus,claimKeys,voucher,reminderSubscribed:record.reminders.includes(code)};
   }
-  if(commandOperations.includes(action))return recordEventCommand(state,record,headers,id,action,()=>{
+  if(commandOperations.includes(action))return recordEventCommand(record,eventCommandReceiptKey(owner,id,action,commandKey),request.delayedEvent?.receipt,()=>{
     if(action==='join'){
       if(!ongoing)reject('EVENT_NOT_OPEN');
       if(!record.joined.includes(code))record.joined.push(code);
