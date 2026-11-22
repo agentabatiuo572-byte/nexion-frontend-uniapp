@@ -13,6 +13,8 @@ const ICONS = {
   "chevron-right": { d: ["m9 6 6 6-6 6"] },
   "chevron-down": { d: ["m6 9 6 6 6-6"] },
   "arrow-right": { d: ["M5 12h14", "m13 6 6 6-6 6"] },
+  "arrow-left": { d: ["M19 12H5", "m11 6-6 6 6 6"] },
+  "arrow-left-right": { d: ["M4 12h16", "m8 8-4 4 4 4", "m16 8 4 4-4 4"] },
   "arrow-down": { d: ["M12 5v14", "m6 13 6 6 6-6"] },
   "arrow-up": { d: ["M12 19V5", "m6 11 6-6 6 6"] },
   "arrow-up-right": { d: ["M7 17 17 7", "M8 7h9v9"] },

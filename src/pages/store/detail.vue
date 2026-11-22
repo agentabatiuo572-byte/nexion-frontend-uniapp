@@ -149,7 +149,7 @@
             <text class="truncate">{{ t.store.detYourPhone }}</text>
             <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">{{ phoneDailyEarnText }}</text>
           </view>
-          <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-4)">↔</text>
+          <view class="shrink-0" style="font-size: 12px; line-height: 0; color: var(--v5-ink-4)" aria-hidden="true"><NxIcon name="arrow-left-right" /></view>
           <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-brand)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
             <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
@@ -245,6 +245,7 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 }
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";

@@ -2537,7 +2537,7 @@ export const ru: Messages = {
     ladderProV2: "Box Pro v2",
     ladderRack: "Rack P1",
     ladderRackP2: "Rack P2",
-    ladderYou: "←вы",
+    ladderYou: "вы",
     perDay: "/день",
     vsPerDay: "/день",
     cardYouEarn: "Ожидаемый доход в день",

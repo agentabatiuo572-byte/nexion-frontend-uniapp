@@ -2537,7 +2537,7 @@ export const ms: Messages = {
     ladderProV2: "Box Pro v2",
     ladderRack: "Rack P1",
     ladderRackP2: "Rack P2",
-    ladderYou: "←anda",
+    ladderYou: "anda",
     perDay: "/hari",
     vsPerDay: "/hari",
     cardYouEarn: "Anggaran pendapatan harian",

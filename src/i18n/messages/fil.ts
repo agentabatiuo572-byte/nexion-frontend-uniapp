@@ -2537,7 +2537,7 @@ export const fil: Messages = {
     ladderProV2: "Box Pro v2",
     ladderRack: "Rack P1",
     ladderRackP2: "Rack P2",
-    ladderYou: "←ikaw",
+    ladderYou: "ikaw",
     perDay: "/araw",
     vsPerDay: "/araw",
     cardYouEarn: "Tinatayang kita kada araw",
