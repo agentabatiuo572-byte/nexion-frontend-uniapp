@@ -417,7 +417,6 @@ const insetSource=/safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/;
 const SAFE_AREA_EXEMPT=[
   ["src/components/support/conversation-thread.vue",".nx-conv-composer"],
   ["src/components/support/conversation-thread.vue",".nx-conv-recovery-actions"],
-  ["src/components/support/conversation-thread.vue",".nx-conv-closedbar"],
   ["src/pages/daily/daily.vue",".dly"],
   ["src/pages/learn/course.vue",".learning-course"],
   ["src/pages/me/goals.vue",".growth-goals"],

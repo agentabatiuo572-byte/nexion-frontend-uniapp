@@ -16,7 +16,7 @@
          of a freshly-laid-out bubble). Programmatic positioning is immediate:
          a UniApp content transition can otherwise commit an obsolete target later. -->
     <scroll-view ref="listHost" scroll-y class="nx-conv-list" :scroll-top="scrollTop" :scroll-into-view="scrollAnchor" :scroll-with-animation="false" :show-scrollbar="false" @scroll="onThreadScroll">
-      <view class="nx-conv-content" :style="{ paddingTop: (topInset || 0) + 'px', paddingBottom: composerVisible ? (composerMeasured ? composerSpace + 'px' : 'calc(' + composerSpace + 'px + env(safe-area-inset-bottom))') : undefined }">
+      <view class="nx-conv-content" :style="{ paddingTop: (topInset || 0) + 'px', paddingBottom: closed ? (closedSpace ? closedSpace + 16 + 'px' : 'calc(var(--nx-tray-clearance) + 32px)') : composerVisible ? (composerMeasured ? composerSpace + 'px' : 'calc(' + composerSpace + 'px + env(safe-area-inset-bottom))') : undefined }">
       <view v-if="$slots['history-prefix']" class="nx-conv-history-prefix" :class="{ 'nx-conv-history-prefix--measured': historyPrefixMeasured }" :style="{ height: historyPrefixMeasured ? historyPrefixHeight + 'px' : undefined }">
         <view ref="historyPrefixHost" class="nx-conv-history-content"><slot name="history-prefix" /></view>
       </view>
@@ -112,11 +112,12 @@
       </view>
     </scroll-view>
 
-    <!-- Closed session → the input is retired; one CTA restarts with a fresh agent.
-         The "why" (timeout notice) is already a system message inside the thread. -->
-    <view v-if="closed" class="nx-conv-closedbar">
-	      <view class="nx-conv-restart active:opacity-80 family-control family-control--primary" role="button" tabindex="0" :aria-label="restartLabel" @click="emit('restart')" @keydown.enter.prevent="onKeyboardActivate($event, () => emit('restart'))" @keydown.space.prevent="onKeyboardActivate($event, () => emit('restart'))"><LiquidGlass rendering="frosted" :radius="22" tone="selection" />
-        <text class="nx-conv-restart-t">{{ restartLabel }}</text>
+    <!-- Read-only session → the input is retired. The shared bottom tray (04 §4.0) floats where the composer was:
+         the reason above, the one action below; with no reason it is the lone floating button. -->
+    <view v-if="closed" ref="closedHost" class="nx-conv-closedbar">
+      <view class="nx-conv-closed-tray nx-glass-bar">
+        <text v-if="closedNote" class="nx-tray-note" role="status">{{ closedNote }}</text>
+        <NxButton variant="primary" :label="restartLabel" @click="emit('restart')" />
       </view>
     </view>
 
@@ -177,6 +178,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onScopeDispose, getCurrentInstance, type CSSProperties } from "vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import MessageStatusIcon from './message-status-icon.vue';
 import type { ThreadMsg, QuickChip, MessageDeliveryState } from "./thread-types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -217,8 +219,9 @@ const props = defineProps<{
   typingLabel?: string;
   /** Bumped by the page on re-reveal (navigateBack) to force a re-scroll to bottom. */
   revealTick?: number;
-  /** Closed session (support timeout) → swap the input row for the restart CTA. */
+  /** Read-only session → swap the input row for the bottom tray: closedNote above the restart action. */
   closed?: boolean;
+  closedNote?: string;
   restartLabel?: string;
   queueLabels?: { edit: string; cancel: string; retry: string; save: string; cancelEdit: string };
   composerKey?: string;
@@ -995,6 +998,37 @@ function observeComposer() {
 watch(composerHost, observeComposer, { flush: 'post' });
 onMounted(observeComposer);
 onScopeDispose(() => composerResizeObserver?.disconnect());
+// The read-only tray floats over the thread like the composer; the thread keeps its height clear plus 16 (04 §4.0).
+const closedHost = ref<unknown>(null), closedSpace = ref(0);
+let closedResizeObserver: ResizeObserver | undefined;
+function measureClosed() {
+  void nextTick(() => {
+    const apply = (height: number | undefined) => {
+      if (!props.closed || !height || !Number.isFinite(height)) return;
+      closedSpace.value = height;
+      if (followingTail && !preparedHistory && !pendingPosition) scrollToEnd();
+    };
+    const node = (closedHost.value as { $el?: HTMLElement } | null)?.$el ?? closedHost.value as HTMLElement | null;
+    if (node?.getBoundingClientRect) { apply(node.getBoundingClientRect().height); return; }
+    if (typeof uni === 'undefined' || !uni.createSelectorQuery) return;
+    const query = uni.createSelectorQuery().in(threadInstance);
+    query.select('.nx-conv-closedbar').boundingClientRect();
+    query.exec(rows => apply((rows[0] as UniApp.NodeInfo)?.height));
+  });
+}
+watch(closedHost, () => {
+  closedResizeObserver?.disconnect();
+  closedResizeObserver = undefined;
+  closedSpace.value = 0;
+  measureClosed();
+  const node = (closedHost.value as { $el?: HTMLElement } | null)?.$el ?? closedHost.value as HTMLElement | null;
+  if (typeof ResizeObserver !== 'undefined' && node?.getBoundingClientRect) {
+    closedResizeObserver = new ResizeObserver(measureClosed);
+    closedResizeObserver.observe(node);
+  }
+}, { flush: 'post' });
+watch(() => [props.closedNote, props.restartLabel], measureClosed);
+onScopeDispose(() => closedResizeObserver?.disconnect());
 watch(() => [inputHeight.value, showInputLength.value, inputOverLimit.value, composerVisible.value,
   props.attachRetry, props.imageLabels?.retryPolicy, props.inputLimitHint, props.timeLocale], () => {
   const node = scroller();
@@ -1415,43 +1449,32 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   --v5-liquid-tint: rgba(40,43,42,.46);
   --v5-liquid-shadow: inset 0 1px 1px rgba(255,255,255,.1);
 }
-.nx-conv-compose-field > :not(.nx-liquid-glass) { position: relative; }
+.nx-conv-compose-field > :not(.nx-liquid-glass) { position: relative; z-index: 2; }
 .nx-conv-compose-content { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .nx-conv-compose-field > :deep(.nx-liquid-glass[data-glass-strategy="frosted"]) { -webkit-backdrop-filter: blur(24px) saturate(135%); backdrop-filter: blur(24px) saturate(135%); }
-.nx-conv-compose-field::before, .nx-conv-compose-field::after {
-  content: ''; position: absolute; z-index: 1; inset: -1px 12px auto; height: 22px;
+/* Top-rim reflection (05 §5.3): one gradient layer on the glass, clipped by the field's rounded outline, under the
+   text and send button, fading out sideways over half the overlap width, so it follows the corner curve with no
+   cut ends. No blur filter or mask: scrolling only repaints this one gradient and its opacity. */
+.nx-conv-compose-field { --nx-rim-colour: var(--nx-rim-dark, transparent); }
+.nx-conv-compose-field::before {
+  content: ''; position: absolute; z-index: 1; inset: 0;
   border-radius: inherit; pointer-events: none; opacity: var(--nx-rim-strength, 0);
-  background: radial-gradient(ellipse var(--nx-rim-width, 60%) 85% at var(--nx-rim-x, 50%) 0%, var(--nx-rim-dark, transparent), transparent 72%);
-  filter: blur(4px);
+  background: radial-gradient(ellipse calc(var(--nx-rim-width, 60%) / 2) 20px at var(--nx-rim-x, 50%) 0, var(--nx-rim-colour), transparent);
 }
-.nx-conv-compose-field::after { height: 2px; filter: blur(.6px); }
-:global([data-theme="light"] .nx-conv-compose-field) { --v5-liquid-tint: rgba(255,255,255,.58); --v5-liquid-shadow: inset 0 1px 1px rgba(255,255,255,.8); }
-:global([data-theme="light"] .nx-conv-compose-field::before), :global([data-theme="light"] .nx-conv-compose-field::after) { background: radial-gradient(ellipse var(--nx-rim-width, 60%) 85% at var(--nx-rim-x, 50%) 0%, var(--nx-rim-light, transparent), transparent 72%); }
+:global([data-theme="light"] .nx-conv-compose-field) { --v5-liquid-tint: rgba(255,255,255,.58); --v5-liquid-shadow: inset 0 1px 1px rgba(255,255,255,.8); --nx-rim-colour: var(--nx-rim-light, transparent); }
 .nx-conv-compose-field .nx-conv-send { flex-shrink: 0; }
 .nx-conv-compose-field :deep(textarea:focus-within),
 .nx-conv-compose-field .nx-conv-input:focus-within { outline: none; }
 .nx-conv-length { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px 8px; padding:0 0 4px; overflow-wrap:break-word; color:var(--v5-ink-3); font-size:var(--ui-type-meta); line-height:var(--ui-type-meta-lh); }
 .nx-conv-length--over { color:var(--v5-danger); }
+/* Transparent host in the composer's place; the tray itself sits 12 from the sides and --nx-tray-bottom from the
+   screen bottom like every page's bottom action (04 §4.0). Messages scroll beneath it. */
 .nx-conv-closedbar {
-  padding: 10px 12px;
-  /* mirrors the input row's safe-area lift (it replaces that row) */
-  padding-bottom: calc(var(--nx-safe-bottom) + 22px);
-  border-top: 1px solid var(--v5-border);
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 2;
+  padding: 8px 12px var(--nx-tray-bottom);
+  pointer-events: none;
 }
-.nx-conv-restart {
-  height: 44px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-}
-.nx-conv-restart-t {
-  font-family: var(--font-v5);
-  font-weight: 600;
-  font-size: 13px;
-  color: inherit;
-}
+.nx-conv-closed-tray { position: relative; left: auto; right: auto; bottom: auto; display: flex; flex-direction: column; pointer-events: auto; }
 .nx-conv-input {
   flex: none;
   min-width: 0;
