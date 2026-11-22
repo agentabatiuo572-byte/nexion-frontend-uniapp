@@ -85,7 +85,7 @@
                   <NxCodeValue class="bills-row__code" :value="b.ref" :label="t.orders.refundBillNo" />
                 </view>
                 <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click.stop="toggleSourceRef(b.id)"  @keydown.enter.stop.prevent="toggleSourceRef(b.id)" @keydown.space.stop.prevent="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
-                <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
+                <NxCodeValue v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward' && b.ref" full :value="b.ref" :label="t.bills.detailRef" :copyable="false" style="color: var(--v5-ink-3); font-size: 12px" />
               </view>
               <view class="bills-row__figure">
                 <view class="bills-row__amount" :class="{ 'bills-row__amount--in': !isDebit(b) }">
@@ -551,7 +551,7 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-sheet__facts { display:flex;flex-direction:column;border-radius:var(--ui-radius-surface);background:var(--v5-surface-2); }
 .bills-sheet__fact { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inset);min-height:48px;box-sizing:content-box;padding:0 16px;font:400 14px/20px var(--font-v5);color:var(--v5-ink-3); }
 .bills-sheet__fact + .bills-sheet__fact { border-top:1px solid var(--v5-border); }
-.bills-sheet__value { min-width:0;font-weight:400;text-align:right;color:var(--v5-ink);overflow-wrap:anywhere; }
+.bills-sheet__value { min-width:0;font-weight:400;text-align:right;color:var(--v5-ink);overflow-wrap:break-word; }
 .bills-sheet__fact--code > text:first-child { min-width:0; }
 .bills-row__code { color:var(--v5-ink-3);font-size:12px;line-height:18px; }
 .bills-sheet__close { position:relative;isolation:isolate;display:grid;place-items:center;min-height:48px;border-radius:24px;color:var(--v5-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);cursor:pointer; }

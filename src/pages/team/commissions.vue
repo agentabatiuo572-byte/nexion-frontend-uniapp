@@ -67,7 +67,7 @@
                 <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
                 <view v-for="code in eventCodes(e)" :key="code.label" class="commission-code"><text class="commission-code__label">{{ code.label }}</text><NxCodeValue class="commission-code__value" :value="code.value" :label="code.label" /></view>
               </view>
-              <view class="text-right" style="max-width: 48%; overflow-wrap: anywhere">
+              <view class="text-right" style="max-width: 48%; overflow-wrap: break-word">
                 <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>
                 <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'uvt')">{{ commissionNexLabel(e) }}</text>
                 <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ coolingTag(e) }}</text>

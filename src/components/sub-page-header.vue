@@ -242,7 +242,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   line-height: 1.2;
   color: var(--v5-ink-3);
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .spv-belldot {
   position: absolute;

@@ -240,7 +240,7 @@ const sheetStyle: CSSProperties = {
 const sheetCloseStyle: CSSProperties = { width: "44px", height: "44px", flexShrink: 0, fontSize: "24px", color: "var(--v5-ink-2)" };
 const sheetStatLabelStyle: CSSProperties = { fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
 function sheetStatValStyle(color: string): CSSProperties {
-  return { fontSize: "var(--ui-type-profile)", fontWeight: 600, marginTop: "8px", overflowWrap: "anywhere", color };
+  return { fontSize: "var(--ui-type-profile)", fontWeight: 600, marginTop: "8px", overflowWrap: "break-word", color };
 }
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
@@ -255,7 +255,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
 .network-overview { --nx-tint: var(--v5-brand); padding: 0 var(--v5-space-4) var(--v5-space-4); border: 0; border-radius: 28px; }
 .network-overview__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); padding-top: var(--ui-space-inset); font: 600 12px/18px var(--font-v5); color: var(--v5-ink-2); }
-.network-overview__split { min-width: 0; overflow-wrap: anywhere; }
+.network-overview__split { min-width: 0; overflow-wrap: break-word; }
 .network-overview__total { flex: none; color: var(--v5-ink); }
 .network-overview__total > .nx-num-metric { font-size: 13px; }
 .network-orbit { position: relative; width: 300px; max-width: 100%; aspect-ratio: 1; margin: var(--v5-space-1) auto 0; }
@@ -269,7 +269,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-orbit__dot--inner { width: 26px; height: 26px; margin: -13px 0 0 -13px; }
 .network-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--v5-space-2) var(--v5-space-3); padding-top: var(--ui-space-row-y); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 .network-legend__item { display: flex; align-items: center; gap: 5px; }
-.network-meta { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); margin-top: var(--v5-space-1); overflow-wrap: anywhere; }
+.network-meta { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); margin-top: var(--v5-space-1); overflow-wrap: break-word; }
 .network-read-state { color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); padding: var(--v5-space-4) 0; }
 .network-member-index { display: flex; flex-direction: column; gap: var(--v5-space-4); }
 .network-members-card { padding: 0 var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
@@ -279,16 +279,16 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-member-pick { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 60px; padding-block: 10px; border-top: 1px solid var(--v5-border); box-sizing: border-box; }
 .network-member-pick--selected { background: color-mix(in srgb, var(--v5-brand) 6%, transparent); }
 .network-member-identity { flex: 1; min-width: 0; }
-.network-member-name { display: block; font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; overflow-wrap: anywhere; }
+.network-member-name { display: block; font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; overflow-wrap: break-word; }
 .network-member-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--v5-space-1) 6px; margin-top: 5px; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 .network-member-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
-.network-member-compute { max-width: 33%; text-align: right; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); overflow-wrap: anywhere; }
+.network-member-compute { max-width: 33%; text-align: right; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .network-member-points { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--v5-ink); }
 .network-chevron { color: var(--v5-ink-3); flex: none; }
 .network-empty { display: block; padding-block: var(--v5-space-4); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); }
 .sheet-handle { width: 36px; height: 3px; border-radius: 999px; background: var(--v5-ink-4); margin: 0 auto var(--v5-space-5); }
 .sheet-heading { display: flex; align-items: center; gap: var(--ui-space-inline); }
-.sheet-identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.sheet-identity { flex: 1; min-width: 0; overflow-wrap: break-word; }
 .sheet-name { display: block; font-size: var(--ui-type-profile); line-height: var(--ui-type-profile-lh); font-weight: 600; }
 .sheet-rank { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); }
 .sheet-relation { display: block; font-size: var(--ui-type-meta); line-height: 1.5; margin-top: var(--v5-space-1); }
@@ -296,7 +296,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .sheet-detail-row { display: flex; align-items: start; justify-content: space-between; gap: var(--v5-space-5); padding: 14px 0; border-top: 1px solid var(--v5-border); font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.5; }
 .sheet-joined-date { flex-wrap: wrap; }
 .sheet-joined-date > :last-child { min-width: 0; flex: 1 1 170px; }
-.sheet-detail-row > :last-child { text-align: right; color: var(--v5-ink); overflow-wrap: anywhere; }
+.sheet-detail-row > :last-child { text-align: right; color: var(--v5-ink); overflow-wrap: break-word; }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .nx-net-sheet-wrap { position: fixed; inset: 0; z-index: 790; display: flex; align-items: flex-end; justify-content: center; }
 .nx-net-scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--v5-surface-3) 70%, transparent); backdrop-filter: blur(4px); }

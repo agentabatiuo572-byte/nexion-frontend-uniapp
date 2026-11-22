@@ -155,16 +155,16 @@ useAutoRecovery({ failed: () => state.value.error && !state.value.loading, retry
 <style scoped>
 .rank-how-page { color: var(--v5-ink); padding-bottom: 28px; }
 .how-state { margin: 0 20px; padding: 32px 0; display: flex; flex-direction: column; gap: 16px; color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); }
-.how-caption { display: block; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
+.how-caption { display: block; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .how-ladder-scroll { width: 100%; }
 .how-ladder-scroll :deep(.uni-scroll-view) { scrollbar-width: thin; scrollbar-color: var(--v5-border) transparent; }
 .how-ladder { display: flex; align-items: flex-start; gap: 16px; padding-bottom: 4px; white-space: normal; }
 .how-rank { flex: 0 0 76px; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .how-rank__level { display: block; margin-top: 8px; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.how-rank__name { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
-.how-authority { display: block; margin: 16px 20px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
+.how-rank__name { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
+.how-authority { display: block; margin: 16px 20px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .how-rank-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; margin: 16px 16px 0; padding: 0 16px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); cursor: pointer; }
-.how-rank-link > text { min-width: 0; overflow-wrap: anywhere; }
+.how-rank-link > text { min-width: 0; overflow-wrap: break-word; }
 .how-rank-link > svg { flex: none; color: var(--v5-ink-4); }
 .how-footer { margin: 24px 16px 0; }
 .how-footer :deep(.nx-button) { width: 100%; box-sizing: border-box; }

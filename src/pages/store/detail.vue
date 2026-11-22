@@ -163,7 +163,7 @@
         <!-- === Section 5: Hardware spec === -->
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detHardware" /></view>
         <SpecTable :rows="hardwareSpecs" />
-        <view v-if="copy.taskLevels" class="mx-4" style="padding: 12px 16px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; color: var(--v5-ink-3)"><text>{{ copy.taskLevels }}</text></view>
+        <view v-if="copy.taskLevels" class="mx-4" style="padding: 12px 16px; font-size: 12px; line-height: 1.5; overflow-wrap: break-word; color: var(--v5-ink-3)"><text>{{ copy.taskLevels }}</text></view>
 
 
         <!-- === Section 7: Trust material === -->
@@ -836,7 +836,7 @@ const faqQStyle: CSSProperties = {
 <style src="@/components/promotion/promotion.css"></style>
 <style scoped>
 .detail-summary { padding: var(--v5-space-5); }
-.detail-summary__name { display: block; overflow-wrap: anywhere; }
+.detail-summary__name { display: block; overflow-wrap: break-word; }
 .detail-summary__tagline { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-list-subtitle); line-height: var(--v5-type-body-s-lh); color: var(--v5-ink-3); }
 .detail-sales-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--v5-space-6); margin-top: var(--v5-space-5); }
 .detail-sales-stat { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }
@@ -844,9 +844,9 @@ const faqQStyle: CSSProperties = {
 .detail-sales-stat--stock { align-items: flex-end; color: var(--v5-brand-2); text-align: right; }
 .detail-sales-stat__value-row { display: flex; align-items: center; gap: var(--v5-space-2); min-width: 0; }
 .detail-sales-stat__value-row svg { flex: none; }
-.detail-sales-stat__value { font-size: var(--v5-type-h3); font-weight: 600; line-height: var(--v5-type-h3-lh); overflow-wrap: anywhere; }
-.detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--v5-type-body-s-lh) var(--font-v5); overflow-wrap: anywhere; }
-.detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--v5-type-h3-lh) var(--font-v5); overflow-wrap: anywhere; }
+.detail-sales-stat__value { font-size: var(--v5-type-h3); font-weight: 600; line-height: var(--v5-type-h3-lh); overflow-wrap: break-word; }
+.detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--v5-type-body-s-lh) var(--font-v5); overflow-wrap: break-word; }
+.detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--v5-type-h3-lh) var(--font-v5); overflow-wrap: break-word; }
 .detail-sales-stat:only-child { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
 .detail-compute-points { display: flex; align-items: flex-start; gap: 5px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .detail-compute-points svg { flex: none; margin-top: 2px; }

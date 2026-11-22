@@ -302,16 +302,16 @@ useAutoRecovery({ failed: () => remoteApiEnabled && remoteState.value === "error
 .leader-row { display: flex; align-items: center; gap: var(--ui-space-inline); border-top: 1px solid var(--v5-border); min-height: 64px; }
 .leader-position { min-width: 20px; font: 600 var(--ui-type-list-title)/20px var(--font-metric); color: var(--v5-ink-3); }
 .leader-person { min-width: 0; flex: 1; }
-.leader-name { display: block; font: var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5); overflow-wrap: anywhere; }
-.leader-meta { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); overflow-wrap: anywhere; }
-.leader-points { text-align: right; font: 600 var(--ui-type-subheading)/20px var(--font-metric); font-variant-numeric: tabular-nums; max-width: 34%; overflow-wrap: anywhere; }
+.leader-name { display: block; font: var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5); overflow-wrap: break-word; }
+.leader-meta { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); overflow-wrap: break-word; }
+.leader-points { text-align: right; font: 600 var(--ui-type-subheading)/20px var(--font-metric); font-variant-numeric: tabular-nums; max-width: 34%; overflow-wrap: break-word; }
 .leader-currency { display: block; margin-top: var(--v5-space-1); font-size: 11px; color: var(--v5-ink-3); }
 /* My rank: brand-tinted strip with the gap and, when known, progress to the next rank. */
 .leader-me { display: flex; align-items: center; gap: var(--ui-space-inline); padding: var(--ui-space-inline) var(--ui-space-inset); border-radius: 20px; background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
 .leader-me .leader-my-rank { display: flex; align-items: baseline; gap: var(--v5-space-1); flex: none; font: 600 22px/28px var(--font-metric); color: var(--v5-brand); }
 .leader-me__body { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .leader-me__line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--v5-space-2); }
-.leader-gap { min-width: 0; color: var(--v5-ink-2); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: anywhere; }
+.leader-gap { min-width: 0; color: var(--v5-ink-2); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
 .leader-me__bar { position: relative; height: 6px; overflow: hidden; border-radius: 999px; background: var(--v5-surface-3); }
 .leader-me__bar > view { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--v5-brand); }
 .leader-cta { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inset); min-height: 48px; padding: var(--ui-space-inline) var(--v5-space-5); box-sizing: border-box; border: 1px solid var(--v5-border); border-radius: 999px; color: var(--v5-ink); background: color-mix(in srgb, var(--v5-ink) 6%, transparent); font-size: 14px; font-weight: 500; }
