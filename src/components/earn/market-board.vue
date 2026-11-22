@@ -20,7 +20,7 @@
         <text class="earn-market__caption">{{ en.market.priceIndex }}</text>
         <text v-if="!priceIndex.length" class="earn-market__status">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
         <!-- Three fixed tiles. With more than three workloads, tile i owns workloads i, i+3, … and every
-             ROTATE_MS each tile cross-fades to its next one (staggered), like a quote screen. Screen readers
+             ROTATE_MS all three tiles switch to their next one at once, like a quote screen. Screen readers
              get the full list once; the rotating faces are hidden from them. -->
         <view
           v-else
@@ -37,7 +37,7 @@
         >
           <view class="nx-sr-only" role="list"><text v-for="w in priceIndex" :key="w.code" role="listitem">{{ spokenWorkload(w) }}</text></view>
           <view class="earn-market__grid" aria-hidden="true">
-          <view v-for="(slot, i) in slots" :key="i" class="earn-market__tile" :style="{ '--earn-market-stagger': `${i * 140}ms` }">
+          <view v-for="(slot, i) in slots" :key="i" class="earn-market__tile">
           <view v-for="(w, k) in slot" :key="w.code" class="earn-market__face" :class="{ 'earn-market__face--on': k === step % slot.length }">
             <text class="earn-market__name">{{ workloadCopy(w).name }}</text>
             <text class="earn-market__unit">{{ workloadCopy(w).unit }}</text>
@@ -222,15 +222,14 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__status { display: block; padding: 10px 0; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .earn-market__board:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 16px; }
-/* Every face of a tile shares one grid cell, so the tile keeps the tallest face's height while they swap. */
+/* Every face of a tile shares one grid cell, so the tile keeps the tallest face's height. A swap shows the next face
+   at once on all three tiles, like a quote board's tick: no fade, never a blank or half-transparent tile. */
 .earn-market__tile { display: grid; min-width: 0; padding: 10px 10px 8px; border-radius: 14px; background: var(--v5-surface-2); }
-.earn-market__face { grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0; opacity: 0; visibility: hidden; transform: translateY(4px);
-  transition: opacity 200ms ease var(--earn-market-stagger, 0ms), transform 200ms ease var(--earn-market-stagger, 0ms), visibility 0s linear calc(200ms + var(--earn-market-stagger, 0ms)); }
-.earn-market__face--on { opacity: 1; visibility: visible; transform: none;
-  transition: opacity 280ms ease calc(200ms + var(--earn-market-stagger, 0ms)), transform 280ms cubic-bezier(0.16, 1, 0.3, 1) calc(200ms + var(--earn-market-stagger, 0ms)), visibility 0s; }
+.earn-market__face { grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0; visibility: hidden; }
+.earn-market__face--on { visibility: visible; }
 @media (prefers-reduced-motion: reduce) {
-  .earn-market__face { transition: none; opacity: 0; visibility: hidden; }
-  .earn-market__face:first-child { opacity: 1; visibility: visible; transform: none; }
+  .earn-market__face { visibility: hidden; }
+  .earn-market__face:first-child { visibility: visible; }
 }
 [data-theme="light"] .earn-market__tile { background: var(--v5-bg); }
 .earn-market__name { font: 500 11px/14px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
