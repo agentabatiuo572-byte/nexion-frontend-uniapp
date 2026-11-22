@@ -232,8 +232,8 @@ const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(na
 const trial = useFreeTrial();
 onShow(() => {
   app.setTaskReadPageVisible("device-inventory", true);
-  void trial.refreshVisible();
-  if (remoteApiEnabled) void app.refreshRemoteFleet(undefined, { coalesce: true });
+  void trial.refreshVisible(false, true);
+  if (remoteApiEnabled) void app.ensureRemoteFleet();
 });
 onHide(() => app.setTaskReadPageVisible("device-inventory", false));
 const trialPresentation = useTrialPresentation();
@@ -254,6 +254,8 @@ async function retryInventory() {
 useAutoRecovery({
   failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && trial.authorityStatus !== "loading"
     && productCatalogState.status !== "loading" && (app.remoteFleetStatus === "error" || trial.authorityStatus === "error"
+      || app.remoteAssignmentStatus === "error"
+      || (app.remoteFleetHasSnapshot && !app.remoteAssignmentHasSnapshot && app.remoteAssignmentStatus === "idle")
       || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")),
   retry: retryInventory,
 });

@@ -212,6 +212,7 @@ import { isCurrentNativeTab } from "@/lib/native-tab-navigation";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { resolveChassisScrollElement, scrollCurrentTabToTop, scrollNativeCurrentTabToTop } from "@/lib/chassis-scroll";
+import { registerVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
@@ -594,6 +595,9 @@ import GlassSegments from "@/components/glass-segments.vue";
 
 const chassisHostId = `nx-chassis-host-${getCurrentInstance()!.uid}`;
 const pageVisible = ref(true);
+watch(() => pageVisible.value && props.hostVisible, (visible, _previous, onCleanup) => {
+  if (visible) onCleanup(registerVisiblePullRefresh());
+}, { immediate: true });
 const scrollVisit = ref(0);
 const pageVisit = ref(0);
 watch(() => props.scrollLoadKey, () => { scrollVisit.value++; }, { flush: "sync" });
