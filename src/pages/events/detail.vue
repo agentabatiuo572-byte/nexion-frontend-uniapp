@@ -39,15 +39,15 @@
         </view>
       </view>
       <text v-if="commandError && !action" class="event-copy" role="status">{{ copy.pending }}</text>
-      <view v-if="action" class="event-bar-space" :class="{ 'event-bar-space--note': commandError }" aria-hidden="true"><text v-if="commandError" class="event-bar-space__note">{{ copy.pending }}</text></view>
+      <view v-if="action" class="event-bar-space" :class="{ 'event-bar-space--note': barNote }" aria-hidden="true"><text v-if="barNote" class="event-bar-space__note">{{ barNote }}</text></view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
   </view>
   <template #pageFixed>
     <view v-if="detail && action" class="event-bar nx-glass-bar">
-      <text v-if="commandError" class="nx-tray-note" role="status">{{ copy.pending }}</text>
+      <text v-if="barNote" class="nx-tray-note" role="status">{{ barNote }}</text>
       <NxButton v-if="action==='open'" variant="primary" size="large" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
-      <NxButton v-else variant="primary" size="large" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
+      <NxButton v-else variant="primary" size="large" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="error" @click="run" />
     </view>
   </template></AppChassis>
 </template>
@@ -86,6 +86,9 @@ const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
 const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);
+// The button is only unavailable while the shown state is a stale snapshot (a failed read); a read in progress does not
+// grey it (03 §3.1). The reason sits above it in the tray; otherwise an unknown result says it is being confirmed.
+const barNote = computed(() => error.value && action.value !== "open" ? copy.value.staleNote : commandError.value ? copy.value.pending : "");
 // State tag tones (03 §3.8): claimable success, running but not met warning, closed or done neutral; 「暂未开放」-type
 // unavailability takes the spec's unavailable tone (neutral fill, auxiliary text). READY is success only for a reward
 // the user can claim now (userStatus CLAIMABLE, the status the claim command needs); purchase, upgrade and voucher
@@ -125,7 +128,7 @@ async function run() {
   if (!visible || busy.value || !detail.value || !action.value) return;
   const selectedAction = action.value;
   if (selectedAction === "open") { navTo(eventDetailHref(detail.value)); return; }
-  if (loading.value || error.value) return;
+  if (error.value) return;
   const scope = identity(), request = generation;
   const current = () => visible && request === generation && scope === identity();
   busy.value = true; commandError.value = false;
