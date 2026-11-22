@@ -1,4 +1,4 @@
-import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
+import { invalidateBeforePassiveTabRead, invalidatePassiveTabRead, rememberPassiveTabRead, runForegroundStoreRead } from "@/lib/passive-tab-read";
 import { reactive } from "vue";
 import { productPhaseApi, remoteApiEnabled } from "@/api/runtime";
 import type { PhaseId } from "./product-phase";
@@ -22,6 +22,7 @@ let phaseEpoch = 0;
 
 export function prepareServerProductPhase(): void {
   if (!remoteApiEnabled) return;
+  invalidatePassiveTabRead("product-phase");
   phaseEpoch += 1;
   refreshInFlight = null;
   serverProductPhaseState.status = "loading";
@@ -30,13 +31,17 @@ export function prepareServerProductPhase(): void {
   serverProductPhaseState.error = "";
 }
 
+export function ensureServerProductPhase(): Promise<boolean> {
+  return runForegroundStoreRead("product-phase", () => refreshServerProductPhase(true));
+}
+
 export function refreshServerProductPhase(force = false): Promise<boolean> {
-    invalidateBeforePassiveTabRead("product-phase");
   if (!remoteApiEnabled) return Promise.resolve(true);
   if (!force && serverProductPhaseState.status === "ready" && serverProductPhaseState.phase) {
     return Promise.resolve(true);
   }
   if (refreshInFlight) return refreshInFlight;
+  invalidateBeforePassiveTabRead("product-phase");
 
   serverProductPhaseState.status = "loading";
   serverProductPhaseState.error = "";
@@ -61,5 +66,5 @@ export function refreshServerProductPhase(force = false): Promise<boolean> {
       if (refreshInFlight === request) refreshInFlight = null;
     });
   refreshInFlight = request;
-  return request;
+  return rememberPassiveTabRead("product-phase", request);
 }

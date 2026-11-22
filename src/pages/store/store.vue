@@ -93,7 +93,6 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/tab-page-frame.vue";
@@ -125,7 +124,7 @@ import NxListGroup from "@/components/ui/nx-list-group.vue";
 import NxListRow from "@/components/ui/nx-list-row.vue";
 import { PRODUCTS } from "@/mock/products";
 import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
-import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
@@ -183,7 +182,7 @@ async function refreshVisibleStore() {
   if (publicOnly.value) { await refreshPromotion(); return; }
   await Promise.allSettled([
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
-    runPassiveTabRead('product-phase', () => refreshServerProductPhase(true)),
+    refreshServerProductPhase(true),
     revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(), refreshPromotion(),
   ]);
 }
@@ -203,7 +202,7 @@ onShow(() => {
   // Re-read it whenever the store becomes visible so a prior failed 0/0
   // bootstrap can recover without an account rebind or a Genesis-detail visit.
   void genesis.ensureSummary();
-  void runPassiveTabRead('product-phase', () => refreshServerProductPhase(true));
+  void ensureServerProductPhase();
   void revalidateProductCatalog();
   void earnConfig.ensure();
   void observeDayOneStorePage();

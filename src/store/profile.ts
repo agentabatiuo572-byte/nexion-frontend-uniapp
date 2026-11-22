@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
-import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
+import { runForegroundStoreRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { defaultNickname } from "@/lib/nickname";
@@ -59,6 +59,10 @@ export const useProfile = defineStore("profile", () => {
 
   function clearAvatar() {
     invalidatePassiveTabRead("profile-avatar");
+    clearAvatarProjection();
+  }
+
+  function clearAvatarProjection() {
     avatarReadEpoch += 1;
     avatarInFlight = null;
     avatarHasSnapshot = false;
@@ -131,7 +135,7 @@ export const useProfile = defineStore("profile", () => {
   }
 
   function ensureAvatar(): Promise<boolean> {
-    return runPassiveTabRead("profile-avatar", () => avatarInFlight ?? refreshAvatar(), undefined,
+    return runForegroundStoreRead("profile-avatar", () => avatarInFlight ?? refreshAvatar(), undefined,
       () => avatarHasSnapshot, 60_000);
   }
 
@@ -159,7 +163,7 @@ export const useProfile = defineStore("profile", () => {
       avatarHasSnapshot = true;
       return true;
     } catch (cause) {
-      if (remoteAccountEpoch.isCurrent(account) && readEpoch === avatarReadEpoch && !isTransientReadFailure(cause)) clearAvatar();
+      if (remoteAccountEpoch.isCurrent(account) && readEpoch === avatarReadEpoch && !isTransientReadFailure(cause)) clearAvatarProjection();
       throw cause;
     }
   }

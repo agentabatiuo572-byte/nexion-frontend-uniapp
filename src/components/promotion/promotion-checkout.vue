@@ -541,11 +541,15 @@ async function pay(){
     let ready=false,blocked='';
     await run(async()=>{
       const items=(expectedOrder.items??[]).map(({productNo,quantity})=>({productNo,quantity}));
-      const eligibility=await Promise.all([...new Set(items.map(item=>item.productNo))].map(productNo=>purchaseEligibilityApi.get(productNo)))
-        .catch(()=>null);
+      const eligibility=await Promise.allSettled([...new Set(items.map(item=>item.productNo))].map(productNo=>purchaseEligibilityApi.get(productNo)));
       updateClock();if(!entryCurrent()||payWindow.value!==true)return;
-      if(!eligibility){error.value=flowCopy.value.queryFailed;return;}
-      if(eligibility.some(item=>!item.eligible)){blocked=t.value.store.gateBlockedToast;error.value=blocked;return;}
+      const reason=eligibility.map(item=>item.status==='rejected'
+        ?checkoutQuoteBlock(item.reason,'eligibility')
+        :item.value.eligible?null:checkoutQuoteBlock(item.value.decisionCode,'eligibility'))
+        .find(block=>block&&block!=='unavailable')??null;
+      if(reason){blocked=checkoutQuoteBlockCopy(reason,t.value);error.value=blocked;return;}
+      if(eligibility.some(item=>item.status==='rejected')){error.value=flowCopy.value.queryFailed;return;}
+      if(eligibility.some(item=>item.status==='fulfilled'&&!item.value.eligible)){blocked=t.value.store.gateBlockedToast;error.value=blocked;return;}
       ready=true;
     });
     if(ready&&entryCurrent()&&canPay.value){paymentSheetOpen.value=true;void confirmPayment();}

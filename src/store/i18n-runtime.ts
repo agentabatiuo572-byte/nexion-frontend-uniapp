@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { LocaleCode } from "@/i18n";
 import { i18nApi, remoteApiEnabled } from "@/api/runtime";
+import { runForegroundStoreRead } from "@/lib/passive-tab-read";
 
 export type I18nRuntimeStatus = "fallback" | "loading" | "ready" | "stale";
 
@@ -102,5 +103,10 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
     return status.value[locale] === "ready" ? bundles.value[locale] ?? {} : {};
   }
 
-  return { bundles, fetchedAt, status, error, prepare, refresh, messages };
+  function ensure(locale: LocaleCode): Promise<void> {
+    return runForegroundStoreRead("i18n-runtime", () => refresh(locale, true), locale,
+      () => status.value[locale] === "ready");
+  }
+
+  return { bundles, fetchedAt, status, error, prepare, refresh, ensure, messages };
 });

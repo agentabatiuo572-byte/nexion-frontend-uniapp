@@ -1,6 +1,6 @@
 import { homeDisplay } from "@/composables/use-home-display";
 import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
-import { runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
+import { runForegroundStoreRead, runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import type { Device, CurrentTask, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
@@ -1135,7 +1135,7 @@ export const useApp = defineStore("app", () => {
 
   function ensureRemoteFleet(): Promise<boolean> {
     const request = remoteAccountEpoch.snapshot();
-    return runPassiveTabRead("remote-fleet", () => refreshRemoteFleet(request, { coalesce: true }), undefined,
+    return runForegroundStoreRead("remote-fleet", () => refreshRemoteFleet(request, { coalesce: true }), undefined,
       () => remoteFleetHasSnapshot.value);
   }
 

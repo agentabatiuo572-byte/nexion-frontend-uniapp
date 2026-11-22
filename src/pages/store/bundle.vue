@@ -237,7 +237,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
-import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { confirm, toast } from "@/store/ui";
 import { bundleDiscountApi, bundleOrderApi, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { matchesBundleQuote, normalizeBundleExpectedAmountUsdt } from "@/api/bundle-order-api";
@@ -298,7 +298,7 @@ onLoad(async (options) => {
 
 onShow(() => {
   void refreshProductCatalog(true);
-  void refreshServerProductPhase(true);
+  void ensureServerProductPhase();
   void refreshBundlePolicy();
   void refreshBundleWallet();
   restoreReceiptRecovery();

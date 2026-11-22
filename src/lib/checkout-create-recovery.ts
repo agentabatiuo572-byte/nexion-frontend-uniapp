@@ -2,6 +2,7 @@ import type { CreateOrderRequest, OrderCreateCommand } from '@/api/order-api';
 import { readAccountRow, writeAccountRow } from '@/store/account-scoped-storage';
 
 const KEY = 'uvel-checkout-create-recovery-v1';
+const COMPLETED_LIMIT = 50;
 export interface PendingCheckoutCreate {
   request: CreateOrderRequest;
   intent: string;
@@ -12,7 +13,7 @@ export interface PendingCheckoutCreate {
 type FailedCreate = Extract<OrderCreateCommand, { status: 'FAILED' }>;
 type Row = {
   creates: Record<string, PendingCheckoutCreate>;
-  completed?: Record<string, PendingCheckoutCreate & { result: FailedCreate }>;
+  completed?: Record<string, PendingCheckoutCreate & { result: FailedCreate; completedAt?: number }>;
 };
 
 /** Storage is the external boundary; restore the exact original request. */
@@ -53,7 +54,11 @@ export function completeFailedCheckoutCreate(accountKey: string, entry: PendingC
   if (row?.creates?.[productNo]?.request.idempotencyKey !== idempotencyKey) return false;
   const creates = { ...row.creates };
   delete creates[productNo];
-  const completed = { ...row.completed, [idempotencyKey]: { ...entry, result } };
+  const previous = Object.entries(row.completed ?? {}).filter(([key]) => key !== idempotencyKey);
+  // Stable sorting preserves insertion order for old records without a timestamp.
+  previous.sort(([, a], [, b]) => (a.completedAt ?? 0) - (b.completedAt ?? 0));
+  const completed = { ...Object.fromEntries(previous.slice(-(COMPLETED_LIMIT - 1))),
+    [idempotencyKey]: { ...entry, result, completedAt: Date.now() } };
   if (!writeAccountRow(KEY, accountKey, { creates, completed })
       || readAccountRow<Row>(KEY, accountKey, true)?.completed?.[idempotencyKey]?.request.idempotencyKey !== idempotencyKey) {
     throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
