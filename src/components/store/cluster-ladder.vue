@@ -38,7 +38,7 @@ import { useT } from "@/i18n/use-t";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import SectionHeader from "./section-header.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
-import { storefrontUsd, storefrontUsdFull, type StoreYieldAuthority, type StoreYieldLadderRow } from "@/lib/store-yield-authority";
+import { storefrontUsd, type StoreYieldAuthority, type StoreYieldLadderRow } from "@/lib/store-yield-authority";
 
 const t = useT();
 const { elRef: ladderEl, inView } = useScrollGrowProgress();
@@ -75,7 +75,7 @@ const tiers = computed<Tier[]>(() => {
       id: row.id,
       label: labels[row.id],
       y: storefrontUsd(amount),
-      yFull: storefrontUsdFull(amount),
+      yFull: storefrontUsd(amount),
       amount: amount?.usd ?? 0,
       width: row.widthPct,
       you,
