@@ -47,6 +47,8 @@ function recordEventCommand(state,record,headers,eventId,operation,execute) {
   const key=eventCommandReceiptKey(state,headers,eventId,operation);
   if(!key)return execute();
   const receipts=record.commandReceipts??={};
+  const previous=receipts[key];
+  if(previous?.status==='SUCCEEDED')return previous.result;
   try {
     const result=execute();
     receipts[key]={status:'SUCCEEDED',result};
