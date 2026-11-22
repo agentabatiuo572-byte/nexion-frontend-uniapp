@@ -13,9 +13,9 @@
         <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="pendingCreateTitle" :description="pendingCreateDescription" />
         <view v-if="pendingCreateTerms" class="checkout-group checkout-fees">
           <CheckoutRow :label="t.store.coRowTotal" :value="reviewMoney(pendingCreateTerms.amount, false, true)" class="checkout-fee" />
-          <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" class="checkout-fee" />
+          <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" :code="pendingCreateTerms.productCode" class="checkout-fee" />
           <CheckoutRow :label="t.store.coRowQuantity" :value="pendingCreateTerms.quantity" class="checkout-fee" />
-          <CheckoutRow :label="t.voucher.checkoutRowLabel" :value="pendingCreateTerms.voucher" class="checkout-fee" />
+          <CheckoutRow :label="t.voucher.checkoutRowLabel" :value="pendingCreateTerms.voucher" :code="pendingCreateTerms.voucherCode" class="checkout-fee" />
         </view>
       </view>
       <view v-else-if="keepCheckoutTarget" class="checkout-page-center" role="status">
@@ -402,12 +402,17 @@ const pendingCreateTerms = computed(() => {
   const pending = pendingCheckoutCreate.value;
   if (!pending || (!canResubmitPendingCreate.value && !pendingCreateReplayBusy.value)) return null;
   const { productNo, quantity, voucherId } = pending.request;
+  const productName = (typeof pending.productName === 'string' && pending.productName) || getProduct(productNo)?.name;
+  const voucherName = voucherId ? (typeof pending.voucherName === 'string' && pending.voucherName)
+    || voucher.catalog.find(offer => offer.id === voucherId)?.name : t.value.promotion.noVoucher;
+  // With the catalog down an older record may carry no name: its number shows as a code, never as body text (03 §3.6.1).
   return {
     amount: pending.amount,
-    product: (typeof pending.productName === 'string' && pending.productName) || getProduct(productNo)?.name || productNo,
+    product: productName || productNo,
+    productCode: !productName,
     quantity: String(quantity),
-    voucher: voucherId ? (typeof pending.voucherName === 'string' && pending.voucherName)
-      || voucher.catalog.find(offer => offer.id === voucherId)?.name || voucherId : t.value.promotion.noVoucher,
+    voucher: voucherName || String(voucherId),
+    voucherCode: !voucherName,
   };
 });
 const pendingCreateTitle = computed(() => originalOrderNavigationFailed.value ? t.value.store.coOriginalOrderOpenFailed
