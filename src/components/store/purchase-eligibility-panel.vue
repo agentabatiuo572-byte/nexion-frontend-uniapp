@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PurchaseEligibilityCondition, PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
-import { resolvePurchaseEligibilityMessage, type PurchaseEligibilityRequestStatus } from "@/lib/purchase-eligibility-copy";
+import { monthlyQuotaExhausted, resolvePurchaseEligibilityMessage, type PurchaseEligibilityRequestStatus } from "@/lib/purchase-eligibility-copy";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -46,7 +46,8 @@ const visiblePolicies = computed(() => !props.blockingOnly ? props.snapshot?.pol
 const statusText = computed(() => props.status === "idle" || props.status === "loading" ? t.value.store.purchaseEligibilityLoading
   : message.value === "eligible" ? t.value.tradein.purchaseEligible
   : message.value === "ineligible" ? t.value.store.purchaseEligibilityIneligible
-  : message.value === "quotaDepleted" ? t.value.tradein.purchaseQuotaDepleted : t.value.store.purchaseEligibilityError);
+  : message.value === "quotaDepleted" ? (monthlyQuotaExhausted(props.snapshot) ? t.value.store.purchaseMonthlyQuotaDepleted : t.value.tradein.purchaseQuotaDepleted)
+  : t.value.store.purchaseEligibilityError);
 function isQuota(condition: PurchaseEligibilityCondition): boolean {
   return condition.kind === "lifetimeQuota" || condition.kind === "monthlyQuota";
 }

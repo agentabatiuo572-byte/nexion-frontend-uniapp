@@ -2570,6 +2570,7 @@ export const ms: Messages = {
     purchaseEligibilityRetry: "Semak kelayakan semula",
     purchaseEligibilityProductPolicy: "Kelayakan pembelian produk",
     purchaseEligibilityQuotaDepleted: "Kuota jualan telah habis",
+    purchaseMonthlyQuotaDepleted: "Kuota bulan ini telah habis. Anda boleh membeli semula bulan hadapan.",
     trialProductUnavailable: "Peranti percubaan kehabisan stok buat sementara. Sila cuba lagi nanti.",
     productUnavailable: "Produk ini tidak tersedia buat sementara. Kembali ke kedai dan cuba lagi.",
     tickerBought: "membeli",

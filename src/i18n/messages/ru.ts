@@ -2570,6 +2570,7 @@ export const ru: Messages = {
     purchaseEligibilityRetry: "Проверить снова",
     purchaseEligibilityProductPolicy: "Условия покупки товара",
     purchaseEligibilityQuotaDepleted: "Квота продаж исчерпана",
+    purchaseMonthlyQuotaDepleted: "Квота на этот месяц исчерпана. Купить снова можно в следующем месяце.",
     trialProductUnavailable: "Пробного устройства временно нет в наличии. Повторите попытку позже.",
     productUnavailable: "Этот товар временно недоступен. Вернитесь в магазин и повторите.",
     tickerBought: "купил(а)",
