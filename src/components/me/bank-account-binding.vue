@@ -326,8 +326,14 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .otp-send[aria-disabled="true"] { opacity: .5; }
 .review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 16px; border-bottom: 1px solid var(--v5-border); color: var(--v5-ink-3); font: 400 14px/20px var(--font-v5); overflow-wrap: break-word; }
 .review-row:last-child { border-bottom: 0; }
-/* The holder name gives way first and wraps; the label keeps whole words. */
+/* The holder name gives way first and wraps; the label keeps its own width (up to 60% of the row) so it stays on one line beside a long name. */
+.review-row:not(.review-row--code) > text:first-child { flex: none; max-width: 100%; }
 .review-row > text:last-child { min-width: 0; }
+/* The value column always fits its longest word (03 §3.6.1: a word breaks only when it is wider than the whole line):
+   min-width:auto is the item's min-content, capped by max-width:100% so a single over-long word still wraps.
+   When label + that word do not fit, the value drops to its own line, right-aligned, and the label stays on one line. */
+.review-row:not(.review-row--code) { flex-wrap: wrap; row-gap: 4px; padding-block: 10px; }
+.review-row:not(.review-row--code) > text:last-child { flex: 1 1 0; min-width: auto; max-width: 100%; text-align: right; }
 /* The new account is checked digit by digit: its own full line under the label, wrapping evenly (03 §3.6.1). */
 .review-row--code { flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; padding-block: 12px; }
 .review-code { color: var(--v5-ink); font-size: var(--ui-type-body); line-height: var(--ui-type-body-lh); font-weight: 500; letter-spacing: .03em; }
@@ -399,7 +405,7 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .rule-text { color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
 .steps2 { display: flex; align-items: center; gap: 10px; margin: -4px 4px 0; }
 .steps2__on { display: inline-flex; align-items: center; gap: 8px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); }
-.steps2__i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-brand); color: var(--v5-on-brand); font: 600 11px/1 var(--font-metric); }
+.steps2__i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 var(--ui-type-meta)/1 var(--font-metric); }
 .steps2__ln { flex: 1; height: 2px; border-radius: 2px; background: var(--v5-surface-3); }
 .steps2__off { width: 10px; height: 10px; border-radius: 50%; background: var(--v5-ink-4); }
 /* Change/first form: label above, input in a recessed well (the .field height contract stays 44px inside). */

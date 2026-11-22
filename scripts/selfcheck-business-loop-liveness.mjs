@@ -142,7 +142,7 @@ function evaluate(text) {
     "runtime probe must exercise the production business-timeout registry");
   assert.match(onShow, /startQuestWatch\(\)[\s\S]*ensureBusinessLoopsRunning\(\)/,
     "onShow must arm the guard before starting gated business loops");
-  assert.match(onShow, /void refreshEarningsReleaseStatus\(\)\.catch\(/,
+  assert.match(onShow, /void ensureEarningsReleaseStatus\(\)\.catch\(/,
     "foreground earnings refresh must consume expected transport failures instead of leaking pageerror");
 }
 
@@ -199,7 +199,7 @@ assertNoRawTimeoutsInBusinessModules(businessModuleSources);
 evaluateDeposits(depositsSource);
 evaluateConfig(configSource);
 // Only the synchronous passive-read invalidation may precede the local-mock exit (78c1cb3d).
-assert.match(functionBody(genesisSource, "syncRemote"), /^\s*(?:invalidateBeforePassiveTabRead\("genesis-state"\);\s*)?if \(!remoteApiEnabled\) return true;/,
+assert.match(functionBody(genesisSource, "syncRemote"), /^\s*(?:invalidateBeforePassiveTabRead\("genesis-state"\);\s*)?if \(!remoteApiEnabled\) return Promise\.resolve\(true\);/,
   "account bootstrap must not leak a rejected Genesis remote sync in local-mock mode");
 
 console.log("business-loop-liveness: PASS");

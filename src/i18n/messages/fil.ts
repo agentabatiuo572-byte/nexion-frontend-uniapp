@@ -4836,7 +4836,7 @@ export const fil: Messages = {
     all: "Lahat",
     events: "record",
     orderPrefix: "Order $",
-    coolingTag: "Papasok sa {n} araw",
+    coolingTag: "Papasok sa {n}\u00A0araw",
     readyTag: "Pumasok na",
     withdrawnTag: "Na-withdraw",
     frozenTag: "Naka-freeze",

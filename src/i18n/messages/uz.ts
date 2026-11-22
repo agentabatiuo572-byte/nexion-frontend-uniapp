@@ -4836,7 +4836,7 @@ export const uz: Messages = {
     all: "Hammasi",
     events: "ta yozuv",
     orderPrefix: "Buyurtma $",
-    coolingTag: "{n} kundan keyin tushadi",
+    coolingTag: "{n}\u00A0kundan keyin tushadi",
     readyTag: "Tushdi",
     withdrawnTag: "Yechib olindi",
     frozenTag: "Muzlatilgan",

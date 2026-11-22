@@ -7,7 +7,7 @@ import { readAccountSessionRecords, useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
-import { refreshEarningsReleaseStatus } from "@/store/earning-release";
+import { ensureEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
 import { apiRuntimeConfig, authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -198,7 +198,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
       void refreshRemoteFleetAfterCatalog(options.identity);
       // A failed request leaves the snapshot unavailable and withdrawal still
       // fails closed at the server endpoint.
-      void refreshEarningsReleaseStatus(options.identity).catch(() => {});
+      void ensureEarningsReleaseStatus(options.identity).catch(() => {});
     });
   }
   const dest = resolvePostSignInRoute({

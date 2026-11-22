@@ -127,6 +127,7 @@
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { commerceCopy } from '@/lib/commerce-review';
@@ -735,7 +736,7 @@ useAutoRecovery({
   },
   retryNotBefore:()=>Math.max(0,...(order.value?.items??[]).map(item=>purchaseEligibilityApi.readCooldownUntil(item.productNo))),
   repeatMs:30_000,
-  quiet:false,
+  repeatWhile:()=>!hasVisiblePullRefresh(),
 });
 useAutoRecovery({
   failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!session.retryOriginal

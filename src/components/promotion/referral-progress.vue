@@ -147,7 +147,7 @@ function noteBasis(text: string): string {
 .referral-activity + .referral-activity { margin-top: var(--ui-space-inset); }
 .referral-hero { position: relative; display: flex; align-items: center; min-height: 84px; margin-top: -4px; }
 .referral-meta { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-2); min-height: 24px; }
-.referral-deadline { height: 24px; padding: 0 10px; display: flex; align-items: center; border-radius: 999px; font: 600 11px/1 var(--font-v5); color: var(--v5-brand-2-ink); background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
+.referral-deadline { height: 24px; padding: 0 10px; display: flex; align-items: center; border-radius: 999px; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-brand-2-ink); background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
 .referral-rule-pill { margin-left: auto; }
 .referral-copy { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .referral-title { display: block; max-width: 60%; font: 600 17px/24px var(--font-v5); overflow-wrap: break-word; }

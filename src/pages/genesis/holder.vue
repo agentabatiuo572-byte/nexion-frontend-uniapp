@@ -239,7 +239,7 @@ import { toast } from "@/store/ui";
 import { formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatGenesisPrice } from "@/lib/genesis-marketplace-presentation";
 import { navTo } from "@/lib/route";
 import { computed, onUnmounted, type CSSProperties } from "vue";

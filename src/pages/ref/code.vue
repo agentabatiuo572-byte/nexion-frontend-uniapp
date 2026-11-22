@@ -337,7 +337,7 @@ function perkRowStyle(divider: boolean): CSSProperties {
 function perkIconBoxStyle(tint: string): CSSProperties {
   return { width: "28px", height: "28px", borderRadius: "9px", background: `color-mix(in srgb, ${tint} 18%, transparent)` };
 }
-const perkTextStyle: CSSProperties = { minWidth: 0, fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.45 };
+const perkTextStyle: CSSProperties = { minWidth: 0, fontSize: "var(--ui-type-description)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-description-lh)" };
 const ctaStyle: CSSProperties = {
   width: "fit-content",
   maxWidth: "100%",

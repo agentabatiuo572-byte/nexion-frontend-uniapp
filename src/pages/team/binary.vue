@@ -14,8 +14,8 @@
             <view class="binary-hero nx-tint">
               <view class="binary-hero-heading">
                 <text class="binary-label">{{ binaryCopy.contributions }}</text>
-                <view class="binary-rule-link" role="button" tabindex="0" :aria-label="t.binary.howItWorksEntry"
-                  @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')"><text class="binary-rule-pill nx-after-chevron">{{ binaryCopy.rules }}</text></view>
+                <view class="binary-rule-link nx-card-link" role="link" tabindex="0" :aria-label="t.binary.howItWorksEntry"
+                  @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')"><text class="nx-after-chevron">{{ binaryCopy.rules }}</text></view>
               </view>
               <view class="binary-comparison">
                 <view v-for="(wing, index) in wings" :key="wing.key" class="binary-contribution">
@@ -367,7 +367,6 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-label { display: block; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); }
 .binary-hero-heading > .binary-label { flex: 1; min-width: 0; }
 .binary-rule-link { display: flex; align-items: center; justify-content: flex-end; min-width: 44px; min-height: 44px; flex: 0 0 auto; }
-.binary-rule-pill { padding: 4px 10px; border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); }
 .binary-estimate { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-4); padding: 14px var(--v5-space-4); border-radius: 18px; background: color-mix(in srgb, var(--ui-device-ink) 10%, var(--v5-surface-2)); }
 .binary-estimate .binary-label { flex: 1; min-width: 0; color: var(--v5-ink-3); }
 .binary-hero .reward-amount { margin: 0; max-width: 68%; font-size: 30px; line-height: 38px; font-weight: 500; letter-spacing: -.03em; overflow-wrap: break-word; }
@@ -395,7 +394,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .reward-binary-basis { display: flex; flex-direction: column; gap: var(--v5-space-1); margin-top: var(--v5-space-3); padding-inline: var(--v5-space-1); }
 .binary-member-recovery { display: flex; align-items: center; justify-content: space-between; }
 .binary-member-recovery > .binary-note { flex: 1; }
-.binary-member-recovery > .binary-text-action { flex: none; font: 600 13px/20px var(--font-v5); }
+.binary-member-recovery > .binary-text-action { flex: none; font: 500 13px/18px var(--font-v5); }
 .reward-wings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin-top: var(--v5-space-3); }
 .reward-wing { min-width: 0; padding: var(--v5-space-4) !important; border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .reward-wing-member__body { min-width: 0; }

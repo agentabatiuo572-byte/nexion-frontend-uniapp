@@ -504,12 +504,12 @@ useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAge
 .agent-track__line { flex: 1; height: 3px; margin: 0 var(--v5-space-1) 26px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); overflow: hidden; }
 .agent-track__line > view { height: 100%; border-radius: var(--v5-radius-full); background: var(--v5-brand); }
 .agent-track__stop { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: none; width: 44px; min-height: 62px; gap: var(--v5-space-1); }
-.agent-track__node { display: grid; place-items: center; flex: none; width: 36px; height: 40px; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); background: var(--v5-border); font: 600 11px/1 var(--font-metric); color: var(--v5-ink-3); }
+.agent-track__node { display: grid; place-items: center; flex: none; width: 36px; height: 40px; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); background: var(--v5-border); font: 500 var(--ui-type-meta)/1 var(--font-metric); color: var(--v5-ink-3); }
 .agent-track__node > text { display: grid; place-items: center; width: calc(100% - 2px); height: calc(100% - 2px); clip-path: inherit; background: var(--v5-surface-2); }
 .agent-track__node--done { color: var(--v5-brand); }
 .agent-track__node--current { background: var(--v5-ink-3); color: var(--v5-brand); }
 .agent-track__node--goal { width: 40px; height: 44px; color: var(--v5-brand-2-ink); }
-.agent-track__label { display: block; min-height: 20px; max-width: 64px; font: 500 11px/14px var(--font-v5); text-align: center; color: var(--v5-ink-3); }
+.agent-track__label { display: block; min-height: 20px; max-width: 64px; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; color: var(--v5-ink-3); }
 .agent-track__stop--current .agent-track__label { color: var(--v5-brand); }
 .agent-track__stop--goal .agent-track__label { color: var(--v5-brand-2-ink); }
 .agent-eligibility { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; box-sizing: border-box; padding-top: var(--ui-space-inline); border-top: 1px solid var(--v5-border); }

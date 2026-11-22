@@ -595,8 +595,9 @@ import GlassSegments from "@/components/glass-segments.vue";
 
 const chassisHostId = `nx-chassis-host-${getCurrentInstance()!.uid}`;
 const pageVisible = ref(true);
-watch(() => pageVisible.value && props.hostVisible, (visible, _previous, onCleanup) => {
-  if (visible) onCleanup(registerVisiblePullRefresh());
+const canPullRefresh = computed(() => pageVisible.value && props.hostVisible && scrollLocks.value === 0);
+watch(canPullRefresh, (available, _previous, onCleanup) => {
+  if (available) onCleanup(registerVisiblePullRefresh());
 }, { immediate: true });
 const scrollVisit = ref(0);
 const pageVisit = ref(0);
@@ -620,8 +621,7 @@ function receiveChassisScrolling(value: boolean) {
   scrolling.value = value;
 }
 function receiveChassisRefresh(visit: string) {
-  if (pageVisible.value && props.hostVisible && visit === chromeConfiguration.value.visit
-    && scrollLocks.value === 0 && !refresh.isRefreshing) void refresh.refresh();
+  if (canPullRefresh.value && visit === chromeConfiguration.value.visit && !refresh.isRefreshing) void refresh.refresh();
 }
 defineExpose({ receiveNativeScrollLoadMore, receiveChassisScrolling, receiveChassisRefresh });
 declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void };

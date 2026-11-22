@@ -135,7 +135,7 @@ useVisibleInterval(updateStatusTime, 30_000);
   text-align: center;
   font-family: var(--font-v5);
   font-size: 15px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1;
 }
 .nx-statusbar__icons {

@@ -357,7 +357,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 }
 .pool-ring__hole { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 108px; height: 108px; border-radius: 999px; background: var(--v5-surface); }
 .pool-ring__pct { font: 600 20px/28px var(--font-metric); color: var(--v5-nex-ink); }
-.pool-ring__label { font-size: 11px; line-height: 16px; color: var(--v5-ink-3); }
+.pool-ring__label { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 .pool-share__copy { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }
 .pool-share__note { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .pool-votes-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--v5-space-3); color: var(--v5-ink); font-size: 15px; line-height: 20px; font-weight: 600; }
