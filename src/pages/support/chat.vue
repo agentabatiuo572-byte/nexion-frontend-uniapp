@@ -65,6 +65,7 @@
       :typing-label="t.conversations.agentTyping"
       :reveal-tick="revealTick"
       :closed="isClosedSession"
+      :closed-note="isTransferredSession ? transferredSessionNotice : ''"
       :restart-label="writableConversationNo ? t.conversations.openCurrentConversation : t.conversations.restartSession"
       :composer-key="app.accountBindingEpoch + ':' + convStore.scopeInvalidated + ':' + (cid || startType || '')"
       :initial-draft="draftText"
@@ -833,7 +834,7 @@ const headerRole = computed(() => {
   if (startType.value && advisorApplies.value && convStore.advisor?.availability === "BUSY") return t.value.conversations.image.busyAdvisor;
   if (startType.value) return t.value.conversations.startConversation;
   if (!conv.value) return "";
-  if (isTransferredSession.value) return transferredSessionNotice.value;
+  if (isTransferredSession.value) return t.value.conversations.sessionDisconnected;
   if (isClosedSession.value) return t.value.conversations.sessionEnded;
   if (!remoteApiEnabled) return t.value.conversations[conv.value.roleKey];
   if (advisorApplies.value && convStore.advisor?.assignmentState === "ADVISOR_DISABLED") return t.value.conversations.image.disabledAdvisor;

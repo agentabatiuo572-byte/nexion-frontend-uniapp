@@ -3427,6 +3427,7 @@ export const kk: Messages = {
     loadEarlier: "Бұрынғы хабарларды жүктеу",
     sessionTransferred: "Бұл чат басқаға берілді, оған енді жауап жазу мүмкін емес. Жаңа чат бастаңыз.",
     sessionTransferredOpenCurrent: "Бұл чат басқаға берілді, оған енді жауап жазу мүмкін емес. Ағымдағы чатта сөйлесуді жалғастырыңыз.",
+    sessionDisconnected: "Ажыратылды",
     title: "Хабарлар",
     back: "Артқа",
     typeAdvisor: "Жеке кеңесші",

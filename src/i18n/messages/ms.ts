@@ -3427,6 +3427,7 @@ export const ms: Messages = {
     loadEarlier: "Muat mesej lebih awal",
     sessionTransferred: "Perbualan ini telah dipindahkan dan tidak lagi boleh menerima balasan. Mulakan perbualan baharu.",
     sessionTransferredOpenCurrent: "Perbualan ini telah dipindahkan dan tidak lagi boleh menerima balasan. Teruskan dalam perbualan semasa anda.",
+    sessionDisconnected: "Terputus",
     title: "Mesej",
     back: "Kembali",
     typeAdvisor: "Ejen khusus",

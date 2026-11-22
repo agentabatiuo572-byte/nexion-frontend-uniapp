@@ -3427,6 +3427,7 @@ export const fil: Messages = {
     loadEarlier: "I-load ang mas lumang mensahe",
     sessionTransferred: "Nailipat na ang usapang ito at hindi na makakatanggap ng reply. Magsimula ng bagong usapan.",
     sessionTransferredOpenCurrent: "Nailipat na ang usapang ito at hindi na makakatanggap ng reply. Magpatuloy sa kasalukuyang usapan.",
+    sessionDisconnected: "Nadiskonekta",
     title: "Mga mensahe",
     back: "Bumalik",
     typeAdvisor: "Nakatalagang support",

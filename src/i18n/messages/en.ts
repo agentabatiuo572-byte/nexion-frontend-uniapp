@@ -3003,6 +3003,7 @@ autoDetect: "auto-detect coming soon",
     loadEarlier: "Load earlier messages",
     sessionTransferred: "This conversation was transferred and can no longer receive replies. Start a new conversation.",
     sessionTransferredOpenCurrent: "This conversation was transferred and can no longer receive replies. Continue in your current conversation.",
+    sessionDisconnected: "Disconnected",
     title: "Messages",
     back: "Back",
     // Left type-rail short labels
