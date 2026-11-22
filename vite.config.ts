@@ -22,6 +22,11 @@ const selfDir = __dirname.replace(/\\/g, "/");
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  const gateway = env.VITE_NEXGRID_API_BASE_URL?.trim().replace(/\/+$/, "");
+  const localGateway = !gateway || /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(gateway);
+  // Native TEST packages can use Vite's production build command.
+  const testPhoneRegions = gateway === "https://api-test.uvel.ai"
+    || (localGateway && (mode === "test" || mode === "development"));
   const manifest = parseJson(readFileSync(new URL("./src/manifest.json", import.meta.url), "utf8"), false, "manifest.json");
   // The dev server, rather than the browser bundle, owns the loopback target.
   // This makes H5 -> /api same-origin and avoids localhost/127.0.0.1 identity
@@ -39,6 +44,7 @@ export default defineConfig(({ mode }) => {
     // Worktrees share dependencies, but optimizer results depend on this source and mode.
     cacheDir: `${selfDir}/.cache/vite/${mode}`,
     define: {
+      __UVEL_TEST_PHONE_REGIONS__: testPhoneRegions,
       __UVEL_RESOURCE_VERSION__: JSON.stringify({ versionName: manifest.versionName, versionCode: manifest.versionCode }),
     },
     plugins: [nativeSvgIcons(), uniH5PickerSnap(), uni(), UnoCSS(), {
