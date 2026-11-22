@@ -2286,6 +2286,7 @@ export const id: Messages = {
     computePointsPerShare: "Setiap porsi menambah {n} poin komputasi untuk tim Anda",
     bestSeller: "Terlaris",
     trending: "Naik daun",
+    badgeRecommended: "Rekomendasi",
     goalFocusTitle: "Dari target pendapatan Anda",
     goalFocusLocated: "Target pendapatan Anda merekomendasikan {name}. Perangkat itu ditandai di bawah.",
     goalFocusUnavailable: "Target pendapatan Anda merekomendasikan {name}, tetapi saat ini belum bisa dibeli. Di bawah ini perangkat yang bisa Anda beli hari ini.",
