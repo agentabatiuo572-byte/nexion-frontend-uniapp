@@ -1,7 +1,10 @@
-import { computed, getCurrentInstance, inject, onUnmounted, ref, watch, type ComponentInternalInstance, type Ref } from "vue";
+import { computed, getCurrentInstance, inject, onUnmounted, ref, watch, type ComponentInternalInstance, type InjectionKey, type Ref } from "vue";
 import { onHide as pageHide, onShow as pageShow } from "@dcloudio/uni-app";
 import { onHide, onShow, TAB_LIFECYCLE } from "./use-tab-page-lifecycle";
 import { useScrollGrowProgress } from "./use-scroll-grow-progress";
+
+/** The chassis's own scrolling state, for one-shot motion that must not start mid-scroll (NxTickNumber). */
+export const CHASSIS_SCROLLING: InjectionKey<Readonly<Ref<boolean>>> = Symbol("chassis-scrolling");
 
 // uni-app stores a child component's page hooks on the page instance and never removes them. Outside a tab host,
 // children share one visibility flag per page, so remounting stage components cannot pile up callbacks.

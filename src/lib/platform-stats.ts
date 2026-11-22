@@ -173,10 +173,11 @@ export function compactNumber(n: number): string {
 
 /**
  * Platform-wide display counts (online nodes, centre nodes, global jobs, registered users) never show the exact
- * figure: floor to a band. Chinese uses W/K (13045 → 1.3W+, 3206 → 3.2K+); other languages K/M (13K+, 3.2K+).
+ * figure: floor to a band. Chinese uses W/K (13045 → 1.3W+, 3206 → 3.2K+); other languages K/M (13K+, 3.2K+). A confirmed 0 is "0".
  * One decimal stays on the decimal tiers so a band change only rolls the changed digit.
  */
 export function networkPopulationBand(value: number, locale: LocaleCode): string {
+  if (value === 0) return "0"; // a confirmed zero is a real 0, never "<100"
   const tenth = (n: number) => (Math.floor(n) / 10).toFixed(1);
   if (locale !== "zh" && value >= 10000) {
     return value >= 1000000 ? `${tenth(value / 100000)}M+` : `${Math.floor(value / 1000)}K+`;
@@ -198,6 +199,7 @@ export function storeHeatFigure(value: number, locale: LocaleCode): string {
  */
 export function platformAmountBand(amount: number, dollar = true): string {
   const v = Math.floor(amount), tenth = (n: number) => (Math.floor(n) / 10).toFixed(1);
+  if (amount === 0) return dollar ? "$0" : "0"; // a confirmed zero is a real 0
   const band = v >= 1e9 ? `${tenth(v / 1e8)}B+` : v >= 1e6 ? `${tenth(v / 1e5)}M+`
     : v >= 1e4 ? `${Math.floor(v / 1e3)}K+` : v >= 1e3 ? `${tenth(v / 100)}K+`
     : v >= 100 ? `${Math.floor(v / 100) * 100}+` : null;
