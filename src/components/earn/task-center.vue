@@ -251,7 +251,7 @@ function completedTime(ts: number): string {
 .earn-history-amount { grid-column: 3; grid-row: 1; text-align: right; white-space: nowrap; }
 .earn-history-status { grid-column: 3; grid-row: 2; font-size: 12px; line-height: 16px; text-align: right; white-space: nowrap; }
 .earn-history-head { min-height: 16px; }
-.earn-history-unit { grid-column: 3; font: 500 11px/16px var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; text-align: right; }
+.earn-history-unit { grid-column: 3; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; text-align: right; }
 .earn-history-time { grid-column: 2; grid-row: 2; min-width: 0; white-space: nowrap; line-height: 16px; }
 .earn-history-document { grid-column: 4; grid-row: 1 / span 2; }
 </style>

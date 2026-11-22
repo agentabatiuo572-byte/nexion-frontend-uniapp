@@ -50,7 +50,7 @@ import { resolveRetiredRoute } from "@/lib/retired-route-migrations";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useConfig } from "@/store/config";
 import { useGenesisConfig } from "@/store/genesis-config";
-import { refreshEarningsReleaseStatus } from "@/store/earning-release";
+import { ensureEarningsReleaseStatus } from "@/store/earning-release";
 import {
   configureBehaviorAnalyticsContext,
   pauseBehaviorAnalytics,
@@ -1394,7 +1394,7 @@ onShow(() => {
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   runScheduledReads(readCurrentRoute());
   if (remoteApiEnabled) void useApp().syncRemoteTaskAssignments();
-  void refreshEarningsReleaseStatus().catch(() => undefined);
+  void ensureEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
   appReadForeground.value = false;

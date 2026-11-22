@@ -1,4 +1,5 @@
 import type { EventDetail } from "@/api/event-detail-api";
+import { asApiError, isAmbiguousEnvelopeOutcome } from "@/api/errors";
 import type { eventDetailCopy } from "@/i18n/event-detail";
 import { formatAmount } from "@/lib/amount-display";
 import { promotionStoreHref } from "@/lib/promotion-entry";
@@ -24,6 +25,23 @@ export function eventDetailHref(detail: EventDetail): string {
   if (["discount", "seasonal"].includes(detail.event.kind) && typeof detail.rules.promotionActivityId === "string" && detail.rules.promotionActivityId) return promotionStoreHref(detail.rules.promotionActivityId);
   if (detail.event.kind === "regional") return "";
   return detail.event.href;
+}
+// Refusals the event commands answer with (4xx + code): the command did not run. A 409 without one of these codes stays
+// ambiguous (it can mean the idempotency key already has a record).
+const eventRefusals: Record<string, EventCommandFailure> = {
+  EVENT_NOT_CLAIMABLE: "notClaimable", EVENT_ALREADY_CLAIMED: "claimed", EVENT_NOT_OPEN: "notOpen", EVENT_REGION_NOT_ELIGIBLE: "notEligible",
+  EVENT_BUDGET_EXHAUSTED: "budget", COVERAGE_REDLINE: "generic", EVENT_REMINDER_NOT_AVAILABLE: "reminder",
+};
+export type EventCommandFailure = "unknown" | "notClaimable" | "claimed" | "notOpen" | "notEligible" | "budget" | "reminder" | "generic";
+/** "unknown" only when the command may have run (network loss, timeout, gateway 5xx, unreadable reply); otherwise the reason to show. */
+export function eventCommandFailure(cause: unknown): EventCommandFailure {
+  const error = asApiError(cause);
+  const status = error.kind === "business" ? error.code : error.status;
+  const refusal = eventRefusals[error.message];
+  if (refusal && (error.kind === "business" || error.kind === "http") && status !== undefined && status >= 400 && status < 500) return refusal;
+  // A 503 the app server returned itself (its envelope carries the code) means the command was not run.
+  if (error.kind === "http" && error.status === 503 && error.code === 503) return "generic";
+  return isAmbiguousEnvelopeOutcome(error) ? "unknown" : "generic";
 }
 export function eventDetailAction(detail: EventDetail): "join" | "claim" | "open" | "remind" | null {
   if (detail.eligible && detail.userStatus === "CLAIMABLE") return "claim";

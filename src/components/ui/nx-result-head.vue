@@ -54,5 +54,8 @@ const speaks = computed(() => props.live && armed.value);
 .nx-result-head--neutral .nx-result-head__icon { background: color-mix(in srgb, var(--v5-ink-3) 18%, transparent); }
 .nx-result-head__live { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
 .nx-result-head__title { display: block; max-width: 100%; margin-top: var(--v5-space-4); font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); text-wrap: balance; }
+/* Chinese breaks at its punctuation first, so a two-clause title never splits a word such as 「订/单」; a run longer than
+   the line still wraps (overflow-wrap) instead of overflowing. */
+:lang(zh) .nx-result-head__title { word-break: keep-all; overflow-wrap: break-word; }
 .nx-result-head__desc { display: block; max-width: 320px; margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap: pretty; }
 </style>

@@ -13,9 +13,9 @@
         <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="pendingCreateTitle" :description="pendingCreateDescription" />
         <view v-if="pendingCreateTerms" class="checkout-group checkout-fees">
           <CheckoutRow :label="t.store.coRowTotal" :value="reviewMoney(pendingCreateTerms.amount, false, true)" class="checkout-fee" />
-          <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" class="checkout-fee" />
+          <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" :code="pendingCreateTerms.productCode" class="checkout-fee" />
           <CheckoutRow :label="t.store.coRowQuantity" :value="pendingCreateTerms.quantity" class="checkout-fee" />
-          <CheckoutRow :label="t.voucher.checkoutRowLabel" :value="pendingCreateTerms.voucher" class="checkout-fee" />
+          <CheckoutRow :label="t.voucher.checkoutRowLabel" :value="pendingCreateTerms.voucher" :code="pendingCreateTerms.voucherCode" class="checkout-fee" />
         </view>
       </view>
       <!-- Original purchase state (03 §3.6.1 结果头): the result, which purchase it is, what not to do. No query button (03 §3.5.2). -->
@@ -410,12 +410,17 @@ const pendingCreateTerms = computed(() => {
   const pending = pendingCheckoutCreate.value;
   if (!pending || (!canResubmitPendingCreate.value && !pendingCreateReplayBusy.value)) return null;
   const { productNo, quantity, voucherId } = pending.request;
+  const productName = (typeof pending.productName === 'string' && pending.productName) || getProduct(productNo)?.name;
+  const voucherName = voucherId ? (typeof pending.voucherName === 'string' && pending.voucherName)
+    || voucher.catalog.find(offer => offer.id === voucherId)?.name : t.value.promotion.noVoucher;
+  // With the catalog down an older record may carry no name: its number shows as a code, never as body text (03 §3.6.1).
   return {
     amount: pending.amount,
-    product: (typeof pending.productName === 'string' && pending.productName) || getProduct(productNo)?.name || productNo,
+    product: productName || productNo,
+    productCode: !productName,
     quantity: String(quantity),
-    voucher: voucherId ? (typeof pending.voucherName === 'string' && pending.voucherName)
-      || voucher.catalog.find(offer => offer.id === voucherId)?.name || voucherId : t.value.promotion.noVoucher,
+    voucher: voucherName || String(voucherId),
+    voucherCode: !voucherName,
   };
 });
 const pendingCreateTitle = computed(() => originalOrderNavigationFailed.value ? t.value.store.coOriginalOrderOpenFailed
@@ -3720,7 +3725,7 @@ const doneBtnStyle: CSSProperties = {
 .checkout-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--v5-space-2); margin:0 16px; }
 .checkout-step-track { height:3px; border-radius:999px; background:var(--v5-surface-3); }
 .checkout-step-fill { height:100%; border-radius:inherit; }
-.checkout-step-label { display:block; margin-top:var(--v5-space-2); font:400 12.5px/18px var(--font-v5); color:var(--v5-ink-3); }
+.checkout-step-label { display:block; margin-top:var(--v5-space-2); font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .checkout-step-label--active { color:var(--v5-brand); font-weight:600; }
 .checkout-group { position:relative; overflow:hidden; border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); }
 /* Product summary: the device image is the card's main visual, copy beside it; quantity is its own full-width row
@@ -3793,7 +3798,7 @@ button.checkout-quantity-button::after {border:0;}
 /* Text buttons are their label line; the gaps keep each 44px target clear of its neighbour's. */
 .checkout-capacity-actions { display:flex; flex-wrap:wrap; align-items:center; gap:26px var(--v5-space-4); margin-top:var(--v5-space-2); }
 .checkout-capacity-links { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:26px var(--v5-space-4); margin-left:auto; }
-.checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 12.5px/20px var(--font-v5); color:var(--v5-ink-3); text-align:center; }
+.checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); text-align:center; }
 .checkout-legal-link { display:inline; color:var(--v5-brand); cursor:pointer; }
 .checkout-legal-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:2px; }
 .checkout-policy-notice { margin-top:var(--v5-space-3); font:400 var(--ui-type-list-subtitle)/20px var(--font-v5); color:var(--v5-ink-2); overflow-wrap:break-word; }

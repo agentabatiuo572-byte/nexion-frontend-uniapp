@@ -157,6 +157,7 @@ import BrandLockup from "@/components/brand-lockup.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
+import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -1029,6 +1030,8 @@ function close() {
   invalidateOtpFlow();
   navReset({ url: "/pages/onboarding/intro", fail: () => {} });
 }
+// Alone on the stack (sign-in redirects here), the system back does what the top bar's back or close does (02 §2.7.3).
+useHeaderSystemBack(() => !loginRecoveryPending.value && (step.value > 1 || mode.value === "reset") ? back : close);
 function goRegister() {
   invalidateOtpFlow();
   const query = refOnLogin.value ? `?ref=${encodeURIComponent(refOnLogin.value)}` : "";

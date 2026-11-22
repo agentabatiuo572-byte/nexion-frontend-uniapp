@@ -67,6 +67,7 @@ import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import { ApiError, asApiError } from "@/api/errors";
 import { READ_RECOVERY_DELAYS_MS, isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import type { UserSession } from "@/api/contracts";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -856,9 +857,13 @@ export const useApp = defineStore("app", () => {
     if (taskAssignmentSnapshotInFlight?.key === key)
       return taskAssignmentSnapshotInFlight.request;
     const failure = taskAssignmentFailure?.key === key ? taskAssignmentFailure : null;
-    if (failure && now < failure.after
-      && !(bypassTransientBackoff && isTransientReadFailure(failure.cause) && !isHttpReadRateLimit(failure.cause))) {
-      return Promise.reject(failure.cause);
+    const explicitRecovery = failure && bypassTransientBackoff && isTransientReadFailure(failure.cause);
+    if (failure) {
+      const coolingDown = now < failure.after && (!explicitRecovery || isHttpReadRateLimit(failure.cause));
+      const inventoryOnly = deviceInventoryVisible && !taskReadPages.size;
+      const pullOwnsRecovery = !explicitRecovery && inventoryOnly
+        && failure.attempts > READ_RECOVERY_DELAYS_MS.length && hasVisiblePullRefresh();
+      if (coolingDown || pullOwnsRecovery) return Promise.reject(failure.cause);
     }
     const requireCurrent = () => {
       if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
@@ -872,10 +877,11 @@ export const useApp = defineStore("app", () => {
       return state;
     }).catch((cause: unknown) => {
       requireCurrent();
-      const attempts = Math.min((failure?.attempts ?? 0) + 1, READ_RECOVERY_DELAYS_MS.length);
+      const delayIndex = explicitRecovery ? 0 : Math.min(failure?.attempts ?? 0, READ_RECOVERY_DELAYS_MS.length);
       const cooldown = isHttpReadRateLimit(cause) ? (cause.retryAfterMs ?? 30_000) : 0;
-      taskAssignmentFailure = { key, attempts, cause,
-        after: Date.now() + Math.max(READ_RECOVERY_DELAYS_MS[attempts - 1], cooldown) };
+      const delay = READ_RECOVERY_DELAYS_MS[Math.min(delayIndex, READ_RECOVERY_DELAYS_MS.length - 1)];
+      taskAssignmentFailure = { key, attempts: delayIndex + 1, cause,
+        after: Date.now() + Math.max(delay, cooldown) };
       throw cause;
     }).finally(() => {
       if (taskAssignmentSnapshotInFlight?.request === pending) taskAssignmentSnapshotInFlight = null;

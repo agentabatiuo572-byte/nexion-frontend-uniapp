@@ -1164,6 +1164,13 @@ async function toggleTwoFactor(value: boolean, resend = false) {
 
 async function confirmTwoFactorChallenge() {
   if (securityBusy.value || overviewReadback.value || twoFactorTarget.value === null || !twoFactorChallengeNo.value) return;
+  // A sheet reopened on a kept challenge starts with an empty password, as the send step does.
+  if (!twoFactorPassword.value) {
+    twoFactorPasswordError.value = t.value.security.twoFactorPasswordRequired;
+    twoFactorPasswordFocus.value = true;
+    toast.error(t.value.login.errorInvalidPassword);
+    return;
+  }
   if (!/^\d{6}$/.test(twoFactorCode.value)) {
     twoFactorCodeError.value = t.value.login.errorInvalidCode;
     return;
@@ -1493,6 +1500,9 @@ async function handleCancelAccountDeletion() {
 function openTwoFactorSheet() {
   if (sessionWriteDisabled.value) return;
   requestedTwoFactor.value = !twoFactorEnabled.value;
+  // A code sent before the sheet was closed still counts while it is valid and for the same switch: the sheet reopens
+  // on its code step and the resend cooldown runs on. Expired, or for the other direction, it starts over.
+  if (twoFactorChallengeNo.value && (twoFactorCodeExpired() || twoFactorTarget.value !== requestedTwoFactor.value)) clearTwoFactorSheet();
   twoFactorSheetOpen.value = true;
 }
 function resendTwoFactorCode() {
@@ -1512,7 +1522,18 @@ function clearTwoFactorSheet() {
   twoFactorPasswordError.value = "";
 }
 function closeTwoFactorSheet() {
-  if (!securityBusy.value) clearTwoFactorSheet();
+  if (securityBusy.value) return;
+  // Closing keeps a still-valid challenge (number, phone, resend deadline) for this page and account, so closing and
+  // reopening the sheet cannot skip the 60s resend wait; the password and the typed code are cleared as before.
+  if (twoFactorChallengeNo.value && !twoFactorCodeExpired()) {
+    twoFactorSheetOpen.value = false;
+    twoFactorPassword.value = "";
+    twoFactorPasswordError.value = "";
+    twoFactorCode.value = "";
+    twoFactorCodeError.value = "";
+    return;
+  }
+  clearTwoFactorSheet();
 }
 function closeDeletionSheet() {
   if (securityBusy.value) return;

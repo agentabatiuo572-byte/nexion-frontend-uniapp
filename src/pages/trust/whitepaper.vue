@@ -110,7 +110,7 @@ useAutoRecovery({ failed: () => status.value === "error", retry: refresh });
 .wp-cover__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--v5-space-2); }
 .wp-cover__fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .wp-cover__fact-label { font: 400 12px/16px var(--font-v5); opacity: .8; }
-.wp-cover__fact-value { font: 600 15px/20px var(--font-v5); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.wp-cover__fact-value { font: 600 15px/20px var(--font-v5); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 .wp-cover__state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--v5-space-3); font: 400 13px/18px var(--font-v5); }
 /* On the brand cover the action inverts: on-brand fill with brand text keeps contrast in both themes. */
 .wp-cover__cta { display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); min-height: 48px; padding: 0 var(--v5-space-5); border-radius: var(--v5-radius-full); background: var(--v5-on-brand); color: var(--v5-brand); font: 700 15px/20px var(--font-v5); cursor: pointer; }

@@ -1,11 +1,11 @@
 import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
-import { earningsReleaseApi } from "@/api/runtime";
+import { earningsReleaseApi, sessionVault } from "@/api/runtime";
 import type { EarningsReleaseStatus } from "@/api/earnings-release-api";
-import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import type { RiskClusterSummary } from "@/store/risk-cluster";
 import { shallowRef } from "vue";
-import { invalidateBeforePassiveTabRead, passiveTabReadScope, runPassiveTabRead } from "@/lib/passive-tab-read";
+import { passiveTabReadScope } from "@/lib/passive-tab-read";
+import { createPassiveReadWindow } from "@/lib/passive-read-window";
 
 export type LedgerRoute = "pending_review" | "bonus_locked";
 export type ReleaseSource = "attest" | "manual";
@@ -22,8 +22,15 @@ export const earningsReleaseHasSnapshot = shallowRef(false);
 let activeEarningsReleaseAccountKey = "default";
 let earningsReleaseRefreshSequence = 0;
 let earningsReleasePending: { owner: string; promise: Promise<EarningsReleaseStatus> } | null = null;
+const releaseResource = "earning-release";
+const releaseReadIntervalMs = 30_000;
+const releaseReadWindow = createPassiveReadWindow();
+// Profile locale hydration can finish between startup and page entry. Release
+// status is locale-independent, so both callers keep the same read scope.
+const releaseReadScope = () => passiveTabReadScope(true, false);
 
 export function bindEarningsReleaseAccount(accountKey: string): void {
+  releaseReadWindow.invalidate(releaseResource);
   activeEarningsReleaseAccountKey = accountKey || "default";
   earningsReleaseRefreshSequence += 1;
   earningsReleaseSnapshot.value = null;
@@ -31,9 +38,16 @@ export function bindEarningsReleaseAccount(accountKey: string): void {
   earningsReleaseStatus.value = "idle";
 }
 
-export function ensureEarningsReleaseStatus(): Promise<EarningsReleaseStatus> {
-  return runPassiveTabRead("earning-release", () => refreshEarningsReleaseStatus(), undefined,
-    () => earningsReleaseStatus.value === "ready" && earningsReleaseHasSnapshot.value);
+const hasEarningsReleaseSnapshot = () => earningsReleaseStatus.value === "ready" && earningsReleaseHasSnapshot.value;
+
+export async function ensureEarningsReleaseStatus(
+  accountKey = activeEarningsReleaseAccountKey,
+): Promise<EarningsReleaseStatus | undefined> {
+  const session = sessionVault.read();
+  if (!session?.accessToken || accountKey !== `user:${session.user.userId}`
+    || accountKey !== activeEarningsReleaseAccountKey) return;
+  return releaseReadWindow.run(releaseReadScope(), releaseResource, () => refreshEarningsReleaseStatus(accountKey),
+    undefined, hasEarningsReleaseSnapshot, releaseReadIntervalMs, releaseReadIntervalMs);
 }
 
 export function refreshEarningsReleaseStatus(
@@ -45,24 +59,22 @@ export function refreshEarningsReleaseStatus(
   if (activeEarningsReleaseAccountKey !== requestedAccountKey) {
     return Promise.reject(new Error("EARNINGS_RELEASE_ACCOUNT_CHANGED"));
   }
-  const readScope = passiveTabReadScope();
+  const readScope = releaseReadScope();
   const snapshotWrite = captureTabSnapshotWrite();
-  const runScope = captureRuntimeRevision();
-  const owner = JSON.stringify([requestedAccountKey, earningsReleaseRefreshSequence, readScope, runScope.epoch]);
+  const owner = JSON.stringify([requestedAccountKey, earningsReleaseRefreshSequence, readScope]);
   if (earningsReleasePending?.owner === owner) return earningsReleasePending.promise;
-  invalidateBeforePassiveTabRead("earning-release");
+  releaseReadWindow.invalidate(releaseResource, true);
   const refreshSequence = ++earningsReleaseRefreshSequence;
   const promise = Promise.resolve().then(async () => {
     if (activeEarningsReleaseAccountKey !== requestedAccountKey || refreshSequence !== earningsReleaseRefreshSequence
-      || !isCurrentRuntimeRevision(runScope) || readScope !== passiveTabReadScope()) throw new Error("EARNINGS_RELEASE_ACCOUNT_CHANGED");
+      || readScope !== releaseReadScope()) throw new Error("EARNINGS_RELEASE_ACCOUNT_CHANGED");
     earningsReleaseStatus.value = "loading";
     try {
       const status = await earningsReleaseApi.status();
       // A response from an account that signed out or switched while the request
       // was in flight must never become the next account's financial truth.
       if (activeEarningsReleaseAccountKey !== requestedAccountKey
-        || !isCurrentRuntimeRevision(runScope)
-        || refreshSequence !== earningsReleaseRefreshSequence || readScope !== passiveTabReadScope()) return status;
+        || refreshSequence !== earningsReleaseRefreshSequence || readScope !== releaseReadScope()) return status;
       earningsReleaseSnapshot.value = status;
       earningsReleaseHasSnapshot.value = true;
       earningsReleaseStatus.value = "ready";
@@ -70,8 +82,7 @@ export function refreshEarningsReleaseStatus(
       return status;
     } catch (error) {
       if (activeEarningsReleaseAccountKey === requestedAccountKey
-        && isCurrentRuntimeRevision(runScope)
-        && refreshSequence === earningsReleaseRefreshSequence && readScope === passiveTabReadScope()) {
+        && refreshSequence === earningsReleaseRefreshSequence && readScope === releaseReadScope()) {
         // This store is read directly by wallet surfaces that do not consume the
         // status ref. Do not leave a failed quote visible for them to present as
         // current; a refresh may retain its snapshot only while it is loading.
@@ -83,8 +94,8 @@ export function refreshEarningsReleaseStatus(
       throw error;
     }
   }).finally(() => { if (earningsReleasePending?.promise === promise) earningsReleasePending = null; });
-  earningsReleasePending = { owner: JSON.stringify([requestedAccountKey, refreshSequence, readScope, runScope.epoch]), promise };
-  return promise;
+  earningsReleasePending = { owner: JSON.stringify([requestedAccountKey, refreshSequence, readScope]), promise };
+  return releaseReadWindow.remember(readScope, releaseResource, promise, undefined, undefined, hasEarningsReleaseSnapshot);
 }
 export function currentEarningsReleaseStatus(): EarningsReleaseStatus | null { return earningsReleaseSnapshot.value; }
 const zero = (): ReleaseOutcome => ({ releasedPendingUsdt: 0, releasedPendingNex: 0, releasedLockedUsdt: 0, releasedLockedNex: 0, escalatedUsdt: 0, escalatedNex: 0, releasedBy: null });

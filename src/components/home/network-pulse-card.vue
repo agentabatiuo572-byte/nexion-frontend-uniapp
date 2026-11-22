@@ -113,7 +113,7 @@ function placeholderCell(label: string, skeleton = showSkeleton.value): Cell {
   return {
     k: label,
     v: "—",
-    vSize: "12.5px",
+    vSize: "12px",
     tone: "var(--v5-ink-3)",
     sub: "",
     subTone: "var(--v5-tech-cyan-ink)",

@@ -284,7 +284,7 @@ const numberBoxStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   fontFamily: "var(--font-metric)",
   fontWeight: 500,
-  fontSize: "11px",
+  fontSize: "var(--ui-type-meta)",
 };
 const pendingLabelStyle: CSSProperties = {
   fontWeight: 500,
