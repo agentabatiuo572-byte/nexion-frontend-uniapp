@@ -3,7 +3,9 @@
     role="button" :tabindex="disabled || busy ? -1 : 0" :aria-disabled="disabled || busy" :aria-busy="busy" :aria-label="label"
     @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
     <view class="nx-button__surface" :class="{ 'nx-frosted-button': variant === 'secondary' || variant === 'brand' }">
-      <view class="nx-button__content"><slot><text>{{ label }}</text></slot><NxIcon v-if="icon" :name="icon" /></view>
+      <view class="nx-button__content" :class="{ 'nx-button__content--busy': busy }"><slot><text>{{ label }}</text></slot><NxIcon v-if="icon" :name="icon" /></view>
+      <!-- Busy (03 §3.1): a spinner takes the label's place; the label stays laid out, hidden, so the width holds. -->
+      <view v-if="busy" class="nx-button__spinner" aria-hidden="true" />
     </view>
   </view>
 </template>
@@ -41,10 +43,18 @@ function activate(event?: Event) { if (!props.disabled && !props.busy && !(event
 .nx-button:is(.nx-button--text, .nx-button--link):not(.nx-glass-bar *, .nx-tray-float) > .nx-button__surface { min-height: 0; padding: 0; }
 .nx-button:is(.nx-button--text, .nx-button--link):not(.nx-glass-bar *, .nx-tray-float)::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: min(-8px, calc(50% - 22px)); right: min(-8px, calc(50% - 22px)); }
 .nx-button--disabled { opacity: .5; cursor: default; }
+/* Busy is "working", not "unavailable": full ink with the spinner instead of the 50% disabled fade. */
+.nx-button[aria-busy="true"] { opacity: 1; }
+.nx-button__content--busy { visibility: hidden; }
+.nx-button__spinner { position: absolute; z-index: 1; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: nx-button-spin 800ms linear infinite; }
+.nx-button--small .nx-button__spinner { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+@keyframes nx-button-spin { to { transform: rotate(360deg); } }
 .nx-button:not(.nx-button--disabled):active { transform: scale(.98); }
 .nx-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .nx-button { transition: none; }
   .nx-button:not(.nx-button--disabled):active { transform: none; }
+  /* Still shows "working" without motion: a static open ring. */
+  .nx-button__spinner { animation: none; }
 }
 </style>
