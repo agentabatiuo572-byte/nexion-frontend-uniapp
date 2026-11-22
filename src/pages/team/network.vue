@@ -296,7 +296,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .sheet-detail-row { display: flex; align-items: start; justify-content: space-between; gap: var(--v5-space-5); padding: 14px 0; border-top: 1px solid var(--v5-border); font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.5; }
 .sheet-joined-date { flex-wrap: wrap; }
 .sheet-joined-date > :last-child { min-width: 0; flex: 1 1 170px; }
-.sheet-detail-row > :last-child { text-align: right; color: var(--v5-ink); overflow-wrap: break-word; }
+.sheet-detail-row > :last-child { min-width: 0; text-align: right; color: var(--v5-ink); overflow-wrap: break-word; }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .nx-net-sheet-wrap { position: fixed; inset: 0; z-index: 790; display: flex; align-items: flex-end; justify-content: center; }
 .nx-net-scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--v5-surface-3) 70%, transparent); backdrop-filter: blur(4px); }

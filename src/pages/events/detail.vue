@@ -146,7 +146,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-copy { display:block; margin-top:10px; font-size:var(--ui-type-list-subtitle); line-height:1.6; color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:break-word; }
 .event-status { display:block; margin-top:12px; font-size:12px; color:var(--v5-brand); }
 .event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font-size:12px; line-height:1.5; }
-.event-row > text:last-child { overflow-wrap:break-word; color:var(--v5-ink-2); }
+.event-row > text:last-child { min-width:0; overflow-wrap:break-word; color:var(--v5-ink-2); }
 .event-progress { margin-top:12px; height:5px; border-radius:5px; overflow:hidden; background:var(--v5-brand-soft); }
 .event-progress > view { height:100%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }

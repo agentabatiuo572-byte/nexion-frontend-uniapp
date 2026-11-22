@@ -389,7 +389,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__slot-image { width: 54px; height: 54px; }
 .entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: white; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
 .entry-card__bonus { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 3px; padding: 0 6px; }
-.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: break-word; }
+.entry-card__bonus-amount { min-width: 0; max-width: 100%; font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: break-word; }
 .entry-pop { animation: entry-card-pop .45s cubic-bezier(.2,.8,.2,1) .5s backwards; }
 @keyframes entry-card-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes entry-card-pop { 0% { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }

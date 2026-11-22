@@ -91,7 +91,7 @@ function statusColor(status: MemberStatus): string {
 .member-points { text-align: right; font: 500 15px/20px var(--font-metric); color: var(--v5-ink); max-width: 34%; overflow-wrap: break-word; }
 .member-details { margin-left: 48px; padding: 0 0 var(--v5-space-4); display: flex; flex-direction: column; gap: var(--ui-space-inline); }
 .member-detail { display: flex; justify-content: space-between; gap: var(--ui-space-inset); font-size: 12px; line-height: 1.5; color: var(--v5-ink-3); }
-.member-detail > :last-child { text-align: right; color: var(--v5-ink-2); overflow-wrap: break-word; }
+.member-detail > :last-child { min-width: 0; text-align: right; color: var(--v5-ink-2); overflow-wrap: break-word; }
 .member-joined { flex-wrap: wrap; }
 .member-joined > :last-child { min-width: 0; flex: 1 1 170px; }
 .member-contribution { color: var(--v5-ink-2); text-align: right; font-size: 12px; }
