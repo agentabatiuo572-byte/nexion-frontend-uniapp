@@ -108,7 +108,7 @@
 <script setup lang="ts">
 import EmptyState from "@/components/empty-state.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { navBack, navReplace, navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
@@ -190,7 +190,7 @@ const tableRows = computed(() => [
 ]);
 
 const nexPriceText = computed(() => market.remoteReady && market.nexPriceUSDT > 0
-  ? `${market.nexPriceUSDT.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`
+  ? formatGroupedAmount(market.nexPriceUSDT, 6)
   : "—");
 
 function goExchange() {

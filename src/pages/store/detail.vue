@@ -245,7 +245,7 @@ import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
 import { useEarnConfig } from "@/store/earn-config";
 import { useLocaleStore } from "@/store/locale";
-import { fmt, fmtMoney } from "@/i18n/format";
+import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -551,8 +551,8 @@ const shareDailyUsdt = computed(() => {
   // Only the server's daily estimate; without one the row shows "—", never a figure derived from an annual rate.
   const estimate = shareDailyEstimate.value;
   return estimate ? {
-    min: formatPlainAmount(estimate.low * qty.value, 6),
-    max: formatPlainAmount(estimate.high * qty.value, 6),
+    min: formatAmount(estimate.low * qty.value),
+    max: formatAmount(estimate.high * qty.value),
   } : null;
 });
 const shareDailyUvtText = computed(() => formatPlainAmount((product.value?.dailyEarnNEX ?? 0) * qty.value, 6));
@@ -565,7 +565,7 @@ const monthlyPctText = computed(() =>
 const annualPctText = computed(() =>
   totalPrice.value > 0 ? ((annualYield.value / totalPrice.value) * 100).toFixed(0) : "0",
 );
-const priceText = computed(() => fmtMoney(product.value ? product.value.price * qty.value : null));
+const priceText = computed(() => product.value ? `$${formatAmount(product.value.price * qty.value)}` : "-");
 
 function dec() {
   if (qty.value > 1) qty.value -= 1;
@@ -608,7 +608,7 @@ function publishStickyCTA() {
       if(!allowed){
         const warming = promotionStatus.value === 'loading' && canPreviewPromotion(activity.value) && !!activity.value?.productNos.includes(product.value.id);
         const label = warming ? activity.value?.eligibility === 'SIGN_IN_REQUIRED' ? t.value.promotion.signIn : t.value.store.cardBuyNow : t.value.promotion.unavailable;
-        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:warming ? isShare.value ? undefined : `${t.value.bundle.estimatedDaily}: $${dailyYieldText.value}` : t.value.promotion.disabledNote,buttonLabel:label,disabled:true,showTabBar:false},stickyOwner);
+        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:warming ? isShare.value ? undefined : fmt(t.value.store.detDailyEstimateLine, { n: dailyYieldText.value }) : t.value.promotion.disabledNote,buttonLabel:label,disabled:true,showTabBar:false},stickyOwner);
         return;
       }
       if(activity.value?.eligibility==='SIGN_IN_REQUIRED'){
@@ -670,7 +670,7 @@ function publishStickyCTA() {
       href: isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1 ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value,voucherContext.value) : `/pages/store/checkout?product=${product.value.id}`,
       quantity: { value:qty.value,min:1,max:maxQuantity.value,decrease:dec,increase:inc },
       amount: `${priceText.value}`,
-      amountSubtext: isShare.value ? undefined : `${t.value.bundle.estimatedDaily}: $${dailyYieldText.value}`,
+      amountSubtext: isShare.value ? undefined : fmt(t.value.store.detDailyEstimateLine, { n: dailyYieldText.value }),
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
@@ -784,12 +784,11 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   const color =
     tone === "success" ? "var(--v5-brand)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
   return {
-    fontFamily: "var(--font-v5)",
-    fontSize: "20px",
-    fontWeight: 600,
+    fontFamily: "var(--font-metric)",
+    fontSize: "var(--ui-type-metric-value)",
+    lineHeight: "var(--ui-type-metric-value-lh)",
+    fontWeight: "var(--ui-type-metric-value-weight)",
     color,
-    letterSpacing: "-0.018em",
-    lineHeight: 1,
     marginTop: "4px",
   };
 }

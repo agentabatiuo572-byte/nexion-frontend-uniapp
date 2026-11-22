@@ -32,7 +32,7 @@
       <view class="relative mt-2 flex items-baseline gap-2">
         <view class="flex items-baseline">
           <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; font-size: 15px; font-weight: 500; color: var(--v5-brand-2-ink); opacity: 0.75">$</text>
-          <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-brand-2-ink); letter-spacing: -0.014em">{{ visibility.mask(formatAmount(ceilingGapToday)) }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-brand-2-ink); letter-spacing: -0.014em">{{ visibility.mask(formatGroupedAmount(ceilingGapToday)) }}</text>
         </view>
         <text class="text-[12px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ vsCeilingText }}</text>
       </view>
@@ -42,7 +42,7 @@
         <view>
           <view class="flex items-center justify-between mb-1" style="font-size: 12px">
             <text style="color: var(--v5-ink-3)">{{ baseLabel }}</text>
-            <text class="tabular-nums" style="color: var(--v5-ink-2)">${{ visibility.mask(formatAmount(baseDaily)) }}/d</text>
+            <text class="tabular-nums" style="color: var(--v5-ink-2)">${{ visibility.mask(formatGroupedAmount(baseDaily)) }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
           <view ref="elRef" class="h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
             <view v-if="!visibility.hidden" class="h-full rounded-full" :style="phoneBarStyle" />
@@ -51,7 +51,7 @@
         <view>
           <view class="flex items-center justify-between mb-1" style="font-size: 12px">
             <text style="color: var(--v5-brand)">{{ ceilingText }}</text>
-            <text class="tabular-nums" style="color: var(--v5-brand)">${{ formatAmount(targetDaily) }}/d</text>
+            <text class="tabular-nums" style="color: var(--v5-brand)">${{ formatGroupedAmount(targetDaily) }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
           <view class="h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
             <view class="h-full w-full rounded-full" style="background: color-mix(in srgb, var(--v5-brand) 45%, transparent)" />
@@ -75,7 +75,7 @@
 
 <script setup lang="ts">
 import { useDataVisibility } from "@/store/data-visibility";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";

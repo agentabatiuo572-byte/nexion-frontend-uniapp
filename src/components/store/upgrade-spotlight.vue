@@ -1,7 +1,7 @@
 <template>
   <view ref="loopRef" class="upgrade-spotlight" :class="{ 'nx-loops-paused': !loops.running.value }" :data-images-ready="baseReady && targetReady">
     <text class="upgrade-eyebrow">{{ copy.upgrade }}</text>
-    <view class="upgrade-title"><text class="upgrade-title__base">{{ base.name }}</text><text class="upgrade-title__target">→ {{ target.name }}</text></view>
+    <view class="upgrade-title"><text class="upgrade-title__base">{{ base.name }}</text><view class="upgrade-title__target"><NxIcon class="upgrade-title__arrow" name="arrow-right" /><text>{{ target.name }}</text></view></view>
     <view class="upgrade-art" aria-hidden="true">
       <view v-if="baseReady" class="upgrade-art__base-shadow" />
       <CatalogMachineImage class="upgrade-art__base" v-bind="baseImageProps" />
@@ -10,11 +10,13 @@
       <CatalogMachineImage class="upgrade-art__target" :class="{ 'upgrade-art__target--ready': targetReady }" v-bind="targetImageProps" />
     </view>
     <view class="upgrade-comparison">
-      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">{{ fmtMoney(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
-      <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">{{ fmtMoney(target.dailyEarn) }}{{ t.store.cardPerDaySuffix }}</text></view>
+      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">${{ formatGroupedAmount(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
+      <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">${{ formatGroupedAmount(target.dailyEarn) }}{{ t.store.cardPerDaySuffix }}</text></view>
     </view>
-    <text class="upgrade-note">{{ t.store.cardYouEarn }}</text>
-    <NxButton class="upgrade-action" variant="secondary" size="medium" :label="copy.details" @click="open" />
+    <view class="upgrade-footer">
+      <text class="upgrade-note">{{ t.store.cardYouEarn }}</text>
+      <NxButton class="upgrade-action" variant="secondary" size="medium" :label="copy.details" @click="open" />
+    </view>
   </view>
 </template>
 <script setup lang="ts">
@@ -26,9 +28,10 @@ import { productCatalogState } from '@/store/product-catalog';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
-import { fmtMoney } from '@/i18n/format';
+import { formatGroupedAmount } from '@/lib/amount-display';
 import { navTo } from '@/lib/route';
 import NxButton from '@/components/ui/nx-button.vue';
+import NxIcon from '@/components/ui/nx-icon.vue';
 import type { Device } from '@/store/types';
 import { getLifecycleSummary } from '@/store/device-lifecycle';
 import { uiLocale } from '@/i18n';
@@ -81,7 +84,8 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-eyebrow { display:block; font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--ui-lime-soft); }
 .upgrade-title { margin-top:6px; overflow-wrap:break-word; }
 .upgrade-title__base { display:block; color:var(--v5-ink-2); font:500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
-.upgrade-title__target { display:block; margin-top:4px; color:var(--v5-brand); font:600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
+.upgrade-title__target { display:flex; align-items:center; gap:6px; margin-top:4px; color:var(--v5-brand); font:600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
+.upgrade-title__arrow { flex:none; }
 .upgrade-art { position:relative; height:118px; margin-top:6px; }
 .upgrade-art__base { position:absolute; left:10px; bottom:10px; width:min(96px,34%); aspect-ratio:1; opacity:.75; }
 .upgrade-art__target { position:absolute; right:0; bottom:6px; width:min(150px,50%); aspect-ratio:1; }
@@ -92,11 +96,12 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-art__target-shadow { position:absolute; right:6px; bottom:8px; width:150px; height:22px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--ui-lime-soft) 45%,transparent),transparent); }
 .upgrade-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:4px; }
 .upgrade-comparison__label { display:block; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
-.upgrade-comparison__value { display:block; margin-top:2px; font:600 16px/22px var(--font-metric); font-variant-numeric:tabular-nums; }
+.upgrade-comparison__value { display:block; margin-top:2px; font:var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric:tabular-nums; }
 .upgrade-comparison__value--target { color:var(--v5-brand); }
-.upgrade-note { display:block; margin-top:10px; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
-.upgrade-spotlight .upgrade-action { display:flex; margin-top:14px; min-height:44px; padding:0; }
-.upgrade-action :deep(.nx-button__surface) { min-height:44px; }
+/* Card action (03 §3.1): neutral glass M at the bottom right, the note beside it; the button drops below, still right-aligned, when the row is too narrow. */
+.upgrade-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 12px; margin-top:10px; }
+.upgrade-note { flex:1 1 120px; min-width:0; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
+.upgrade-spotlight .upgrade-action { margin-left:auto; }
 @keyframes upgrade-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .upgrade-art__target--ready { animation-play-state:paused; }
 @media(max-width:350px) { .upgrade-art__base { left:0; width:min(84px,34%); }.upgrade-art__target { width:min(136px,50%); }.upgrade-art__arrow { left:42%; width:42px; height:29px; } }
