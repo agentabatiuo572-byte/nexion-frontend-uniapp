@@ -4126,7 +4126,7 @@ timeHoursAgo: "{n}小时前",
       peer: "同级奖励",
       pool: "团队激励池",
       votes: "票",
-      peerNotDispatched: "同级奖励 {n}% · 暂未开放",
+      peerNotDispatched: "{n}% · 暂未开放",
     },
     cond: {
       selfBuy: "自买 ≥ ${n}",

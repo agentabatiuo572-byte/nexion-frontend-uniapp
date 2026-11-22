@@ -4519,7 +4519,7 @@ export const kk: Messages = {
       peer: "Тең дәреже сыйақысы",
       pool: "Ынталандыру қоры",
       votes: "дауыс",
-      peerNotDispatched: "Тең дәреже сыйақысы {n}% · әлі ашылмаған",
+      peerNotDispatched: "{n}% · әлі ашылмаған",
     },
     cond: {
       selfBuy: "Жеке сатып алу ≥ ${n}",

@@ -205,7 +205,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-device { display:flex;align-items:center;gap:12px;padding:8px 0 12px;border-bottom:1px solid var(--v5-border); }
 .tcs-device-art { width:200px;height:200px;flex:none; }
 .tcs-device-meta { min-width:0;display:flex;flex-direction:column;gap:5px; }
-.tcs-device-caption { font:400 11px/1.5 var(--font-v5);color:var(--v5-ink-3); }
+.tcs-device-caption { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .tcs-device-name { font:600 19px/1.3 var(--font-v5);color:var(--v5-ink);overflow-wrap:break-word; }
 .tcs-device-duration { font:500 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-brand);overflow-wrap:break-word; }
 .tcs-hero { margin-top:16px;border-radius:16px;padding:16px;position:relative;overflow:hidden;background:color-mix(in srgb,var(--v5-brand) 6%,var(--v5-surface-2));border:none; }
@@ -218,7 +218,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-success { margin-top:16px;padding:16px;border-radius:16px;background:color-mix(in srgb,var(--v5-brand) 7%,var(--v5-surface-2));border:1px solid color-mix(in srgb,var(--v5-brand) 25%,transparent); }
 .tcs-success-body { display:block;font:400 var(--ui-type-list-subtitle)/1.65 var(--font-v5);color:var(--v5-ink-2); }
 .tcs-success-time { display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-top:14px;font:400 12px/1.5 var(--font-v5);color:var(--v5-ink-3); }
-.tcs-success-time > text:last-child { font-size:22px;font-weight:600;color:var(--v5-brand); }
+.tcs-success-time > text:last-child { font-size:22px;font-weight:500;color:var(--v5-brand); }
 .tcs-error { margin-top:14px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--v5-warning) 10%,transparent); }
 .tcs-error-t { display:block;font:400 12px/1.65 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
 .tcs-ctas { margin-top:20px;display:flex;flex-direction:column;gap:8px; }

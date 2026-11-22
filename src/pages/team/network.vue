@@ -263,7 +263,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-orbit__ring--outer { inset: 5%; }
 .network-orbit__ring--inner { inset: 25%; border-color: color-mix(in srgb, var(--v5-brand) 30%, transparent); }
 .network-orbit__center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 999px; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 16%, transparent), transparent); }
-.network-orbit__you { font: 600 11px/14px var(--font-v5); color: var(--v5-brand); }
+.network-orbit__you { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand); }
 .network-orbit__center:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .network-orbit__dot { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 999px; box-shadow: 0 0 0 3px var(--v5-surface); font: 600 10px/1 var(--font-v5); color: var(--v5-on-brand); }
 .network-orbit__dot--inner { width: 26px; height: 26px; margin: -13px 0 0 -13px; }
@@ -283,7 +283,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-member-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--v5-space-1) 6px; margin-top: 5px; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 .network-member-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
 .network-member-compute { max-width: 33%; text-align: right; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); overflow-wrap: break-word; }
-.network-member-points { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--v5-ink); }
+.network-member-points { font-size: 15px; line-height: 20px; font-weight: 500; color: var(--v5-ink); }
 .network-chevron { color: var(--v5-ink-3); flex: none; }
 .network-empty { display: block; padding-block: var(--v5-space-4); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); }
 .sheet-handle { width: 36px; height: 3px; border-radius: 999px; background: var(--v5-ink-4); margin: 0 auto var(--v5-space-5); }
@@ -296,7 +296,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .sheet-detail-row { display: flex; align-items: start; justify-content: space-between; gap: var(--v5-space-5); padding: 14px 0; border-top: 1px solid var(--v5-border); font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.5; }
 .sheet-joined-date { flex-wrap: wrap; }
 .sheet-joined-date > :last-child { min-width: 0; flex: 1 1 170px; }
-.sheet-detail-row > :last-child { text-align: right; color: var(--v5-ink); overflow-wrap: break-word; }
+.sheet-detail-row > :last-child { min-width: 0; text-align: right; color: var(--v5-ink); overflow-wrap: break-word; }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .nx-net-sheet-wrap { position: fixed; inset: 0; z-index: 790; display: flex; align-items: flex-end; justify-content: center; }
 .nx-net-scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--v5-surface-3) 70%, transparent); backdrop-filter: blur(4px); }
