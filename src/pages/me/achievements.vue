@@ -46,9 +46,10 @@
                 class="achievement-row flex items-center" :class="{'achievement-row--badge': grp.key === 'badges', 'achievement-row--locked': row.status === 'LOCKED', 'achievement-row--ready': row.status === 'CLAIMABLE'}"
                 :style="[grp.key === 'badges' ? {} : rowStyle(i !== 0), {'--ui-growth-delay': Math.min(i * 60, 480) + 'ms'}]"
               >
-                <view class="grid place-items-center shrink-0" :style="remoteIconBoxStyle(row.status)">
-                  <view v-html="iconSvg(row.iconId, row.status === 'LOCKED' ? 'var(--v5-ink-4)' : 'var(--v5-brand)')" />
-                </view>
+                <view v-if="grp.key === 'badges'" class="achievement-medal shrink-0"><NxObjectIcon kind="medal" tone="var(--v5-warning)" :muted="row.status === 'LOCKED'"><view v-html="iconSvg(row.iconId, 'currentColor')" /></NxObjectIcon></view>
+                <NxIconTile v-else :tone="row.status === 'LOCKED' ? 'muted' : 'amber'" size="m">
+                  <view style="display: grid" v-html="iconSvg(row.iconId, 'currentColor')" />
+                </NxIconTile>
                 <view class="min-w-0 achievement-row__text">
                   <text class="block" :style="aLabelStyle(row.status !== 'LOCKED')">{{ row.label }}</text>
                   <text class="block" :style="aDescStyle(row.status !== 'LOCKED')">{{ row.description }}</text>
@@ -77,9 +78,9 @@
               class="flex items-center"
               :style="rowStyle(i !== 0)"
             >
-              <view class="grid place-items-center shrink-0" :style="iconBoxStyle(a, grp.cat)">
-                <view v-html="iconSvg(a.id, isUnlocked(a.id) ? catColor(grp.cat) : 'var(--v5-ink-4)')" />
-              </view>
+              <NxIconTile :tone="isUnlocked(a.id) ? CAT_TONE[grp.cat] : 'muted'" size="m">
+                <view style="display: grid" v-html="iconSvg(a.id, 'currentColor')" />
+              </NxIconTile>
               <view class="min-w-0" style="flex: 1">
                 <view class="flex items-center" style="gap: 6px">
                   <text :style="aLabelStyle(isUnlocked(a.id))">{{ label(a) }}</text>
@@ -119,6 +120,8 @@ import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { onMounted, computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import GrowthProgress from "@/components/ui/growth-progress.vue";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxPageContent from "@/components/ui/nx-page-content.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -192,6 +195,8 @@ const CAT_COLOR: Record<AchievementCategory, string> = {
   loyalty: "var(--v5-success)",
   hardware: "var(--v5-brand-2)",
 };
+// The shared tile's hue per category (the lime tile is kept for main actions).
+const CAT_TONE = { firsts: "sky", earnings: "amber", social: "teal", loyalty: "purple", hardware: "coral" } as const;
 
 const ICON_SVG: Record<string, string> = {
   flame: `<path d="M5 12.5 10 17 19 7.5" />`,
@@ -500,15 +505,6 @@ const retryBtnStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
 };
-function remoteIconBoxStyle(status: RemoteStatus): CSSProperties {
-  return {
-    width: "40px",
-    height: "40px",
-    borderRadius: "var(--v5-radius-s)",
-    background: status === "LOCKED" ? "var(--v5-surface-3)" : "var(--v5-brand-soft)",
-    opacity: 1,
-  };
-}
 // Badge list keeps a filled tile identity (achievement/badge semantic, de-card
 // white-list) — the single visual difference is the fill; outer border dropped.
 const listStyle: CSSProperties = {
@@ -521,19 +517,6 @@ function rowStyle(divider: boolean): CSSProperties {
     gap: "12px",
     padding: "12px 16px",
     borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
-  };
-}
-function iconBoxStyle(a: AchievementDef, cat: AchievementCategory): CSSProperties {
-  const ul = isUnlocked(a.id);
-  return {
-    width: "40px",
-    height: "40px",
-    borderRadius: "var(--v5-radius-s)",
-    // 未解锁态原用 --v5-surface,与所在卡片同色 → 图标框整个隐形(双主题)。
-    // 改 surface-3(同 security.vue 关闭态图标框的既有惯例);叠加下面的 opacity .5 后
-    // 对卡片仍有 ΔE≈4.5,弱而可见 —— 未解锁本就该弱,但不该没有。
-    background: ul ? `color-mix(in srgb, ${CAT_COLOR[cat]} 10%, transparent)` : "var(--v5-surface-3)",
-    opacity: ul ? 1 : 0.5,
   };
 }
 function aLabelStyle(ul: boolean): CSSProperties {
@@ -574,6 +557,8 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
 .achievement-row--ready { position:relative; overflow:hidden; background:color-mix(in srgb,var(--v5-brand) 8%,transparent); }.achievement-row--ready::before { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(105deg,transparent,color-mix(in srgb,var(--v5-brand) 16%,transparent),transparent); animation:achievement-sheen 800ms ease-out both; }.achievement-row--locked { opacity:.55; }
 .achievement-badges { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--v5-space-2); background:transparent !important; box-shadow:none !important; }
 .achievement-row--badge { display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 6px 12px; border-radius:18px; background:var(--v5-surface); text-align:center; animation:nx-viz-pop 420ms cubic-bezier(.2,1.4,.4,1) var(--ui-growth-delay) both; }.achievement-row--badge.achievement-row--locked { border:1.5px dashed var(--v5-border-strong); background:transparent; }.achievement-row--badge > view { flex:none !important; }.achievement-row--badge > view:first-child {width:44px !important;height:44px !important;border-radius:50% !important;}.achievement-row--badge > view:last-child { text-align:center; }.achievement-row--badge > view:nth-child(2) > text:first-child { font:500 13px/18px var(--font-v5) !important; }.achievement-row--badge > view:nth-child(2) > text:nth-child(2), .achievement-row--badge > view:last-child > text:nth-child(2) { display:none; }
+.achievement-row.achievement-row--badge > view.achievement-medal.achievement-medal:first-child { background:none !important; box-shadow:none !important; }
+.achievement-medal :deep(.nx-object-icon__glyph svg) { width:16px; height:16px; }
 @keyframes achievement-pulse { 50% {transform:scale(.7); opacity:.5;} } @keyframes achievement-sheen { from {transform:translateX(-100%);} to {transform:translateX(100%);} }
 @media (prefers-reduced-motion:reduce) { .achievement-row--badge,.achievement-node__dot,.achievement-row--ready::before {animation:none !important;} }
 

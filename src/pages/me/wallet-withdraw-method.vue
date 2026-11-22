@@ -13,7 +13,7 @@
       </view>
       <view class="method" role="button" tabindex="0" data-testid="withdraw-method-bank" :aria-disabled="!canOpenBank" @click="openBank" @keydown.enter.prevent="openBank" @keydown.space.prevent="openBank">
         <view class="method-top">
-          <view class="method-icon method-icon--bank" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
+          <view class="method-icon method-icon--object" aria-hidden="true"><NxObjectIcon kind="bank-card" /></view>
           <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ bankNote }}</text></view>
           <svg v-if="canOpenBank" class="method-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
@@ -32,6 +32,7 @@ import { computed, ref, watch } from "vue";
 import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { readWithdrawAttempt } from "@/lib/withdraw-attempt";
@@ -86,10 +87,10 @@ function openBank() {
 .method { position: relative; display: block; margin-bottom: 12px; padding: 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); cursor: pointer; }
 .method-top { display: flex; align-items: center; gap: 14px; }
 .method-icon { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: var(--v5-radius-m); }
-.method-icon--usdt { background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); }
+/* Tokens and the bank card are objects: they sit straight on the card, no tinted tile behind them. */
 /* The shared USDT coin (usdt-coin.vue) inside the method tile. */
-.method-coin { width: 30px; height: 30px; }
-.method-icon--bank { background: var(--v5-success-soft); color: var(--v5-success-ink); }
+.method-coin { width: 40px; height: 40px; }
+.method-icon--object { padding: 2px; }
 .method-copy { flex: 1; min-width: 0; }
 .method-title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .method-note { display: block; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }

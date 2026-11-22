@@ -10,9 +10,7 @@
   <view class="nx-glass-card rounded-2xl border overflow-hidden" :style="cardStyle">
     <!-- Header -->
     <view class="flex items-center border-b" :style="headerStyle">
-      <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
-      </view>
+      <view class="shrink-0" style="width: 36px; height: 36px"><NxObjectIcon kind="bank-card" /></view>
       <view class="flex-1 min-w-0">
         <text class="block" :style="headerTitleStyle">{{ t.store.coCardSelect }}</text>
         <view class="flex items-center" style="gap: 6px; margin-top: 2px">
@@ -105,6 +103,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
 import { ref, computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -186,7 +185,6 @@ function emitCancel() {
 // ─── styles ───
 const cardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)", background: "var(--nx-glass-fill)", borderColor: "transparent" };
 const headerStyle: CSSProperties = { padding: "16px 20px", gap: "12px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const iconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "var(--v5-brand-2-soft)" };
 const headerTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
