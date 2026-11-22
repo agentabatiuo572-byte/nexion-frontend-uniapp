@@ -305,7 +305,7 @@ export default countUpView;
 /* Wallet debt: amber figure and one note line under it; the top-up action carries the brand glass. */
 .nx-wallet.nx-wallet--debt .nx-wallet-total { color: var(--v5-warning-ink); margin-bottom: 10px; }
 .nx-wallet--debt .nx-wallet-fraction { color: inherit; opacity: .72; }
-.nx-wallet-debt { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 6px; margin-bottom: 18px; font: 400 var(--v5-type-caption)/1.45 var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
+.nx-wallet-debt { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 6px; margin-bottom: 18px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .nx-wallet-debt__icon { flex-shrink: 0; margin-top: 1px; color: var(--v5-warning-ink); }
 .nx-wallet-nex { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; font: 500 20px/1.4 var(--font-amount); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; color: var(--v5-bg); background: var(--v5-nex); }
