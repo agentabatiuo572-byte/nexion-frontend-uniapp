@@ -1822,6 +1822,7 @@ export const fil: Messages = {
     purchaseEligible: "Kwalipikadong bilhin ang produktong ito",
     purchaseQuotaDepleted: "Ubos na ang quota ng benta",
     purchaseQuotaRequired: "Kailangan ding may natitirang quota ng benta",
+    purchaseMonthlyQuotaRequired: "Kailangan ding may natitirang quota ngayong buwan",
     purchaseViewConditions: "Paano i-unlock",
     purchaseResume: "Ituloy ang bayad na ito",
     purchaseGap: "Kulang pa: {amount}",

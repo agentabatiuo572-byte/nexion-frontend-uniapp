@@ -14,7 +14,7 @@
           <text class="purchase-panel__note">{{ condition.met ? t.tradein.purchaseMet : fmt(t.tradein.purchaseGap, { amount: condition.kind === 'rank' ? visibility.mask(fmt(t.tradein.purchaseRanks, { n: condition.gap })) : conditionAmount(condition, condition.gap, true) }) }}</text>
         </view>
         <!-- Quota is an independent remaining-capacity check, never part of EITHER unlock conditions. -->
-        <text v-if="!blockingOnly && !policy.eligible && policy.conditions.some(isQuota)" class="purchase-panel__note">{{ t.tradein.purchaseQuotaRequired }}</text>
+        <text v-if="!blockingOnly && !policy.eligible && policy.conditions.some(isQuota)" class="purchase-panel__note">{{ policy.conditions.some(condition => condition.kind === 'monthlyQuota') ? t.tradein.purchaseMonthlyQuotaRequired : t.tradein.purchaseQuotaRequired }}</text>
         <view v-for="condition in policy.conditions.filter(isQuota)" :key="condition.kind" class="purchase-panel__condition">
           <view class="purchase-panel__row"><text>{{ conditionLabel(condition) }}</text><text class="purchase-panel__values">{{ conditionValues(condition) }}</text></view>
           <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />

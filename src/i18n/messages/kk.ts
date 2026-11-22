@@ -1822,6 +1822,7 @@ export const kk: Messages = {
     purchaseEligible: "Бұл тауарды сатып алуға болады",
     purchaseQuotaDepleted: "Сату квотасы қалмады",
     purchaseQuotaRequired: "Сату квотасы да қалған болуы керек",
+    purchaseMonthlyQuotaRequired: "Осы айдағы квота да қалған болуы керек",
     purchaseViewConditions: "Ашылу шарттарын қарау",
     purchaseResume: "Осы төлемді жалғастыру",
     purchaseGap: "Жетпейді: {amount}",
