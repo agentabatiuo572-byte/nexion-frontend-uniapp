@@ -247,7 +247,7 @@
       </view>
       <!-- The server allows the original keep payment to continue with its own key: that continuation is the page's one action (03 §3.5.2, 04 §4.0). -->
       <view v-if="promotionRoute ? promotionCheckout?.keepResumeAllowed : keepResumeAllowed" class="checkout-sticky checkout-sticky--single nx-glass-bar">
-        <NxButton variant="primary" :label="purchaseRecoveryCopy(locale.code).resume" @click="promotionRoute ? promotionCheckout?.openKeepResume() : openKeepResume()" />
+        <NxButton variant="primary" :disabled="tradein.state.kind === 'keep-recovery'" :label="purchaseRecoveryCopy(locale.code).resume" @click="promotionRoute ? promotionCheckout?.openKeepResume() : openKeepResume()" />
       </view>
       <view v-if="!promotionRoute && (originalOrderNavigationFailed || (pendingCreateUnresolved && createLookupUnavailable)) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
         <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
@@ -701,10 +701,11 @@ function leaveUnavailableProduct(scope: CheckoutRouteScope, listing: Product | u
 let refusedCapacityTarget: string | null = null;
 function openKeepResume(): boolean {
   const resume = checkoutKeepResume.value;
-  if (!resume || !keepResumeAllowed.value || !auth.isAuthenticated || !isCurrentCheckoutRoute(captureCheckoutRoute())) return false;
+  if (!resume || !keepResumeAllowed.value || tradein.state.kind === "keep-recovery"
+      || !auth.isAuthenticated || !isCurrentCheckoutRoute(captureCheckoutRoute())) return false;
   return resume.kind === "intent" ? resume.open() : recoverCapacityBeforePurchase([resume.target], false, resume);
 }
-function recoverCapacityBeforePurchase(targets: string[], explicit = false, resume?: CheckoutKeepResume, showRecovery = true): boolean {
+function recoverCapacityBeforePurchase(targets: string[], explicit = false, resume?: CheckoutKeepResume): boolean {
   if (!resume) refusedCapacityTarget = null;
   if (!remoteApiEnabled) return false;
   const accountKey = app.accountKey;
@@ -730,7 +731,7 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false, resu
     }
     keepCheckoutRecovery.value = { ...recovery, accountKey };
     productId.value = target;
-    if (showRecovery) tradein.showKeepRecovery(target as DeviceKind);
+    if (resume) tradein.showKeepRecovery(target as DeviceKind);
     return true;
   }
   if (!resume) keepCheckoutRecovery.value = null;
@@ -3027,7 +3028,7 @@ async function refreshForegroundOrdinaryCheckout() {
     return;
   }
   // Register the original with the checkout host; only its recovery reads the intent.
-  if (recoverCapacityBeforePurchase([scope.productNo], false, undefined, false)) return;
+  if (recoverCapacityBeforePurchase([scope.productNo])) return;
   if (!ordinaryCheckoutInitialized.value || !product.value || activeSession.value) return;
   const eligibility = await refreshPurchaseEligibility(scope, false);
   if (!isCurrentCheckoutRoute(scope) || eligibility === "stale") return;

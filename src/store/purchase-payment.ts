@@ -79,7 +79,7 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   loading: false, retrying: false, reading: false, busy: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
-let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void } | null = null;
+let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void; onExpired?: () => void } | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
 let quoteTimer: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<typeof setTimeout> | undefined;
 const releaseListeners = new Set<(accountKey: string, commandKey: string) => void>();
@@ -301,16 +301,18 @@ function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
 function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, { notice, retryNotice: '', concluded: true, cashier: false }); }
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
+  const expired = state.intent?.status === 'EXPIRED';
   requestVersion++; stopTimers(); openCashierOnReady = false;
   reviewedQuote = confirmedQuote = null;
   Object.assign(state, { open: false, loading: false, retrying: false, reading: false, busy: false, cashier: false, notice: '', concluded: false,
     originalRecovery: null, canResubmit: false });
   const choice = activeChoice; activeChoice = null; context = null; choice?.resolve(result);
+  if (expired) choice?.onExpired?.();
 }
-function waitForChoice(): Promise<PurchaseChoice | null> {
+function waitForChoice(onExpired?: () => void): Promise<PurchaseChoice | null> {
   let resolve!: (result: PurchaseChoice | null) => void;
   const promise = new Promise<PurchaseChoice | null>(done => { resolve = done; });
-  activeChoice = { promise, resolve };
+  activeChoice = { promise, resolve, onExpired };
   return promise;
 }
 
@@ -791,31 +793,32 @@ export function requestPurchasePayment(value: PurchasePaymentContext): Promise<P
   return result;
 }
 type DeliveredPayment = Extract<PurchaseChoice, { method: 'EXTERNAL' }>;
-async function resume(pending: PendingExternal, onDelivered?: (result: DeliveredPayment) => void) {
+type CheckoutCapacityResume = { onDelivered: (result: DeliveredPayment) => void; onExpired: () => void };
+async function resume(pending: PendingExternal, checkout?: CheckoutCapacityResume) {
   if (state.open) return;
   context = null;
   const payload = JSON.parse(pending.fingerprint)[1] as Record<string, unknown>;
   open({ summary: pending.summary, kind: pending.kind, payload, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
-  waitForResumedChoice(onDelivered);
+  waitForResumedChoice(checkout);
   await query();
 }
-function waitForResumedChoice(onDelivered?: (result: DeliveredPayment) => void) {
+function waitForResumedChoice(checkout?: CheckoutCapacityResume) {
   // No active purchase callback after reload. A delivered intent returns to the original order.
-  void waitForChoice().then(result => {
+  void waitForChoice(checkout?.onExpired).then(result => {
     if (result?.method !== 'EXTERNAL' || !result.receipt || typeof result.receipt !== 'object') return;
     acknowledgePurchasePayment(result);
-    if (onDelivered) { onDelivered(result); return; }
+    if (checkout) { checkout.onDelivered(result); return; }
     const orderNo = (result.receipt as { orderNo?: unknown }).orderNo;
     if (typeof orderNo === 'string' && orderNo) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
   });
 }
 /** Open a checkout-confirmed original through the same payment layer as View Progress. */
 export function resumeCheckoutCapacityPayment(accountKey: string, kind: 'CAPACITY_KEEP' | 'CAPACITY_REPLACE',
-  commandKey: string, intentNo: string, onDelivered: (result: DeliveredPayment) => void): boolean {
+  commandKey: string, intentNo: string, checkout: CheckoutCapacityResume): boolean {
   if (state.open || accountKey !== account()) return false;
   const pending = pendingPayments().find(row => row.commandKey === commandKey && row.kind === kind);
   if (!pending || pending.intentNo && pending.intentNo !== intentNo) return false;
-  void resume({ ...pending, intentNo }, onDelivered);
+  void resume({ ...pending, intentNo }, checkout);
   return true;
 }
 // The App runtime keeps a page's query on $page.options; H5 also sets options.
