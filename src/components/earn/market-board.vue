@@ -22,19 +22,7 @@
         <!-- Three fixed tiles. With more than three workloads, tile i owns workloads i, i+3, … and every
              ROTATE_MS all three tiles switch to their next one at once, like a quote screen. Screen readers
              get the full list once; the rotating faces are hidden from them. -->
-        <view
-          v-else
-          ref="rotationRef"
-          class="earn-market__board"
-          role="group"
-          :aria-label="en.market.priceIndex"
-          :tabindex="rotating ? 0 : undefined"
-          @touchstart="held = true"
-          @touchend="held = false"
-          @touchcancel="held = false"
-          @focusin="focused = true"
-          @focusout="focused = false"
-        >
+        <view v-else ref="rotationRef" class="earn-market__board" role="group" :aria-label="en.market.priceIndex">
           <view class="nx-sr-only" role="list"><text v-for="w in priceIndex" :key="w.code" role="listitem">{{ spokenWorkload(w) }}</text></view>
           <view class="earn-market__grid" aria-hidden="true">
           <view v-for="(slot, i) in slots" :key="i" class="earn-market__tile">
@@ -83,7 +71,7 @@
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
-import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import type { DeviceKind, TaskCategory } from "@/store/types";
 import { useApp } from "@/store/app";
@@ -93,7 +81,7 @@ import { en } from "@/i18n/messages/en";
 import { getProductMedia } from "@/lib/product-media";
 import DeviceArt from "@/components/device-art.vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
-import { CHASSIS_SCROLLING } from "@/lib/chassis-scroll";
+import { marketBoardRotation } from "./market-board-rotation";
 
 const PHONE_ART = "/static/img/home-glass-20260928/phone.webp";
 
@@ -147,14 +135,13 @@ const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
 const ROTATE_MS = 6000;
 const slots = computed(() => [0, 1, 2].map((i) => priceIndex.value.filter((_, j) => j % 3 === i)).filter((slot) => slot.length));
 const rotating = computed(() => priceIndex.value.length > 3);
-const step = ref(0);
-const held = ref(false);
-const focused = ref(false);
-const scrolling = inject(CHASSIS_SCROLLING, ref(false));
+// The position survives a remount of the page, so the board continues where it was when it comes back.
+const step = ref(marketBoardRotation.step);
+watch(step, (value) => { marketBoardRotation.step = value; });
 const { elRef: rotationRef, running: inView } = useLoopsInView(".earn-market__board");
-// Off screen, hidden page, scrolling, touch or focus pause the rotation (WCAG 2.2.2). Reduced motion keeps the
-// first faces in CSS, so the App's logic layer needs no media query.
-const rotationActive = computed(() => rotating.value && inView.value && !scrolling.value && !held.value && !focused.value);
+// The board always rotates while the user can see it; it stops only off screen or on a hidden page (also the App in
+// the background). Touch, focus, scrolling and reduced motion don't stop it: a swap is a plain text change.
+const rotationActive = computed(() => rotating.value && inView.value);
 // Every resume waits a full period before the next swap.
 let rotationTimer: ReturnType<typeof setInterval> | undefined;
 watch(rotationActive, (active) => {
@@ -223,16 +210,11 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__caption--plain { letter-spacing: 0; text-transform: none; }
 .earn-market__status { display: block; padding: 10px 0; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.earn-market__board:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 16px; }
 /* Every face of a tile shares one grid cell, so the tile keeps the tallest face's height. A swap shows the next face
    at once on all three tiles, like a quote board's tick: no fade, never a blank or half-transparent tile. */
 .earn-market__tile { display: grid; min-width: 0; padding: 10px 10px 8px; border-radius: 14px; background: var(--v5-surface-2); }
 .earn-market__face { grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0; visibility: hidden; }
 .earn-market__face--on { visibility: visible; }
-@media (prefers-reduced-motion: reduce) {
-  .earn-market__face { visibility: hidden; }
-  .earn-market__face:first-child { visibility: visible; }
-}
 [data-theme="light"] .earn-market__tile { background: var(--v5-bg); }
 .earn-market__name { font: 500 11px/14px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-market__unit { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
