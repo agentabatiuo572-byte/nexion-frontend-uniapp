@@ -278,7 +278,8 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__menu-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 /* Menu rows use the list-title role at 400 (03 §3.5); a destructive action only swaps its text to the error colour (03 §3.1). */
 .device-inventory-row__menu-label { flex: 1; min-width: 0; color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
-.device-inventory-row__menu-row--danger .device-inventory-row__menu-label { color: var(--v5-danger); }
+/* Deactivating is a reverse action: it lives in this menu in neutral text; only its confirm dialog uses the error colour. */
+.device-inventory-row__menu-row--danger .device-inventory-row__menu-label { color: var(--v5-ink); }
 .device-inventory-row__menu-desc { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .device-inventory-row__menu-chevron { display: flex; flex: none; color: var(--v5-ink-4); }
 </style>

@@ -155,7 +155,10 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 /* Actions sit right (03 §3.1); 取消试用 keeps the left edge, and a button that no longer fits wraps whole to the right of the next line (03 §3.6.1). */
 .trial-device-row--inventory .trial-device-row__actions { margin-top:12px; justify-content:flex-end; }
 /* Cancelling the trial is destructive: a neutral glass S like 详情, with only its text in the error colour (03 §3.1). */
-.trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; color:var(--v5-danger); }
+/* A reverse action stays findable but quiet (user): bare text in the secondary ink, no pill, no error colour; the
+   confirm dialog after it carries the consequence. */
+.trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; padding-inline:0; color:var(--v5-ink-3); }
+.trial-device-row--inventory .trial-device-row__actions > .trial-device-row__cancel--inline { font:400 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__actions > view { font:var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); white-space:nowrap; }
 .trial-device-row--inventory .trial-device-row__main { gap:12px; }
 .trial-device-row--inventory .trial-device-row__status { font:400 13px/18px var(--font-v5); }
@@ -166,10 +169,10 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 /* Compact actions are glass pills: neutral for details, brand-tinted for buying early. */
 .trial-device-row--inventory .trial-device-row__details { color:var(--v5-ink); }
 .trial-device-row--inventory .trial-device-row__buy { gap:4px; }
-.trial-device-row--inventory .trial-device-row__details::before,.trial-device-row--inventory .trial-device-row__buy::before,.trial-device-row--inventory .trial-device-row__cancel--inline::before { border:0;
+.trial-device-row--inventory .trial-device-row__details::before,.trial-device-row--inventory .trial-device-row__buy::before { border:0;
   background:linear-gradient(145deg,rgba(255,255,255,.06),transparent 38%,transparent 66%,rgba(255,255,255,.06)),var(--trial-pill-fill,color-mix(in srgb,var(--v5-ink) 7%,transparent));
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.10),inset 0 3px 6px -2px rgba(255,255,255,.24),inset 2px 0 8px -4px rgba(255,255,255,.24),inset 0 -4px 9px -4px rgba(0,0,0,.28); }
-[data-theme="light"] .trial-device-row--inventory .trial-device-row__details::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__buy::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__cancel--inline::before {
+[data-theme="light"] .trial-device-row--inventory .trial-device-row__details::before,[data-theme="light"] .trial-device-row--inventory .trial-device-row__buy::before {
   background:linear-gradient(145deg,rgba(255,255,255,.30),transparent 38%,transparent 66%,rgba(255,255,255,.30)),var(--trial-pill-fill,color-mix(in srgb,var(--v5-ink) 7%,transparent));
   box-shadow:inset 0 0 0 1px rgba(73,94,125,.12),inset 0 3px 6px -2px rgba(255,255,255,.85),inset 2px 0 8px -4px rgba(255,255,255,.85),inset 0 -4px 9px -4px rgba(87,115,155,.18); }
 .trial-device-row--inventory .trial-device-row__buy { --trial-pill-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent); }
