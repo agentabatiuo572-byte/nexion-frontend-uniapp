@@ -46,7 +46,7 @@
             </view>
             <view class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" role="button" tabindex="0" data-testid="wallet-card-unbind" @click="handleRemove(card)" @keydown.enter.prevent="handleRemove(card)">
               <view class="inline-flex items-center" style="gap: 6px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
                 <text :style="actionUnbindTextStyle">{{ t.cards.unbind }}</text>
               </view>
             </view>
@@ -199,7 +199,8 @@ const cardMetaStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color
 const cardActionsStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" };
 const actionBtnStyle: CSSProperties = { height: "44px", fontSize: "13px" };
 const actionDefaultTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
-const actionUnbindTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-brand-2)" };
+// Unbinding is a reverse action: quiet secondary-ink text, never an accent; its confirm dialog carries the consequence.
+const actionUnbindTextStyle: CSSProperties = { fontSize: "var(--ui-type-text-link)", lineHeight: "var(--ui-type-text-link-lh)", fontWeight: 400, color: "var(--v5-ink-3)" };
 
 const addBtnStyle: CSSProperties = {
   height: "48px",
