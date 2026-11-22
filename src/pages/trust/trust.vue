@@ -198,6 +198,7 @@ import { navTo } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
 import { useTrustDocuments } from "@/composables/use-trust-documents";
 import { usePublishedNetworkStats } from "@/composables/use-published-network-stats";
@@ -249,7 +250,7 @@ const profileFacts = computed(() => {
   return [
     { label: center.value.factJurisdiction, value: value.jurisdiction === "New York, USA" ? center.value.newYork : value.jurisdiction, small: false },
     { label: center.value.factDosId, value: value.nyDosId, small: false },
-    { label: center.value.factCapital, value: `US$${value.authorizedCapitalUsd.toLocaleString("en-US")}`, small: false },
+    { label: center.value.factCapital, value: `US$${formatGroupedAmount(value.authorizedCapitalUsd, "full")}`, small: false },
     { label: center.value.factAddress, value: value.registeredAddress, small: true },
   ];
 });

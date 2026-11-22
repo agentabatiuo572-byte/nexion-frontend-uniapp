@@ -1,9 +1,9 @@
 /** Display only: keep API, ledger and command amounts at their original precision. */
-export function formatGroupedAmount(value: number | string | null | undefined, precision: 2 | 6 | "full" = 2): string {
+export function formatGroupedAmount(value: number | string | null | undefined, precision: 2 | 4 | 6 | "full" = 2): string {
   const fixed = formatAmount(value, precision), [whole, fraction] = fixed.split('.');
   return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction === undefined ? '' : '.' + fraction);
 }
-export function formatAmount(value: number | string | null | undefined, precision: 2 | 6 | "full" = 2): string {
+export function formatAmount(value: number | string | null | undefined, precision: 2 | 4 | 6 | "full" = 2): string {
   if (typeof value === "number" && !Number.isFinite(value)) return "-";
   const match = String(value ?? "").trim().match(/^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);
   if (!match) return "-";
