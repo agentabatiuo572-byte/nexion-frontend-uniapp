@@ -1816,6 +1816,7 @@ export const ru: Messages = {
     purchaseEligible: "Можно купить этот товар",
     purchaseQuotaDepleted: "Квота продаж исчерпана",
     purchaseQuotaRequired: "Также нужна свободная квота продаж",
+    purchaseMonthlyQuotaRequired: "Также нужна свободная квота на этот месяц",
     purchaseViewConditions: "Условия открытия",
     purchaseResume: "Продолжить оплату",
     purchaseGap: "Не хватает: {amount}",

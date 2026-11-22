@@ -1816,6 +1816,7 @@ export const uz: Messages = {
     purchaseEligible: "Bu mahsulotni sotib olishingiz mumkin",
     purchaseQuotaDepleted: "Sotuv kvotasi qolmadi",
     purchaseQuotaRequired: "Sotuv kvotasi ham qolgan boʻlishi kerak",
+    purchaseMonthlyQuotaRequired: "Bu oylik kvota ham qolgan boʻlishi kerak",
     purchaseViewConditions: "Ochish shartlari",
     purchaseResume: "Bu toʻlovni davom ettirish",
     purchaseGap: "Yana kerak: {amount}",
