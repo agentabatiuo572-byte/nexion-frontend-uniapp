@@ -28,7 +28,6 @@
       aria-modal="true"
       :aria-label="displayName"
       @click="closeMenu"
-      @keydown="onMenuKeydown"
     >
       <!-- Mobile action sheet: handle, device header, grouped actions, separate cancel. -->
       <view class="nx-glass-sheet nx-action-sheet nx-sheet-slide-up" @click.stop>
@@ -53,7 +52,7 @@
             <svg v-if="tradeinRow.tradeinCtaLabel" class="nx-action-sheet__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
           </view>
         </view>
-        <view class="nx-action-sheet__cancel" role="button" tabindex="0" @click="closeMenu" @keydown="onMenuKeydown"><LiquidGlass :radius="24" tone="control" /><text>{{ t.earn.quickMenu.cancel }}</text></view>
+        <view class="nx-action-sheet__cancel" role="button" tabindex="0" @click="closeMenu" @keydown.enter.prevent="closeMenu" @keydown.space.prevent="closeMenu"><LiquidGlass :radius="24" tone="control" /><text>{{ t.earn.quickMenu.cancel }}</text></view>
       </view>
     </view>
     <!-- 有任务时的取消激活三选一(等完成 / 强制 / 返回),就地弹出;拦截触摸,长按不穿透到卡片。 -->
@@ -398,7 +397,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
-import { computed, nextTick, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { advanceMonotonicHighWater, deadlineRemainingDays, deadlineRemainingMs, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { useApp } from "@/store/app";
@@ -418,7 +417,7 @@ import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSID
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
 import { useTradeinStrip } from "@/composables/use-tradein-strip";
-import { useDialogScrollLock } from "@/composables/use-dialog-a11y";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
 import { canShowLivePhoneHashpower, computeLiveHashpower, isDeviceOnline, deviceOnlineState } from "@/lib/hashpower";
@@ -461,7 +460,6 @@ useVisibleInterval(() => {
 onHide(() => { onPressEnd(); closeMenu(); });
 onUnmounted(() => {
   onPressEnd();
-  if (typeof document !== "undefined") document.removeEventListener("keydown", onDocumentMenuKeydown, true);
 });
 
 const KIND_ICON_PATHS: Partial<Record<DeviceKind, string>> = {
@@ -749,9 +747,10 @@ const menuOpen = ref(false);
 const deactivation = useDeviceDeactivation();
 const tradein = useTradeinStrip(() => menuOpen.value);
 const tradeinRow = computed(() => tradein.tradeinStrip(props.device));
-useDialogScrollLock(menuOpen);
+// One layer stack for the quick menu (03 §3.5, 02 §2.7): focus in and back, Tab kept inside, Esc, browser back and the
+// Android back key close it, and the page does not scroll under it.
+useDialogA11y(menuOpen, () => cardRoot()?.querySelector<HTMLElement>(".nx-device-quick-menu"), closeMenu, true);
 const pressFiredMenu = ref(false);
-let navigatingToStatistics = false;
 let longPress: ReturnType<typeof setTimeout> | null = null;
 function cardRoot(): HTMLElement | undefined {
   if (typeof document === "undefined") return undefined;
@@ -764,48 +763,6 @@ function openMenu() {
 function closeMenu() {
   menuOpen.value = false;
 }
-function onMenuKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeMenu();
-    return;
-  }
-  trapMenuFocus(event);
-}
-function onDocumentMenuKeydown(event: KeyboardEvent) {
-  if (menuOpen.value) onMenuKeydown(event);
-}
-function trapMenuFocus(event: KeyboardEvent) {
-  if (event.key !== "Tab") return;
-  const items = Array.from(cardRoot()?.querySelectorAll<HTMLElement>(".nx-device-quick-menu [tabindex='0']") ?? [])
-    .filter((element) => element.offsetParent !== null);
-  if (!items.length || typeof document === "undefined") return;
-  const current = items.indexOf(document.activeElement as HTMLElement);
-  if (event.shiftKey && current <= 0) {
-    event.preventDefault();
-    event.stopPropagation();
-    items[items.length - 1].focus();
-  } else if (!event.shiftKey && (current < 0 || current === items.length - 1)) {
-    event.preventDefault();
-    event.stopPropagation();
-    items[0].focus();
-  }
-}
-watch(menuOpen, async (open) => {
-  if (typeof document !== "undefined") {
-    document.removeEventListener("keydown", onDocumentMenuKeydown, true);
-    if (open) document.addEventListener("keydown", onDocumentMenuKeydown, true);
-  }
-  await nextTick();
-  if (!open && navigatingToStatistics) { navigatingToStatistics = false; return; }
-  const root = cardRoot();
-  if (!root) return;
-  const target = open
-    ? root.querySelector<HTMLElement>(".nx-device-quick-menu [tabindex='0']")
-    : root.querySelector<HTMLElement>(props.detailPage ? ".device-management-heading [role='button']" : props.stage ? ".earn-stage__more" : ".nx-device-card__header");
-  target?.focus();
-});
 function onPressStart() {
   if (longPress) clearTimeout(longPress);
   pressFiredMenu.value = false;
@@ -831,7 +788,6 @@ function onRowTap() {
   emit("toggle");
 }
 function goStatsMenu() {
-  navigatingToStatistics = true;
   closeMenu();
   if (props.detailPage) emit('statistics');
   else navTo(`/pages/earn/device-detail?id=${encodeURIComponent(props.device.id)}&section=statistics`);

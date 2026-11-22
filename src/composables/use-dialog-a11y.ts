@@ -157,8 +157,108 @@ function scheduleRestore(order: number, run: () => void, drop: () => void): void
 // and Tab, is the only part of the page a screen reader can reach (everything beside its ancestor path is inert), and
 // takes focus when it opens; closing it hands focus back inside the layer below (03 §3.5). A layer whose root is not on
 // screen (a dialog left open in a hidden tab) never counts as the top.
-type Layer = { order: number; root: () => HTMLElement | null | undefined };
+type Layer = { order: number; root: () => HTMLElement | null | undefined; close?: () => void };
 const openLayers: Layer[] = [];
+
+// #ifdef H5
+// Browser back on H5 answers the top layer first (02.7, 03 §3.5), as Esc does, through the same close callback and so the
+// same guards. Each open layer pushes its own history entry: a copy of the page's router state with a marker, at the
+// same URL. Opening a layer is therefore a forward step, and like any forward step it drops the browser's forward
+// entries; closing it returns the history to its shape before the layer opened. A back that pops a layer entry is kept
+// from vue-router and uni (uni would drop the page) and closes that layer; if its guard keeps it open (a submitting
+// payment PIN) the entry is pushed again, so the history still matches the screen. A layer closed by code steps back
+// off its own entry and that one pop is ignored. A marker whose layer is already gone is stepped over, so no back is
+// ever empty. uni.navigateBack from the app steps over layer entries to the page before. This also covers a page opened
+// straight from another document (deep link, reload). The native App keeps registerNativeDialog for its back button.
+type LayerEntry = { id: number; layer: Layer };
+const layerEntries: LayerEntry[] = [];
+let entrySeq = 0;
+let currentMarker: number | null = null;
+// Pops this guard caused itself, each with the layer entry it expected to start from ("any" for a correcting step).
+const ignoredPops: (number | "any")[] = [];
+// Router state (current, position) of page entries replaced away from under a layer entry.
+const stalePageEntries: { current: unknown; position: unknown }[] = [];
+let appBackAt = 0;
+let browserBackGuarded = false;
+const markerOf = (state: unknown): number | null => {
+  const marker = (state as { __nxLayer?: unknown } | null)?.__nxLayer;
+  return typeof marker === "number" ? marker : null;
+};
+function pushLayerEntry(layer: Layer): void {
+  if (!browserBackGuarded) return;
+  const id = ++entrySeq;
+  history.pushState({ ...((history.state as object | null) ?? {}), __nxLayer: id }, "", location.href);
+  layerEntries.push({ id, layer });
+}
+/** A layer closed by code (or unmounted) leaves its entry: step back off it once the current step has settled, so a
+ *  navigation started in the same step lands first. Only when the browser is still on that entry. */
+function releaseLayerEntry(layer: Layer): void {
+  const index = layerEntries.findIndex((entry) => entry.layer === layer);
+  if (index < 0) return;
+  const [entry] = layerEntries.splice(index, 1);
+  setTimeout(() => {
+    if (markerOf(history.state) !== entry.id) return;
+    ignoredPops.push(entry.id);
+    history.back();
+  }, 0);
+}
+/** Called once at app start, before the router exists: listeners on window run in the order they were added (whatever
+ *  the capture flag), and vue-router's own popstate listener must not see a pop that belongs to a layer. */
+export function installBrowserBackGuard(): void {
+  if (browserBackGuarded || typeof window === "undefined") return;
+  browserBackGuarded = true;
+  currentMarker = markerOf(history.state);
+  // Every entry the router or a layer pushes or replaces tells us whether the browser now sits on a layer entry.
+  const push = history.pushState.bind(history), replace = history.replaceState.bind(history);
+  history.pushState = (state, title, url) => { push(state, title, url); currentMarker = markerOf(state); };
+  history.replaceState = (state, title, url) => {
+    const before = history.state as { __nxLayer?: unknown; current?: unknown; position?: unknown } | null;
+    let next = state;
+    // The router replaced the page while a layer entry was current (a tab switch or reset started from inside a layer).
+    // The new page's entry is not a layer entry; the page entry and layer entries left below it belong to a page that is
+    // gone, and are stepped over on the way back.
+    if (markerOf(before) !== null && state && typeof state === "object" && (state as { current?: unknown }).current !== before?.current) {
+      stalePageEntries.push({ current: before?.current, position: before?.position });
+      const { __nxLayer: _layer, ...rest } = state as Record<string, unknown>;
+      next = rest;
+    }
+    replace(next, title, url);
+    currentMarker = markerOf(next);
+  };
+  uni.addInterceptor("navigateBack", { invoke() { appBackAt = Date.now(); } });
+  window.addEventListener("popstate", (ev) => {
+    const from = currentMarker;
+    const landed = markerOf(ev.state);
+    currentMarker = landed;
+    if (ignoredPops.length) {
+      const expected = ignoredPops.shift();
+      ev.stopImmediatePropagation();
+      // A navigation pushed its entry between the step back and the browser carrying it out, so the step went back over
+      // that navigation instead of over the layer entry: go forward to it again, unseen by the router.
+      if (expected !== "any" && from !== expected) { ignoredPops.push("any"); history.forward(); }
+      return;
+    }
+    const landedState = ev.state as { current?: unknown; position?: unknown } | null;
+    if (landedState && stalePageEntries.some((entry) => entry.current === landedState.current && entry.position === landedState.position)) {
+      ev.stopImmediatePropagation();
+      history.back();
+      return;
+    }
+    // The pop did not start on a layer entry: an ordinary page step for the router.
+    if (from === null) return;
+    ev.stopImmediatePropagation();
+    // Entries above where the browser landed have been popped (one, for a single back).
+    const popped = layerEntries.filter((entry) => landed === null || entry.id > landed);
+    popped.forEach((entry) => layerEntries.splice(layerEntries.indexOf(entry), 1));
+    const top = popped[popped.length - 1];
+    // uni.navigateBack, or a step off an entry whose layer is gone: keep going back to the real page step.
+    if (!top || Date.now() - appBackAt < 1_000) { history.back(); return; }
+    top.layer.close?.();
+    // The layer's guard kept it open (or it has no close at all): its entry goes back so history matches the screen.
+    setTimeout(() => { if (openLayers.includes(top.layer)) pushLayerEntry(top.layer); }, 0);
+  });
+}
+// #endif
 const dropLayer = (layer: Layer) => { const index = openLayers.indexOf(layer); if (index >= 0) openLayers.splice(index, 1); };
 function topLayer(): { layer: Layer; el: HTMLElement | null } | null {
   for (let i = openLayers.length - 1; i >= 0; i--) {
@@ -378,7 +478,7 @@ export function useDialogA11y(
   // order and redraws its pay button): its test id, else its role and accessible name.
   let previousTrace: Trace | null = null;
   let openedAt = 0;
-  const layer: Layer = { order: 0, root: () => rootEl() };
+  const layer: Layer = { order: 0, root: () => rootEl(), close };
   // Closed only because a newer layer took over (a notice over the payment page): the trigger is kept for its return.
   let paused = false;
   // Only a layer that really opened hands focus back (the immediate watch runs the closed branch on mount).
@@ -497,6 +597,9 @@ export function useDialogA11y(
       openedAt = ++openSeq;
       layer.order = openedAt;
       openLayers.push(layer);
+      // #ifdef H5
+      pushLayerEntry(layer);
+      // #endif
       document.addEventListener("keydown", onKeydown, true);
       await nextTick();
       // 焦点必须真的移进来:不移的话读屏用户不知道弹层开了,键盘用户按 Tab 时
@@ -513,6 +616,9 @@ export function useDialogA11y(
       return;
     }
     syncInert();
+    // #ifdef H5
+    releaseLayerEntry(layer);
+    // #endif
     if (wasOpen) scheduleRestore(openedAt, restore, forget);
   // immediate:有些弹层不是靠自身的 v-if 开关,而是**整个组件被父级 v-if 挂载**
   // (captcha-slider 就是这样)。它们的 open 恒为 true,不给 immediate 的话 watch
@@ -524,6 +630,9 @@ export function useDialogA11y(
   onBeforeUnmount(() => {
     detach();
     dropLayer(layer);
+    // #ifdef H5
+    releaseLayerEntry(layer);
+    // #endif
     syncInert();
     if (open.value && (previousFocus || previousTrace)) scheduleRestore(openedAt, restore, forget);
   });

@@ -36,8 +36,9 @@
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
         <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices" @support="contactOrderSupport" v-slot="{ done }">
-        <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
-        <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
+        <!-- "Running" is the end of the replay: it waits, in place, for the head to reach 设备已激活 so both tell one progress. -->
+        <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">{{ resultRunningText }}</text>
+        <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit nx-tint" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
           <view v-if="resultOrder.trialReward.usdt > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUsdt }}</text><text class="trial-result-usdt">+{{ formatAmount(resultOrder.trialReward.usdt) }} USDT</text></view>
           <view v-if="resultOrder.trialReward.nex > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUvt }}</text><text class="trial-result-uvt">+{{ formatAmount(resultOrder.trialReward.nex) }} UVT</text></view>
@@ -47,7 +48,8 @@
         </view>
         <!-- The exit keeps its place but stays hidden and untouchable until the result animation has finished. -->
         <view class="trial-result-actions" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">
-          <view class="trial-result-secondary active:opacity-85" role="button" tabindex="0" :aria-label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false"><text>{{ purchaseCopy.resultOrder }}</text></view>
+          <!-- The second exit is the shared neutral glass L (03 §3.1), not a page-private outlined pill. -->
+          <NxButton variant="secondary" :label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false" />
         </view>
         </CheckoutResult>
       </view>
@@ -747,7 +749,8 @@ const dataCenterLabel = computed(() => {
   const name = dc.toLowerCase();
   if (name === "frankfurt" || name === "frankfurt dc") return t.value.store.coDcFrankfurt;
   if (name === "singapore" || name === "singapore dc") return t.value.store.coDcSingapore;
-  return dc;
+  // Chinese runs straight into a Chinese place name; a Latin name the server sends as is keeps a space on each side.
+  return locale.code === "zh" ? ` ${dc} ` : dc;
 });
 const dynamicHint = computed(() => {
   const o = order.value;
@@ -1285,7 +1288,8 @@ const sectionLabelStyle: CSSProperties = {
 .trial-result-icon { width:64px;height:64px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand); }
 .trial-result-title { font-size:var(--ui-type-page-title);line-height:var(--ui-type-page-title-lh);font-weight:600;color:var(--v5-ink); }
 .trial-result-body { display:block;text-align:center;font-size:var(--ui-type-body);line-height:var(--ui-type-body-lh);color:var(--v5-ink-2);overflow-wrap:break-word; }
-.trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l);background:color-mix(in srgb, var(--v5-brand) 10%, transparent);border:1px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); }
+/* Credited rewards: the shared tinted card (01 §1.1.2 整体底色, brand hue, soft inner rim), no hard stroke. */
+.trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l); }
 .trial-result-credit-label { font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);font-weight:600;color:var(--v5-ink-2); }
 .trial-result-row, .trial-result-line { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);color:var(--v5-ink-3); }
 .trial-result-row > text:last-child { font-size:var(--ui-type-list-title);line-height:var(--ui-type-list-title-lh);font-weight:600;font-variant-numeric:tabular-nums; }
@@ -1294,7 +1298,6 @@ const sectionLabelStyle: CSSProperties = {
 .trial-result-summary { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-3) var(--v5-space-4);border-radius:var(--v5-radius-l);background:var(--v5-surface); }
 .trial-result-line > text:last-child { color:var(--v5-ink-2);font-variant-numeric:tabular-nums; }
 .trial-result-actions { display:flex;flex-direction:column;gap:var(--v5-space-3);margin-top:var(--v5-space-2); }
-.trial-result-primary, .trial-result-secondary { display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--v5-radius-full);font-size:var(--ui-type-button);line-height:var(--ui-type-button-lh);font-weight:600; }
+.trial-result-primary { display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--v5-radius-full);font-size:var(--ui-type-button);line-height:var(--ui-type-button-lh);font-weight:600; }
 .trial-result-primary { background:var(--v5-brand);color:var(--v5-on-brand); }
-.trial-result-secondary { border:1px solid var(--v5-border-strong);color:var(--v5-ink); }
 </style>
