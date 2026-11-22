@@ -121,6 +121,8 @@ function trackFocus(): void {
   document.addEventListener("focusout", (ev) => {
     const left = ev.target instanceof Element ? ev.target : null;
     setTimeout(() => {
+      // A hidden page has no focus moved for it, in a layer or on the page.
+      if (document.hidden) return;
       const active = document.activeElement;
       const top = topLayer();
       // While a layer is open focus stays in it (a removed control, a tap on a persistent sheet's scrim or on empty
@@ -129,7 +131,7 @@ function trackFocus(): void {
         if (!active || active === document.body || !top.el.contains(active)) focusFirst([() => landingSpot(top.el)]);
         return;
       }
-      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left)) || document.hidden) return;
+      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left))) return;
       if (Date.now() - restoredAt < 5_000) {
         const landing = focusFirst(fallbacks(null, null));
         if (landing) settleOnLanding(landing);
@@ -287,8 +289,9 @@ function focusInside(el: HTMLElement): void {
   focusFirst([() => firstFocusable(el), () => landingSpot(el)]);
 }
 const MAIN_REGION = '[role="main"], main, uni-page-body';
-// The sub-page header title: the page's own title when the content draws no heading of its own (03 §3.5).
-const PAGE_TITLE = '.spv-title';
+// The sub-page header title (either header component): the page's own title when the content draws no heading of its
+// own (03 §3.5).
+const PAGE_TITLE = '.spv-title, .nx-nav-title';
 /** Focus that fell back to the page's main region moves on to its heading or bottom-bar action once the page draws one
  *  (a result page renders its head just after the payment dialog closes), unless the user has moved on. */
 function settleOnLanding(landing: Element): void {
@@ -312,6 +315,18 @@ function fallbacks(trace: Trace | null, scope: HTMLElement | null): (() => Eleme
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse()) list.push(() => el);
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'))) list.push(() => landingSpot(el));
   for (const el of Array.from(document.querySelectorAll<HTMLElement>(PAGE_TITLE))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION))) list.push(() => landingSpot(el));
+  return list;
+}
+
+/** Where focus waits on the page while the trigger is still busy: something that only says where the user is (the
+ *  content heading, else the sub-page title), never another action such as 取消订单 that a screen reader would
+ *  announce as the next step; the bar actions and the main region only when the page has no title. */
+function pageWaitLandings(): (() => Element | null | undefined)[] {
+  const list: (() => Element | null | undefined)[] = [];
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[role="heading"], h1, h2'))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(PAGE_TITLE))) list.push(() => landingSpot(el));
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('.nx-glass-bar [role="button"]')).reverse()) list.push(() => el);
   for (const el of Array.from(document.querySelectorAll<HTMLElement>(MAIN_REGION))) list.push(() => landingSpot(el));
   return list;
 }
@@ -450,8 +465,10 @@ export function useDialogA11y(
     // The trigger, or the copy the page redrew in its place, is still there and only disabled for now. Focus never
     // waits on <body>: it lands at once on the next fallback (the trigger and its copies skipped), and goes on to the
     // trigger once that can take it, unless the user has moved on meanwhile (03 §3.5).
+    // On the page the wait lands on a title, not on another action; inside a layer below, its usual order applies.
     const copies = new Set<Element | null>([trigger, current, ...replacements(trace, scope)]);
-    const landing = focusFirst(fallbacks(trace, scope).map((next) => () => { const el = next(); return el && !copies.has(el) ? el : null; }));
+    const candidates = scope ? fallbacks(trace, scope) : pageWaitLandings();
+    const landing = focusFirst(candidates.map((next) => () => { const el = next(); return el && !copies.has(el) ? el : null; }));
     restoredAt = Date.now();
     waitForTrigger(find, landing, () => { if (landing) settleOnLanding(landing); });
   }
