@@ -14,19 +14,19 @@
         <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
       </view>
       <view v-if="detail.rewards.length" class="nx-glass-card event-section">
-        <text class="event-heading">{{ copy.rewards }}</text>
-        <text v-for="(reward, index) in detail.rewards" :key="index" class="event-copy">{{ reward.type === 'USDT' ? `${reward.pool ? `${copy.labels.poolUsdt} · ` : ''}${formatUsd(reward.quantity ?? reward.amount, 'detail')}` : eventDetailReward(reward, copy) }}</text>
+        <text class="event-card-title">{{ copy.rewards }}</text>
+        <text v-for="(reward, index) in detail.rewards" :key="index" class="event-reward">{{ reward.type === 'USDT' ? `${reward.pool ? `${copy.labels.poolUsdt} · ` : ''}${formatUsd(reward.quantity ?? reward.amount, 'detail')}` : eventDetailReward(reward, copy) }}</text>
       </view>
       <view v-if="ruleRows.length" class="event-section event-section--plain">
         <text class="event-heading">{{ copy.rules }}</text>
         <view v-for="row in ruleRows" :key="row.label" class="event-row" :class="{'event-rule-paragraph':[copy.labels.description,copy.labels.terms].includes(row.label)}"><text>{{ row.label }}</text><text>{{ row.value }}</text></view>
       </view>
       <view v-if="detail.event.kind !== 'regional' && detail.targetValue > 0" class="event-section event-section--plain">
-        <view class="event-row"><text class="event-heading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
+        <view class="event-row"><text class="event-subheading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
         <view class="event-progress" role="progressbar" :aria-label="copy.progress" :aria-valuenow="Math.min(detail.progressValue, detail.targetValue)" :aria-valuemin="0" :aria-valuemax="detail.targetValue"><view v-viz-inview class="nx-viz-grow" :style="{ width: `${Math.min(100, detail.progressValue / detail.targetValue * 100)}%` }" /></view>
       </view>
       <view v-if="detail.myRewardAmount != null" class="nx-glass-card event-section">
-        <view class="event-row"><text class="event-heading">{{ copy.myReward }}</text><text>{{ formatUsd(detail.myRewardAmount, 'detail') }}</text></view>
+        <view class="event-row"><text class="event-subheading">{{ copy.myReward }}</text><text>{{ formatUsd(detail.myRewardAmount, 'detail') }}</text></view>
       </view>
       <view v-if="detail.results.length || detail.event.state === 'ended'" class="event-section event-section--plain">
         <text class="event-heading">{{ copy.results }}</text>
@@ -140,17 +140,24 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-detail { padding:0 16px 28px; color:var(--v5-ink); }
 .event-section { margin-top:12px; padding:16px; border-radius:var(--nx-glass-radius); background:var(--nx-glass-fill); box-shadow:var(--nx-glass-edge); }
 .event-section--plain { padding:var(--ui-space-inset) 0; border-radius:0; background:transparent; box-shadow:none; border-top:1px solid var(--v5-border); }
-.event-title { display:block; font-size:20px; font-weight:600; line-height:1.4; overflow-wrap:break-word; }
+.event-title { display:block; font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .event-heading { display:block; font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
-.event-copy { display:block; margin-top:10px; font-size:var(--ui-type-list-subtitle); line-height:1.6; color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:break-word; }
+.event-card-title { display:block; font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.event-subheading { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
+.event-copy { display:block; margin-top:10px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:break-word; }
+.event-title + .event-copy { margin-top:4px; }
+.event-reward { display:block; margin-top:12px; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
+.event-reward + .event-reward { margin-top:8px; }
 .event-status { display:block; margin-top:12px; font-size:12px; color:var(--v5-brand); }
-.event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font-size:12px; line-height:1.5; }
-.event-row > text:last-child { min-width:0; overflow-wrap:break-word; color:var(--v5-ink-2); }
-.event-progress { margin-top:12px; height:5px; border-radius:5px; overflow:hidden; background:var(--v5-brand-soft); }
-.event-progress > view { height:100%; background:var(--v5-brand); }
+.event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.event-row > text:first-child:not(.event-subheading) { color:var(--v5-ink-3); }
+.event-row > text:last-child { min-width:0; overflow-wrap:break-word; color:var(--v5-ink); }
+.event-progress { margin-top:12px; height:4px; border-radius:4px; background:color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.event-progress > view { position:relative; height:100%; border-radius:inherit; background:linear-gradient(90deg, color-mix(in srgb, var(--v5-brand) 12%, transparent), color-mix(in srgb, var(--v5-brand) 70%, transparent)); }
+.event-progress > view::after { content:""; position:absolute; top:50%; right:-3px; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
 .event-navigate { margin-top:16px; width:100%; }
 .event-rule-paragraph { display:block; }
 .event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:break-word; }
-.event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2); }
+.event-row.event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2);font:var(--ui-type-long-form-weight) var(--ui-type-long-form)/var(--ui-type-long-form-lh) var(--font-v5); }
 </style>
