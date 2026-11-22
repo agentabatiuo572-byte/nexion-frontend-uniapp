@@ -39,9 +39,11 @@ export function voucherEntryContext(query:Record<string,string|undefined>):Vouch
 function voucherEntryQuery(context?:VoucherEntryContext):string {
   return context?.voucherId?'&voucherId='+encodeURIComponent(context.voucherId)+(context.upgradeActivityId?'&upgradeActivityId='+encodeURIComponent(context.upgradeActivityId):''):'';
 }
+/** Where a member browses an offer: a named activity has its own activity page (promotionLandingHref);
+ *  a voucher keeps the store with its voucher context; otherwise the whole store. */
 export function promotionStoreHref(activityId?: string, context?:VoucherEntryContext): string {
   if(context?.voucherId)return '/pages/store/store?scope=all'+voucherEntryQuery(context);
-  return '/pages/store/store' + (activityId ? '?activityId=' + encodeURIComponent(activityId) : '?scope=all');
+  return activityId ? '/pages/events/promotion-detail?id=' + encodeURIComponent(activityId) : '/pages/store/store?scope=all';
 }
 
 export function promotionDetailHref(productNo: string, activityId?: string, context?:VoucherEntryContext): string {

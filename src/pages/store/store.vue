@@ -2,20 +2,8 @@
 <template>
   <AppChassis active="store">
     <CardStagger class="store-content">
-      <view v-if="activityId" class="promotion store-promotion-scope" data-testid="store-promotion-scope">
-        <view class="store-promotion-actions">
-          <text v-if="activity" class="promotion-badge">{{ t.promotion.activityProducts }}</text>
-          <view class="promotion-link" role="button" tabindex="0" @click="clearPromotion"><text>{{ activity?t.promotion.scopeClear:t.promotion.allProducts }}</text></view>
-        </view>
-        <text class="promotion-title promotion-title--section">{{ activity ? localized(activity.title,locale.code) : promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
-        <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-        <text v-else-if="promotionStatus==='error'" class="promotion-copy">—</text>
-        <text v-else-if="activity&&promotionStatus==='ready'&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
-        <text v-else-if="activity" class="promotion-copy">{{ t.promotion.promoSub }}</text>
-        <view v-if="activity && unlockedProducts.filter(p=>p.productType!=='SHARE').length>=2" :aria-disabled="!promotionAvailable" class="promotion-link" role="button" tabindex="0" @click="promotionAvailable && navTo(promotionBundleHref(activityId))"><text>{{ t.promotion.bundle }}</text></view>
-      </view>
-      <template v-else-if="!publicOnly">
-        <view v-if="voucherContext.voucherId" class="promotion promotion-flat"><text class="promotion-title">{{ t.promotion.eventVoucher }}</text><text class="promotion-copy">{{ t.promotion.eventVoucherTerms }}</text><view class="promotion-link" role="button" tabindex="0" @click="clearPromotion" @keydown.enter.prevent="clearPromotion" @keydown.space.prevent="clearPromotion"><text>{{ t.promotion.scopeClear }}</text></view></view>
+      <template v-if="!publicOnly">
+        <view v-if="voucherContext.voucherId" class="promotion promotion-flat"><text class="promotion-title">{{ t.promotion.eventVoucher }}</text><text class="promotion-copy">{{ t.promotion.eventVoucherTerms }}</text></view>
         <LoopScope v-if="voucherOffers.length&&!voucherContext.voucherId" class="store-voucher-ticket" data-testid="store-voucher-ticket" role="button" tabindex="0" @click="openStoreVouchers" @keydown.enter.prevent="openStoreVouchers" @keydown.space.prevent="openStoreVouchers">
           <view class="store-voucher-ticket__value"><text v-if="voucherBenefit.amount != null" class="store-voucher-ticket__currency">$</text><text>{{ voucherBenefit.amount != null ? fmtMoney(voucherBenefit.amount).replace(/^\$/, '').replace(/\.00$/, '') : voucherBenefit.percent != null ? voucherBenefit.percent + '%' : '–' }}</text></view>
           <view class="store-voucher-ticket__rule" aria-hidden="true" />
@@ -32,8 +20,7 @@
       </template>
 
       <view v-if="publicOnly" class="promotion" data-testid="promotion-public-store">
-        <template v-if="activity"><PromotionProduct v-for="productNo in landingProductNos(activity)" :key="productNo" :activity="activity" :product-no="productNo" public-only /></template>
-        <view v-if="activity||voucherContext.voucherId" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionStoreHref(activityId,voucherContext)))"><text>{{ t.promotion.signIn }}</text></view>
+        <view v-if="voucherContext.voucherId" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionStoreHref(undefined,voucherContext)))"><text>{{ t.promotion.signIn }}</text></view>
       </view>
       <template v-else>
 
@@ -44,7 +31,7 @@
            carries `focus`; the card locates the recommended SKU instead of
            silently featuring the generic first product, and names the change
            when the recommendation is no longer purchasable. -->
-      <view v-if="focusProductId&&!activityId" data-testid="store-goal-focus" class="rounded-2xl" :style="goalFocusCardStyle">
+      <view v-if="focusProductId" data-testid="store-goal-focus" class="rounded-2xl" :style="goalFocusCardStyle">
         <text class="block" :style="goalFocusTitleStyle">{{ t.store.goalFocusTitle }}</text>
         <text class="block mt-1" :style="goalFocusBodyStyle">{{ goalFocusBody }}</text>
 
@@ -57,26 +44,25 @@
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
       </view>
       <view v-else-if="catalogStatus === 'error' && !catalogHasProducts" class="nx-glass-card" :style="catalogStateStyle"><text class="block" :style="catalogStateTitleStyle">{{ t.store.allProducts }}</text><text class="block mt-1" :style="catalogStateBodyStyle">—</text></view>
-      <view class="nx-glass-card" v-if="!activityId && catalogStatus === 'ready' && !catalogHasProducts" data-testid="store-catalog-empty" :style="catalogStateStyle">
+      <view class="nx-glass-card" v-if="catalogStatus === 'ready' && !catalogHasProducts" data-testid="store-catalog-empty" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogEmptyTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogEmptyBody }}</text>
       </view>
-      <view v-if="activity&&promotionStatus==='ready'&&catalogStatus==='ready'&&!unlockedProducts.length" class="promotion-flat"><text class="promotion-copy">{{ t.promotion.noMatchingProducts }}</text><view class="promotion-link" role="button" tabindex="0" @click="clearPromotion"><text>{{ t.promotion.allProducts }}</text></view></view>
       <template v-if="catalogHasProducts">
         <NxSection class="store-catalogue" :title="t.store.allProducts" :meta="String(unlockedProducts.length)">
           <view class="store-product-grid">
-            <ProductCard v-for="p in catalogProducts" :key="p.id" :product="p" :promotion="activity" :activity-id="activityId" :voucher-context="voucherContext" :promotion-ready="promotionStatus==='ready'" compact />
+            <ProductCard v-for="p in catalogProducts" :key="p.id" :product="p" :voucher-context="voucherContext" compact />
           </view>
           <text class="store-estimate-note">{{ t.store.cardEstimateNote }}</text>
         </NxSection>
-        <NxListGroup v-if="(!activityId && genesisCfg.config.showcaseEnabled) || lockedProducts.length" class="store-more">
-          <NxListRow v-if="!activityId && genesisCfg.config.showcaseEnabled" :title="t.store.secGenesis" :subtitle="t.store.genesisCardPerks" :value="genesisCfg.config.marketOpenState === 'closed' ? auditCopy.comingSoon : undefined" @click="navTo('/pages/genesis/genesis')"><template #leading><view class="store-more__icon store-more__icon--gold"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m2 8 4 10h12l4-10-5 3-5-7-5 7z" /></svg></view></template></NxListRow>
+        <NxListGroup v-if="genesisCfg.config.showcaseEnabled || lockedProducts.length" class="store-more">
+          <NxListRow v-if="genesisCfg.config.showcaseEnabled" :title="t.store.secGenesis" :subtitle="t.store.genesisCardPerks" :value="genesisCfg.config.marketOpenState === 'closed' ? auditCopy.comingSoon : undefined" @click="navTo('/pages/genesis/genesis')"><template #leading><view class="store-more__icon store-more__icon--gold"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m2 8 4 10h12l4-10-5 3-5-7-5 7z" /></svg></view></template></NxListRow>
           <NxListRow v-if="lockedProducts.length" :title="t.store.secComingSoon" :subtitle="lockedProducts.map(p => p.name).join(' · ')" :value="comingSoonOpen ? auditCopy.collapse : auditCopy.expand" :disclosure="comingSoonOpen ? 'open' : 'closed'" @click="comingSoonOpen = !comingSoonOpen"><template #leading><view class="store-more__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></view></template></NxListRow>
         </NxListGroup>
         <view v-if="comingSoonOpen && lockedProducts.length" class="store-locked-list"><LockedProductCard v-for="p in lockedProducts" :key="p.id" :product="p" /></view>
       </template>
 
-      <view v-if="!publicOnly && !activityId && !voucherContext.voucherId" class="store-bundle-entry" data-testid="store-bundle-entry" role="button" tabindex="0" :aria-label="t.promotion.bundle"
+      <view v-if="!publicOnly && !voucherContext.voucherId" class="store-bundle-entry" data-testid="store-bundle-entry" role="button" tabindex="0" :aria-label="t.promotion.bundle"
         @click="navTo('/pages/store/bundle')" @keydown.enter.prevent="navTo('/pages/store/bundle')" @keydown.space.prevent="navTo('/pages/store/bundle')">
         <text>{{ t.promotion.bundle }}</text><NxIcon name="chevron-right" />
       </view>
@@ -101,10 +87,7 @@ import UpgradeSpotlight from "@/components/store/upgrade-spotlight.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import ProductCard from "@/components/store/product-card.vue";
 import PromotionEntry from '@/components/promotion/promotion-entry.vue';
-import PromotionProduct from '@/components/promotion/promotion-product.vue';
-import { usePromotionContext } from '@/composables/use-promotion-context';
-import { promotionBundleHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
-import { localized } from '@/lib/promotion-display';
+import { promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
 import { useLocaleStore } from '@/store/locale';
 import { navTo,takeNavigationQuery } from '@/lib/route';
 import LockedProductCard from "@/components/store/locked-product-card.vue";
@@ -138,23 +121,19 @@ import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
 import { behaviorTracker, createStoreViewEvent } from "@/services/behavior-analytics";
-import { landingProductNos } from "@/lib/promotion-landing";
 
 const t = useT();
 const auditCopy = useAuditUiCopy(), voucher = useVoucher(), comingSoonOpen = ref(false);
 const voucherClaimSheet = useVoucherClaimSheet();
 const app = useApp();
 const locale=useLocaleStore();
-const activityId=ref('');
 const voucherContext=ref<VoucherEntryContext>({});
 const publicOnly=computed(()=>{void app.accountKey;void app.accountBindingEpoch;return !sessionVault.read();});
-const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId, true);
 function readPromotionQuery(query:Record<string,string|undefined>){
   voucherContext.value=voucherEntryContext(query);
-  if(query.scope==='all'||voucherContext.value.voucherId)activityId.value='';
-  else if(query.activityId)activityId.value=query.activityId.trim();
+  // An older link to an activity's products opens that activity's page; the store no longer filters by activity.
+  if(query.scope!=='all'&&!voucherContext.value.voucherId&&query.activityId?.trim())void navTo(promotionStoreHref(query.activityId.trim()));
 }
-function clearPromotion(){activityId.value='';voucherContext.value={};void navTo(promotionStoreHref());}
 // The fleet store clears this flag on every account binding. Retained devices
 // are presentation only and never supply purchase eligibility.
 const ownedDevices = computed(() => app.remoteFleetHasSnapshot ? app.visibleDevices : []);
@@ -178,11 +157,11 @@ let storeViewAttempt: { scopeKey: string; userId: number; event: ReturnType<type
 let releaseActiveRefresh = () => {};
 async function refreshVisibleStore() {
   if (!storePageVisible) return;
-  if (publicOnly.value) { await refreshPromotion(); return; }
+  if (publicOnly.value) return;
   await Promise.allSettled([
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     refreshServerProductPhase(true),
-    revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(), refreshPromotion(),
+    revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(),
   ]);
 }
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -287,7 +266,7 @@ const displayCatalog = computed(() => remoteApiEnabled ? productCatalogPresentat
 const displayProducts = computed(() => {
   const products=remoteApiEnabled ? displayCatalog.value?.products ?? [] : PRODUCTS;
   if(publicOnly.value)return [];
-  return activityId.value ? products.filter(p=>activity.value?.productNos.includes(p.id)) : products;
+  return products;
 });
 const catalogHasProducts = computed(() => displayProducts.value.length > 0);
 const liveYield = computed(() => buildStoreYieldAuthority(
@@ -375,7 +354,7 @@ const goalFocusBody = computed(() => {
 // Feature a real upgrade when one is available; a goal-recommended SKU outranks
 // it; the full catalogue remains browsable.
 const featured = computed(
-  () => (activityId.value ? undefined : focusFeatured.value)
+  () => focusFeatured.value
     ?? unlockedProducts.value.find((p) => p.id === upgrade.value?.target.id)
     ?? unlockedProducts.value[0],
 );
@@ -390,7 +369,6 @@ const catalogProducts = computed(() => focusFeatured.value
 function retryCatalog() {
   void refreshProductCatalog(true);
 }
-useAutoRecovery({ failed: () => promotionStatus.value === "error", retry: () => refreshPromotion() });
 useAutoRecovery({ failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
 
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:
@@ -479,6 +457,4 @@ const goalFocusRetryStyle: CSSProperties = {
 .store-bundle-entry:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:8px; }
 .store-bundle-entry:active { opacity:.75; }
 .store-footer { display:block; margin-top:20px; padding-bottom:8px; font:400 12px/18px var(--font-v5); text-align:center; color:var(--v5-ink-3); }
-.store-promotion-scope { display:flex; flex-direction:column; gap:12px; }
-.store-promotion-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 </style>
