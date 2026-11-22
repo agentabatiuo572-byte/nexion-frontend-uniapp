@@ -17,7 +17,7 @@
           <NxCodeValue class="tx-retained-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
           <view class="tx-hash-copy"><NxButton variant="text" size="small" :label="copyButtonText" @click="copyHash" /></view>
         </view>
-        <view class="tx-bills-link" role="link" tabindex="0" :style="copyBtnStyle" @click="viewBills" @keydown.enter.prevent="viewBills"><text>{{ recoveryCopy.viewBills }}</text></view>
+        <view class="nx-card-footer tx-bills-footer"><view class="nx-card-action" role="link" tabindex="0" @click="viewBills" @keydown.enter.prevent="viewBills" @keydown.space.prevent="viewBills"><text class="nx-after-arrow">{{ recoveryCopy.viewBills }}</text></view></view>
       </view>
 
       <template v-else>
@@ -257,20 +257,6 @@ const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
 };
 const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-success-ink)" };
-// Nested copy chip — soft surface-2 fill lifts it off the surface hero, no border.
-const copyBtnStyle: CSSProperties = {
-  marginTop: "8px",
-  display: "inline-flex",
-  // 《07》tap≥44:原 4px 上下 padding 实测 79×22。padding 归零改用 minHeight + 居中,
-  // chip 背景随之长高是预期的 —— 复制是主动作,值得一个正常大小的按钮。
-  alignItems: "center",
-  minHeight: "44px",
-  padding: "0 10px",
-  borderRadius: "6px",
-  background: "var(--v5-surface-2)",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
 // Tx fields — single-record container (form b: surface fill, no border); the
 // TxRow hairlines are the internal dividers.
 const detailsCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", marginTop: "12px", borderRadius: "var(--nx-glass-radius)", background: "var(--nx-glass-fill)", overflow: "hidden" };
@@ -300,7 +286,8 @@ const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-typ
 .tx-retained-hash, .tx-hero-hash { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); user-select: text; }
 /* Copy is an in-place action: a text button under the hash, at its right end (03 §3.1). */
 .tx-hash-copy { display: flex; justify-content: flex-end; margin-top: 4px; }
-.tx-bills-link { display: flex !important; justify-content: center; }
+/* The way on from this card is its footer action into the next page (03 §3.1 P-67), not a private chip. */
+.tx-bills-footer { margin-top: 12px; }
 [role="button"][aria-disabled="true"] { opacity: 0.5; }
 [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>
