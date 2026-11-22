@@ -8,7 +8,7 @@
         <text class="event-title">{{ detail.event.title }}</text>
         <text class="event-copy">{{ detail.event.subtitle }}</text>
         <text v-if="detail.event.kind==='seasonal'&&detail.rules.voucherId" class="event-copy">{{ copy.voucherTerms }}</text>
-        <text class="event-status" role="status">{{ copy.eligibility[detail.eligibilityReason] }}</text>
+        <NxTag class="event-status" role="status" wrap :tone="eligibilityTone[detail.eligibilityReason]" :label="copy.eligibility[detail.eligibilityReason]" />
         <text v-if="detail.reminderSubscribed" class="event-copy" role="status">{{ reminderCopy.subscribed }}</text>
         <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, locale.code) }}</text></view>
         <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
@@ -58,10 +58,11 @@ import { useT } from "@/i18n/use-t";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
+import NxTag from '@/components/ui/nx-tag.vue';
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { apiClient, eventsApi, remoteApiEnabled } from "@/api/runtime";
 import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
-import { createEventDetailApi, type EventDetail } from "@/api/event-detail-api";
+import { createEventDetailApi, type EventDetail, type EventEligibilityReason } from "@/api/event-detail-api";
 import { useApp } from "@/store/app";
 import { useLocaleStore } from "@/store/locale";
 import { eventDetailCopy } from "@/i18n/event-detail";
@@ -81,6 +82,14 @@ const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
 const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);
+// State tag tones (03 §3.8): claimable success, running but not met warning, closed or done neutral; 「暂未开放」-type
+// unavailability takes the spec's unavailable tone (neutral fill, auxiliary text).
+const eligibilityTone: Record<EventEligibilityReason, "success" | "warning" | "neutral" | "unavailable"> = {
+  READY: "success", IN_PROGRESS: "warning", NOT_ELIGIBLE: "warning",
+  NOT_STARTED: "neutral", ENDED: "neutral", CLAIMED: "neutral",
+  VOUCHER_NOT_STARTED: "neutral", VOUCHER_EXPIRED: "neutral", VOUCHER_ALREADY_USED: "neutral", VOUCHER_EXHAUSTED: "neutral",
+  DISABLED: "unavailable", VOUCHER_UNAVAILABLE: "unavailable",
+};
 let code = "", visible = false, generation = 0;
 let unconfirmedAction: "join" | "claim" | "remind" | null = null;
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
@@ -151,7 +160,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-title + .event-copy { margin-top:4px; }
 .event-reward { display:block; margin-top:12px; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .event-reward + .event-reward { margin-top:8px; }
-.event-status { display:block; margin-top:12px; font-size:12px; color:var(--v5-brand); }
+.event-status { margin-top:12px; }
 .event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .event-row > text:first-child:not(.event-subheading) { color:var(--v5-ink-3); }
 .event-row > text:last-child { min-width:0; overflow-wrap:break-word; color:var(--v5-ink); }
