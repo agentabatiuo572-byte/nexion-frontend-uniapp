@@ -128,7 +128,7 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden; padding: var(--nx-overlay-top) 0 0; background: var(--v5-bg-color-mask); }
 .payment-pin-sheet { display: flex; flex-direction: column; width: 100%; max-width: 440px; max-height: 100%; min-height: 0; overflow: hidden; padding: var(--v5-space-5) var(--v5-space-5) 0; background: var(--nx-glass-fill); color: var(--v5-ink); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); }
 .payment-pin-header { flex: none; display: flex; align-items: flex-start; gap: var(--v5-space-3); margin-bottom: var(--v5-space-4); }
-.payment-pin-title { flex: 1; font-size: var(--ui-type-section); font-weight: var(--ui-type-section-weight); line-height: 1.4; overflow-wrap: break-word; }
+.payment-pin-title { flex: 1; font-size: var(--ui-type-section); font-weight: var(--ui-type-section-weight); line-height: var(--ui-type-section-lh); overflow-wrap: break-word; }
 .payment-pin-close { width: 44px; min-height: 44px; flex: 0 0 44px; margin-top: -10px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); }
 .payment-pin-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(-1 * var(--v5-space-2)); padding-inline: var(--v5-space-2); padding-bottom: var(--nx-overlay-bottom); display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .payment-pin-body > * { flex-shrink: 0; }
@@ -137,9 +137,9 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-step { color: var(--v5-ink-3); font-size: var(--ui-type-meta); margin-top: var(--v5-space-2); }
 .payment-pin-summary { padding: var(--v5-space-3) 0; margin-bottom: var(--v5-space-1); border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
 .payment-pin-summary__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-type-list-subtitle); }
-.payment-pin-summary__amount { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--v5-space-2); margin-top:var(--v5-space-2); font-weight:650; font-size:var(--ui-type-card-title); }
+.payment-pin-summary__amount { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--v5-space-2); margin-top:var(--v5-space-2); font-weight:500; font-size:var(--ui-type-card-title); }
 .payment-pin-details { font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: break-word; }
-.payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--ui-space-row-y); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: 600; }
+.payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--ui-space-row-y); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); }
 .payment-pin-primary.nx-button { padding:0; background:none; }
 .payment-pin-primary:not(.nx-button)[aria-disabled="true"] { opacity: .45; }
 .payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
@@ -147,7 +147,7 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-link[aria-disabled="true"] { opacity: .5; }
 /* While the PIN is submitting the exits are held: say so to assistive tech and show it (03 §3.1 disabled 50%). */
 .payment-pin-close[aria-disabled="true"] { opacity: .5; }
-.payment-pin-phone { display: block; font-weight: 600; margin-top: var(--v5-space-2); }
+.payment-pin-phone { display: block; font-weight: 500; margin-top: var(--v5-space-2); }
 .payment-pin-code { width: 100%; min-height: 48px; padding: var(--v5-space-3); border-radius: var(--v5-radius-s); color: var(--v5-ink); background: var(--v5-surface-2); border: 1px solid var(--v5-border); }
 .payment-pin-error { display: block; color: var(--v5-danger); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
 @media (min-width: 500px) {

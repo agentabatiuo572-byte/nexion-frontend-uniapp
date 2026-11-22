@@ -283,7 +283,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-member-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--v5-space-1) 6px; margin-top: 5px; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 .network-member-dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
 .network-member-compute { max-width: 33%; text-align: right; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); overflow-wrap: break-word; }
-.network-member-points { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--v5-ink); }
+.network-member-points { font-size: 15px; line-height: 20px; font-weight: 500; color: var(--v5-ink); }
 .network-chevron { color: var(--v5-ink-3); flex: none; }
 .network-empty { display: block; padding-block: var(--v5-space-4); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); }
 .sheet-handle { width: 36px; height: 3px; border-radius: 999px; background: var(--v5-ink-4); margin: 0 auto var(--v5-space-5); }

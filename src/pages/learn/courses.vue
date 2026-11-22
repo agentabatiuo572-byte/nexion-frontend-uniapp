@@ -206,7 +206,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!error.value && !loading.va
 .learning-summary__line { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
 .learning-summary__progress { font-size: var(--v5-type-h3); font-weight: 600; line-height: 29px; font-variant-numeric: tabular-nums; }
 .learning-summary__earned { display: flex; gap: 3px; align-items: baseline; font-size: 12.5px; color: var(--v5-ink-3); }
-.learning-summary__earned .learning-reward { font-weight: 600; }
+.learning-summary__earned .learning-reward { font-weight: 500; }
 .learning-reward { color: var(--learning-reward); font-variant-numeric: tabular-nums; }
 .learning-summary__bar { height: 6px; margin-top: 10px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); overflow: hidden; }
 .learning-summary__bar > view { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--v5-brand-deep), var(--ui-lime-soft)); box-shadow: 0 0 10px color-mix(in srgb, var(--v5-brand) 45%, transparent); }

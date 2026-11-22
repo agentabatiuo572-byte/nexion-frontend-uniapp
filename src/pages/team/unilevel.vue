@@ -12,7 +12,7 @@
             <text class="block nx-unilevel-hero-title">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : t.directReferral.purchaseTotal }} · {{ visibility.mask(remoteGroupCount) }} {{ t.directReferral.settlementGroups }}</text>
             <view class="nx-royalty-totals" :class="{ 'nx-royalty-totals-large': wideAmount(remoteTotalUSDT) || wideAmount(remoteTotalNEX) }">
               <view><text class="block nx-num-amount nx-direct-amount nx-unilevel-main-amount"><text class="nx-unilevel-dollar">$</text>{{ totalAmountParts[0] }}<text v-if="totalAmountParts[1]" class="nx-unilevel-decimals">.{{ totalAmountParts[1] }}</text></text></view>
-              <view><text class="block font-display tabular-nums nx-direct-amount" :style="{ fontSize: amount(remoteTotalNEX).length > 18 ? '20px' : '26px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ visibility.mask(((remoteTotalNEX ?? 0) > 0 ? '+' : '') + formatAmount(remoteTotalNEX)) }}</text><text>UVT</text></view>
+              <view><text class="block font-display tabular-nums nx-direct-amount" :style="{ fontSize: amount(remoteTotalNEX).length > 18 ? '20px' : '26px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ visibility.mask(((remoteTotalNEX ?? 0) > 0 ? '+' : '') + formatAmount(remoteTotalNEX)) }}</text><text>UVT</text></view>
             </view>
           </RewardHero>
         </template>
@@ -263,7 +263,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 .nx-unilevel-hero-title { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--v5-ink-2); }
 :deep(.nx-unilevel-hero .reward-hero__art) { display: none; }
 .nx-royalty-totals { display: flex; flex-direction: column; gap: 2px; margin-top: var(--ui-space-row-y); }
-.nx-unilevel-main-amount { font-size: 40px; line-height: 48px; font-weight: 550; letter-spacing: -0.03em; }
+.nx-unilevel-main-amount { font-size: 40px; line-height: 48px; font-weight: 500; letter-spacing: -0.03em; }
 .nx-unilevel-dollar { margin-right: 2px; font-size: 22px; color: var(--v5-ink-3); }
 .nx-unilevel-decimals { color: var(--v5-ink-3); }
 .nx-royalty-totals > view + view { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
