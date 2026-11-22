@@ -22,7 +22,7 @@ export function invalidatePassiveTabRead(resource: string): void { window.invali
 export function rememberPassiveTabRead<T>(resource: string, promise: Promise<T>, query?: unknown, attemptedAt?: number, hasCache?: () => boolean): Promise<T> {
   return window.remember(passiveTabReadScope(), resource, promise, query, attemptedAt, hasCache);
 }
-export function passiveTabReadScope(includeWrites = true): string {
+export function passiveTabReadScope(includeWrites = true, includeLocale = true): string {
   const account = remoteAccountScope.snapshot();
   const version = captureRuntimeRevision();
   const pinia = getActivePinia();
@@ -34,6 +34,6 @@ export function passiveTabReadScope(includeWrites = true): string {
   lastVault = vault; lastAuthRevision = revision;
   return JSON.stringify([account.accountKey, account.epoch, runtime.apiRuntimeConfig.environment,
     runtime.apiRuntimeConfig.baseUrl, vault?.read()?.user.userId ?? null, authBinding,
-    pinia ? useLocaleStore().code : "", pinia ? piniaIds.get(pinia) : null, version.runId,
+    pinia && includeLocale ? useLocaleStore().code : "", pinia ? piniaIds.get(pinia) : null, version.runId,
     includeWrites ? capturePassiveWriteRevision() : null]);
 }
