@@ -1810,6 +1810,7 @@ export const id: Messages = {
     keepRecoveryPending: "Hasil pembelian dengan tetap menyimpan perangkat lama belum terkonfirmasi.",
     keepRecoveryChecking: "Sedang mengecek hasil pembelian dengan tetap menyimpan perangkat lama. Jangan membayar lagi.\nHalaman ini akan diperbarui otomatis.",
     keepRecoveryResumable: "Pembelian dengan tetap menyimpan perangkat lama belum dibayar.\nJangan buat pesanan baru.",
+    recoveryResumable: "Tukar tambah sebelumnya belum dibayar.\nJangan buat pesanan baru.",
     keepRecoveryReadError: "Permintaan pembelian awal tidak dapat dipastikan. Cek pesanan Anda atau hubungi layanan pelanggan sebelum membayar lagi.",
     purchasePoliciesAll: "Semua syarat pembelian di bawah harus terpenuhi",
     purchaseProductPolicy: "Syarat pembelian produk",

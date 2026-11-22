@@ -13,7 +13,7 @@
         <text>{{ t.store.coRecoverOriginalOrder }}</text><NxButton :label="t.store.catalogRetry" :busy="checkoutLeaving" @click="recoverCheckoutCreation" />
       </view>
       <view v-else-if="keepCheckoutTarget" class="checkout-recovery-state nx-empty--page" role="status">
-        <text>{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : keepResumeAllowed ? t.tradein.keepRecoveryResumable : t.tradein.keepRecoveryChecking }}</text>
+        <text>{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : keepRecoveryOperation === 'replace' ? (keepResumeAllowed ? t.tradein.recoveryResumable : t.tradein.recoveryChecking) : keepResumeAllowed ? t.tradein.keepRecoveryResumable : t.tradein.keepRecoveryChecking }}</text>
       </view>
       <view v-else-if="remoteTradeinRecoveryError" class="checkout-recovery-state nx-empty--page" role="status">
         <text>{{ t.tradein.recoveryChecking }}</text>
