@@ -105,7 +105,7 @@
               <view v-if="!hasVoucher && (hasTradein || removedTradein || tradeinAvailable)" class="checkout-option checkout-tradein">
                 <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h13m1 12 4-4-4-4M21 16H8" /></svg></view>
                 <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-row-description">{{ tradeinChipText }}</text></view>
-                <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" class="checkout-tradein-remove" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
+                <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" class="nx-reverse-action" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
                 <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" @click="reAddTradein" />
               </view>
             </view>
@@ -3776,10 +3776,7 @@ button.checkout-quantity-button::after {border:0;}
 /* Long trade-in labels (ru, kk) would squeeze the title into 3 lines: the action drops below, right-aligned. */
 .checkout-tradein { flex-wrap:wrap; }
 .checkout-tradein .checkout-option-copy { flex:1 1 8em; }
-.checkout-tradein :deep(.nx-button) { margin-left:auto; }
-/* Removing the trade-in is a reverse action (user): quiet secondary-ink text; adding it back stays a brand text button. */
-.checkout-tradein .checkout-tradein-remove, .checkout-tradein .checkout-tradein-remove :deep(.nx-button__surface) { --ui-button-ink:var(--v5-ink-3); color:var(--v5-ink-3); font-weight:400; }
-.checkout-payment { cursor:pointer; transition:background 180ms ease; }
+.checkout-tradein :deep(.nx-button) { margin-left:auto; }.checkout-payment { cursor:pointer; transition:background 180ms ease; }
 .checkout-payment--active { background:color-mix(in srgb,var(--v5-brand) 7%,transparent); box-shadow:inset 3px 0 0 var(--v5-brand); }
 .checkout-payment--active .checkout-icon { color:var(--v5-brand); }
 .checkout-radio { flex:none; width:20px; height:20px; border-radius:50%; border:1.5px solid var(--v5-ink-4); background:var(--v5-ink); }
