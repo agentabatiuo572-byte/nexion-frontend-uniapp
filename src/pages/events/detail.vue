@@ -123,13 +123,15 @@ watch(action, (next, prev) => {
   if (document.activeElement && document.activeElement !== document.body) return;
   statusTag.value?.$el?.focus({ preventScroll: true });
 }, { flush: "post" });
-let code = "", visible = false, generation = 0;
+// generation orders reads; commands is bumped only by reset(), so a read the user starts (a pull) during a command does
+// not orphan it: the command still clears busy and reads its result.
+let code = "", visible = false, generation = 0, commands = 0;
 let unconfirmedAction: "join" | "claim" | "remind" | null = null;
 // The claim key a claim with an unknown outcome used: a tiered event (the reinvest bonus) stays claimable after one tier,
 // so the claim is confirmed once that key has left claimKeys, not only by CLAIMED.
 let unconfirmedClaimKey = "";
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
-function reset() { generation += 1; detail.value = null; error.value = false; commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = ""; busy.value = false; }
+function reset() { generation += 1; commands += 1; detail.value = null; error.value = false; commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = ""; busy.value = false; }
 async function load() {
   if (!visible) return;
   const request = ++generation, scope = identity();
@@ -156,8 +158,8 @@ async function run() {
   const selectedAction = action.value;
   if (selectedAction === "open") { navTo(eventDetailHref(detail.value)); return; }
   if (error.value) return;
-  const scope = identity(), request = generation;
-  const current = () => visible && request === generation && scope === identity();
+  const scope = identity(), request = commands;
+  const current = () => visible && request === commands && scope === identity();
   busy.value = true; commandError.value = false; userActed = true;
   const claimKey = detail.value.claimKeys?.[0] ?? "";
   const fleetRequest = selectedAction === "claim" ? app.captureRemoteAccountRequest() : undefined;
