@@ -534,9 +534,10 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
 .product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .product-compact-levels { display:block; margin-top:6px; font:400 12px/17px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
-.product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
+/* Price bottom-left, estimate bottom-right; when both do not fit one row the estimate drops to the next line, still right-aligned. */
+.product-compact-bottom { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; column-gap:8px; row-gap:2px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
 .product-compact-price { color:var(--v5-ink); font:500 16px/21px var(--font-amount); font-variant-numeric:tabular-nums; }
-.product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
+.product-compact-estimate { margin-left:auto; text-align:right; font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
 /* The rate and its "/day" never split across lines. */
 .product-compact-estimate__value { white-space:nowrap; }
 .product-compact-status { display:block; margin-top:8px; font:400 12px/17px var(--font-v5); color:var(--v5-warning-ink); }
