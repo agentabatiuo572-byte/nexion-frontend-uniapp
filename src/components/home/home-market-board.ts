@@ -31,10 +31,12 @@ function formatPrice(price: number | null): string {
 }
 
 export function presentHomeMarketWorkload(row: AppHomeWorkload, t: Messages): HomeMarketDisplayRow {
-  // Same flat band as the Earn board: within ±0.05% reads as unchanged, without a sign or a trend colour.
-  const deltaTone: HomeMarketDeltaTone = row.deltaPct === null
+  // The direction follows the shown one-decimal value: a change that rounds to 0.0 reads as unchanged, without a sign
+  // or a trend colour; anything else keeps its sign (−0.04 → 0.0%, −0.06 → −0.1%).
+  const shownDelta = row.deltaPct === null ? null : Number(row.deltaPct.toFixed(1));
+  const deltaTone: HomeMarketDeltaTone = shownDelta === null || shownDelta === 0
     ? "neutral"
-    : row.deltaPct > 0.05 ? "positive" : row.deltaPct < -0.05 ? "negative" : "neutral";
+    : shownDelta > 0 ? "positive" : "negative";
   const copy = marketWorkloadCopy(t, row.code, row.name, row.unit);
 
   return {
@@ -42,9 +44,9 @@ export function presentHomeMarketWorkload(row: AppHomeWorkload, t: Messages): Ho
     name: copy.name,
     priceText: formatPrice(row.price),
     unitText: compactMarketUnit(row.code, copy.unit),
-    deltaText: row.deltaPct === null
+    deltaText: shownDelta === null
       ? "—"
-      : `${deltaTone === "positive" ? "+" : deltaTone === "negative" ? "−" : ""}${Math.abs(row.deltaPct).toFixed(1)}%`,
+      : `${deltaTone === "positive" ? "+" : deltaTone === "negative" ? "−" : ""}${Math.abs(shownDelta).toFixed(1)}%`,
     deltaTone,
     sparkline: row.sparkline,
   };

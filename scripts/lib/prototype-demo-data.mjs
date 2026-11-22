@@ -749,7 +749,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!empty){
       overview.marketBoard={workloads:[
         {code:'IG',name:'SDXL Turbo',unit:null,price:.003,deltaPct:4.2,sparkline:[.4,.5,.42,.55,.6,.7,.72],flagshipDeltaPct:null},
-        {code:'LL',name:'Llama 70B',unit:null,price:.0024,deltaPct:18.7,sparkline:[.3,.35,.4,.42,.6,.78,.88],flagshipDeltaPct:32.1},
+        {code:'LL',name:'Llama 70B',unit:null,price:.0024,deltaPct:18.7,sparkline:[.3,.35,.4,.42,.6,.78,.88],flagshipDeltaPct:null},
         {code:'VG',name:'Video generation',unit:null,price:.1,deltaPct:-1.2,sparkline:[.8,.75,.78,.72,.7,.72,.69],flagshipDeltaPct:null},
         {code:'FT',name:'LoRA fine-tune',unit:null,price:.06,deltaPct:0,sparkline:[.5,.52,.49,.51,.5,.5,.5],flagshipDeltaPct:null},
         {code:'EM',name:'BGE-M3',unit:null,price:.0008,deltaPct:2.1,sparkline:[.4,.45,.4,.5,.52,.55,.57],flagshipDeltaPct:null},
