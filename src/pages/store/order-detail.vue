@@ -38,7 +38,7 @@
         <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices" @support="contactOrderSupport" v-slot="{ done }">
         <!-- "Running" is the end of the replay: it waits, in place, for the head to reach 设备已激活 so both tell one progress. -->
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">{{ resultRunningText }}</text>
-        <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
+        <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit nx-tint" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
           <view v-if="resultOrder.trialReward.usdt > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUsdt }}</text><text class="trial-result-usdt">+{{ formatAmount(resultOrder.trialReward.usdt) }} USDT</text></view>
           <view v-if="resultOrder.trialReward.nex > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUvt }}</text><text class="trial-result-uvt">+{{ formatAmount(resultOrder.trialReward.nex) }} UVT</text></view>
@@ -1292,7 +1292,8 @@ const sectionLabelStyle: CSSProperties = {
 .trial-result-icon { width:64px;height:64px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand); }
 .trial-result-title { font-size:var(--ui-type-page-title);line-height:var(--ui-type-page-title-lh);font-weight:600;color:var(--v5-ink); }
 .trial-result-body { display:block;text-align:center;font-size:var(--ui-type-body);line-height:var(--ui-type-body-lh);color:var(--v5-ink-2);overflow-wrap:break-word; }
-.trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l);background:color-mix(in srgb, var(--v5-brand) 10%, transparent);border:1px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); }
+/* Credited rewards: the shared tinted card (01 §1.1.2 整体底色, brand hue, soft inner rim), no hard stroke. */
+.trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l); }
 .trial-result-credit-label { font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);font-weight:600;color:var(--v5-ink-2); }
 .trial-result-row, .trial-result-line { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);color:var(--v5-ink-3); }
 .trial-result-row > text:last-child { font-size:var(--ui-type-list-title);line-height:var(--ui-type-list-title-lh);font-weight:600;font-variant-numeric:tabular-nums; }
