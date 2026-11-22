@@ -1,10 +1,8 @@
-<!-- IconRow — emoji in brand-soft 36×36 box + label + body (how-it-works/parts.tsx IconRow). -->
+<!-- IconRow — a line glyph in the shared tile + label + body (how-it-works/parts.tsx IconRow; 03 §3.6.1: no emoji as icons). -->
 <template>
   <view :style="outerStyle">
     <view :style="gridStyle">
-      <view class="flex items-center justify-center" :style="emojiBoxStyle">
-        <text style="font-size: 20px; line-height: 1">{{ emoji }}</text>
-      </view>
+      <NxIconTile :tone="tone" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="icon" /></svg></NxIconTile>
       <view class="min-w-0">
         <text class="block" :style="labelStyle">{{ label }}</text>
         <text class="block" :style="bodyStyle">{{ body }}</text>
@@ -15,8 +13,9 @@
 
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 
-defineProps<{ emoji: string; label: string; body: string }>();
+defineProps<{ icon: string; tone: "purple" | "sky" | "amber" | "teal"; label: string; body: string }>();
 
 const outerStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
@@ -25,15 +24,9 @@ const outerStyle: CSSProperties = {
 };
 const gridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "36px 1fr",
+  gridTemplateColumns: "40px 1fr",
   gap: "12px",
   alignItems: "flex-start",
-};
-const emojiBoxStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "10px",
-  background: "var(--v5-brand-soft)",
 };
 // Typography pass 2026-07-08 — label 13.5, body 13/1.62 ink-2 (was a wall of text).
 const labelStyle: CSSProperties = {

@@ -25,7 +25,7 @@
 
       <view class="reward-grid">
         <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-tint': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
-          <view v-if="c.key === 'promotion'" class="reward-gift" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h18v4H3zM5 12v9h14v-9M12 8v13M12 8H7.5a2.5 2.5 0 1 1 2.4-3.2L12 8Zm0 0h4.5a2.5 2.5 0 1 0-2.4-3.2L12 8Z" /></svg></view>
+          <view v-if="c.key === 'promotion'" class="reward-gift reward-gift--object" aria-hidden="true"><NxObjectIcon kind="gift" /></view>
           <view class="reward-tile__body">
             <text class="reward-tile__title">{{ c.label }}</text>
             <view v-if="c.big" class="reward-tile__amount"><text class="reward-value"><template v-if="c.key === 'usdt' && c.big.startsWith('$')"><text class="amount-cur">$</text>{{ c.big.slice(1).split('.')[0] }}<text class="amount-dec">{{ c.big.includes('.') ? '.' + c.big.split('.')[1] : '' }}</text></template><template v-else>{{ c.big }}</template></text><text class="reward-tile__unit" :class="{'reward-voucher-unit': c.key === 'voucher'}">{{ c.unit }}</text></view>
@@ -48,6 +48,7 @@ import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useVoucher } from "@/store/voucher";
@@ -343,6 +344,7 @@ const hintStyle: CSSProperties = {
 .reward-perf { margin: var(--v5-space-3) -4px 10px; border-top: 1.5px dashed var(--v5-border-strong); }
 .reward-tile--promotion { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; animation-delay: 140ms; }.reward-tile__body { flex: 1; min-width: 0; }
 .reward-gift { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 18px; color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 18%,transparent); }
+.reward-gift--object { background: none; padding: 2px; }
 @keyframes reward-enter { from { transform: translateY(12px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .reward-tile { animation: none; } }
 

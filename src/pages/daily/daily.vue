@@ -34,7 +34,7 @@
             <view class="dly-spk" style="right: -20px; top: 52px; width: 4px; height: 4px; background: var(--v5-brand-2); opacity: .6" />
             <view class="dly-spk" style="right: -12px; top: 170px; width: 7px; height: 7px; background: var(--v5-warning); opacity: .5" />
             <view v-if="ring.next !== null" class="dly-gift" :class="{ 'dly-gift--reached': ring.reached }" aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
+              <view class="dly-gift__object"><NxObjectIcon kind="gift" /></view>
             </view>
           </template>
           <view class="dly-ctr" aria-hidden="true">
@@ -256,6 +256,7 @@ import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StreakPowerUps from "@/components/daily/streak-power-ups.vue";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -919,8 +920,10 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 [data-theme="light"] .dly-ring__td--breathe { opacity: .6; animation-name: dly-breathe-light; }
 .nx-loops-paused .dly-ring__td--breathe { animation-play-state: paused; }
 .dly-spk { position: absolute; border-radius: 50%; pointer-events: none; }
-.dly-gift.dly-gift--reached { background: var(--v5-warning); box-shadow: 0 0 0 4px var(--v5-bg); color: var(--v5-bg); }
-.dly-gift { position: absolute; left: 104px; top: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--v5-warning) 18%, var(--v5-bg)); box-shadow: 0 0 0 4px var(--v5-bg), inset 0 0 0 1.5px color-mix(in srgb, var(--v5-warning) 70%, transparent); color: var(--v5-warning-ink); }
+/* The gift object sits straight on the ring (no disc behind it); an unreached milestone is a little quieter. */
+.dly-gift__object { width: 40px; height: 40px; opacity: .85; }
+.dly-gift--reached .dly-gift__object { opacity: 1; }
+.dly-gift { position: absolute; left: 104px; top: 0; display: grid; place-items: center; width: 40px; height: 40px; }
 .dly-ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dly-num { margin-top: 2px; font: 500 76px/76px var(--font-metric); letter-spacing: -.05em; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .dly-num--q { color: var(--v5-ink-4); }

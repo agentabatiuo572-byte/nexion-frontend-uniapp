@@ -31,12 +31,6 @@
 .message-center .notification-item { border-bottom: 1px solid var(--v5-border); }
 .message-center .notification-item--last { border-bottom: 0; }
 .message-center .notification-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 2px; min-height: 44px; box-sizing: border-box; cursor: pointer; }
-.message-center .notification-icon { flex-shrink: 0; width: 24px; height: 24px; margin-top: 1px; color: var(--v5-ink-2); }
-.message-center .notification-icon[data-category="finance"] { color: var(--v5-success-ink); }
-.message-center .notification-icon[data-category="device"] { color: var(--message-device-ink); }
-.message-center .notification-icon[data-category="team"] { color: var(--v5-brand-2-ink); }
-.message-center .notification-icon[data-category="rewards"] { color: var(--v5-warning-ink); }
-.message-center .notification-icon[data-category="system"] { color: var(--v5-nex); }
 .message-center .notification-content { flex: 1; min-width: 0; }
 .message-center .notification-top { display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; }
 .message-center .notification-heading { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }

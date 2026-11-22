@@ -17,9 +17,9 @@
         <!-- Collection hero — de-carded: sits on the page floor. -->
         <view class="marketplace-hero" :style="heroStyle">
           <view class="flex items-start" style="gap: var(--ui-space-inline)">
-            <view class="grid place-items-center shrink-0" :style="avatarStyle">
+            <NxIconTile tone="amber" size="l">
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z" /><path d="M4 21h16" /></svg>
-            </view>
+            </NxIconTile>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="collTitleStyle">UVEL Genesis Node</text>
               <text class="block" :style="marketScopeLineStyle">{{ t.marketplace.internalMarketLine }}</text>
@@ -99,7 +99,7 @@
                对空列表排序点了没有可观测变化,属规范里的 dead control。
                关闭态不给「从一级预订」CTA:一级与二级同读 marketOpenState,那时跳过去是死路,
                而关闭原因顶部已有说明条讲清,这里不复述。 -->
-          <view v-else class="marketplace-listings-empty"><view class="marketplace-empty-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m20.6 13.4-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></view><text class="marketplace-empty-title">{{ t.empty.genesisListingsTitle }}</text><text class="marketplace-empty-desc">{{ primaryAvailable ? t.empty.genesisListingsDesc : consumerCopy.empty }}</text><NxButton v-if="secondaryBlock === null" variant="brand" size="medium" @click="goGenesis">{{ primaryEntryLabel }}</NxButton></view>
+          <view v-else class="marketplace-listings-empty"><NxIconTile tone="muted" size="l"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m20.6 13.4-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></NxIconTile><text class="marketplace-empty-title">{{ t.empty.genesisListingsTitle }}</text><text class="marketplace-empty-desc">{{ primaryAvailable ? t.empty.genesisListingsDesc : consumerCopy.empty }}</text><NxButton v-if="secondaryBlock === null" variant="brand" size="medium" @click="goGenesis">{{ primaryEntryLabel }}</NxButton></view>
         </template>
 
         <!-- ACTIVITY TAB(真实成交 + 虚拟成交混排,FEAT-GEN10)-->
@@ -156,6 +156,7 @@ import { navTo } from "@/lib/route";
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ListingCard, { type Listing } from "@/components/genesis/listing-card.vue";
 import ActivityRow, { type ActivityEvent } from "@/components/genesis/activity-row.vue";
@@ -514,13 +515,6 @@ function onEligSubscribe() {
 const heroStyle: CSSProperties = {
   padding: "0 2px",
 };
-const avatarStyle: CSSProperties = {
-  width: "56px",
-  height: "56px",
-  borderRadius: "var(--v5-radius-m)",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-genesis-gold-on-dark)",
-};
 const collTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "20px",
@@ -666,7 +660,6 @@ const sortOptions = computed(() => [
 .marketplace-hero { position:relative; padding:18px 16px 16px!important; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
 .marketplace-hero::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 160deg,transparent 0 40%,color-mix(in srgb,var(--v5-genesis-gold) 80%,transparent) 66%,transparent 92%); mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); mask-composite:exclude; pointer-events:none; }
 .marketplace-hero > .flex { align-items:center; gap:14px!important; }
-.marketplace-hero > .flex > view:first-child { width:52px!important; height:52px!important; border-radius:var(--v5-radius-m)!important; background:color-mix(in srgb,var(--v5-genesis-gold) 16%,transparent)!important; color:var(--v5-genesis-gold)!important; }
 .marketplace-hero > .flex > view:nth-child(2) > text:first-child { font-size:16px!important; line-height:22px; }
 .marketplace-hero > .flex > view:nth-child(2) > text:nth-child(2) { font:400 12px/16px var(--font-v5)!important; letter-spacing:0!important; margin-top:2px!important; }
 .marketplace-hero > .grid { margin-top:14px!important; padding:var(--v5-space-3); gap:0!important; border-radius:var(--v5-radius-m); background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent), inset 0 0 0 1px var(--v5-border); }
@@ -694,7 +687,6 @@ const sortOptions = computed(() => [
 
 <style scoped>
 .marketplace-listings-empty { display:flex; flex-direction:column; align-items:center; text-align:center; padding:var(--v5-space-4) 24px 0; }
-.marketplace-empty-icon { display:grid; place-items:center; width:56px; height:56px; border-radius:18px; background:var(--v5-surface-2); color:var(--v5-ink-3); }
 .marketplace-empty-title { margin-top:var(--v5-space-3); font-size:15px; line-height:22px; font-weight:500; }
 .marketplace-empty-desc { margin-top:var(--v5-space-1); color:var(--v5-ink-3); font-size:13px; line-height:20px; }
 </style>

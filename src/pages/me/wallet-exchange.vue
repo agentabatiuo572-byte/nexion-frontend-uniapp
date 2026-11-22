@@ -151,9 +151,9 @@
         <EmptyState v-if="history.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
         <view v-else class="ex-rows">
           <view v-for="h in history" :key="h.id" class="ex-row">
-            <view class="ex-row__ico">
+            <NxIconTile tone="purple" size="m">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
-            </view>
+            </NxIconTile>
             <view class="flex-1 min-w-0">
               <text class="ex-row__p">{{ swapLine(h) }}</text>
               <text class="ex-k ex-mono">@ {{ h.rate.toFixed(5) }} · {{ formatDisplayDateTime(h.ts, dateLocale(), true) }}</text>
@@ -179,6 +179,7 @@
 
 <script setup lang="ts">
 import UvtCoin from "@/components/ui/uvt-coin.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import UsdtCoin from "@/components/ui/usdt-coin.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
@@ -1147,7 +1148,6 @@ const historyEmptyStyle: CSSProperties = {
 .ex-rows { overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .ex-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
 .ex-row + .ex-row { border-top: 1px solid var(--v5-border); }
-.ex-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); background: var(--v5-nex-soft); color: var(--v5-nex-ink); }
 .ex-row__p { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; }
 .ex-bar-space { height: 110px; }
 .ex-bar { position: absolute; z-index: 36; }
