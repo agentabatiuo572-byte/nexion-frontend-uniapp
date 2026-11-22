@@ -79,6 +79,7 @@ import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
 import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref, eventCommandFailure } from "./event-detail-display";
 import { toast } from "@/store/ui";
+import { forgetPendingEventCommand, readPendingEventCommand, rememberPendingEventCommand } from "@/lib/event-pending-command";
 import { uiLocale, serverLanguage } from "@/i18n";
 
 const app = useApp(), locale = useLocaleStore(), api = createEventDetailApi(apiClient);
@@ -134,6 +135,10 @@ const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.
 function reset() { generation += 1; commands += 1; detail.value = null; error.value = false; commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = ""; busy.value = false; }
 async function load() {
   if (!visible) return;
+  // A command left unconfirmed by a reload or an earlier visit of this account is confirmed again by this read. Not while
+  // a command is in flight: it writes its own record before it is sent.
+  const saved = !unconfirmedAction && !busy.value && code ? readPendingEventCommand(app.accountKey, code) : null;
+  if (saved) { commandError.value = true; unconfirmedAction = saved.action; unconfirmedClaimKey = saved.claimKey; }
   const request = ++generation, scope = identity();
   // A failed read keeps its stale-snapshot state (greyed action and its reason) until a read succeeds, so a retry in
   // flight does not re-enable the action on data that is still stale.
@@ -148,6 +153,7 @@ async function load() {
         // A claim confirmed only by this read lost its receipt; a device it issued still has to reach the fleet.
         if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
         commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
+        void forgetPendingEventCommand(app.accountKey, code);
       }
     }
   } catch (cause) { if (current()) { error.value = true; if (!isTransientReadFailure(cause)) detail.value = null; } }
@@ -164,24 +170,33 @@ async function run() {
   const claimKey = detail.value.claimKeys?.[0] ?? "";
   const fleetRequest = selectedAction === "claim" ? app.captureRemoteAccountRequest() : undefined;
   const deviceClaim = selectedAction === "claim" && detail.value.rewards.some((reward) => reward.type === "DEVICE");
+  const account = app.accountKey;
+  const commandKey = selectedAction === "remind" ? `h4-event-reminder:${code}` : selectedAction === "claim" ? eventClaimCommandKey(code, detail.value.claimKeys) : `h4-event-join:${code}`;
+  // Recorded before sending, as checkout does, so a reload while the result is unknown still confirms it. The record only
+  // restores the confirming note; the fixed idempotency key keeps a resend safe without it, so a storage failure does not
+  // block the command.
+  void rememberPendingEventCommand(account, code, { action: selectedAction, key: commandKey, claimKey: selectedAction === "claim" ? claimKey : "" });
   try {
-    if (selectedAction === "remind") await api.remind(code, `h4-event-reminder:${code}`);
+    if (selectedAction === "remind") await api.remind(code, commandKey);
     else if (selectedAction === "claim") {
       // A lost claim receipt can leave the warehouse refresh to onShow.
       if (deviceClaim) app.invalidateRemoteFleet(fleetRequest);
-      const claim = await eventsApi.claim(code, eventClaimCommandKey(code, detail.value.claimKeys));
+      const claim = await eventsApi.claim(code, commandKey);
       if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
-    } else await eventsApi.join(code, `h4-event-join:${code}`);
+    } else await eventsApi.join(code, commandKey);
+    void forgetPendingEventCommand(account, code);
     if (current()) { busy.value = false; await load(); }
   } catch (cause) {
     // The outcome may be unknown even if this page is gone: a fleet read started during the claim may predate the device.
     // Invalidate it, then read again so a warehouse already on screen does not keep the pre-claim fleet.
     if (deviceClaim) { app.invalidateRemoteFleet(fleetRequest); void app.refreshRemoteFleet(fleetRequest, { coalesce: true }); }
+    // Only an unknown outcome is confirmed by reading (03 §3.5.2); a refusal or a 503 from the server is a result: say why
+    // once (03 §3.5.1 toast) and leave the action available. The read shows the event as it now stands. A known result
+    // needs no confirming later, even if this page is gone.
+    const failure = eventCommandFailure(cause);
+    if (failure !== "unknown") void forgetPendingEventCommand(account, code);
     if (!current()) return;
     busy.value = false;
-    // Only an unknown outcome is confirmed by reading (03 §3.5.2); a refusal or a 503 from the server is a result: say why
-    // once (03 §3.5.1 toast) and leave the action available. The read shows the event as it now stands.
-    const failure = eventCommandFailure(cause);
     if (failure === "unknown") { commandError.value = true; unconfirmedAction = selectedAction; unconfirmedClaimKey = selectedAction === "claim" ? claimKey : ""; }
     // Already claimed is the outcome the user wanted, not an error.
     else if (failure === "claimed") toast.info(copy.value.eligibility.CLAIMED);
@@ -197,7 +212,8 @@ onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/page
 let releaseActiveRefresh = () => {};
 onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value || commandError.value ? undefined : load(), "pages/events/detail"); void load(); });
 onHide(() => { visible = false; releaseActiveRefresh(); reset(); });
-watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { reset(); void load(); }, { flush: "sync" });
+// Another account does not inherit this account's unconfirmed command.
+watch(() => [app.accountKey, app.accountBindingEpoch, language.value], (next, prev) => { if (code && next[0] !== prev[0]) void forgetPendingEventCommand(String(prev[0]), code); reset(); void load(); }, { flush: "sync" });
 const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });
 onUnmounted(() => { visible = false; releaseActiveRefresh(); reset(); unsubscribe(); });
 useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !commandError.value && !loading.value && !busy.value, retry: load });
