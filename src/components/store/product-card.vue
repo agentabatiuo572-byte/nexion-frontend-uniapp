@@ -143,7 +143,7 @@ const props = withDefaults(defineProps<{ product: Product; featured?: boolean; c
 });
 const t = useT();
 const locale = useLocaleStore();
-const estimateLabel = computed(() => ({ zh: '预估', en: 'Est.', vi: 'Ước tính', id: 'Est.', ms: 'Angg.', fil: 'Tantiya', ru: '≈', kk: 'Болж.', uz: 'Taxm.' })[uiLocale(locale.code)]);
+const estimateLabel = computed(() => ({ zh: '预估', en: 'Est.', vi: '≈', id: 'Est.', ms: 'Angg.', fil: 'Est.', ru: '≈', kk: 'Болж.', uz: 'Taxm.' })[uiLocale(locale.code)]);
 const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
 
 const isShare = computed(() => props.product.productType === "SHARE");
