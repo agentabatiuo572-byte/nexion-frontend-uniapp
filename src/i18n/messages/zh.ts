@@ -584,16 +584,9 @@ export const zh: Messages = {
     networkMembers: "注册用户",
     networkDevices: "在线设备",
     networkPaidOut: "累计已发放",
-    networkRankExplanation: "排名说明",
-    networkRankDisabled: "设备排名暂未开放。",
-    networkRankUnavailable: "暂时无法获取设备排名，请稍后重试。",
-    networkYourRank: "设备排名",
     // FEAT-HOME02 脉搏三格副文本 + 排名三态(上榜 / 未上榜 / 配置拉不到)
     networkMembersSub: "每月 +{n}%",
     networkDevicesSub: "正在跑任务",
-    networkRankUnranked: "未上榜",
-    networkRankTipRanked: "按当前绑定手机的有效算力估算排名，仅供参考，不影响收益或奖励。",
-    networkRankTipUnranked: "当前绑定手机尚无可用于排名的有效算力。",
     // 值槽 89.3px@20px 放不下「数据更新中」(实测 98.6px),缩到「更新中」= 59.2px。
     networkStatUpdating: "更新中",
     // 没有服务端可核验聚合时的如实说明(zentao #59):不拿运营配置值充事实。

@@ -13,7 +13,6 @@
       <view v-else-if="!homePromotionRead && (homePromotionStatus === 'idle' || homePromotionStatus === 'loading')" class="home-promotion-skeleton" role="status" aria-busy="true" :aria-label="t.coreReview.loadingOffers"><view /><view /></view>
       <LiveFeedCard />
       <OnGridSection ref="homeGrid" />
-      <HomeNetworkSnapshot />
       <DoTheMathCard />
       <MarketBoardCard />
       <TrustChipWall ref="homeTrust" />
@@ -31,7 +30,6 @@ import HomeActionList from '@/components/home/action-list.vue';
 import MyFleetSection from '@/components/home/my-fleet-section.vue';
 import PromotionEntry from '@/components/promotion/promotion-entry.vue';
 import HomeBenefits from '@/components/home/home-benefits.vue';
-import HomeNetworkSnapshot from '@/components/home/network-snapshot.vue';
 import LiveFeedCard from '@/components/home/live-feed-card.vue';
 import OnGridSection from '@/components/home/on-grid-section.vue';
 import DoTheMathCard from '@/components/home/do-the-math-card.vue';
