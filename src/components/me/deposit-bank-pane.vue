@@ -289,6 +289,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
@@ -791,7 +792,7 @@ const creditedUsdt = computed(() => {
   if (!it) return 0;
   return dep.records.find((r) => r.depositId === it.intentId)?.creditedUsdt ?? it.usdtAmount;
 });
-const rateText = computed(() => (intent.value ? intent.value.fxRate.toLocaleString("en-US") : "—"));
+const rateText = computed(() => (intent.value ? formatGroupedAmount(intent.value.fxRate, "full") : "—"));
 const locale = useLocaleStore();
 // Credited time comes from the credit record; without one the row is left out.
 const creditedAtText = computed(() => {

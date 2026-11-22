@@ -329,23 +329,22 @@ const subtotal = computed(() => bundleQuote.value?.subtotalUsdt ?? Number.NaN);
 const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN);
 const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
 const cumulativeDailyEarnText = computed(() => {
-  let low = 0, high = 0, hasShareEstimate = false;
+  let low = 0, high = 0;
   for (const product of products.value) {
     const estimate = productDailyEstimateRange(product);
     if (!estimate) continue;
     low += estimate.low;
     high += estimate.high;
-    hasShareEstimate ||= product.productType === "SHARE";
   }
-  const lowText = hasShareEstimate ? formatPlainAmount(low, 6) : formatAmount(low);
-  const highText = hasShareEstimate ? formatPlainAmount(high, 6) : formatAmount(high);
+  const lowText = formatAmount(low);
+  const highText = formatAmount(high);
   return lowText === highText ? lowText : `${lowText}–${highText}`;
 });
 function bundleProductYieldText(p: Product): string {
   const estimate = productDailyEstimateRange(p);
   if (estimate) {
-    const low = p.productType === "SHARE" ? formatPlainAmount(estimate.low, 6) : formatAmount(estimate.low);
-    const high = p.productType === "SHARE" ? formatPlainAmount(estimate.high, 6) : formatAmount(estimate.high);
+    const low = formatAmount(estimate.low);
+    const high = formatAmount(estimate.high);
     return `${t.value.bundle.estimatedDaily} · $${low === high ? low : `${low}–${high}`}`;
   }
   // No server estimate: "—", never an annual rate or a figure derived from one.

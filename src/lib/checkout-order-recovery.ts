@@ -1,6 +1,6 @@
 import type { CanonicalTradeinQuote, CanonicalTradeinResult } from "@/api/device-e3-api";
 import type { CanonicalOrder, CanonicalOrderList, OrderApi } from "@/api/order-api";
-import { readAccountRow, writeAccountRow, releaseAccountCommandKey } from "@/store/account-scoped-storage";
+import { readAccountRow, writeAccountRow, releaseAccountCommandKey, type AccountCommandRow } from "@/store/account-scoped-storage";
 
 const KEY = "nexgrid-checkout-server-order-recovery-v1";
 const COMMANDS_KEY = "nexgrid-remote-checkout-commands-v1";
@@ -94,6 +94,17 @@ export function finishCheckoutTradein(accountKey: string, pointer: CheckoutTrade
 
 type OrderRecoveryResult = "absent" | "handled" | "navigation-failed";
 
+function retireCheckoutOrder(accountKey: string, productNo: string, pointer: Pointer): boolean {
+  const row = readAccountRow<Row>(KEY, accountKey);
+  const current = row?.orders?.[productNo];
+  if (!row || current?.orderNo !== pointer.orderNo || current.commandKey !== pointer.commandKey
+      || current.intent !== pointer.intent) return false;
+  const command = readAccountRow<AccountCommandRow>(COMMANDS_KEY, accountKey)?.commands?.[pointer.intent];
+  if (command && command === pointer.commandKey
+      && !releaseAccountCommandKey(COMMANDS_KEY, accountKey, pointer.intent, pointer.commandKey)) return false;
+  return removeCheckoutPointer(accountKey, row, productNo);
+}
+
 /** Recovery only navigates to the original server order; it never creates or pays. */
 export async function recoverCheckoutOrder(accountKey: string, productNo: string, deps: {
   list: OrderApi["list"]; isCurrent(): boolean; isCurrentAccount(): boolean; navigate(url: string): Promise<boolean>;
@@ -106,6 +117,7 @@ export async function recoverCheckoutOrder(accountKey: string, productNo: string
   if (!pointer || pointer.productNo !== productNo || typeof pointer.orderNo !== "string" || !pointer.orderNo.trim()) return "absent";
   if (!deps.isCurrent()) return "handled";
   let found: CanonicalOrder | undefined;
+  let reachedLastPage = false;
   try {
     let cursor: string | null = null;
     const visited = new Set<string>();
@@ -115,20 +127,22 @@ export async function recoverCheckoutOrder(accountKey: string, productNo: string
       found = page.orders.find((order) => order.orderNo === pointer.orderNo);
       if (found) break;
       cursor = page.nextCursor ?? null;
-      if (!cursor || visited.has(cursor)) break;
+      if (!cursor) {
+        reachedLastPage = true;
+        break;
+      }
+      if (visited.has(cursor)) break;
       visited.add(cursor);
     } while (cursor);
   } catch { /* The canonical order page offers a read-only retry during outages. */ }
   if (!deps.isCurrent()) return "handled";
+  if (reachedLastPage && deps.isCurrentAccount() && retireCheckoutOrder(accountKey, productNo, pointer)) return "absent";
   const navigated = await deps.navigate(`/pages/store/order-detail?id=${encodeURIComponent(pointer.orderNo)}`);
   if (!navigated) return "navigation-failed";
   // Successful navigation may already have unloaded checkout. Retire only the
   // same account generation and receipt, never a newer recovery pointer.
-  const current = readAccountRow<Row>(KEY, accountKey)?.orders?.[productNo];
-  if (deps.isCurrentAccount() && found?.productNo === productNo && found.quantity === 1 && terminal.has(found.canonicalStatus)
-      && current?.orderNo === pointer.orderNo && current.commandKey === pointer.commandKey && current.intent === pointer.intent) {
-    releaseAccountCommandKey(COMMANDS_KEY, accountKey, pointer.intent, pointer.commandKey);
-    forgetCheckoutOrder(accountKey, productNo, pointer.orderNo);
+  if (deps.isCurrentAccount() && found?.productNo === productNo && found.quantity === 1 && terminal.has(found.canonicalStatus)) {
+    retireCheckoutOrder(accountKey, productNo, pointer);
   }
   return "handled";
 }
