@@ -46,7 +46,8 @@
         @keydown.space.prevent="onTap"
       >
         <text class="scb-cta-t">{{ cta.buttonLabel }}</text>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <!-- → means "goes to the next page" (03 §3.1); a disabled button goes nowhere. -->
+        <svg v-if="!cta.disabled" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
   </view>

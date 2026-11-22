@@ -263,7 +263,7 @@ import { authenticatedPageObservationReporter } from "@/lib/authenticated-page-o
 import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
-import { purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
+import { monthlyQuotaExhausted, purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import type { TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
 import { usePublishedTrust } from "@/composables/use-published-trust";
@@ -632,12 +632,13 @@ function publishStickyCTA() {
         // A rank-only product has no quota tier; take the user to rank progression.
         href: quotaDepleted ? `/pages/store/detail?id=${product.value.id}` : purchaseEligibilityUnlockHref(eligibility.value.snapshot!, product.value.id),
         amount: `${priceText.value}`,
-        amountSubtext: quotaDepleted
-          ? t.value.store.purchaseEligibilityQuotaDepleted
-          : t.value.store.purchaseEligibilityIneligible,
-        buttonLabel: quotaDepleted
-          ? t.value.store.purchaseEligibilityQuotaDepleted
-          : t.value.store.gateLockedCta,
+        // Quota used up: the reason sits above the disabled button and the button keeps its short label (03 §3.1, §3.4).
+        // The monthly allowance (F4B) and the sale allowance (E1) each say which one ran out.
+        note: quotaDepleted
+          ? monthlyQuotaExhausted(eligibility.value.snapshot) ? t.value.store.purchaseMonthlyQuotaDepleted : t.value.store.purchaseEligibilityQuotaDepleted
+          : undefined,
+        amountSubtext: quotaDepleted ? undefined : t.value.store.purchaseEligibilityIneligible,
+        buttonLabel: quotaDepleted ? t.value.store.cardBuyNow : t.value.store.gateLockedCta,
         disabled: quotaDepleted,
         showTabBar: false,
       }, stickyOwner);
