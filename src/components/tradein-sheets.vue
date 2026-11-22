@@ -61,7 +61,7 @@
         <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
         <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatGroupedAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }}&nbsp;USDT</text>
         <!-- Busy keeps the label and the width, adds a spinner and tells assistive tech it is working (03 §3.1). -->
-        <view v-if="capacityResumeAllowed" class="tis-cta" :class="{ 'tis-cta-disabled': capacityResumeBusy }" role="button" :tabindex="capacityResumeBusy ? -1 : 0" :aria-disabled="capacityResumeBusy" :aria-busy="capacityResumeBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><view v-if="capacityResumeBusy" class="tis-cta-spin" aria-hidden="true" /><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
+        <view v-if="capacityResumeAllowed || checkoutCapacityResume?.kind === 'intent'" class="tis-cta" :class="{ 'tis-cta-disabled': capacityResumeBusy }" role="button" :tabindex="capacityResumeBusy ? -1 : 0" :aria-disabled="capacityResumeBusy" :aria-busy="capacityResumeBusy" @click="resumeCapacityFromSheet" @keydown.enter.prevent="resumeCapacityFromSheet" @keydown.space.prevent="resumeCapacityFromSheet"><view v-if="capacityResumeBusy" class="tis-cta-spin" aria-hidden="true" /><text class="tis-cta-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
       </template>
       <template v-else-if="state.kind === 'choice'">
@@ -393,7 +393,7 @@ let capacityRecoveryGeneration = 0;
 let checkoutCapacityRead: { accountKey: string; target: string; at: number } | undefined;
 const capacityResumeKey = ref<string | null>(null);
 const capacityResumeAllowed = computed(() => capacityResumeKey.value !== null && capacityRecovery.value?.key === capacityResumeKey.value);
-// recoverCapacityPurchase ignores a tap while either read is running, so the button shows busy for both.
+// The sheet ignores a tap while either read is running, so the button shows busy for both.
 const capacityResumeBusy = computed(() => capacityRecoveryBusy.value || capacityReadBusy.value);
 const capacityIntentResume = ref<{ commandKey: string; intentNo: string; cutoff: number | null } | null>(null);
 watch(capacityIntentResume, (resume, _previous, cleanup) => {
@@ -434,18 +434,26 @@ watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,()=>props
   if (capacityRecoveryUnavailable.value || savedCapacity.value?.key !== capacityResumeKey.value) capacityResumeKey.value = null;
   if (capacityRecoveryUnavailable.value || savedCapacity.value?.key !== capacityIntentResume.value?.commandKey) capacityIntentResume.value = null;
 },{immediate:true,flush:'sync'});
+const checkoutCapacityResume = computed((): CheckoutKeepResume | null => {
+  const target = props.checkoutCapacityTarget;
+  const pending = capacityRecovery.value;
+  if (!target || !props.active || !capacityPageShown.value || !foregroundReadAllowed() || !pending) return null;
+  const productNo = pending.quote ? pending.quote.targetProductNo : pending.targetProductNo;
+  if (productNo !== target) return null;
+  const identity = { target, commandKey: pending.key, operation: pending.operation };
+  const intent = capacityIntentResume.value;
+  if (intent?.commandKey === pending.key) return { ...identity, kind: "intent", open: () => openCapacityIntent(target) };
+  return capacityResumeAllowed.value ? { ...identity, kind: "command" } : null;
+});
 if (reportCheckoutKeepResume) {
-  watch((): CheckoutKeepResume | null => {
-    const target = props.checkoutCapacityTarget;
-    const pending = capacityRecovery.value;
-    if (!target || !props.active || !capacityPageShown.value || !foregroundReadAllowed() || !pending) return null;
-    const productNo = pending.quote ? pending.quote.targetProductNo : pending.targetProductNo;
-    if (productNo !== target) return null;
-    const identity = { target, commandKey: pending.key, operation: pending.operation };
-    const intent = capacityIntentResume.value;
-    if (intent?.commandKey === pending.key) return { ...identity, kind: "intent", open: () => openCapacityIntent(target) };
-    return capacityResumeAllowed.value ? { ...identity, kind: "command" } : null;
-  }, reportCheckoutKeepResume, { flush: "sync" });
+  watch(checkoutCapacityResume, reportCheckoutKeepResume, { flush: "sync" });
+}
+
+function resumeCapacityFromSheet() {
+  if (capacityResumeBusy.value) return;
+  const resume = checkoutCapacityResume.value;
+  if (resume?.kind === "intent") resume.open();
+  else if (capacityResumeAllowed.value) void recoverCapacityPurchase(true);
 }
 useAutoRecovery({
   failed: () => remoteApiEnabled && props.active && capacityPageShown.value
