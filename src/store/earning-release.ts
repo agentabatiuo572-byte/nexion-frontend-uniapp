@@ -2,10 +2,10 @@ import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { earningsReleaseApi } from "@/api/runtime";
 import type { EarningsReleaseStatus } from "@/api/earnings-release-api";
-import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import type { RiskClusterSummary } from "@/store/risk-cluster";
 import { shallowRef } from "vue";
-import { invalidateBeforePassiveTabRead, passiveTabReadScope, runPassiveTabRead } from "@/lib/passive-tab-read";
+import { invalidateBeforePassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope,
+  rememberPassiveTabRead, runForegroundStoreRead } from "@/lib/passive-tab-read";
 
 export type LedgerRoute = "pending_review" | "bonus_locked";
 export type ReleaseSource = "attest" | "manual";
@@ -24,6 +24,7 @@ let earningsReleaseRefreshSequence = 0;
 let earningsReleasePending: { owner: string; promise: Promise<EarningsReleaseStatus> } | null = null;
 
 export function bindEarningsReleaseAccount(accountKey: string): void {
+  invalidatePassiveTabRead("earning-release");
   activeEarningsReleaseAccountKey = accountKey || "default";
   earningsReleaseRefreshSequence += 1;
   earningsReleaseSnapshot.value = null;
@@ -31,9 +32,10 @@ export function bindEarningsReleaseAccount(accountKey: string): void {
   earningsReleaseStatus.value = "idle";
 }
 
+const hasEarningsReleaseSnapshot = () => earningsReleaseStatus.value === "ready" && earningsReleaseHasSnapshot.value;
+
 export function ensureEarningsReleaseStatus(): Promise<EarningsReleaseStatus> {
-  return runPassiveTabRead("earning-release", () => refreshEarningsReleaseStatus(), undefined,
-    () => earningsReleaseStatus.value === "ready" && earningsReleaseHasSnapshot.value);
+  return runForegroundStoreRead("earning-release", () => refreshEarningsReleaseStatus(), undefined, hasEarningsReleaseSnapshot);
 }
 
 export function refreshEarningsReleaseStatus(
@@ -47,21 +49,19 @@ export function refreshEarningsReleaseStatus(
   }
   const readScope = passiveTabReadScope();
   const snapshotWrite = captureTabSnapshotWrite();
-  const runScope = captureRuntimeRevision();
-  const owner = JSON.stringify([requestedAccountKey, earningsReleaseRefreshSequence, readScope, runScope.epoch]);
+  const owner = JSON.stringify([requestedAccountKey, earningsReleaseRefreshSequence, readScope]);
   if (earningsReleasePending?.owner === owner) return earningsReleasePending.promise;
   invalidateBeforePassiveTabRead("earning-release");
   const refreshSequence = ++earningsReleaseRefreshSequence;
   const promise = Promise.resolve().then(async () => {
     if (activeEarningsReleaseAccountKey !== requestedAccountKey || refreshSequence !== earningsReleaseRefreshSequence
-      || !isCurrentRuntimeRevision(runScope) || readScope !== passiveTabReadScope()) throw new Error("EARNINGS_RELEASE_ACCOUNT_CHANGED");
+      || readScope !== passiveTabReadScope()) throw new Error("EARNINGS_RELEASE_ACCOUNT_CHANGED");
     earningsReleaseStatus.value = "loading";
     try {
       const status = await earningsReleaseApi.status();
       // A response from an account that signed out or switched while the request
       // was in flight must never become the next account's financial truth.
       if (activeEarningsReleaseAccountKey !== requestedAccountKey
-        || !isCurrentRuntimeRevision(runScope)
         || refreshSequence !== earningsReleaseRefreshSequence || readScope !== passiveTabReadScope()) return status;
       earningsReleaseSnapshot.value = status;
       earningsReleaseHasSnapshot.value = true;
@@ -70,7 +70,6 @@ export function refreshEarningsReleaseStatus(
       return status;
     } catch (error) {
       if (activeEarningsReleaseAccountKey === requestedAccountKey
-        && isCurrentRuntimeRevision(runScope)
         && refreshSequence === earningsReleaseRefreshSequence && readScope === passiveTabReadScope()) {
         // This store is read directly by wallet surfaces that do not consume the
         // status ref. Do not leave a failed quote visible for them to present as
@@ -83,8 +82,8 @@ export function refreshEarningsReleaseStatus(
       throw error;
     }
   }).finally(() => { if (earningsReleasePending?.promise === promise) earningsReleasePending = null; });
-  earningsReleasePending = { owner: JSON.stringify([requestedAccountKey, refreshSequence, readScope, runScope.epoch]), promise };
-  return promise;
+  earningsReleasePending = { owner: JSON.stringify([requestedAccountKey, refreshSequence, readScope]), promise };
+  return rememberPassiveTabRead("earning-release", promise, undefined, undefined, hasEarningsReleaseSnapshot);
 }
 export function currentEarningsReleaseStatus(): EarningsReleaseStatus | null { return earningsReleaseSnapshot.value; }
 const zero = (): ReleaseOutcome => ({ releasedPendingUsdt: 0, releasedPendingNex: 0, releasedLockedUsdt: 0, releasedLockedNex: 0, escalatedUsdt: 0, escalatedNex: 0, releasedBy: null });
