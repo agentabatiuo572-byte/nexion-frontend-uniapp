@@ -30,7 +30,7 @@
                 <view class="nx-unilevel-record-head">
                   <view class="nx-unilevel-icon" :class="`nx-unilevel-icon--${filter}`" aria-hidden="true"><svg v-if="filter === 'device_earning'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></view>
                   <view class="nx-unilevel-record-copy">
-                    <view class="nx-unilevel-member-line"><text class="nx-unilevel-member">{{ event.sourceUserName }}</text><NxTag v-if="event.status !== 'unlocked' || ('statusUSDT' in event && event.statusUSDT !== event.statusNEX)" :tone="event.status === 'cooling' ? 'warning' : 'neutral'">{{ statusText(event) }}</NxTag></view>
+                    <view class="nx-unilevel-member-line"><text class="nx-unilevel-member">{{ event.sourceUserName }}</text><template v-if="event.status !== 'unlocked' || ('statusUSDT' in event && event.statusUSDT !== event.statusNEX)"><NxTag v-for="tag in statusTags(event)" :key="tag.key" wrap :tone="tag.tone">{{ tag.text }}</NxTag></template></view>
                     <text class="nx-unilevel-source-label">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : filter === 'direct' ? t.directReferral.purchase : t.directReferral.networkPurchase }} · {{ recordTime(event.ts) }}</text>
                   </view>
                   <view class="nx-unilevel-record-amounts">
@@ -228,9 +228,19 @@ function amount(value: number | null | undefined) { return visibility.mask(forma
 const totalAmountParts = computed(() => amount(remoteTotalUSDT.value).split('.'));
 function wideAmount(value: number) { return amount(value).length > 12; }
 function recordTime(ts: number) { return ts > 0 ? new Date(ts).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }) : logicCopy.value.dateUnavailable; }
-function statusText(event: DirectReferralEvent | TeamUnilevelEvent) {
+// One tag per status, so each carries its own colour (03 §3.8); USDT and UVT get a tag each when they differ.
+function statusTags(event: DirectReferralEvent | TeamUnilevelEvent) {
   const { statusUSDT, statusNEX } = event as TeamUnilevelEvent;
-  return statusUSDT && statusNEX && statusUSDT !== statusNEX ? `USDT ${statusLabel(event, statusUSDT)} · UVT ${statusLabel(event, statusNEX)}` : statusLabel(event);
+  return statusUSDT && statusNEX && statusUSDT !== statusNEX
+    ? [{ key: "usdt", text: `USDT ${statusLabel(event, statusUSDT)}`, tone: statusTone(statusUSDT) }, { key: "uvt", text: `UVT ${statusLabel(event, statusNEX)}`, tone: statusTone(statusNEX) }]
+    : [{ key: "all", text: statusLabel(event), tone: statusTone(event.status) }];
+}
+// 03 §3.8: pending payout → warning, credited → success, withdrawn → neutral, reversed or not paid → error. Frozen money is held, so warning.
+function statusTone(status: DirectReferralEvent["status"]) {
+  return status === "unlocked" ? "success" as const
+    : status === "withdrawn" ? "neutral" as const
+    : status === "reversed" || status === "rejected" ? "danger" as const
+    : "warning" as const;
 }
 function statusLabel(event: DirectReferralEvent | TeamUnilevelEvent, status = event.status) {
   if (status === "cooling") return fmt(t.value.commissions.coolingTag, { n: Math.max(0, Math.ceil((event.unlockAt - Date.now()) / 86400000)) });
