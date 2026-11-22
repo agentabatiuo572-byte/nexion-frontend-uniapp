@@ -22,7 +22,7 @@ const parts = computed(() => ambassadorAmountParts(props.value));
 
 <style scoped>
 .amb-amount { display: inline-flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 0 var(--v5-space-1); min-width: 0; max-width: 100%; font: var(--ui-type-list-title-weight, 500) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
-.amb-amount__number { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.amb-amount__number { min-width: 0; max-width: 100%; overflow-wrap: break-word; }
 .amb-amount__dec { color: var(--v5-ink-3); }
 .amb-amount__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); }
 .amb-amount--long { font-size: max(12px, calc(var(--ui-type-list-title) - 1px)); }

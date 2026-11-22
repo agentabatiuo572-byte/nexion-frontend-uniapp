@@ -102,7 +102,7 @@
               <text v-else class="block" :style="rowSubStyle">{{ b.memo }}</text>
               <text v-if="courseRewardId(b)" class="block active:opacity-70 nx-after-chevron" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }}</text>
               <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: var(--v5-space-1)" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
-              <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
+              <NxCodeValue v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward' && b.ref" full :value="b.ref" :label="t.bills.detailRef" :copyable="false" style="color: var(--v5-ink-3); font-size: 12px" />
             </view>
             <view class="text-right shrink-0" style="margin-left: var(--v5-space-2)">
               <text class="block tabular-nums" :style="rewardAmountStyle(b)" :aria-label="`${rewardAmountText(b)} ${platformDisplayText(b.symbol)}`">{{ rewardAmountText(b) }}</text>
@@ -129,6 +129,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { toast } from "@/store/ui";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
@@ -434,7 +435,7 @@ function vIconStyle(dim: boolean): CSSProperties {
 }
 const rowTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 500, color: "var(--v5-ink)" };
 const rowSubStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "12px", color: "var(--v5-ink-3)", overflowWrap: "anywhere" };
+const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "12px", color: "var(--v5-ink-3)", overflowWrap: "break-word" };
 const rowDateStyle: CSSProperties = { fontFamily: "var(--font-metric)", marginTop: "2px", fontSize: "12px", lineHeight: "16px", color: "var(--v5-ink-3)" };
 function rewardAmountText(bill: Bill): string {
   return formatUsd(bill.amountExact ?? bill.amount, bill.symbol === 'USDT' ? 'detail' : 'overview', true).replace('$', '');

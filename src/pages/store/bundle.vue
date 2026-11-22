@@ -90,7 +90,7 @@
               {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
             </text>
             <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
-            <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
+            <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: break-word">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
             <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.purchaseEligibilityIneligible) }}</text>
           </view>
@@ -128,7 +128,7 @@
               </text>
               <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
               <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.gateBlockedToast) }}</text>
-              <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
+              <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: break-word">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             </view>
             <view v-if="!eligibilityUnavailable(p.id)" class="shrink-0 flex items-center" style="gap: 4px">
             <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">

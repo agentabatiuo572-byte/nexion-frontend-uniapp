@@ -44,8 +44,8 @@ function activateRow(event: KeyboardEvent) { if (!props.row.action && !event.rep
 @media (prefers-reduced-motion: reduce) { .home-action-ring__arc { animation: none; } }
 .home-action-ring__count { position:absolute;inset:0;display:grid;place-items:center;font:600 9.5px/1 var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-ink); }
 .home-action-copy { flex:1;min-width:0; }
-.home-action-title { display:block;font-size:var(--ui-text-body);font-weight:500;line-height:20px;color:var(--v5-ink);overflow-wrap:anywhere; }
-.home-action-subtitle { display:flex;flex-wrap:wrap;align-items:baseline;column-gap:4px;margin-top:2px;font-size:var(--ui-text-caption);line-height:18px;color:var(--v5-ink-3);overflow-wrap:anywhere; }
+.home-action-title { display:block;font-size:var(--ui-text-body);font-weight:500;line-height:20px;color:var(--v5-ink);overflow-wrap:break-word; }
+.home-action-subtitle { display:flex;flex-wrap:wrap;align-items:baseline;column-gap:4px;margin-top:2px;font-size:var(--ui-text-caption);line-height:18px;color:var(--v5-ink-3);overflow-wrap:break-word; }
 .home-action-hint { color:var(--v5-ink-2); }
 .home-action-status { color:var(--ui-attention);font-weight:500; }
 .home-action-reward { color:var(--v5-quest-violet-ink); }

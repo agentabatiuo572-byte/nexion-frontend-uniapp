@@ -17,7 +17,7 @@ const t = useT();
 
 <style scoped>
 .device-unclassified-card { padding: 20px; border-radius: var(--v5-radius-xl); background: var(--v5-surface); color: var(--v5-ink); }
-.device-unclassified-card__name { display: block; font-weight: 600; overflow-wrap: anywhere; }
-.device-unclassified-card__sku { display: block; margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.device-unclassified-card__name { display: block; font-weight: 600; overflow-wrap: break-word; }
+.device-unclassified-card__sku { display: block; margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); overflow-wrap: break-word; }
 .device-unclassified-card__metric { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 13px; color: var(--v5-ink-3); }
 </style>

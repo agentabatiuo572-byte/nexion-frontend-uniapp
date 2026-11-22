@@ -281,7 +281,7 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 /* Standalone notes share the 4px inset of section titles. */
 .binding-body > .hint, .field-block > .hint, .hint-stack { padding: 0 4px; }
 .hint-stack { display: flex; flex-direction: column; }
-.hint { display: block; color: var(--v5-ink-3); font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
+.hint { display: block; color: var(--v5-ink-3); font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .warn-text { color: var(--v5-warning-ink); }
 /* Account numbers and codes are read character by character (01 §1.2). */
 .mono { font-family: var(--font-jet-mono); font-variant-numeric: tabular-nums; letter-spacing: .03em; }
@@ -323,8 +323,10 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 /* Brand glass S (03 §3.1): frosted material with a 14% brand fill. */
 .otp-send { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); flex: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: 999px; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); white-space: nowrap; }
 .otp-send[aria-disabled="true"] { opacity: .5; }
-.review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 16px; border-bottom: 1px solid var(--v5-border); color: var(--v5-ink-3); font: 400 14px/20px var(--font-v5); overflow-wrap: anywhere; }
+.review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 16px; border-bottom: 1px solid var(--v5-border); color: var(--v5-ink-3); font: 400 14px/20px var(--font-v5); overflow-wrap: break-word; }
 .review-row:last-child { border-bottom: 0; }
+/* The value (a typed account up to 32 digits, a holder name) gives way first and wraps; the label keeps whole words. */
+.review-row > text:last-child { min-width: 0; }
 .strong { color: var(--v5-ink); font-size: 15px; font-weight: 500; text-align: right; }
 .muted { color: var(--v5-ink-3); }
 .group-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); }

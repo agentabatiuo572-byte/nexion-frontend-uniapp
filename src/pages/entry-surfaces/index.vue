@@ -142,7 +142,7 @@ function open(route: string) {
   color: var(--v5-ink-3);
   font-size: 12px;
   line-height: 1.45;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 @media (min-width: 700px) {

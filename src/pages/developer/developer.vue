@@ -111,7 +111,7 @@
             <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
             <view v-if="docs" class="mt-3 rounded-lg" :style="requestStatusStyle">
-              <view v-for="(endpoint, index) in docs.endpoints" :key="`${endpoint.method}:${endpoint.path}:${index}`" style="padding: 6px 0; overflow-wrap: anywhere">
+              <view v-for="(endpoint, index) in docs.endpoints" :key="`${endpoint.method}:${endpoint.path}:${index}`" style="padding: 6px 0; overflow-wrap: break-word">
                 <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ endpoint.method }}</text>
                 <text class="font-mono-tabular" style="margin-left: 8px; font-size: 12px">{{ endpoint.path }}</text>
               </view>
@@ -163,7 +163,7 @@
             <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle"><text>—</text></view>
             <view v-for="item in (resourcesReady ? webhooks : [])" :key="item.id" :style="resourceRowStyle">
               <view style="display: flex; flex-direction: column; gap: 8px">
-                <view class="min-w-0" style="overflow-wrap: anywhere"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.url }} · {{ item.deliveryStatus }}</text></view>
+                <view class="min-w-0" style="overflow-wrap: break-word"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.url }} · {{ item.deliveryStatus }}</text></view>
                 <view v-if="item.status !== 'DELETED'" class="flex" style="gap: 8px; flex-wrap: wrap"><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `toggle-webhook:${item.id}`)" role="button" tabindex="0" @click="setWebhookEnabled(item, item.status !== 'ACTIVE')"><text style="font-size: 12px">{{ item.status === 'ACTIVE' ? t.developer.disable : t.developer.enable }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `deliveries-webhook:${item.id}`)" role="button" tabindex="0" @click="loadWebhookDeliveries(item)"><text style="font-size: 12px">{{ t.developer.deliveryAttempts }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `rotate-webhook:${item.id}`)" role="button" tabindex="0" @click="rotateWebhook(item)"><text style="font-size: 12px">{{ t.developer.rotate }}</text></view><view class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `delete-webhook:${item.id}`)" role="button" tabindex="0" @click="deleteWebhook(item.id)"><text style="font-size: 12px">{{ t.developer.delete }}</text></view></view>
               </view>
               <view v-if="rotationRecovery[item.id]" class="mt-2 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.rotationUnknownWarning }}</text></view>

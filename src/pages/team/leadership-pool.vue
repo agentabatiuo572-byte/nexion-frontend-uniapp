@@ -341,7 +341,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .pool-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
 .pool-hero { --nx-tint: var(--v5-warning); position: relative; padding: var(--v5-space-5); border-radius: 28px; }
 .pool-label { color: var(--v5-ink); font-size: 13px; line-height: 18px; font-weight: 600; }
-.pool-hero .reward-amount { display: block; margin: var(--v5-space-1) 0 6px; font-size: 32px; line-height: 40px; font-weight: 550; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.pool-hero .reward-amount { display: block; margin: var(--v5-space-1) 0 6px; font-size: 32px; line-height: 40px; font-weight: 550; letter-spacing: -.03em; overflow-wrap: break-word; }
 .pool-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
 .pool-decimals { color: var(--v5-ink-3); }
 .pool-payout { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; margin-top: var(--v5-space-4); padding: var(--ui-space-row-y) var(--v5-space-4); border-radius: 16px; background: var(--v5-surface-2); color: var(--v5-ink); font-size: 14px; font-weight: 600; }
@@ -376,7 +376,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .pool-history-row > view { flex: 1; min-width: 0; }
 .pool-history-row > .pool-record-icon { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 12px; color: var(--v5-nex); background: color-mix(in srgb, var(--v5-nex) 16%, transparent); }
 .pool-record-amount { color: var(--v5-brand); font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 600; }
-.pool-history-row > text { max-width: 52%; text-align: right; overflow-wrap: anywhere; }
+.pool-history-row > text { max-width: 52%; text-align: right; overflow-wrap: break-word; }
 .pool-action { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 44px; color: var(--v5-ink-2); font-size: var(--ui-type-button); line-height: var(--ui-type-button-lh); }
 .pool-action > svg { display: none; }
 .pool-action > text { color: inherit !important; }

@@ -49,7 +49,7 @@ const idLineStyle: CSSProperties = {
 };
 const priceStyle: CSSProperties = {
   minWidth: 0,
-  overflowWrap: "anywhere",
+  overflowWrap: "break-word",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
   fontSize: "15px",
@@ -60,7 +60,7 @@ const agoStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-2)",
-  overflowWrap: "anywhere",
+  overflowWrap: "break-word",
 };
 
 import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";

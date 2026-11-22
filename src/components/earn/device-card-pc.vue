@@ -911,7 +911,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .nx-action-sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px var(--nx-overlay-bottom); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; font-family: var(--font-v5); }
 .nx-action-sheet__handle { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 18%, transparent); align-self: center; }
 .nx-action-sheet__head { display: flex; flex-direction: column; gap: 2px; padding: 4px 4px 0; }
-.nx-action-sheet__title { color: var(--v5-ink); font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: var(--ui-type-section-weight); overflow-wrap: anywhere; }
+.nx-action-sheet__title { color: var(--v5-ink); font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: var(--ui-type-section-weight); overflow-wrap: break-word; }
 .nx-action-sheet__meta { display: flex; align-items: center; gap: 6px; color: var(--v5-ink-3); font-size: var(--ui-type-description); line-height: var(--ui-type-description-lh); }
 .nx-action-sheet__dot { width: 6px; height: 6px; flex: none; border-radius: 999px; background: var(--v5-success); }
 .nx-action-sheet__group { border-radius: 20px; background: var(--v5-surface-2); overflow: hidden; }
@@ -939,24 +939,24 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-device-art :deep(.hf-computer) { width: 52px; height: 56px; }
 .earn-device-art :deep(.hf-computer svg) { width: 38px; height: 38px; }
 .earn-device-meta { flex: 1; min-width: 0; }
-.earn-device-name { display: block; font: 600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.earn-device-status { margin-top: 4px; line-height: 1.45; overflow-wrap: anywhere; }
+.earn-device-name { display: block; font: 600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.earn-device-status { margin-top: 4px; line-height: 1.45; overflow-wrap: break-word; }
 .nx-device-status-label { font-size:clamp(11px,3.08vw,12px); }
 .device-status-online::before { content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:var(--v5-success); vertical-align:1px; }
 .nx-device-card__numbers { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 152px; }
 .earn-device-amount { text-align: right; min-width: 0; }
 .earn-device-amount-label { display: block; font: 400 clamp(11px,3.08vw,12px)/1.4 var(--font-v5); color: var(--v5-ink-3); }
-.earn-device-value { display: block; margin-top: 4px; font: 600 clamp(13px,3.85vw,15px)/1.3 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.earn-device-value { display: block; margin-top: 4px; font: 600 clamp(13px,3.85vw,15px)/1.3 var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .nx-device-card__details { animation: earn-detail-in .2s ease-out; }
 .device-management-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px; }
 .device-section-title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/22px var(--font-v5);color:var(--v5-ink); }
 .device-statistics { padding:20px;border-block:1px solid var(--v5-border);scroll-margin-top:76px; }
 .device-statistics:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
 .device-statistics__values { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-block:16px; }
-.device-statistics__amount { font:600 24px/32px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+.device-statistics__amount { font:600 24px/32px var(--font-metric);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
 .device-statistics__label { color:var(--v5-ink-3);font:400 12px/18px var(--font-v5); }
 .device-statistics__status { display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding-top:12px;font:500 13px/18px var(--font-v5); }
-.device-statistics__scope { margin-top:12px;color:var(--v5-ink-3);font:400 12px/18px var(--font-v5);overflow-wrap:anywhere; }
+.device-statistics__scope { margin-top:12px;color:var(--v5-ink-3);font:400 12px/18px var(--font-v5);overflow-wrap:break-word; }
 @keyframes earn-detail-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .nx-device-card__details { animation: none; } }
 .nx-device-card__spec { flex: 1 1 160px; min-width: min(100%, 160px); line-height: 1.35; }
@@ -980,7 +980,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__body { position: relative; animation: none; }
 .earn-stage__top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 18px; }
 .earn-stage__id { min-width: 0; }
-.earn-stage__name { display: block; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.earn-stage__name { display: block; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .earn-stage__status { display: flex; align-items: center; gap: 6px; margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .earn-stage__dot.nx-online-dot { background: var(--v5-success); }
@@ -1017,7 +1017,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__value { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-stage__value--ok { color: var(--v5-success-ink); }
 .earn-stage__value--nex { color: var(--v5-nex-ink); }
-.earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: anywhere; }
+.earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: break-word; }
 .earn-stage__recent { position: relative; margin: 6px 18px 0; }
 .earn-stage__recent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: var(--v5-space-2); min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); cursor: pointer; text-align: right; }

@@ -530,14 +530,14 @@ async function deferPhoneActivation() {
   font-size: var(--ui-type-subheading);
   font-weight: var(--ui-type-subheading-weight);
   color: var(--v5-ink);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .est-phone__spec {
   display: block;
   font-size: 12px;
   color: color-mix(in oklab, var(--v5-brand) 90%, transparent);
   margin-top: 2px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .est-phone__rate {
   text-align: right;

@@ -558,12 +558,12 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 
 <style scoped>
 .bank-withdraw { padding: 0 16px 40px; color: var(--v5-ink); font-family: var(--font-v5); }
-.screen-title { display: block; font-size: 26px; line-height: 1.3; font-weight: 600; letter-spacing: -.5px; overflow-wrap: anywhere; }
+.screen-title { display: block; font-size: 26px; line-height: 1.3; font-weight: 600; letter-spacing: -.5px; overflow-wrap: break-word; }
 .intro { display: block; margin: 10px 0 24px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.6; }
-.muted { display: block; color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.muted { display: block; color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; overflow-wrap: break-word; }
 .loading { margin-bottom: 12px; }
 .account-card, .amount-card { border-radius: 16px; background: var(--v5-surface-2); padding: 18px; margin: 20px 0; }
-.account-number { display: block; font-family: var(--font-metric); font-size: 20px; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin: 6px 0; overflow-wrap: anywhere; }
+.account-number { display: block; font-family: var(--font-metric); font-size: 20px; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin: 6px 0; overflow-wrap: break-word; }
 .bank-name { font-size: var(--ui-type-body); }
 .chip { display: inline-block; border-radius: 999px; background: var(--v5-surface-2); color: var(--v5-brand); padding: 4px 10px; font-size: 12px; }
 .notice { border-left: 2px solid var(--v5-warning); padding-left: 12px; color: var(--v5-ink-2); font-size: 12px; line-height: 1.7; margin: 20px 0; }

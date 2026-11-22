@@ -78,7 +78,7 @@
           <text class="whitespace-nowrap active:opacity-70 nx-after-arrow" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
-      <text v-if="copy.taskLevels" class="block mt-1.5" style="font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; color: var(--v5-ink-3)">{{ copy.taskLevels }}</text>
+      <text v-if="copy.taskLevels" class="block mt-1.5" style="font-size: 12px; line-height: 1.5; overflow-wrap: break-word; color: var(--v5-ink-3)">{{ copy.taskLevels }}</text>
       <PromotionProduct v-if="marketingPromotion" :activity="marketingPromotion" :product-no="product.id" />
     </view>
 
@@ -549,9 +549,9 @@ const gateMetaStyle: CSSProperties = {
 @keyframes product-compact-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
 .product-card--compact .product-ribbon { top:0 !important; left:0 !important; padding:2px 9px !important; border-radius:0 0 6px 0 !important; background:var(--v5-brand) !important; color:var(--v5-on-brand) !important; font:500 11px/16px var(--font-v5) !important; }
 .product-compact-body { flex:1; display:flex; flex-direction:column; padding:10px 14px 14px; }
-.product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:anywhere; }
+.product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
 .product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
-.product-compact-levels { display:block; margin-top:6px; font:400 12px/17px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
+.product-compact-levels { display:block; margin-top:6px; font:400 12px/17px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 .product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
 .product-compact-price { color:var(--v5-ink); font:600 16px/21px var(--font-v5); }
 .product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }

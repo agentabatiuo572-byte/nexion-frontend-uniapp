@@ -19,5 +19,5 @@ const visibility = useDataVisibility();
 </script>
 
 <style scoped>
-.compute-task-status { margin-top:8px; font-size:12px; line-height:1.6; color:var(--v5-ink-3); overflow-wrap:anywhere; }
+.compute-task-status { margin-top:8px; font-size:12px; line-height:1.6; color:var(--v5-ink-3); overflow-wrap:break-word; }
 </style>

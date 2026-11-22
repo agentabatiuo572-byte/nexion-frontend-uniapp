@@ -96,7 +96,7 @@ useDialogA11y(computed(() => props.open), '.invite-detail', () => emit('close'))
 .invite-detail__record-copy { flex: 1; }
 .invite-detail__hero { --nx-tint: var(--v5-brand); display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; padding: 18px; border-radius: 24px; }
 .invite-detail__total { display: flex; flex-direction: column; gap: 4px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-2); }
-.invite-detail__amount { font: 600 40px/44px var(--font-amount); letter-spacing: -.03em; color: var(--v5-ink); overflow-wrap: anywhere; }
+.invite-detail__amount { font: 600 40px/44px var(--font-amount); letter-spacing: -.03em; color: var(--v5-ink); overflow-wrap: break-word; }
 .invite-detail__unit { font: 600 15px/20px var(--font-metric); letter-spacing: 0; color: var(--v5-brand); }
 .invite-detail__dots { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 5px; }
 .invite-detail__dot { aspect-ratio: 1; border-radius: 5px; background: var(--v5-brand); }
@@ -113,7 +113,7 @@ useDialogA11y(computed(() => props.open), '.invite-detail', () => emit('close'))
 .invite-detail__record > view { min-width: 0; }
 .invite-detail__record > view > text { display: block; }
 .invite-detail__record-copy > text:first-child { font: 500 14px/20px var(--font-v5); }
-.invite-detail__record-amount { text-align: right; font: 500 15px/20px var(--font-metric); color: var(--v5-brand); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.invite-detail__record-amount { text-align: right; font: 500 15px/20px var(--font-metric); color: var(--v5-brand); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 .invite-detail__muted { display: block; margin-top: 2px; color: var(--v5-ink-3); font-size: 12px; line-height: 16px; }
 .invite-detail__paragraph { display: block; margin-bottom: var(--ui-space-section); color: var(--v5-ink-2); }
 .invite-detail__records + .invite-detail__muted { margin: 8px 4px 0; }
