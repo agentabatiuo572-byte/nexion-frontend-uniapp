@@ -1121,11 +1121,16 @@ async function toggleTwoFactor(value: boolean, resend = false) {
     toast.success(t.value.addrRebind.otpSendCta);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+    // Only a real session loss (the client's auth kind) ends the account state. A 401 CURRENT_PASSWORD_INVALID is the
+    // server answering this form: the sheet stays open and the answer goes on the password field (03 §3.3).
+    if (cause instanceof ApiError && cause.kind === "auth") clearSecurityAccountState();
     console.warn("[security] 2FA challenge failed:", cause);
-    // A failed send is an operation failure: one toast above the sheet (03 §3.5.1). The sheet stays open with the password
-    // kept, so 确认 sends the code again; nothing lands in the password sheet's error line.
-    toast.error(securityErrorMessage(cause));
+    if (isApiRefusal(cause, 401, "CURRENT_PASSWORD_INVALID")) {
+      twoFactorPasswordError.value = securityErrorMessage(cause);
+      twoFactorPasswordFocus.value = true;
+    // Any other failed send is an operation failure: one toast above the sheet (03 §3.5.1). The sheet stays open with
+    // the password kept, so 确认 sends the code again.
+    } else toast.error(securityErrorMessage(cause));
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
@@ -1152,12 +1157,17 @@ async function confirmTwoFactorChallenge() {
     });
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
+    // As on send: only the client's auth kind is a session loss; business 401s keep the sheet and its inputs.
+    if (cause instanceof ApiError && cause.kind === "auth") clearSecurityAccountState();
     console.warn("[security] 2FA update failed:", cause);
-    // A wrong or expired code belongs to the field, and resend opens at once; other failures stay a toast (03 §3.5.1).
+    // A wrong or expired code belongs to the field, and resend opens at once; a wrong current password goes on its field;
+    // other failures stay a toast (03 §3.5.1).
     if (isApiRefusal(cause, 401, "USER_TWO_FACTOR_OTP_INVALID_OR_EXPIRED") || isApiRefusal(cause, 422, "USER_TWO_FACTOR_OTP_REQUIRED")) {
       stopTwoFactorResendCountdown();
       twoFactorCodeError.value = t.value.bankBinding.otpInvalid;
+    } else if (isApiRefusal(cause, 401, "CURRENT_PASSWORD_INVALID")) {
+      twoFactorPasswordError.value = securityErrorMessage(cause);
+      twoFactorPasswordFocus.value = true;
     } else toast.error(securityErrorMessage(cause));
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
