@@ -391,7 +391,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-contribution-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px; background: linear-gradient(180deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 25%, transparent)); }
 .binary-contribution-fill--other { background: linear-gradient(180deg, var(--ui-device-ink), color-mix(in srgb, var(--ui-device-ink) 25%, transparent)); }
 .binary-rate { position: absolute; left: 50%; top: 132px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; color: var(--ui-device-ink); font: 500 14px/20px var(--font-metric); text-align: center; overflow-wrap: break-word; }
-.binary-rate .binary-note { font-size: 11px; line-height: 16px; }
+.binary-rate .binary-note { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
 .reward-binary-basis { display: flex; flex-direction: column; gap: var(--v5-space-1); margin-top: var(--v5-space-3); padding-inline: var(--v5-space-1); }
 .binary-member-recovery { display: flex; align-items: center; justify-content: space-between; }
 .binary-member-recovery > .binary-note { flex: 1; }
@@ -399,7 +399,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .reward-wings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin-top: var(--v5-space-3); }
 .reward-wing { min-width: 0; padding: var(--v5-space-4) !important; border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .reward-wing-member__body { min-width: 0; }
-.reward-wing-member__body > .binary-label { font-size: 11px; line-height: 16px; }
+.reward-wing-member__body > .binary-label { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
 .reward-wing-member__name { display: block; font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: break-word; }
 .reward-wing-member__facts { display: flex; align-items: center; gap: var(--ui-space-row-y); min-width: 0; }
 .reward-wing-member__rank { flex: none; }
