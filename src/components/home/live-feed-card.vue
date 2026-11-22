@@ -40,7 +40,7 @@
         </view>
         <view class="nx-feed-copy">
           <text class="nx-feed-title">{{ r.model }}</text>
-          <view class="nx-feed-sub nx-feed-sub--split"><text class="nx-feed-sub__lead">{{ r.client }}</text><text aria-hidden="true">·</text><text data-home-live-time="true" class="nx-feed-sub__time">{{ r.ts }}</text></view>
+          <view class="nx-feed-sub nx-feed-sub--split nx-feed-sub--wrap"><text class="nx-feed-sub__lead">{{ r.client }}</text><text aria-hidden="true">·</text><text data-home-live-time="true" class="nx-feed-sub__time">{{ r.ts }}</text></view>
         </view>
         <text class="nx-feed-amount nx-feed-amount--earned font-mono-tabular">{{ r.val }}</text>
       </view>
@@ -225,9 +225,10 @@ function goAll() {
 .nx-home-live-feed :deep(.nx-feed-list .nx-feed-title) { display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden; }
 .nx-home-live-feed :deep(.nx-feed-sub) { overflow:hidden;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);white-space:nowrap;text-overflow:ellipsis; }
 .nx-home-live-feed :deep(.nx-feed-sub--split) { display:flex;gap:var(--v5-space-1); }
-/* Running rows: the estimate drops to its own line rather than cutting the status. */
+/* Activity and running rows open nothing, so the client or status is never cut (03 §3.6.1): the time or estimate drops
+   to its own line, and a lead longer than the row wraps between words. */
 .nx-home-live-feed :deep(.nx-feed-sub--wrap) { flex-wrap:wrap; }
-.nx-home-live-feed :deep(.nx-feed-sub__lead) { overflow:hidden;min-width:0;text-overflow:ellipsis;white-space:nowrap; }
+.nx-home-live-feed :deep(.nx-feed-sub__lead) { min-width:0;white-space:normal;overflow-wrap:break-word; }
 .nx-home-live-feed :deep(.nx-feed-sub__time) { flex:none; }
 .nx-home-live-feed :deep(.nx-feed-amount) { display:flex;align-items:baseline;gap:9px;font:500 14px/20px var(--font-metric);white-space:nowrap; }
 .nx-home-live-feed :deep(.nx-feed-amount--earned), .nx-home-live-feed :deep(.nx-feed-list .nx-feed-amount) { color:var(--v5-success-ink); }
