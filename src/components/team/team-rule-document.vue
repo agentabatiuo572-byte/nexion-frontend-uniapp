@@ -36,11 +36,11 @@ defineProps<{ blocks: HowContentBlock[]; compact?: boolean }>();
 <style scoped>
 .team-rule-document__block { padding: 12px 0; }
 .team-rule-document__block + .team-rule-document__block { border-top: 1px solid var(--v5-border); }
-.team-rule-document__title { display: block; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); overflow-wrap: anywhere; }
-.team-rule-document__body { display: block; margin-top: 4px; color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); white-space: pre-line; text-wrap: pretty; overflow-wrap: anywhere; }
+.team-rule-document__title { display: block; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); overflow-wrap: break-word; }
+.team-rule-document__body { display: block; margin-top: 4px; color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); white-space: pre-line; text-wrap: pretty; overflow-wrap: break-word; }
 .team-rule-document__items { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .team-rule-document__item { display: flex; align-items: baseline; gap: 8px; color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); }
-.team-rule-document__item > text:last-child { min-width: 0; overflow-wrap: anywhere; }
+.team-rule-document__item > text:last-child { min-width: 0; overflow-wrap: break-word; }
 .team-rule-document__after-body { margin-top: 4px; }
 .team-rule-document__marker { flex: 0 0 20px; color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
 :deep(.team-rule-note--block) { margin: var(--ui-space-section-gap) 16px 0; padding: 16px; border-radius: var(--ui-radius-surface); }

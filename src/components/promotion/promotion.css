@@ -7,7 +7,7 @@
    (the disclosure's refund heading) the subheading role (10.1). Each use names its role. */
 .promotion-title.promotion-title--section { font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
 .promotion-title.promotion-title--sub { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.promotion-copy { display:block; font-size:var(--ui-type-list-subtitle); line-height:1.7; color:var(--v5-ink-3); overflow-wrap:anywhere; }
+.promotion-copy { display:block; font-size:var(--ui-type-list-subtitle); line-height:1.7; color:var(--v5-ink-3); overflow-wrap:break-word; }
 .promotion-price { font-size:14px; }
 .promotion-row { display:flex; align-items:flex-start; gap:12px; padding:15px 0; border-bottom:1px solid var(--v5-border); }
 .promotion-row:last-child { border-bottom:0; }
@@ -31,7 +31,7 @@
 .promotion-notice { border-left:2px solid var(--v5-brand); padding:4px 0 4px 12px; font-size:var(--ui-type-list-subtitle); line-height:1.7; }
 .promotion-badge { display:inline-flex; margin-top:8px; padding:4px 8px; border-radius:8px; color:var(--v5-brand); background:color-mix(in srgb,var(--v5-brand) 10%,var(--v5-surface)); font-size:12px; }
 .promotion-summary { display:flex; justify-content:space-between; gap:18px; padding:10px 0; font-size:var(--ui-type-list-subtitle); }
-.promotion-summary > * { min-width:0; overflow-wrap:anywhere; }
+.promotion-summary > * { min-width:0; overflow-wrap:break-word; }
 .promotion-summary > :last-child { text-align:right; }
 .promotion-filters { display:flex; flex-wrap:wrap; gap:8px; }
 .promotion-filters .promotion-action { min-height:44px; padding:9px 13px; font-size:13px; font-weight:400; }

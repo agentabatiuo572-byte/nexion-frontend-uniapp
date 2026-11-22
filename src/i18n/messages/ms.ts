@@ -4524,7 +4524,7 @@ export const ms: Messages = {
       peer: "Ganjaran pangkat sama",
       pool: "Dana insentif pasukan",
       votes: "undi",
-      peerNotDispatched: "Ganjaran pangkat sama {n}% · belum dibuka",
+      peerNotDispatched: "{n}% · belum dibuka",
     },
     cond: {
       selfBuy: "Beli sendiri ≥ ${n}",

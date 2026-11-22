@@ -273,9 +273,9 @@ onUnmounted(() => {
 <style scoped>
 .third-party-auth { margin: var(--v5-space-5) 0; color: var(--v5-ink); }
 .oauth-title { display: block; font-size: var(--ui-type-subheading); font-weight: var(--ui-type-subheading-weight); margin-bottom: var(--v5-space-3); }
-.oauth-copy { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.6; color: var(--v5-ink-2); margin: 10px 0; overflow-wrap: anywhere; }
+.oauth-copy { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.6; color: var(--v5-ink-2); margin: 10px 0; overflow-wrap: break-word; }
 .oauth-panel { padding: 14px; margin-top: var(--v5-space-3); border-radius:var(--v5-radius-m); background: var(--v5-surface); }
-.oauth-identity { display: block; overflow-wrap: anywhere; font-weight: 600; margin: var(--v5-space-3) 0; }
+.oauth-identity { display: block; overflow-wrap: break-word; font-weight: 600; margin: var(--v5-space-3) 0; }
 .oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px; border-radius: 10px; color: var(--v5-ink); background: var(--v5-surface-2); margin: var(--v5-space-3) 0; }
 .oauth-button { min-height: 44px; display: flex; align-items: center; justify-content: center; margin-top: 10px; border-radius:var(--ui-radius-icon); background: var(--v5-brand); color: white; font-size: var(--ui-type-button); }
 .oauth-button:active { opacity: 0.8; }

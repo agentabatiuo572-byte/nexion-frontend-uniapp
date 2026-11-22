@@ -41,7 +41,7 @@
         </svg>
       </view>
       <text class="block mt-1" style="font-family: var(--font-v5); font-weight: 600; font-size: 12px; color: var(--v5-ink)">{{ c.label }}</text>
-      <text class="block font-mono-tabular" :style="{ fontSize: '12px', lineHeight: '1.25', maxWidth: '100%', overflowWrap: 'anywhere', color: iconColor(c.tone), marginTop: '1px' }">{{ c.sub }}</text>
+      <text class="block font-mono-tabular" :style="{ fontSize: '12px', lineHeight: '1.25', maxWidth: '100%', overflowWrap: 'break-word', color: iconColor(c.tone), marginTop: '1px' }">{{ c.sub }}</text>
     </view>
   </view>
 </template>

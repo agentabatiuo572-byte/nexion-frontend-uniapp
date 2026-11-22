@@ -228,7 +228,7 @@ const tableHeadStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
   borderBottom: "1px solid var(--v5-border)",
 };
-const thCellLeft: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "anywhere", padding: "8px 6px", fontWeight: 500 };
+const thCellLeft: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "break-word", padding: "8px 6px", fontWeight: 500 };
 const thCellRight: CSSProperties = { ...thCellLeft };
 function tableRowStyle(isFirst: boolean): CSSProperties {
   return {
@@ -240,7 +240,7 @@ function tableRowStyle(isFirst: boolean): CSSProperties {
 const tdTermStyle: CSSProperties = {
   flex: "1 1 0",
   minWidth: 0,
-  overflowWrap: "anywhere",
+  overflowWrap: "break-word",
   padding: "8px 6px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,

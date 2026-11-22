@@ -624,8 +624,8 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-slot .trial-slot__tag { position:absolute;left:50%;bottom:-12px;padding:0 10px;transform:translateX(-50%); }
 .trial-terminal-copy { display:flex;flex-direction:column;align-items:center;margin-top:28px;padding:0 24px;text-align:center; }
 .trial-terminal-copy--claim { margin-top:36px; }
-.trial-terminal-copy__title { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);text-wrap:balance;overflow-wrap:anywhere; }
-.trial-terminal-copy__body { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);text-wrap:pretty;overflow-wrap:anywhere; }
+.trial-terminal-copy__title { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);text-wrap:balance;overflow-wrap:break-word; }
+.trial-terminal-copy__body { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);text-wrap:pretty;overflow-wrap:break-word; }
 .trial-terminal-copy__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-wrap:pretty; }
 
 /* ── Bottom action bar (DS-30): the shared glass bar ── */

@@ -262,7 +262,7 @@ function isOpenSlot(p: PowerUp): boolean {
 .spu-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: color-mix(in srgb, var(--t) 16%, transparent); color: var(--t); }
 .spu-card--l .spu-ic { background: color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink-4); }
 .spu-th { font: 500 12px/16px var(--font-metric); color: var(--v5-ink-3); }
-.spu-nm { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); word-break: keep-all; overflow-wrap: anywhere; }
+.spu-nm { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); word-break: keep-all; overflow-wrap: break-word; }
 .spu-card--l .spu-nm { color: var(--v5-ink-2); }
 .spu-ds { margin-top: -6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .spu-bt { margin-top: auto; display: flex; align-items: center; gap: 4px; font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); }

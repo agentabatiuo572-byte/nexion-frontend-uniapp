@@ -4197,7 +4197,7 @@ timeHoursAgo: "{n}h ago",
       peer: "Same-rank reward",
       pool: "Team incentive pool",
       votes: "votes",
-      peerNotDispatched: "Same-rank reward {n}% · not open yet",
+      peerNotDispatched: "{n}% · not open yet",
     },
     cond: {
       selfBuy: "Self-buy ≥ ${n}",

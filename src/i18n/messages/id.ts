@@ -4524,7 +4524,7 @@ export const id: Messages = {
       peer: "Hadiah peringkat sama",
       pool: "Pool insentif tim",
       votes: "suara",
-      peerNotDispatched: "Hadiah peringkat sama {n}% · belum dibuka",
+      peerNotDispatched: "{n}% · belum dibuka",
     },
     cond: {
       selfBuy: "Beli sendiri ≥ ${n}",

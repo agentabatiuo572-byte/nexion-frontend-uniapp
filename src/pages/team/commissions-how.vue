@@ -193,18 +193,18 @@ useAutoRecovery({ failed: () => state.value.error && !state.value.loading, retry
 .commission-guide-status__tag, .commission-guide-status__body { align-self: stretch; padding: 12px 0; }
 .commission-guide-status__tag { padding-right: 12px; }
 .commission-guide-status--next { border-top: 1px solid var(--v5-border); }
-.commission-guide-status__body { color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); overflow-wrap: anywhere; }
+.commission-guide-status__body { color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); overflow-wrap: break-word; }
 .commission-guide-example { display: flex; flex-direction: column; gap: 12px; white-space: normal; }
 .commission-guide-example__base { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--v5-border); }
-.commission-guide-example__base-value { color: var(--v5-ink); font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.commission-guide-example__base-value { color: var(--v5-ink); font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 .commission-guide-example__row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .commission-guide-example__name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.commission-guide-example__label { color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: anywhere; }
-.commission-guide-example__detail { color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
-.commission-guide-example__value { flex: none; max-width: 52%; font: 500 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.commission-guide-example__label { color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.commission-guide-example__detail { color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
+.commission-guide-example__value { flex: none; max-width: 52%; font: 500 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: break-word; }
 .commission-guide-example__total { padding-top: 12px; border-top: 1px solid var(--v5-border); }
-.commission-guide-example__total-value { flex: none; max-width: 60%; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); text-align: right; overflow-wrap: anywhere; }
+.commission-guide-example__total-value { flex: none; max-width: 60%; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); text-align: right; overflow-wrap: break-word; }
 .commission-guide-example__note { color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .commission-guide-publication-note { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 12px; color: var(--v5-ink-3); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); }
-.commission-guide-footer { display: block; margin: 16px 20px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
+.commission-guide-footer { display: block; margin: 16px 20px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 </style>

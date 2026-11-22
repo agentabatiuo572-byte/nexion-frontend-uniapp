@@ -52,7 +52,7 @@
         </view>
         <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.coOrPaste }}</text>
         <view class="w-full flex items-center rounded-xl active:opacity-90" :style="addressBtnStyle" role="button" tabindex="0" :aria-label="t.store.coAddressCopied" @click.stop="copyAddress">
-          <text class="flex-1 font-mono" style="text-align: left; font-size: 12px; color: var(--v5-ink-2); word-break: break-all">{{ session.address }}</text>
+          <NxCodeValue :value="session.address" :label="t.store.coOrPaste" full :copyable="false" />
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
         </view>
       </view>
@@ -89,6 +89,7 @@ import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { mockServerNow } from "@/store/server-time";
 import { formatCountdown, sessionSecondsLeft, type PendingCheckoutSession } from "@/store/pending-checkout-core";
 import { fnv1a, mulberry32 } from "@/store/deposits-core";

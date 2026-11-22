@@ -4524,7 +4524,7 @@ export const uz: Messages = {
       peer: "Teng daraja mukofoti",
       pool: "Jamoa ragʻbat fondi",
       votes: "ovoz",
-      peerNotDispatched: "Teng daraja mukofoti {n}% · hali ochilmagan",
+      peerNotDispatched: "{n}% · hali ochilmagan",
     },
     cond: {
       selfBuy: "Shaxsiy xarid ≥ ${n}",

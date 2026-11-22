@@ -651,23 +651,23 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-result-header__title { text-align: center; white-space: normal; overflow-wrap: break-word; font-size: 18px; font-weight: 600; line-height: 24px; }
 .course-result { display: flex; flex-direction: column; align-items: center; padding: 56px 24px 0; text-align: center; }
 .course-result__badge { display: grid; place-items: center; flex: none; width: 84px; height: 84px; border-radius: 50%; color: var(--v5-on-brand); background: linear-gradient(160deg, var(--ui-lime-pale), var(--v5-brand)); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 10%, transparent), 0 0 0 22px color-mix(in srgb, var(--v5-brand) 5%, transparent), 0 14px 40px color-mix(in srgb, var(--v5-brand) 35%, transparent); }
-.course-result__title { display: block; margin-top: 18px; font-size: var(--v5-type-h2); font-weight: 600; line-height: 38px; overflow-wrap: anywhere; }
-.course-result__summary { display: block; margin-top: 6px; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); font-variant-numeric: tabular-nums; text-wrap: pretty; }
-.course-result__reward { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 32px; margin-top: var(--v5-space-4); padding: var(--v5-space-1) 14px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--learning-reward) 16%, transparent); color: var(--learning-reward); font-size: 14px; font-weight: 600; line-height: 24px; font-variant-numeric: tabular-nums; }
+.course-result__title { display: block; margin-top: 18px; font-size: var(--ui-type-display-title); font-weight: var(--ui-type-display-title-weight); line-height: var(--ui-type-display-title-lh); overflow-wrap: break-word; }
+.course-result__summary { display: block; margin-top: 6px; font-size: var(--ui-type-description); line-height: var(--ui-type-description-lh); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; text-wrap: pretty; }
+.course-result__reward { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 32px; margin-top: var(--v5-space-4); padding: var(--v5-space-1) 14px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--learning-reward) 16%, transparent); color: var(--learning-reward); font-size: 14px; font-weight: 500; line-height: 24px; font-variant-numeric: tabular-nums; }
 .course-result__reward--pending { background: var(--v5-surface); color: var(--v5-ink-3); }
 .course-next-section { padding: var(--v5-space-10) var(--v5-space-4) 0; }
 .course-next { --nx-tint: var(--v5-brand); position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); }
-.course-next__label { display: block; font-size: 12.5px; font-weight: 500; line-height: 18px; color: var(--v5-brand); }
-.course-next__title { display: block; margin-top: 6px; font-size: 18px; font-weight: 600; line-height: 24px; overflow-wrap: anywhere; }
-.course-next__meta { margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.course-next__label { display: block; font-size: var(--ui-type-note); font-weight: 500; line-height: var(--ui-type-note-lh); color: var(--v5-brand); }
+.course-next__title { display: block; margin-top: 6px; font-size: 18px; font-weight: 600; line-height: 24px; overflow-wrap: break-word; }
+.course-next__meta { margin-top: 6px; font-size: var(--ui-type-note); line-height: var(--ui-type-note-lh); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .course-next__reward { color: var(--learning-reward); font-variant-numeric: tabular-nums; }
 .learning-course .course-next__cta { display: flex; box-sizing: border-box; width: 100%; min-height: 48px; margin-top: var(--v5-space-4); padding: 0; font-size: var(--ui-type-button); font-weight: 600; }
 .course-quiz-result { display:flex;flex-direction:column;gap:var(--v5-space-2);margin-top:var(--v5-space-5);padding-top:20px;border-top:1px solid var(--v5-border); }
 .course-quiz-result__title { font:600 18px/25px var(--font-v5);color:var(--v5-ink); }
-.course-quiz-result__score { font:600 28px/36px var(--font-metric);font-variant-numeric:tabular-nums; }
+.course-quiz-result__score { font:500 28px/36px var(--font-metric);font-variant-numeric:tabular-nums; }
 .course-quiz-result__meta { font:400 var(--ui-type-list-subtitle)/20px var(--font-v5);color:var(--v5-ink-2); }
 .course-quiz-result__retry { width:100%;margin-top:var(--v5-space-2); }
-.course-next-state { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); padding: 18px; text-align: center; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); }
+.course-next-state { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); padding: 18px; text-align: center; font-size: var(--ui-type-description); line-height: var(--ui-type-description-lh); color: var(--v5-ink-3); }
 .learning-course .course-result__back { display: flex; box-sizing: border-box; width: 100%; margin-top: var(--v5-space-3); }
 .course-next-state.nx-inline-recovery { display: grid; align-items: center; gap: var(--v5-space-3); text-align: start; }
 [role="radio"] { display: flex; align-items: center; gap: var(--v5-space-3); min-height: 48px; padding: var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: 14px; font: 400 14px/1.5 var(--font-v5); }
@@ -688,9 +688,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 /* Approved growth board geometry and material. */
  .growth-course-chassis { width:100%; max-width:100vw; min-width:0; }
 .learning-course, .course-lesson, .course-lesson__meta, .course-lesson__body { box-sizing:border-box; width:100%; max-width:100%; min-width:0; }
-.learning-course { padding-top:0; overflow-wrap:anywhere; }
+.learning-course { padding-top:0; overflow-wrap:break-word; }
 .learning-course :deep(.spv), .learning-course :deep(.spv-titlewrap) { min-width:0; max-width:100%; }
-.course-lesson__body, .course-lesson__body :deep(span) { white-space:pre-wrap; overflow-wrap:anywhere; word-break:normal; }
+.course-lesson__body, .course-lesson__body :deep(span) { white-space:pre-wrap; overflow-wrap:break-word; word-break:normal; }
 .course-read-progress { width:calc(100% - 32px); max-width:calc(100% - 32px); box-sizing:border-box; }
 .course-sticky { position:fixed; min-width:0; }
 .course-sticky .course-submit { width:100%; min-width:0; }

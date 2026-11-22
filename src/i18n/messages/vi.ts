@@ -4113,7 +4113,7 @@ timeHoursAgo: "{n} giờ",
       peer: "Thưởng đồng cấp",
       pool: "Quỹ thưởng nhóm",
       votes: "phiếu",
-      peerNotDispatched: "Thưởng đồng cấp {n}% · chưa mở",
+      peerNotDispatched: "{n}% · chưa mở",
     },
     cond: {
       selfBuy: "Tự mua ≥ ${n}",

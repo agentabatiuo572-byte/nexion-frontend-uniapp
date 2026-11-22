@@ -47,7 +47,7 @@ function open() { if (props.application.applicationId) void navTo(AMBASSADOR_ROU
 .amb-card--solid { background: var(--v5-surface); box-shadow: var(--v5-glass-shadow, none); }
 .amb-card__head { display: flex; align-items: flex-start; gap: var(--ui-space-inline); }
 .amb-card__titles { flex: 1; min-width: 0; }
-.amb-card__title { display: block; font: var(--ui-type-card-title-weight, 600) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.amb-card__title { display: block; font: var(--ui-type-card-title-weight, 600) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .amb-card__meta { display: block; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 /* The event date never splits at its hyphens. */
 .amb-card__date { white-space: nowrap; }

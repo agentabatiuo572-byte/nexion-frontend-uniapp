@@ -141,12 +141,12 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-detail { padding:0 16px 28px; color:var(--v5-ink); }
 .event-section { margin-top:12px; padding:16px; border-radius:var(--nx-glass-radius); background:var(--nx-glass-fill); box-shadow:var(--nx-glass-edge); }
 .event-section--plain { padding:var(--ui-space-inset) 0; border-radius:0; background:transparent; box-shadow:none; border-top:1px solid var(--v5-border); }
-.event-title { display:block; font-size:20px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+.event-title { display:block; font-size:20px; font-weight:600; line-height:1.4; overflow-wrap:break-word; }
 .event-heading { display:block; font-size:14px; font-weight:600; }
-.event-copy { display:block; margin-top:10px; font-size:var(--ui-type-list-subtitle); line-height:1.6; color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:anywhere; }
+.event-copy { display:block; margin-top:10px; font-size:var(--ui-type-list-subtitle); line-height:1.6; color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:break-word; }
 .event-status { display:block; margin-top:12px; font-size:12px; color:var(--v5-brand); }
 .event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font-size:12px; line-height:1.5; }
-.event-row > text:last-child { overflow-wrap:anywhere; color:var(--v5-ink-2); }
+.event-row > text:last-child { min-width:0; overflow-wrap:break-word; color:var(--v5-ink-2); }
 .event-progress { margin-top:12px; height:5px; border-radius:5px; overflow:hidden; background:var(--v5-brand-soft); }
 .event-progress > view { height:100%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
@@ -154,6 +154,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-primary { background:var(--v5-brand); color:var(--v5-on-brand); }
 .event-navigate { margin-top:16px; width:100%; }
 .event-rule-paragraph { display:block; }
-.event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:anywhere; }
+.event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:break-word; }
 .event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2); }
 </style>

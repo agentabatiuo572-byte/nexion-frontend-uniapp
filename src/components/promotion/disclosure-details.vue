@@ -43,5 +43,5 @@ const rights=computed(()=>{
 <style scoped>
 .promotion-entitlements { margin-top:12px; }
 .disclosure-right { display:flex; align-items:flex-start; gap:8px; padding:6px 0; color:var(--v5-ink-2); font:400 14px/22px var(--font-v5); }
-.disclosure-right > :last-child { min-width:0; overflow-wrap:anywhere; }
+.disclosure-right > :last-child { min-width:0; overflow-wrap:break-word; }
 </style>
