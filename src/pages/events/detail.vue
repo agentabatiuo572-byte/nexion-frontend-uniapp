@@ -38,14 +38,14 @@
           <view v-if="result.rewardAmount != null" class="event-row"><text>{{ detail.event.kind === 'regional' ? copy.regionPrize : copy.prize }}</text><text>{{ formatUsd(result.rewardAmount, 'detail') }}</text></view>
         </view>
       </view>
-      <text v-if="commandError && !action" class="event-copy" role="alert">{{ copy.pending }}</text>
+      <text v-if="commandError && !action" class="event-copy" role="status">{{ copy.pending }}</text>
       <view v-if="action" class="event-bar-space" :class="{ 'event-bar-space--note': commandError }" aria-hidden="true"><text v-if="commandError" class="event-bar-space__note">{{ copy.pending }}</text></view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
   </view>
   <template #pageFixed>
     <view v-if="detail && action" class="event-bar nx-glass-bar">
-      <text v-if="commandError" class="nx-tray-note" role="alert">{{ copy.pending }}</text>
+      <text v-if="commandError" class="nx-tray-note" role="status">{{ copy.pending }}</text>
       <NxButton v-if="action==='open'" variant="primary" size="large" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
       <NxButton v-else variant="primary" size="large" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
     </view>
@@ -148,12 +148,15 @@ async function run() {
 }
 onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/pages/events/detail")); code = String(options?.id ?? query.get("id") ?? "").trim(); reset(); if (visible) void load(); });
 let releaseActiveRefresh = () => {};
-onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value ? undefined : load(), "pages/events/detail"); void load(); });
+onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value || commandError.value ? undefined : load(), "pages/events/detail"); void load(); });
 onHide(() => { visible = false; releaseActiveRefresh(); reset(); });
 watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { reset(); void load(); }, { flush: "sync" });
 const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });
 onUnmounted(() => { visible = false; releaseActiveRefresh(); reset(); unsubscribe(); });
-useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value && !busy.value, retry: load });
+useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !commandError.value && !loading.value && !busy.value, retry: load });
+// A command whose result is unknown is settled by this read (load reconciles it), so the page keeps reading at a low rate
+// until it is, quietly: a pull during the check is not a failed refresh (03 §3.5.2). One owner per state.
+useAutoRecovery({ failed: () => remoteApiEnabled && commandError.value && !loading.value && !busy.value, retry: load, repeatMs: 30_000 });
 </script>
 <style scoped>
 .event-detail { padding:0 16px 28px; color:var(--v5-ink); }
