@@ -505,7 +505,6 @@ export const useApp = defineStore("app", () => {
   } | null = null;
   let taskAssignmentSnapshotInFlight: {
     key: string;
-    startedAt: number;
     request: Promise<CanonicalTaskAssignments>;
   } | null = null;
   let taskAssignmentReadEpoch = 0;
@@ -843,7 +842,7 @@ export const useApp = defineStore("app", () => {
         && now < taskAssignmentSnapshot.receivedAt + TASK_ASSIGNMENT_CACHE_MS) {
       return Promise.resolve(taskAssignmentSnapshot.state);
     }
-    if (taskAssignmentSnapshotInFlight?.key === key && now < taskAssignmentSnapshotInFlight.startedAt + TASK_ASSIGNMENT_CACHE_MS)
+    if (taskAssignmentSnapshotInFlight?.key === key)
       return taskAssignmentSnapshotInFlight.request;
     const requireCurrent = () => {
       if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
@@ -854,14 +853,10 @@ export const useApp = defineStore("app", () => {
       requireCurrent();
       taskAssignmentSnapshot = { key, receivedAt: Date.now(), receivedMonotonicAt: readMonotonicNowMs(), state };
       return state;
-    }, (cause: unknown) => {
-      if (taskAssignmentSnapshotInFlight?.request === pending && isHttpReadRateLimit(cause)) {
-        // The API client owns Retry-After for this endpoint. Do not cache the 429 for the snapshot interval.
-        taskAssignmentSnapshotInFlight = null;
-      }
-      throw cause;
+    }).finally(() => {
+      if (taskAssignmentSnapshotInFlight?.request === pending) taskAssignmentSnapshotInFlight = null;
     });
-    taskAssignmentSnapshotInFlight = { key, startedAt: now, request: pending };
+    taskAssignmentSnapshotInFlight = { key, request: pending };
     return pending;
   }
 
@@ -876,9 +871,9 @@ export const useApp = defineStore("app", () => {
     if (deviceInventoryVisible === visible) return;
     deviceInventoryVisible = visible;
     if (!visible && !taskReadPages.size) stopInventoryTaskRead();
-    if (visible && remoteFleetRefreshCoordinator.hasInFlight()
-      && fleetAssignmentReadEpoch !== taskAssignmentReadEpoch) {
-      // The fleet can still be shared, but its task read belongs to the previous display.
+    if (visible && (!remoteAssignmentHasSnapshot.value || (remoteFleetRefreshCoordinator.hasInFlight()
+      && fleetAssignmentReadEpoch !== taskAssignmentReadEpoch))) {
+      // A cached fleet can outlive an unfinished assignment read.
       void refreshVisibleTaskAssignments(true);
     }
   }
@@ -897,6 +892,7 @@ export const useApp = defineStore("app", () => {
       && lastConfirmedAssignments.state.serverNow > state.serverNow) return lastConfirmedAssignments.state;
     lastConfirmedAssignments = { request: { ...request }, state,
       receivedMonotonicAt: taskAssignmentSnapshot?.state === state ? taskAssignmentSnapshot.receivedMonotonicAt : readMonotonicNowMs() };
+    visibleTaskReadAfter = (taskAssignmentSnapshot?.state === state ? taskAssignmentSnapshot.receivedAt : Date.now()) + VISIBLE_TASK_READ_MS;
     return state;
   }
 
@@ -909,7 +905,6 @@ export const useApp = defineStore("app", () => {
     const activeSession = sessionVault.read();
     if (!activeSession || request.accountKey !== `user:${activeSession.user.userId}`) return;
     const runScope = captureRuntimeRevision();
-    visibleTaskReadAfter = Date.now() + VISIBLE_TASK_READ_MS;
     const foregroundEpoch = remoteTaskForegroundEpoch;
     if (!remoteTaskForeground || !hasVisiblePage() || foregroundEpoch !== remoteTaskForegroundEpoch
       || !remoteAccountEpoch.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return;
@@ -918,7 +913,7 @@ export const useApp = defineStore("app", () => {
       const state = await readRemoteTaskAssignments(request);
       if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch
         || readEpoch !== taskAssignmentReadEpoch || !remoteAccountEpoch.isCurrent(request)
-        || !isCurrentRuntimeRevision(runScope)) return;
+        || !isCurrentRuntimeRevision(runScope) || Date.now() < visibleTaskReadAfter) return;
       devices.value = applyRemoteAssignments(devices.value, rememberTaskAssignments(request, state));
       remoteAssignmentHasSnapshot.value = true;
       remoteAssignmentStatus.value = "ready";

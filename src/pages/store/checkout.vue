@@ -9,8 +9,14 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved || canResubmitPendingCreate) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || canResubmitPendingCreate }">
-        <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle" :description="pendingCreateDescription" />
+      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved || pendingCreateTerms) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || pendingCreateTerms }">
+        <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="pendingCreateTitle" :description="pendingCreateDescription" />
+        <view v-if="pendingCreateTerms" class="checkout-group checkout-fees">
+          <CheckoutRow :label="t.store.coRowTotal" :value="reviewMoney(pendingCreateTerms.amount, false, true)" class="checkout-fee" />
+          <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" class="checkout-fee" />
+          <CheckoutRow :label="t.store.coRowQuantity" :value="pendingCreateTerms.quantity" class="checkout-fee" />
+          <CheckoutRow :label="t.voucher.checkoutRowLabel" :value="pendingCreateTerms.voucher" class="checkout-fee" />
+        </view>
       </view>
       <view v-else-if="keepCheckoutTarget" class="checkout-page-center" role="status">
         <text class="checkout-page-state">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : keepRecoveryOperation === 'replace' ? (keepResumeAllowed ? t.tradein.recoveryResumable : t.tradein.recoveryChecking) : keepResumeAllowed ? t.tradein.keepRecoveryResumable : t.tradein.keepRecoveryChecking }}</text>
@@ -249,10 +255,10 @@
       <view v-if="promotionRoute ? promotionCheckout?.keepResumeAllowed : keepResumeAllowed" class="checkout-sticky checkout-sticky--single nx-glass-bar">
         <NxButton variant="primary" :label="purchaseRecoveryCopy(locale.code).resume" @click="promotionRoute ? promotionCheckout?.openKeepResume() : openKeepResume()" />
       </view>
-      <view v-if="!promotionRoute && (originalOrderNavigationFailed || canResubmitPendingCreate) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
+      <view v-if="!promotionRoute && (originalOrderNavigationFailed || pendingCreateTerms) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
         <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
-      <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <text v-if="checkoutTrayBlock" class="nx-tray-note w-full" role="status">{{ checkoutTrayBlock }}</text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
@@ -386,11 +392,26 @@ const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
 const confirmedMissingCreateKey = ref<string | null>(null);
 const pendingCreateFound = ref(false);
+const pendingCreateReplayBusy = ref(false);
 const pendingCreateUnresolved = computed(() => !createdCheckoutOrder.value
   && (!!pendingCreatePointer.value || (!!pendingCheckoutCreate.value
     && pendingCheckoutCreate.value.request.idempotencyKey !== confirmedMissingCreateKey.value)));
 const canResubmitPendingCreate = computed(() => !createdCheckoutOrder.value && !!pendingCheckoutCreate.value
   && confirmedMissingCreateKey.value === pendingCheckoutCreate.value.request.idempotencyKey && catalogStatus.value === 'error');
+const pendingCreateTerms = computed(() => {
+  const pending = pendingCheckoutCreate.value;
+  if (!pending || (!canResubmitPendingCreate.value && !pendingCreateReplayBusy.value)) return null;
+  const { productNo, quantity, voucherId } = pending.request;
+  return {
+    amount: pending.amount,
+    product: (typeof pending.productName === 'string' && pending.productName) || getProduct(productNo)?.name || productNo,
+    quantity: String(quantity),
+    voucher: voucherId ? (typeof pending.voucherName === 'string' && pending.voucherName)
+      || voucher.catalog.find(offer => offer.id === voucherId)?.name || voucherId : t.value.promotion.noVoucher,
+  };
+});
+const pendingCreateTitle = computed(() => originalOrderNavigationFailed.value ? t.value.store.coOriginalOrderOpenFailed
+  : canResubmitPendingCreate.value ? t.value.store.coPendingCreateNotFound : t.value.store.coPendingCreateTitle);
 const pendingCreateDescription = computed(() => originalOrderNavigationFailed.value
   ? (pendingCreateFound.value ? t.value.store.coPendingCreateFound : t.value.store.coOriginalOrderOpenHint)
   : (canResubmitPendingCreate.value ? t.value.store.coResubmitOrderHint : t.value.store.coPendingCreateChecking));
@@ -1243,6 +1264,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   foregroundPaymentSignature = null;
   confirmedMissingCreateKey.value = null;
   pendingCreateFound.value = false;
+  pendingCreateReplayBusy.value = false;
   originalOrderNavigationFailed.value = false;
   paymentBlocked.value = '';
   settledResultReplay.value = false;
@@ -2049,6 +2071,7 @@ async function retryOriginalCheckout() {
   const scope = captureCheckoutRoute();
   const attempt = ++checkoutLeaveAttempt;
   checkoutLeaving.value = true;
+  pendingCreateReplayBusy.value = true;
   try {
     // A submitted replay is uncertain again until the server confirms its result.
     confirmedMissingCreateKey.value = null;
@@ -2063,7 +2086,10 @@ async function retryOriginalCheckout() {
   } catch {
     if (isCurrentCheckoutRoute(scope)) toast.warn(t.value.store.coPendingCreateTitle);
   } finally {
-    if (attempt === checkoutLeaveAttempt) checkoutLeaving.value = false;
+    if (attempt === checkoutLeaveAttempt) {
+      pendingCreateReplayBusy.value = false;
+      checkoutLeaving.value = false;
+    }
   }
 }
 async function cancelCheckout() {
@@ -2474,8 +2500,9 @@ async function readPendingCheckoutCreate() {
     // Release the pending screen while retaining the original payload and key for the next explicit confirm.
     confirmedMissingCreateKey.value = pending.request.idempotencyKey;
     step.value = 'select-payment';
-    toast.info(t.value.store.coPendingCreateNotFound);
-    if (!ordinaryCheckoutInitialized.value) await initializeCheckout(beginCheckoutRoute(), "read-only");
+    const reviewScope = ordinaryCheckoutInitialized.value ? scope : beginCheckoutRoute();
+    if (!ordinaryCheckoutInitialized.value) await initializeCheckout(reviewScope, "read-only");
+    if (isCurrentCheckoutRoute(reviewScope) && !canResubmitPendingCreate.value) toast.info(t.value.store.coPendingCreateNotFound);
   } else if (result.status === 'FAILED') {
     // The active key can be released while the original request still owns the B60 readback.
     retireRemoteOrderKey(pending.intent, scope.accountKey, pending.request.idempotencyKey);
@@ -2616,6 +2643,7 @@ async function submitRemoteOrder(): Promise<void> {
     const creation = pendingCheckoutCreate.value ?? {
       request: { productNo: p.id, quantity: 1, voucherId: requestedVoucherId, idempotencyKey: remoteOrderKey() },
       intent: remoteOrderIntent(), subtotal: purchaseSubtotal.value, discount: voucherDiscount.value, amount: reviewedTotal,
+      productName: p.name, voucherName: voucher.catalog.find(offer => offer.id === requestedVoucherId)?.name,
     };
     if (!existingOrder) {
       rememberCheckoutCreate(submissionScope.accountKey, creation);

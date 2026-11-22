@@ -9,6 +9,8 @@ export interface PendingCheckoutCreate {
   subtotal: number;
   discount: number;
   amount: number;
+  productName?: string;
+  voucherName?: string;
 }
 type FailedCreate = Extract<OrderCreateCommand, { status: 'FAILED' }>;
 type Row = {

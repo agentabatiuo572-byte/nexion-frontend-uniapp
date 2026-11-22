@@ -169,6 +169,7 @@ export const useOrders = defineStore("orders", () => {
   const orders = ref<Order[]>([]);
   const nextCursor = ref<string | null>(null);
   const loadingMore = ref(false);
+  const failedOrderReadbacks = ref(new Set<string>());
 
   function clearOrdersForCommerceRunChange() {
     if (!remoteApiEnabled) return;
@@ -176,6 +177,7 @@ export const useOrders = defineStore("orders", () => {
     orders.value = [];
     nextCursor.value = null;
     loadingMore.value = false;
+    failedOrderReadbacks.value.clear();
   }
   const unsubscribeCommerceRun = subscribeRuntimeRevision(clearOrdersForCommerceRunChange);
   onScopeDispose(unsubscribeCommerceRun);
@@ -212,6 +214,7 @@ export const useOrders = defineStore("orders", () => {
     orders.value = remoteApiEnabled ? [] : (rows.bind(boundKey)?.orders ?? []);
     nextCursor.value = null;
     loadingMore.value = false;
+    failedOrderReadbacks.value.clear();
   }
   bindAccount(boundKey); // boot 期先挂 "default";账号确定后由 rebindAccountScopedStores 重绑
 
@@ -278,6 +281,7 @@ export const useOrders = defineStore("orders", () => {
       if (!isCurrent()) return;
       orders.value = canonical.orders.map(fromCanonical);
       nextCursor.value = canonical.nextCursor ?? null;
+      failedOrderReadbacks.value.clear();
     } catch (error) {
       if (!isCurrent()) return;
       throw error;
@@ -315,24 +319,36 @@ export const useOrders = defineStore("orders", () => {
 
   /** Reconcile a card already on screen without resetting the list's pagination. */
   async function reconcileRemoteOrder(id: string, stillVisible: () => boolean): Promise<void> {
-    if (!remoteApiEnabled || !getById(id)) return;
+    if (!remoteApiEnabled || !stillVisible()) return;
+    if (!getById(id)) { failedOrderReadbacks.value.delete(id); return; }
     const requestEpoch = boundEpoch;
     const requestRun = captureRuntimeRevision();
-    const current = () => stillVisible() && boundEpoch === requestEpoch && isCurrentRuntimeRevision(requestRun);
+    const currentAccount = () => boundEpoch === requestEpoch && isCurrentRuntimeRevision(requestRun);
     const visited = new Set<string>();
     let cursor: string | null = null;
-    do {
-      const page: Awaited<ReturnType<typeof orderApi.list>> = await orderApi.list(cursor, 100);
-      if (!current()) return;
-      const order = page.orders.find(row => row.orderNo === id);
-      if (order) {
-        orders.value = orders.value.map(previous => previous.id === id ? fromCanonical(order) : previous);
-        return;
-      }
-      cursor = page.nextCursor ?? null;
-      if (!cursor || visited.has(cursor)) return;
-      visited.add(cursor);
-    } while (cursor);
+    try {
+      do {
+        const page: Awaited<ReturnType<typeof orderApi.list>> = await orderApi.list(cursor, 100);
+        if (!currentAccount() || !stillVisible()) return;
+        const order = page.orders.find(row => row.orderNo === id);
+        if (order) {
+          orders.value = orders.value.map(previous => previous.id === id ? fromCanonical(order) : previous);
+          break;
+        }
+        cursor = page.nextCursor ?? null;
+        if (!cursor || visited.has(cursor)) break;
+        visited.add(cursor);
+      } while (cursor);
+      failedOrderReadbacks.value.delete(id);
+    } catch (cause) {
+      if (!currentAccount()) return;
+      failedOrderReadbacks.value.add(id);
+      throw cause;
+    }
+  }
+
+  async function retryOrderReadbacks(stillVisible: () => boolean): Promise<void> {
+    await Promise.all([...failedOrderReadbacks.value].map(id => reconcileRemoteOrder(id, stillVisible)));
   }
 
   async function ensureRemoteOrder(id: string): Promise<Order | undefined> {
@@ -598,7 +614,7 @@ export const useOrders = defineStore("orders", () => {
     currentAccountBindingRevision,
     refreshRemote,
     loadMoreRemote,
-    ensureRemoteOrder, reconcileRemoteOrder,
+    ensureRemoteOrder, reconcileRemoteOrder, failedOrderReadbacks, retryOrderReadbacks,
   };
 });
 
