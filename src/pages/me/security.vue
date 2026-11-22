@@ -1096,7 +1096,9 @@ async function toggleTwoFactor(value: boolean) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
     console.warn("[security] 2FA challenge failed:", cause);
-    err.value = securityErrorMessage(cause);
+    // A failed send is an operation failure: one toast above the sheet (03 §3.5.1). The sheet stays open with the password
+    // kept, so 确认 sends the code again; nothing lands in the password sheet's error line.
+    toast.error(securityErrorMessage(cause));
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
@@ -1105,7 +1107,7 @@ async function toggleTwoFactor(value: boolean) {
 async function confirmTwoFactorChallenge() {
   if (securityBusy.value || overviewReadback.value || twoFactorTarget.value === null || !twoFactorChallengeNo.value) return;
   if (!/^\d{6}$/.test(twoFactorCode.value)) {
-    err.value = t.value.addrRebind.otpExpired;
+    toast.error(t.value.addrRebind.otpExpired);
     return;
   }
   const pageScope = securityPageFence.capture("two-factor-confirm");
@@ -1125,7 +1127,7 @@ async function confirmTwoFactorChallenge() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearSecurityAccountState();
     console.warn("[security] 2FA update failed:", cause);
-    err.value = securityErrorMessage(cause);
+    toast.error(securityErrorMessage(cause));
   } finally {
     if (isCurrentSecurityRequest(pageScope, accountScope, accountKey)) securityBusy.value = false;
   }
