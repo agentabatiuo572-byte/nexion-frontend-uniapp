@@ -2316,6 +2316,7 @@ export const kk: Messages = {
     detEstReturnsMeta: "Нақты төлем өзгеше болуы мүмкін",
     detMonthly: "Болж. айлық",
     detVsPhone: "салыстыру: телефоныңыз {n}",
+    detDailyEstimateLine: "Болжамды күндік табыс: ${n}",
     detHardware: "Жабдық",
     specTarget: "Мақсат {n}",
     detTrustedBy: "Қатысты материалдар",

@@ -2316,6 +2316,7 @@ export const id: Messages = {
     detEstReturnsMeta: "Pembayaran aktual bisa berbeda",
     detMonthly: "Est. bulanan",
     detVsPhone: "vs ponsel Anda {n}",
+    detDailyEstimateLine: "Perkiraan pendapatan harian: ${n}",
     detHardware: "Spesifikasi",
     specTarget: "Target {n}",
     detTrustedBy: "Materi terkait",

@@ -2316,6 +2316,7 @@ export const ms: Messages = {
     detEstReturnsMeta: "Bayaran sebenar mungkin berbeza",
     detMonthly: "Angg. bulanan",
     detVsPhone: "berbanding telefon anda {n}",
+    detDailyEstimateLine: "Anggaran pendapatan harian: ${n}",
     detHardware: "Perkakasan",
     specTarget: "Sasaran {n}",
     detTrustedBy: "Bahan berkaitan",

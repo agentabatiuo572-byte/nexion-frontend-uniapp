@@ -2316,6 +2316,7 @@ export const uz: Messages = {
     detEstReturnsMeta: "Toʻlov farq qilishi mumkin",
     detMonthly: "Taxminan oyiga",
     detVsPhone: "Telefoningiz bilan: {n}",
+    detDailyEstimateLine: "Taxminiy kunlik daromad: ${n}",
     detHardware: "Qurilma",
     specTarget: "Maqsad: {n}",
     detTrustedBy: "Tegishli hujjatlar",

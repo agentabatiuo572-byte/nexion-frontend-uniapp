@@ -2316,6 +2316,7 @@ export const ru: Messages = {
     detEstReturnsMeta: "Итог — по фактическим выплатам",
     detMonthly: "≈ в месяц",
     detVsPhone: "против телефона {n}",
+    detDailyEstimateLine: "Ожидаемый доход в день: ${n}",
     detHardware: "Оборудование",
     specTarget: "Цель {n}",
     detTrustedBy: "Материалы",
