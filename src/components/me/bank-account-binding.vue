@@ -53,7 +53,7 @@
         <view class="section-head"><text class="section-title">{{ c.verifyTitle }}</text><text class="hint">{{ c.verifyHint }}</text></view>
         <view class="group" role="group" :aria-label="c.reviewTitle" data-testid="bank-binding-review">
           <view class="review-row"><text>{{ c.oldAccount }}</text><text class="mono muted">{{ state.config.beneficiary.maskedAccount }}</text></view>
-          <view class="review-row"><text>{{ c.newAccount }}</text><text class="mono strong" data-testid="bank-review-account">{{ state.account.trim() }}</text></view>
+          <view class="review-row review-row--code"><text>{{ c.newAccount }}</text><NxCodeValue class="review-code" full data-testid="bank-review-account" :value="state.account.trim()" :label="c.newAccount" :copyable="false" /></view>
           <view class="review-row"><text>{{ c.holderLabel }}</text><text class="strong" data-testid="bank-review-holder">{{ state.holder.trim() }}</text></view>
           <view v-if="state.phase === 'details'" class="group-link" role="button" tabindex="0" data-testid="bank-bind-edit" @click="changeStep = 1" @keydown.enter.prevent="changeStep = 1" @keydown.space.prevent="changeStep = 1"><text>{{ c.editDetails }}</text></view>
         </view>
@@ -113,7 +113,7 @@
         <view class="sheet-handle" aria-hidden="true" />
         <view class="sheet-head"><text class="section-title" role="heading" aria-level="2">{{ c.reviewTitle }}</text><text class="hint">{{ c.reviewHint }}</text></view>
         <view class="group group--inset">
-          <view class="review-row"><text>{{ c.accountLabel }}</text><text class="mono strong" data-testid="bank-review-account">{{ review.account }}</text></view>
+          <view class="review-row review-row--code"><text>{{ c.accountLabel }}</text><NxCodeValue class="review-code" full data-testid="bank-review-account" :value="review.account" :label="c.accountLabel" :copyable="false" /></view>
           <view class="review-row"><text>{{ c.holderLabel }}</text><text class="strong" data-testid="bank-review-holder">{{ review.holder }}</text></view>
         </view>
         <text class="hint">{{ c.effectiveNote }}</text>
@@ -133,6 +133,7 @@ import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { apiClient } from "@/api/runtime";
@@ -325,8 +326,11 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .otp-send[aria-disabled="true"] { opacity: .5; }
 .review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 16px; border-bottom: 1px solid var(--v5-border); color: var(--v5-ink-3); font: 400 14px/20px var(--font-v5); overflow-wrap: break-word; }
 .review-row:last-child { border-bottom: 0; }
-/* The value (a typed account up to 32 digits, a holder name) gives way first and wraps; the label keeps whole words. */
+/* The holder name gives way first and wraps; the label keeps whole words. */
 .review-row > text:last-child { min-width: 0; }
+/* The new account is checked digit by digit: its own full line under the label, wrapping evenly (03 §3.6.1). */
+.review-row--code { flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; padding-block: 12px; }
+.review-code { color: var(--v5-ink); font-size: var(--ui-type-body); line-height: var(--ui-type-body-lh); font-weight: 500; letter-spacing: .03em; }
 .strong { color: var(--v5-ink); font-size: 15px; font-weight: 500; text-align: right; }
 .muted { color: var(--v5-ink-3); }
 .group-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); }
