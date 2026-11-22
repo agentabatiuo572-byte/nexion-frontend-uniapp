@@ -133,13 +133,15 @@ function reset() { generation += 1; detail.value = null; error.value = false; co
 async function load() {
   if (!visible) return;
   const request = ++generation, scope = identity();
-  loading.value = true; error.value = false;
+  // A failed read keeps its stale-snapshot state (greyed action and its reason) until a read succeeds, so a retry in
+  // flight does not re-enable the action on data that is still stale.
+  loading.value = true;
   const current = () => visible && generation === request && scope === identity();
   try {
     if (!remoteApiEnabled || !code) throw new Error("EVENT_UNAVAILABLE");
     const value = await api.detail(code, language.value);
     if (current()) {
-      detail.value = value;
+      detail.value = value; error.value = false;
       if ((unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && (value.userStatus === "CLAIMED" || (!!unconfirmedClaimKey && !(value.claimKeys ?? []).includes(unconfirmedClaimKey)))) || (unconfirmedAction === "remind" && value.reminderSubscribed)) {
         // A claim confirmed only by this read lost its receipt; a device it issued still has to reach the fleet.
         if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
