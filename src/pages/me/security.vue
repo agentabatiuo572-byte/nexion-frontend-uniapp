@@ -166,9 +166,9 @@
             <text v-if="twoFactorPasswordError" id="security-2fa-password-error" class="block" :style="errStyle" role="alert">{{ twoFactorPasswordError }}</text></view>
           <view v-if="remoteApiEnabled && twoFactorChallengeNo" class="security-field"><text class="security-field__label">{{ t.thirdParty.codeLabel }}</text>
             <input class="w-full" :style="pwdInputStyle" inputmode="numeric" :value="twoFactorCode" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" :aria-invalid="twoFactorCodeError ? 'true' : 'false'" :aria-describedby="twoFactorCodeError ? 'security-2fa-code-error' : undefined" maxlength="6" @input="onTwoFactorCode" />
-            <text class="block" :style="rowSubStyle">{{ fmt(t.addrRebind.otpBody, { phone: twoFactorPhoneMasked }) }}</text>
-            <!-- A code problem sits on the field with the resend right under it (03 §3.3); resend waits out the code's real validity
-                 (04 §4.6: the server gives no other limit) and shows the seconds left. -->
+            <text class="block" :style="rowSubStyle">{{ fmt(twoFactorResent ? t.security.twoFactorCodeResent : t.addrRebind.otpBody, { phone: twoFactorPhoneMasked }) }}</text>
+            <!-- A code problem sits on the field with the resend right under it (03 §3.3). Resend opens after a 60s cooldown and
+                 shows the seconds left; the code's own validity is separate (see startTwoFactorTimers). -->
             <text v-if="twoFactorCodeError" id="security-2fa-code-error" class="block" :style="errStyle" role="alert">{{ twoFactorCodeError }}</text>
             <view class="security-2fa-resend"><NxButton variant="text" size="small" :disabled="twoFactorResendLeft > 0 || securityBusy" :label="twoFactorResendLeft > 0 ? fmt(t.addrRebind.otpResendIn, { s: twoFactorResendLeft }) : t.addrRebind.otpResendCta" @click="resendTwoFactorCode" /></view></view>
         </view><template #footer><NxButton v-if="!twoFactorChallengeNo" variant="primary" :busy="securityBusy" @click="toggleTwoFactor(requestedTwoFactor)">{{ t.ui.confirm }}</NxButton><NxButton v-else-if="remoteApiEnabled && twoFactorChallengeNo" variant="primary" :busy="securityBusy" @click="confirmTwoFactorChallenge">{{ t.addrRebind.otpConfirmCta }}</NxButton></template></NxSheet>
@@ -376,22 +376,38 @@ const twoFactorPhoneMasked = ref("");
 const twoFactorTarget = ref<boolean | null>(null);
 const twoFactorCodeError = ref("");
 const twoFactorResendLeft = ref(0);
-let twoFactorResendTimer: ReturnType<typeof setInterval> | undefined;
-function stopTwoFactorResendCountdown() {
-  if (twoFactorResendTimer) clearInterval(twoFactorResendTimer);
-  twoFactorResendTimer = undefined;
+const twoFactorResent = ref(false);
+// Two separate deadlines. Resend opens after a short cooldown: the challenge API gives none, so a user whose SMS never
+// arrived waits 60s, not the code's validity. The code itself stays valid for expiresInSeconds; when that passes the
+// field says so. A new code replaces the old one on the server, and the line under the field says that.
+const TWO_FACTOR_RESEND_COOLDOWN_MS = 60_000;
+let twoFactorResendAt = 0;
+let twoFactorValidUntil = 0;
+let twoFactorTimer: ReturnType<typeof setInterval> | undefined;
+const twoFactorCodeExpired = () => twoFactorValidUntil > 0 && Date.now() >= twoFactorValidUntil;
+function stopTwoFactorTimers() {
+  if (twoFactorTimer) clearInterval(twoFactorTimer);
+  twoFactorTimer = undefined;
+  twoFactorResendLeft.value = 0;
+  twoFactorResendAt = 0;
+  twoFactorValidUntil = 0;
+}
+function tickTwoFactorTimers() {
+  const now = Date.now();
+  twoFactorResendLeft.value = Math.max(0, Math.ceil((twoFactorResendAt - now) / 1000));
+  if (now < twoFactorValidUntil) return;
+  twoFactorCodeError.value = t.value.addrRebind.otpExpired;
+  if (twoFactorTimer) clearInterval(twoFactorTimer);
+  twoFactorTimer = undefined;
   twoFactorResendLeft.value = 0;
 }
-// The code is valid for expiresInSeconds; when that runs out the field says so and resend opens.
-function startTwoFactorResendCountdown(seconds: number) {
-  stopTwoFactorResendCountdown();
-  twoFactorResendLeft.value = seconds;
-  twoFactorResendTimer = setInterval(() => {
-    twoFactorResendLeft.value -= 1;
-    if (twoFactorResendLeft.value > 0) return;
-    stopTwoFactorResendCountdown();
-    twoFactorCodeError.value = t.value.addrRebind.otpExpired;
-  }, 1000);
+function startTwoFactorTimers(validSeconds: number) {
+  stopTwoFactorTimers();
+  const now = Date.now();
+  twoFactorResendAt = now + TWO_FACTOR_RESEND_COOLDOWN_MS;
+  twoFactorValidUntil = now + validSeconds * 1000;
+  tickTwoFactorTimers();
+  twoFactorTimer = setInterval(tickTwoFactorTimers, 1000);
 }
 const deletionBalanceBlock = computed(() => {
   if (app.user.usdtBalance < 0) return "debt";
@@ -747,7 +763,7 @@ onHide(() => {
   clearSecurityAccountState(true);
 });
 onUnmounted(() => {
-  stopTwoFactorResendCountdown();
+  stopTwoFactorTimers();
   securityPageVisible = false;
   releaseActiveRefresh();
   clearSecurityAccountState();
@@ -965,7 +981,7 @@ function onTwoFactorPassword(e: Event) {
 }
 function onTwoFactorCode(e: Event) {
   twoFactorCode.value = detailVal(e).replace(/\D/g, "").slice(0, 6);
-  if (twoFactorResendLeft.value > 0) twoFactorCodeError.value = "";
+  if (!twoFactorCodeExpired()) twoFactorCodeError.value = "";
 }
 function onDeletionPassword(e: Event) {
   deletionPassword.value = detailVal(e);
@@ -1118,8 +1134,9 @@ async function toggleTwoFactor(value: boolean, resend = false) {
     twoFactorCode.value = "";
     twoFactorCodeError.value = "";
     twoFactorPasswordError.value = "";
-    startTwoFactorResendCountdown(challenge.expiresInSeconds);
-    toast.success(t.value.addrRebind.otpSendCta);
+    twoFactorResent.value = resend;
+    // The code field and its 「验证码已发送至…」 line are the result; no toast repeats it (03 §3.5.1, review I02).
+    startTwoFactorTimers(challenge.expiresInSeconds);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     // Only a real session loss (the client's auth kind) ends the account state. A 401 CURRENT_PASSWORD_INVALID is the
@@ -1161,11 +1178,11 @@ async function confirmTwoFactorChallenge() {
     // As on send: only the client's auth kind is a session loss; business 401s keep the sheet and its inputs.
     if (cause instanceof ApiError && cause.kind === "auth") clearSecurityAccountState();
     console.warn("[security] 2FA update failed:", cause);
-    // A wrong or expired code belongs to the field, and resend opens at once; a wrong current password goes on its field;
-    // other failures stay a toast (03 §3.5.1).
+    // A code problem belongs to the field. The server answers wrong and expired alike; a wrong code leaves the challenge
+    // open, so while the code is still valid the field says the code is wrong, after that that it expired. Neither
+    // touches the resend cooldown. A wrong current password goes on its field; other failures stay a toast (03 §3.5.1).
     if (isApiRefusal(cause, 401, "USER_TWO_FACTOR_OTP_INVALID_OR_EXPIRED") || isApiRefusal(cause, 422, "USER_TWO_FACTOR_OTP_REQUIRED")) {
-      stopTwoFactorResendCountdown();
-      twoFactorCodeError.value = t.value.bankBinding.otpInvalid;
+      twoFactorCodeError.value = twoFactorCodeExpired() ? t.value.addrRebind.otpExpired : t.value.security.twoFactorCodeWrong;
     } else if (isApiRefusal(cause, 401, "CURRENT_PASSWORD_INVALID")) {
       twoFactorPasswordError.value = securityErrorMessage(cause);
       twoFactorPasswordFocus.value = true;
@@ -1475,7 +1492,8 @@ function resendTwoFactorCode() {
   void toggleTwoFactor(twoFactorTarget.value, true);
 }
 function clearTwoFactorSheet() {
-  stopTwoFactorResendCountdown();
+  stopTwoFactorTimers();
+  twoFactorResent.value = false;
   twoFactorCodeError.value = "";
   twoFactorSheetOpen.value = false;
   twoFactorCode.value = "";

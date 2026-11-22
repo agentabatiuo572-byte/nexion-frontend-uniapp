@@ -75,7 +75,7 @@
     <view v-if="mode==='home'&&items.length>1" class="entry-pagination" role="button" tabindex="0" :aria-label="`${t.promotion.nextOffer} · ${activeIndex+1} / ${items.length}`" @click="cycleOffer(1)" @keydown.enter.prevent="cycleOffer(1)" @keydown.space.prevent="cycleOffer(1)" @keydown.right.prevent="cycleOffer(1)" @keydown.left.prevent="cycleOffer(-1)">
       <view v-for="(_,index) in items" :key="index" class="entry-page-dot" :class="{selected:activeIndex===index}" aria-hidden="true" />
     </view>
-    <NxButton v-if="hasMore&&mode==='events'" class="entry-cta" size="medium" :busy="status==='loading'" :label="status==='loading'?t.promotion.loading:t.promotion.more" icon="arrow-right" @click="load(false)"><text>{{ status==='loading'?t.promotion.loading:t.promotion.more }}</text></NxButton>
+    <NxButton v-if="hasMore&&mode==='events'" class="entry-cta" size="medium" :busy="status==='loading'" :label="t.promotion.more" :busy-label="t.promotion.loading" icon="arrow-right" @click="load(false)"><text>{{ t.promotion.more }}</text></NxButton>
     <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="termsText" :rules="termsRules" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>

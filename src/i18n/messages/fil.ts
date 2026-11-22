@@ -3232,6 +3232,8 @@ export const fil: Messages = {
     confirmPassword: "Ulitin ang bagong password",
     twoFactorCurrentPassword: "Kasalukuyang password (2FA)",
     twoFactorPasswordRequired: "Ilagay ang kasalukuyang password mo.",
+    twoFactorCodeWrong: "Mali ang code. Suriin ito at ilagay ulit.",
+    twoFactorCodeResent: "May bagong code na ipinadala sa {phone}. Hindi na gagana ang naunang code.",
     deletionPassword: "Kasalukuyang password (pag-delete)",
     deletionReasonLabel: "Dahilan ng pag-delete (opsyonal)",
     deletionReasonPlaceholder: "Sabihin sa amin kung bakit para mapabuti namin ang serbisyo",

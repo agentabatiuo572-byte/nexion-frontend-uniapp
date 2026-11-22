@@ -174,6 +174,9 @@ type LayerEntry = { id: number; layer: Layer };
 const layerEntries: LayerEntry[] = [];
 let entrySeq = 0;
 let currentMarker: number | null = null;
+// The router position of the entry the browser sits on, to tell a forward step from a back step.
+let currentPosition: unknown;
+const positionOf = (state: unknown): unknown => (state as { position?: unknown } | null)?.position;
 // Pops this guard caused itself, each with the layer entry it expected to start from ("any" for a correcting step).
 const ignoredPops: (number | "any")[] = [];
 // Router state (current, position) of page entries replaced away from under a layer entry.
@@ -208,9 +211,10 @@ export function installBrowserBackGuard(): void {
   if (browserBackGuarded || typeof window === "undefined") return;
   browserBackGuarded = true;
   currentMarker = markerOf(history.state);
+  currentPosition = positionOf(history.state);
   // Every entry the router or a layer pushes or replaces tells us whether the browser now sits on a layer entry.
   const push = history.pushState.bind(history), replace = history.replaceState.bind(history);
-  history.pushState = (state, title, url) => { push(state, title, url); currentMarker = markerOf(state); };
+  history.pushState = (state, title, url) => { push(state, title, url); currentMarker = markerOf(state); currentPosition = positionOf(state); };
   history.replaceState = (state, title, url) => {
     const before = history.state as { __nxLayer?: unknown; current?: unknown; position?: unknown } | null;
     let next = state;
@@ -224,12 +228,14 @@ export function installBrowserBackGuard(): void {
     }
     replace(next, title, url);
     currentMarker = markerOf(next);
+    currentPosition = positionOf(next);
   };
   uni.addInterceptor("navigateBack", { invoke() { appBackAt = Date.now(); } });
   window.addEventListener("popstate", (ev) => {
-    const from = currentMarker;
-    const landed = markerOf(ev.state);
+    const from = currentMarker, fromPosition = currentPosition;
+    const landed = markerOf(ev.state), landedPosition = positionOf(ev.state);
     currentMarker = landed;
+    currentPosition = landedPosition;
     if (ignoredPops.length) {
       const expected = ignoredPops.shift();
       ev.stopImmediatePropagation();
@@ -243,6 +249,21 @@ export function installBrowserBackGuard(): void {
       ev.stopImmediatePropagation();
       history.back();
       return;
+    }
+    // A forward step onto a layer entry whose layer is gone (it was closed by back or by code, and the browser kept the
+    // entry as a forward entry): there is nothing to reopen. Step back to where the user was, unseen by the router, so
+    // the route stays and the next back does one thing. Forward is a later router position, or on the same page a
+    // layer entry above the one left (a page entry sits below its layer entries).
+    if (landed !== null && !layerEntries.some((entry) => entry.id === landed)) {
+      const forward = typeof landedPosition === "number" && typeof fromPosition === "number" && landedPosition !== fromPosition
+        ? landedPosition > fromPosition
+        : from === null || landed > from;
+      if (forward) {
+        ev.stopImmediatePropagation();
+        ignoredPops.push(landed);
+        history.back();
+        return;
+      }
     }
     // The pop did not start on a layer entry: an ordinary page step for the router.
     if (from === null) return;

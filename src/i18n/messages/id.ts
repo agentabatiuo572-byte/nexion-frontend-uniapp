@@ -3232,6 +3232,8 @@ export const id: Messages = {
     confirmPassword: "Konfirmasi kata sandi baru",
     twoFactorCurrentPassword: "Kata sandi saat ini (2FA)",
     twoFactorPasswordRequired: "Masukkan kata sandi saat ini.",
+    twoFactorCodeWrong: "Kode salah. Periksa lalu masukkan lagi.",
+    twoFactorCodeResent: "Kode baru telah dikirim ke {phone}. Kode sebelumnya tidak berlaku lagi.",
     deletionPassword: "Kata sandi saat ini untuk hapus akun",
     deletionReasonLabel: "Alasan penghapusan (opsional)",
     deletionReasonPlaceholder: "Beri tahu alasannya agar kami bisa memperbaiki layanan",

@@ -131,7 +131,7 @@
         <text v-else-if="submitBlocker || pack.materialRevision > 0" class="amb-bar__why nx-tray-note">{{ submitBlocker || c.resubmitHint }}</text>
         <view class="amb-bar__row">
           <NxButton v-if="editedBeyondCategory || editRequested" variant="secondary" :label="c.discard" :disabled="saving || picking || !!pendingSubmission" @click="discardChanges" />
-          <NxButton class="amb-bar__main" variant="primary" :label="saving ? c.saving : c.submit" :disabled="!!submitBlocker" :busy="saving" @click="save" />
+          <NxButton class="amb-bar__main" variant="primary" :label="c.submit" :busy-label="c.saving" :disabled="!!submitBlocker" :busy="saving" @click="save" />
         </view>
       </AmbassadorActionBar>
       <AmbassadorActionBar v-else-if="pack && row && editable">

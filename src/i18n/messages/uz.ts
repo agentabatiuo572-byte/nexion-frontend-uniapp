@@ -3232,6 +3232,8 @@ export const uz: Messages = {
     confirmPassword: "Yangi parolni tasdiqlang",
     twoFactorCurrentPassword: "2FA uchun joriy parol",
     twoFactorPasswordRequired: "Joriy parolingizni kiriting.",
+    twoFactorCodeWrong: "Kod notoʻgʻri. Tekshirib, qayta kiriting.",
+    twoFactorCodeResent: "Yangi kod yuborildi: {phone}. Oldingi kod endi yaroqsiz.",
     deletionPassword: "Akkauntni oʻchirish uchun joriy parol",
     deletionReasonLabel: "Oʻchirish sababi (ixtiyoriy)",
     deletionReasonPlaceholder: "Nega ketayotganingizni yozing — bu bizga yaxshilanishga yordam beradi",
