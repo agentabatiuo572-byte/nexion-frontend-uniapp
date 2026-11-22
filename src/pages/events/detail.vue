@@ -179,6 +179,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commandError.value && !loadi
 <style scoped>
 .event-detail { padding:0 16px 28px; color:var(--v5-ink); }
 .event-section { margin-top:12px; padding:16px; border-radius:var(--nx-glass-radius); background:var(--nx-glass-fill); box-shadow:var(--nx-glass-edge); }
+/* Content cards are solid (01 §1.1.2): .nx-glass-card is the flat content surface; light adds the general light shadow. */
+[data-theme="light"] .event-section:not(.event-section--plain) { box-shadow:var(--v5-glass-shadow); }
 .event-section--plain { padding:var(--ui-space-inset) 0; border-radius:0; background:transparent; box-shadow:none; border-top:1px solid var(--v5-border); }
 .event-title { display:block; font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .event-heading { display:block; font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
