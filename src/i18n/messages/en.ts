@@ -4191,7 +4191,7 @@ timeHoursAgo: "{n}h ago",
       direct: "Friend purchase reward",
       peer: "Same-rank reward",
       pool: "Team incentive pool",
-      votes: "votes",
+      votes: "vote|votes",
       peerNotDispatched: "{n}% · not open yet",
     },
     cond: {

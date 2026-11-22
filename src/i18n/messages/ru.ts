@@ -4518,7 +4518,7 @@ export const ru: Messages = {
       direct: "За покупки друзей",
       peer: "За равный ранг",
       pool: "Пул наград команды",
-      votes: "голосов",
+      votes: "голос|голоса|голосов",
       peerNotDispatched: "{n}% · пока закрыто",
     },
     cond: {
