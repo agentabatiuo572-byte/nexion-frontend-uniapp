@@ -156,7 +156,7 @@
       <!-- The order's next actions sit in the thumb zone at the bottom of the page (DS-30), whatever its state. -->
       <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
-          <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
+          <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel nx-reverse-action" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
           <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
         </template>
         <template v-else-if="needsRecovery">
@@ -1238,9 +1238,6 @@ const sectionLabelStyle: CSSProperties = {
 .order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
 .order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
 /* Paired buttons share a card row, so they take the M side padding (16px) to fit two labels. */
-/* Cancelling is a reverse action (user): a short quiet text at the tray's left, so 继续支付 is the one clear action. */
-.order-sticky > .order-hero__cancel { flex: 0 0 auto; }
-.order-sticky .order-hero__cancel, .order-sticky.nx-glass-bar > .order-hero__cancel.nx-button--secondary :deep(.nx-button__surface) { color: var(--v5-ink-3); font: 400 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
 /* Progress track: 24px steps joined by 2px segments; done segments grow in (DS-29). */
 .order-track { display: grid; margin-top: 20px; }
 .order-track__step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; text-align: center; }
