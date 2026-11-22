@@ -8,25 +8,25 @@
         <text class="event-title">{{ detail.event.title }}</text>
         <text class="event-copy">{{ detail.event.subtitle }}</text>
         <text v-if="detail.event.kind==='seasonal'&&detail.rules.voucherId" class="event-copy">{{ copy.voucherTerms }}</text>
-        <text class="event-status" role="status">{{ copy.eligibility[detail.eligibilityReason] }}</text>
+        <NxTag class="event-status" role="status" wrap :tone="eligibilityTone[detail.eligibilityReason]" :label="copy.eligibility[detail.eligibilityReason]" />
         <text v-if="detail.reminderSubscribed" class="event-copy" role="status">{{ reminderCopy.subscribed }}</text>
         <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, locale.code) }}</text></view>
         <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
       </view>
       <view v-if="detail.rewards.length" class="nx-glass-card event-section">
-        <text class="event-heading">{{ copy.rewards }}</text>
-        <text v-for="(reward, index) in detail.rewards" :key="index" class="event-copy">{{ reward.type === 'USDT' ? `${reward.pool ? `${copy.labels.poolUsdt} · ` : ''}${formatUsd(reward.quantity ?? reward.amount, 'detail')}` : eventDetailReward(reward, copy) }}</text>
+        <text class="event-card-title">{{ copy.rewards }}</text>
+        <text v-for="(reward, index) in detail.rewards" :key="index" class="event-reward">{{ reward.type === 'USDT' ? `${reward.pool ? `${copy.labels.poolUsdt} · ` : ''}${formatUsd(reward.quantity ?? reward.amount, 'detail')}` : eventDetailReward(reward, copy) }}</text>
       </view>
       <view v-if="ruleRows.length" class="event-section event-section--plain">
         <text class="event-heading">{{ copy.rules }}</text>
         <view v-for="row in ruleRows" :key="row.label" class="event-row" :class="{'event-rule-paragraph':[copy.labels.description,copy.labels.terms].includes(row.label)}"><text>{{ row.label }}</text><text>{{ row.value }}</text></view>
       </view>
       <view v-if="detail.event.kind !== 'regional' && detail.targetValue > 0" class="event-section event-section--plain">
-        <view class="event-row"><text class="event-heading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
+        <view class="event-row"><text class="event-subheading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
         <view class="event-progress" role="progressbar" :aria-label="copy.progress" :aria-valuenow="Math.min(detail.progressValue, detail.targetValue)" :aria-valuemin="0" :aria-valuemax="detail.targetValue"><view v-viz-inview class="nx-viz-grow" :style="{ width: `${Math.min(100, detail.progressValue / detail.targetValue * 100)}%` }" /></view>
       </view>
       <view v-if="detail.myRewardAmount != null" class="nx-glass-card event-section">
-        <view class="event-row"><text class="event-heading">{{ copy.myReward }}</text><text>{{ formatUsd(detail.myRewardAmount, 'detail') }}</text></view>
+        <view class="event-row"><text class="event-subheading">{{ copy.myReward }}</text><text>{{ formatUsd(detail.myRewardAmount, 'detail') }}</text></view>
       </view>
       <view v-if="detail.results.length || detail.event.state === 'ended'" class="event-section event-section--plain">
         <text class="event-heading">{{ copy.results }}</text>
@@ -38,9 +38,12 @@
           <view v-if="result.rewardAmount != null" class="event-row"><text>{{ detail.event.kind === 'regional' ? copy.regionPrize : copy.prize }}</text><text>{{ formatUsd(result.rewardAmount, 'detail') }}</text></view>
         </view>
       </view>
-      <text v-if="commandError" class="event-copy" role="alert">{{ copy.pending }}</text>
-      <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
-      <NxButton v-else-if="action" class="event-navigate" variant="primary" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
+      <text v-if="commandError && !action" class="event-copy" role="alert">{{ copy.pending }}</text>
+      <view v-if="action" class="event-bar nx-glass-bar">
+        <text v-if="commandError" class="nx-tray-note" role="alert">{{ copy.pending }}</text>
+        <NxButton v-if="action==='open'" variant="primary" size="large" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
+        <NxButton v-else variant="primary" size="large" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
+      </view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
   </view></AppChassis>
@@ -55,10 +58,11 @@ import { useT } from "@/i18n/use-t";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
+import NxTag from '@/components/ui/nx-tag.vue';
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { apiClient, eventsApi, remoteApiEnabled } from "@/api/runtime";
 import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
-import { createEventDetailApi, type EventDetail } from "@/api/event-detail-api";
+import { createEventDetailApi, type EventDetail, type EventEligibilityReason } from "@/api/event-detail-api";
 import { useApp } from "@/store/app";
 import { useLocaleStore } from "@/store/locale";
 import { eventDetailCopy } from "@/i18n/event-detail";
@@ -78,6 +82,14 @@ const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
 const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);
+// State tag tones (03 §3.8): claimable success, running but not met warning, closed or done neutral; 「暂未开放」-type
+// unavailability takes the spec's unavailable tone (neutral fill, auxiliary text).
+const eligibilityTone: Record<EventEligibilityReason, "success" | "warning" | "neutral" | "unavailable"> = {
+  READY: "success", IN_PROGRESS: "warning", NOT_ELIGIBLE: "warning",
+  NOT_STARTED: "neutral", ENDED: "neutral", CLAIMED: "neutral",
+  VOUCHER_NOT_STARTED: "neutral", VOUCHER_EXPIRED: "neutral", VOUCHER_ALREADY_USED: "neutral", VOUCHER_EXHAUSTED: "neutral",
+  DISABLED: "unavailable", VOUCHER_UNAVAILABLE: "unavailable",
+};
 let code = "", visible = false, generation = 0;
 let unconfirmedAction: "join" | "claim" | "remind" | null = null;
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
@@ -140,17 +152,29 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-detail { padding:0 16px 28px; color:var(--v5-ink); }
 .event-section { margin-top:12px; padding:16px; border-radius:var(--nx-glass-radius); background:var(--nx-glass-fill); box-shadow:var(--nx-glass-edge); }
 .event-section--plain { padding:var(--ui-space-inset) 0; border-radius:0; background:transparent; box-shadow:none; border-top:1px solid var(--v5-border); }
-.event-title { display:block; font-size:20px; font-weight:600; line-height:1.4; overflow-wrap:break-word; }
+.event-title { display:block; font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .event-heading { display:block; font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
-.event-copy { display:block; margin-top:10px; font-size:var(--ui-type-list-subtitle); line-height:1.6; color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:break-word; }
-.event-status { display:block; margin-top:12px; font-size:12px; color:var(--v5-brand); }
-.event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font-size:12px; line-height:1.5; }
-.event-row > text:last-child { min-width:0; overflow-wrap:break-word; color:var(--v5-ink-2); }
-.event-progress { margin-top:12px; height:5px; border-radius:5px; overflow:hidden; background:var(--v5-brand-soft); }
-.event-progress > view { height:100%; background:var(--v5-brand); }
+.event-card-title { display:block; font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.event-subheading { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
+.event-copy { display:block; margin-top:10px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:break-word; }
+.event-title + .event-copy { margin-top:4px; }
+.event-reward { display:block; margin-top:12px; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
+.event-reward + .event-reward { margin-top:8px; }
+.event-status { margin-top:12px; }
+.event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.event-row > text:first-child:not(.event-subheading) { color:var(--v5-ink-3); }
+.event-row > text:last-child { min-width:0; overflow-wrap:break-word; color:var(--v5-ink); }
+.event-progress { margin-top:12px; height:4px; border-radius:4px; background:color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.event-progress > view { position:relative; height:100%; border-radius:inherit; background:linear-gradient(90deg, color-mix(in srgb, var(--v5-brand) 12%, transparent), color-mix(in srgb, var(--v5-brand) 70%, transparent)); }
+.event-progress > view::after { content:""; position:absolute; top:50%; right:-3px; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
-.event-navigate { margin-top:16px; width:100%; }
+/* The main action floats in the shared bottom bar (04 §4.0); the content clears it: 48 + 22 + 16 for the lone button,
+   the tray's own height + 38 once the pending note sits above it. */
+.event-detail:has(> .event-bar) { padding-bottom:calc(48px + var(--nx-tray-bottom) + 16px); }
+.event-detail:has(> .event-bar > .nx-tray-note) { padding-bottom:calc(92px + 38px); }
+.event-bar { position:absolute; z-index:36; display:flex; flex-direction:column; }
+.event-bar > .nx-button { width:100%; }
 .event-rule-paragraph { display:block; }
 .event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:break-word; }
-.event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2); }
+.event-row.event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2);font:var(--ui-type-long-form-weight) var(--ui-type-long-form)/var(--ui-type-long-form-lh) var(--font-v5); }
 </style>
