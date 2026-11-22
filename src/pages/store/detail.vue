@@ -608,7 +608,7 @@ function publishStickyCTA() {
       if(!allowed){
         const warming = promotionStatus.value === 'loading' && canPreviewPromotion(activity.value) && !!activity.value?.productNos.includes(product.value.id);
         const label = warming ? activity.value?.eligibility === 'SIGN_IN_REQUIRED' ? t.value.promotion.signIn : t.value.store.cardBuyNow : t.value.promotion.unavailable;
-        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:warming ? isShare.value ? undefined : `${t.value.bundle.estimatedDaily}: $${dailyYieldText.value}` : t.value.promotion.disabledNote,buttonLabel:label,disabled:true,showTabBar:false},stickyOwner);
+        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:warming ? isShare.value ? undefined : fmt(t.value.store.detDailyEstimateLine, { n: dailyYieldText.value }) : t.value.promotion.disabledNote,buttonLabel:label,disabled:true,showTabBar:false},stickyOwner);
         return;
       }
       if(activity.value?.eligibility==='SIGN_IN_REQUIRED'){
@@ -670,7 +670,7 @@ function publishStickyCTA() {
       href: isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1 ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value,voucherContext.value) : `/pages/store/checkout?product=${product.value.id}`,
       quantity: { value:qty.value,min:1,max:maxQuantity.value,decrease:dec,increase:inc },
       amount: `${priceText.value}`,
-      amountSubtext: isShare.value ? undefined : `${t.value.bundle.estimatedDaily}: $${dailyYieldText.value}`,
+      amountSubtext: isShare.value ? undefined : fmt(t.value.store.detDailyEstimateLine, { n: dailyYieldText.value }),
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);

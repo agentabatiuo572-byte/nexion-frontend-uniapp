@@ -2322,6 +2322,7 @@ export const fil: Messages = {
     detEstReturnsMeta: "Batay sa aktuwal na payout",
     detMonthly: "Tantiya kada buwan",
     detVsPhone: "vs iyong phone {n}",
+    detDailyEstimateLine: "Tinatayang kita kada araw: ${n}",
     detHardware: "Hardware",
     specTarget: "Target {n}",
     detTrustedBy: "Kaugnay na materyales",
