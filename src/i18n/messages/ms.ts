@@ -2294,6 +2294,7 @@ export const ms: Messages = {
     computePointsPerShare: "Setiap bahagian menambah {n} mata pengkomputeran pasukan",
     bestSeller: "Terlaris",
     trending: "Sohor kini",
+    badgeRecommended: "Disyorkan",
     goalFocusTitle: "Daripada matlamat pendapatan",
     goalFocusLocated: "Matlamat pendapatan anda mengesyorkan {name}. Ia ditandakan di bawah.",
     goalFocusUnavailable: "Matlamat pendapatan anda mengesyorkan {name}, tetapi ia tidak boleh dibeli sekarang. Peranti di bawah boleh dibeli hari ini.",
