@@ -201,9 +201,10 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row { position: relative; min-width: 0; padding: 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); box-shadow: var(--v5-glass-shadow); }
 /* The device is the card's visual anchor: the catalog art leaves about 40% empty around the machine, so the square
    image is as wide as the art column (the Rack's 87%-wide body still fits) and the column is only as tall as the
-   machine; the transparent margins overlap the card padding. */
-.device-inventory-row__head { display: grid; grid-template-columns: 100px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
-.device-inventory-row__art { position: relative; display: grid; place-items: center; width: 100px; height: 56px; }
+   machine; the transparent margins overlap the card padding. The column bleeds 12px into that padding so the name
+   column keeps its width. */
+.device-inventory-row__head { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.device-inventory-row__art { position: relative; display: grid; place-items: center; width: 100px; height: 56px; margin-left: -12px; }
 .device-inventory-row__image { position: absolute; left: 0; top: 50%; display: block; width: 100px; height: 100px; transform: translateY(-56%); pointer-events: none; }
 .device-inventory-row__art--inactive .device-inventory-row__image { filter: grayscale(.85); opacity: .55; }
 .device-inventory-row__identity { min-width: 0; }
@@ -252,8 +253,8 @@ async function chooseMenu(action: "toggle" | "tradein") {
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @keyframes device-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
 @media (max-width: 374px) {
-  .device-inventory-row__head { grid-template-columns: 84px minmax(0, 1fr) auto; gap: 10px; }
-  .device-inventory-row__art { width: 84px; height: 48px; }
+  .device-inventory-row__head { grid-template-columns: 76px minmax(0, 1fr) auto; gap: 10px; }
+  .device-inventory-row__art { width: 84px; height: 48px; margin-left: -8px; }
   .device-inventory-row__image { width: 84px; height: 84px; }
 }
 @media (prefers-reduced-motion: reduce) { .device-inventory-row__eq > view { animation: none; } .device-inventory-row__fill { transition: none; } }
