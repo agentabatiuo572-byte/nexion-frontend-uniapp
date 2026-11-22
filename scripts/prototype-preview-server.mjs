@@ -86,7 +86,7 @@ const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
 // Runs in every App page before the App starts (design rule at demoSeedFleet). It drops the records of another
 // scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
-function previewScenarioPage(scenario,keys,purchaseCashierPrefix){
+function previewScenarioPage(scenario,keys,purchaseCashierPrefix,eventScene){
   // Keep the bank top-up placeholder on its current page.
   window.navigation?.addEventListener('navigate',event=>{if(event.destination.url==='https://api.hdpayadmin.com/pay/demo-preview-only')event.preventDefault();});
   // The app validates the hosted address first. Rewrite it before assigning the iframe's source.
@@ -96,6 +96,8 @@ function previewScenarioPage(scenario,keys,purchaseCashierPrefix){
     iframeSrc.set.call(this,local);
   }});
   if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
+  // An Activity preset replaces the event scene without a new scenario: the event commands awaiting confirmation go with it.
+  if(localStorage.getItem('uvel-preview-event-scene')!==eventScene){localStorage.removeItem('uvel-event-pending-accounts-v1');localStorage.setItem('uvel-preview-event-scene',eventScene);}
   const follow=value=>{if(value&&value!==scenario)location.reload();};
   // Once another page has entered a new scenario the shared records are that scenario's: this page may neither write nor
   // remove them. A page still alone in the old scenario writes freely, and the next load of the new one clears its records.
@@ -158,7 +160,7 @@ function selectedSupportAccount(url) {
 }
 function scenarioSeed(url) {
   const sample=state.messageState==='transferred'?selectedSupportAccount(url)?.supportTransferSample:null;
-  return '<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+');'
+  return '<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+','+JSON.stringify(scenarioId()+':'+(state.eventSceneEpoch??0))+');'
     +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(sample??null)+','+JSON.stringify(demoAccountId)+');</script>';
 }
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
@@ -279,6 +281,8 @@ const server=http.createServer(async(req,res)=>{
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
+        // A new Activity preset is a new event scene: pages drop the event commands of the old one (previewScenarioPage).
+        if(update.eventState)state.eventSceneEpoch=(state.eventSceneEpoch??0)+1;
         if(update.eventState||scenarioChange)setDemoH4Scene(state,now);
         const rewardSelection=demoOptions.promotionRewardState.find(([value])=>value===update.promotionRewardState);
         if(rewardSelection||update.reset||scenarioChange){
