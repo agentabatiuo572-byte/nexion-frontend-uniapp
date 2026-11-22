@@ -10,7 +10,7 @@ import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewa
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
 import { disabledLongOptions, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
-import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
+import { beginDelayedDemoH4EventCommand, demoH4EventCommandResponse, initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { restoreSupportConversationNumbers, setTransferSampleOutcome, supportStateFor } from './lib/prototype-demo-support.mjs';
@@ -385,6 +385,8 @@ const server=http.createServer(async(req,res)=>{
       const walletBillsRead=req.method==='GET'&&url.pathname==='/api/app/wallet/bills';
       if((businessRead||walletBillsRead)&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
       if(businessRead&&state.dataState==='loading')await new Promise(resolve=>setTimeout(resolve,5000));
+      const eventCommand=demoH4EventCommandResponse(url,req.method,state,req.headers);
+      if(eventCommand)return sendJson(res,eventCommand,eventCommand.code||200);
       // A material read that answers late with the facts it saw when it arrived (simulates a GET overtaken by a POST).
       if(req.method==='GET'&&state.ambassadorIoState==='late-read-once'&&/^\/api\/app\/team\/ambassador-applications\/\d+\/materials$/.test(url.pathname)){
         state.ambassadorIoState='normal';
@@ -403,6 +405,11 @@ const server=http.createServer(async(req,res)=>{
       }
       let body='';for await(const chunk of req)body+=chunk;
       if(staleWrite())return refuseStale();
+      const delayedEvent=beginDelayedDemoH4EventCommand(url,req.method,state,req.headers,Date.now());
+      if(delayedEvent){
+        await new Promise(resolve=>setTimeout(resolve,5000));
+        if(staleWrite()||delayedEvent!==state.h4Events)return refuseStale();
+      }
       if (withdrawalRequest) {
         const response = withdrawalRecoveryResponse(state, url.pathname, req.method, req.headers, JSON.parse(body || '{}'));
         return sendJson(res, response.body, response.status);

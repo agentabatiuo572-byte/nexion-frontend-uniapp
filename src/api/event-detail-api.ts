@@ -21,6 +21,39 @@ export interface EventDetail {
   reminderSubscribed?: boolean;
   voucher?: EventVoucher | null;
 }
+type EventCommandOperation = "join" | "claim" | "reminder";
+type EventCommandReceipt =
+  | { status: "NOT_FOUND" | "PROCESSING" | "UNKNOWN" }
+  | { status: "SUCCEEDED"; rewardType?: string }
+  | { status: "FAILED"; error: ApiError };
+
+function parseCommandReceipt(value: unknown, status: number, code: string, operation: EventCommandOperation): EventCommandReceipt {
+  const invalid = () => new ApiError({ kind: "protocol", message: "EVENT_COMMAND_RECEIPT_INVALID" });
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid();
+  const receipt = value as { status?: unknown; result?: unknown; error?: unknown };
+  if (status === 404 && receipt.status === "NOT_FOUND") return { status: "NOT_FOUND" };
+  if (status !== 200) throw invalid();
+  if (receipt.status === "PROCESSING" || receipt.status === "UNKNOWN") return { status: receipt.status };
+  if (receipt.status === "SUCCEEDED" && receipt.result && typeof receipt.result === "object" && !Array.isArray(receipt.result)) {
+    const result = receipt.result as { eventId?: unknown; status?: unknown; rewardType?: unknown };
+    if (result.eventId !== code) throw invalid();
+    if (operation === "claim" && typeof result.rewardType === "string" && result.rewardType) {
+      return { status: "SUCCEEDED", rewardType: result.rewardType };
+    }
+    if ((operation === "join" && result.status === "JOINED") || (operation === "reminder" && result.status === "SUBSCRIBED")) {
+      return { status: "SUCCEEDED" };
+    }
+  }
+  if (receipt.status === "FAILED" && receipt.error && typeof receipt.error === "object" && !Array.isArray(receipt.error)) {
+    const error = receipt.error as { code?: unknown; message?: unknown };
+    if (typeof error.code === "number" && Number.isInteger(error.code) && error.code >= 400 && error.code <= 599
+      && typeof error.message === "string" && /^[A-Z][A-Z0-9_]{0,127}$/.test(error.message)) {
+      return { status: "FAILED", error: new ApiError({ kind: "http", status: error.code, code: error.code, message: error.message }) };
+    }
+  }
+  throw invalid();
+}
+
 function record(value: unknown): Record<string, any> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new ApiError({ kind: "protocol", message: "EVENT_DETAIL_INVALID" });
   return value as Record<string, any>;
@@ -82,6 +115,13 @@ export function createEventDetailApi(client: ApiClient) {
     const result = parseEventDetail(await client.request({ method: "GET", path: `/api/events/${encodeURIComponent(code)}/detail?locale=${encodeURIComponent(locale)}` }));
     if (result.event.eventCode !== code) throw new ApiError({ kind: "protocol", message: "EVENT_DETAIL_SCOPE_MISMATCH" });
     return result;
+  }, commandReceipt: (code: string, operation: EventCommandOperation, key: string): Promise<EventCommandReceipt> => {
+    return client.request({
+      method: "GET", path: `/api/events/${encodeURIComponent(code)}/commands/${operation}`, idempotencyKey: key,
+      headers: { "Cache-Control": "no-store" },
+      acceptedResponses: [{ status: 404, code: 404, message: "EVENT_COMMAND_NOT_FOUND" }],
+      parseResponseData: (value, status) => parseCommandReceipt(value, status, code, operation),
+    });
   }, remind: async (code: string, key: string) => {
     const result = record(await client.request({ method: "POST", path: `/api/events/${encodeURIComponent(code)}/reminder`, idempotencyKey: key }));
     if (result.eventId !== code || result.status !== "SUBSCRIBED") throw new ApiError({ kind: "protocol", message: "EVENT_REMINDER_INVALID" });

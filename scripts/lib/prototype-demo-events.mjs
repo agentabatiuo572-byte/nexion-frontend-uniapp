@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
+import { previewAccountId } from './prototype-demo-identity.mjs';
 // Shared facts for the managed activities in the loopback preview.
 const day=86400000;
 const teamCalendar=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -6,6 +7,57 @@ export const demoTeamBusinessDate=at=>teamCalendar.format(at);
 const localized=(locale,zh,en,vi)=>locale==='zh'?zh:locale==='vi'?vi:en;
 const date=ms=>new Date(ms).toISOString();
 const reject=(message,status=409)=>{throw Object.assign(new Error(message),{status});};
+const commandOperations=['join','claim','reminder'];
+const readCommandKey=headers=>(headers['idempotency-key']||headers['Idempotency-Key'])?.trim();
+
+function eventCommandReceiptKey(state,headers,eventId,operation) {
+  const owner=previewAccountId(state,headers),key=readCommandKey(headers);
+  return owner&&key ? JSON.stringify([owner,eventId,operation,key]) : null;
+}
+
+export function demoH4EventCommandResponse(url,method,state,headers) {
+  const match=url.pathname.match(/^\/api\/events\/([^/]+)\/commands\/([^/]+)$/);
+  if(!match)return undefined;
+  if(method!=='GET')reject('METHOD_NOT_ALLOWED',405);
+  if(!previewAccountId(state,headers))reject('AUTH_REQUIRED',401);
+  const eventId=decodeURIComponent(match[1]),operation=match[2],key=readCommandKey(headers);
+  if(!commandOperations.includes(operation))reject('EVENT_COMMAND_OPERATION_UNSUPPORTED',422);
+  if(!key)reject('IDEMPOTENCY_KEY_REQUIRED',422);
+  if(key.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
+  const receipt=state.h4Events?.commandReceipts?.[eventCommandReceiptKey(state,headers,eventId,operation)];
+  return receipt ? {code:0,message:'OK',data:receipt} : {code:404,message:'EVENT_COMMAND_NOT_FOUND',data:{status:'NOT_FOUND'}};
+}
+
+// Opt-in at the loopback request boundary so the receipt can be read while the write is in flight.
+export function beginDelayedDemoH4EventCommand(url,method,state,headers,now) {
+  if(method!=='POST'||headers['x-preview-delay-event-command']!=='1')return null;
+  const match=url.pathname.match(/^\/api\/events\/(demo-[^/]+)\/(join|claim|reminder)$/);
+  if(!match)return null;
+  const [,eventId,operation]=match;
+  if(!events.some(([code])=>eventId==='demo-'+code)||state.dataState==='empty'||state.eventState==='empty')return null;
+  const key=eventCommandReceiptKey(state,headers,eventId,operation);
+  if(!key||readCommandKey(headers).length>128)return null;
+  const record=scene(state,now),receipts=record.commandReceipts??={};
+  if(receipts[key])return null;
+  receipts[key]={status:'PROCESSING'};
+  return record;
+}
+
+function recordEventCommand(state,record,headers,eventId,operation,execute) {
+  const key=eventCommandReceiptKey(state,headers,eventId,operation);
+  if(!key)return execute();
+  const receipts=record.commandReceipts??={};
+  try {
+    const result=execute();
+    receipts[key]={status:'SUCCEEDED',result};
+    return result;
+  } catch(error) {
+    if(Number.isInteger(error.status)&&error.status>=400&&error.status<600) {
+      receipts[key]={status:'FAILED',error:{code:error.status,message:error.message}};
+    }
+    throw error;
+  }
+}
 
 const rulesByCode={
   upgrade:{promotionActivityId:'demo-promo-0'},
@@ -378,7 +430,8 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
   if(empty)return {events:[],serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
   const read=action==='detail'||action==='spin/state';
   if(!list&&request.method()!==(read?'GET':'POST'))reject('METHOD_NOT_ALLOWED',405);
-  const commandKey=(request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'])?.trim();
+  const headers=request.headers?.()??{};
+  const commandKey=readCommandKey(headers);
   if(action==='claim'||action==='spin'){
     if(!commandKey)reject('IDEMPOTENCY_KEY_REQUIRED',422);
     if(commandKey.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
@@ -407,17 +460,17 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
       progressValue:event.progressValue,targetValue:event.targetValue,rewards:rewards(rules),results:[],myRewardAmount:null,
       userStatus:event.userStatus,claimKeys,voucher,reminderSubscribed:record.reminders.includes(code)};
   }
-  if(action==='join'){
-    if(!ongoing)reject('EVENT_NOT_OPEN');
-    if(!record.joined.includes(code))record.joined.push(code);
-    return {eventId:id,status:'JOINED'};
-  }
-  if(action==='reminder'){
-    if(event.state!=='upcoming')reject('EVENT_REMINDER_NOT_AVAILABLE');
-    if(!record.reminders.includes(code))record.reminders.push(code);
-    return {eventId:id,status:'SUBSCRIBED'};
-  }
-  if(action==='claim'){
+  if(commandOperations.includes(action))return recordEventCommand(state,record,headers,id,action,()=>{
+    if(action==='join'){
+      if(!ongoing)reject('EVENT_NOT_OPEN');
+      if(!record.joined.includes(code))record.joined.push(code);
+      return {eventId:id,status:'JOINED'};
+    }
+    if(action==='reminder'){
+      if(event.state!=='upcoming')reject('EVENT_REMINDER_NOT_AVAILABLE');
+      if(!record.reminders.includes(code))record.reminders.push(code);
+      return {eventId:id,status:'SUBSCRIBED'};
+    }
     const previous=record.claims[code];
     if(commandKey&&previous?.key===commandKey)return previous.result;
     if(event.state==='upcoming')reject('EVENT_NOT_OPEN');
@@ -429,7 +482,7 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
       if(!hasGiftStock(products.find(product=>product.id===rules.giftProductNo),rules))reject('H4_EVENT_GIFT_STOCK_UNAVAILABLE');
     }
     return award(state,code,now,commandKey);
-  }
+  });
   const serverDate=date(now).slice(0,10),nextResetAtUtc=date(Date.parse(serverDate)+day);
   const freeAvailable=ongoing&&!record.spins.some(({result})=>result.spinDate===serverDate&&result.sourceType==='DAILY');
   const bonusTickets=ongoing?Math.max(0,spinTickets-record.spins.filter(({result})=>result.sourceType==='BONUS').length):0;
