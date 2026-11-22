@@ -2292,6 +2292,7 @@ export const fil: Messages = {
     computePointsPerShare: "Bawat share ay nagdadagdag ng {n} pts ng compute sa team mo",
     bestSeller: "Pinakamabenta",
     trending: "Trending",
+    badgeRecommended: "Rekomendado",
     goalFocusTitle: "Mula sa iyong target na kita",
     goalFocusLocated: "Inirekomenda ng iyong target na kita ang {name}. Naka-highlight ito sa ibaba.",
     goalFocusUnavailable: "Inirekomenda ng iyong target na kita ang {name}, pero hindi ito mabibili ngayon. Nasa ibaba ang mga device na mabibili mo ngayon.",

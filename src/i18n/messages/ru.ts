@@ -2292,6 +2292,7 @@ export const ru: Messages = {
     computePointsPerShare: "Каждая доля: +{n} оч. мощности команде",
     bestSeller: "Хит продаж",
     trending: "В тренде",
+    badgeRecommended: "Рекомендуем",
     goalFocusTitle: "Для вашей цели по доходу",
     goalFocusLocated: "Для вашей цели по доходу рекомендуем {name}. Устройство выделено ниже.",
     goalFocusUnavailable: "Для вашей цели рекомендовано {name}, но сейчас его нельзя купить. Ниже — устройства, доступные сегодня.",

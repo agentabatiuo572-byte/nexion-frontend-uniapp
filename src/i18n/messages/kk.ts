@@ -2292,6 +2292,7 @@ export const kk: Messages = {
     computePointsPerShare: "Әр үлес командаңызға {n} есептеу ұпайын қосады",
     bestSeller: "Хит",
     trending: "Танымал",
+    badgeRecommended: "Ұсынылады",
     goalFocusTitle: "Табыс мақсатыңыздан",
     goalFocusLocated: "Табыс мақсатыңыз {name} құрылғысын ұсынды. Ол төменде белгіленген.",
     goalFocusUnavailable: "Табыс мақсатыңыз {name} құрылғысын ұсынды, бірақ оны қазір сатып алу мүмкін емес. Бүгін сатып алуға болатын құрылғылар төменде.",
@@ -2476,7 +2477,7 @@ export const kk: Messages = {
       },
       "stellarbox-pro-v2": {
         tagline: "Өткізу қабілеті S1 моделінен 2.5 есе жоғары",
-        badge: "Жақсартуға ұсынылады",
+        badge: "Жаңарту таңдауы",
       },
       "stellarrack-p1": {
         tagline: "Тәжірибелі операторларға арналған деректер орталығы деңгейіндегі A100 тірегі.",
