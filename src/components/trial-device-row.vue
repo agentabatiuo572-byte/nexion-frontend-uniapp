@@ -2,8 +2,8 @@
   <view v-if="presentation.active.value" ref="loopRef" class="trial-device-row" :class="[`trial-device-row--${variant}`, { 'nx-glass-card': variant === 'inventory', 'nx-loops-paused': !loops.running.value }]" data-trial-device-row="true" data-device-key="trial:current">
     <view class="trial-device-row__heading" :role="variant === 'inventory' ? undefined : 'button'" :tabindex="variant === 'inventory' ? undefined : '0'" :aria-label="`${copy.details}: ${presentation.deviceName.value || '—'} · ${statusText} · ${presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining} ${remainingText}`" :aria-expanded="variant === 'earn' ? isExpanded : undefined" :aria-controls="variant === 'earn' ? `trial-device-details-${variant}` : undefined" @click="onRowClick" @keydown.enter.stop.prevent="onRowClick" @keydown.space.stop.prevent="onRowClick">
       <view class="trial-device-row__main">
-        <view class="trial-device-row__art" aria-hidden="true"><image v-if="productMedia" class="trial-device-row__image" :src="productMedia.src" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view>
-        <view class="trial-device-row__identity"><text class="trial-device-row__name">{{ presentation.deviceName.value || '—' }}</text><NxTag v-if="variant === 'inventory'" class="trial-device-row__tag" tone="brand">{{ copy.imageBadge }}</NxTag><text class="trial-device-row__status" :class="{ 'trial-device-row__status--online': isOnline }">{{ statusText }}</text></view>
+        <view class="trial-device-row__visual"><view class="trial-device-row__art" aria-hidden="true"><image v-if="productMedia" class="trial-device-row__image" :src="productMedia.src" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view><NxTag v-if="variant === 'inventory'" class="trial-device-row__tag" tone="brand">{{ copy.imageBadge }}</NxTag></view>
+        <view class="trial-device-row__identity"><text class="trial-device-row__name">{{ presentation.deviceName.value || '—' }}</text><text class="trial-device-row__status" :class="{ 'trial-device-row__status--online': isOnline }">{{ statusText }}</text></view>
       </view>
       <view class="trial-device-row__summary">
         <view class="trial-device-row__time"><text>{{ presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining }}</text><text class="trial-device-row__remaining">{{ remainingText }}</text></view>
@@ -133,13 +133,16 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__heading:active { opacity:1; }
 .trial-device-row--inventory .trial-device-row__chevron { display:none; }
 .trial-device-row--inventory .trial-device-row__image-badge { display:none; }
-/* Name and trial tag (NxTag, 03 §3.8) share a line while they fit; otherwise the whole tag moves under the name, so it
-   never runs into the remaining time on the right in any language (03 §3.6.1). */
+/* The name wraps at word boundaries and never runs into the remaining time on the right (03 §3.6.1); the trial tag
+   sits on the art instead (see .trial-device-row__visual). */
 .trial-device-row--inventory .trial-device-row__identity { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
 .trial-device-row--inventory .trial-device-row__identity > .trial-device-row__name { min-width:0; max-width:100%; overflow-wrap:break-word; }
 .trial-device-row--inventory .trial-device-row__identity > .trial-device-row__status { flex-basis:100%; margin-top:0; }
 .trial-device-row--inventory .trial-device-row__time > text { overflow-wrap:break-word; }
 /* Same art band as the warehouse device cards: the square catalog image spans the column, the band is the machine's height. */
+/* The trial tag sits on the art's top-right corner, as on the warehouse bay: NxTag on an opaque surface, over the art. */
+.trial-device-row__visual { position:relative; display:flex; flex:none; }
+.trial-device-row--inventory .trial-device-row__tag { position:absolute; z-index:1; top:-6px; right:0; background:linear-gradient(var(--v5-brand-soft),var(--v5-brand-soft)),var(--v5-surface); }
 .trial-device-row--inventory .trial-device-row__art { width:100px; height:56px; margin-left:-12px; margin-right:-12px; overflow:visible; }
 .trial-device-row--inventory .trial-device-row__image { position:absolute; left:0; top:50%; width:100px; height:100px; transform:translateY(-56%); pointer-events:none; }
 .trial-device-row--inventory .trial-device-row__name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
