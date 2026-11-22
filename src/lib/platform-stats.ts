@@ -186,6 +186,11 @@ export function networkPopulationBand(value: number, locale: LocaleCode): string
     : value >= 100 ? `${Math.floor(value / 100) * 100}+` : '<100';
 }
 
+/** Store heat figures (sold, viewing, sold in 24h/30m): under 100 exact, from 100 the count band above. */
+export function storeHeatFigure(value: number, locale: LocaleCode): string {
+  return value < 100 ? String(value) : networkPopulationBand(value, locale);
+}
+
 /**
  * Platform-wide display amounts (cumulative paid out) use the same floor-to-band idea, in K/M/B in every language:
  * $3,000 → $3.0K+, $236,400 → $236K+, $1,284,650 → $1.2M+, $850 → $800+, under $100 → <$100.

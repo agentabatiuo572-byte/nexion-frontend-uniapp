@@ -245,6 +245,7 @@ import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
 import { useEarnConfig } from "@/store/earn-config";
 import { useLocaleStore } from "@/store/locale";
+import { storeHeatFigure } from "@/lib/platform-stats";
 import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
@@ -537,7 +538,8 @@ const faqs = computed(() => {
 const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock > 0 && product.value.stock < 50,
 );
-const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
+// Store heat figure: exact under 100, the platform band from 100 (storeHeatFigure).
+const soldText = computed(() => storeHeatFigure(product.value?.sold ?? 0, locale.code));
 // Per-unit team compute points: a quiet product fact, not personal data, so the hide-stats eye does not mask it.
 const computePointsLine = computed(() => {
   const points = product.value?.computePoints;
