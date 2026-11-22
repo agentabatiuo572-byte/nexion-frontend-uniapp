@@ -93,7 +93,6 @@
           <text v-if="order.paymentStatus==='PENDING'&&payWindow!==true" class="promotion-notice">{{ p.unknown }}</text>
 
           <view class="promotion-link" role="button" tabindex="0" @click="viewOrder"><text>{{ p.viewOrder }}</text></view>
-          <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
         </template>
         <template v-else-if="!unknown">
           <text v-if="quote&&!quoteFresh" class="promotion-notice">{{ p.quoteExpired }}</text>
@@ -818,6 +817,10 @@ const footer = computed(() => {
     label: t.value.myDevices.inventoryTitle, disabled: !visible.value||leaving.value,
     action: () => navTo('/pages/me/devices'), note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
   if (!order.value) return { amount, amountValue, currency, label: p.value.confirmOrder, disabled: rawAmount==null||!canCreate.value||leaving.value, action: createOrder, note: checkoutQuoteBlockCopy(quoteBlock.value,t.value) };
+  // Original order refunded, cancelled or expired: 再买一单 is the page's main action, so it sits in the bottom bar (04 §4.0)
+  // as a lone floating button; the old order's amount is not this purchase's total, so the bar shows no amount.
+  if (order.value.paymentStatus !== 'PAID' && !openedOriginal && !props.orderNo && props.items.length && canStartNew.value)
+    return { amount, amountValue, currency, amountless: true, label: p.value.buyAgain, disabled: busy.value||leaving.value, action: startNewPurchase };
   return null;
 });
 const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
