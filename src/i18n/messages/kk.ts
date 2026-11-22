@@ -2557,7 +2557,7 @@ export const kk: Messages = {
     gateSoldOut: "Осы кезеңде сатылып кетті",
     temporarilyOutOfStock: "Уақытша қоймада жоқ",
     gateBlockedToast: "Шарт орындалмады — қалай ашуға болатынын қараңыз",
-    gateSoldOutToast: "Осы кезеңде сатылып кетті",
+    gateSoldOutToast: "Сату квотасы қалмады",
     purchaseEligibilityCheck: "Сатып алу шарттарын тексеру",
     purchaseEligibilityLoading: "Сатып алу шарттары тексерілуде…",
     purchaseEligibilityIneligible: "Сатып алу шарты орындалмады",

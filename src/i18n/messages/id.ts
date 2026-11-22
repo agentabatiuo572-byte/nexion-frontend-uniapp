@@ -2557,7 +2557,7 @@ export const id: Messages = {
     gateSoldOut: "Habis periode ini",
     temporarilyOutOfStock: "Stok sedang habis",
     gateBlockedToast: "Belum memenuhi syarat — lihat cara membuka",
-    gateSoldOutToast: "Habis untuk periode ini",
+    gateSoldOutToast: "Kuota penjualan habis",
     purchaseEligibilityCheck: "Cek kelayakan pembelian",
     purchaseEligibilityLoading: "Memeriksa kelayakan pembelian…",
     purchaseEligibilityIneligible: "Belum memenuhi syarat beli",

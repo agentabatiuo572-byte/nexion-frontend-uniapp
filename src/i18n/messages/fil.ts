@@ -2557,7 +2557,7 @@ export const fil: Messages = {
     gateSoldOut: "Ubos na ngayong cycle",
     temporarilyOutOfStock: "Pansamantalang ubos ang stock",
     gateBlockedToast: "Hindi pa kwalipikado — tingnan kung paano i-unlock",
-    gateSoldOutToast: "Ubos na ngayong cycle",
+    gateSoldOutToast: "Ubos na ang quota ng benta",
     purchaseEligibilityCheck: "Suriin kung puwedeng bumili",
     purchaseEligibilityLoading: "Sinusuri ang eligibility sa pagbili…",
     purchaseEligibilityIneligible: "Hindi kwalipikadong bumili",
