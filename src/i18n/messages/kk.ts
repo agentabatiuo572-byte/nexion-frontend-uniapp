@@ -2565,7 +2565,7 @@ export const kk: Messages = {
     purchaseEligibilityRetry: "Шарттарды қайта тексеру",
     purchaseEligibilityProductPolicy: "Сатып алу шарттары",
     purchaseEligibilityQuotaDepleted: "Сату квотасы қалмады",
-    purchaseMonthlyQuotaDepleted: "Осы айдағы квота бітті. Келесі айда қайта сатып алуға болады.",
+    purchaseMonthlyQuotaDepleted: "Осы айдағы квота бітті.",
     trialProductUnavailable: "Сынақ құрылғысы уақытша қоймада жоқ. Кейінірек қайталап көріңіз.",
     productUnavailable: "Бұл тауар уақытша қолжетімсіз. Дүкенге оралып, қайталап көріңіз.",
     tickerBought: "сатып алды",
