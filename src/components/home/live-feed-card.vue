@@ -235,8 +235,9 @@ function goAll() {
 .nx-home-live-feed :deep(.nx-feed-figure) { display:flex;flex-direction:column;align-items:flex-end; }
 .nx-home-live-feed :deep(.nx-feed-pct) { font:500 14px/20px var(--font-metric);color:var(--ui-device-ink); }
 .nx-home-live-feed :deep(.nx-feed-est) { font:400 12px/18px var(--font-metric);color:var(--v5-ink-3);white-space:nowrap; }
-.nx-home-live-feed :deep(.nx-feed-progress) { position:absolute;left:0;right:0;bottom:var(--v5-space-2);height:4px;overflow:hidden;border-radius:999px;background:var(--v5-surface-3); }
-.nx-home-live-feed :deep(.nx-feed-progress__fill) { height:100%;border-radius:inherit;background:var(--ui-device-ink);transition:width 1s linear; }
+/* Shared thin bar (.nx-progress in tokens.css) in the device hue that the row's icon and percentage use. */
+.nx-home-live-feed :deep(.nx-feed-progress) { position:absolute;left:0;right:0;bottom:var(--v5-space-2);--nx-progress-hue:var(--ui-device-ink); }
+.nx-home-live-feed :deep(.nx-feed-progress__fill) { transition:width 1s linear; }
 .nx-home-live-feed :deep(.nx-feed-state) { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);min-height:64px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .nx-home-live-feed :deep(.nx-feed-retry) { display:inline-flex;align-items:center;min-height:44px;padding:0 12px;font:500 13px/18px var(--font-v5);color:var(--v5-brand); }
 .nx-home-feed-footer { display:flex;justify-content:flex-end; }
