@@ -3,6 +3,7 @@ import { asApiError, isAmbiguousEnvelopeOutcome } from "@/api/errors";
 import type { eventDetailCopy } from "@/i18n/event-detail";
 import { formatAmount } from "@/lib/amount-display";
 import { promotionStoreHref } from "@/lib/promotion-entry";
+import { promotionLandingHref } from "@/lib/promotion-landing";
 
 export function eventDetailRules(rules: EventDetail["rules"], copy: typeof eventDetailCopy.en) {
   return Object.entries(copy.labels).flatMap(([key, label]) => {
@@ -22,7 +23,7 @@ export function eventClaimCommandKey(code: string, claimKeys: readonly string[] 
 }
 export function eventDetailHref(detail: EventDetail): string {
   if(detail.event.kind==='seasonal'&&typeof detail.rules.voucherId==='string'&&detail.rules.voucherId.trim())return promotionStoreHref(undefined,{voucherId:detail.rules.voucherId,upgradeActivityId:typeof detail.rules.promotionActivityId==='string'?detail.rules.promotionActivityId:undefined});
-  if (["discount", "seasonal"].includes(detail.event.kind) && typeof detail.rules.promotionActivityId === "string" && detail.rules.promotionActivityId) return promotionStoreHref(detail.rules.promotionActivityId);
+  if (["discount", "seasonal"].includes(detail.event.kind) && typeof detail.rules.promotionActivityId === "string" && detail.rules.promotionActivityId) return promotionLandingHref(detail.rules.promotionActivityId);
   if (detail.event.kind === "regional") return "";
   return detail.event.href;
 }
