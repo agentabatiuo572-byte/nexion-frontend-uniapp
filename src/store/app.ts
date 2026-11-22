@@ -485,9 +485,6 @@ export const useApp = defineStore("app", () => {
     remoteTaskForegroundEpoch += 1;
     if (foreground) {
       remoteTaskSyncAfter = 0;
-      visibleTaskReadAfter = 0;
-      taskAssignmentSnapshot = null;
-      invalidateRemoteFleet();
       void syncRemoteTaskAssignments();
     }
   }
@@ -928,7 +925,7 @@ export const useApp = defineStore("app", () => {
       remoteAssignmentError.value = "";
       if (inventoryOnly) return;
       await Promise.allSettled([
-        refreshRemoteFleet(request, { coalesce: true }),
+        ensureRemoteFleet(),
         refreshHomeTruth(request),
       ]);
     } catch (cause) {
@@ -954,7 +951,7 @@ export const useApp = defineStore("app", () => {
     remoteTaskSyncAfter = calledAt + REMOTE_TASK_SYNC_MS;
     try {
       if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch || !remoteAccountEpoch.isCurrent(request)) return;
-      if (!remoteFleetHasSnapshot.value) await refreshRemoteFleet(request, { coalesce: true });
+      if (!remoteFleetHasSnapshot.value) await ensureRemoteFleet();
       await refreshVisibleTaskAssignments();
     } finally {
       if (remoteTaskSyncInFlightKey === syncKey) remoteTaskSyncInFlightKey = null;
