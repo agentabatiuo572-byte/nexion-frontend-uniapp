@@ -17,6 +17,11 @@ export function landingKind(activity: Pick<PublicPromotion, 'template'>): Landin
 export function promotionLandingHref(activityId: string): string {
   return '/pages/events/promotion-detail?id=' + encodeURIComponent(activityId);
 }
+/** Every running template has its own activity page; referral and bundle join the purchase offers. */
+export type ActivityPageKind = LandingKind | 'referral' | 'bundle';
+export function activityPageKind(activity: Pick<PublicPromotion, 'template'>): ActivityPageKind | null {
+  return landingKind(activity) ?? (activity.template === 'DIRECT_REFERRAL' ? 'referral' : activity.template === 'MULTI_PRODUCT' ? 'bundle' : null);
+}
 
 // The store catalog is read for a signed-in session only. Anonymous visitors get the
 // bundled artwork for a known SKU and no catalog name or price.
