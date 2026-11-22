@@ -77,7 +77,7 @@ import { navTo, takeNavigationQuery } from "@/lib/route";
 import { displayDeadline } from "@/lib/promotion-display";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
-import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref, eventCommandFailure } from "./event-detail-display";
+import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref, eventCommandFailure, isEventNotFound } from "./event-detail-display";
 import { toast } from "@/store/ui";
 import { forgetPendingEventCommand, readPendingEventCommand, rememberPendingEventCommand } from "@/lib/event-pending-command";
 import { uiLocale, serverLanguage } from "@/i18n";
@@ -162,7 +162,13 @@ async function load() {
         void forgetPendingEventCommand(app.accountKey, code);
       }
     }
-  } catch (cause) { if (current()) { error.value = true; if (!isTransientReadFailure(cause)) detail.value = null; } }
+  } catch (cause) {
+    if (current()) {
+      error.value = true; if (!isTransientReadFailure(cause)) detail.value = null;
+      // The event no longer exists: a command on it has nothing left to confirm. This is not its success.
+      if (isEventNotFound(cause)) { commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = ""; void forgetPendingEventCommand(app.accountKey, code); }
+    }
+  }
   finally { if (current()) loading.value = false; }
 }
 async function run() {
