@@ -472,7 +472,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   return devices;
 }
 // The authoritative fleet from the retained state, independent of presentation knobs.
-export function demoFleetFacts(url,locale,state) {
+export function demoFleetFacts(url,locale,state,eventOwner) {
   // Initialize sample orders and the trial before projecting the fleet.
   const trialSlotCount=demoTrialSlots(url,locale,state);
   const now=Date.now(),products=demoProducts(state,url.origin);
@@ -499,7 +499,7 @@ export function demoFleetFacts(url,locale,state) {
   if(!state.promotionGift&&state.promotionRewardState!=='CANCELLED'&&demoAccountOrders(url,locale,state,now)
       .some(order=>order.orderNo===demoPromotionGift.orderNo&&order.paymentStatus==='PAID'))reservedSlotCount+=demoPromotionGift.quantity;
   const roster=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
-  const eventGift=demoH4Gift(state);
+  const eventGift=demoH4Gift(state,eventOwner);
   const gifts=[eventGift&&{...eventGift.result.receipt,at:eventGift.at,deviceIds:eventGift.deviceIds},state.promotionGift];
   for(const gift of gifts){
     if(!gift)continue;
@@ -1328,7 +1328,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       count+(type==='SPIN'&&demoMilestoneClaimed(state,index+1)?amount:0),0);
     const cardGrantBefore=state.streakSaverBalance==null?0:demoH4Savers(state);
     const eventResponse=demoH4EventResponse(url,contentLocale,state,request,now,{
-      fleet:()=>demoFleetFacts(url,locale,state),
+      fleet:owner=>demoFleetFacts(url,locale,state,owner),
       promotion:id=>demoFixture(new URL('/api/promotions/'+id,url.origin),locale,state,request),
       products,spinTickets,
     });
@@ -1464,7 +1464,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
   }
   if(pathname==='/api/devices/earnings') {
-    const facts=demoFleetFacts(url,locale,state);
+    const facts=demoFleetFacts(url,locale,state,previewAccountId(state,request.headers?.()??{}));
     const active=facts.devices.filter(device=>device.activatedAt!==null);
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
     const data=base();data.walletUsdt=demoWalletUsdt(state);data.walletNex=demoWalletNex(state,now);data.userJoinedAt=demoH4Account(state).createdAt;
