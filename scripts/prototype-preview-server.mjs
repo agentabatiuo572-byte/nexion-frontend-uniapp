@@ -372,7 +372,7 @@ const server=http.createServer(async(req,res)=>{
       const delayedEvent=beginDelayedDemoH4EventCommand(url,req.method,state,req.headers,Date.now());
       if(delayedEvent){
         await new Promise(resolve=>setTimeout(resolve,5000));
-        if(staleWrite()||delayedEvent!==state.h4Events)return refuseStale();
+        if(staleWrite()||delayedEvent.record!==state.h4Events)return refuseStale();
       }
       if (withdrawalRequest) {
         const response = withdrawalRecoveryResponse(state, url.pathname, req.method, req.headers, JSON.parse(body || '{}'));
@@ -390,7 +390,7 @@ const server=http.createServer(async(req,res)=>{
       if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
       for(const route of [...routes].reverse()) {
         if(route.matcher!=='**/*'&&!route.matcher(url))continue;
-        await route.handler({request:()=>({url:()=>url.href,method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>JSON.parse(body||'{}')}),fulfill:async response=>{res.writeHead(response.status||200,{'Content-Type':response.contentType||mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(response.body);},continue:async()=>{}});
+        await route.handler({request:()=>({url:()=>url.href,method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>JSON.parse(body||'{}'),delayedEvent}),fulfill:async response=>{res.writeHead(response.status||200,{'Content-Type':response.contentType||mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(response.body);},continue:async()=>{}});
         if(res.writableEnded)return;
       }
       return sendJson(res,{code:404,message:'暂无演示内容',data:null},404);
