@@ -866,7 +866,7 @@ export const useApp = defineStore("app", () => {
     return `${request.accountKey}:${request.epoch}:${remoteTaskForegroundEpoch}:${taskAssignmentReadEpoch}`;
   }
 
-  function readRemoteTaskAssignments(request: RemoteAccountRequest): Promise<CanonicalTaskAssignments> {
+  function readRemoteTaskAssignments(request: RemoteAccountRequest, bypassTransientBackoff = false): Promise<CanonicalTaskAssignments> {
     const readEpoch = taskAssignmentReadEpoch;
     const key = taskAssignmentReadKey(request);
     const foregroundEpoch = remoteTaskForegroundEpoch;
@@ -878,7 +878,10 @@ export const useApp = defineStore("app", () => {
     if (taskAssignmentSnapshotInFlight?.key === key)
       return taskAssignmentSnapshotInFlight.request;
     const failure = taskAssignmentFailure?.key === key ? taskAssignmentFailure : null;
-    if (failure && now < failure.after) return Promise.reject(failure.cause);
+    if (failure && now < failure.after
+      && !(bypassTransientBackoff && isTransientReadFailure(failure.cause) && !isHttpReadRateLimit(failure.cause))) {
+      return Promise.reject(failure.cause);
+    }
     const requireCurrent = () => {
       if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
       if (foregroundEpoch !== remoteTaskForegroundEpoch) throw new Error("REMOTE_FOREGROUND_CHANGED");
@@ -1162,7 +1165,7 @@ export const useApp = defineStore("app", () => {
 
   async function refreshRemoteFleet(
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
-    options: RemoteFleetRefreshOptions = {},
+    options: RemoteFleetRefreshOptions & { retryTransientAssignments?: boolean } = {},
   ): Promise<boolean> {
     // A request captured for a previous account must not disturb the current account's fleet reads.
     if (!remoteAccountEpoch.isCurrent(request)) return false;
@@ -1200,7 +1203,7 @@ export const useApp = defineStore("app", () => {
         remoteAssignmentStatus.value = "loading";
         remoteAssignmentError.value = "";
         const [fleetResult, assignmentResult] = await Promise.allSettled([
-          deviceE3Api.fleet(), readRemoteTaskAssignments(request),
+          deviceE3Api.fleet(), readRemoteTaskAssignments(request, options.retryTransientAssignments),
         ]);
         if (!remoteAccountEpoch.isCurrent(request)
           || !isCurrentRuntimeRevision(runScope)
@@ -1269,7 +1272,7 @@ export const useApp = defineStore("app", () => {
           && remoteFleetRefreshCoordinator.isCurrent(lease)
           && refreshSequence != null
           && refreshSequence === remoteFleetRefreshSequence) {
-          return refreshRemoteFleet(request, options);
+          return refreshRemoteFleet(request, { ...options, retryTransientAssignments: false });
         }
         if (remoteAccountEpoch.isCurrent(request)
           && isCurrentRuntimeRevision(runScope)
