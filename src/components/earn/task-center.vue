@@ -13,7 +13,7 @@
       <text class="earn-tc__title" role="heading" aria-level="2">{{ t.earn.taskCenter }}</text>
       <view class="earn-tc__pulse">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--v5-tech-cyan)"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
-        <text class="earn-tc__count">{{ activeJobsText }}</text>
+        <NxTickNumber class="earn-tc__count" :text="activeJobsText" />
         <text>{{ t.earn.jobsLive }}</text>
       </view>
     </view>
@@ -104,6 +104,9 @@ import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import TaskV2Status from "@/components/earn/task-v2-status.vue";
 import ComputeSettlements from "@/components/earn/compute-settlements.vue";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
+import { networkPopulationBand } from "@/lib/platform-stats";
+import { useLocaleStore } from "@/store/locale";
 
 import { toast } from "@/store/ui";
 
@@ -131,7 +134,9 @@ onHide(() => {
   receiptRequestEpoch += 1;
 });
 useHomeDisplay(() => remoteApiEnabled);
-const activeJobsText = computed(() => app.activeJobsDisplay?.toLocaleString() ?? "—");
+const locale = useLocaleStore();
+// Global jobs are a platform figure: the 06 §6.4 band, rolling when the band changes.
+const activeJobsText = computed(() => app.activeJobsDisplay == null ? null : networkPopulationBand(app.activeJobsDisplay, locale.code));
 function receiptFor(id: string): Receipt | undefined {
   return receipts?.byId(id);
 }

@@ -171,12 +171,31 @@ export function compactNumber(n: number): string {
   return n.toLocaleString();
 }
 
-/** Public population display: floor validated counts to a shared approximate band. */
+/**
+ * Platform-wide display counts (online nodes, centre nodes, global jobs, registered users) never show the exact
+ * figure: floor to a band. Chinese uses W/K (13045 → 1.3W+, 3206 → 3.2K+); other languages K/M (13K+, 3.2K+).
+ * One decimal stays on the decimal tiers so a band change only rolls the changed digit.
+ */
 export function networkPopulationBand(value: number, locale: LocaleCode): string {
+  const tenth = (n: number) => (Math.floor(n) / 10).toFixed(1);
   if (locale !== "zh" && value >= 10000) {
-    return value >= 1000000 ? `${Math.floor(value / 100000) / 10}M+` : `${Math.floor(value / 1000)}K+`;
+    return value >= 1000000 ? `${tenth(value / 100000)}M+` : `${Math.floor(value / 1000)}K+`;
   }
-  return value >= 10000 ? `${Math.floor(value / 1000) / 10}W+`
-    : value >= 1000 ? `${Math.floor(value / 100) / 10}K+`
+  return value >= 10000 ? `${tenth(value / 1000)}W+`
+    : value >= 1000 ? `${tenth(value / 100)}K+`
     : value >= 100 ? `${Math.floor(value / 100) * 100}+` : '<100';
+}
+
+/**
+ * Platform-wide display amounts (cumulative paid out) use the same floor-to-band idea, in K/M/B in every language:
+ * $3,000 → $3.0K+, $236,400 → $236K+, $1,284,650 → $1.2M+, $850 → $800+, under $100 → <$100.
+ * `dollar: false` returns the figure for a caller that writes its own unit (… USDT).
+ */
+export function platformAmountBand(amount: number, dollar = true): string {
+  const v = Math.floor(amount), tenth = (n: number) => (Math.floor(n) / 10).toFixed(1);
+  const band = v >= 1e9 ? `${tenth(v / 1e8)}B+` : v >= 1e6 ? `${tenth(v / 1e5)}M+`
+    : v >= 1e4 ? `${Math.floor(v / 1e3)}K+` : v >= 1e3 ? `${tenth(v / 100)}K+`
+    : v >= 100 ? `${Math.floor(v / 100) * 100}+` : null;
+  if (band === null) return dollar ? "<$100" : "<100";
+  return dollar ? `$${band}` : band;
 }
