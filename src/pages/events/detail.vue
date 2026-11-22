@@ -149,12 +149,15 @@ async function load() {
     const value = await api.detail(code, language.value);
     if (current()) {
       detail.value = value; error.value = false;
-      if ((unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && (value.userStatus === "CLAIMED" || (!!unconfirmedClaimKey && !(value.claimKeys ?? []).includes(unconfirmedClaimKey)))) || (unconfirmedAction === "remind" && value.reminderSubscribed)) {
+      // Success is said only on positive evidence: claimed, joined, subscribed. A claim key that left claimKeys only shows
+      // the reward is not claimable now (a tiered claim's tier taken, or eligibility lost), so it ends the check quietly.
+      const confirmed = (unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && value.userStatus === "CLAIMED") || (unconfirmedAction === "remind" && !!value.reminderSubscribed);
+      const claimKeyGone = unconfirmedAction === "claim" && !!unconfirmedClaimKey && !(value.claimKeys ?? []).includes(unconfirmedClaimKey);
+      if (confirmed || claimKeyGone) {
         // A claim confirmed only by this read lost its receipt; a device it issued still has to reach the fleet.
         if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
-        // The result the server confirmed is said once (03 §3.5.2 提交结果未知); a read that only shows the action gone says
-        // nothing, since it does not show a refusal.
-        toast.success(unconfirmedAction === "claim" ? copy.value.eligibility.CLAIMED : unconfirmedAction === "remind" ? reminderCopy.value.subscribed : copy.value.joined);
+        // The result the server confirmed is said once (03 §3.5.2 提交结果未知).
+        if (confirmed) toast.success(unconfirmedAction === "claim" ? copy.value.eligibility.CLAIMED : unconfirmedAction === "remind" ? reminderCopy.value.subscribed : copy.value.joined);
         commandError.value = false; unconfirmedAction = null; unconfirmedClaimKey = "";
         void forgetPendingEventCommand(app.accountKey, code);
       } else if (unconfirmedAction && (eventDetailAction(value) !== unconfirmedAction || !readPendingEventCommand(app.accountKey, code))) {
