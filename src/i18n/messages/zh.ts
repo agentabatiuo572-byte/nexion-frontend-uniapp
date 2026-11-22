@@ -3260,8 +3260,8 @@ earningsMilestone: "收益里程碑 ${threshold}",
     statusChargeback: "付款争议",
     // 列表页把 payment_failed / provisioning_failed 两种失败合并显示;详情页仍分别用上面两条
     statusFailedShort: "处理失败",
-    provisioningHint: "正在 {dc} 分配机位…",
-    activatedHint: "已在 {dc} 激活 · 收益以实际到账为准",
+    provisioningHint: "正在{dc}分配机位…",
+    activatedHint: "已在{dc}激活 · 收益以实际到账为准",
     dataCenter: "数据中心",
     eta: "预计上线",
     // legacy(仅类型兼容,UI 不再展示):

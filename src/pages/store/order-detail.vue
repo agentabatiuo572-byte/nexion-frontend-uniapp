@@ -749,7 +749,8 @@ const dataCenterLabel = computed(() => {
   const name = dc.toLowerCase();
   if (name === "frankfurt" || name === "frankfurt dc") return t.value.store.coDcFrankfurt;
   if (name === "singapore" || name === "singapore dc") return t.value.store.coDcSingapore;
-  return dc;
+  // Chinese runs straight into a Chinese place name; a Latin name the server sends as is keeps a space on each side.
+  return locale.code === "zh" ? ` ${dc} ` : dc;
 });
 const dynamicHint = computed(() => {
   const o = order.value;

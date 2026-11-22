@@ -20,7 +20,7 @@ export const trialPurchaseCopy = {
     confirmTitle: '确认购买 {device}', confirmPay: '从钱包支付 {amount}\u00A0USDT', confirmCredit: '购后到账 {rewards}',
     confirmRun: '支付成功后设备立即开始运行，试用随之结束。',
     refundClause: '试用购机退款时，购机时发放的试用奖励随退款收回。',
-    resultTitle: '购买成功', resultRunning: '{device} 已在 {dc} 开始运行', resultRunningNoDc: '{device} 已开始运行',
+    resultTitle: '购买成功', resultRunning: '{device} 已在{dc}开始运行', resultRunningNoDc: '{device} 已开始运行',
     resultCredited: '试用奖励已到账', resultUsdt: 'USDT 余额', resultUvt: 'UVT 余额',
     resultPaid: '实付', resultSaved: '共节省', resultDevices: '查看我的设备', resultOrder: '查看订单',
     orderPaid: '实付', orderTrialReward: '试用奖励到账', orderRewardsReversed: '试用奖励已随退款收回',
