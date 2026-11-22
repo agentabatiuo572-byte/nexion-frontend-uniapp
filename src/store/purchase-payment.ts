@@ -79,7 +79,7 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   loading: false, retrying: false, reading: false, busy: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
-let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void } | null = null;
+let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void; onExpired?: () => void } | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
 let quoteTimer: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<typeof setTimeout> | undefined;
 const releaseListeners = new Set<(accountKey: string, commandKey: string) => void>();
@@ -213,13 +213,20 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
 }
 
+type CheckoutCapacityPaymentRead = PaymentCommandReceipt | { status: 'AWAITING_PAYMENT'; intentNo: string; cutoff: number | null };
+let checkoutIntentRead: { accountKey: string; commandKey: string; result: Promise<PurchasePaymentIntent | null> } | null = null;
+
 /** Project a checkout-owned external read into the same records used by the floating bar.
  *  Undefined leaves the command lookup to checkout. Null means the known intent was released. */
 export async function readCheckoutCapacityPayment(accountKey: string, kind: 'CAPACITY_KEEP' | 'CAPACITY_REPLACE',
-  commandKey: string, current: () => boolean): Promise<PaymentCommandReceipt | null | undefined> {
+  commandKey: string, current: () => boolean): Promise<CheckoutCapacityPaymentRead | null | undefined> {
   const pending = rows(accountKey).records[commandKey];
   if (pending?.kind !== kind) return;
-  const intent = await readIntent(pending);
+  const read = { accountKey, commandKey, result: readIntent(pending) };
+  checkoutIntentRead = read;
+  const intent = await read.result.finally(() => {
+    if (checkoutIntentRead === read) checkoutIntentRead = null;
+  });
   if (!current()) return;
   projectPassivePayment(accountKey, pending, intent);
   if (!intent) return pending.intentNo ? null : undefined;
@@ -227,6 +234,8 @@ export async function readCheckoutCapacityPayment(accountKey: string, kind: 'CAP
   if (intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED') {
     return { status: 'SUCCEEDED', canResumeSameKey: false, receipt: intent.receipt };
   }
+  const timing = purchasePaymentTiming(intent, Date.now());
+  if (timing.canPay) return { status: 'AWAITING_PAYMENT', intentNo: intent.intentNo, cutoff: timing.cutoff };
   return { status: 'PROCESSING', canResumeSameKey: false };
 }
 function settled(intent: PurchasePaymentIntent | null) {
@@ -292,16 +301,18 @@ function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
 function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, { notice, retryNotice: '', concluded: true, cashier: false }); }
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
+  const expired = state.intent?.status === 'EXPIRED';
   requestVersion++; stopTimers(); openCashierOnReady = false;
   reviewedQuote = confirmedQuote = null;
   Object.assign(state, { open: false, loading: false, retrying: false, reading: false, busy: false, cashier: false, notice: '', concluded: false,
     originalRecovery: null, canResubmit: false });
   const choice = activeChoice; activeChoice = null; context = null; choice?.resolve(result);
+  if (expired) choice?.onExpired?.();
 }
-function waitForChoice(): Promise<PurchaseChoice | null> {
+function waitForChoice(onExpired?: () => void): Promise<PurchaseChoice | null> {
   let resolve!: (result: PurchaseChoice | null) => void;
   const promise = new Promise<PurchaseChoice | null>(done => { resolve = done; });
-  activeChoice = { promise, resolve };
+  activeChoice = { promise, resolve, onExpired };
   return promise;
 }
 
@@ -569,7 +580,9 @@ async function query() {
       return;
     }
     if (!pending) return;
-    const result = await readIntent(pending);
+    const checkoutRead = checkoutIntentRead;
+    const result = await (checkoutRead?.accountKey === accountKey && checkoutRead.commandKey === pending.commandKey
+      ? checkoutRead.result : readIntent(pending));
     if (!owns(version, accountKey) || state.concluded) return;
     if (result) {
       state.canResubmit = false;
@@ -779,22 +792,34 @@ export function requestPurchasePayment(value: PurchasePaymentContext): Promise<P
   if (existing) void query();
   return result;
 }
-async function resume(pending: PendingExternal) {
+type DeliveredPayment = Extract<PurchaseChoice, { method: 'EXTERNAL' }>;
+type CheckoutCapacityResume = { onDelivered: (result: DeliveredPayment) => void; onExpired: () => void };
+async function resume(pending: PendingExternal, checkout?: CheckoutCapacityResume) {
   if (state.open) return;
   context = null;
   const payload = JSON.parse(pending.fingerprint)[1] as Record<string, unknown>;
   open({ summary: pending.summary, kind: pending.kind, payload, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
-  waitForResumedChoice();
+  waitForResumedChoice(checkout);
   await query();
 }
-function waitForResumedChoice() {
+function waitForResumedChoice(checkout?: CheckoutCapacityResume) {
   // No active purchase callback after reload. A delivered intent returns to the original order.
-  void waitForChoice().then(result => {
+  void waitForChoice(checkout?.onExpired).then(result => {
     if (result?.method !== 'EXTERNAL' || !result.receipt || typeof result.receipt !== 'object') return;
     acknowledgePurchasePayment(result);
+    if (checkout) { checkout.onDelivered(result); return; }
     const orderNo = (result.receipt as { orderNo?: unknown }).orderNo;
     if (typeof orderNo === 'string' && orderNo) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
   });
+}
+/** Open the original payment and hand final results back to its owning checkout. */
+export function resumeCheckoutCapacityPayment(accountKey: string, kind: 'CAPACITY_KEEP' | 'CAPACITY_REPLACE',
+  commandKey: string, intentNo: string | undefined, checkout: CheckoutCapacityResume): boolean {
+  if (state.open || accountKey !== account()) return false;
+  const pending = pendingPayments().find(row => row.commandKey === commandKey && row.kind === kind);
+  if (!pending || intentNo && pending.intentNo && pending.intentNo !== intentNo) return false;
+  void resume(intentNo ? { ...pending, intentNo } : pending, checkout);
+  return true;
 }
 // The App runtime keeps a page's query on $page.options; H5 also sets options.
 function pageQuery(page: unknown) {

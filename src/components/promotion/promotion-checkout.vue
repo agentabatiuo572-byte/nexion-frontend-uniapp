@@ -275,12 +275,12 @@ const keepResumeAllowed = computed(() => {
 });
 function openKeepResume(): boolean {
   const resume = checkoutKeepResume?.value;
-  return !!resume && keepResumeAllowed.value && recoverKeepBeforeNewPurchase(true, resume);
+  if (!resume || !keepResumeAllowed.value || tradein.state.kind === 'keep-recovery') return false;
+  return resume.kind === 'intent' ? resume.open() : recoverKeepBeforeNewPurchase(true, resume);
 }
-function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume, showRecovery=true):boolean {
+function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume):boolean {
   // Original orders and commands always recover before any new purchase gate.
   if(props.orderNo||session.record.order||session.record.pending)return false;
-  const previous=keepRecoveryTarget.value;
   // Keep the current owner until the synchronous recheck determines the next one.
   for(const {productNo} of selection.value){
     if (resume && productNo !== resume.target) continue;
@@ -301,7 +301,7 @@ function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume,
     catch{if (resume) return false;}
     keepRecovery.value=recovery;
     freshQuoteReady.value=false;quoteFresh.value=false;quotePresentation.value=null;
-    if(showRecovery&&(reopen||previous!==productNo))tradein.showKeepRecovery(productNo as DeviceKind);
+    if(resume)tradein.showKeepRecovery(productNo as DeviceKind);
     return true;
   }
   if (!resume) keepRecovery.value = null;
@@ -809,7 +809,7 @@ function refreshForegroundReview():boolean{
     }
     if(session.record.pending||session.record.order||props.orderNo)return true;
     // The checkout host automatically reads any original command found here.
-    if(!recoverKeepBeforeNewPurchase(false,undefined,false))void loadQuote(true,true);
+    if(!recoverKeepBeforeNewPurchase())void loadQuote(true,true);
   }catch{recoveryReadFailed.value=true;}
   return true;
 }
