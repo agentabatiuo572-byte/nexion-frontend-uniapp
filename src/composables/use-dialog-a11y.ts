@@ -129,7 +129,7 @@ function trackFocus(): void {
         if (!active || active === document.body || !top.el.contains(active)) focusFirst([() => landingSpot(top.el)]);
         return;
       }
-      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left))) return;
+      if (!left || (active && active !== document.body) || (left.isConnected && canTake(left)) || waitingForTrigger) return;
       if (Date.now() - restoredAt < 5_000) {
         const landing = focusFirst(fallbacks(null, null));
         if (landing) settleOnLanding(landing);
@@ -194,6 +194,28 @@ function canTake(el: Element | null | undefined): el is HTMLElement | SVGElement
   return getComputedStyle(el).visibility === "visible" && el.matches(CAN_FOCUS);
 }
 type Candidate = Element | null | undefined | (() => Element | null | undefined);
+/** A trigger still on screen that is only disabled for the moment: not removed, hidden or inert. */
+const onlyDisabled = (el: Element) => el.isConnected && shown(el) && !el.closest("[inert]") && getComputedStyle(el).visibility === "visible"
+  && (el.getAttribute("aria-disabled") === "true" || (el as HTMLButtonElement).disabled === true);
+// Restores waiting for their trigger; the shared focusout fallback stays out of their way meanwhile.
+let waitingForTrigger = 0;
+/** A page may re-enable the trigger only once the layer has fully closed (order detail turns 「继续支付」 back on after
+ *  the payment sheet is gone). Give it up to a second, then land; if focus moves meanwhile (the user, a new layer),
+ *  leave it there. */
+function waitForTrigger(el: Element, scope: HTMLElement | null, land: () => void): void {
+  waitingForTrigger += 1;
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    const active = document.activeElement;
+    // The layer below holding focus on its own root (the shared focusout keeps focus in it) is still waiting too.
+    const moved = !!active && active !== document.body && active !== scope;
+    if (!moved && !canTake(el) && onlyDisabled(el) && tries < 20) return;
+    clearInterval(timer);
+    waitingForTrigger -= 1;
+    if (!moved) land();
+  }, 50);
+}
 /** Focus the first candidate that can take it and really does; otherwise go on down the list. */
 function focusFirst(candidates: Candidate[]): HTMLElement | SVGElement | null {
   for (const candidate of candidates) {
@@ -378,11 +400,18 @@ export function useDialogA11y(
     const active = document.activeElement;
     // A parent dialog closing in the same step may already have restored focus; move it only when it is really lost.
     const settled = canTake(active) && inScope(active);
-    const back = focusFirst([() => (inScope(previousFocus) ? previousFocus : null), ...(settled ? [] : fallbacks(previousTrace, scope))]);
-    restoredAt = Date.now();
-    if (back) settleOnLanding(back);
+    const trigger = inScope(previousFocus) ? previousFocus : null;
+    const trace = previousTrace;
     previousFocus = null;
     previousTrace = null;
+    const land = () => {
+      const back = focusFirst([() => trigger, ...(settled ? [] : fallbacks(trace, scope))]);
+      restoredAt = Date.now();
+      if (back) settleOnLanding(back);
+    };
+    // The trigger is still there and only disabled for now: wait for it before taking the fallback order (03 §3.5).
+    if (!settled && trigger && !canTake(trigger) && onlyDisabled(trigger)) waitForTrigger(trigger, scope, land);
+    else land();
   }
 
   function detach(): void {
