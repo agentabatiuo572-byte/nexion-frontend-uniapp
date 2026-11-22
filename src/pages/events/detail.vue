@@ -39,7 +39,7 @@
         </view>
       </view>
       <text v-if="commandError && !action" class="event-copy" role="alert">{{ copy.pending }}</text>
-      <view v-if="action" class="event-bar-space" :class="{ 'event-bar-space--note': commandError }" aria-hidden="true" />
+      <view v-if="action" class="event-bar-space" :class="{ 'event-bar-space--note': commandError }" aria-hidden="true"><text v-if="commandError" class="event-bar-space__note">{{ copy.pending }}</text></view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
   </view>
@@ -173,10 +173,13 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
 /* The main action floats in the shared bottom bar (04 §4.0), in the chassis layer that does not scroll. The in-flow spacer
    reserves the clearance in place of the page's bottom padding: 48 + 22 + 16 for the lone button, the tray's own height
-   + 38 once the pending note sits above it. */
+   + 38 once the pending note sits above it. The spacer carries an invisible copy of the note at the note's width
+   (16 + 16 inside the page's 16 = the tray's 12 + 8 + 12) and type, so a note that wraps reserves its real height:
+   12 (tray padding 8 + note 4) + note + 8 + 48 + 8, then 22 + 16. */
 .event-detail--bar { padding-bottom:0; }
 .event-bar-space { height:calc(48px + var(--nx-tray-bottom) + 16px); }
-.event-bar-space--note { height:calc(92px + 38px); }
+.event-bar-space--note { height:auto; padding:12px 16px calc(8px + 48px + 8px + var(--nx-tray-bottom) + 16px); visibility:hidden; }
+.event-bar-space__note { display:block; font:var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:break-word; text-wrap:pretty; }
 .event-bar { position:absolute; z-index:36; display:flex; flex-direction:column; }
 .event-bar > .nx-button { width:100%; }
 .event-rule-paragraph { display:block; }
