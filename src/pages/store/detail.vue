@@ -23,7 +23,7 @@
            mirroring the prototype's SetPageHeader. -->
 
       <view v-if="publicOnly" class="promotion promotion-main" data-testid="promotion-public-detail">
-        <text class="promotion-title">{{ activity?localized(activity.title,locale.code):promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
+        <text class="promotion-title promotion-title--section">{{ activity?localized(activity.title,locale.code):promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
         <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
         <text v-else-if="promotionStatus === 'error'" class="promotion-copy">—</text>
         <text v-else-if="activity&&promotionStatus==='ready'&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>

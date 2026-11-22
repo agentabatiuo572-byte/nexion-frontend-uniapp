@@ -4,7 +4,7 @@
       <text class="promotion-title">{{ t.promotion.promotionList }}</text>
       <view class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.space.prevent="navTo('/pages/me/rewards-list?cat=promotion')"><text>{{ t.promotion.rewards }}</text><NxIcon name="chevron-right" /></view>
     </view>
-    <view v-if="!items.length&&!listRead" class="entry-placeholder" role="status" :aria-busy="status==='loading'" :aria-label="status==='loading'?t.promotion.loading:undefined"><text v-if="mode==='home'" class="promotion-title">{{ t.promotion.promotionList }}</text><view /><view /></view>
+    <view v-if="!items.length&&!listRead" class="entry-placeholder" role="status" :aria-busy="status==='loading'" :aria-label="status==='loading'?t.promotion.loading:undefined"><text v-if="mode==='home'" class="promotion-title promotion-title--section">{{ t.promotion.promotionList }}</text><view /><view /></view>
 
     <view v-if="status==='ready'&&!items.length&&mode==='events'" class="entry-status">
       <text class="promotion-title">{{ t.promotion.empty }}</text><text class="promotion-copy">{{ t.promotion.emptyNote }}</text>
