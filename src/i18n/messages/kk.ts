@@ -3232,6 +3232,8 @@ export const kk: Messages = {
     confirmPassword: "Жаңа құпиясөзді растау",
     twoFactorCurrentPassword: "2FA үшін қазіргі құпиясөз",
     twoFactorPasswordRequired: "Қазіргі құпиясөзді енгізіңіз.",
+    twoFactorCodeWrong: "Код қате. Тексеріп, қайта енгізіңіз.",
+    twoFactorCodeResent: "Жаңа код {phone} нөміріне жіберілді. Алдыңғы код енді жарамсыз.",
     deletionPassword: "Аккаунтты жою үшін қазіргі құпиясөз",
     deletionReasonLabel: "Жою себебі (міндетті емес)",
     deletionReasonPlaceholder: "Неліктен кететініңізді айтыңыз, бұл бізге жақсаруға көмектеседі",
