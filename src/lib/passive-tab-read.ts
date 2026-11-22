@@ -13,6 +13,10 @@ let lastVault: object | null = null, lastAuthRevision: number | null = null, aut
 export function runPassiveTabRead<T>(resource: string, read: () => Promise<T>, query?: unknown, hasCache?: () => boolean, maxAgeMs = 5_000): Promise<T> {
   return window.run(passiveTabReadScope(), resource, read, query, hasCache, maxAgeMs);
 }
+/** A foreground hook reuses recent attempts. Explicit and recovery dispatches bypass this window. */
+export function runForegroundStoreRead<T>(resource: string, read: () => Promise<T>, query?: unknown, hasCache?: () => boolean, maxAgeMs = 30_000): Promise<T> {
+  return window.run(passiveTabReadScope(), resource, read, query, hasCache, maxAgeMs, 30_000);
+}
 export function invalidatePassiveTabRead(resource: string): void { window.invalidate(resource); }
 /** Seed the same window at an actual startup/manual store dispatch, without gating it. */
 export function rememberPassiveTabRead<T>(resource: string, promise: Promise<T>, query?: unknown, attemptedAt?: number, hasCache?: () => boolean): Promise<T> {

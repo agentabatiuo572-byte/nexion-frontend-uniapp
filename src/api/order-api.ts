@@ -156,7 +156,7 @@ export interface CreateOrderRequest {
 }
 
 export type OrderCreateCommand =
-  | { status: "PROCESSING" | "NOT_FOUND" | "UNKNOWN" | "UNAVAILABLE" }
+  | { status: "PROCESSING" | "NOT_FOUND" | "UNKNOWN" }
   | { status: "FAILED"; code: number; message: string }
   | { status: "SUCCEEDED"; orderNo: string };
 
@@ -572,7 +572,7 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
         });
       } catch (error) {
         if (error instanceof ApiError && error.kind === "http" && error.status === 404 && error.message !== notFound.message) {
-          return { status: "UNAVAILABLE" };
+          return { status: "UNKNOWN" };
         }
         throw error;
       }

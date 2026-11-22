@@ -76,13 +76,15 @@ function parse(value: unknown, expectedProductNo: string, mode: ApiEnvironment):
 }
 
 export function createPurchaseEligibilityApi(client: ApiClient, mode: ApiEnvironment = "prod") {
+  const path = (productNo: string) => `/api/store/purchase-eligibility?productNo=${encodeURIComponent(productNo)}`;
   return {
+    readCooldownUntil: (productNo: string) => client.readCooldownUntil?.(path(productNo.trim())) ?? 0,
     get: async (productNo: string) => {
       const normalized = productNo.trim();
       if (!normalized) throw new Error("PURCHASE_ELIGIBILITY_PRODUCT_REQUIRED");
       return parse(await client.request({
         method: "GET",
-        path: `/api/store/purchase-eligibility?productNo=${encodeURIComponent(normalized)}`,
+        path: path(normalized),
       }), normalized, mode);
     },
   };

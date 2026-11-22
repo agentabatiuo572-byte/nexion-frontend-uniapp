@@ -2,9 +2,10 @@
 import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
-import { refreshActivePage } from "@/lib/active-page-refresh";
+import { hasVisiblePullRefresh, refreshActivePage } from "@/lib/active-page-refresh";
 import { useNotifications } from "@/store/notifications";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";
 import { logicalNativePage } from "@/lib/native-tab-navigation";
@@ -71,8 +72,8 @@ import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route'
 import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { installFieldNaming } from "@/lib/a11y-field-label";
-import { refreshEarnConfig } from "@/store/earn-config";
-import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { ensureEarnConfig } from "@/store/earn-config";
+import { ensureServerProductPhase, refreshServerProductPhase, serverProductPhaseState } from "@/store/server-product-phase";
 import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
 import { useMarket } from "@/store/market";
@@ -366,7 +367,7 @@ let lastTrialNoticeEpoch = -1;
 let lastTrialNoticeStatus: ReturnType<typeof useFreeTrial>["status"] = "none";
 
 function refreshVisibleResource(route: string) {
-  if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible();
+  if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible(false, route === "pages/me/devices");
   else if (route === "pages/me/wallet-bills") void refreshActivePage(route);
   else if (route === "pages/me/notifications" && useMessageDrawer().section === "notifications") {
     const notifications = useNotifications();
@@ -441,11 +442,35 @@ function installForegroundReadSignals() {
   watch([foregroundReadAllowed, appReadOnline, () => app.accountBindingEpoch], ([allowed, online], [wasAllowed, wasOnline]) => {
     if (allowed) {
       if (!wasAllowed && canRunBusinessLoops()) maintainRemoteSession(true);
-      runScheduledReads(readCurrentRoute(), online && !wasOnline);
+      const reconnected = online && !wasOnline;
+      if (reconnected) {
+        const locale = useLocaleStore().code;
+        const i18n = useI18nRuntime();
+        // A failed resource already has a reconnect retry in useAutoRecovery.
+        if (!serverProductPhaseState.retryableError) void refreshServerProductPhase(true);
+        if (!i18n.retryableError[locale]) void i18n.refresh(locale, true);
+      }
+      runScheduledReads(readCurrentRoute(), reconnected);
     } else {
       scheduledReadBinding = "";
       if (remoteApiEnabled) stopBusinessLoops();
     }
+  });
+}
+
+if (remoteApiEnabled) {
+  const repeatWithoutPull = () => !hasVisiblePullRefresh();
+  useAutoRecovery({
+    failed: () => serverProductPhaseState.retryableError,
+    retry: () => refreshServerProductPhase(true),
+    repeatMs: 30_000,
+    repeatWhile: repeatWithoutPull,
+  });
+  useAutoRecovery({
+    failed: () => useI18nRuntime().retryableError[useLocaleStore().code] === true,
+    retry: () => useI18nRuntime().refresh(useLocaleStore().code, true),
+    repeatMs: 30_000,
+    repeatWhile: repeatWithoutPull,
   });
 }
 
@@ -1295,7 +1320,7 @@ onLaunch(() => {
   if (remoteApiEnabled) {
     // Public server configuration is warmed at launch. Each store starts
     // empty/fail-closed, so a failed request cannot expose prototype values.
-    void refreshEarnConfig().catch(() => undefined);
+    void ensureEarnConfig().catch(() => undefined);
     void useMarket().syncRemote();
     // The server catalog is a USER-only resource. Clear any local compatibility
     // rows at startup, then let the authenticated Store entry fetch it; an
@@ -1355,9 +1380,9 @@ onShow(() => {
     // PC-managed runtime configuration must converge when the App returns to
     // foreground; a launch-only fetch leaves pricing, phase and translations
     // stale for an entire long-lived session.
-    void refreshEarnConfig().catch(() => undefined);
-    void refreshServerProductPhase(true).catch(() => false);
-    void useI18nRuntime().refresh(useLocaleStore().code, true).catch(() => undefined);
+    void ensureEarnConfig().catch(() => undefined);
+    void ensureServerProductPhase().catch(() => false);
+    void useI18nRuntime().ensure(useLocaleStore().code).catch(() => undefined);
   }
   // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
   // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」

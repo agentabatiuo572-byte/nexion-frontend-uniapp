@@ -7,6 +7,9 @@ const COMMANDS_KEY = "nexgrid-remote-checkout-commands-v1";
 type Pointer = { productNo: string; orderNo: string; intent: string; commandKey: string;
   tradeinQuote?: CanonicalTradeinQuote; tradeinResult?: CanonicalTradeinResult; tradeinCommandSubmitted?: boolean };
 export type CheckoutTradeinRecovery = Pointer & { tradeinQuote: CanonicalTradeinQuote };
+export function hasKnownCheckoutTradeinStatus(quote: CanonicalTradeinQuote): boolean {
+  return quote.targetDeviceStatus === "ACTIVE" || quote.targetDeviceStatus === "INACTIVE";
+}
 type Row = { orders: Record<string, Pointer> };
 const terminal = new Set(["activated", "inventory", "cancelled", "expired", "refunded", "chargeback"]);
 
@@ -63,7 +66,7 @@ export function readCheckoutTradein(accountKey: string, productNo: string): Chec
       || (pointer.tradeinCommandSubmitted !== undefined && typeof pointer.tradeinCommandSubmitted !== 'boolean')
       || typeof pointer.commandKey !== "string" || !pointer.commandKey.trim()
       || typeof pointer.intent !== "string" || !pointer.intent.trim() || !Number.isSafeInteger(quote.sourceRowVersion)
-      || quote.sourceRowVersion < 0 || !["ACTIVE", "INACTIVE"].includes(quote.targetDeviceStatus)) {
+      || quote.sourceRowVersion < 0) {
     // The payment API can recover any in-flight order from the next purchase attempt.
     if (!removeCheckoutPointer(accountKey, row, productNo)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
     return null;

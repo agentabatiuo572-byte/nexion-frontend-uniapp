@@ -13,7 +13,7 @@ import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
-import { appReadOnline } from '@/lib/foreground-read';
+import { appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { getT } from '@/i18n/use-t';
 import { toast } from './ui';
@@ -189,14 +189,19 @@ function sharedPassiveRead(run: () => Promise<unknown>): Promise<unknown> {
 /** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
 export function refreshPendingPayments(accountKey: string, current: () => boolean, shouldRead: (row: PendingExternal) => boolean = () => true): Promise<unknown> {
   if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
-  const records = pendingPayments().filter(shouldRead);
+  const app = useApp();
+  const binding = app.accountBindingEpoch;
+  const sameAccount = () => app.accountKey === accountKey && app.accountBindingEpoch === binding;
+  const records = pendingPayments().filter(row => row.lastStatus !== 'DELIVERED' && !row.businessDelivered && shouldRead(row));
   if (!records.length) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(records.map(async pending => {
     const intent = await readIntent(pending);
-    if (current() && account() === accountKey && !state.open && shouldRead(pending)) projectPassivePayment(accountKey, pending, intent);
+    if (!sameAccount() || !current() || state.open || !shouldRead(pending)) return;
+    const orderNo = projectPassivePayment(accountKey, pending, intent);
+    if (orderNo) await useOrders().reconcileRemoteOrder(orderNo, () => sameAccount() && foregroundReadAllowed());
   })));
 }
-function projectPassivePayment(accountKey: string, pending: PendingExternal, intent: PurchasePaymentIntent | null) {
+function projectPassivePayment(accountKey: string, pending: PendingExternal, intent: PurchasePaymentIntent | null): string | undefined {
   if (!intent) {
     if (pending.intentNo) {
       const orderNo = pending.kind === 'ORDER_PAY' ? JSON.parse(pending.fingerprint)[1].orderNo : '';
@@ -205,12 +210,15 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
     return;
   }
   matches(intent, pending);
-  if (intent.status === pending.lastStatus) return;
-  if (intent.status === 'EXPIRED') { saveExpiry(accountKey, pending.commandKey, pending.kind); return; }
-  if (!settled(intent)) return;
-  const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
-  if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
-  save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
+  if (intent.status === pending.lastStatus || !settled(intent)) return;
+  if (intent.status === 'EXPIRED') {
+    saveExpiry(accountKey, pending.commandKey, pending.kind);
+  } else {
+    const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
+    if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
+    save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
+  }
+  if (pending.kind === 'ORDER_PAY') return JSON.parse(pending.fingerprint)[1].orderNo;
 }
 
 type CheckoutCapacityPaymentRead = PaymentCommandReceipt | { status: 'AWAITING_PAYMENT'; intentNo: string; cutoff: number | null };

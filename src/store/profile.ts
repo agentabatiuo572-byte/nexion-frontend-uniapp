@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
-import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
+import { runForegroundStoreRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { defaultNickname } from "@/lib/nickname";
@@ -12,7 +12,7 @@ import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import type { UserSession } from "@/api/contracts";
 import { acquireProfileCommandKey, finishProfileCommand } from "@/lib/profile-command-key";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
-import type { ProfileAvatar } from "@/api/profile-api";
+import type { ProfileAvatar, ProfileProjection } from "@/api/profile-api";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
 // 旧设备级单键 "nexgrid-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
@@ -51,7 +51,7 @@ export const useProfile = defineStore("profile", () => {
   const avatarRevision = ref("");
   let avatarReadEpoch = 0;
   let avatarHasSnapshot = false;
-  let avatarInFlight: Promise<boolean> | null = null;
+  let profileInFlight: Promise<ProfileProjection | null> | null = null;
   let environmentInvalidated = false;
   const phoneE164 = ref("");
   const uid = ref("");
@@ -59,8 +59,12 @@ export const useProfile = defineStore("profile", () => {
 
   function clearAvatar() {
     invalidatePassiveTabRead("profile-avatar");
+    clearAvatarProjection();
+  }
+
+  function clearAvatarProjection() {
     avatarReadEpoch += 1;
-    avatarInFlight = null;
+    profileInFlight = null;
     avatarHasSnapshot = false;
     avatarUrl.value = "";
     avatarRevision.value = "";
@@ -123,43 +127,49 @@ export const useProfile = defineStore("profile", () => {
     if (!remoteApiEnabled) return;
     invalidatePassiveTabRead("profile-avatar");
     avatarReadEpoch += 1;
-    avatarInFlight = null;
+    profileInFlight = null;
     avatarHasSnapshot = true;
     avatarUrl.value = avatar.avatarUrl;
     avatarRevision.value = avatar.avatarRevision;
-    rememberPassiveTabRead("profile-avatar", Promise.resolve(true), undefined, undefined, () => avatarHasSnapshot);
   }
 
-  function ensureAvatar(): Promise<boolean> {
-    return runPassiveTabRead("profile-avatar", () => avatarInFlight ?? refreshAvatar(), undefined,
+  function ensureRemoteProfile(): Promise<ProfileProjection | null> {
+    return runForegroundStoreRead("profile-avatar", () => profileInFlight ?? refreshRemoteProfile(), undefined,
       () => avatarHasSnapshot, 60_000);
   }
 
-  function refreshAvatar(): Promise<boolean> {
+  async function ensureAvatar(): Promise<boolean> {
+    return !remoteApiEnabled || !!await ensureRemoteProfile();
+  }
+
+  async function refreshAvatar(): Promise<boolean> {
+    return !remoteApiEnabled || !!await refreshRemoteProfile();
+  }
+
+  function refreshRemoteProfile(): Promise<ProfileProjection | null> {
     invalidateBeforePassiveTabRead("profile-avatar");
-    const promise = readAvatar();
-    avatarInFlight = promise;
+    const promise = readRemoteProfile();
+    profileInFlight = promise;
     rememberPassiveTabRead("profile-avatar", promise, undefined, undefined, () => avatarHasSnapshot);
-    const clear = () => { if (avatarInFlight === promise) avatarInFlight = null; };
+    const clear = () => { if (profileInFlight === promise) profileInFlight = null; };
     void promise.then(clear, clear);
     return promise;
   }
 
-  async function readAvatar(): Promise<boolean> {
-    if (!remoteApiEnabled) return true;
-    if (environmentInvalidated) return false;
+  async function readRemoteProfile(): Promise<ProfileProjection | null> {
+    if (!remoteApiEnabled || environmentInvalidated) return null;
     const account = remoteAccountEpoch.snapshot();
     const runtime = captureRuntimeRevision();
     const readEpoch = ++avatarReadEpoch;
     try {
       const projection = await profileApi.profile();
-      if (!remoteAccountEpoch.isCurrent(account) || readEpoch !== avatarReadEpoch || !isCurrentRuntimeRevision(runtime)) return false;
+      if (!remoteAccountEpoch.isCurrent(account) || readEpoch !== avatarReadEpoch || !isCurrentRuntimeRevision(runtime)) return null;
       avatarUrl.value = projection.avatarUrl;
       avatarRevision.value = projection.avatarRevision;
       avatarHasSnapshot = true;
-      return true;
+      return projection;
     } catch (cause) {
-      if (remoteAccountEpoch.isCurrent(account) && readEpoch === avatarReadEpoch && !isTransientReadFailure(cause)) clearAvatar();
+      if (remoteAccountEpoch.isCurrent(account) && readEpoch === avatarReadEpoch && !isTransientReadFailure(cause)) clearAvatarProjection();
       throw cause;
     }
   }
@@ -211,6 +221,6 @@ export const useProfile = defineStore("profile", () => {
   return {
     displayName, avatarSeed, avatarUrl, avatarRevision, phoneE164, uid, nicknameCandidates,
     setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity, projectServerNickname,
-    refreshNicknameCandidates, projectServerAvatar, refreshAvatar, ensureAvatar,
+    refreshNicknameCandidates, projectServerAvatar, refreshAvatar, ensureAvatar, ensureRemoteProfile, refreshRemoteProfile,
   };
 });
