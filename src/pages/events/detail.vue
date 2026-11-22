@@ -40,7 +40,7 @@
       </view>
       <text v-if="commandError" class="event-copy" role="alert">{{ copy.pending }}</text>
       <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
-      <view v-else-if="action" class="event-primary" role="button" :tabindex="busy || loading || error ? -1 : 0" :aria-disabled="busy || loading || error" @click="run" @keydown.enter.prevent="activate($event, run)" @keydown.space.prevent="activate($event, run)"><text>{{ busy ? copy.busy : action === 'remind' ? reminderCopy.remind : copy[action] }}</text></view>
+      <NxButton v-else-if="action" class="event-navigate" variant="primary" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
   </view></AppChassis>
@@ -127,7 +127,6 @@ async function run() {
     if (current()) { busy.value = false; commandError.value = true; unconfirmedAction = selectedAction; await load(); }
   }
 }
-function activate(event: KeyboardEvent, action: () => unknown) { if (!event.repeat) void action(); }
 onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/pages/events/detail")); code = String(options?.id ?? query.get("id") ?? "").trim(); reset(); if (visible) void load(); });
 let releaseActiveRefresh = () => {};
 onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value ? undefined : load()); void load(); });
@@ -142,7 +141,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-section { margin-top:12px; padding:16px; border-radius:var(--nx-glass-radius); background:var(--nx-glass-fill); box-shadow:var(--nx-glass-edge); }
 .event-section--plain { padding:var(--ui-space-inset) 0; border-radius:0; background:transparent; box-shadow:none; border-top:1px solid var(--v5-border); }
 .event-title { display:block; font-size:20px; font-weight:600; line-height:1.4; overflow-wrap:break-word; }
-.event-heading { display:block; font-size:14px; font-weight:500; }
+.event-heading { display:block; font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
 .event-copy { display:block; margin-top:10px; font-size:var(--ui-type-list-subtitle); line-height:1.6; color:var(--v5-ink-3); white-space:pre-wrap; overflow-wrap:break-word; }
 .event-status { display:block; margin-top:12px; font-size:12px; color:var(--v5-brand); }
 .event-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; margin-top:12px; font-size:12px; line-height:1.5; }
@@ -150,8 +149,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-progress { margin-top:12px; height:5px; border-radius:5px; overflow:hidden; background:var(--v5-brand-soft); }
 .event-progress > view { height:100%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
-.event-primary { display:flex; justify-content:center; margin-top:16px; padding:13px 16px; border-radius:24px; font-size:13px; font-weight:600; color:var(--v5-brand); }
-.event-primary { background:var(--v5-brand); color:var(--v5-on-brand); }
 .event-navigate { margin-top:16px; width:100%; }
 .event-rule-paragraph { display:block; }
 .event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:break-word; }
