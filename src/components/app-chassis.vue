@@ -147,7 +147,8 @@
 
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
-import { ref, computed, watch, onMounted, onUnmounted, inject, provide, getCurrentInstance } from "vue";
+import { ref, readonly, computed, watch, onMounted, onUnmounted, inject, provide, getCurrentInstance } from "vue";
+import { CHASSIS_SCROLLING } from "@/composables/use-loops-in-view";
 import { checkoutKeepResumeKey, openCheckoutCapacityProgressKey, reportCheckoutKeepResumeKey } from "@/components/checkout/checkout-keep-resume";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
@@ -321,6 +322,7 @@ watch(
 // both App and H5. Only scrolling edges and an explicit refresh intent cross back.
 const scrollEl = ref<unknown>(null);
 const scrolling = ref(false);
+provide(CHASSIS_SCROLLING, readonly(scrolling));
 const scrollLocks = ref(0);
 provide(DIALOG_SCROLL_LOCK, () => {
   scrollLocks.value += 1;

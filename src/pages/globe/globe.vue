@@ -241,7 +241,7 @@ const centerStats = computed(() => globeSimulation(globeSettings.value ? Math.fl
 // Platform counts show the 06 §6.4 band and roll when the band changes; the online figure carries the live dot.
 const band = (value: number | null) => value === null ? null : networkPopulationBand(value, locale.code);
 const topStats = computed<NetworkStatCell[]>(() => [
-  { key: "devices", label: t.value.home.networkDevices, text: band(onlineTotal.value), roll: true, live: true },
+  { key: "devices", label: t.value.home.networkDevices, text: band(onlineTotal.value), roll: true, live: (onlineTotal.value ?? 0) > 0 },
   { key: "jobs", label: t.value.globe.activeJobs, text: band(app.activeJobsDisplay), roll: true },
 ]);
 // Display offsets separate nearby centers; leader lines preserve geographic anchors.
