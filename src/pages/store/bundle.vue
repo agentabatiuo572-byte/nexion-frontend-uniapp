@@ -1056,7 +1056,7 @@ function rowValueStyle(tint?: string, big = false): CSSProperties {
    tray: 8 + note + 8 + 48 + 8, plus 22 + 16. */
 .bundle-bar-space { visibility: hidden; padding: 0 32px 22px; }
 .bundle-bar-space--tray { padding-bottom: 46px; }
-.bundle-bar-space__note { display: block; padding-top: 4px; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: anywhere; text-wrap: pretty; }
+.bundle-bar-space__note { display: block; padding-top: 4px; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: break-word; text-wrap: pretty; }
 .promotion-bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; align-items: center; animation: bundle-bar-in .42s cubic-bezier(.16,1,.3,1) .2s both; }
 .promotion-bar .nx-tray-note { flex: 1 1 100%; }
 /* Each button keeps its label on one line; when both do not fit one row they stack full width (03 §3.6.1). */
