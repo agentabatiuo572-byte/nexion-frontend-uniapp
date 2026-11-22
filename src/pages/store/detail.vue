@@ -844,9 +844,9 @@ const faqQStyle: CSSProperties = {
 .detail-sales-stat--stock { align-items: flex-end; color: var(--v5-brand-2); text-align: right; }
 .detail-sales-stat__value-row { display: flex; align-items: center; gap: var(--v5-space-2); min-width: 0; }
 .detail-sales-stat__value-row svg { flex: none; }
-.detail-sales-stat__value { font-size: var(--v5-type-h3); font-weight: 600; line-height: var(--v5-type-h3-lh); overflow-wrap: break-word; }
-.detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--v5-type-body-s-lh) var(--font-v5); overflow-wrap: break-word; }
-.detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--v5-type-h3-lh) var(--font-v5); overflow-wrap: break-word; }
+.detail-sales-stat__value { font-size: var(--ui-type-metric-value); font-weight: var(--ui-type-metric-value-weight); line-height: var(--ui-type-metric-value-lh); overflow-wrap: break-word; }
+.detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
+.detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--ui-type-metric-value-lh) var(--font-v5); overflow-wrap: break-word; }
 .detail-sales-stat:only-child { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
 .detail-compute-points { display: flex; align-items: flex-start; gap: 5px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .detail-compute-points svg { flex: none; margin-top: 2px; }
