@@ -240,9 +240,9 @@
       </view>
     </NxSheet>
     <template #pageFixed>
-      <view v-if="promotionRoute && promotionCheckout?.footer" class="checkout-sticky nx-glass-bar">
+      <view v-if="promotionRoute && promotionCheckout?.footer" class="checkout-sticky nx-glass-bar" :class="{ 'checkout-sticky--single': promotionCheckout.footer.amountless }">
         <text v-if="promotionCheckout.footer.note" class="nx-tray-note w-full" role="status">{{ promotionCheckout.footer.note }}</text>
-        <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
+        <view v-if="!promotionCheckout.footer.amountless" class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
       </view>
       <!-- The server allows the original keep payment to continue with its own key: that continuation is the page's one action (03 §3.5.2, 04 §4.0). -->
