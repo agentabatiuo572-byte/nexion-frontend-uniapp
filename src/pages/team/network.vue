@@ -254,9 +254,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 <style scoped>
 .network-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
 .network-overview { --nx-tint: var(--v5-brand); padding: 0 var(--v5-space-4) var(--v5-space-4); border: 0; border-radius: 28px; }
-.network-overview__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); padding-top: var(--ui-space-inset); font: 600 12px/18px var(--font-v5); color: var(--v5-ink-2); }
+.network-overview__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); padding-top: var(--ui-space-inset); font: 400 12px/18px var(--font-v5); color: var(--v5-ink-2); }
 .network-overview__split { min-width: 0; overflow-wrap: break-word; }
-.network-overview__total { flex: none; color: var(--v5-ink); }
+.network-overview__total { flex: none; color: var(--v5-ink); font-weight: 500; }
 .network-overview__total > .nx-num-metric { font-size: 13px; }
 .network-orbit { position: relative; width: 300px; max-width: 100%; aspect-ratio: 1; margin: var(--v5-space-1) auto 0; }
 .network-orbit__ring { position: absolute; border-radius: 999px; border: 1px dashed color-mix(in srgb, var(--v5-ink) 14%, transparent); }
