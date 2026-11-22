@@ -27,6 +27,9 @@ const ICONS = {
   more: { d: ["M3.2 12a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0", "M10.2 12a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0", "M17.2 12a1.8 1.8 0 1 0 3.6 0 1.8 1.8 0 1 0-3.6 0"], fill: true },
   clock: { d: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M12 7v5l3 2"] },
   sparkle: { d: ["M12 3c.6 4.6 3.4 7.4 8 8-4.6.6-7.4 3.4-8 8-.6-4.6-3.4-7.4-8-8 4.6-.6 7.4-3.4 8-8z"], fill: true },
+  send: { d: ["M20.5 3.5 10.6 13.4", "M20.5 3.5 14.3 20.5l-3.7-7.1-7.1-3.7z"] },
+  bag: { d: ["M5.2 8h13.6l-1.1 11.1a2 2 0 0 1-2 1.9H8.3a2 2 0 0 1-2-1.9z", "M9 10.5V7a3 3 0 0 1 6 0v3.5"] },
+  gift: { d: ["M4.5 11.5h15V19a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z", "M3.5 7.5h17v4h-17z", "M12 7.5V21", "M12 7.5C10.8 4.6 8.9 3.4 7.6 3.9c-1.5.6-.9 3.6 4.4 3.6z", "M12 7.5c1.2-2.9 3.1-4.1 4.4-3.6 1.5.6.9 3.6-4.4 3.6z"] },
 } as const satisfies Record<string, { d: readonly string[]; fill?: boolean }>;
 export type NxIconName = keyof typeof ICONS;
 const props = defineProps<{ name: NxIconName; size?: number }>();

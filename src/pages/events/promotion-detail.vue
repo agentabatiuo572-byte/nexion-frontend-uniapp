@@ -140,11 +140,12 @@
           <view v-if="note" class="lp-note lp-rise lp-d2"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
           <text class="lp-section lp-section-title lp-rise lp-d2">{{ c.referralSteps }}</text>
           <view class="lp-panel lp-panel--track lp-rise lp-d2"><view class="lp-track" role="list" :aria-label="c.referralSteps">
-            <view v-for="(step, index) in trackSteps" :key="step.title" class="lp-track__step" :class="'lp-track__step--' + step.state" role="listitem" :aria-current="step.state === 'current' ? 'step' : undefined">
-              <view class="lp-track__rail" aria-hidden="true">
-                <view class="lp-track__line" :class="{ 'lp-track__line--none': index === 0 }"><view class="lp-track__fill" :class="{ 'is-on': step.state !== 'todo' }" :style="{ animationDelay: index * 160 + 'ms' }" /></view>
-                <view class="lp-track__node"><svg v-if="step.state === 'done'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg><text v-else>{{ index + 1 }}</text></view>
-                <view class="lp-track__line" :class="{ 'lp-track__line--none': index === trackSteps.length - 1 }"><view class="lp-track__fill" :class="{ 'is-on': index < trackSteps.length - 1 && trackSteps[index + 1].state !== 'todo' }" :style="{ animationDelay: index * 160 + 80 + 'ms' }" /></view>
+            <!-- One continuous line from the first to the last node; the brand part runs to the furthest reached step. -->
+            <view class="lp-track__line" aria-hidden="true"><view class="lp-track__fill" :style="{ transform: 'scaleX(' + trackFill + ')' }" /></view>
+            <view v-for="step in trackSteps" :key="step.title" class="lp-track__step" :class="'lp-track__step--' + step.state" role="listitem" :aria-current="step.state === 'current' ? 'step' : undefined">
+              <view class="lp-track__node" aria-hidden="true">
+                <NxIcon :name="step.icon" :size="20" />
+                <view v-if="step.state === 'done'" class="lp-track__badge"><NxIcon name="check" :size="10" /></view>
               </view>
               <text class="lp-track__title">{{ step.title }}</text>
               <text class="lp-track__note">{{ step.note }}</text>
@@ -278,6 +279,7 @@ import NxTag from '@/components/ui/nx-tag.vue';
 import PromotionTerms from '@/components/promotion/promotion-terms.vue';
 import SharePosterSheet from '@/components/team/share-poster-sheet.vue';
 import UvtCoin from '@/components/ui/uvt-coin.vue';
+import NxIcon from '@/components/ui/nx-icon.vue';
 import { useDataVisibility } from '@/store/data-visibility';
 import { promotionApi, remoteApiEnabled, sessionVault } from '@/api/runtime';
 import type { PublicPromotion, PublicPurchaseRule, ReferralProgress } from '@/api/promotion-contracts';
@@ -316,6 +318,8 @@ const inviteHero = computed(() => {
   if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward), friend: partsText(buyer) };
   return { label: c.value.friendGets, parts: buyer, friend: '' };
 });
+// Share of the line in brand colour: up to the furthest step that is done or current (0, half or all).
+const trackFill = computed(() => { const last = trackSteps.value.reduce((at, step, index) => step.state === 'todo' ? at : index, 0); return last / (trackSteps.value.length - 1); });
 // Steps light up from real data only: a friend's first purchase reaches step 2, an issued reward step 3.
 // Whether the member has shared is unknown, so step 1 is never marked done on its own.
 const trackSteps = computed(() => {
@@ -323,9 +327,9 @@ const trackSteps = computed(() => {
   const friends = r?.qualifyingOrders ?? 0, paid = r ? r.ownRewards.filter(item => item.state === 'ISSUED').length : 0;
   const reached = !known ? -1 : paid > 0 ? 3 : friends > 0 ? 2 : 0;
   const steps = [
-    { title: copy.stepShare, note: copy.stepShareNote },
-    { title: copy.stepFriendBuys, note: known ? ambassadorCount(copy.friendsBought, friends) : copy.stepFriendBuysNote },
-    { title: copy.stepRewardPaid, note: known && paid > 0 ? ambassadorCount(copy.rewardsPaid, paid) : copy.stepRewardPaidNote },
+    { title: copy.stepShare, note: copy.stepShareNote, icon: 'send' as const },
+    { title: copy.stepFriendBuys, note: known ? ambassadorCount(copy.friendsBought, friends) : copy.stepFriendBuysNote, icon: 'bag' as const },
+    { title: copy.stepRewardPaid, note: known && paid > 0 ? ambassadorCount(copy.rewardsPaid, paid) : copy.stepRewardPaidNote, icon: 'gift' as const },
   ];
   return steps.map((step, index) => ({ ...step, state: index < reached ? 'done' as const : index === reached ? 'current' as const : 'todo' as const }));
 });
@@ -897,19 +901,22 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-panel .lp-product__art { width: 112px; height: 104px; }
 .lp-panel .lp-link--block { margin-top: var(--ui-space-inset); }
 
-/* Step track: nodes joined by a 2px line. Done steps fill brand with a check, the current step is a brand ring; lines into reached steps grow once (07 §7.1.1). */
-.lp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--ui-space-inset); }
-.lp-track__step { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
-.lp-track__rail { display: flex; align-items: center; width: 100%; height: 28px; }
-.lp-track__line { flex: 1; height: 2px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); overflow: hidden; }
-.lp-track__line--none { visibility: hidden; }
-.lp-track__fill { width: 100%; height: 100%; background: var(--v5-brand); transform: scaleX(0); transform-origin: left center; }
-.lp-track__fill.is-on { transform: scaleX(1); animation: lp-track-grow 1400ms cubic-bezier(0.16, 1, 0.3, 1) .3s backwards; }
-@keyframes lp-track-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.lp-track__node { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: 0 6px; box-sizing: border-box; border: 1.5px solid var(--v5-ink-4); border-radius: 999px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); font-variant-numeric: tabular-nums; }
-.lp-track__step--done .lp-track__node { border-color: var(--v5-brand); background: var(--v5-brand); color: var(--v5-on-brand); }
-.lp-track__step--current .lp-track__node { border: 2px solid var(--v5-brand); background: var(--v5-brand-soft); color: var(--v5-brand); }
-.lp-track__title { display: block; margin-top: 8px; padding: 0 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+/* Step track: one continuous 2px line behind three 40px icon nodes (send, bag, gift). Done = soft brand disc with a
+   small check badge, current = brand outline with a gentle breathing ring, not reached = neutral disc. Each node sits on
+   a card-coloured backing so the line never shows through it. The brand part of the line grows once (07 §7.1.1). */
+.lp-track { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--ui-space-inset); }
+.lp-track__line { position: absolute; left: calc(100% / 6); right: calc(100% / 6); top: 19px; height: 2px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 10%, var(--v5-surface)); overflow: hidden; }
+.lp-track__fill { position: absolute; inset: 0; background: var(--v5-brand); transform-origin: left center; animation: lp-track-grow 1400ms cubic-bezier(0.16, 1, 0.3, 1) .3s backwards; }
+@keyframes lp-track-grow { from { transform: scaleX(0); } }
+.lp-track__step { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
+.lp-track__node { position: relative; display: grid; place-items: center; width: 40px; height: 40px; box-sizing: border-box; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, var(--v5-surface)); color: var(--v5-ink-3); }
+.lp-track__step--done .lp-track__node { background: color-mix(in srgb, var(--v5-brand) 16%, var(--v5-surface)); color: var(--v5-brand); }
+.lp-track__step--current .lp-track__node { background: color-mix(in srgb, var(--v5-brand) 8%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); color: var(--v5-brand); }
+.lp-track__step--current .lp-track__node::after { content: ''; position: absolute; inset: -1px; border-radius: 999px; border: 1.5px solid var(--v5-brand); opacity: 0; animation: lp-track-breathe 2.4s ease-out infinite; pointer-events: none; }
+@keyframes lp-track-breathe { 0% { transform: scale(1); opacity: .45; } 100% { transform: scale(1.35); opacity: 0; } }
+:global(.nx-chassis[data-page-visible="false"]) .lp-track__node::after, :global(.nx-chassis[data-scrolling="true"]) .lp-track__node::after { animation-play-state: paused; }
+.lp-track__badge { position: absolute; right: -3px; bottom: -3px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); box-shadow: 0 0 0 2px var(--v5-surface); }
+.lp-track__title { display: block; margin-top: 10px; padding: 0 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .lp-track__step--todo .lp-track__title { color: var(--v5-ink-3); }
 .lp-track__note { display: block; margin-top: 2px; padding: 0 4px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 
@@ -934,7 +941,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-flow__fact:first-child { padding-left: 0; }
 .lp-flow__fact + .lp-flow__fact { border-left: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .lp-flow__fact-value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
-@media (prefers-reduced-motion: reduce) { .lp-track__fill.is-on { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .lp-track__fill, .lp-track__node::after { animation: none; } }
 /* PROTOTYPE: bundle stage. The reward leads at the top; up to three listed devices share one floor, the middle one largest. */
 .lp-combo { position: relative; height: 272px; margin-top: var(--ui-space-section); }
 .lp-combo__reward { position: absolute; left: 0; top: 4px; z-index: 1; }
