@@ -592,7 +592,7 @@ export const vi: Messages = {
     onGridNow: "ngay lúc này",
     onGridMap: "Bản đồ",
     onGridOnline: "node trực tuyến",
-    networkPulseTitle: "Nhịp mạng lưới",
+    platformStatsTitle: "Số liệu nền tảng",
     networkLive: "trực tiếp",
     networkEstimatedDevices: "Ước tính trực tuyến",
     networkGlobalGrid: "Lưới toàn cầu · trực tiếp",

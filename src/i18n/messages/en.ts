@@ -597,7 +597,7 @@ export const en = {
     onGridNow: "now",
     onGridMap: "Map",
     onGridOnline: "online nodes",
-    networkPulseTitle: "Network pulse",
+    platformStatsTitle: "Platform stats",
     networkLive: "live",
     networkEstimatedDevices: "Estimated online",
     networkGlobalGrid: "Global grid · live",

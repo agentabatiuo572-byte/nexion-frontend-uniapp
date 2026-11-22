@@ -936,7 +936,7 @@ export const ms: Messages = {
     onGridNow: "kini",
     onGridMap: "Peta",
     onGridOnline: "nod dalam talian",
-    networkPulseTitle: "Nadi rangkaian",
+    platformStatsTitle: "Data platform",
     networkLive: "langsung",
     networkEstimatedDevices: "Anggaran dalam talian",
     networkGlobalGrid: "Grid global · langsung",

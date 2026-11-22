@@ -936,7 +936,7 @@ export const ru: Messages = {
     onGridNow: "сейчас",
     onGridMap: "Карта",
     onGridOnline: "узлов в сети",
-    networkPulseTitle: "Пульс сети",
+    platformStatsTitle: "Данные платформы",
     networkLive: "онлайн",
     networkEstimatedDevices: "Сейчас в сети (оценка)",
     networkGlobalGrid: "Глобальная сеть · онлайн",

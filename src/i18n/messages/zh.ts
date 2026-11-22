@@ -581,7 +581,7 @@ export const zh: Messages = {
     onGridNow: "实时",
     onGridMap: "地图",
     onGridOnline: "在线节点",
-    networkPulseTitle: "网络脉搏",
+    platformStatsTitle: "平台数据",
     networkLive: "实时",
     networkEstimatedDevices: "预计在线设备",
     networkGlobalGrid: "全球网格 · 实时",
