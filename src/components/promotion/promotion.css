@@ -3,6 +3,10 @@
 /* Content card: 16px inset (01 §1.3 --ui-space-inset); its title is the card-title role (10.1: 16/22 at 375+, 15/22 at 360). */
 .promotion-flat { background:var(--v5-surface); border-radius:20px; padding:var(--ui-space-inset); min-width:0; }
 .promotion-title { display:block; font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+/* The same class outside a card: an open-layout heading takes the section-title role, a heading inside running text
+   (the disclosure's refund heading) the subheading role (10.1). Each use names its role. */
+.promotion-title.promotion-title--section { font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
+.promotion-title.promotion-title--sub { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
 .promotion-copy { display:block; font-size:var(--ui-type-list-subtitle); line-height:1.7; color:var(--v5-ink-3); overflow-wrap:anywhere; }
 .promotion-price { font-size:14px; }
 .promotion-row { display:flex; align-items:flex-start; gap:12px; padding:15px 0; border-bottom:1px solid var(--v5-border); }
