@@ -7,7 +7,7 @@ import { useFreeTrial } from "@/store/free-trial";
 import { useVoucher } from "@/store/voucher";
 import { useEarnConfig } from "@/store/earn-config";
 import { productCatalogState, revalidateProductCatalog } from "@/store/product-catalog";
-import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { ensureServerProductPhase } from "@/store/server-product-phase";
 import { readHomePromotions } from "@/store/home-promotions";
 import { useCommission } from "@/store/commission";
 import { useNetwork } from "@/store/network";
@@ -84,7 +84,7 @@ export function useTabFirstLoad(homeVisible: Ref<boolean>, settleHome: (current:
             () => useFreeTrial().refreshVisible(), () => useVoucher().revalidateRemote(),
             () => readHomePromotions(`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`, true),
             () => revalidateProductCatalog(), () => useEarnConfig().ensure(),
-            () => runPassiveTabRead("product-phase", () => refreshServerProductPhase(true)),
+            () => ensureServerProductPhase(),
           ] : [
             () => useCommission().ensureCanonicalEvents(), () => useNetwork().ensureCanonicalNetwork(),
             () => useVRank().ensureCanonicalVRank(), () => useReferralReward().ensure(),

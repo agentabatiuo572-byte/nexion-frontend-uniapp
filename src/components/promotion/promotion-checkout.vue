@@ -137,7 +137,7 @@ import { promotionApi,deviceE3Api,purchaseEligibilityApi,sessionVault } from '@/
 import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api';
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { PromotionItem } from '@/api/promotion-api';
-import { checkoutQuoteBlock, validatePromotionItems, type CheckoutQuoteBlock } from '@/api/promotion-api';
+import { checkoutQuoteBlock, validatePromotionItems, type CheckoutQuoteBlock, type OrderReceipt } from '@/api/promotion-api';
 import type { RewardDisclosure,Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
@@ -542,6 +542,10 @@ async function selectVoucher(id:string|null){
 }
 async function createOrder(){if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;await run(()=>session.create());if(canPay.value&&current()&&visible.value){paymentSheetOpen.value=true;void confirmPayment();}}
 const paymentDialogOwner=`promotion-payment:${Date.now()}:${Math.random()}`;
+// Photo signatures can renew while payment terms stay the same.
+function orderItemSignature(items:OrderReceipt['items']) {
+  return JSON.stringify(items?.map(({imageUrl,...line}: NonNullable<OrderReceipt['items']>[number] & {imageUrl?: string | null})=>line));
+}
 async function pay(){
   updateClock();if(paymentEntryChecking.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
   if(session.externalPaymentRefused){
@@ -558,19 +562,23 @@ async function pay(){
     if(!recovered||!canPay.value||!current()||!visible.value)return;
     const expectedOrder=order.value,generation=readGeneration,runtime=captureRuntimeRevision(),sessionRevision=sessionVault.revision();
     if(!expectedOrder)return;
-    const signature=JSON.stringify([expectedOrder.orderNo,expectedOrder.amountUsdt,expectedOrder.payBy,expectedOrder.items]);
+    const signature=JSON.stringify([expectedOrder.orderNo,expectedOrder.amountUsdt,expectedOrder.payBy,orderItemSignature(expectedOrder.items)]);
     const entryCurrent=()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
       &&(sessionVault.revision()===sessionRevision||sessionVault.isRefreshContinuation(sessionRevision))
       &&session.confirmed&&!session.unknown&&order.value?.paymentStatus==='PENDING'
-      &&JSON.stringify([order.value.orderNo,order.value.amountUsdt,order.value.payBy,order.value.items])===signature;
+      &&JSON.stringify([order.value.orderNo,order.value.amountUsdt,order.value.payBy,orderItemSignature(order.value.items)])===signature;
     let ready=false,blocked='';
     await run(async()=>{
       const items=(expectedOrder.items??[]).map(({productNo,quantity})=>({productNo,quantity}));
-      const eligibility=await Promise.all([...new Set(items.map(item=>item.productNo))].map(productNo=>purchaseEligibilityApi.get(productNo)))
-        .catch(()=>null);
+      const eligibility=await Promise.allSettled([...new Set(items.map(item=>item.productNo))].map(productNo=>purchaseEligibilityApi.get(productNo)));
       updateClock();if(!entryCurrent()||payWindow.value!==true)return;
-      if(!eligibility){error.value=flowCopy.value.queryFailed;return;}
-      if(eligibility.some(item=>!item.eligible)){blocked=t.value.store.gateBlockedToast;error.value=blocked;return;}
+      const reason=eligibility.map(item=>item.status==='rejected'
+        ?checkoutQuoteBlock(item.reason,'eligibility')
+        :item.value.eligible?null:checkoutQuoteBlock(item.value.decisionCode,'eligibility'))
+        .find(block=>block&&block!=='unavailable')??null;
+      if(reason){blocked=checkoutQuoteBlockCopy(reason,t.value);error.value=blocked;return;}
+      if(eligibility.some(item=>item.status==='rejected')){error.value=flowCopy.value.queryFailed;return;}
+      if(eligibility.some(item=>item.status==='fulfilled'&&!item.value.eligible)){blocked=t.value.store.gateBlockedToast;error.value=blocked;return;}
       ready=true;
     });
     if(ready&&entryCurrent()&&canPay.value){paymentSheetOpen.value=true;void confirmPayment();}
@@ -586,10 +594,10 @@ async function confirmPayment(){
   if(!expectedOrder)return;
   const {orderNo,amountUsdt}=expectedOrder;
   if(amountUsdt===undefined||!Number.isFinite(Number(amountUsdt)))return;
-  const lines=JSON.stringify(expectedOrder.items),payBy=expectedOrder.payBy;
+  const lines=orderItemSignature(expectedOrder.items),payBy=expectedOrder.payBy;
   const paymentCurrent=()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
     &&(sessionVault.revision()===sessionRevision||sessionVault.isRefreshContinuation(sessionRevision))
-    &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&JSON.stringify(order.value?.items)===lines&&order.value?.payBy===payBy
+    &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&orderItemSignature(order.value?.items)===lines&&order.value?.payBy===payBy
     &&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&!session.unknown;
   paymentConfirming.value=true;paymentSheetOpen.value=false;
   let rejection='',paymentDestination='',paymentReplace=false;paymentLeaveApproved=false;

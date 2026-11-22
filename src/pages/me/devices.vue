@@ -217,8 +217,8 @@ const app = useApp();
 const trial = useFreeTrial();
 onShow(() => {
   app.setDeviceInventoryVisible(true);
-  void trial.refreshVisible();
-  if (remoteApiEnabled) void app.refreshRemoteFleet(undefined, { coalesce: true });
+  void trial.refreshVisible(false, true);
+  if (remoteApiEnabled) void app.ensureRemoteFleet();
 });
 onHide(() => app.setDeviceInventoryVisible(false));
 const trialPresentation = useTrialPresentation();

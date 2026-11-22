@@ -1,6 +1,6 @@
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { TRIAL_CONVERT_COMMANDS_TABLE } from '@/lib/purchase-caller-record';
-import { invalidateBeforePassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
+import { invalidateBeforePassiveTabRead, runForegroundStoreRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef } from "vue";
@@ -447,10 +447,11 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return remoteApiEnabled && foregroundReadAllowed() && !!session && boundKey === `user:${session.user.userId}`;
   }
 
-  async function refreshVisible(eligibilityFallback = false): Promise<boolean> {
+  async function refreshVisible(eligibilityFallback = false, foregroundInventory = false): Promise<boolean> {
     if (!canReadVisible()) return false;
     const epoch = accountBindingEpoch;
-    const ready = await runPassiveTabRead("trial-state", () => refreshRemote(), undefined, () => authorityStatus.value === "ready");
+    const read = foregroundInventory ? runForegroundStoreRead : runPassiveTabRead;
+    const ready = await read("trial-state", () => refreshRemote(), undefined, () => authorityStatus.value === "ready");
     if (ready || !eligibilityFallback || epoch !== accountBindingEpoch || !canReadVisible()) return ready;
     return runPassiveTabRead("trial-eligibility", () => refreshEligibilityRemote(), undefined, () => authorityStatus.value === "ready");
   }

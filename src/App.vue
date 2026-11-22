@@ -71,8 +71,8 @@ import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route'
 import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { installFieldNaming } from "@/lib/a11y-field-label";
-import { refreshEarnConfig } from "@/store/earn-config";
-import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { ensureEarnConfig } from "@/store/earn-config";
+import { ensureServerProductPhase } from "@/store/server-product-phase";
 import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
 import { useMarket } from "@/store/market";
@@ -366,7 +366,7 @@ let lastTrialNoticeEpoch = -1;
 let lastTrialNoticeStatus: ReturnType<typeof useFreeTrial>["status"] = "none";
 
 function refreshVisibleResource(route: string) {
-  if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible();
+  if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible(false, route === "pages/me/devices");
   else if (route === "pages/me/wallet-bills") void refreshActivePage(route);
   else if (route === "pages/me/notifications" && useMessageDrawer().section === "notifications") {
     const notifications = useNotifications();
@@ -1295,7 +1295,7 @@ onLaunch(() => {
   if (remoteApiEnabled) {
     // Public server configuration is warmed at launch. Each store starts
     // empty/fail-closed, so a failed request cannot expose prototype values.
-    void refreshEarnConfig().catch(() => undefined);
+    void ensureEarnConfig().catch(() => undefined);
     void useMarket().syncRemote();
     // The server catalog is a USER-only resource. Clear any local compatibility
     // rows at startup, then let the authenticated Store entry fetch it; an
@@ -1355,9 +1355,9 @@ onShow(() => {
     // PC-managed runtime configuration must converge when the App returns to
     // foreground; a launch-only fetch leaves pricing, phase and translations
     // stale for an entire long-lived session.
-    void refreshEarnConfig().catch(() => undefined);
-    void refreshServerProductPhase(true).catch(() => false);
-    void useI18nRuntime().refresh(useLocaleStore().code, true).catch(() => undefined);
+    void ensureEarnConfig().catch(() => undefined);
+    void ensureServerProductPhase().catch(() => false);
+    void useI18nRuntime().ensure(useLocaleStore().code).catch(() => undefined);
   }
   // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
   // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」

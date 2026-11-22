@@ -313,6 +313,28 @@ export const useOrders = defineStore("orders", () => {
     }
   }
 
+  /** Reconcile a card already on screen without resetting the list's pagination. */
+  async function reconcileRemoteOrder(id: string, stillVisible: () => boolean): Promise<void> {
+    if (!remoteApiEnabled || !getById(id)) return;
+    const requestEpoch = boundEpoch;
+    const requestRun = captureRuntimeRevision();
+    const current = () => stillVisible() && boundEpoch === requestEpoch && isCurrentRuntimeRevision(requestRun);
+    const visited = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const page: Awaited<ReturnType<typeof orderApi.list>> = await orderApi.list(cursor, 100);
+      if (!current()) return;
+      const order = page.orders.find(row => row.orderNo === id);
+      if (order) {
+        orders.value = orders.value.map(previous => previous.id === id ? fromCanonical(order) : previous);
+        return;
+      }
+      cursor = page.nextCursor ?? null;
+      if (!cursor || visited.has(cursor)) return;
+      visited.add(cursor);
+    } while (cursor);
+  }
+
   async function ensureRemoteOrder(id: string): Promise<Order | undefined> {
     if (!remoteApiEnabled) return getById(id);
     const requestBoundKey = boundKey;
@@ -576,7 +598,7 @@ export const useOrders = defineStore("orders", () => {
     currentAccountBindingRevision,
     refreshRemote,
     loadMoreRemote,
-    ensureRemoteOrder,
+    ensureRemoteOrder, reconcileRemoteOrder,
   };
 });
 

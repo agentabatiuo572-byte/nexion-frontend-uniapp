@@ -193,7 +193,17 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
   if (!records.length) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(records.map(async pending => {
     const intent = await readIntent(pending);
-    if (current() && account() === accountKey && !state.open && shouldRead(pending)) projectPassivePayment(accountKey, pending, intent);
+    const stillVisible = () => current() && account() === accountKey && !state.open && shouldRead(pending);
+    if (!stillVisible()) return;
+    if (pending.kind === 'ORDER_PAY' && intent && intent.status !== pending.lastStatus && settled(intent)) {
+      matches(intent, pending);
+      const payload = JSON.parse(pending.fingerprint)[1];
+      if (intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED') {
+        validatePurchasePaymentReceipt(pending.kind, payload, intent.receipt, intent);
+      }
+      await useOrders().reconcileRemoteOrder(payload.orderNo, stillVisible);
+    }
+    if (stillVisible()) projectPassivePayment(accountKey, pending, intent);
   })));
 }
 function projectPassivePayment(accountKey: string, pending: PendingExternal, intent: PurchasePaymentIntent | null) {

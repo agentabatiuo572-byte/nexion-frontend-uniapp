@@ -9,7 +9,7 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || createLookupUnavailable }">
+      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved || canResubmitPendingCreate) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || canResubmitPendingCreate }">
         <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalOrderNavigationFailed ? t.store.coOriginalOrderOpenFailed : t.store.coPendingCreateTitle" :description="pendingCreateDescription" />
       </view>
       <view v-else-if="keepCheckoutTarget" class="checkout-page-center" role="status">
@@ -249,7 +249,7 @@
       <view v-if="promotionRoute ? promotionCheckout?.keepResumeAllowed : keepResumeAllowed" class="checkout-sticky checkout-sticky--single nx-glass-bar">
         <NxButton variant="primary" :label="purchaseRecoveryCopy(locale.code).resume" @click="promotionRoute ? promotionCheckout?.openKeepResume() : openKeepResume()" />
       </view>
-      <view v-if="!promotionRoute && (originalOrderNavigationFailed || (pendingCreateUnresolved && createLookupUnavailable)) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
+      <view v-if="!promotionRoute && (originalOrderNavigationFailed || canResubmitPendingCreate) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
         <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
@@ -311,7 +311,7 @@ import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
-import { readCheckoutOrderPointer, rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
+import { readCheckoutOrderPointer, rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, hasKnownCheckoutTradeinStatus, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
 import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
 import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
@@ -349,7 +349,7 @@ import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityG
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
-import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
@@ -385,14 +385,15 @@ const createdCheckoutOrder = ref<CreatedOrder | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
 const confirmedMissingCreateKey = ref<string | null>(null);
-const createLookupUnavailable = ref(false);
 const pendingCreateFound = ref(false);
 const pendingCreateUnresolved = computed(() => !createdCheckoutOrder.value
   && (!!pendingCreatePointer.value || (!!pendingCheckoutCreate.value
     && pendingCheckoutCreate.value.request.idempotencyKey !== confirmedMissingCreateKey.value)));
+const canResubmitPendingCreate = computed(() => !createdCheckoutOrder.value && !!pendingCheckoutCreate.value
+  && confirmedMissingCreateKey.value === pendingCheckoutCreate.value.request.idempotencyKey && catalogStatus.value === 'error');
 const pendingCreateDescription = computed(() => originalOrderNavigationFailed.value
   ? (pendingCreateFound.value ? t.value.store.coPendingCreateFound : t.value.store.coOriginalOrderOpenHint)
-  : (createLookupUnavailable.value ? t.value.store.coResubmitOrderHint : t.value.store.coPendingCreateChecking));
+  : (canResubmitPendingCreate.value ? t.value.store.coResubmitOrderHint : t.value.store.coPendingCreateChecking));
 // A definitive server refusal of this payment: shown with its reason and a cancel-order exit.
 const paymentBlocked = ref('');
 const hasOriginalCheckout = computed(() => !!createdCheckoutOrder.value || !!pendingCheckoutCreate.value || !!pendingCreatePointer.value);
@@ -1241,7 +1242,6 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   foregroundTradeinSignature = null;
   foregroundPaymentSignature = null;
   confirmedMissingCreateKey.value = null;
-  createLookupUnavailable.value = false;
   pendingCreateFound.value = false;
   originalOrderNavigationFailed.value = false;
   paymentBlocked.value = '';
@@ -2045,11 +2045,13 @@ async function retryOriginalCheckout() {
     return;
   }
   const pendingCreate = pendingCheckoutCreate.value;
-  if (!pendingCreate || !pendingCreateUnresolved.value || !createLookupUnavailable.value) return;
+  if (!pendingCreate || !canResubmitPendingCreate.value) return;
   const scope = captureCheckoutRoute();
   const attempt = ++checkoutLeaveAttempt;
   checkoutLeaving.value = true;
   try {
+    // A submitted replay is uncertain again until the server confirms its result.
+    confirmedMissingCreateKey.value = null;
     const created = await orderApi.create(pendingCreate.request);
     if (!isCurrentCheckoutRoute(scope)) return;
     rememberCheckoutOrder(scope.accountKey, { productNo: scope.productNo, orderNo: created.orderNo, intent: pendingCreate.intent, commandKey: pendingCreate.request.idempotencyKey });
@@ -2236,7 +2238,7 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
       && current.payableUsdt === reviewedQuote.payableUsdt
       && current.discountUsdt === reviewedQuote.discountUsdt;
   };
-  const expectedActive = recovery.tradeinQuote.targetDeviceStatus === "ACTIVE";
+  const knownTargetStatus = hasKnownCheckoutTradeinStatus(reviewedQuote);
   const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
   const markCommandSubmitted = () => {
     if (!authorizationIsCurrent()) throw new Error('CHECKOUT_ACCOUNT_CHANGED');
@@ -2244,7 +2246,7 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
     rememberCheckoutOrder(submissionScope.accountKey, recovery);
     return key;
   };
-  let recoveredResult = recovery.tradeinResult;
+  let recoveredResult = knownTargetStatus ? recovery.tradeinResult : undefined;
   if (!newSubmission && !recoveredResult) {
     if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
     const result = await readPaymentCommand(apiClient, 'trade-in', key);
@@ -2254,12 +2256,15 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
     }
     if (result.status === 'SUCCEEDED') recoveredResult = parseCanonicalTradeinResult(result.receipt);
     // A passive read may confirm a prior command, but only an entry or user action can resume it.
-    else if (!readOnly && result.status === 'NOT_SEEN' && result.canResumeSameKey
+    else if (knownTargetStatus && !readOnly && result.status === 'NOT_SEEN' && result.canResumeSameKey
         && recovery.tradeinCommandSubmitted === false && !hasTradeinPurchaseIntent(submissionScope.accountKey, key)) {
       remoteTradeinRecoveryError.value = false;
     }
     else throw new Error('PAYMENT_RESULT_UNRESOLVED');
   }
+  if (!knownTargetStatus && !recoveredResult) throw new Error('PAYMENT_RESULT_UNRESOLVED');
+  const verifiedTargetStatus = knownTargetStatus ? reviewedQuote.targetDeviceStatus : recoveredResult?.targetDeviceStatus;
+  const expectedActive = verifiedTargetStatus == null ? null : verifiedTargetStatus === "ACTIVE";
   return completeVerifiedMutation({
         submit: async () => {
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
@@ -2325,13 +2330,14 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
         },
         verifyOrder(submitted, persisted) {
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
+          const active = expectedActive ?? persisted?.canonicalStatus === "activated";
           if (!persisted || persisted.tradeinNo !== submitted.tradeinNo
               || persisted.sourceDeviceId !== submitted.sourceDeviceId
               || persisted.targetDeviceId !== submitted.targetDeviceId
-              || persisted.canonicalStatus !== (expectedActive ? "activated" : "inventory")
+              || persisted.canonicalStatus !== (active ? "activated" : "inventory")
               || persisted.paymentStatus.toUpperCase() !== "PAID"
               || persisted.orderStatus.toUpperCase() !== "COMPLETED"
-              || persisted.activationStatus.toUpperCase() !== (expectedActive ? "ACTIVATED" : "INVENTORY")
+              || persisted.activationStatus.toUpperCase() !== (active ? "ACTIVATED" : "INVENTORY")
               || typeof persisted.amountUsdt !== "number"
               || Math.abs(persisted.amountUsdt - purchasePrincipalUsdt(submitted)) > 0.000001
               || Math.abs(persisted.discountUsdt - submitted.discountUsdt) > 0.000001) {
@@ -2384,7 +2390,8 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, { navigate 
   }
   if (!recovery) return false;
   const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
-  const refused = refusedPurchasePayment(scope.accountKey, key);
+  const statusKnown = hasKnownCheckoutTradeinStatus(recovery.tradeinQuote);
+  const refused = statusKnown && refusedPurchasePayment(scope.accountKey, key);
   if (refused) {
     remoteTradeinRecoveryRequired.value = false;
     remoteTradeinRecoveryError.value = false;
@@ -2396,7 +2403,7 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, { navigate 
   if (remoteTradeinRecoveryBusy.value) return true;
   remoteTradeinRecoveryBusy.value = true;
   try {
-    const tracking = readOnly ? null : prepareTradeinPaymentRecovery(scope.accountKey, key, recovery.tradeinCommandSubmitted === false);
+    const tracking = readOnly || !statusKnown ? null : prepareTradeinPaymentRecovery(scope.accountKey, key, recovery.tradeinCommandSubmitted === false);
     if (tracking) {
       await tracking;
       if (!current()) return true;
@@ -2463,9 +2470,7 @@ async function readPendingCheckoutCreate() {
   }
   if (!isCurrentCheckoutRoute(scope) || !isTopCheckoutPage() || !foregroundReadAllowed()
       || pendingCheckoutCreate.value?.request.idempotencyKey !== pending.request.idempotencyKey) return;
-  if (result.status === 'UNAVAILABLE') {
-    createLookupUnavailable.value = true;
-  } else if (result.status === 'NOT_FOUND') {
+  if (result.status === 'NOT_FOUND') {
     // Release the pending screen while retaining the original payload and key for the next explicit confirm.
     confirmedMissingCreateKey.value = pending.request.idempotencyKey;
     step.value = 'select-payment';
@@ -2480,7 +2485,6 @@ async function readPendingCheckoutCreate() {
       return;
     }
     pendingCheckoutCreate.value = null;
-    createLookupUnavailable.value = false;
     step.value = 'select-payment';
     const failure = new ApiError({ kind: 'http', status: result.code, code: result.code, message: result.message });
     const outOfStock = isApiRefusal(failure, 409, 'PRODUCT_OUT_OF_STOCK');
@@ -2816,7 +2820,7 @@ useAutoRecovery({
   repeatMs: 30_000,
 });
 useAutoRecovery({
-  failed: () => remoteApiEnabled && pendingCreateUnresolved.value && !createLookupUnavailable.value
+  failed: () => remoteApiEnabled && pendingCreateUnresolved.value
     && !paymentFlowBusy.value && !checkoutLeaving.value && isTopCheckoutPage(),
   retry: readPendingCheckoutCreate,
   repeatMs: 30_000,
@@ -2911,7 +2915,7 @@ function showCheckout() {
       pending.setViewing(activeSession.value.id); // 它展示的那张发票不需要浮动条重复提醒
     }
   }
-  void refreshServerProductPhase(true);
+  void ensureServerProductPhase();
   void refreshCheckoutWallet();
   restoreReceiptRecovery();
 }
@@ -2969,7 +2973,6 @@ async function refreshForegroundOrdinaryCheckout() {
   if (pendingCreate && pendingCheckoutCreate.value?.request.idempotencyKey !== pendingCreate.request.idempotencyKey) {
     pendingCheckoutCreate.value = pendingCreate;
     pendingCreatePointer.value = null;
-    createLookupUnavailable.value = false;
   }
   if (!pendingCheckoutCreate.value && !createdCheckoutOrder.value) {
     const recent = readCheckoutOrderPointer(scope.accountKey, scope.productNo);
