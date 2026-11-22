@@ -815,77 +815,13 @@ const noteStyle: CSSProperties = {
 .gh-chassis--owned { background-image: url("/static/img/genesis/obsidian-light.webp") !important; background-size: cover !important; background-position: center !important; }
 :global(html[data-theme="dark"] .gh-chassis--owned) { background-image: url("/static/img/genesis/obsidian-dark.webp") !important; }
 .gh-chassis--owned :deep(.nx-top-chrome) { background: transparent; }
-.gh-page { padding-bottom: 32px; color: var(--v5-ink); font-family: var(--font-v5); }
-.gh-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-4); }
 .gh-surface:not(.nx-tint) { background: color-mix(in srgb, var(--v5-surface) 96%, transparent); }
 .gh-surface { border-radius: var(--v5-radius-xl); padding: var(--v5-space-4); }
 /* Aggregate holding artwork carries no fixed serial; account content stays live. */
 .gh-hero { --gh-logo-width: 128px; position: relative; padding: var(--v5-space-3) 20px 16px; border-radius: 18px; }
 .gh-hero:not(.nx-tint) { background: var(--v5-surface); }
 .gh-hero-art { margin-bottom: var(--v5-space-3); border-radius:var(--ui-radius-icon); }
-.gh-identity, .gh-summary, .gh-stats, .gh-emissions { position: relative; z-index: 1; }
-.gh-identity { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 44px; margin-bottom: var(--v5-space-3); }
-.gh-identity :deep(.uvel-brand) { width: var(--gh-logo-width); height: 44px; }
-.gh-identity :deep(.genesis-holder-badge) { max-width: calc(100% - var(--gh-logo-width) - 12px); gap: var(--v5-space-2); padding: 5px 12px; min-height: 36px; border: 1px solid color-mix(in srgb, var(--v5-genesis-gold) 80%, transparent); font-size: 13px; font-weight: 600; line-height: 1.3; background: color-mix(in srgb, var(--v5-genesis-gold) 5%, transparent); }
-.gh-identity :deep(.genesis-holder-badge svg) { width: 24px; height: 24px; }
-.gh-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--v5-space-8); align-items: center; }
-.gh-allocation, .gh-stats > view:last-child { position: relative; }
-.gh-allocation { transform: translateY(-4px); }
-.gh-allocation::before, .gh-stats > view:last-child::before { content: ""; position: absolute; inset-inline-start: -23px; top: 4px; bottom: 4px; width: 1px; background: linear-gradient(transparent, var(--v5-border-strong), transparent); }
-.gh-label { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.5; color: var(--v5-ink-3); overflow-wrap: break-word; }
-.gh-count { display: flex; align-items: baseline; gap: var(--v5-space-2); font-size: var(--v5-type-hero); line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
-.gh-unit { font-size: var(--v5-type-h3); }
-.gh-value { display: block; font-size: var(--ui-type-metric-value); line-height: var(--ui-type-metric-value-lh); font-weight: var(--ui-type-metric-value-weight); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
-.gh-brand { color: var(--v5-brand); }
-.gh-hero .gh-value { line-height: 1.2; }
-.gh-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--v5-space-8); margin-top: var(--v5-space-3); padding-top: 8px; border-top: 1px solid var(--v5-border); }
-@media (max-width: 374px) { .gh-hero { --gh-logo-width: 104px; padding-inline: 16px; } .gh-identity :deep(.genesis-holder-badge) { gap: 6px; padding-inline: 8px; font-size: 12px; } .gh-identity :deep(.genesis-holder-badge svg) { width: 20px; height: 20px; } .gh-summary { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } .gh-summary, .gh-stats { column-gap: var(--v5-space-4); } .gh-allocation::before, .gh-stats > view:last-child::before { inset-inline-start: -12px; } }
-.gh-disclosure { display: flex; align-items: center; gap: var(--v5-space-3); color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
-.gh-disclosure svg { flex-shrink: 0; }
-.gh-heading { display: flex; align-items: center; gap: var(--v5-space-3); margin-bottom: var(--v5-space-3); font-size: var(--ui-type-section); font-weight: 600; line-height: 1.5; }
-.gh-heading::after { content: ""; width: 40px; height: 1px; flex-shrink: 0; background: linear-gradient(90deg, var(--v5-genesis-gold), transparent); }
-.gh-title { display: block; font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight); line-height: 1.5; }
-.gh-link { color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); }
-.gh-how { display: flex; align-items: center; justify-content: center; align-self: center; min-height: 44px; padding: 0 12px; text-align: center; }
-.gh-section-row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); flex-wrap: wrap; margin-bottom: var(--v5-space-2); }
-.gh-chip { padding: var(--v5-space-1) 8px; border-radius: var(--v5-radius-full); color: var(--v5-brand); background: var(--v5-brand-soft); font-size: var(--v5-type-caption); }
-.gh-rank { display: flex; gap: var(--v5-space-3); align-items: center; padding: var(--v5-space-2); font-size: var(--ui-type-list-subtitle); }
-.gh-rank--me { background: var(--v5-brand-soft); border-radius: var(--v5-radius-s); }
-.gh-rank-who { flex: 1; min-width: 0; overflow-wrap: break-word; }
-.gh-note { display: block; font-size: var(--ui-type-note); line-height: var(--ui-type-note-lh); color: var(--v5-ink-3); margin-top: var(--v5-space-1); overflow-wrap: break-word; }
-.gh-holding-list { padding-top: 4px; padding-bottom: 4px; }
-.gh-holding { display: flex; align-items: center; gap: var(--v5-space-3); padding: var(--v5-space-4) 0; }
-.gh-holding + .gh-holding { border-top: 1px solid var(--v5-border); }
-.gh-holding-icon { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--v5-radius-s); color: var(--v5-genesis-gold); background: color-mix(in srgb, var(--v5-genesis-gold) 12%, transparent); }
-.gh-holding-body { flex: 1; min-width: 0; }
-.gh-amount { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-note); line-height: var(--ui-type-note-lh); overflow-wrap: break-word; }
-.gh-icon-button { display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: var(--v5-radius-full); flex-shrink: 0; color: var(--v5-ink-3); background: var(--v5-surface-2); }
-.gh-perk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--v5-space-6); row-gap: var(--v5-space-5); padding: var(--v5-space-5); }
-.gh-perk { min-width: 0; }
-.gh-perk:nth-child(n + 3) { padding-top: 20px; border-top: 1px solid var(--v5-border); }
-.gh-perk-icon { display: flex; color: var(--v5-genesis-gold); margin-bottom: 10px; }
-.gh-perk-label { display: block; font-size: 13px; font-weight: 600; line-height: 1.5; overflow-wrap: break-word; }
-.gh-perk-body { display: block; margin-top: 5px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: break-word; }
-.gh-body { display: block; font-size: var(--v5-type-body-s); font-weight: 500; line-height: 1.5; }
-.gh-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--v5-space-2); }
-.gh-action { display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); padding: var(--v5-space-3); min-height: 52px; border-radius: var(--v5-radius-full); background: var(--v5-surface); font-size: var(--v5-type-body-s); font-weight: 500; text-align: center; }
-.gh-action svg { flex-shrink: 0; }
-.gh-boost { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: var(--v5-space-3) 20px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font-size: var(--v5-type-button); line-height: 1.5; font-weight: 600; text-align: center; }
-.gh-content [role="button"] { cursor: pointer; }
-.gh-content [role="button"]:active { opacity: 0.8; }
-.gh-content [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-.gh-empty { display: flex; flex-direction: column; gap: var(--v5-space-3); color: var(--v5-ink); }
-.gh-empty > svg { color: var(--v5-genesis-gold); }
-.gh-muted { color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
-.gh-emissions { margin-top: var(--v5-space-4); }
-.gh-emission-row { display: flex; align-items: center; gap: var(--v5-space-4); margin-top: var(--v5-space-3); }
-.gh-emission-values { min-width: 0; flex: 1; }
-.gh-emission-values > .gh-label:not(:first-child) { margin-top: var(--v5-space-3); }
-.gh-ring { width: 96px; height: 96px; padding: var(--v5-space-2); border-radius: 50%; flex-shrink: 0; }
-.gh-ring-inner { width: 100%; height: 100%; border-radius: 50%; background: var(--v5-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-.gh-ring-inner .gh-label { font-size: var(--v5-type-caption); }
-.gh-ledger-row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); padding-top: 12px; font-size: var(--ui-type-note); line-height: var(--ui-type-note-lh); overflow-wrap: break-word; }
-.gh-ledger-row > text { min-width: 0; }
+@media (max-width: 374px) { .gh-hero { --gh-logo-width: 104px; padding-inline: 16px; } }
 </style>
 
 <style scoped>
