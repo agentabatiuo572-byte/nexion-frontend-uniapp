@@ -271,7 +271,8 @@ const keepResumeAllowed = computed(() => {
 });
 function openKeepResume(): boolean {
   const resume = checkoutKeepResume?.value;
-  return !!resume && keepResumeAllowed.value && recoverKeepBeforeNewPurchase(true, resume);
+  if (!resume || !keepResumeAllowed.value) return false;
+  return resume.kind === 'intent' ? resume.open() : recoverKeepBeforeNewPurchase(true, resume);
 }
 function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume, showRecovery=true):boolean {
   // Original orders and commands always recover before any new purchase gate.

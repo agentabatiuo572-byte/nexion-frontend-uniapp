@@ -277,7 +277,7 @@ import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
-import { checkoutKeepResumeKey, ownsCheckoutCapacityPaymentKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
+import { checkoutKeepResumeKey, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute } from '@/lib/advisor-chat-route';
 import { useConversations } from '@/store/conversations';
@@ -533,6 +533,11 @@ const ownsCheckoutCapacityPayment: OwnsCheckoutCapacityPayment = row => {
   return !!owner && row.commandKey === owner.commandKey && row.kind === capacityPaymentKind(owner.operation);
 };
 provide(ownsCheckoutCapacityPaymentKey, ownsCheckoutCapacityPayment);
+provide(showsCheckoutCapacityResumeKey, row => {
+  const resume = checkoutKeepResume.value;
+  const shown = promotionRoute.value ? promotionCheckout.value?.keepResumeAllowed : keepResumeAllowed.value;
+  return !!resume && !!shown && row.commandKey === resume.commandKey && row.kind === capacityPaymentKind(resume.operation);
+});
 const checkoutPurchaseChecking = computed(() => remoteApiEnabled && !createdCheckoutOrder.value
   && (serverOrderRecovery.value !== null || (!ordinaryCheckoutInitialized.value && !originalOrderNavigationFailed.value)));
 type PurchaseEligibilityResult = "eligible" | "ineligible" | "outOfStock" | "productUnavailable" | "unavailable" | "stale";
@@ -697,7 +702,7 @@ let refusedCapacityTarget: string | null = null;
 function openKeepResume(): boolean {
   const resume = checkoutKeepResume.value;
   if (!resume || !keepResumeAllowed.value || !auth.isAuthenticated || !isCurrentCheckoutRoute(captureCheckoutRoute())) return false;
-  return recoverCapacityBeforePurchase([resume.target], false, resume);
+  return resume.kind === "intent" ? resume.open() : recoverCapacityBeforePurchase([resume.target], false, resume);
 }
 function recoverCapacityBeforePurchase(targets: string[], explicit = false, resume?: CheckoutKeepResume, showRecovery = true): boolean {
   if (!resume) refusedCapacityTarget = null;

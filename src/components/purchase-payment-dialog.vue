@@ -244,7 +244,7 @@
 </template>
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
-import { ownsCheckoutCapacityPaymentKey, type OwnsCheckoutCapacityPayment } from '@/components/checkout/checkout-keep-resume';
+import { ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type OwnsCheckoutCapacityPayment } from '@/components/checkout/checkout-keep-resume';
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import NxButton from '@/components/ui/nx-button.vue';
@@ -282,7 +282,9 @@ const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
 // Orders lists every unfinished payment; dismissal applies only to the floating count.
-const records = computed(() => unsettled.value.filter(row => !row.validated && !row.businessDelivered && row.lastStatus !== 'DELIVERED'));
+const showsCheckoutCapacityResume = inject(showsCheckoutCapacityResumeKey, null);
+const records = computed(() => unsettled.value.filter(row => !row.validated && !row.businessDelivered
+  && row.lastStatus !== 'DELIVERED' && !showsCheckoutCapacityResume?.(row)));
 const pending = computed(() => records.value.filter(row => !payment.resumeDismissed(row)));
 // One payment opens directly; several are listed on Orders.
 function openPending() { if (pending.value.length === 1) void payment.resume(pending.value[0]); else void navTo('/pages/store/orders'); }

@@ -299,7 +299,7 @@ import { isProductAvailable } from "@/store/product-availability";
 import { useOrders } from "@/store/orders";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision } from "@/domain/e20-capacity-coordinator";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { onPurchaseRecordReleased, readCheckoutCapacityPayment, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { onPurchaseRecordReleased, readCheckoutCapacityPayment, refusedPurchasePayment, resumeCheckoutCapacityPayment, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
 import { readPaymentCommand } from "@/api/payment-command-api";
 import { parseCanonicalTradeinResult,parseCanonicalCapacityKeepResult,type CanonicalTradeinResult,type CanonicalCapacityKeepResult } from "@/api/device-e3-api";
@@ -392,10 +392,17 @@ let capacityRecoveryGeneration = 0;
 let checkoutCapacityRead: { accountKey: string; target: string; at: number } | undefined;
 const capacityResumeKey = ref<string | null>(null);
 const capacityResumeAllowed = computed(() => capacityResumeKey.value !== null && capacityRecovery.value?.key === capacityResumeKey.value);
+const capacityIntentResume = ref<{ commandKey: string; intentNo: string; cutoff: number | null } | null>(null);
+watch(capacityIntentResume, (resume, _previous, cleanup) => {
+  if (resume?.cutoff == null || !Number.isFinite(resume.cutoff)) return;
+  const timer = setTimeout(() => { capacityIntentResume.value = null; }, Math.max(0, resume.cutoff - Date.now()));
+  cleanup(() => clearTimeout(timer));
+});
 const reportCheckoutKeepResume = inject(reportCheckoutKeepResumeKey, null);
 function invalidateCapacityRecovery() {
   capacityRecoveryGeneration++;
   capacityResumeKey.value = null;
+  capacityIntentResume.value = null;
 }
 onShow(() => { capacityPageShown.value=true; });
 onHide(() => { capacityPageShown.value=false; invalidateCapacityRecovery(); });
@@ -404,6 +411,7 @@ const stopCapacityRelease = onPurchaseRecordReleased((accountKey, key) => {
   if (accountKey !== app.accountKey || savedCapacity.value?.key !== key) return;
   savedCapacity.value = null;
   capacityResumeKey.value = null;
+  capacityIntentResume.value = null;
   refreshKeepRecovery();
 });
 onUnmounted(() => { invalidateCapacityRecovery(); reportCheckoutKeepResume?.(null); stopCapacityRelease(); });
@@ -421,15 +429,19 @@ watch([()=>app.accountKey,()=>app.accountBindingEpoch,()=>props.active,()=>props
   try { savedCapacity.value=remoteApiEnabled?readCapacityPending(app.accountKey):null;capacityRecoveryUnavailable.value=false; }
   catch { capacityRecoveryUnavailable.value=true; }
   if (capacityRecoveryUnavailable.value || savedCapacity.value?.key !== capacityResumeKey.value) capacityResumeKey.value = null;
+  if (capacityRecoveryUnavailable.value || savedCapacity.value?.key !== capacityIntentResume.value?.commandKey) capacityIntentResume.value = null;
 },{immediate:true,flush:'sync'});
 if (reportCheckoutKeepResume) {
   watch((): CheckoutKeepResume | null => {
     const target = props.checkoutCapacityTarget;
     const pending = capacityRecovery.value;
-    if (!target || !props.active || !capacityPageShown.value || !foregroundReadAllowed()
-        || !capacityResumeAllowed.value || !pending) return null;
+    if (!target || !props.active || !capacityPageShown.value || !foregroundReadAllowed() || !pending) return null;
     const productNo = pending.quote ? pending.quote.targetProductNo : pending.targetProductNo;
-    return productNo === target ? { target, commandKey: pending.key, operation: pending.operation } : null;
+    if (productNo !== target) return null;
+    const identity = { target, commandKey: pending.key, operation: pending.operation };
+    const intent = capacityIntentResume.value;
+    if (intent?.commandKey === pending.key) return { ...identity, kind: "intent", open: () => openCapacityIntent(target) };
+    return capacityResumeAllowed.value ? { ...identity, kind: "command" } : null;
   }, reportCheckoutKeepResume, { flush: "sync" });
 }
 useAutoRecovery({
@@ -1166,6 +1178,7 @@ function writeCapacityPending(accountKey:string,pending:CapacityPending|null):vo
       || readCapacityPending(accountKey)?.key!==(pending?.key)) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
   savedCapacity.value=pending;
   capacityResumeKey.value=null;
+  capacityIntentResume.value=null;
 }
 
 function rejectCapacityPurchase(accountKey: string, original: CapacityPending, message?: string) {
@@ -1219,6 +1232,12 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
       if (result === null) return "cleared";
       result ??= await readPaymentCommand(apiClient, original.operation === 'replace' ? 'capacity-replace' : 'capacity-keep', original.key);
       if (!current()) return;
+      if (result.status === 'AWAITING_PAYMENT') {
+        capacityResumeKey.value = null;
+        capacityIntentResume.value = { commandKey: original.key, intentNo: result.intentNo, cutoff: result.cutoff };
+        return;
+      }
+      capacityIntentResume.value = null;
       capacityResumeKey.value = result.status === 'NOT_SEEN' && result.canResumeSameKey ? original.key : null;
       if (result.status==='SUCCEEDED') receipt=original.operation==='replace'
         ?parseCanonicalTradeinResult(result.receipt):parseCanonicalCapacityKeepResult(result.receipt);
@@ -1267,6 +1286,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
           capacityCommandKey.value = null;
           savedCapacity.value = null;
           capacityResumeKey.value = null;
+          capacityIntentResume.value = null;
           hide();
           if (reason === 'rejectCapacitySourceChanged') void refreshCapacityReplacement(target as DeviceKind);
         },
@@ -1275,18 +1295,59 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
       if (!receipt) { savedCapacity.value=readCapacityPending(scope.accountKey); return; }
     }
     if (!current()||!original) return;
-    if (Math.abs(purchasePrincipalUsdt(receipt)-payable)>0.000001
-        || (effectiveOperation==='replace'&&(receipt as CanonicalTradeinResult).sourceDeviceId!==frozen!.sourceDeviceId))
-      throw new Error('CAPACITY_RECEIPT_QUOTE_MISMATCH');
-    if (effectiveOperation==='replace') await submitCanonicalCapacityReplacement(frozen!,target as DeviceKind,
-      {key:original.key,receipt:receipt as CanonicalTradeinResult},readOnlyCurrent);
-    else await submitCanonicalKeepBuy(target as DeviceKind,frozen,{key:original.key,intent:original.intent,receipt:receipt as CanonicalCapacityKeepResult},readOnlyCurrent);
+    await completeCapacityPurchase(original, receipt, readOnlyCurrent);
   } catch {
+    if (current() && readOnlyCurrent) capacityIntentResume.value = null;
     if (current()&&!readOnlyCurrent) toast.warn(recoveryCopy.value.paymentPending);
   } finally {
     if (readOnlyCurrent) capacityReadBusy.value=false;
     else {capacityRecoveryBusy.value=false;confirming.value=false;}
   }
+}
+
+async function completeCapacityPurchase(original: CapacityPending, receipt: CanonicalTradeinResult | CanonicalCapacityKeepResult,
+    current?: () => boolean) {
+  const payable = original.quote ? original.quote.payableUsdt : original.payableUsdt;
+  if (Math.abs(purchasePrincipalUsdt(receipt) - payable) > 0.000001
+      || (original.operation === 'replace' && (receipt as CanonicalTradeinResult).sourceDeviceId !== original.quote.sourceDeviceId))
+    throw new Error('CAPACITY_RECEIPT_QUOTE_MISMATCH');
+  if (original.operation === 'replace') {
+    await submitCanonicalCapacityReplacement(original.quote, original.quote.targetProductNo as DeviceKind,
+      { key: original.key, receipt: receipt as CanonicalTradeinResult }, current);
+  } else {
+    const target = original.quote ? original.quote.targetProductNo : original.targetProductNo;
+    await submitCanonicalKeepBuy(target as DeviceKind, original.quote,
+      { key: original.key, intent: original.intent, receipt: receipt as CanonicalCapacityKeepResult }, current);
+  }
+}
+
+function openCapacityIntent(target: string): boolean {
+  const intent = capacityIntentResume.value;
+  const original = capacityRecovery.value;
+  if (!intent || original?.key !== intent.commandKey || props.checkoutCapacityTarget !== target
+      || intent.cutoff !== null && Date.now() >= intent.cutoff) return false;
+  const scope = captureAccountScope();
+  let generation = capacityRecoveryGeneration;
+  const current = () => isCurrentAccountScope(scope) && props.active && capacityPageShown.value
+    && props.checkoutCapacityTarget === target && generation === capacityRecoveryGeneration;
+  const opened = resumeCheckoutCapacityPayment(scope.accountKey, capacityPaymentKind(original.operation), original.key, intent.intentNo, async result => {
+    if (!current()) return;
+    capacityRecoveryBusy.value = true;
+    try {
+      const receipt = original.operation === 'replace'
+        ? parseCanonicalTradeinResult(result.receipt) : parseCanonicalCapacityKeepResult(result.receipt);
+      await completeCapacityPurchase(original, receipt, current);
+    } catch {
+      // Checkout's existing readback continues if the completed payment cannot be verified here.
+    } finally {
+      capacityRecoveryBusy.value = false;
+    }
+  });
+  if (opened) {
+    invalidateCapacityRecovery();
+    generation = capacityRecoveryGeneration;
+  }
+  return opened;
 }
 
 async function recoverCapacityPurchase(resume=false):Promise<void> {
@@ -1301,6 +1362,7 @@ async function recoverCapacityPurchase(resume=false):Promise<void> {
     if (!pending || (target && !resume && refusedPurchasePayment(scope.accountKey, pending.key))) {
       savedCapacity.value = null;
       capacityResumeKey.value = null;
+      capacityIntentResume.value = null;
       capacityRecoveryUnavailable.value = false;
       refreshKeepRecovery();
       if (target) emit("checkout-capacity-cleared", target);
