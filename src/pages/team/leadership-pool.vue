@@ -341,7 +341,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .pool-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
 .pool-hero { --nx-tint: var(--v5-warning); position: relative; padding: var(--v5-space-5); border-radius: 28px; }
 .pool-label { color: var(--v5-ink); font-size: 13px; line-height: 18px; font-weight: 600; }
-.pool-hero .reward-amount { display: block; margin: var(--v5-space-1) 0 6px; font-size: 32px; line-height: 40px; font-weight: 550; letter-spacing: -.03em; overflow-wrap: break-word; }
+.pool-hero .reward-amount { display: block; margin: var(--v5-space-1) 0 6px; font-size: 32px; line-height: 40px; font-weight: 500; letter-spacing: -.03em; overflow-wrap: break-word; }
 .pool-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
 .pool-decimals { color: var(--v5-ink-3); }
 .pool-payout { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; margin-top: var(--v5-space-4); padding: var(--ui-space-row-y) var(--v5-space-4); border-radius: 16px; background: var(--v5-surface-2); color: var(--v5-ink); font-size: 14px; font-weight: 600; }
