@@ -181,7 +181,7 @@ function arrow(w: WorkloadPrice): string {
   return w.delta !== null && w.delta > 0.05 ? "nx-before-arrow-up" : w.delta !== null && w.delta < -0.05 ? "nx-before-arrow-down" : "nx-before-arrow-right";
 }
 function arrowColor(w: WorkloadPrice): string {
-  return w.delta !== null && w.delta > 0.05 ? "var(--v5-success-ink)" : w.delta !== null && w.delta < -0.05 ? "var(--v5-danger)" : "var(--v5-ink-4)";
+  return w.delta !== null && w.delta > 0.05 ? "var(--v5-success-ink)" : w.delta !== null && w.delta < -0.05 ? "var(--v5-danger)" : "var(--v5-ink-3)";
 }
 // Same thresholds as the workload delta: up arrow rising, down arrow falling, no arrow when flat.
 function trendClass(delta: number): string | undefined {
@@ -213,7 +213,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 <style scoped>
 .nx-earn-market-board { margin: 0 16px; color: var(--v5-ink); }
 .earn-market__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 2px 8px; }
-.earn-market__title { font: 600 17px/24px var(--font-v5); color: var(--v5-ink); }
+.earn-market__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
 .earn-market__updated { display: inline-flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); }
 .earn-market__card { padding: 14px 14px 6px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
