@@ -432,7 +432,8 @@ if (reportCheckoutKeepResume) {
 }
 useAutoRecovery({
   failed: () => remoteApiEnabled && !!props.checkoutCapacityTarget && props.active && capacityPageShown.value
-    && !capacityReadBusy.value && !capacityRecoveryBusy.value && !confirming.value && !viewingCheckoutCapacityPayment.value,
+    && !capacityReadBusy.value && !capacityRecoveryBusy.value && !confirming.value
+    && !capacityResumeAllowed.value && !viewingCheckoutCapacityPayment.value,
   retry: () => recoverCapacityPurchase(false),
   // Reopening the browser tab must not restart the original payment lookup.
   retryNotBefore: () => checkoutCapacityRead?.target === props.checkoutCapacityTarget
@@ -801,8 +802,7 @@ async function onChooseFullPrice() {
   const s = state.value;
   if (s.kind !== "choice" || quoteLoading.value) return;
   if (remoteApiEnabled) {
-    if (handleOriginalCapacityPurchase(s.targetKind, true)) return;
-    await refreshCapacityReplacement(s.targetKind);
+    await refreshCapacityReplacement(s.targetKind, true);
     return;
   }
   // If slot full, hand off to the replace sheet; else just dismiss (caller's
@@ -844,7 +844,7 @@ function handleOriginalCapacityPurchase(target: DeviceKind, retryRefused = false
   return true;
 }
 
-async function refreshCapacityReplacement(targetKind: DeviceKind) {
+async function refreshCapacityReplacement(targetKind: DeviceKind, retryRefused = false) {
   const requestGeneration = ++quoteRequestGeneration.value;
   const requestScope = captureAccountScope();
   const requestIsCurrent = () => requestGeneration === quoteRequestGeneration.value
@@ -854,7 +854,7 @@ async function refreshCapacityReplacement(targetKind: DeviceKind) {
     const quote = await deviceE3Api.capacityQuote(targetKind);
     if (!requestIsCurrent()) return;
     if (quote.decision === "REPLACE_REQUIRED") {
-      if (handleOriginalCapacityPurchase(targetKind)) return;
+      if (handleOriginalCapacityPurchase(targetKind, retryRefused)) return;
       sheet.showCanonicalReplace(targetKind, quote.payableUsdt, quote);
       return;
     }

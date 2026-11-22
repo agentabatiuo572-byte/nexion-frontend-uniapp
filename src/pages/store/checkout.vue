@@ -291,7 +291,7 @@ import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
-import { capacityCheckoutHref, capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
+import { capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, originalCapacityCheckoutHref, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute } from '@/lib/advisor-chat-route';
 import { useConversations } from '@/store/conversations';
@@ -753,17 +753,10 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false, resu
   for (const target of targets) {
     let recovery: CheckoutCapacityRecovery = { target, commandKey: null, operation: null };
     try {
-      const pending = readCapacityPending(accountKey);
+      const pending = readCapacityPending(accountKey, target);
       if (!pending) continue;
-      const original = describeCapacityOriginal(pending, t.value);
-      const refused = refusedPurchasePayment(accountKey, pending.key);
-      if (resume && (original.target !== target || pending.operation !== resume.operation || pending.key !== resume.commandKey)) return false;
-      if (original.target !== target) {
-        if (refused) continue;
-        void navReplace(capacityCheckoutHref(original.target));
-        return true;
-      }
-      if (refused) {
+      if (resume && (pending.operation !== resume.operation || pending.key !== resume.commandKey)) return false;
+      if (refusedPurchasePayment(accountKey, pending.key)) {
         if (resume) return false;
         refusedCapacityTarget = target;
         if (!explicit || !pending.quote) continue;
@@ -771,7 +764,7 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false, resu
         tradein.showCanonicalReplace(target as DeviceKind, pending.quote.payableUsdt, pending.quote);
         return true;
       }
-      recovery = { ...original, commandKey: pending.key, operation: pending.operation };
+      recovery = { ...describeCapacityOriginal(pending, t.value), commandKey: pending.key, operation: pending.operation };
     }
     catch {
       if (resume) return false;
@@ -1370,6 +1363,11 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'foreground
       if (quote.decision === "REPLACE_REQUIRED") {
         tradeinAvailable.value = true;
         if (mode !== 'interactive') return true;
+        const recoveryHref = originalCapacityCheckoutHref(requestScope.accountKey);
+        if (recoveryHref) {
+          void navReplace(recoveryHref);
+          return true;
+        }
         if (eligibility?.eligible && sourceIds.length > 0) {
           tradein.showChoice(kind, p.price, sourceIds);
         } else {
@@ -2684,6 +2682,12 @@ async function submitRemoteOrder(): Promise<void> {
       throw new Error("E3_TRADEIN_QUOTE_REQUIRED");
     }
     if (tradeinContext) {
+      const recoveryHref = originalCapacityCheckoutHref(submissionScope.accountKey);
+      if (recoveryHref) {
+        confirming = false;
+        void navReplace(recoveryHref);
+        return;
+      }
       const recovery: CheckoutTradeinRecovery = { productNo: p.id, orderNo: "", intent: remoteOrderIntent(),
         commandKey: remoteOrderKey(), tradeinQuote: { ...tradeinContext.canonicalQuote! }, tradeinCommandSubmitted: false };
       rememberCheckoutOrder(submissionScope.accountKey, recovery);

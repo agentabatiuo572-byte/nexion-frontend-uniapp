@@ -136,7 +136,7 @@ import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import { computed,inject,ref,shallowRef,watch,onMounted,onBeforeUnmount } from 'vue';
-import { capacityCheckoutHref, capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, type CheckoutCapacityRecovery, type CheckoutKeepResume } from '@/components/checkout/checkout-keep-resume';
+import { capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, type CheckoutCapacityRecovery, type CheckoutKeepResume } from '@/components/checkout/checkout-keep-resume';
 // #ifdef H5
 import { onBeforeRouteLeave } from 'vue-router';
 // #endif
@@ -302,27 +302,17 @@ function recoverKeepBeforeNewPurchase(reopen=false, resume?: CheckoutKeepResume)
     if (resume && productNo !== resume.target) continue;
     let recovery: CheckoutCapacityRecovery = { target: productNo, commandKey: null, operation: null };
     try{
-      const pending=readCapacityPending(account);
+      const pending=readCapacityPending(account, productNo);
       if(!pending)continue;
-      const original = describeCapacityOriginal(pending, t.value);
-      const refused = refusedPurchasePayment(account, pending.key);
       if (resume && (pending.operation !== resume.operation || pending.key !== resume.commandKey)) return false;
-      if (original.target !== productNo) {
-        if (resume) return false;
-        if (!refused && !selection.value.some(item => item.productNo === original.target)) {
-          void navReplace(capacityCheckoutHref(original.target));
-          return true;
-        }
-        continue;
-      }
-      if(refused){
+      if(refusedPurchasePayment(account,pending.key)){
         if (resume) return false;
         if(!reopen||!pending.quote)continue;
         keepRecovery.value = null;
         tradein.showCanonicalReplace(productNo as DeviceKind,pending.quote.payableUsdt,pending.quote);
         return true;
       }
-      recovery = { ...original, commandKey: pending.key, operation: pending.operation };
+      recovery = { ...describeCapacityOriginal(pending, t.value), commandKey: pending.key, operation: pending.operation };
     }
     catch{if (resume) return false;}
     keepRecovery.value=recovery;
