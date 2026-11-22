@@ -254,7 +254,7 @@ import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { PROMOTION_CHECKOUT_TABLE, selectPromotionCheckoutRecord, type PromotionCheckoutRecord } from "@/lib/promotion-checkout-session";
-import { readCapacityPending } from "@/lib/capacity-command-recovery";
+import { originalCapacityCheckoutHref } from "@/components/checkout/checkout-keep-resume";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
@@ -620,8 +620,11 @@ async function openBundleReview(list:Product[]):Promise<boolean> {
     let original=true;
     try{
       const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:'',items});
-      original=!!record?.pending||record?.order?.paymentStatus==='PENDING'
-        ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
+      original=!!record?.pending||record?.order?.paymentStatus==='PENDING';
+      if (!original) {
+        const href = originalCapacityCheckoutHref(app.accountKey);
+        if (href) { await navTo(href); return true; }
+      }
     }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
     if (!original && list.some((p) => eligibilityUnavailable(p.id))) return true;
     // Every device and Cloud Share takes one slot; the server refuses a bundle

@@ -283,7 +283,7 @@ import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
-import { checkoutKeepResumeKey, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
+import { capacityCheckoutHref, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute } from '@/lib/advisor-chat-route';
 import { useConversations } from '@/store/conversations';
@@ -452,7 +452,17 @@ const app = useApp();
 const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string}&VoucherEntryContext)|null>(null);
 const keepCheckoutRecovery = shallowRef<(CheckoutCapacityRecovery & { accountKey: string }) | null>(null);
 const keepCheckoutTarget = computed(() => keepCheckoutRecovery.value?.target ?? null);
-const keepCheckoutReadError = computed(() => keepCheckoutRecovery.value?.commandKey === null);
+const capacityUnreadableTarget = shallowRef<string | null>(null);
+provide(checkoutCapacityUnreadableTargetKey, capacityUnreadableTarget);
+const keepCheckoutReadError = computed(() => keepCheckoutRecovery.value?.commandKey === null || (
+  keepCheckoutTarget.value !== null && keepCheckoutTarget.value === capacityUnreadableTarget.value
+));
+const keepRecoveryProduct = computed(() => {
+  const original = keepCheckoutRecovery.value;
+  return original?.accountKey === app.accountKey && original.operation && !keepCheckoutReadError.value
+    ? { productName: original.productName, payableUsdt: original.payableUsdt }
+    : null;
+});
 const keepRecoveryOperation = computed(() => keepCheckoutRecovery.value?.operation ?? null);
 const checkoutKeepResume = shallowRef<CheckoutKeepResume | null>(null);
 provide(checkoutKeepResumeKey, checkoutKeepResume);
@@ -462,7 +472,7 @@ const keepResumeAllowed = computed(() => {
   return !!resume && recovery?.accountKey === app.accountKey
     && resume.target === recovery.target && resume.commandKey === recovery.commandKey && resume.operation === recovery.operation;
 });
-defineExpose({ keepRecoveryOperation, keepResumeAllowed, openKeepResume });
+defineExpose({ keepRecoveryOperation, keepRecoveryProduct, keepResumeAllowed, openKeepResume });
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
@@ -734,10 +744,17 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false, resu
   for (const target of targets) {
     let recovery: CheckoutCapacityRecovery = { target, commandKey: null, operation: null };
     try {
-      const pending = readCapacityPending(accountKey, target);
+      const pending = readCapacityPending(accountKey);
       if (!pending) continue;
-      if (resume && (pending.operation !== resume.operation || pending.key !== resume.commandKey)) return false;
-      if (refusedPurchasePayment(accountKey, pending.key)) {
+      const original = describeCapacityOriginal(pending, t.value);
+      const refused = refusedPurchasePayment(accountKey, pending.key);
+      if (resume && (original.target !== target || pending.operation !== resume.operation || pending.key !== resume.commandKey)) return false;
+      if (original.target !== target) {
+        if (refused) continue;
+        void navReplace(capacityCheckoutHref(original.target));
+        return true;
+      }
+      if (refused) {
         if (resume) return false;
         refusedCapacityTarget = target;
         if (!explicit || !pending.quote) continue;
@@ -745,7 +762,7 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false, resu
         tradein.showCanonicalReplace(target as DeviceKind, pending.quote.payableUsdt, pending.quote);
         return true;
       }
-      recovery = { target, commandKey: pending.key, operation: pending.operation };
+      recovery = { ...original, commandKey: pending.key, operation: pending.operation };
     }
     catch {
       if (resume) return false;
@@ -1338,6 +1355,7 @@ async function fireTradeinIntercept(mode: 'review' | 'interactive' | 'foreground
       checkoutOnboardingRequired.value = false;
       checkoutCapacityTradeinRejection.value = undefined;
       if (mode === 'interactive' && hasVoucher.value) return;
+      if (mode === 'interactive' && recoverCapacityBeforePurchase([kind], true)) return true;
       const sourceIds = eligibility?.sources.filter((source) => source.eligible)
         .map((source) => String(source.sourceDeviceId)) ?? [];
       if (quote.decision === "REPLACE_REQUIRED") {

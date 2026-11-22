@@ -254,6 +254,7 @@ import ProductRender from "@/components/store/product-render.vue";
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionStoreHref,canPreviewPromotion,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
+import { capacityCheckoutHref, originalCapacityCheckoutHref } from "@/components/checkout/checkout-keep-resume";
 import { localized } from '@/lib/promotion-display';
 import LiveSocialProof from "@/components/store/live-social-proof.vue";
 import SpecTable from "@/components/store/spec-table.vue";
@@ -704,8 +705,15 @@ function publishStickyCTA() {
         amountSubtext: t.value.promotion.capacityUnavailable, buttonLabel: t.value.home.fleetManage, showTabBar: false }, stickyOwner);
       return;
     }
+    const productNo = product.value.id;
+    const checkoutHref = isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1
+      ? promotionCheckoutHref([{productNo,quantity:qty.value}],activityId.value,voucherContext.value)
+      : capacityCheckoutHref(productNo);
     sticky.show({
-      href: isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1 ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value,voucherContext.value) : `/pages/store/checkout?product=${product.value.id}`,
+      get href() {
+        try { return originalCapacityCheckoutHref(app.accountKey) ?? checkoutHref; }
+        catch { return capacityCheckoutHref(productNo); }
+      },
       quantity: { value:qty.value,min:1,max:maxQuantity.value,decrease:dec,increase:inc },
       amount: `${priceText.value}`,
       amountSubtext: isShare.value ? undefined : `${t.value.bundle.estimatedDaily}: $${dailyYieldText.value}`,
