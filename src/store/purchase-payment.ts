@@ -3,6 +3,7 @@ import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
+import type { PaymentCommandReceipt } from '@/api/payment-command-api';
 import { useApp } from './app';
 import { useOrders } from './orders';
 import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
@@ -186,26 +187,47 @@ function sharedPassiveRead(run: () => Promise<unknown>): Promise<unknown> {
   return passiveRead;
 }
 /** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
-export function refreshPendingPayments(accountKey: string, current: () => boolean): Promise<unknown> {
+export function refreshPendingPayments(accountKey: string, current: () => boolean, shouldRead: (row: PendingExternal) => boolean = () => true): Promise<unknown> {
   if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
-  return sharedPassiveRead(() => Promise.allSettled(pendingPayments().map(async pending => {
+  const records = pendingPayments().filter(shouldRead);
+  if (!records.length) return passiveRead ?? Promise.resolve();
+  return sharedPassiveRead(() => Promise.allSettled(records.map(async pending => {
     const intent = await readIntent(pending);
-    if (!current() || account() !== accountKey || state.open) return;
-    if (!intent) {
-      if (pending.intentNo) {
-        const orderNo = pending.kind === 'ORDER_PAY' ? JSON.parse(pending.fingerprint)[1].orderNo : '';
-        releaseMissingPayment(pending, accountKey, orderNo);
-      }
-      return;
-    }
-    if (intent.status === pending.lastStatus) return;
-    matches(intent, pending);
-    if (intent.status === 'EXPIRED') { saveExpiry(accountKey, pending.commandKey, pending.kind); return; }
-    if (!settled(intent)) return;
-    const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
-    if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
-    save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
+    if (current() && account() === accountKey && !state.open && shouldRead(pending)) projectPassivePayment(accountKey, pending, intent);
   })));
+}
+function projectPassivePayment(accountKey: string, pending: PendingExternal, intent: PurchasePaymentIntent | null) {
+  if (!intent) {
+    if (pending.intentNo) {
+      const orderNo = pending.kind === 'ORDER_PAY' ? JSON.parse(pending.fingerprint)[1].orderNo : '';
+      releaseMissingPayment(pending, accountKey, orderNo);
+    }
+    return;
+  }
+  matches(intent, pending);
+  if (intent.status === pending.lastStatus) return;
+  if (intent.status === 'EXPIRED') { saveExpiry(accountKey, pending.commandKey, pending.kind); return; }
+  if (!settled(intent)) return;
+  const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
+  if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
+  save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
+}
+
+/** Project a checkout-owned external read into the same records used by the floating bar.
+ *  Undefined leaves the command lookup to checkout. Null means the known intent was released. */
+export async function readCheckoutCapacityPayment(accountKey: string, kind: 'CAPACITY_KEEP' | 'CAPACITY_REPLACE',
+  commandKey: string, current: () => boolean): Promise<PaymentCommandReceipt | null | undefined> {
+  const pending = rows(accountKey).records[commandKey];
+  if (pending?.kind !== kind) return;
+  const intent = await readIntent(pending);
+  if (!current()) return;
+  projectPassivePayment(accountKey, pending, intent);
+  if (!intent) return pending.intentNo ? null : undefined;
+  if (intent.status === 'EXPIRED') return { status: 'REJECTED', canResumeSameKey: false, message: 'PURCHASE_PAYMENT_EXPIRED' };
+  if (intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED') {
+    return { status: 'SUCCEEDED', canResumeSameKey: false, receipt: intent.receipt };
+  }
+  return { status: 'PROCESSING', canResumeSameKey: false };
 }
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
