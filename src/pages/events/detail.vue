@@ -133,6 +133,11 @@ const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.
 function reset() { generation += 1; commands += 1; detail.value = null; error.value = false; commandError.value = false; pendingCommand = null; readingReceipt.value = false; busy.value = false; }
 function showCommandFailure(failure: Exclude<EventCommandFailure, "unknown">) {
   if (failure === "claimed") toast.info(copy.value.eligibility.CLAIMED);
+  else if (failure === "joined") toast.info(copy.value.joined);
+  // Each says what happened and the next step (06 §6.1): slots reuse the warehouse line, stock and account add a line.
+  else if (failure === "slots") toast.error(uiT.value.myDevices.inventorySlotsFullWarning);
+  else if (failure === "stock") toast.error(copy.value.failed.stock, copy.value.failed.stockNext);
+  else if (failure === "account") toast.error(copy.value.failed.account, copy.value.failed.accountNext);
   else toast.error(failure === "notEligible" ? copy.value.eligibility.NOT_ELIGIBLE : copy.value.failed[failure]);
 }
 async function load() {
