@@ -139,7 +139,7 @@
           </view>
           <view v-if="note" class="lp-note lp-rise lp-d2"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
           <text class="lp-section lp-section-title lp-rise lp-d2">{{ c.referralSteps }}</text>
-          <view class="lp-track lp-rise lp-d2" role="list" :aria-label="c.referralSteps">
+          <view class="lp-panel lp-panel--track lp-rise lp-d2"><view class="lp-track" role="list" :aria-label="c.referralSteps">
             <view v-for="(step, index) in trackSteps" :key="step.title" class="lp-track__step" :class="'lp-track__step--' + step.state" role="listitem" :aria-current="step.state === 'current' ? 'step' : undefined">
               <view class="lp-track__rail" aria-hidden="true">
                 <view class="lp-track__line" :class="{ 'lp-track__line--none': index === 0 }"><view class="lp-track__fill" :class="{ 'is-on': step.state !== 'todo' }" :style="{ animationDelay: index * 160 + 'ms' }" /></view>
@@ -149,7 +149,7 @@
               <text class="lp-track__title">{{ step.title }}</text>
               <text class="lp-track__note">{{ step.note }}</text>
             </view>
-          </view>
+          </view></view>
         </template>
 
         <!-- Bundle: the listed devices share one lit stage; each rule reads as a flow from device to reward. -->
@@ -162,7 +162,7 @@
           </view>
           <view v-if="note" class="lp-note lp-rise lp-d2"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
           <text class="lp-section lp-section-title lp-rise lp-d2">{{ c.offerRules }}</text>
-          <view v-for="ticket in giftTickets" :key="ticket.id" class="lp-flow-group lp-rise lp-d2" role="group" :aria-label="ticket.buyName + ' ' + ticket.buyQty + ' · ' + ticket.getLabel + ' ' + ticket.getName">
+          <view class="lp-panel lp-rise lp-d2"><view v-for="ticket in giftTickets" :key="ticket.id" class="lp-flow-group" role="group" :aria-label="ticket.buyName + ' ' + ticket.buyQty + ' · ' + ticket.getLabel + ' ' + ticket.getName">
             <view class="lp-flow" aria-hidden="true">
               <view class="lp-flow__end">
                 <view class="lp-flow__art"><view class="lp-flow__floor" /><CatalogMachineImage class="lp-fill" :sku="ticket.buySku" :image-url="productImage(ticket.buySku)" :scope-key="activity.activityId + ':' + ticket.id + ':buy'" /></view>
@@ -180,7 +180,7 @@
             <view class="lp-flow__facts">
               <view v-for="cell in ticket.cells" :key="cell.label" class="lp-flow__fact"><text class="lp-field">{{ cell.label }}</text><text class="lp-flow__fact-value">{{ cell.value }}</text></view>
             </view>
-          </view>
+          </view></view>
         </template>
 
         <!-- Repurchase: owned devices on a glass slab, then the empty slot to fill. -->
@@ -220,7 +220,7 @@
         <!-- Eligible devices: each opens the product page with this offer attached. -->
         <template v-if="kind === 'first' || kind === 'repurchase' || kind === 'referral' || kind === 'bundle' || (kind === 'gift' && products.length > 1)">
           <view id="lp-devices" class="lp-section lp-section-head lp-section-head--start lp-rise lp-d4"><text class="lp-section-title">{{ kind === 'repurchase' ? c.addableTitle : kind === 'referral' ? c.friendDevices : c.devicesTitle }}</text><text class="lp-count">{{ products.length }}</text></view>
-          <view v-for="item in products" :key="item.sku" class="lp-product lp-rise lp-d4" role="link" tabindex="0" :aria-label="item.name" @click="navTo(promotionDetailHref(item.sku, activity.activityId))" @keydown.enter.prevent="navTo(promotionDetailHref(item.sku, activity.activityId))">
+          <view class="lp-panel lp-panel--list lp-rise lp-d4"><view v-for="item in products" :key="item.sku" class="lp-product" role="link" tabindex="0" :aria-label="item.name" @click="navTo(promotionDetailHref(item.sku, activity.activityId))" @keydown.enter.prevent="navTo(promotionDetailHref(item.sku, activity.activityId))">
             <view class="lp-product__art"><CatalogMachineImage class="lp-fill" :sku="item.sku" :image-url="productImage(item.sku)" :scope-key="activity.activityId + ':product'" /></view>
             <view class="lp-product__copy">
               <text class="lp-product__name">{{ item.name }}</text>
@@ -229,17 +229,17 @@
               <view v-if="item.tag" class="lp-product__tag"><NxTag :tone="item.tagTone">{{ item.tag }}</NxTag></view>
             </view>
             <svg class="lp-product__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-          </view>
+          </view></view>
         </template>
         <template v-if="kind === 'first' || kind === 'repurchase' || kind === 'referral' || kind === 'bundle'">
           <text class="lp-section lp-section-title lp-rise lp-d5">{{ kind === 'repurchase' ? c.conditionsTitle : c.keyRules }}</text>
-          <view class="lp-lines lp-rise lp-d5">
+          <view class="lp-panel lp-rise lp-d5"><view class="lp-lines">
             <view v-if="kind === 'repurchase'" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="6" rx="1.6" /><rect x="4" y="13" width="16" height="6" rx="1.6" /><path d="M7.5 8h.01M7.5 16h.01" /></svg><text>{{ c.conditionOwn }}</text></view>
             <view v-if="limitSentence" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg><text>{{ limitSentence }}</text></view>
             <view v-if="kind !== 'repurchase' && rewardTerms" class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4.5h4.5" /></svg><text>{{ rewardTerms }}</text></view>
             <view class="lp-line"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></svg><text>{{ activityTime }}</text></view>
           </view>
-          <view class="lp-link lp-link--block lp-rise lp-d5" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text class="nx-after-chevron">{{ c.fullRules }}</text></view>
+          <view class="lp-link lp-link--block" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text class="nx-after-chevron">{{ c.fullRules }}</text></view></view>
         </template>
       </view>
       <view class="lp-bar-space" aria-hidden="true" />
@@ -886,6 +886,16 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-gift__amount { font-size: 64px; line-height: 68px; }
 .lp-gift__friend { display: block; margin-top: 8px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .lp-gift--ended .lp-gift__art { opacity: .55; filter: grayscale(.7); }
+
+/* Content cards (01 §1.1.2 solid): the step track, the rule flow, the device list and the key rules each sit in one card;
+   the reward hero stays open. Nothing nests inside them but rows and hairlines. */
+.lp-panel { margin-top: var(--ui-space-card-gap); padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.lp-panel--list { padding: 4px 16px; }
+.lp-panel--track { padding: var(--ui-space-inset) 4px 14px; }
+.lp-panel .lp-track, .lp-panel .lp-lines, .lp-panel .lp-flow-group { margin-top: 0; }
+.lp-panel > .lp-product:first-child { border-top: 0; }
+.lp-panel .lp-product__art { width: 112px; height: 104px; }
+.lp-panel .lp-link--block { margin-top: var(--ui-space-inset); }
 
 /* Step track: nodes joined by a 2px line. Done steps fill brand with a check, the current step is a brand ring; lines into reached steps grow once (07 §7.1.1). */
 .lp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--ui-space-inset); }
