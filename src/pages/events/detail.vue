@@ -1,5 +1,5 @@
 <template>
-  <AppChassis active="home"><view class="event-detail" :aria-busy="loading">
+  <AppChassis active="home"><view class="event-detail" :class="{ 'event-detail--bar': detail && action }" :aria-busy="loading">
     <SubPageHeader back="/pages/events/events?source=legacy" :title="copy.title" />
     <text v-if="loading && !detail" class="event-copy" role="status">{{ copy.loading }}</text>
     <EmptyState v-else-if="!detail" kind="recoverable-error" page :title="copy.unavailable" :cta-label="uiT.ui.reload" @cta="load" />
@@ -39,14 +39,17 @@
         </view>
       </view>
       <text v-if="commandError && !action" class="event-copy" role="alert">{{ copy.pending }}</text>
-      <view v-if="action" class="event-bar nx-glass-bar">
-        <text v-if="commandError" class="nx-tray-note" role="alert">{{ copy.pending }}</text>
-        <NxButton v-if="action==='open'" variant="primary" size="large" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
-        <NxButton v-else variant="primary" size="large" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
-      </view>
+      <view v-if="action" class="event-bar-space" :class="{ 'event-bar-space--note': commandError }" aria-hidden="true" />
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
     </template>
-  </view></AppChassis>
+  </view>
+  <template #pageFixed>
+    <view v-if="detail && action" class="event-bar nx-glass-bar">
+      <text v-if="commandError" class="nx-tray-note" role="alert">{{ copy.pending }}</text>
+      <NxButton v-if="action==='open'" variant="primary" size="large" :label="copy.open" icon="arrow-right" :busy="busy" @click="run"><text>{{ copy.open }}</text></NxButton>
+      <NxButton v-else variant="primary" size="large" :label="action === 'remind' ? reminderCopy.remind : copy[action]" :busy="busy" :busy-label="copy.busy" :disabled="loading || error" @click="run" />
+    </view>
+  </template></AppChassis>
 </template>
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -168,10 +171,12 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-progress > view { position:relative; height:100%; border-radius:inherit; background:linear-gradient(90deg, color-mix(in srgb, var(--v5-brand) 12%, transparent), color-mix(in srgb, var(--v5-brand) 70%, transparent)); }
 .event-progress > view::after { content:""; position:absolute; top:50%; right:-3px; width:6px; height:6px; margin-top:-3px; border-radius:50%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
-/* The main action floats in the shared bottom bar (04 §4.0); the content clears it: 48 + 22 + 16 for the lone button,
-   the tray's own height + 38 once the pending note sits above it. */
-.event-detail:has(> .event-bar) { padding-bottom:calc(48px + var(--nx-tray-bottom) + 16px); }
-.event-detail:has(> .event-bar > .nx-tray-note) { padding-bottom:calc(92px + 38px); }
+/* The main action floats in the shared bottom bar (04 §4.0), in the chassis layer that does not scroll. The in-flow spacer
+   reserves the clearance in place of the page's bottom padding: 48 + 22 + 16 for the lone button, the tray's own height
+   + 38 once the pending note sits above it. */
+.event-detail--bar { padding-bottom:0; }
+.event-bar-space { height:calc(48px + var(--nx-tray-bottom) + 16px); }
+.event-bar-space--note { height:calc(92px + 38px); }
 .event-bar { position:absolute; z-index:36; display:flex; flex-direction:column; }
 .event-bar > .nx-button { width:100%; }
 .event-rule-paragraph { display:block; }
