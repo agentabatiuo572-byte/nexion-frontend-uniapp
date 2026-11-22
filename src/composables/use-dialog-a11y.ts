@@ -253,23 +253,23 @@ export function installBrowserBackGuard(): void {
       history.back();
       return;
     }
-    // A forward step onto a layer entry whose layer is gone (it was closed by back or by code, and the browser kept the
-    // entry as a forward entry): there is nothing to reopen. Step back to where the user was, unseen by the router, so
-    // the route stays and the next back does one thing. Forward is a later router position, or on the same page a
-    // layer entry above the one left (a page entry sits below its layer entries).
-    if (landed !== null && !layerEntries.some((entry) => entry.id === landed)) {
-      const forward = typeof landedPosition === "number" && typeof fromPosition === "number" && landedPosition !== fromPosition
-        ? landedPosition > fromPosition
-        : from === null || landed > from;
-      if (forward) {
-        ev.stopImmediatePropagation();
-        ignoredPops.push(landed);
-        history.back();
-        return;
-      }
+    const gone = (marker: number | null) => marker !== null && !layerEntries.some((entry) => entry.id === marker);
+    const crossPage = typeof landedPosition === "number" && typeof fromPosition === "number" && landedPosition !== fromPosition;
+    // A forward step on the same page onto a layer entry whose layer is gone (it was closed by back or by code, and the
+    // browser kept the entry as a forward entry): there is nothing to reopen. Unseen by the router, keep going forward to
+    // the next real entry (a page navigated to from inside the layer); with none, step back to where the user was, so the
+    // route stays and the next back does one thing. On the same page a forward step lands on a layer entry above the one
+    // left (a page entry sits below its layer entries). A step to another page's entry (the history menu,
+    // history.go(2)) is the router's, whatever entry it lands on.
+    if (gone(landed) && !crossPage && (from === null || landed! > from)) {
+      ev.stopImmediatePropagation();
+      const navigation = (window as { navigation?: { canGoForward?: boolean } }).navigation;
+      if (navigation?.canGoForward === false) { ignoredPops.push(landed!); history.back(); } else history.forward();
+      return;
     }
-    // The pop did not start on a layer entry: an ordinary page step for the router.
-    if (from === null) return;
+    // The pop did not start on a live layer entry: an ordinary page step for the router. That includes a forward step off
+    // a gone layer entry to a later page (the step above, or the browser's own forward).
+    if (from === null || (gone(from) && crossPage && (landedPosition as number) > (fromPosition as number))) return;
     ev.stopImmediatePropagation();
     // Entries above where the browser landed have been popped (one, for a single back).
     const popped = layerEntries.filter((entry) => landed === null || entry.id > landed);
