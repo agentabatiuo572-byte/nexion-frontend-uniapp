@@ -355,13 +355,8 @@ export const uz: Messages = {
     failed: "Taklifni skanerlab boʻlmadi. Qayta urinib koʻring.",
   },
   pageLoad: {
-    module: "Sahifa resurslarini yuklab boʻlmadi",
-    timeout: "Sahifa juda uzoq yuklanmoqda",
+    module: "Bu sahifaning yangi versiyasi chiqdi",
     unknown: "Sahifani yuklab boʻlmadi",
-    staleVersionHint: "Sahifa resurslari yangilandi. Qayta yuklang; joriy kirish saqlanadi.",
-    recoveryHint: "Sahifani qayta yuklab, qayta urining. Saqlanmagan maʼlumotlar yoʻqolishi mumkin.",
-    retry: "Qayta yuklash",
-    reloading: "Yangilanmoqda…",
   },
   bankBinding: {
     otpHint: "Bank hisobini almashtirish uchun akkauntingizga ulangan telefon raqamini tasdiqlang.",

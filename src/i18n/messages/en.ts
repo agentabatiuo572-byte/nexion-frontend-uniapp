@@ -39,13 +39,8 @@ export const en = {
     failed: "Could not scan the invitation. Please try again.",
   },
   pageLoad: {
-    module: "Page resources could not be loaded",
-    timeout: "The page is taking too long to load",
+    module: "A new version of this page is available",
     unknown: "The page could not be loaded",
-    staleVersionHint: "Page resources have been updated. Reload; the current sign-in is retained.",
-    recoveryHint: "Reload the page and retry. Unsaved content may be lost.",
-    retry: "Reload page",
-    reloading: "Reloading…",
   },
   bankBinding: {
     otpHint: "Verify the phone number linked to your account to change your bank account.",

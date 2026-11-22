@@ -40,13 +40,8 @@ export const zh: Messages = {
     failed: "扫码未完成，请重试。",
   },
   pageLoad: {
-    module: "页面资源加载失败",
-    timeout: "页面加载时间过长",
+    module: "本页已有新版本",
     unknown: "页面暂时无法加载",
-    staleVersionHint: "页面资源已更新，请重新加载。当前登录状态保留。",
-    recoveryHint: "请重新加载页面后重试。未保存的内容可能丢失。",
-    retry: "重新加载页面",
-    reloading: "正在重新加载…",
   },
   bankBinding: {
     otpHint: "换卡需验证当前账号绑定手机号。",

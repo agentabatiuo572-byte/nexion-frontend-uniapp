@@ -355,13 +355,8 @@ export const fil: Messages = {
     failed: "Hindi ma-scan ang imbitasyon. Subukan ulit.",
   },
   pageLoad: {
-    module: "Hindi ma-load ang resources ng page",
-    timeout: "Masyadong matagal mag-load ang page",
+    module: "May bagong bersyon na ang page na ito",
     unknown: "Hindi ma-load ang page",
-    staleVersionHint: "Na-update ang resources ng page. I-reload; mananatili kang naka-log in.",
-    recoveryHint: "I-reload ang page at subukan ulit. Baka mawala ang hindi na-save na content.",
-    retry: "I-reload ang page",
-    reloading: "Nire-reload…",
   },
   bankBinding: {
     otpHint: "I-verify ang numero ng phone na naka-link sa account mo para mapalitan ang account sa bangko.",

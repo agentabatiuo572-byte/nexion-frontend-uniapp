@@ -40,13 +40,8 @@ export const vi: Messages = {
     failed: "Chưa quét được lời mời. Vui lòng thử lại.",
   },
   pageLoad: {
-    module: "Không thể tải tài nguyên trang",
-    timeout: "Trang mất quá nhiều thời gian để tải",
+    module: "Trang này đã có phiên bản mới",
     unknown: "Không thể tải trang",
-    staleVersionHint: "Tài nguyên trang đã được cập nhật. Vui lòng tải lại; trạng thái đăng nhập hiện tại được giữ nguyên.",
-    recoveryHint: "Vui lòng tải lại trang rồi thử lại. Nội dung chưa lưu có thể bị mất.",
-    retry: "Tải lại trang",
-    reloading: "Đang tải lại…",
   },
   bankBinding: {
     otpHint: "Đổi tài khoản ngân hàng cần xác minh số điện thoại đã liên kết.",

@@ -355,13 +355,8 @@ export const id: Messages = {
     failed: "Undangan gagal dipindai. Coba lagi.",
   },
   pageLoad: {
-    module: "Sumber daya halaman gagal dimuat",
-    timeout: "Halaman terlalu lama dimuat",
+    module: "Versi baru halaman ini sudah tersedia",
     unknown: "Halaman tidak dapat dimuat",
-    staleVersionHint: "Sumber daya halaman telah diperbarui. Muat ulang; status masuk Anda tetap tersimpan.",
-    recoveryHint: "Muat ulang halaman, lalu coba lagi. Konten yang belum disimpan bisa hilang.",
-    retry: "Muat ulang",
-    reloading: "Memuat ulang…",
   },
   bankBinding: {
     otpHint: "Verifikasi nomor ponsel yang tertaut ke akun Anda untuk mengganti rekening bank.",

@@ -355,13 +355,8 @@ export const ms: Messages = {
     failed: "Jemputan tidak dapat diimbas. Sila cuba lagi.",
   },
   pageLoad: {
-    module: "Sumber halaman gagal dimuatkan",
-    timeout: "Halaman terlalu lama untuk dimuatkan",
+    module: "Versi baharu halaman ini sudah tersedia",
     unknown: "Halaman tidak dapat dimuatkan",
-    staleVersionHint: "Sumber halaman telah dikemas kini. Muat semula; log masuk semasa dikekalkan.",
-    recoveryHint: "Muat semula halaman dan cuba lagi. Kandungan yang belum disimpan mungkin hilang.",
-    retry: "Muat semula",
-    reloading: "Memuat semula…",
   },
   bankBinding: {
     otpHint: "Sahkan nombor telefon yang dipautkan pada akaun anda untuk menukar akaun bank.",
