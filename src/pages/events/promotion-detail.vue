@@ -532,7 +532,7 @@ type Bar = { wide?: boolean; hint?: string; label: string; variant: 'primary' | 
 const bar = computed<Bar | null>(() => {
   const a = activity.value, k = kind.value, copy = c.value;
   if (!a || !k) return null;
-  if (phase.value === 'scheduled') return { hint: copy.orderAfterStart, label: copy.notStarted, variant: 'primary', disabled: true };
+  if (phase.value === 'scheduled') return { hint: k === 'referral' ? copy.inviteAfterStart : copy.orderAfterStart, label: copy.notStarted, variant: 'primary', disabled: true };
   if (phase.value === 'ended') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
   if (refused.value) {
     if (k !== 'repurchase' || repurchaseInterval.value !== null) return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
