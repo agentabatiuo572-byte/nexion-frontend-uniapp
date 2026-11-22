@@ -180,6 +180,7 @@ import BrandLockup from "@/components/brand-lockup.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
+import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -1030,6 +1031,8 @@ function back() {
   step.value = (step.value === 3 ? 2 : 1) as Step;
 }
 function close() { navReset({ url: "/pages/onboarding/intro", fail: () => {} }); }
+// Alone on the stack, the system back does what the top bar's back or close does (02 §2.7.3).
+useHeaderSystemBack(() => step.value > 1 ? back : close);
 function goLogin() {
   const sponsorCode = lockedRef.value || invite.value.trim();
   const query = sponsorCode ? `?ref=${encodeURIComponent(sponsorCode)}` : "";

@@ -73,6 +73,7 @@ import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { useNotifications, type Notification } from "@/store/notifications";
 import { navTo, navBack, takeNavigationQuery } from "@/lib/route";
+import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
 import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
 import { useApp } from "@/store/app";
@@ -349,6 +350,8 @@ const filterOptions = computed(() => visibleFilterIds.value.map(value => {
 }));
 
 import { advanceMessageHeader, createMessageHeaderState } from "@/lib/message-header-scroll";
+// Alone on the stack, the system back does what the header back does (02 §2.7.3).
+useHeaderSystemBack(() => () => navBack('/pages/me/me'));
 const headerState = ref(createMessageHeaderState());
 const headerFocused = ref(false);
 const headerInstance = getCurrentInstance();
