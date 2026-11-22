@@ -8,7 +8,7 @@
         <text class="event-title">{{ detail.event.title }}</text>
         <text class="event-copy">{{ detail.event.subtitle }}</text>
         <text v-if="detail.event.kind==='seasonal'&&detail.rules.voucherId" class="event-copy">{{ copy.voucherTerms }}</text>
-        <NxTag class="event-status" role="status" wrap :tone="eligibilityTone[detail.eligibilityReason]" :label="copy.eligibility[detail.eligibilityReason]" />
+        <NxTag class="event-status" role="status" wrap :tone="statusTone" :label="copy.eligibility[detail.eligibilityReason]" />
         <text v-if="detail.reminderSubscribed" class="event-copy" role="status">{{ reminderCopy.subscribed }}</text>
         <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, locale.code) }}</text></view>
         <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
@@ -86,13 +86,17 @@ const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(f
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
 const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);
 // State tag tones (03 §3.8): claimable success, running but not met warning, closed or done neutral; 「暂未开放」-type
-// unavailability takes the spec's unavailable tone (neutral fill, auxiliary text).
+// unavailability takes the spec's unavailable tone (neutral fill, auxiliary text). READY is success only for a reward
+// the user can claim now (userStatus CLAIMABLE, the status the claim command needs); purchase, upgrade and voucher
+// events return READY for eligibility to keep shopping, which is neutral.
 const eligibilityTone: Record<EventEligibilityReason, "success" | "warning" | "neutral" | "unavailable"> = {
   READY: "success", IN_PROGRESS: "warning", NOT_ELIGIBLE: "warning",
   NOT_STARTED: "neutral", ENDED: "neutral", CLAIMED: "neutral",
   VOUCHER_NOT_STARTED: "neutral", VOUCHER_EXPIRED: "neutral", VOUCHER_ALREADY_USED: "neutral", VOUCHER_EXHAUSTED: "neutral",
   DISABLED: "unavailable", VOUCHER_UNAVAILABLE: "unavailable",
 };
+// Read only where the tag renders, i.e. once a detail is loaded.
+const statusTone = computed(() => { const { eligibilityReason, userStatus } = detail.value!; return eligibilityReason === "READY" && userStatus !== "CLAIMABLE" ? "neutral" : eligibilityTone[eligibilityReason]; });
 let code = "", visible = false, generation = 0;
 let unconfirmedAction: "join" | "claim" | "remind" | null = null;
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${language.value}:${captureRuntimeRevision().epoch}:${code}`;
