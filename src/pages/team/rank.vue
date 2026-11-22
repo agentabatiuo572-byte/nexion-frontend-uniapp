@@ -26,7 +26,7 @@
             </view>
               </view>
             </view>
-            <view class="rank-upcoming"><text class="rank-caption">{{ upcomingBenefitsTitle }}</text><view class="rank-perk-tags"><text v-for="perk in upcomingBenefits" :key="perk.key" class="rank-perk-tag">{{ perk.label }} {{ perk.value }}</text></view><text v-if="upcomingPeerNotice" class="rank-caption rank-upcoming__notice">{{ upcomingPeerNotice }}</text><view v-if="prog.next.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
+            <view class="rank-upcoming"><text class="rank-caption">{{ upcomingBenefitsTitle }}</text><view class="rank-perk-tags"><NxTag v-for="perk in upcomingBenefits" :key="perk.key" tone="uvt">{{ perk.label }} {{ perk.value }}</NxTag></view><text v-if="upcomingPeerNotice" class="rank-caption rank-upcoming__notice">{{ upcomingPeerNotice }}</text><view v-if="prog.next.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
             <NxButton class="rank-invite" variant="primary" :label="designCopy.rankUpInvite" @click="go('/pages/team/team?intent=share')"><text>{{ designCopy.rankUpInvite }}</text><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></NxButton>
           </view>
         </view>
@@ -76,6 +76,7 @@ import NxListRow from "@/components/ui/nx-list-row.vue";
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { rankGuideCopy } from '@/i18n/rank-guide-copy';
 import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useVRank, type VRank, type VRankDef, type VRankReward, type VRankConditions } from "@/store/v-rank";
@@ -278,7 +279,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-inherited__toggle { min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);font-size:12px;color:var(--v5-ink-3);cursor:pointer; }
 .rank-upcoming { margin-top:16px; }
 .rank-perk-tags { display:flex;flex-wrap:wrap;gap:6px;margin-top:8px; }
-.rank-perk-tag { display:inline-flex;align-items:center;box-sizing:border-box;min-height:26px;max-width:100%;padding:3px 10px;border:1px solid var(--v5-border);border-radius:999px;background:var(--ui-perk);font:500 12px/18px var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
 .rank-upcoming__notice { margin-top:8px; }
 .rank-invite { width:100%;margin-top:18px;box-sizing:border-box;color:var(--v5-ink); }
 .rank-ladder-section { margin-top:6px; }
@@ -357,7 +357,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-upcoming { display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:14px;padding:10px 14px; }
 .rank-upcoming .rank-caption { color:var(--v5-ink-2); }
 .rank-upcoming .rank-perk-tags { margin-top:0; }
-.rank-upcoming .rank-perk-tag { min-height:0;padding:0;border:0;background:none;color:var(--v5-nex-ink);font-weight:600; }
 .rank-upcoming .rank-scope-link { min-height:24px;margin:0 0 0 auto; }
 .rank-ladder-row + .rank-ladder-row::after { content:"";position:absolute;left:-6px;top:26px;width:6px;height:2px;background:var(--v5-surface-3); }
 .rank-ladder-row[data-status="done"] + .rank-ladder-row::after,.rank-ladder-row[data-status="current"]::after { background:var(--v5-brand); }
