@@ -1,7 +1,10 @@
 <template>
   <AppChassis active="home"><view class="event-detail" :class="{ 'event-detail--bar': detail && action }" :aria-busy="loading">
     <SubPageHeader back="/pages/events/events?source=legacy" :title="copy.title" />
-    <text v-if="loading && !detail" class="event-copy" role="status">{{ copy.loading }}</text>
+    <view v-if="loading && !detail" class="event-skeleton" role="status" aria-busy="true" :aria-label="copy.loading">
+      <view class="nx-glass-card event-section event-skeleton__card"><view /><view /><view /><view /><view /></view>
+      <view class="event-section event-section--plain event-skeleton__plain"><view /><view /><view /><view /></view>
+    </view>
     <EmptyState v-else-if="!detail" kind="recoverable-error" page :title="copy.unavailable" :cta-label="uiT.ui.reload" @cta="load" />
     <template v-else>
       <view class="nx-glass-card event-section">
@@ -219,6 +222,15 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commandError.value && !loadi
 @keyframes event-bar-in { from { transform:translateY(100%); } to { transform:none; } }
 @media (prefers-reduced-motion: reduce) { .event-bar { animation:none; } }
 .event-bar > .nx-button { width:100%; }
+/* First load: the first card and the rules block in their real sizes (03 §3.4), static. */
+.event-skeleton view > view { border-radius:8px; background:var(--v5-surface-3); }
+.event-skeleton__card > view:nth-child(1) { width:62%; height:var(--ui-type-hero-title-lh); }
+.event-skeleton__card > view:nth-child(2) { width:84%; height:14px; margin-top:8px; }
+.event-skeleton__card > view:nth-child(3) { width:96px; height:24px; margin-top:12px; border-radius:999px; }
+.event-skeleton__card > view:nth-child(n+4) { height:16px; margin-top:16px; }
+.event-skeleton__plain > view:nth-child(1) { width:40%; height:var(--ui-type-section-lh); }
+.event-skeleton__plain > view:nth-child(n+2) { height:16px; margin-top:14px; }
+.event-skeleton__plain > view:last-child { width:70%; }
 .event-rule-paragraph { display:block; }
 .event-rule-paragraph > text { display:block;white-space:pre-wrap;text-align:left;overflow-wrap:break-word; }
 .event-row.event-rule-paragraph > text + text { margin-top:6px;color:var(--v5-ink-2);font:var(--ui-type-long-form-weight) var(--ui-type-long-form)/var(--ui-type-long-form-lh) var(--font-v5); }
