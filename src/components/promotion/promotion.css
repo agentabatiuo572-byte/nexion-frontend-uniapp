@@ -31,8 +31,6 @@
 .promotion-filters .promotion-action { min-height:44px; padding:9px 13px; font-size:13px; font-weight:400; }
 .promotion-section-title { display:block; font-size:17px; font-weight:600; line-height:1.4; margin-bottom:12px; }
 .promotion-summary.total { border-top:1px solid var(--v5-border); font-size:18px; font-weight:600; padding-top:15px; }
-.promotion-overlay { position:fixed; inset:0; z-index:1100; display:flex; align-items:center; justify-content:center; padding:16px; background:var(--v5-backdrop,rgba(0,0,0,.62)); }
-.promotion-overlay-dismiss { position:absolute; inset:0; }
 .promotion-modal { width:358px; max-width:100%; max-height:calc(100vh - 32px); overflow-y:auto; box-sizing:border-box; padding:24px 22px; border-radius:28px; border:1px solid var(--v5-border); background:var(--v5-glass-bg,var(--v5-surface)); backdrop-filter:blur(20px) saturate(118%); }
 .promotion-image { width:64px; height:64px; border-radius:12px; flex:none; }
 .promotion-steps { display:flex; gap:7px; }
