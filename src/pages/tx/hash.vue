@@ -15,7 +15,7 @@
         <view v-if="hash" style="margin-top: 16px">
           <text class="block" :style="holdBodyStyle">{{ recoveryCopy.txHashLabel }}</text>
           <NxCodeValue class="tx-retained-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
-          <view :style="copyBtnStyle" role="button" :tabindex="copyBusy ? -1 : 0" :aria-disabled="copyBusy" :aria-busy="copyBusy" @click="copyHash" @keydown.enter.prevent="copyHash" @keydown.space.prevent="copyHash"><text>{{ copyButtonText }}</text></view>
+          <view class="tx-hash-copy"><NxButton variant="text" size="small" :label="copyButtonText" @click="copyHash" /></view>
         </view>
         <view class="tx-bills-link" role="link" tabindex="0" :style="copyBtnStyle" @click="viewBills" @keydown.enter.prevent="viewBills"><text>{{ recoveryCopy.viewBills }}</text></view>
       </view>
@@ -29,10 +29,7 @@
           <text :style="confirmedStyle">{{ w.confirmed }}</text>
         </view>
         <NxCodeValue class="tx-hero-hash" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
-        <view class="flex items-center active:opacity-70" :style="copyBtnStyle" role="button" tabindex="0" :aria-label="copyButtonText" @click.stop="copyHash">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-          <text>{{ copyButtonText }}</text>
-        </view>
+        <view class="tx-hash-copy"><NxButton variant="text" size="small" :label="copyButtonText" @click="copyHash" /></view>
         <view class="grid grid-cols-3 text-center" style="gap: 8px; margin-top: 12px">
           <Stat :label="w.block" :value="`#${blockNumber.toLocaleString()}`" />
           <Stat :label="w.confirmations" :value="String(confirmations)" tint="var(--v5-success)" />
@@ -77,6 +74,7 @@ import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import Stat from "@/components/tx/tx-stat.vue";
 import Row from "@/components/tx/tx-row.vue";
 import { useT } from "@/i18n/use-t";
@@ -300,6 +298,8 @@ const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-typ
 <style scoped>
 /* The retained hash stays fully visible: its own full-width monospace block, wrapping evenly (NxCodeValue full); the copy button below copies it. */
 .tx-retained-hash, .tx-hero-hash { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); user-select: text; }
+/* Copy is an in-place action: a text button under the hash, at its right end (03 §3.1). */
+.tx-hash-copy { display: flex; justify-content: flex-end; margin-top: 4px; }
 .tx-bills-link { display: flex !important; justify-content: center; }
 [role="button"][aria-disabled="true"] { opacity: 0.5; }
 [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
