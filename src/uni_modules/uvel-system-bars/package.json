@@ -2,7 +2,7 @@
   "id": "uvel-system-bars",
   "displayName": "UVEL system bars",
   "version": "1.0.0",
-  "description": "Repository-owned UTS bridge that paints the Android navigation bar with the page floor",
+  "description": "Repository-owned UTS bridge that draws the page under a transparent Android navigation bar",
   "engines": { "HBuilderX": "^5.32.0" },
   "uni_modules": {
     "dependencies": [],

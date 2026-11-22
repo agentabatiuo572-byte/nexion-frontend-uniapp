@@ -1,3 +1,4 @@
 import { SystemBarsBridge } from 'uts.sdk.modules.uvelSystemBars'
 
 export function setNavigationBarTheme(dark: boolean): void { SystemBarsBridge.navigationBar(dark) }
+export function getNavigationButtonsInset(): number { return SystemBarsBridge.buttonsInset() }

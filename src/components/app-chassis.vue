@@ -498,14 +498,15 @@ const statusBarHeight = computed(() => {
 });
 const HEADER_H = 56;
 // Preserve the existing floor clearance while the navigation rail changes height.
-const TABBAR_CLEARANCE = 36; // HomeIndicator (22) + 14px gap, in addition to the responsive rail height.
-const SUB_BOTTOM = 40; //  home indicator (~22) + 18 breathing (was 26)
+// Gaps above the home-indicator spacer (var(--nx-tray-bottom): 22px, more above Android's three buttons).
+const TABBAR_CLEARANCE = 14; // in addition to the responsive rail height
+const SUB_BOTTOM = 18;
 const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HEADER_H : navHeaderH.value));
 const showFloatingSupport = computed(() => isTabRoute.value && ['home', 'earn', 'team'].includes(activeTab.value));
 // Let the last page action scroll fully above the floating support shortcut.
 const contentBottom = computed(() => isTabRoute.value
-  ? `calc(var(--nx-tabbar-height, 56px) + ${TABBAR_CLEARANCE + (showFloatingSupport.value ? 60 : 0)}px)`
-  : `${SUB_BOTTOM}px`);
+  ? `calc(var(--nx-tabbar-height, 56px) + var(--nx-tray-bottom) + ${TABBAR_CLEARANCE + (showFloatingSupport.value ? 60 : 0)}px)`
+  : `calc(var(--nx-tray-bottom) + ${SUB_BOTTOM}px)`);
 // ── 待支付浮动条的落位 ──
 // 浮动条永远占 chrome 之下自己的一条带(top = contentTop + 8),页面内容整体下让 PENDING_BAR_INSET,
 // 任何页都不被盖住:tab 页 / useSetPageHeader 子页的 chassis 头在带之上;用 sub-page-header(内容内

@@ -1394,7 +1394,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 .nx-conv-composer {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 2;
   pointer-events: none;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 22px);
+  padding-bottom: calc(var(--nx-safe-bottom) + 22px);
   background: transparent;
 }
 .nx-conv-composer > * { pointer-events: auto; }
@@ -1435,7 +1435,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 .nx-conv-closedbar {
   padding: 10px 12px;
   /* mirrors the input row's safe-area lift (it replaces that row) */
-  padding-bottom: calc(env(safe-area-inset-bottom) + 22px);
+  padding-bottom: calc(var(--nx-safe-bottom) + 22px);
   border-top: 1px solid var(--v5-border);
 }
 .nx-conv-restart {

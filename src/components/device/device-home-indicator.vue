@@ -5,14 +5,15 @@
 <script setup lang="ts">
 let isNativeAndroid = false;
 // #ifdef APP-PLUS
-// Keep the spacer and tab position; Android already draws the gesture bar.
+// Keep the spacer and tab position; Android draws its own gesture handle or buttons over the page.
 isNativeAndroid = uni.getSystemInfoSync().platform === "android";
 // #endif
 </script>
 
 <style scoped>
+/* The nav pill sits on this spacer, as high as the bottom trays (--nx-tray-bottom). */
 .nx-home-indicator {
-  height: 22px;
+  height: var(--nx-tray-bottom, 22px);
   display: flex;
   align-items: flex-start;
   justify-content: center;
