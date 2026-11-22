@@ -5,7 +5,7 @@
 
   Top→bottom:
     · SKU-specific product artwork, including the Cloud Share resource pool,
-      with folded-corner badge ribbon + tier-code chip + Legacy chip overlay.
+      with the marketing badge (ProductBadge) + tier-code chip + Legacy chip overlay.
     · Body: name, ROI hero (daily earn / trade-in). Specs and AI throughput
       stay on the detail page.
     · Footer: price + frosted Buy CTA.
@@ -20,10 +20,7 @@
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
       </view>
 
-      <!-- Badge ribbon -->
-      <view v-if="copy.badge" class="product-ribbon absolute" :style="ribbonStyle">
-        <text>{{ copy.badge }}</text>
-      </view>
+      <ProductBadge v-if="copy.badge" :label="copy.badge" :kind="copy.badgeKind" />
 
 
     </view>
@@ -139,6 +136,7 @@ import PromotionProduct from '@/components/promotion/promotion-product.vue';
 
 import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDetailHref,type VoucherEntryContext } from '@/lib/promotion-entry';
 import { uiLocale } from "@/i18n";
+import ProductBadge from "@/components/store/product-badge.vue";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean; compact?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean; voucherContext?:VoucherEntryContext }>(), {
   featured: false,
@@ -371,21 +369,6 @@ const fadeStyle: CSSProperties = {
   background: "linear-gradient(180deg, transparent 78%, var(--v5-surface) 100%)",
   pointerEvents: "none",
 };
-const ribbonStyle: CSSProperties = {
-  top: 0,
-  left: "16px",
-  padding: "3px 10px 4px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontVariantNumeric: "tabular-nums",
-  fontSize: "12px",
-  fontWeight: 500,
-  borderRadius: "0 0 6px 6px",
-  letterSpacing: "-0.005em",
-  zIndex: 2,
-  pointerEvents: "none",
-};
 const tierChipStyle: CSSProperties = {
   fontSize: "12px",
   letterSpacing: "0.22em",
@@ -547,7 +530,6 @@ const gateMetaStyle: CSSProperties = {
 .product-card--compact .product-art-entry { display:flex; align-items:center; justify-content:center; padding:0; }
 .product-card--compact .product-art { position:relative !important; inset:auto !important; width:min(172px,100%) !important; height:auto !important; aspect-ratio:1; max-width:172px; margin:0; animation-name:product-compact-float; animation-duration:4.2s; }
 @keyframes product-compact-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
-.product-card--compact .product-ribbon { top:0 !important; left:0 !important; padding:2px 9px !important; border-radius:0 0 6px 0 !important; background:var(--v5-brand) !important; color:var(--v5-on-brand) !important; font:var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5) !important; }
 .product-compact-body { flex:1; display:flex; flex-direction:column; padding:10px 14px 14px; }
 .product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
 .product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }

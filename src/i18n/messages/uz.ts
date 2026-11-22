@@ -2286,6 +2286,7 @@ export const uz: Messages = {
     computePointsPerShare: "Har bir ulush jamoaga {n} quvvat balli qoʻshadi",
     bestSeller: "Xit",
     trending: "Ommabop",
+    badgeRecommended: "Tavsiya",
     goalFocusTitle: "Daromad maqsadingizdan",
     goalFocusLocated: "Daromad maqsadingiz {name} qurilmasini tavsiya qildi. U quyida belgilangan.",
     goalFocusUnavailable: "Daromad maqsadingiz {name} qurilmasini tavsiya qildi, lekin hozir uni sotib olib boʻlmaydi. Quyida bugun sotib olish mumkin boʻlgan qurilmalar.",
