@@ -210,6 +210,7 @@ const server=http.createServer(async(req,res)=>{
         if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
         if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
+        if(['normal','device-limit'].includes(update.registrationState))state.registrationState=update.registrationState;
         if(['none','overview','deletion','phone-policy','next-page'].includes(update.securityReadFailure))state.securityReadFailure=update.securityReadFailure;
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(update.reset||update.savedAttemptState)authDemo.reset();

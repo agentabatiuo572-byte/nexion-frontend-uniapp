@@ -642,7 +642,8 @@ function registrationErrorText(cause: unknown): string {
 function recoverRejectedRegistration(cause: unknown, sentSponsorCode: string | null): boolean {
   if (!(cause instanceof ApiError) || cause.kind !== "http") return false;
   const invalidOtp = cause.status === 422 && cause.message === "USER_REGISTRATION_OTP_INVALID";
-  const signupLimited = cause.status === 409 && cause.message === "USER_REGISTRATION_K1_IP_LIMIT";
+  const signupLimited = cause.status === 409
+    && ["USER_REGISTRATION_K1_IP_LIMIT", "USER_REGISTRATION_DEVICE_LIMIT"].includes(cause.message);
   const sponsorRejected = cause.message === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || cause.message === "USER_REGISTRATION_SPONSOR_INVALID";
   if (!invalidOtp && !signupLimited && !sponsorRejected) return false;
   // These refusals leave no new account; the challenge cannot be reused.

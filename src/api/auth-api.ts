@@ -153,6 +153,7 @@ function passwordResetOtpFromResponse(value: unknown): PasswordResetOtpResult {
 const SETTLED_REGISTRATION_CONFLICTS = new Set([
   "USER_REGISTRATION_ACCOUNT_EXISTS",
   "USER_REGISTRATION_K1_IP_LIMIT",
+  "USER_REGISTRATION_DEVICE_LIMIT",
   "USER_REGISTRATION_SPONSOR_AMBIGUOUS",
   "USER_REGISTRATION_SPONSOR_STATE_CHANGED",
   "USER_REGISTRATION_SPONSOR_ENVIRONMENT_MISMATCH",
@@ -578,6 +579,11 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
+        headers: options.clientSurface === "H5" ? {
+          ...sessionIssuanceHeaders,
+          "X-NexGrid-Installation-Id": options.installationId?.() ?? "",
+          "X-NexGrid-Execution-Supported": "false",
+        } : sessionIssuanceHeaders,
       });
       return registrationOtpFromResponse(data);
     },
