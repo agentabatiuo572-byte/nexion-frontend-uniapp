@@ -684,7 +684,7 @@ const signOutStyle: CSSProperties = {
 .me-shortcut-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--v5-space-3) var(--v5-space-1); padding: var(--v5-space-3) 0 var(--v5-space-1); }
 .me-shortcut { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); min-width: 0; min-height: 80px; cursor: pointer; }
 .me-shortcut__label { font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); text-align: center; overflow-wrap: break-word; }
-.me-row-dot { position: absolute; right: 0; top: 0; width: var(--v5-space-2); height: var(--v5-space-2); border-radius: var(--v5-radius-full); background: var(--v5-danger); box-shadow: 0 0 0 2px var(--v5-bg); }
+.me-row-dot { position: absolute; right: 0; top: 0; width: var(--v5-space-2); height: var(--v5-space-2); border-radius: var(--v5-radius-full); background: var(--ui-unread-badge); box-shadow: 0 0 0 2px var(--v5-bg); }
 .me-network-item__meta { margin-top: -4px; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); text-align: center; overflow-wrap: break-word; }
 .me-shortcut:focus-visible, .me-network-item:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: var(--v5-radius-s); }
 .me-shortcut:active, .me-network-item:active { opacity: .72; }
