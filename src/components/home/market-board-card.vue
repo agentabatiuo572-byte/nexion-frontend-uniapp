@@ -4,7 +4,7 @@
   stay explicit instead of being replaced with local mock movement or volume.
 -->
 <template>
-  <view class="home-market" data-home-section="compute-market">
+  <view class="home-market" data-home-section="compute-market" :aria-busy="!homeMarketRows.length && marketBoardState === 'loading' ? 'true' : undefined">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="home-market__title-note">{{ t.home.marketBoardPrices }}</text></text>
       <!-- Opens the next level (the market page): a text link, ink-3 with a chevron (03 §3.1, §3.9). -->
@@ -57,7 +57,7 @@
     </view>
     <!-- First read in progress or failed: the table keeps its size with still placeholders and no status text; a failed
          read recovers on its own (03 §3.4, §3.5.2; the home earnings card owns the retry). -->
-    <view v-else class="home-market-table" aria-hidden="true" :aria-busy="marketBoardState === 'loading' ? 'true' : undefined" data-home-market-placeholder="true">
+    <view v-else class="home-market-table" aria-hidden="true" data-home-market-placeholder="true">
       <view class="home-market-grid home-market-head grid"><view class="home-market-bar" style="width: 24px" /></view>
       <view v-for="n in MARKET_PLACEHOLDER_ROWS" :key="n" class="home-market-grid home-market-row home-market-row--placeholder grid items-center">
         <view class="home-market-bar home-market-bar--tag" />
@@ -131,7 +131,7 @@ function goEarn() {
 .home-market-empty { display: flex; align-items: center; min-height: 60px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: var(--v5-surface); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 [data-theme="light"] .home-market-empty { box-shadow: var(--v5-glass-shadow); }
 /* Still placeholders (no shimmer): the same row height as a loaded row. */
-.home-market-row--placeholder { min-height: 56px; box-sizing: border-box; cursor: default; }
+.home-market-row--placeholder, .home-market-row--placeholder:active { min-height: 56px; box-sizing: border-box; cursor: default; opacity: 1; }
 .home-market-bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .home-market-bar--tag { width: 40px; height: 24px; }
 @media (max-width: 360px) {
