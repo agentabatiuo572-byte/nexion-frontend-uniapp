@@ -3,7 +3,7 @@ import { demoWalletUsdt, postDemoWalletEntries } from './prototype-demo-wallet.m
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
 import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, updateDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
-import { demoUsdtWithdrawalNetworks, demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
+import { demoPayoutAddressCooldownDays, demoPayoutAddressDelayHours, demoUsdtWithdrawalNetworks, demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, longBankOrderNo } from './prototype-demo-long-content.mjs';
 
 const DAY = 86400000;
@@ -195,7 +195,13 @@ export function bankDemo(url, state, request) {
     if (current && Date.parse(current.nextChangeAllowedAt) > now) fail('PAYOUT_ADDRESS_CHANGE_COOLDOWN');
     if (current && address.toLowerCase() === current.address.toLowerCase()) return snapshot(current);
     demo.addresses ??= {};
-    demo.addresses[network] = { ...proof, network, address, status: 'ACTIVE', effectiveAt: new Date(now + DAY).toISOString(), createdAt: current?.createdAt ?? new Date(now).toISOString(), nextChangeAllowedAt: new Date(now + 7 * DAY).toISOString(), changePending: true };
+    demo.addresses[network] = {
+      ...proof, network, address, status: 'ACTIVE',
+      createdAt: current?.createdAt ?? new Date(now).toISOString(),
+      effectiveAt: new Date(now + demoPayoutAddressDelayHours * 3600000).toISOString(),
+      nextChangeAllowedAt: new Date(now + demoPayoutAddressCooldownDays * DAY).toISOString(),
+      changePending: true,
+    };
     return snapshot(demo.addresses[network]);
   });
 }

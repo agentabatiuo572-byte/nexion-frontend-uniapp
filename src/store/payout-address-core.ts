@@ -26,8 +26,10 @@ export type PayoutAddressSource = "user" | "migrated";
 /** 当前生效的提现地址(每网络至多一个)。 */
 export interface PayoutAddressEntry {
   address: string;
-  /** 生效时间。user = 添加/更换时刻;migrated = 原配对验证时刻(账龄延续)。 */
+  /** 地址行创建时间，旧本地数据也用它作为账龄起点。 */
   addedAt: number;
+  /** 该地址本次设置的生效时间。旧本地数据可从原冻结截止或验证时间读取。 */
+  effectiveAt?: number;
   source: PayoutAddressSource;
 }
 
@@ -132,11 +134,12 @@ export function applyAddAddress(
   cooldownDays: number,
 ): NetworkPayoutState | null {
   if (state.current !== null) return null;
+  const effectiveAt = now + PAYOUT_FREEZE_MS;
   return {
     ...state,
-    current: { address: address.trim(), addedAt: now, source: "user" },
+    current: { address: address.trim(), addedAt: now, effectiveAt, source: "user" },
     history: [...state.history],
-    freezeUntil: now + PAYOUT_FREEZE_MS,
+    freezeUntil: effectiveAt,
     nextChangeAt: now + cooldownDays * 24 * 3600 * 1000,
   };
 }
@@ -153,10 +156,11 @@ export function applyChangeAddress(
   cooldownDays: number,
 ): NetworkPayoutState | null {
   if (state.current === null) return null;
+  const effectiveAt = now + PAYOUT_FREEZE_MS;
   return {
-    current: { address: address.trim(), addedAt: now, source: "user" },
+    current: { address: address.trim(), addedAt: now, effectiveAt, source: "user" },
     history: [...state.history, { ...state.current, replacedAt: now }],
-    freezeUntil: now + PAYOUT_FREEZE_MS,
+    freezeUntil: effectiveAt,
     nextChangeAt: now + cooldownDays * 24 * 3600 * 1000,
   };
 }

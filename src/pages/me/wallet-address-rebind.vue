@@ -38,7 +38,7 @@
         <view v-if="remoteReadFailed" class="nx-rebind-read-retry w-full grid place-items-center" :style="primaryCtaStyle" role="button" :aria-disabled="remoteRefreshPending" :tabindex="remoteRefreshPending ? -1 : 0" @click="retryRemoteSnapshot" @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"><text>{{ remoteRefreshPending ? copy.addressLoading : copy.retry }}</text></view>
       </view>
       <!-- ── 成功态 ── -->
-      <view v-else-if="step === 'success'" class="mx-4 nx-step-in">
+      <view v-else-if="step === 'success'" class="mx-4 nx-step-in" :data-effective-at="currentEffectiveAt" :data-address-effective="addressEffective">
         <view class="flex flex-col items-center" style="padding: 32px 0 0">
           <view class="grid place-items-center" :style="successIconBoxStyle">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
@@ -154,7 +154,7 @@
               <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ t.addrRebind.sourceMigrated }}</text>
             </view>
           </view>
-          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(current?.addedAt ?? 0) }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(currentEffectiveAt ?? 0) }}</text>
           <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期)。
                冻结期不叠挂:冻结横幅说「禁提」时再说「可能需复核」= 同屏两种结论
                (审计 P1;与 wallet-withdraw 的 !frozenNow 反冗余门同型)。 -->
@@ -802,6 +802,17 @@ const projectedServerNow = computed<number | null>(() => {
   return anchor
     ? projectServerNow(anchor.serverNowEpochMs, anchor.receivedMonotonicAt, monotonicNow.value)
     : null;
+});
+const currentEffectiveAt = computed<number | null>(() => {
+  const address = current.value;
+  if (!address) return null;
+  const legacyEffectiveAt = address.source === "user" ? payout.stateFor(network.value).freezeUntil : null;
+  return address.effectiveAt ?? legacyEffectiveAt ?? address.addedAt;
+});
+const addressEffective = computed<boolean | null>(() => {
+  const now = projectedServerNow.value;
+  const effectiveAt = currentEffectiveAt.value;
+  return now === null || effectiveAt === null ? null : now >= effectiveAt;
 });
 const freezeLeftMs = computed<number | null>(() => {
   const now = projectedServerNow.value;
