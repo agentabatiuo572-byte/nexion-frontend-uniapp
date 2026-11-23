@@ -451,7 +451,7 @@ async function loadQuote(recheckCapacity=false,foreground=false){
       // Publishing the catalog invalidates voucher reads. Quote only after this
       // checkout's catalog refresh has finished, as with its wallet read.
       catalogRefresh??=refreshProductCatalog(true);
-      const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
+      const catalogReady=await settleProductCatalogRefresh(catalogRefresh,{requireFresh:true});
       if(!readCurrent(generation))return;
       if(!catalogReady){
         catalogRefresh=null;quotePresentation.value=null;promotion.value=null;quoteBlock.value='unavailable';

@@ -4,7 +4,7 @@ import type { Messages } from '@/i18n/messages/en';
 import { fmt } from '@/i18n/format';
 import { landingCopy } from '@/i18n/promotion-landing';
 import { ambassadorCount } from '@/i18n/ambassador';
-import { sessionVault } from '@/api/runtime';
+import { remoteApiEnabled, sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
 import { isProductCatalogDisplayCurrent, productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
 import { displayDeadline, localized, rewardAmount } from './promotion-display';
@@ -29,7 +29,8 @@ function catalogReady(): boolean {
   return (productCatalogState.status === 'ready' || (productCatalogState.status === 'loading' && productCatalogState.serverCanonical)) && !!sessionVault.read();
 }
 export function landingProduct(sku: string) {
-  return catalogReady() ? getProduct(sku) : undefined;
+  if (!catalogReady()) return undefined;
+  return remoteApiEnabled ? productCatalogPresentation.value?.products.find(product => product.id === sku) : getProduct(sku);
 }
 /** A signed-out read takes the public catalog name; without one it says "eligible device", never the internal SKU. */
 export function landingProductName(activity: PublicPromotion, sku: string, language?: string): string {
