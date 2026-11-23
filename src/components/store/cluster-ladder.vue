@@ -123,7 +123,8 @@ function yieldColor(tier: Tier): string {
 .ladder-you { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand-2-ink); }
 .ladder-track { position: relative; height: 6px; overflow: hidden; border-radius: 999px; background: var(--v5-surface-3); }
 .ladder-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; }
-.ladder-yield { overflow: hidden; text-align: right; white-space: nowrap; font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; }
+/* Side-by-side yield estimates use the inline-figure role (10 §10.1 行内数值, JetBrains Mono). */
+.ladder-yield { overflow: hidden; text-align: right; white-space: nowrap; font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .ladder-unit { font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 @media (prefers-reduced-motion: reduce) { .ladder-fill { transition: none !important; } }
 </style>
