@@ -82,7 +82,7 @@ export const earningCreditCopy = {
     loadFailedTitle: "Hindi pa ma-load ang detalye", loadFailedHint: "Awtomatikong sinusubukan ulit", unavailable: "Hindi available ang resibo ng kitang ito", removed: "Hindi na makikita ang mensaheng ito",
     pushTitle: "Alerto sa kita", pushHint: "Phone notification lang; walang pagbabago sa mensahe sa app",
     pushOptions: {
-      DAILY: { label: "Isang beses kada araw", hint: "Default · Buod ng kita bandang 21:00" },
+      DAILY: { label: "Araw-araw", hint: "Default · Buod ng kita bandang 21:00" },
       HALF_HOURLY: { label: "Kada 30 minuto", hint: "Kapag may pumasok na kita; wala mula 23:00 hanggang 08:00" },
       OFF: { label: "Naka-off", hint: "Walang alerto sa kita" },
     },
@@ -105,7 +105,7 @@ export const earningCreditCopy = {
     pushTitle: "Табыс хабарландыруы", pushHint: "Тек телефон хабарландырулары; қолданбадағы хабарлар өзгермейді",
     pushOptions: {
       DAILY: { label: "Күніне бір рет", hint: "Әдепкі · Күндік жиынтық шамамен 21:00\u2011де" /* non-breaking hyphen keeps the time and its suffix together */ },
-      HALF_HOURLY: { label: "Әр 30 минут сайын", hint: "Табыс түскенде; 23:00–08:00 аралығында жіберілмейді" },
+      HALF_HOURLY: { label: "30 минут сайын", hint: "Табыс түскенде; 23:00–08:00 аралығында жіберілмейді" },
       OFF: { label: "Өшірулі", hint: "Табыс хабарландыруы жіберілмейді" },
     },
     pushNote: "Тек телефон хабарландыруларын басқарады, алғашқы табыс хабарландыруын қоса.",

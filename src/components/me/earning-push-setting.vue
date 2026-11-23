@@ -82,7 +82,8 @@ function moveFocus(index: number, step: number) {
 .earning-push-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .earning-push-label { color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .earning-push-hint { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; text-wrap: pretty; }
-.earning-push-value { flex-shrink: 0; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
+/* The summary column never takes the title's width (10.3): it stays within 40% and wraps at word boundaries. */
+.earning-push-value { flex: 0 1 auto; max-width: 40%; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: right; overflow-wrap: break-word; text-wrap: balance; }
 .earning-push-chevron { flex-shrink: 0; color: var(--v5-ink-4); }
 /* Single-choice rows (design-rules picker rows): 22px radio on the right, selected row brand 10% tint and outline. */
 .earning-push-options { display: flex; flex-direction: column; gap: 8px; }
