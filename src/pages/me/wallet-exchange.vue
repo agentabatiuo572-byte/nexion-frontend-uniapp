@@ -101,9 +101,9 @@
       <!-- Daily cap as a ring card (risk-control dashboard), queue below when present. -->
       <view class="ex-quota">
         <view class="ex-quota__top">
-          <view class="ex-ring" role="img" :aria-label="`${t.exchange.yourDaily} ${userCapPct}%`">
-            <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="ex-ring__trk" cx="30" cy="30" r="26" /><circle class="ex-ring__val" cx="30" cy="30" r="26" :style="{ strokeDashoffset: `${(163 * (1 - userCapPct / 100)).toFixed(1)}` }" /></svg>
-            <text class="ex-ring__b">{{ remoteApiEnabled && !remoteState ? '—' : `${userCapPct}%` }}</text>
+          <view class="ex-ring" role="img" :aria-label="`${t.exchange.yourDaily} ${quotaPctText}`">
+            <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="ex-ring__trk" cx="30" cy="30" r="26" /><circle v-if="quotaKnown" class="ex-ring__val" cx="30" cy="30" r="26" :style="{ strokeDashoffset: `${(163 * (1 - userCapPct / 100)).toFixed(1)}` }" /></svg>
+            <text class="ex-ring__b">{{ quotaPctText }}</text>
           </view>
           <view class="ex-quota__grow">
             <text class="ex-quota__t">{{ t.exchange.capsLabel }}</text>
@@ -1022,6 +1022,9 @@ const toParts = computed<[string, string]>(() => {
   const text = toAmountLabel.value, at = text.lastIndexOf(".");
   return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
 });
+// Without a snapshot the used amount is unknown: the ring shows only its track, and text and name read "—".
+const quotaKnown = computed(() => !remoteApiEnabled || remoteState.value !== null);
+const quotaPctText = computed(() => quotaKnown.value ? `${userCapPct.value}%` : "—");
 const userCapPct = computed(() => displayUserCap.value > 0 ? Math.min(100, Math.max(0, Math.round(displayUserUsed.value / displayUserCap.value * 100))) : 0);
 const errorLabel = computed(() =>
   overBalance.value
