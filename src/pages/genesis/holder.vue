@@ -279,7 +279,7 @@ const genesisPoints = useGenesisPoints();
 const perkKeys = ["a", "c", "f"] as const;
 // Perk icons: line glyphs in the shared tile (03 §3.6.1: no emoji as icons). a = UVT allowance, c = founding member, f = transferable.
 const PERK_TILES = {
-  a: { tone: "purple", path: "m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" },
+  a: { tone: "purple", path: "m12 3 8 4.5v9L12 21l-8-4.5v-9zM9 8.5v4a3 3 0 0 0 6 0v-4" },
   c: { tone: "sky", path: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
   f: { tone: "coral", path: "M7 7h13l-3-3M17 17H4l3 3" },
 } as const;
