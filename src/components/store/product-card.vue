@@ -87,7 +87,7 @@
         <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label + '\u00A0·\u00A0' }}</text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
-      <NxTag v-if="compactUnavailable" class="product-compact-status" tone="unavailable" wrap :label="buyLabel" />
+      <NxTag v-if="compactUnavailable" class="product-compact-status" tone="unavailable" wrap :label="gateLabel" />
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
@@ -263,12 +263,13 @@ const buyLabel = computed(() =>
 // The compact card is one link: its name reads what the card shows, in the order it shows it (badge, name, price,
 // and why it cannot be bought now), so a screen reader hears the same facts as a sighted user (03 §3.8, 07 §7.2).
 // Only a confirmed state shows: sold out or an eligibility answer of "no". A catalogue that has not been read yet
-// shows nothing, so it never looks like a known refusal (03 §3.5.2).
+// shows nothing, so it never looks like a known refusal (03 §3.5.2). The tag and the name use gateLabel, the confirmed
+// reason, so a retained catalogue that is refreshing or failed to refresh never swaps it for a read status (03 §3.4).
 const compactUnavailable = computed(() => stockUnavailable.value
   || (remoteApiEnabled && eligibility.value.status === "ready" && !eligibility.value.eligible));
 const compactAriaLabel = computed(() => [copy.value.badge, props.product.name,
   `${t.value.store.cardPriceLabel} $${formatGroupedAmount(props.product.price)}`,
-  compactUnavailable.value ? buyLabel.value : ""].filter(Boolean).join(" · "));
+  compactUnavailable.value ? gateLabel.value : ""].filter(Boolean).join(" · "));
 function onBuy() {
   if (buyUnavailable.value) return;
   if(promotionSignIn.value){navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId)));return;}

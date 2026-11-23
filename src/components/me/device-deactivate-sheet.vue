@@ -48,12 +48,13 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
           <text>{{ t.deactivateSheet.waitCta }}</text>
         </NxButton>
-        <NxButton class="nx-deactivate-action nx-deactivate-action--danger" variant="secondary" size="large" :label="forceLabel" @click="emit('force')">
+        <NxButton class="nx-deactivate-action nx-deactivate-action--danger" variant="secondary" size="large" :label="forceLabel" aria-describedby="nx-deactivate-force-note" @click="emit('force')">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
           <text>{{ forceLabel }}</text>
         </NxButton>
-        <!-- The button names only the action; what forcing costs is one auxiliary line right under it (03 §3.1). -->
-        <text class="nx-deactivate-note">{{ forceNote }}</text>
+        <!-- The button names only the action; what forcing costs is one auxiliary line right under it (03 §3.1), and the
+             button points to it with aria-describedby so a screen reader hears the cost before acting (07 §7.2). -->
+        <text id="nx-deactivate-force-note" class="nx-deactivate-note">{{ forceNote }}</text>
         <NxButton class="nx-deactivate-back" variant="text" size="large" :label="t.deactivateSheet.backCta" @click="emit('dismiss')" />
       </view>
     </view>
