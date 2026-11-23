@@ -17,7 +17,7 @@ import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxi
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
-import { demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
+import { demoEarningCredits, demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
 import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { contentOptions, demoHasLongBillRefs } from './prototype-demo-long-content.mjs';
@@ -119,7 +119,7 @@ export const demoOptions = {
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 560']],
   homeDisplayState:[['paused','暂停'],['growth','增长']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
-  fleetState:[['normal','默认设备'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
+  fleetState:[['normal','默认设备'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位'],['earning-credit','收益到账通知 · 三台设备']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款读取失败（503，保留原单）'],['intent-missing','确证没有原付款单（404，结束查询）'],['remote-in-progress','别处发起的进行中付款（本机无记录）'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['late','宽限结束后到账·订单已取消（示例 001 剩 1 分钟）'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','后台关闭 ERC20'],['usdt-off','后台关闭 USDT 两个网络'],['low-balance','钱包余额不足（820.64 USDT）'],['reward-clawback-debt','奖励扣回·USDT 欠款（−12.123456）']],
   deviceTaskSampleState:[['default','默认作业样例'],['long','长作业名 · 最近完成 10 条（模拟作业）']],
   interfaceLanguagesState:[['all','9 种全开'],['default','后端默认八种（不含中文）'],['en-only','只开英文']],
@@ -495,6 +495,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   const second=(state.computeState??'app')==='app'?{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}
     :clone(42,'CLOUD-SHARE','Cloud Share',0.6,19.9,{instanceNo:'DEMO-CLOUD',deviceType:'SHARE',todayEarningsUsdt:.2,todayEarningsNex:0});
   let devices=state.fleetState==='none'?[]:[template,...phones,second];
+  if(state.fleetState==='earning-credit')devices.push(clone(54,'STELLARRACK-P1','UVELRack P1',45,12999,{}));
   if(state.fleetState==='inventory')devices.push(clone(51,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='decayed'){
     const decayedPurchaseAt=Math.max(decayedS1PurchasedAt(),minimumPurchaseAt);
@@ -678,6 +679,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return reviewFixture(url,locale,state,request,previewHomeDisplaySample(state,now).online);
   }
   const fleetDevices=()=>demoFleetFacts(url,locale,state).devices;
+  if(state.fleetState==='earning-credit'&&pathname.startsWith('/api/tasks/receipts')&&!state.fleetSeed)fleetDevices();
   // Reconcile due cycles before any fixture response can read or change the wallet.
   const computeFacts=(state.computeState??'app')==='app'?null:demoComputeFacts(state,now,fleetDevices);
   if(computeFacts){
@@ -1669,7 +1671,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       const order=orders.find(item=>item.orderNo==='DEMO-ORDER-002')??orders.find(item=>item.paymentStatus==='PAID');
       return demoNotifications(locale,state,now,device,order);
     };
-    if(pathname==='/api/notifications')return demoNotificationPage(notificationRows(),url.searchParams);
+    if(pathname==='/api/notifications')return demoNotificationPage(notificationRows(),url.searchParams,{
+      includeActionableUnread:state.fleetState!=='earning-credit',
+    });
     if(/^\/api\/notifications\/\d+\/read$/.test(pathname)){state.readIds||=[];state.readIds.push(Number(pathname.split('/')[3]));return null;}
     if(pathname==='/api/notifications/read-all'){
       const count=notificationRows().filter(item=>item.readAt===null).length;
@@ -1684,6 +1688,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(/^\/api\/notifications\/\d+\/actions$/.test(pathname)){
       const id=Number(pathname.split('/')[3]);
       const item=notificationRows().find(row=>row.id===id);
+      if(demoEarningCredits(state).some(sample=>sample.id===id&&sample.actionMissing)){
+        state.clearedNotificationIds??=[];
+        if(item)state.clearedNotificationIds.push(id);
+        throw Object.assign(new Error('NOTIFICATION_NOT_FOUND'),{status:404});
+      }
       if(!item?.ctaHref)throw new Error('DEMO_NOTIFICATION_ACTION_UNAVAILABLE');
       return {notificationId:id,action:request.postDataJSON()?.action||'cta',route:item.ctaHref,recorded:true};
     }

@@ -3,7 +3,7 @@ import { demoTaskAssignments } from './prototype-demo-auxiliary.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 import { demoHasEarningsHistory, demoSettledTasks, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 
-import { demoBatchPage, demoReceiptPage, demoSimulatedReceiptFields, demoSimulatedReceiptDetail } from './prototype-demo-secondary.mjs';
+import { demoBatchPage, demoEarningReceiptRead, demoReceiptPage, demoSimulatedReceiptFields, demoSimulatedReceiptDetail } from './prototype-demo-secondary.mjs';
 
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
 const cycleMs = 60000;
@@ -161,8 +161,10 @@ export function computeDemo(url, state, request, now, facts) {
       rewardNex: 0, earningStatus: 'POSTED', proofHash: simulated ? null : 'a'.repeat(64),
       durationSec: posted.durationSec??60,...(posted.simulation&&demoSimulatedReceiptFields(posted)) };
   });
-  if (path === '/api/tasks/receipts') return demoReceiptPage(url.searchParams,receipts);
+  if (path === '/api/tasks/receipts') return demoReceiptPage(url.searchParams,receipts,state);
   if(path.startsWith('/api/tasks/receipts/')){
+    const earningReceipt=demoEarningReceiptRead(url,state);
+    if(earningReceipt)return earningReceipt;
     const receipt=receipts.find(row=>row.receiptNo===decodeURIComponent(path.split('/').pop()));
     if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     const posted=postedTasks.find(row=>row.receiptNo===receipt.receiptNo);

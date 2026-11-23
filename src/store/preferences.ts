@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { notificationPreferencesApi, remoteApiEnabled } from "@/api/runtime";
+import type { NotificationPreferences } from "@/api/notification-preferences-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { accountErrorMessageKey, type AccountErrorMessageKey } from "@/lib/account-error-message";
 
@@ -79,7 +80,7 @@ export const usePreferences = defineStore("preferences", () => {
   const readFailedWithoutData = computed(() => !!readError.value && !remoteReady.value);
   const remoteAccountEpoch = createRemoteAccountEpoch("default");
   let generation = 0;
-  let canonicalNotifPrefs = init.notifPrefs;
+  let canonicalNotifPrefs: NotificationPreferences = init.notifPrefs;
   let mutationTail: Promise<void> = Promise.resolve();
   let nextMutationId = 0;
   const pendingNotifMutations = new Map<NotifKind, { id: number; value: boolean }>();
@@ -107,7 +108,7 @@ export const usePreferences = defineStore("preferences", () => {
   }
 
   function applyVisibleNotifPrefs() {
-    const visible = { ...canonicalNotifPrefs };
+    const { earningPush, ...visible } = canonicalNotifPrefs;
     for (const [kind, pending] of pendingNotifMutations) visible[kind] = pending.value;
     // Remote mandatory delivery is enforced by the server. Retain its confirmed
     // value on failure rather than disguising legacy false data as a successful write.

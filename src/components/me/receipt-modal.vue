@@ -142,7 +142,10 @@ const receiptTitle = computed(() => isLegacyVerification.value ? t.value.receipt
 const stampColor = computed(() => (isLegacyVerification.value ? "var(--v5-tech-cyan)" : "var(--v5-brand)"));
 const isReceiptSettled = computed(() => {
   const r = props.receipt;
-  return !!r && (!isCanonicalComputeReceipt(r) || /^(POSTED|SUCCESS|SETTLED|CREDITED|PAID)$/.test(r.earningStatus.toUpperCase()));
+  if (!r) return false;
+  if (!isCanonicalComputeReceipt(r)) return true;
+  if (isSimulatedReceipt.value && r.rewardUsdt === 0 && r.rewardNex === 0 && r.settledAt === null) return false;
+  return /^(POSTED|SUCCESS|SETTLED|CREDITED|PAID)$/.test(r.earningStatus.toUpperCase());
 });
 const receiptStatus = computed(() => {
   const r = props.receipt;

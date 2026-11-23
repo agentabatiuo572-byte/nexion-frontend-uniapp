@@ -2,8 +2,9 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 
 export type NotificationPreferenceKey = "commission" | "team" | "staking" | "market" | "genesis" | "system";
-export type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
-export type NotificationPreferencesPatch = Partial<NotificationPreferences>;
+export type EarningPush = "REALTIME" | "HALF_HOURLY" | "DAILY" | "OFF";
+export type NotificationPreferences = Record<NotificationPreferenceKey, boolean> & { earningPush?: EarningPush };
+export type NotificationPreferencesPatch = Partial<Record<NotificationPreferenceKey, boolean>>;
 
 export interface NotificationPreferencesApi {
   get(): Promise<NotificationPreferences>;
@@ -12,15 +13,22 @@ export interface NotificationPreferencesApi {
 
 const KEYS: NotificationPreferenceKey[] = ["commission", "team", "staking", "market", "genesis", "system"];
 
+function isEarningPush(value: unknown): value is EarningPush {
+  return value === "REALTIME" || value === "HALF_HOURLY" || value === "DAILY" || value === "OFF";
+}
+
 function parse(value: unknown): NotificationPreferences {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ApiError({ kind: "protocol", message: "NOTIFICATION_PREFERENCES_RESPONSE_INVALID" });
   }
   const row = value as Record<string, unknown>;
-  if (KEYS.some((key) => typeof row[key] !== "boolean")) {
+  if (KEYS.some((key) => typeof row[key] !== "boolean")
+      || ("earningPush" in row && !isEarningPush(row.earningPush))) {
     throw new ApiError({ kind: "protocol", message: "NOTIFICATION_PREFERENCES_RESPONSE_INVALID" });
   }
-  return Object.fromEntries(KEYS.map((key) => [key, row[key]])) as NotificationPreferences;
+  const preferences = Object.fromEntries(KEYS.map((key) => [key, row[key]])) as NotificationPreferences;
+  if (isEarningPush(row.earningPush)) preferences.earningPush = row.earningPush;
+  return preferences;
 }
 
 function patchBody(value: NotificationPreferencesPatch): NotificationPreferencesPatch {

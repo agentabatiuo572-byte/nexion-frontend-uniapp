@@ -63,6 +63,13 @@ import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import { earningCreditCopy } from "@/i18n/earning-credit";
+import { creditedAmounts } from "@/lib/amount-display";
+import { workloadLabel } from "@/lib/workload-label";
+import { useDataVisibility } from "@/store/data-visibility";
+import type { NotificationEarning } from "@/api/notification-api";
+import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
+import { isReceiptUnavailable } from "@/lib/earning-receipt-status";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ServiceMessageList from "@/components/support/service-message-list.vue";
 import { useConversations } from "@/store/conversations";
@@ -72,10 +79,10 @@ import { notificationCategory, type NotificationCategory } from "@/lib/notificat
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
-import { useNotifications, type Notification } from "@/store/notifications";
+import { EARNING_NOTIFICATION_REMOVED, useNotifications, type Notification } from "@/store/notifications";
 import { navTo, navBack, takeNavigationQuery } from "@/lib/route";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
 import { useApp } from "@/store/app";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
@@ -90,6 +97,10 @@ const notifs = useNotifications();
 const app = useApp();
 const ui = useUI();
 const actionCopy = computed(() => notificationActionsCopy[uiLocale(locale.code)]);
+const earningCopy = computed(() => earningCreditCopy[uiLocale(locale.code)]);
+const dataVisibility = useDataVisibility();
+// Hidden amounts mask only the digits on these rows; units stay (03.10). The detail sheet is not masked.
+const amountsHidden = computed(() => dataVisibility.hidden);
 const clearingRead = ref(false);
 const confirmOwner = `notification-center:${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let pageGeneration = 0;
@@ -107,7 +118,9 @@ function isCurrentIntent(intent: ReturnType<typeof captureIntent>) {
 // 写法与 risk-disclosure.vue:108 同源。
 const notifsErrorText = computed(() => notifs.readFailedWithoutData ? t.value.notifs.loadFailed : "");
 watch(() => notifs.commandError, error => {
-  if (error && pageVisible.value) toast.error(t.value.notifs.loadFailed);
+  if (!error || !pageVisible.value) return;
+  if (error === EARNING_NOTIFICATION_REMOVED) toast.info(earningCopy.value.removed);
+  else toast.error(t.value.notifs.loadFailed);
 }, { flush: "sync" });
 
 async function loadMoreNotifications() {
@@ -118,11 +131,14 @@ async function loadMoreNotifications() {
 
 const center = useMessageDrawer();
 const conversations = useConversations();
+type Filter = "all" | NotificationCategory;
+const filter = ref<Filter>("all");
 let sectionLoaded = false;
 let sectionAccountWasBound = app.accountKey !== "default";
 const initialSectionAccountEpoch = app.accountBindingEpoch;
 let sectionEntryAllowed = true;
 let initialSection: MessageSection | null = sectionAccountWasBound ? null : center.section;
+let initialFilter: Filter = "all";
 const section = computed({ get: () => center.section, set: (value: MessageSection) => {
   center.section = value;
   if (!sectionAccountWasBound && sectionEntryAllowed) initialSection = value;
@@ -163,10 +179,16 @@ function preserveSectionInH5() {
   } catch { /* Unsupported history leaves the existing in-memory selection intact. */ }
 }
 onLoad(query => {
-  const pending = takeNavigationQuery("/pages/me/notifications");
-  const initial = query?.section ?? new URLSearchParams(pending).get("section");
+  const pending = new URLSearchParams(takeNavigationQuery("/pages/me/notifications"));
+  const initial = query?.section ?? pending.get("section");
   sectionLoaded = true;
-  if (sectionEntryAllowed && (initial === "notifications" || initial === "service")) section.value = initial;
+  if (sectionEntryAllowed && (initial === "notifications" || initial === "service")) {
+    section.value = initial;
+    if (initial === "notifications" && (query?.filter ?? pending.get("filter")) === "finance") {
+      initialFilter = "finance";
+      filter.value = initialFilter;
+    }
+  }
   else preserveSectionInH5();
 });
 const sectionOptions = computed(() => [
@@ -181,8 +203,6 @@ const unreadLabel = computed(() => {
   const unreadLoading = conversations.loading || (notifs.loading && !notifs.hasRemoteSnapshot);
   return unreadLoading ? t.value.notifs.unreadUnavailable : t.value.notifs.allCaughtUp;
 });
-type Filter = "all" | NotificationCategory;
-const filter = ref<Filter>("all");
 const filterIds: Filter[] = ["all", "finance", "device", "team", "rewards", "system"];
 const visibleFilterIds = computed(() => filterIds);
 const expandedId = ref<string | null>(null);
@@ -199,11 +219,23 @@ const categoryIcons: Record<NotificationCategory, string> = {
 function keepUnits(text: string) { return text.replace(/(\d) (USDT|UVT|VND)\b/g, "$1\u00a0$2"); }
 function kindIcon(n: Notification) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${categoryIcons[notificationCategory(n)]}</svg>`; }
 function countOf(id: Filter) { return id === "all" ? notifs.items.length : notifs.items.filter(n => notificationCategory(n) === id).length; }
-const filtered = computed(() => filter.value === "all" ? notifs.items : notifs.items.filter(n => notificationCategory(n) === filter.value));
+const filtered = computed(() => {
+  const rows = filter.value === "all" ? notifs.items : notifs.items.filter(n => notificationCategory(n) === filter.value);
+  return rows.map(n => {
+    if (!n.earning) return n;
+    return {
+      ...n,
+      title: earningAmountText(n.earning),
+      body: earningSummary(n.earning),
+      readAt: notifs.earningsReadConfirmed ? n.readAt ?? n.ts : n.readAt,
+    };
+  });
+});
 function filterLabel(id: Filter) { return id === "all" ? t.value.notifs.filterAll : t.value.notifs[categoryKeys[id]]; }
 const emptyTitle = computed(() => filter.value === "all" ? t.value.notifs.emptyAllTitle : fmt(t.value.notifs.emptyFilterTitle, { filter: filterLabel(filter.value) }));
-function directNotice(n: Notification) { return !!n.ctaHref && isDirectNotificationSummary(n.body); }
+function directNotice(n: Notification) { return !!n.earning || (!!n.ctaHref && isDirectNotificationSummary(n.body)); }
 function toggle(n: Notification) {
+  if (n.earning) { void openEarningDetail(n, n.earning); return; }
   if (directNotice(n)) { void onTap(n); return; }
   void notifs.markRead(n.id);
   expandedId.value = expandedId.value === n.id ? null : n.id;
@@ -234,10 +266,12 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextE
   else if (!firstBinding) {
     sectionEntryAllowed = false;
     initialSection = null;
+    initialFilter = "all";
     section.value = "notifications";
   }
   preserveSectionInH5();
-  expandedId.value = null; filter.value = "all"; resetHeader();
+  expandedId.value = null; filter.value = initialFilter; resetHeader();
+  if (notifs.category !== filter.value) void notifs.selectCategory(filter.value);
   if (!disposed && pageVisible.value && foregroundReadAllowed()) {
     void refreshHealthyNotifications();
     void refreshHealthyService();
@@ -268,6 +302,82 @@ function timeAgo(ts: number): string {
   const mins = Math.max(1, Math.floor((now.getTime() - ts) / 60_000));
   if (mins < 60) return fmt(t.value.notifs.timeMinutesAgo, { n: mins });
   return fmt(t.value.notifs.timeHoursAgo, { n: Math.floor(mins / 60) });
+}
+
+function earningAmountText(earning: NotificationEarning) {
+  return creditedAmounts(earning.usdt, earning.uvt)
+    .map(({ sign, value, unit }) => `${sign}${amountsHidden.value ? "••••" : value}\u00a0${unit}`)
+    .join("\u00a0· ");
+}
+
+function earningSummary(earning: NotificationEarning) {
+  return [earningCopy.value.credited, earning.deviceName,
+    earning.taskClass && workloadLabel(t.value, earning.taskClass)].filter(Boolean).join("\u00a0· ");
+}
+
+// The message center sheet will bind to this state when its markup is available.
+type EarningDetailState = "loading" | "ready" | "failed" | "unavailable";
+const earningDetail = ref<{ earning: NotificationEarning; state: EarningDetailState; receipt: CanonicalComputeReceipt | null } | null>(null);
+let pendingEarningAction: ReturnType<typeof captureIntent> | null = null;
+let detailReadGeneration = 0;
+
+async function readEarningDetail() {
+  const detail = earningDetail.value;
+  const intent = captureIntent();
+  if (!detail || !isCurrentIntent(intent) || !foregroundReadAllowed()) return;
+  const generation = ++detailReadGeneration;
+  const isCurrent = () => generation === detailReadGeneration && earningDetail.value === detail
+    && isCurrentIntent(intent) && foregroundReadAllowed();
+  try {
+    const receipt = await taskAssignmentApi.receipt(detail.earning.receiptNo);
+    if (!isCurrent()) return;
+    detail.receipt = receipt;
+    detail.state = "ready";
+  } catch (cause) {
+    if (!isCurrent()) return;
+    const unavailable = isReceiptUnavailable(cause);
+    detail.state = unavailable ? "unavailable" : "failed";
+    if (!unavailable) throw cause;
+  }
+}
+
+useAutoRecovery({
+  active: () => pageVisible.value && earningDetail.value !== null,
+  failed: () => earningDetail.value?.state === "failed",
+  retry: readEarningDetail,
+  repeatMs: 30_000,
+});
+
+async function runEarningAction(n: Notification, earning: NotificationEarning, action: "cta" | "swipe_conversion") {
+  const intent = captureIntent();
+  if (!isCurrentIntent(intent) || pendingEarningAction || section.value !== "notifications") return;
+  const requestedFilter = filter.value;
+  pendingEarningAction = intent;
+  try {
+    const route = await (action === "cta" ? notifs.recordCta(n.id, earning.receiptNo)
+      : notifs.recordSwipeConversion(n.id, earning.receiptNo));
+    if (!route || !isCurrentIntent(intent) || requestedFilter !== filter.value || section.value !== "notifications") return;
+    if (action === "swipe_conversion") {
+      navTo(route);
+      return;
+    }
+    earningDetail.value = { earning, state: "loading", receipt: null };
+    void readEarningDetail().catch(() => { /* The failed state starts read recovery. */ });
+  } finally {
+    if (pendingEarningAction === intent) pendingEarningAction = null;
+  }
+}
+
+function openEarningDetail(n: Notification, earning: NotificationEarning) {
+  if (suppressedClick?.id === n.id && Date.now() <= suppressedClick.until) {
+    suppressedClick = null;
+    return;
+  }
+  return runEarningAction(n, earning, "cta");
+}
+
+function closeEarningDetail() {
+  earningDetail.value = null;
 }
 
 async function onTap(n: Notification) {
@@ -314,6 +424,10 @@ async function onTouchEnd(n: Notification, event: UniTouchEvent) {
   if (!remoteApiEnabled) return;
   if (!start || !end || !isCurrentIntent(start.intent) || !isLeftConversionSwipe(start.point, end)) return;
   suppressedClick = { id: n.id, until: Date.now() + 800 };
+  if (n.earning) {
+    await runEarningAction(n, n.earning, "swipe_conversion");
+    return;
+  }
   const canonicalRoute = await notifs.recordSwipeConversion(n.id);
   if (canonicalRoute && isCurrentIntent(start.intent)) navTo(canonicalRoute);
 }
@@ -323,13 +437,18 @@ function invalidatePendingIntents() {
   ui.clearConfirmsBy(confirmOwner);
   touchStarts.clear();
   suppressedClick = null;
+  pendingEarningAction = null;
 }
 function invalidatePage() {
   pageVisible.value = false;
+  closeEarningDetail();
   releaseActiveRefresh();
   invalidatePendingIntents();
 }
-watch(() => [app.accountKey, app.accountBindingEpoch], invalidatePendingIntents, { flush: "sync" });
+watch(() => [app.accountKey, app.accountBindingEpoch], () => {
+  closeEarningDetail();
+  invalidatePendingIntents();
+}, { flush: "sync" });
 onShow(() => {
   if (disposed) return;
   pageVisible.value = true;
@@ -339,6 +458,9 @@ onShow(() => {
 });
 watch([pageVisible, foregroundReadAllowed], ([visible, allowed], [wasVisible]) => {
   if (disposed || !visible || !allowed) return;
+  if (earningDetail.value?.state === "loading") {
+    void readEarningDetail().catch(() => { /* The failed state starts read recovery. */ });
+  }
   void refreshHealthyNotifications();
   if (!wasVisible || section.value === "service") void refreshHealthyService();
 });
@@ -387,8 +509,9 @@ function onMessageScroll(event: { detail: { scrollTop: number } }) {
   headerState.value = advanceMessageHeader(headerState.value, event.detail.scrollTop, headerFocused.value, now, now - lastScrollInputAt < 160);
 }
 function resetHeader() { headerState.value = createMessageHeaderState(); }
-watch(section, () => { resetHeader(); preserveSectionInH5(); });
+watch(section, () => { closeEarningDetail(); resetHeader(); preserveSectionInH5(); });
 watch(filter, value => {
+  closeEarningDetail();
   expandedId.value = null;
   resetHeader();
   void notifs.selectCategory(value);
