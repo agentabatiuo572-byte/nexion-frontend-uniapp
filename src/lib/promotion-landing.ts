@@ -2,9 +2,9 @@ import type { PublicPromotion, PublicRewardSpec } from '@/api/promotion-contract
 import { parseServerTimestamp } from '@/api/server-time';
 import type { Messages } from '@/i18n/messages/en';
 import { fmt } from '@/i18n/format';
-import { sessionVault } from '@/api/runtime';
+import { remoteApiEnabled, sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
-import { productCatalogState } from '@/store/product-catalog';
+import { productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
 import { displayDeadline, localized, rewardAmount, rewardSummary } from './promotion-display';
 
 /** Purchase offers with a dedicated landing page; other templates keep the store entry. */
@@ -27,7 +27,8 @@ function catalogReady(): boolean {
   return (productCatalogState.status === 'ready' || (productCatalogState.status === 'loading' && productCatalogState.serverCanonical)) && !!sessionVault.read();
 }
 export function landingProduct(sku: string) {
-  return catalogReady() ? getProduct(sku) : undefined;
+  if (!catalogReady()) return undefined;
+  return remoteApiEnabled ? productCatalogPresentation.value?.products.find(product => product.id === sku) : getProduct(sku);
 }
 export function landingProductName(activity: PublicPromotion, sku: string): string {
   const gift = activity.rewardRules.flatMap(rule => [rule.buyerReward, rule.inviterReward])

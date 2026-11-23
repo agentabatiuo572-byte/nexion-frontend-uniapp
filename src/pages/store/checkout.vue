@@ -58,7 +58,7 @@
 
         <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
-          <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="product.tagline" class="checkout-product-meta">{{ product.tagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="checkoutTagline" class="checkout-product-meta">{{ checkoutTagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
           <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><view class="checkout-quantity-controls">
             <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" :size="20" /></button>
             <text class="checkout-quantity-value" aria-live="polite">1</text>
@@ -364,6 +364,7 @@ import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityG
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
+import { serverTagline } from "@/lib/product-copy";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -915,6 +916,11 @@ const product = computed<Product | undefined>(() => !productId.value || (remoteA
   : remoteApiEnabled
     ? productCatalogPresentation.value?.products.find((entry) => entry.id === productId.value)
     : getProduct(productId.value));
+const checkoutTagline = computed(() => {
+  const listing = product.value;
+  if (!listing) return "";
+  return remoteApiEnabled ? serverTagline(t.value, listing, locale.code) : listing.tagline;
+});
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
 function productOutOfStock(product: Product | undefined): boolean {
   return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
