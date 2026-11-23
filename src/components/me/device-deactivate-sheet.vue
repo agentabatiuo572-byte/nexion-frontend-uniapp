@@ -16,43 +16,42 @@
       <view class="flex items-start justify-between" style="gap: 12px">
         <view class="min-w-0">
           <text class="block" :style="titleStyle">{{ t.deactivateSheet.title }}</text>
-          <text class="block" :style="descStyle">{{ descLine }}</text>
+          <text class="nx-deactivate-desc">{{ descLine }}</text>
         </view>
-        <view class="grid place-items-center shrink-0 transition active:bg-[var(--v5-surface-3)]" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('dismiss')"  @keydown.enter.prevent="emit('dismiss')" @keydown.space.prevent="emit('dismiss')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-        </view>
+        <!-- The shared sheet close (same as NxSheet): neutral glass M with the close icon, 03 §3.1／§3.5. -->
+        <NxButton class="nx-deactivate-close" :label="t.ui.close" size="medium" @click="emit('dismiss')"><NxIcon name="close" :size="18" /></NxButton>
       </view>
 
       <!-- Task progress preview -->
       <view v-if="task" :style="taskCardStyle">
         <view class="flex items-center justify-between" style="gap: 8px">
           <view class="min-w-0 flex-1">
-            <text class="block truncate" :style="taskModelStyle">{{ task.type }}</text>
-            <text class="block truncate" :style="taskRewardStyle">{{ taskRewardLine }}</text>
+            <text class="nx-deactivate-task">{{ task.type }}</text>
+            <text class="nx-deactivate-meta">{{ taskRewardLine }}</text>
           </view>
           <view class="text-right shrink-0">
-            <text class="block" :style="pctStyle">{{ progressPct }}%</text>
-            <text class="block" :style="etaStyle">{{ etaLine }}</text>
+            <text class="nx-deactivate-pct">{{ progressPct }}%</text>
+            <text class="nx-deactivate-meta">{{ etaLine }}</text>
           </view>
         </view>
-        <view :style="trackStyle">
-          <view :style="fillStyle" />
+        <view class="nx-deactivate-progress nx-progress" aria-hidden="true" :aria-valuenow="progressPct">
+          <view class="nx-progress__fill" :style="{ width: `${progressPct}%` }" />
         </view>
       </view>
 
       <!-- Actions -->
-      <view style="margin-top: 16px">
-        <view class="w-full flex items-center justify-center transition active:scale-[0.98]" :style="waitBtnStyle" role="button" tabindex="0" @click="emit('wait')"  @keydown.enter.prevent="emit('wait')" @keydown.space.prevent="emit('wait')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          <text :style="waitLabelStyle">{{ t.deactivateSheet.waitCta }}</text>
-        </view>
-        <view class="w-full flex items-center justify-center transition active:bg-[color-mix(in_srgb,var(--v5-brand-2)_25%,transparent)]" :style="forceBtnStyle" role="button" tabindex="0" @click="emit('force')"  @keydown.enter.prevent="emit('force')" @keydown.space.prevent="emit('force')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
-          <text :style="forceLabelStyle">{{ task?.executionMode === 'SIMULATED' ? computeCopy.stopNow : t.deactivateSheet.forceCta }}</text>
-        </view>
-        <view class="w-full flex items-center justify-center transition active:bg-[var(--v5-surface-3)]" :style="backBtnStyle" role="button" tabindex="0" @click="emit('dismiss')"  @keydown.enter.prevent="emit('dismiss')" @keydown.space.prevent="emit('dismiss')">
-          <text :style="backLabelStyle">{{ t.deactivateSheet.backCta }}</text>
-        </view>
+      <!-- 03 §3.1 types: waiting is the one primary L; forcing is this choice's last, destructive step, so it is a neutral
+           glass L whose text alone turns to the error colour; 返回 is a text button (关闭／取消：中性玻璃或文字). -->
+      <view class="nx-deactivate-actions">
+        <NxButton class="nx-deactivate-action" variant="primary" size="large" :label="t.deactivateSheet.waitCta" @click="emit('wait')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+          <text>{{ t.deactivateSheet.waitCta }}</text>
+        </NxButton>
+        <NxButton class="nx-deactivate-action nx-deactivate-action--danger" variant="secondary" size="large" :label="forceLabel" @click="emit('force')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
+          <text>{{ forceLabel }}</text>
+        </NxButton>
+        <NxButton class="nx-deactivate-back" variant="text" size="large" :label="t.deactivateSheet.backCta" @click="emit('dismiss')" />
       </view>
     </view>
   </view>
@@ -71,6 +70,8 @@ import { useT } from "@/i18n/use-t";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 
 const props = defineProps<{ device: Device | null }>();
 const emit = defineEmits<{ (e: "wait"): void; (e: "force"): void; (e: "dismiss"): void }>();
@@ -108,6 +109,7 @@ const etaSec = computed(() => {
 const etaLabel = computed(() =>
   etaSec.value >= 60 ? `~${Math.ceil(etaSec.value / 60)}m` : `~${etaSec.value}s`,
 );
+const forceLabel = computed(() => task.value?.executionMode === "SIMULATED" ? computeCopy.value.stopNow : t.value.deactivateSheet.forceCta);
 const etaLine = computed(() => fmt(t.value.deactivateSheet.etaRemaining, { eta: etaLabel.value }));
 const taskRewardLine = computed(() => {
   const tk = task.value;
@@ -150,99 +152,27 @@ const titleStyle: CSSProperties = {
   fontWeight: "var(--ui-type-hero-title-weight)",
   color: "var(--v5-ink)",
 };
-const descStyle: CSSProperties = {
-  marginTop: "4px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.45,
-};
-const closeBtnStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  boxSizing: "border-box",
-  padding: "4px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  backgroundClip: "content-box",
-};
 const taskCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   background: "var(--v5-surface-2)",
   padding: "12px",
 };
-const taskModelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const taskRewardStyle: CSSProperties = {
-  marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-const pctStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-brand)",
-};
-const etaStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-const trackStyle: CSSProperties = {
-  marginTop: "8px",
-  height: "4px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-3)",
-  overflow: "hidden",
-};
-const fillStyle = computed<CSSProperties>(() => ({
-  height: "100%",
-  width: `${progressPct.value}%`,
-  background: "var(--v5-brand)",
-  transition: "width 500ms ease",
-}));
-const waitBtnStyle: CSSProperties = {
-  gap: "6px",
-  height: "48px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-};
-const waitLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-on-brand)",
-};
-const forceBtnStyle: CSSProperties = {
-  marginTop: "8px",
-  gap: "6px",
-  height: "48px",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
-};
-const forceLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-list-subtitle)",
-  fontWeight: 500,
-  color: "var(--v5-brand-2)",
-};
-const backBtnStyle: CSSProperties = {
-  marginTop: "8px",
-  height: "40px",
-  borderRadius: "12px",
-  background: "var(--v5-surface-2)",
-};
-const backLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-list-subtitle)",
-  color: "var(--v5-ink-2)",
-};
 
 
 </script>
+<style scoped>
+/* Sheet copy and task preview on the 10 §10.1 roles; the preview bar is the shared .nx-progress (03 §3.6). */
+.nx-deactivate-desc { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.nx-deactivate-task { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.nx-deactivate-meta { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-deactivate-pct { display: block; color: var(--v5-brand); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
+.nx-deactivate-progress { margin-top: 8px; }
+.nx-deactivate-progress .nx-progress__fill { transition: width 500ms ease; }
+.nx-deactivate-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 16px; }
+.nx-deactivate-action { width: 100%; }
+.nx-deactivate-action--danger { --ui-button-ink: var(--v5-danger); color: var(--v5-danger); }
+.nx-deactivate-back { align-self: center; }
+.nx-deactivate-close { flex: none; }
+@media (prefers-reduced-motion: reduce) { .nx-deactivate-progress .nx-progress__fill { transition: none; } }
+</style>

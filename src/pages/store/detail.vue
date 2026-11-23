@@ -77,7 +77,7 @@
           </view>
 
           <view class="detail-summary relative">
-            <text class="detail-summary__name" :style="nameStyle">{{ product.name }}</text>
+            <text class="detail-summary__name">{{ product.name }}</text>
             <text class="detail-summary__tagline">{{ copy.tagline }}</text>
 
             <view class="detail-sales-proof">
@@ -151,7 +151,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
             <text class="tabular-nums" style="font-family: var(--font-metric); font-weight: 500">${{ dailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
-          <text v-if="speedup > 0" class="shrink-0" :style="vsMultChipStyle">{{ estimateLabel }} {{ speedup }}×</text>
+          <text v-if="speedup > 0" class="detail-vs-mult shrink-0">{{ estimateLabel }} <text class="detail-vs-mult__value">{{ speedup }}×</text></text>
         </view>
 
         <!-- === Section 4: ROI calc — qty stepper + 4-cell grid === -->
@@ -753,13 +753,6 @@ const heroCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderColor: "var(--v5-border)",
 };
-const nameStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
-  letterSpacing: "-0.024em",
-  color: "var(--v5-ink)",
-};
 const multBadgeStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
@@ -773,17 +766,6 @@ const multBadgeStyle: CSSProperties = {
 const vsStripStyle: CSSProperties = {
   padding: "var(--v5-space-3) 14px",
   gap: "var(--v5-space-3)",
-};
-const vsMultChipStyle: CSSProperties = {
-  padding: "var(--v5-space-1) 10px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-soft)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "15px",
-  color: "var(--v5-brand)",
-  letterSpacing: "-0.014em",
-  lineHeight: 1,
 };
 const roiCardStyle: CSSProperties = {
   padding: "var(--v5-space-4)",
@@ -882,7 +864,8 @@ const faqQStyle: CSSProperties = {
 <style src="@/components/promotion/promotion.css"></style>
 <style scoped>
 .detail-summary { padding: var(--v5-space-5); }
-.detail-summary__name { display: block; overflow-wrap: break-word; }
+/* The product name heads the detail hero: display-title role (10 §10.1, 26/34 600 at 390), -0.02em at 24px and up (01 §1.2). */
+.detail-summary__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-display-title-weight) var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-v5); letter-spacing: -0.02em; }
 .detail-summary__tagline { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-list-subtitle); line-height: var(--v5-type-body-s-lh); color: var(--v5-ink-3); }
 .detail-sales-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--v5-space-6); margin-top: var(--v5-space-5); }
 .detail-sales-stat { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }
@@ -897,6 +880,10 @@ const faqQStyle: CSSProperties = {
 .detail-compute-points { display: flex; align-items: flex-start; gap: 5px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .detail-compute-points svg { flex: none; margin-top: 2px; }
 .detail-compute-points__value { margin: 0 2px; color: var(--v5-ink-2); font-family: var(--font-metric); font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+/* 「估算 N×」 is the strip's own figure: the card-figure role (10 §10.1 卡内主数值), the multiple in JetBrains Mono
+   as a metric (01 §1.2); the short label stays in the interface font. */
+.detail-vs-mult { padding: var(--v5-space-1) 10px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-v5); white-space: nowrap; }
+.detail-vs-mult__value { font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
 .share-returns { padding: var(--v5-space-5); }
 .share-returns__title { display: block; font: 600 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
 .share-returns__description { display: block; margin-top: var(--v5-space-1); font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }

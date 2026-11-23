@@ -2187,7 +2187,7 @@ export const ms: Messages = {
     taskRewardLine: "{client} · ganjaran +${amount}",
     etaRemaining: "{eta} lagi",
     waitCta: "Nyahaktif selepas tugasan selesai",
-    forceCta: "Paksa nyahaktif (lucut ganjaran tugasan)",
+    forceCta: "Paksa nyahaktif (ganjaran lucut)",
     backCta: "Kembali",
     toastForced: "{name} dinyahaktif secara paksa · ganjaran tugasan semasa dilucutkan",
     toastSubmitting: "Menghantar nyahaktif automatik…",

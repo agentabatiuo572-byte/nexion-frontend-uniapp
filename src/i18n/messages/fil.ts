@@ -2187,7 +2187,7 @@ export const fil: Messages = {
     taskRewardLine: "{client} · reward +${amount}",
     etaRemaining: "{eta} natitira",
     waitCta: "Auto-deactivate pagkatapos ng task",
-    forceCta: "I-deactivate na (mawawala ang reward sa task)",
+    forceCta: "I-deactivate na (walang reward)",
     backCta: "Bumalik",
     toastForced: "Na-deactivate na ang {name} · hindi na makukuha ang reward ng kasalukuyang task",
     toastSubmitting: "Isinusumite ang auto-deactivation…",

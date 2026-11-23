@@ -11,7 +11,7 @@
     · Footer: price + frosted Buy CTA.
 -->
 <template>
-  <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': artInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? (product.name) : undefined" @click="goDetail">
+  <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': artInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? compactAriaLabel : undefined" @click="goDetail">
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
     <view ref="mediaRef" class="product-media relative overflow-hidden" :style="renderWrapStyle" :role="compact ? undefined : 'button'" :tabindex="compact ? -1 : 0" :aria-label="compact ? undefined : (product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
@@ -87,7 +87,7 @@
         <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label + '\u00A0·\u00A0' }}</text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
-      <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
+      <text v-if="compactUnavailable" class="product-compact-status">{{ buyLabel }}</text>
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
@@ -259,6 +259,13 @@ const buyLabel = computed(() =>
       ? t.value.store.gateLockedEyebrow
       : t.value.store.cardBuyNow,
 );
+// The compact card is one link: its name reads what the card shows, in the order it shows it (badge, name, price,
+// and why it cannot be bought now), so a screen reader hears the same facts as a sighted user (03 §3.8, 07 §7.2).
+const compactUnavailable = computed(() => stockUnavailable.value || catalogUnavailable.value
+  || (remoteApiEnabled && eligibility.value.status === "ready" && !eligibility.value.eligible));
+const compactAriaLabel = computed(() => [copy.value.badge, props.product.name,
+  `${t.value.store.cardPriceLabel} $${formatGroupedAmount(props.product.price)}`,
+  compactUnavailable.value ? buyLabel.value : ""].filter(Boolean).join(" · "));
 function onBuy() {
   if (buyUnavailable.value) return;
   if(promotionSignIn.value){navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId)));return;}
@@ -532,18 +539,22 @@ const gateMetaStyle: CSSProperties = {
 .product-card--compact .product-art { position:relative !important; inset:auto !important; width:min(172px,100%) !important; height:auto !important; aspect-ratio:1; max-width:172px; margin:0; animation-name:product-compact-float; animation-duration:4.2s; }
 @keyframes product-compact-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
 .product-compact-body { flex:1; display:flex; flex-direction:column; padding:10px 14px 14px; }
-.product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
-.product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
-.product-compact-levels { display:block; margin-top:6px; font:400 12px/17px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
+/* Five-tier roles (10 §10.1): the name is the card title, the tagline and task levels are card descriptions. */
+.product-compact-name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
+.product-compact-tagline { margin-top:2px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); }
+.product-compact-levels { display:block; margin-top:6px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
 /* Price bottom-left, estimate bottom-right; when both do not fit one row the estimate drops to the next line, still right-aligned. */
 .product-compact-bottom { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; column-gap:8px; row-gap:2px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
-.product-compact-price { color:var(--v5-ink); font:500 16px/21px var(--font-amount); font-variant-numeric:tabular-nums; }
-.product-compact-estimate { margin-left:auto; text-align:right; font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
+/* The price is the card's main figure (10 §10.1 卡内主数值, Montserrat for amounts); the estimate is a right-side summary. */
+.product-compact-price { color:var(--v5-ink); font:var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric:tabular-nums; }
+.product-compact-estimate { margin-left:auto; text-align:right; font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color:var(--v5-brand); }
 /* The rate and its "/day" never split across lines. */
 .product-compact-estimate__value { white-space:nowrap; }
 /* Field name in the auxiliary colour, the figure in brand (01 §1.1.1 rules 1 and 4). */
 .product-compact-estimate__label { color:var(--v5-ink-3); }
-.product-compact-status { display:block; margin-top:8px; font:400 12px/17px var(--font-v5); color:var(--v5-warning-ink); }
+/* Why the product cannot be bought now: one status line in the warning ink (01 §1.1.1 rule 4). A pill would wrap to
+   two lines in the narrow card in long languages (ruler L1-pill), so it stays text. */
+.product-compact-status { display:block; margin-top:8px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-warning-ink); overflow-wrap:break-word; }
 .product-card--compact:nth-child(2n) .product-art { animation-delay:-1.1s; }
 .product-card--compact:nth-child(3n) .product-art { animation-delay:-2.2s; }
 .product-card--compact:nth-child(4n) .product-art { animation-delay:-3.1s; }
