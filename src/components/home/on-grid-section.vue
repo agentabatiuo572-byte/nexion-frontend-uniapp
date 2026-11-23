@@ -7,11 +7,12 @@
 <template>
   <view data-home-section="on-grid">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.onGridTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.onGridNow }}</text></text>
+      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.onGridTitle }} <text class="on-grid__title-note">{{ t.home.onGridNow }}</text></text>
       <text class="inline-flex items-center active:opacity-70 nx-after-chevron" style="min-height: 44px; padding-left: 12px; font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3)" role="link" tabindex="0" data-home-action="on-grid-map" @click="goGlobe" @keydown.enter.stop.prevent="goGlobe">{{ t.home.onGridMap }}</text>
     </view>
 
-    <view class="nx-glass-card" style="background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); border-radius: var(--nx-glass-radius); overflow: hidden">
+    <!-- Not a focal block on any approved board, so a solid card (01 §1.1.2): surface, soft shadow in light. -->
+    <view class="on-grid__card">
       <view
         v-for="(c, i) in gridClients"
         :key="c.id"
@@ -19,19 +20,20 @@
         :style="{ gridTemplateColumns: '32px 1fr', borderBottom: i < gridClients.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
       >
         <view class="grid place-items-center" style="width: 30px; height: 30px; border-radius: 8px; background: var(--v5-brand-soft)">
-          <text :style="{ color: c.color, fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '12px' }">{{ companyInitial(c.name) }}</text>
+          <text class="on-grid__initial" :style="{ color: c.color }">{{ companyInitial(c.name) }}</text>
         </view>
         <view class="min-w-0">
-          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink); letter-spacing: -0.008em">{{ c.name ?? "—" }}</text>
-          <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.model ?? "—" }} <text style="color: var(--v5-ink-4)">· {{ c.city ?? "—" }}</text></text>
+          <!-- The rows open nothing, so names wrap in full instead of being cut (03 §3.6.1). -->
+          <text class="on-grid__name">{{ c.name ?? "—" }}</text>
+          <text class="on-grid__meta">{{ c.model ?? "—" }} <text style="color: var(--v5-ink-4)">·</text> {{ c.city ?? "—" }}</text>
         </view>
       </view>
-      <view ref="footerRef" class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular on-grid__footer" :class="{ 'nx-loops-paused': !footerRunning }" style="border-top:1px solid var(--v5-border);font-size:12px;color:var(--v5-ink-3);min-height:44px">
+      <view ref="footerRef" class="px-4 py-2 flex items-center justify-between on-grid__footer" :class="{ 'nx-loops-paused': !footerRunning }" style="border-top:1px solid var(--v5-border);min-height:44px">
         <view class="flex items-center" style="gap:6px;min-width:0">
           <view v-if="activeDevices !== null && activeDevices > 0" class="on-grid__dot nx-online-dot" aria-hidden="true" />
-          <text><text style="color:var(--v5-ink);font-weight:500"><NxTickNumber :text="onlineBand" /></text> {{ t.home.onGridOnline }}</text>
+          <text><text class="font-mono-tabular" style="color:var(--v5-ink);font-weight:500"><NxTickNumber :text="onlineBand" /></text> {{ t.home.onGridOnline }}</text>
         </view>
-        <text style="color:var(--v5-success-ink);font-weight:500">{{ perSecText }}</text>
+        <text class="font-mono-tabular" style="color:var(--v5-ink);font-weight:500">{{ perSecText }}</text>
       </view>
     </view>
   </view>
@@ -86,5 +88,13 @@ function goGlobe() {
 </script>
 
 <style scoped>
+.on-grid__card { overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+[data-theme="light"] .on-grid__card { box-shadow: var(--v5-glass-shadow); }
+.on-grid__title-note { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); letter-spacing: 0; }
+.on-grid__initial { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
+.on-grid__name { display: block; min-width: 0; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.on-grid__meta { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+/* Figures in JetBrains Mono, the label in the interface font (01 §1.2, 06 §6.3); aux figure role. */
+.on-grid__footer { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .on-grid__dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success); }
 </style>

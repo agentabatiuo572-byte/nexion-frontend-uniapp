@@ -22,7 +22,7 @@
           <DeviceArt v-if="item.device" class="fleet-stage__chip-art" :device="item.device" />
           <DeviceArt v-else class="fleet-stage__chip-art" :src="trialArt" />
           <text class="fleet-stage__chip-name">{{ item.name }}</text>
-          <text v-if="!item.device" class="fleet-stage__chip-tag">{{ trialCopy.imageBadge }}</text>
+          <NxTag v-if="!item.device" tone="brand" :label="trialCopy.imageBadge" />
           <view class="fleet-stage__chip-dot" :class="{ 'fleet-stage__chip-dot--on': item.online }" />
         </view>
         <view v-if="fleet.countReady.value && fleet.freeSlots.value > 0" class="fleet-stage__chip fleet-stage__chip--add" role="button" tabindex="0" :aria-label="`${t.earn.addDevice}, ${freeSlotsText}`" @click="addDevice"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></view>
@@ -52,6 +52,7 @@ import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useFleetSlots } from "@/composables/use-fleet-slots";
 import type { Device } from "@/store/types";
 import DeviceArt from "@/components/device-art.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import DeviceCardPC from "./device-card-pc.vue";
 import TrialStage from "./trial-stage.vue";
 import JobGauge from "./job-gauge.vue";
@@ -123,13 +124,13 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 
 .fleet-stage__chips { display: flex; gap: 8px; padding: 0 16px 2px; overflow-x: auto; scrollbar-width: none; }
 .fleet-stage__chips::-webkit-scrollbar { display: none; }
-.fleet-stage__chip { position: relative; flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 14px 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); font: 500 13px/18px var(--font-v5); color: var(--v5-ink-2); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Device switcher label: segment option role, ink-3, brand when selected (03 §3.7, 10 §10.1). */
+.fleet-stage__chip { position: relative; flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 14px 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); font: var(--ui-type-segment-weight) var(--ui-type-segment)/var(--ui-type-segment-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .fleet-stage__chip--selected { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); color: var(--v5-brand); }
 .fleet-stage__chip:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .fleet-stage__chip:active { opacity: .85; }
 .fleet-stage__chip-art { width: 34px; height: 30px; flex: none; }
 .fleet-stage__chip--off .fleet-stage__chip-art { filter: grayscale(.75); opacity: .55; }
-.fleet-stage__chip-tag { padding: 0 4px; border-radius: 5px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 10px/14px var(--font-v5); }
 .fleet-stage__chip-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .fleet-stage__chip-dot--on { background: var(--v5-success); }
 .fleet-stage__chip--add { width: 44px; padding: 0; justify-content: center; background: transparent; color: var(--v5-ink-3); }
