@@ -595,7 +595,10 @@ watch(filter, value => {
 .message-center .notification-amount__unit { color:var(--v5-ink-3); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
 .message-center .notification-amount__sep { color:var(--v5-ink-4); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
 .message-center .notification-earning-summary { margin-top:2px; }
-.message-center .notification-earning-device { white-space:nowrap; }
+/* A device name stays whole on its line; one longer than the line ends in an ellipsis (the row's label and the detail carry it in full). */
+.message-center .notification-earning-device { display:inline-block; max-width:100%; vertical-align:bottom; }
+/* uni-app puts the words in an inner span; the clip and ellipsis sit on it, the element that holds the text. */
+.message-center .notification-earning-device :deep(span) { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .notification-management { position:absolute; right:16px; bottom:var(--nx-overlay-bottom); padding:0; }
 :global([data-theme="light"] .message-center .notification-row) { box-shadow:var(--v5-glass-shadow); }
 </style>
