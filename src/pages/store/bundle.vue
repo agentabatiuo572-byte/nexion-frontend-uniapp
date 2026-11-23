@@ -216,6 +216,7 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 }
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
+import { formatEstimateRange } from "@/lib/estimate-display";
 import { productTaskLevelsText } from "@/lib/product-copy";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
@@ -336,17 +337,11 @@ const cumulativeDailyEarnText = computed(() => {
     low += estimate.low;
     high += estimate.high;
   }
-  const lowText = formatAmount(low);
-  const highText = formatAmount(high);
-  return lowText === highText ? lowText : `${lowText}–${highText}`;
+  return formatEstimateRange(low, high);
 });
 function bundleProductYieldText(p: Product): string {
   const estimate = productDailyEstimateRange(p);
-  if (estimate) {
-    const low = formatAmount(estimate.low);
-    const high = formatAmount(estimate.high);
-    return `${t.value.bundle.estimatedDaily} · $${low === high ? low : `${low}–${high}`}`;
-  }
+  if (estimate) return `${t.value.bundle.estimatedDaily} · $${formatEstimateRange(estimate.low, estimate.high)}`;
   // No server estimate: "—", never an annual rate or a figure derived from one.
   return `${t.value.bundle.estimatedDaily} · —`;
 }

@@ -10,8 +10,8 @@
       <CatalogMachineImage class="upgrade-art__target" :class="{ 'upgrade-art__target--ready': targetReady }" v-bind="targetImageProps" />
     </view>
     <view class="upgrade-comparison">
-      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">${{ formatGroupedAmount(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
-      <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">${{ formatGroupedAmount(target.dailyEarn) }}{{ t.store.cardPerDaySuffix }}</text></view>
+      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">${{ formatEstimate(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
+      <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">${{ targetDailyText }}{{ t.store.cardPerDaySuffix }}</text></view>
     </view>
     <view class="upgrade-footer">
       <text class="upgrade-note">{{ t.store.cardYouEarn }}</text>
@@ -28,7 +28,9 @@ import { productCatalogState } from '@/store/product-catalog';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
-import { formatGroupedAmount } from '@/lib/amount-display';
+import { formatEstimate, formatEstimateRange } from '@/lib/estimate-display';
+import { productDailyEstimateRange } from '@/lib/product-estimates';
+import type { Product } from '@/mock/products';
 import { navTo } from '@/lib/route';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxIcon from '@/components/ui/nx-icon.vue';
@@ -36,11 +38,17 @@ import type { Device } from '@/store/types';
 import { getLifecycleSummary } from '@/store/device-lifecycle';
 import { uiLocale } from '@/i18n';
 import { useLoopsInView } from '@/composables/use-loops-in-view';
-const props = defineProps<{ base: Device; baseImageUrl?: string | null; target: { id: string; name: string; imageUrl?: string | null; dailyEarn: number } }>();
+const props = defineProps<{ base: Device; baseImageUrl?: string | null; target: { id: string; name: string; imageUrl?: string | null }
+  & Pick<Product, "productType" | "dailyEarn" | "dailyEstimateLowUsdt" | "dailyEstimateHighUsdt"> }>();
 // The upgraded device floats only while the card is on screen and its page is shown.
 const loops = useLoopsInView('.upgrade-spotlight');
 const loopRef = loops.elRef;
 const baseDaily = computed(() => getLifecycleSummary(props.base).dailyRateNow);
+// Both sides are estimates (estimate-display.ts); the target shows the catalog range when sent.
+const targetDailyText = computed(() => {
+  const range = productDailyEstimateRange(props.target);
+  return range ? formatEstimateRange(range.low, range.high) : formatEstimate(props.target.dailyEarn);
+});
 const copy = useAuditUiCopy(), t = useT();
 const locale = useLocaleStore();
 const comparisonCopy = computed(() => ({

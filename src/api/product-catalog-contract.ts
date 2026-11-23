@@ -211,6 +211,9 @@ function product(value: unknown): CatalogProduct {
     monthlyEstimateUsdt: optionalEstimate(source.monthlyEstimateUsdt),
     dailyEstimateLowUsdt: optionalEstimate(source.dailyEstimateLowUsdt),
     dailyEstimateHighUsdt: optionalEstimate(source.dailyEstimateHighUsdt),
+    // UVT daily range (backend B75-BE-02). The field names are provisional: this is the only place that reads them.
+    dailyEstimateLowNex: optionalEstimate(source.dailyEstimateLowNex),
+    dailyEstimateHighNex: optionalEstimate(source.dailyEstimateHighNex),
     shareYieldMin,
     shareYieldMax,
     computePoints: optionalInteger(source.computePoints),

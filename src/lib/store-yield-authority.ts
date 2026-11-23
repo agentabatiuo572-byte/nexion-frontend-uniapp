@@ -1,10 +1,14 @@
 import type { EarnPhoneTier } from "@/api/earn-config-api";
 import type { Product } from "@/mock/products";
-import { formatGroupedAmount } from "./amount-display";
+import { formatEstimate, formatEstimateRange } from "./estimate-display";
+import { productDailyEstimateRange, productDailyUvtRange } from "./product-estimates";
 
 export interface YieldAmount {
   usd: number;
   nex: number;
+  /** Catalog daily ranges; absent for the phone tier, which has one figure. */
+  usdRange?: { low: number; high: number };
+  nexRange?: { low: number; high: number };
 }
 
 export interface StoreYieldLadderRow {
@@ -43,7 +47,9 @@ function productAmount(products: readonly Product[], productId: string): YieldAm
     && Number.isFinite(product.dailyEarn) && product.dailyEarn >= 0
     && Number.isFinite(product.dailyEarnNEX) && product.dailyEarnNEX >= 0);
   if (candidates.length !== 1) return null;
-  return { usd: candidates[0].dailyEarn, nex: candidates[0].dailyEarnNEX };
+  const [product] = candidates;
+  return { usd: product.dailyEarn, nex: product.dailyEarnNEX,
+    usdRange: productDailyEstimateRange(product) ?? undefined, nexRange: productDailyUvtRange(product) };
 }
 
 export function buildStoreYieldAuthority(
@@ -76,15 +82,18 @@ export function buildStoreYieldAuthority(
   };
 }
 
-// Per-device daily estimates are not statistic totals: shown in full, grouped, never K/M (01 §1.2, 03 §3.6).
+// Per-device daily estimates use the shared estimate format (estimate-display.ts): the catalog range when sent,
+// two significant figures, never K/M.
 export function storefrontUsd(amount: YieldAmount | null): string {
-  return amount ? `$${formatGroupedAmount(amount.usd)}` : "—";
+  if (!amount) return "—";
+  return `$${amount.usdRange ? formatEstimateRange(amount.usdRange.low, amount.usdRange.high) : formatEstimate(amount.usd)}`;
 }
 
 export function storefrontNex(amount: YieldAmount | null): string {
-  return amount ? formatGroupedAmount(amount.nex) : "—";
+  if (!amount) return "—";
+  return amount.nexRange ? formatEstimateRange(amount.nexRange.low, amount.nexRange.high) : formatEstimate(amount.nex);
 }
 
 export function storefrontNexFull(amount: YieldAmount | null): string {
-  return amount ? `${formatGroupedAmount(amount.nex)}\u00A0UVT` : "— UVT";
+  return amount ? `${storefrontNex(amount)}\u00A0UVT` : "— UVT";
 }

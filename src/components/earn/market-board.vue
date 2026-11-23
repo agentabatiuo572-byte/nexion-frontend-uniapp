@@ -76,7 +76,7 @@
           <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.kind ? getProductMedia(d.kind)?.src ?? null : null" />
           <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text></view>
           <view class="earn-ranking-value">
-            <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
+            <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatEstimate(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
             <!-- Decorative (the amount is read); aria-valuenow is the shared bar's state hook: no fill when unknown, no head dot at 0. -->
             <view class="earn-ranking-value__track nx-progress" aria-hidden="true" :aria-valuenow="d.dailyEarn === null ? undefined : Math.round(rankShare(d))"><view v-viz-inview class="nx-progress__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
           </view>
@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatEstimate } from "@/lib/estimate-display";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
 import { computed, onBeforeUnmount, ref, watch } from "vue";

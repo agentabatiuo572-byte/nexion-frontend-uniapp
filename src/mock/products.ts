@@ -49,9 +49,12 @@ export interface Product {
   dailyEarnNEX: number;     // NEX/day (spec §3.1)
   /** Exact server monthly estimate; absent when the SKU has no monthly target. */
   monthlyEstimateUsdt?: number;
-  /** Server daily USDT range for SHARE; never reconstructed from reference annual rates. */
+  /** Server daily USDT range (Share; devices once backend B75 ships); never reconstructed from reference annual rates. */
   dailyEstimateLowUsdt?: number;
   dailyEstimateHighUsdt?: number;
+  /** Server daily UVT range; field names follow backend B75-BE-02 once delivered. */
+  dailyEstimateLowNex?: number;
+  dailyEstimateHighNex?: number;
   /** E1 reference annual range for SHARE; this is not a settlement guarantee. */
   shareYieldMin?: number;
   shareYieldMax?: number;
