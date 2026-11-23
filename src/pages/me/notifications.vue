@@ -312,7 +312,7 @@ function earningSummary(earning: NotificationEarning) {
 }
 // Screen readers get the same words as the screen, masked the same way.
 function earningRowLabel(earning: NotificationEarning) {
-  const amounts = earningAmounts(earning).map(({ sign, value, unit }) => `${sign}${amountsHidden.value ? "••••" : value} ${unit}`).join(" · ");
+  const amounts = earningAmounts(earning).map(({ sign, value, unit }) => `${sign}${amountsHidden.value ? "••••" : value}\u00a0${unit}`).join(" · ");
   return `${amounts}, ${earningSummary(earning).map(part => part.text).join(" · ")}`;
 }
 type EarningDetailState = "loading" | "ready" | "failed" | "unavailable";
