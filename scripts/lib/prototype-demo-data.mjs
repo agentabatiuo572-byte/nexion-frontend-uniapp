@@ -1101,6 +1101,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
+    if(quote?.activityId&&quote.expectedRewards.length){
+      const current=demoFixture(new URL('/api/promotions/'+quote.activityId,url.origin),locale,state,{...request,method:()=>'GET'},now);
+      if(current.state==='ACTIVE'&&current.eligibility==='INELIGIBLE')refuse('PROMOTION_ELIGIBILITY_CHANGED');
+    }
     const bundle=pathname==='/api/orders/bundle';
     const quantityRequested=input.quantity??1;
     let productNo=input.productNo,voucherId=input.voucherId;
@@ -1131,8 +1135,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }else{
       if(lineProducts.some(p=>!p.available))refuse('PRODUCT_NOT_RELEASED');
       if(lineProducts.some((p,i)=>p.inventoryMode==='FINITE'&&p.stock<lines[i].quantity))refuse('PRODUCT_OUT_OF_STOCK');
-      requireDemoPurchase(state,products,lines,now);
-      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
+      if(quote){
+        if(lineProducts.some(p=>!demoE1PurchaseRule(state,p,now).eligible))refuse('PURCHASE_GATE_BLOCKED');
+      }else requireDemoPurchase(state,products,lines,now);
+      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse(quote?'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE':'PROMOTION_CAPACITY_UNAVAILABLE');
     }
     const quantity=lines.reduce((s,l)=>s+l.quantity,0),subtotal=lines.reduce((s,l)=>s+products.find(p=>p.id===l.productNo).price*l.quantity,0),discountRate=bundleRate(lines.length),bundleDiscount=Number((subtotal*discountRate).toFixed(2));
     const voucher=demoVoucherRedemption(state,quote?quote.voucherId:voucherId,lines,subtotal,now);
@@ -1142,7 +1148,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       if(!(Math.abs(input.expectedAmountUsdt-amount)<=0.000001))refuse('BUNDLE_QUOTE_STALE');
       if(lineProducts.some(p=>!p.available))refuse('BUNDLE_PRODUCT_NOT_RELEASED');
       if(lineProducts.some(p=>!demoE1PurchaseRule(state,p,now).eligible))refuse('PURCHASE_GATE_BLOCKED');
-      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('CAPACITY_REPLACEMENT_REQUIRED');
+      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse(quote?'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE':'CAPACITY_REPLACEMENT_REQUIRED');
     }
     const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:quote?amount.toFixed(2):amount,placedAt:now,
       computePoints:lines.reduce((total,line)=>total+products.find(p=>p.id===line.productNo).computePoints*line.quantity,0),orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
