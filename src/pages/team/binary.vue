@@ -375,7 +375,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-section-title { display: block; font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: 600; color: var(--v5-ink); }
 .binary-note { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: break-word; }
 .binary-notice { display: flex; align-items: flex-start; border-bottom: 1px solid var(--v5-border); margin-top: -12px; }
-.binary-notice > svg { flex: 0 0 18px; color: var(--v5-warning); margin-top: 2px; }
+.binary-notice > svg, .binary-notice > .nx-native-svg { flex: 0 0 18px; color: var(--v5-warning); margin-top: 2px; }
 .binary-notice-copy { min-width: 0; flex: 1; }
 .binary-notice-title { display: block; font-weight: 500; font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); margin-bottom: 6px; }
 .binary-text-action { display: inline-flex; align-items: center; gap: var(--ui-space-row-y); min-height: 44px; min-width: 44px; color: var(--v5-ink-2); font-size: var(--ui-type-button); line-height: var(--ui-type-button-lh); }

@@ -1,6 +1,6 @@
 // Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
-import { clearPreviewAccessToken, demoPhoneAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
+import { clearPreviewAccessToken, demoReferralBuyer, demoPhoneAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
 import { demoSecurityAccount } from './prototype-demo-account.mjs';
 import { createSignInDemo, demoExistingUser as existing, findDemoSignInUser } from './prototype-demo-sign-in.mjs';
 
@@ -81,7 +81,7 @@ export function createAuthDemo(state) {
       if (path === '/auth/users/refresh') {
         return state.sessionState === 'signed-out' || headers.authorization && !previewAccountId(state, headers)
           ? failure(401, 'AUTH_REQUIRED')
-          : issue(session(state.authUser ?? existing));
+          : issue(session(state.authUser ?? (state.promotionBuyer === 'sponsored-new' ? demoReferralBuyer.user : existing)));
       }
       if (path === '/auth/users/register/otp/send') {
         const challengeNo = 'REG-' + randomBytes(16).toString('hex');

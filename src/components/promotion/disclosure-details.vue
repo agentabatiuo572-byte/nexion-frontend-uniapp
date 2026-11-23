@@ -2,13 +2,13 @@
   <view>
     <text class="promotion-copy" style="white-space:pre-wrap;margin-top:12px">{{ localized(disclosure.benefitDescription,locale.code) }}</text>
     <view v-if="disclosure.deviceRights" class="promotion-entitlements" role="list"><view v-for="(sentence,index) in rights" :key="index" class="disclosure-right" role="listitem"><text aria-hidden="true">·</text><text>{{ sentence }}</text></view></view>
-    <text v-if="terms" class="promotion-copy" style="white-space:pre-wrap;margin-top:12px">{{ terms }}</text>
-    <text class="promotion-title promotion-title--sub" style="margin-top:16px">{{ t.promotion.returnPolicy }}</text><text class="promotion-copy" style="white-space:pre-wrap">{{ localized(disclosure.refundTerms,locale.code) }}</text>
+    <text v-if="terms && !sharedTerms" class="promotion-copy" style="white-space:pre-wrap;margin-top:12px">{{ terms }}</text>
+    <template v-if="!sharedRefund"><text class="promotion-title promotion-title--sub" style="margin-top:16px">{{ t.promotion.returnPolicy }}</text><text class="promotion-copy" style="white-space:pre-wrap">{{ localized(disclosure.refundTerms,locale.code) }}</text></template>
   </view>
 </template>
 <script setup lang="ts">
 import{computed}from'vue';import{useT}from'@/i18n/use-t';import{useLocaleStore}from'@/store/locale';import{localized}from'@/lib/promotion-display';import type{RewardDisclosure}from'@/api/promotion-contracts';
-const props=defineProps<{disclosure:RewardDisclosure}>(),t=useT(),locale=useLocaleStore();
+const props=defineProps<{disclosure:RewardDisclosure;sharedTerms?:boolean;sharedRefund?:boolean}>(),t=useT(),locale=useLocaleStore();
 import { uniquePromotionParagraphs } from '@/lib/promotion-paragraphs';
 import { uiLocale } from '@/i18n';
 import { fmt } from '@/i18n/format';

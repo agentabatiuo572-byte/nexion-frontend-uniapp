@@ -7,7 +7,7 @@
         <view v-if="celebrating" class="checkout-result__celebration" aria-hidden="true"><view v-for="spark in sparks" :key="spark.index" class="checkout-result__spark" :style="spark.style" /></view>
         <view v-if="(celebrating && phase === 'confirmed') || popped" :key="phase" class="checkout-result__halo" aria-hidden="true" />
         <image v-if="productImage && !imageFailed" class="checkout-result__image" :src="productImage" :alt="productName || copy.device" mode="aspectFit" @error="imageFailed = true" />
-        <view v-else class="checkout-result__fallback" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="16" y="8" width="32" height="44" rx="4"/><path d="M24 18h16M24 26h16M24 34h16M20 56h24"/><circle cx="32" cy="43" r="2"/></svg></view>
+        <view v-else class="checkout-result__fallback" aria-hidden="true"><svg width="80" height="80" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="16" y="8" width="32" height="44" rx="4"/><path d="M24 18h16M24 26h16M24 34h16M20 56h24"/><circle cx="32" cy="43" r="2"/></svg></view>
         <view v-if="state === 'activated' && phase === 'activating'" class="checkout-result__orbit" aria-hidden="true" />
         <view v-if="(state === 'activated' || state === 'inventory') && phase === 'complete'" class="checkout-result__check" :class="{ 'is-pop': popped }" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg></view>
       </view>

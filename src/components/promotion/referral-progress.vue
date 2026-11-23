@@ -37,7 +37,7 @@
     </view>
     <view v-if="error && !activities.length" class="referral-activity nx-tint"><text class="referral-title">{{ copy.firstPurchase }}</text><text class="referral-number">—</text></view>
     <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" icon="arrow-right" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text></NxButton>
-    <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="localized(termsActivity?.terms,locale.code)" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
+    <PromotionTerms audience="inviter" :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="termsActivity ? promotionTermsText(termsActivity,t.promotion,locale.code) : ''" :rules="termsActivity ? promotionTermsRules(termsActivity,t.promotion,id=>landingProductName(termsActivity!,id,locale.code),locale.code) : []" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>
 <script setup lang="ts">
@@ -55,6 +55,7 @@ import NxTag from '@/components/ui/nx-tag.vue';
 import PromotionTerms from './promotion-terms.vue';
 import NxSheet from '@/components/ui/nx-sheet.vue';
 import { isPromotionActive,promotionDisclosures } from '@/lib/promotion-entry';
+import { landingProductName,promotionTermsRules,promotionTermsText } from '@/lib/promotion-landing';
 import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { promotionMachineSlots } from '@/components/catalog-machine-image';
 const emit=defineEmits<{(e:'share'):void}>(),t=useT(),app=useApp(),auth=useAuth(),locale=useLocaleStore();const activities=ref<PublicPromotion[]>([]),progress=ref<Record<string,ReferralProgress>>({}),loading=ref(false),error=ref(false),hasMore=ref(false),listRead=ref(false);let cursor:string|null=null,generation=0,alive=true,visible=true;

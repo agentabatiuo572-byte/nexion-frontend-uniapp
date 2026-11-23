@@ -345,7 +345,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .pool-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
 .pool-decimals { color: var(--v5-ink-3); }
 .pool-payout { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; margin-top: var(--v5-space-4); padding: var(--ui-space-row-y) var(--v5-space-4); border-radius: 16px; background: var(--v5-surface-2); color: var(--v5-ink); font-size: 14px; font-weight: 600; }
-.pool-payout > svg { color: var(--v5-nex); flex: none; }
+.pool-payout > svg, .pool-payout > .nx-native-svg { color: var(--v5-nex); flex: none; }
 .pool-payout__days { font-size: 18px; line-height: 22px; font-weight: 700; }
 /* Personal share (P-41): ring for my share, dot grid for votes, faint violet tint (DS-28/29). */
 .pool-personal { padding: var(--v5-space-4); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
@@ -378,7 +378,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .pool-record-amount { color: var(--v5-brand); font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 600; }
 .pool-history-row > text { max-width: 52%; text-align: right; overflow-wrap: break-word; }
 .pool-action { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 44px; color: var(--v5-ink-2); font-size: var(--ui-type-button); line-height: var(--ui-type-button-lh); }
-.pool-action > svg { display: none; }
+.pool-action > svg, .pool-action > .nx-native-svg { display: none; }
 .pool-action > text { color: inherit !important; }
 .pool-action::after { content: ""; flex: none; width: 1em; height: 1em; background: currentColor; -webkit-mask: var(--nx-glyph-arrow-right) center / contain no-repeat; mask: var(--nx-glyph-arrow-right) center / contain no-repeat; }
 .pool-read-state { padding-block: 18px; border-top: 1px solid var(--v5-border); }

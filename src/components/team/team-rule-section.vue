@@ -2,7 +2,7 @@
   <view v-if="q" class="team-rule-faq">
     <view class="team-rule-faq__toggle" role="button" tabindex="0" :aria-expanded="expanded" :aria-controls="bodyId" @click="toggle" @keydown.enter.prevent="toggle" @keydown.space.prevent="toggle">
       <text class="team-rule-faq__q">{{ q }}</text>
-      <svg class="team-rule-chevron" :class="{ 'is-open': expanded }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      <view class="team-rule-chevron" :class="{ 'is-open': expanded }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></view>
     </view>
     <view v-if="expanded" :id="bodyId" class="team-rule-faq__a"><text>{{ a }}</text></view>
   </view>
@@ -22,7 +22,7 @@
   <view v-else-if="fold" class="team-rule-fold">
     <view class="team-rule-fold__toggle" role="button" tabindex="0" :aria-expanded="expanded" :aria-controls="bodyId" @click="toggle" @keydown.enter.prevent="toggle" @keydown.space.prevent="toggle">
       <text class="team-rule-fold__title">{{ title || label }}</text>
-      <svg class="team-rule-chevron" :class="{ 'is-open': expanded }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      <view class="team-rule-chevron" :class="{ 'is-open': expanded }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></view>
     </view>
     <view v-if="expanded" :id="bodyId" class="team-rule-fold__body"><slot /></view>
   </view>
@@ -90,7 +90,7 @@ function toggle() { open.value = !open.value; }
 .team-rule-fold__title { min-width: 0; color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .team-rule-fold__body { padding: 4px 16px 16px; border-top: 1px solid var(--v5-border); }
 
-.team-rule-chevron { flex: none; color: var(--v5-ink-4); transition: transform 160ms ease-out; }
+.team-rule-chevron { display: grid; flex: none; color: var(--v5-ink-4); transition: transform 160ms ease-out; }
 .team-rule-chevron.is-open { transform: rotate(180deg); color: var(--v5-brand); }
 .team-rule-faq__toggle:focus-visible, .team-rule-fold__toggle:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { .team-rule-chevron { transition: none; } }

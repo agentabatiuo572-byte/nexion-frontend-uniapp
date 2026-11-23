@@ -6,11 +6,14 @@
   (PITFALLS P-013). Dot positions precomputed in script (no useMemo needed).
 -->
 <template>
+  <!-- The box is a real view: on the App the svg below is written through NxNativeSvg, which takes no layout styles. -->
+  <view aria-hidden="true" :style="rootStyle">
   <svg
-    aria-hidden="true"
+    width="100%"
+    height="100%"
     :viewBox="`0 0 ${VIEW} ${VIEW}`"
     preserveAspectRatio="xMidYMid meet"
-    :style="rootStyle"
+    style="display: block"
   >
     <defs>
       <radialGradient id="orbCenterGlow" cx="50%" cy="50%" r="50%">
@@ -50,6 +53,7 @@
       <animate attributeName="opacity" values="0.75;1;0.75" dur="4.4s" repeatCount="indefinite" />
     </circle>
   </svg>
+  </view>
 </template>
 
 <script setup lang="ts">
