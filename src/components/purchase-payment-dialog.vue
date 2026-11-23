@@ -1,11 +1,15 @@
 <template>
-  <view v-if="showResume && active && !s.open && (pending.length || showHistory && records.length)" class="purchase-payment-resume nx-float-panel" :class="{ 'has-close': !showHistory }" :style="barBottom === null ? undefined : { bottom: barBottom + 'px' }" role="status">
-    <view v-if="!showHistory" class="purchase-payment-resume__close nx-frosted-button" role="button" tabindex="0" :aria-label="copy.close" @click="payment.dismissResume(pending)" @keydown.enter.prevent="payment.dismissResume(pending)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+  <!-- One amber line with the count (user 2026-11-22, 2026-11-24); Orders and the order detail never show it: their
+       lists carry the payments themselves. -->
+  <view v-if="barShown" class="purchase-payment-resume" :style="barBottom === null ? undefined : { bottom: barBottom + 'px' }" role="status">
+    <view class="purchase-payment-resume__icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
     </view>
-    <!-- Outside Orders the bar is one line with the count (user 2026-11-22); Orders lists each payment to pick from. -->
-    <view v-if="!showHistory" class="purchase-payment__row"><text>{{ fill(copy.resumeCount, { n: pending.length }) }}</text><NxButton :label="copy.viewProgress" variant="link" icon="chevron-right" @click="openPending" /></view>
-    <view v-for="row in showHistory ? records : []" :key="row.commandKey" class="purchase-payment__row"><text :style="{ flexBasis: rowBasis(row) }">{{ row.summary }} · {{ rowLabel(row) }}</text><NxButton :label="copy.view" variant="text" @click="payment.resume(row)" /></view>
+    <text class="purchase-payment-resume__text">{{ fill(copy.resumeCount, { n: pending.length }) }}</text>
+    <NxButton class="purchase-payment-resume__link" :label="copy.viewProgress" variant="link" icon="chevron-right" @click="openPending" />
+    <view class="purchase-payment-resume__close" role="button" tabindex="0" :aria-label="copy.close" @click="payment.dismissResume(pending)" @keydown.enter.prevent="payment.dismissResume(pending)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+    </view>
   </view>
 
   <!-- Step sheet: method → network / bank confirmation. -->
@@ -254,12 +258,12 @@ import NxTag from '@/components/ui/nx-tag.vue';
 import NxCodeValue from '@/components/ui/nx-code-value.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
-import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, type PurchaseNotice } from '@/store/purchase-payment';
+import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, PAYMENT_BAR_HEIGHT_KEY, type PurchaseNotice } from '@/store/purchase-payment';
 import { appDeviceOffline, appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
-import { purchasePaymentCopy, paymentRowStatus, fillCopy as fill } from '@/lib/purchase-payment-copy';
+import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
@@ -270,8 +274,8 @@ import { navTo } from '@/lib/route';
 import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
 import qrcode from 'qrcode-generator';
 const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale = useLocaleStore();
-// The order detail shows its own payment state in the hero, so it hides the floating bar.
-const props = withDefaults(defineProps<{ showHistory?: boolean; showResume?: boolean }>(), { showHistory: false, showResume: true });
+// Orders and the order detail show their payments in place, so they hide the floating bar.
+const props = withDefaults(defineProps<{ showResume?: boolean }>(), { showResume: true });
 const URGENT_MS = 5 * 60000;
 // Space the bank page leaves for the tray (04 §4.0 multi-row tray: its height + 38): tray 108 (8 + note 4 + 32 for two
 // lines + gap 8 + button 48 + 8) + 22 off the screen bottom + 16 above it. Fixed whether or not the save button shows, so the native view never resizes.
@@ -281,7 +285,6 @@ const copy = computed(() => purchasePaymentCopy(locale.code));
 const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
-// Orders lists every unfinished payment; dismissal applies only to the floating count.
 const showsCheckoutCapacityResume = inject(showsCheckoutCapacityResumeKey, null);
 const records = computed(() => unsettled.value.filter(row => !row.validated && !row.businessDelivered
   && row.lastStatus !== 'DELIVERED' && !showsCheckoutCapacityResume?.(row)));
@@ -306,16 +309,23 @@ function readResumeRows() {
     () => resumeWatched.value && app.accountKey === accountKey && foregroundReadAllowed(), canReadResumeRow));
 }
 useVisibleInterval(readResumeRows, 15000, () => resumeWatched.value);
-// The bar floats 12px above what sits at the bottom of the page, the tab bar, the floating support button or the
-// page's action tray, so it never covers or touches them (02: nothing covers the support button); their heights differ by page and state, so they are measured while the bar shows.
-const barShown = computed(() => props.showResume && active.value && !s.open && (pending.value.length > 0 || props.showHistory && records.value.length > 0));
+// The bar floats 12px above the tab pill or the page's action tray, measured while it shows (their heights differ by page
+// and state). The floating support shortcut moves up above the bar instead (user 2026-11-24), so it is not measured here.
+const barShown = computed(() => props.showResume && active.value && !s.open && pending.value.length > 0);
 const barBottom = ref<number | null>(null);
+// The page's chassis lifts its floating support shortcut above the bar by the height measured here (user 2026-11-24).
+const sharedBarHeight = inject(PAYMENT_BAR_HEIGHT_KEY, null);
 function placeBar() {
-  uni.createSelectorQuery().selectAll('.nx-tabbar-pill, .nx-glass-bar, .nx-support-bubble').boundingClientRect(found => {
+  uni.createSelectorQuery().selectAll('.nx-tabbar-pill, .nx-glass-bar').boundingClientRect(found => {
     const tops = (Array.isArray(found) ? found : [found]).filter(rect => rect && (rect.height ?? 0) > 0).map(rect => rect.top as number);
     barBottom.value = tops.length ? Math.max(0, uni.getSystemInfoSync().windowHeight - Math.min(...tops) + 12) : null;
+  }).select('.purchase-payment-resume').boundingClientRect(bar => {
+    const height = !Array.isArray(bar) && bar?.height ? Math.round(bar.height) : 0;
+    if (sharedBarHeight) sharedBarHeight.value = barShown.value ? height : 0;
   }).exec();
 }
+watch(barShown, shown => { if (!shown && sharedBarHeight) sharedBarHeight.value = 0; });
+onUnmounted(() => { if (sharedBarHeight) sharedBarHeight.value = 0; });
 watch(() => barShown.value && s.revision, shown => { if (shown !== false) setTimeout(placeBar, 50); }, { immediate: true });
 useVisibleInterval(placeBar, 2000, () => barShown.value);
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
@@ -471,16 +481,6 @@ const conclusion = computed(() => networkPaused.value
   ? { title: fill(copy.value.networkPausedTitle, { network: networkName.value }), body: copy.value.networkPaused }
   : noticeFor(purchaseConclusion(s.intent)));
 
-type ResumeRow = ReturnType<typeof payment.records>[number];
-function rowLabel(row: ResumeRow) { return paymentRowStatus(copy.value, row); }
-// Footer rule (as in referral-progress): the note stays beside its action while it fits in two lines. Its basis is
-// about half its one-line width (CJK about 1em, other scripts about 0.55em per character) plus 2.5em for word breaks,
-// so the row wraps, putting the action at the bottom-right, only when the note would need a third line.
-function rowBasis(row: ResumeRow) {
-  let em = 2.5;
-  for (const ch of `${row.summary} · ${rowLabel(row)}`) em += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 0.5 : 0.275;
-  return `${em.toFixed(1)}em`;
-}
 function amount(value: string | number) { return formatGroupedAmount(value); }
 function walletAmount(value: number) { return formatGroupedAmount(value, app.user.usdtBalance < 0 ? 6 : 2); }
 function clock(ms: number) { const total = Math.ceil(ms / 1000); return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`; }
@@ -812,21 +812,16 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-cashier__row2 { display: flex; gap: 8px; }
 .pp-cashier__done { flex: 1; }
 
-/* One line sits in a 56px row with equal space above and below; the text action is its label line with a 44px target. */
-.purchase-payment__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 56px; box-sizing: border-box; padding: 4px 0; color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.purchase-payment__row > text { flex: 1; min-width: 0; padding-block: 6px; }
-.purchase-payment__row > :last-child { flex-shrink: 0; white-space: nowrap; }
-/* The link's 44px target reaches 8px past its label (56 from the edge); the close mark's target starts 48 from the edge, so 8px stay between them. */
-.purchase-payment-resume.has-close { padding-right: 64px; }
-.purchase-payment-resume__close { position: absolute; top: 14px; right: var(--v5-space-3); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
-.purchase-payment-resume__close::after { content: ''; position: absolute; inset: -8px; }
-/* The bar already blurs what is behind it; the close disc keeps the shared fill and rim without a second filter (03 §3.2). */
-.purchase-payment-resume__close { backdrop-filter: none; -webkit-backdrop-filter: none; }
-.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); display: grid; max-height: 160px; overflow: auto; padding: 0 var(--v5-space-4); border-radius: 28px; color: var(--v5-ink); font-size: var(--ui-type-description); }
-
-
-.purchase-payment-resume:not(.has-close) .purchase-payment__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--v5-space-3); padding: var(--v5-space-3) 0; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.purchase-payment-resume:not(.has-close) .purchase-payment__row > text { flex: 1; min-width: 0; }
-.purchase-payment-resume:not(.has-close) .purchase-payment__row > :last-child { flex-shrink: 0; margin-left: auto; white-space: nowrap; }
-.purchase-payment-resume:not(.has-close) .purchase-payment__row:last-child { border-bottom: 0; }
+/* Amber status bar (user 2026-11-24, board A): the unread amber, solid in both themes, with one light shadow. placeBar puts
+   it 12px above the tab pill or the page's action tray; until it measures, the default sits about there. */
+.purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); box-sizing: border-box; min-height: 56px; display: flex; align-items: center; padding: 6px 6px 6px var(--v5-space-3); border-radius: 28px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); box-shadow: var(--v5-glass-shadow); }
+.purchase-payment-resume__icon { flex: none; width: 32px; height: 32px; margin-right: 10px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .4); }
+.purchase-payment-resume__text { flex: 1 1 auto; min-width: 0; margin-right: var(--v5-space-2); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; text-wrap: pretty; }
+/* The link keeps its role (13/18, 500, chevron) in the bar's ink, since muted grey has no contrast on amber; 8px before the
+   close mark keep its 44px target (8px past the label) off the mark's target. */
+.purchase-payment-resume .purchase-payment-resume__link { flex: none; margin-right: var(--v5-space-2); color: inherit; }
+/* No disc on a coloured bar (04 §4.0: no glass control on a tray): a bare 20px mark with a 44px target. */
+.purchase-payment-resume__close { flex: none; width: 44px; height: 44px; display: grid; place-items: center; color: inherit; cursor: pointer; }
+.purchase-payment-resume__close:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; border-radius: 50%; }
+@media (forced-colors: active) { .purchase-payment-resume { background: Canvas; color: CanvasText; outline: 1px solid CanvasText; box-shadow: none; } }
 </style>

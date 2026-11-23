@@ -134,6 +134,7 @@
   --v5-warning: #C68316;
   --v5-warning-soft: #FBF1D9;
   --v5-danger: #99443B;       /* AA small text on danger-soft and page tints through 15%. */
+  --ui-on-danger: #FFFFFF;     /* text on a danger fill (swipe-delete zone): 6.47:1 */
   --v5-danger-soft: #F8E1DC;
 
   --v5-tech-cyan: #0CC4D6;
@@ -404,6 +405,7 @@
   --v5-warning: #FFCB4D;        /* amber, brighter on dark surfaces */
   --v5-warning-soft: rgba(255,203,77,0.20);
   --v5-danger: #FF5C5C;         /* slightly brighter, still desaturated */
+  --ui-on-danger: #0A0A0A;       /* text on a danger fill: 6.54:1 (white is 3.03:1) */
   --v5-danger-soft: rgba(255,92,92,0.18);
 
   /* Tech accent — purple, lifted for visibility on dark cards */

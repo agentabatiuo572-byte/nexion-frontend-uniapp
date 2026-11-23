@@ -1,4 +1,4 @@
-import { reactive } from 'vue';
+import { reactive, type InjectionKey, type Ref } from 'vue';
 import { canSelectNewUsdtNetwork, isVisibleUsdtNetwork } from '@/lib/usdt-network-options';
 import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
@@ -19,6 +19,9 @@ import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order
 import { getT } from '@/i18n/use-t';
 import { toast } from './ui';
 
+/** Height of the page's floating payment bar, 0 while it is hidden. The bar measures itself and writes it; the chassis
+ *  only reads it to lift the support shortcut and pad the content, so the two never measure each other. */
+export const PAYMENT_BAR_HEIGHT_KEY: InjectionKey<Ref<number>> = Symbol('nx-payment-bar-height');
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
   scopeCurrent?: () => boolean;

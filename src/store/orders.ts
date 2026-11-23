@@ -603,6 +603,10 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
+  // Swipe-delete of an expired order on Orders (user 2026-11-24). Placeholder for the logic item: hide it per account while
+  // it stays expired, show it again if its status changes, and later call the backend's hide API (B81).
+  function hideExpiredOrder(_id: string): void {}
+
   return {
     orders, visibleOrders,
     nextCursor,
@@ -615,6 +619,7 @@ export const useOrders = defineStore("orders", () => {
     cancelOrderRemote,
     cancelOrderRemoteResult,
     getById,
+    hideExpiredOrder,
     bindAccount,
     currentAccountKey,
     currentAccountBindingRevision,

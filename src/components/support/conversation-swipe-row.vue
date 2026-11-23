@@ -64,7 +64,8 @@ function captureClick(event: Event) {
 .conversation-swipe { position: relative; overflow: hidden; touch-action: pan-y; }
 .conversation-swipe__content { position: relative; background: var(--v5-bg); transition: transform 180ms ease-out; }
 .conversation-swipe__content--dragging { transition: none; user-select: none; }
-.conversation-swipe__delete { position: absolute; inset: 1px 0 1px auto; width: 80px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; visibility: hidden; background: var(--v5-danger); color: #fff; font: 600 12px/1.3 var(--font-v5); cursor: pointer; }
+/* Label on the chip role (12/16, 500: 01 §1.2 caps 14px and below at 500); ink on the danger fill keeps 4.5:1 in both themes. */
+.conversation-swipe__delete { position: absolute; inset: 1px 0 1px auto; width: 80px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--v5-space-1); visibility: hidden; background: var(--v5-danger); color: var(--ui-on-danger); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); cursor: pointer; }
 .conversation-swipe__delete--visible { visibility: visible; }
 .conversation-swipe__delete:active { opacity: .8; }
 .conversation-swipe__delete:focus-visible { outline: 2px solid var(--v5-ink); outline-offset: -3px; }

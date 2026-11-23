@@ -7,6 +7,7 @@
           <template v-else-if="icon === 'shield'"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="M12 8v4" /><path d="M12 16h.01" /></template>
           <template v-else-if="icon === 'failed'"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></template>
           <template v-else-if="icon === 'info'"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></template>
+          <template v-else-if="icon === 'trash'"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6" /></template>
           <template v-else><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></template>
         </svg>
       </view>
@@ -27,7 +28,7 @@ import { useDialogA11y } from '@/composables/use-dialog-a11y';
 // Centered notice (DS 03 §3.5 居中确认框, the same anatomy as the global confirm()): icon, title, one short explanation,
 // a solid primary and an optional secondary exit below it as a brand text button.
 const props = withDefaults(defineProps<{ open: boolean; title: string; body?: string; primary: string; secondary?: string;
-  icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean;
+  icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info' | 'trash'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean;
   // A busy primary that only reads (no write in flight) can still be left: the quiet exit, Esc and back stay live (03 §3.5.2).
   secondaryWhileBusy?: boolean }>(), { icon: 'alert', tone: 'warning' });
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();

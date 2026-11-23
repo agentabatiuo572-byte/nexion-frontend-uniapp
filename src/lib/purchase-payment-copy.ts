@@ -60,6 +60,8 @@ const zh = {
   keepOrderTitle: '订单已保留', keepOrderBody: '离开后可在「我的订单」继续付款，未付款的订单到截止时间会自动取消。',
   resumeCount: '当前有 {n} 笔付款进行中', viewProgress: '查看进度',
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
+  // Orders list payment cards name the purchase kind (user 2026-11-24); trade-in and replacement reuse existing labels.
+  kindTrialConvert: '试用转购', kindCapacityKeep: '保留旧机购机',
 };
 const en: typeof zh = {
   cashierSaveQr: 'Save QR code',
@@ -119,6 +121,7 @@ const en: typeof zh = {
   keepOrderTitle: 'Your order is saved', keepOrderBody: 'You can pay later from Orders. An unpaid order is cancelled automatically at its deadline.',
   resumeCount: 'Payments in progress: {n}', viewProgress: 'View',
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
+  kindTrialConvert: 'Trial to purchase', kindCapacityKeep: 'Keep-and-buy',
 };
 const vi: typeof zh = {
   cashierSaveQr: 'Lưu mã QR',
@@ -178,6 +181,7 @@ const vi: typeof zh = {
   keepOrderTitle: 'Đơn hàng đã được giữ', keepOrderBody: 'Bạn có thể thanh toán sau trong mục Đơn hàng. Đơn chưa thanh toán sẽ tự hủy khi hết hạn.',
   resumeCount: 'Đang thanh toán: {n}', viewProgress: 'Xem tiến độ',
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
+  kindTrialConvert: 'Mua sau dùng thử', kindCapacityKeep: 'Mua và giữ máy cũ',
 };
 const id: typeof zh = {
   cashierSaveQr: 'Simpan QR',
@@ -237,6 +241,7 @@ const id: typeof zh = {
   keepOrderTitle: 'Pesanan disimpan', keepOrderBody: 'Anda bisa membayar nanti dari Pesanan. Pesanan yang belum dibayar otomatis dibatalkan saat batas waktu.',
   resumeCount: '{n} pembayaran sedang berjalan', viewProgress: 'Lihat',
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
+  kindTrialConvert: 'Beli setelah uji coba', kindCapacityKeep: 'Beli, simpan perangkat lama',
 };
 const ms: typeof zh = {
   cashierSaveQr: 'Simpan QR',
@@ -296,6 +301,7 @@ const ms: typeof zh = {
   keepOrderTitle: 'Pesanan disimpan', keepOrderBody: 'Anda boleh bayar kemudian dari Pesanan. Pesanan yang belum dibayar dibatalkan secara automatik apabila tamat tempoh.',
   resumeCount: '{n} bayaran sedang berjalan', viewProgress: 'Lihat',
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
+  kindTrialConvert: 'Beli selepas percubaan', kindCapacityKeep: 'Simpan-dan-beli',
 };
 const fil: typeof zh = {
   cashierSaveQr: 'I-save QR',
@@ -355,6 +361,7 @@ const fil: typeof zh = {
   keepOrderTitle: 'Naka-save ang order', keepOrderBody: 'Puwede kang magbayad mamaya sa Mga order. Awtomatikong makakansela ang order na hindi nabayaran pagdating ng deadline.',
   resumeCount: '{n} bayad ang isinasagawa', viewProgress: 'Tingnan',
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
+  kindTrialConvert: 'Bili mula sa trial', kindCapacityKeep: 'Bili, itabi ang luma',
 };
 const ru: typeof zh = {
   cashierSaveQr: 'Сохранить QR',
@@ -414,6 +421,7 @@ const ru: typeof zh = {
   keepOrderTitle: 'Заказ сохранён', keepOrderBody: 'Оплатить можно позже в разделе «Заказы». Неоплаченный заказ отменится автоматически по истечении срока.',
   resumeCount: 'Оплат в процессе: {n}', viewProgress: 'Ход оплаты',
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
+  kindTrialConvert: 'Покупка после пробы', kindCapacityKeep: 'Покупка с сохранением',
 };
 const kk: typeof zh = {
   cashierSaveQr: 'QR кодты сақтау',
@@ -473,6 +481,7 @@ const kk: typeof zh = {
   keepOrderTitle: 'Тапсырыс сақталды', keepOrderBody: 'Кейін «Тапсырыстар» бөлімінен төлей аласыз. Төленбеген тапсырыс мерзімі біткенде автоматты түрде жойылады.',
   resumeCount: 'Жүріп жатқан төлемдер: {n}', viewProgress: 'Қарау',
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
+  kindTrialConvert: 'Сынақтан кейін сатып алу', kindCapacityKeep: 'Ескісін сақтап сатып алу',
 };
 const uz: typeof zh = {
   cashierSaveQr: 'QR kodni saqlash',
@@ -532,6 +541,7 @@ const uz: typeof zh = {
   keepOrderTitle: 'Buyurtma saqlandi', keepOrderBody: 'Keyinroq «Buyurtmalar» boʻlimidan toʻlashingiz mumkin. Toʻlanmagan buyurtma muddat tugaganda avtomatik bekor qilinadi.',
   resumeCount: 'Jarayondagi toʻlovlar: {n}', viewProgress: 'Koʻrish',
   resume: 'Toʻlov jarayonda', view: 'Toʻlovni koʻrish', review: 'Toʻlovingiz tasdiqlanmoqda', ended: 'Bu toʻlov yakunlangan', delivered: 'Toʻlov yakunlandi',
+  kindTrialConvert: 'Sinovdan keyin xarid', kindCapacityKeep: 'Eskisini saqlab xarid',
 };
 export type PurchasePaymentCopy = typeof zh;
 const copy: Record<UiLocale, PurchasePaymentCopy> = { zh, en, vi, id, ms, fil, ru, kk, uz };
