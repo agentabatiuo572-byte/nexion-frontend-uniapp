@@ -4,7 +4,7 @@
     <text v-if="loading && !listRead && !activities.length" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
     <view v-for="activity in activities" :key="activity.activityId" class="referral-activity referral-activity--footer nx-tint" :data-activity-id="activity.activityId">
       <view class="referral-meta">
-        <text v-if="deadlineText(activity)" class="referral-deadline">{{ deadlineText(activity) }}</text>
+        <NxTag v-if="deadlineText(activity)" class="referral-deadline" tone="warning" :label="deadlineText(activity)" />
         <view class="nx-card-link referral-rule-pill" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><svg class="nx-card-link__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view>
       </view>
       <view class="referral-hero">
@@ -20,7 +20,7 @@
         <view class="referral-details">
           <view class="referral-summary nx-tint">
             <view class="referral-art referral-summary__art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /><image class="referral-bow" src="/static/img/team-20261025/gift-bow.png" mode="aspectFit" /></view>
-            <text v-if="deadlineText(activity)" class="referral-deadline">{{ deadlineText(activity) }}</text>
+            <NxTag v-if="deadlineText(activity)" class="referral-deadline" tone="warning" :label="deadlineText(activity)" />
             <view class="referral-count"><text class="referral-number">{{ visibility.mask(qualifyingCount(activity.activityId)) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
             <text class="referral-summary__rule">{{ copy.giftRule }}</text>
           </view>
@@ -51,6 +51,7 @@ import { teamRedesignCopy } from '@/i18n/team-redesign';
 import { uiLocale } from '@/i18n';
 import { formatDayMonth } from '@/lib/display-date';
 import NxButton from '@/components/ui/nx-button.vue';
+import NxTag from '@/components/ui/nx-tag.vue';
 import PromotionTerms from './promotion-terms.vue';
 import NxSheet from '@/components/ui/nx-sheet.vue';
 import { isPromotionActive,promotionDisclosures } from '@/lib/promotion-entry';
@@ -147,7 +148,8 @@ function noteBasis(text: string): string {
 .referral-activity + .referral-activity { margin-top: var(--ui-space-inset); }
 .referral-hero { position: relative; display: flex; align-items: center; min-height: 84px; margin-top: -4px; }
 .referral-meta { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-2); min-height: 24px; }
-.referral-deadline { height: 24px; padding: 0 10px; display: flex; align-items: center; border-radius: 999px; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-brand-2-ink); background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
+/* Remaining days: the shared tag the activity cards use (04.2, 03 §3.8). */
+.referral-deadline { flex: none; }
 .referral-rule-pill { margin-left: auto; }
 .referral-copy { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .referral-title { display: block; max-width: 60%; font: 600 17px/24px var(--font-v5); overflow-wrap: break-word; }
