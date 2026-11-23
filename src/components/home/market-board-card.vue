@@ -88,8 +88,9 @@ const marketBoardUnavailable = "—";
 const homeMarketRows = computed(() => app.homeTruth?.marketBoard.workloads ?? []);
 // The six workload codes are the most the board can list, so the placeholder holds the full table's height.
 const MARKET_PLACEHOLDER_ROWS = 6;
-// Only a read that succeeded with no workloads is empty; loading and a failed first read keep the placeholder.
-const marketBoardState = computed(() => app.homeTruthStatus === "ready" ? "empty" : app.homeTruthStatus === "error" ? "failed" : "loading");
+// Empty only when a read has succeeded with no workloads; that snapshot stays while a refresh runs or fails, so the
+// board does not fall back to placeholders. Before any read succeeds, loading and a failed read keep the placeholder.
+const marketBoardState = computed(() => app.homeTruth ? "empty" : app.homeTruthStatus === "error" ? "failed" : "loading");
 const marketNavigation = createMarketBoardNavigation(navTo);
 
 function displayRow(row: AppHomeWorkload) {
