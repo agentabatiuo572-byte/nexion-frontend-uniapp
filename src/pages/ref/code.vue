@@ -95,9 +95,9 @@
           <text>{{ t.home.platformStatsTitle }}</text>
         </view>
         <view class="grid grid-cols-2 text-center" style="gap: 12px 8px">
-          <Stat :label="t.home.networkMembers" :value="published.registered.value" tint="var(--v5-brand)" />
-          <Stat :label="t.home.networkDevices" :value="published.online.value" tint="var(--v5-tech-cyan-ink)" />
-          <Stat :label="t.home.networkPaidOut" :value="published.paidOut.value" tint="var(--v5-warning)" style="grid-column: span 2" />
+          <view><text class="ref-stat__label">{{ t.home.networkMembers }}</text><NxTickNumber class="ref-stat__value" :text="published.registered.value" /></view>
+          <view><text class="ref-stat__label">{{ t.home.networkDevices }}</text><NxTickNumber class="ref-stat__value" :text="published.online.value" /></view>
+          <view style="grid-column: span 2"><text class="ref-stat__label">{{ t.home.networkPaidOut }}</text><NxTickNumber class="ref-stat__value" :text="published.paidOut.value" /></view>
         </view>
       </view>
 
@@ -132,7 +132,7 @@ import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
 import { useEntryRecoveryCopy } from "@/i18n/entry-recovery";
 import { fmt } from "@/i18n/format";
-import Stat from "@/components/trust/trust-stat.vue";
+import NxTickNumber from "@/components/ui/nx-tick-number.vue";
 import { pickSponsor } from "@/mock/sponsors";
 import { apiClient, remoteApiEnabled } from "@/api/runtime";
 import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
@@ -391,6 +391,10 @@ const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", display: "inl
 /* Brand liquid glass (03 §3.1), centred under the cards: the shared frosted capsule with a 14% brand fill and brand ink. */
 .ref-cta { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); }
 .ref-signin-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 6px; }
+/* Platform figures: the stat-value role (10.1: 17/23 at 360, 18/24 at 390, 500, JetBrains Mono, main ink; 01 §1.1.1 keeps
+   accent hues off numbers); the label is a field name in muted ink. */
+.ref-stat__label { display: block; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.ref-stat__value { display: block; margin-top: 4px; font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric: tabular-nums; color: var(--v5-ink); }
 .ref-preview-status { display: flex; align-items: center; gap: 12px; padding: 16px 0; font-size: 13px; line-height: 1.55; color: var(--v5-ink-3); }
 .ref-preview-status > text { flex: 1; }
 .ref-preview-retry[aria-disabled="true"] { opacity: 0.5; }
