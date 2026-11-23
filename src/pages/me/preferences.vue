@@ -19,6 +19,7 @@
             <text class="push-settings-action">{{ nativePushPermission === 'unknown' ? pushCopy.enable : pushCopy.settings }}</text>
             <view class="push-settings-chevron" aria-hidden="true"><NxIcon name="chevron-right" /></view>
           </view>
+          <EarningPushSetting />
         </view>
         <text v-if="pushSettingsFailed" class="block mx-1" :style="footerStyle" role="alert">{{ pushCopy.settingsFailed }}</text>
         <view v-if="nativePushRegistrationUnavailable" class="mx-1" role="status" aria-live="polite">
@@ -82,6 +83,9 @@ import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
+// #ifdef APP-PLUS
+import EarningPushSetting from "@/components/me/earning-push-setting.vue";
+// #endif
 import { useT } from "@/i18n/use-t";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
 import { onHide, onShow } from "@dcloudio/uni-app";

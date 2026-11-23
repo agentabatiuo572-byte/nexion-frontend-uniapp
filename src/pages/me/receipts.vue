@@ -65,9 +65,10 @@
                 <text class="block truncate font-mono-code" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
                 <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
               </view>
-              <view class="text-right shrink-0 min-w-0" style="margin-left: 8px; max-width: 42%">
-                <text class="block truncate tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 'full')} UVT` : `+$${formatAmount(r.rewardUsdt, 'full')}` }}</text>
-                <text class="block truncate" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
+              <!-- Each credited asset on its own line, same figure role as the message row (04.5, 10.1). -->
+              <view class="text-right shrink-0" style="margin-left: 8px">
+                <text v-for="amount in creditedAmounts(r.rewardUsdt, r.rewardNex)" :key="amount.unit" class="block" :style="computeAmountStyle">{{ amount.sign }}{{ amount.value }}&nbsp;<text :style="computeUnitStyle">{{ amount.unit }}</text></text>
+                <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
           </template>
@@ -163,7 +164,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { displayTimestamp, formatDisplayDate, formatDisplayTime } from "@/lib/display-date";
 import { receiptLine } from "@/lib/receipt-line";
-import { formatAmount } from "@/lib/amount-display";
+import { creditedAmounts, formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -699,7 +700,16 @@ function rowAmountStyle(r: Receipt): CSSProperties {
     color: "var(--v5-brand)",
   };
 }
-const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
+const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
+// Compute receipt amounts: card figure in Montserrat and the success colour, unit as the auxiliary figure (10.1).
+const computeAmountStyle: CSSProperties = {
+  whiteSpace: "nowrap", color: "var(--v5-success-ink)", fontFamily: "var(--font-amount)", fontVariantNumeric: "tabular-nums",
+  fontSize: "var(--ui-type-card-figure)", lineHeight: "var(--ui-type-card-figure-lh)", fontWeight: "var(--ui-type-card-figure-weight)" as CSSProperties["fontWeight"],
+};
+const computeUnitStyle: CSSProperties = {
+  whiteSpace: "nowrap", color: "var(--v5-ink-3)", fontFamily: "var(--font-v5)",
+  fontSize: "var(--ui-type-meta)", lineHeight: "var(--ui-type-meta-lh)", fontWeight: "var(--ui-type-meta-weight)" as CSSProperties["fontWeight"],
+};
 const remoteAmountStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "13px",

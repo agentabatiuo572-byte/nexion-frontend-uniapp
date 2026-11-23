@@ -12,23 +12,43 @@
   prop/emit — no chassis-level overlay host).
 -->
 <template>
-  <NxSheet :open="receipt !== null" :title="receiptTitle" native-back class="nx-receipt-modal-root" style="z-index: 1000" @close="emit('close')">
-      <!-- Header -->
-      <view :style="headerStyle">
-        <view class="flex items-center" style="gap: 8px">
-          <text v-if="isReceiptSettled" class="inline-flex items-center" :style="stampStyle">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="margin-left: 4px">{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</text>
-          </text>
-          <text class="nx-receipt-line" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ receiptStatus }} · {{ receiptTime }}</text>
+  <NxSheet :open="open" :title="title ?? receiptTitle" native-back class="nx-receipt-modal-root" :class="{ 'nx-receipt-modal-root--placeholder': state !== 'ready' }" style="z-index: 1000" @close="emit('close')">
+      <!-- Header: settled tag and status line; while the detail loads, one still bar (03.4, no loading loop). -->
+      <view v-if="state === 'ready' || state === 'loading'" :style="headerStyle">
+        <view v-if="state === 'loading'" class="nx-receipt-skeleton" style="width: 180px; height: 14px" aria-hidden="true" />
+        <view v-else class="flex items-center" style="gap: 8px">
+          <NxTag v-if="isReceiptSettled" tone="success" class="nx-receipt-stamp"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</NxTag>
+          <text class="nx-receipt-line" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ receiptStatus }} · {{ receiptTime }}</text>
         </view>
       </view>
 
-      <view class="nx-receipt-body" :style="bodyStyle">
-      <view :style="summaryStyle">
-        <text class="block" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ copy.result }}</text>
-        <text class="nx-receipt-line tabular-nums" :title="summaryAmount" style="font-family: var(--font-amount); margin-top:6px;font-size:26px;line-height:1.3;font-weight:500">{{ summaryAmount }}</text>
+      <view class="nx-receipt-body" :style="bodyStyle" :aria-busy="state === 'loading' ? 'true' : undefined">
+      <!-- An unavailable receipt states the result only, without an amount (04.5). -->
+      <view v-if="state !== 'unavailable' && summaryLines.length" :style="summaryStyle">
+        <text class="block" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-3)">{{ copy.result }}</text>
+        <view class="nx-receipt-amounts">
+          <text v-for="line in summaryLines" :key="line.unit" class="nx-receipt-amount">{{ line.sign }}{{ line.whole }}<text class="nx-receipt-amount__fraction">{{ line.fraction }}</text><text class="nx-receipt-amount__unit">{{ line.unit }}</text></text>
+        </view>
       </view>
+      <view v-if="state === 'loading'" aria-hidden="true">
+        <view v-for="(widths, si) in loadingRows" :key="si" :style="sectionStyle(si)">
+          <view class="nx-receipt-skeleton" :style="{ width: si ? '64px' : '84px', height: '14px', margin: '2px 0 14px' }" />
+          <view v-for="(width, ri) in widths" :key="ri" class="nx-receipt-row" :style="rowStyle">
+            <view class="nx-receipt-skeleton" style="width: 56px; height: 12px" />
+            <view class="nx-receipt-skeleton" :style="{ justifySelf: 'end', width: width + 'px', height: '12px' }" />
+          </view>
+        </view>
+      </view>
+      <!-- Read failure recovers on its own (03 §3.5.2): warning icon and the retry line, no button. -->
+      <view v-else-if="state === 'failed' || state === 'unavailable'" class="nx-receipt-state" role="status">
+        <view class="nx-receipt-state__icon" :class="{ 'nx-receipt-state__icon--warning': state === 'failed' }" aria-hidden="true">
+          <svg v-if="state === 'failed'" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+          <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="m9.5 12.5 5 5" /><path d="m14.5 12.5-5 5" /></svg>
+        </view>
+        <text class="nx-receipt-state__title">{{ state === 'failed' ? stateCopy.loadFailedTitle : stateCopy.unavailable }}</text>
+        <text v-if="state === 'failed'" class="nx-receipt-state__hint">{{ stateCopy.loadFailedHint }}</text>
+      </view>
+      <template v-else>
       <!-- Only identifiers and hashes use monospace; raw values remain unchanged. -->
       <view v-for="(sec, si) in visibleSections" :key="si" :style="sectionStyle(si)">
         <text class="block" :style="sectionHeadStyle">{{ sec.heading || sectionHeading(sec) }}</text>
@@ -38,7 +58,7 @@
           class="nx-receipt-row"
           :style="rowStyle"
         >
-          <text class="nx-receipt-line" :title="fieldLabel(row.k)" style="color:var(--v5-ink-2)">{{ fieldLabel(row.k) }}</text>
+          <text class="nx-receipt-line" :title="fieldLabel(row.k)" style="color:var(--v5-ink-3)">{{ fieldLabel(row.k) }}</text>
           <view v-if="row.divider" :style="dividerStyle" />
           <view
             v-else-if="row.copyValue"
@@ -52,10 +72,10 @@
             @keydown.space.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
           >
             <text class="nx-receipt-line" style="font-family:var(--font-jet-mono),ui-monospace,monospace;color:var(--v5-ink)">{{ receiptLine(row.v) }}</text>
-            <text v-if="row.hint" class="nx-receipt-line" style="color:var(--v5-ink-2);font-size:12px">({{ row.hint }})</text>
+            <text v-if="row.hint" class="nx-receipt-line" style="color:var(--v5-ink-3);font-size:12px">({{ row.hint }})</text>
             <!-- Check when just-copied, else Copy affordance (mirrors prototype RowCopy) -->
             <svg v-if="copiedField === (row.copyKey ?? row.k)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
-            <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+            <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
           <text v-else class="nx-receipt-line text-right" :style="valueStyle(row)" :title="row.v" @longpress="row.v && copyRow(row.k, row.v)">{{ receiptLine(row.v) }}</text>
         </view>
@@ -63,21 +83,27 @@
         <view v-if="sec.checks" style="margin-top: 4px">
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
-            <text class="nx-receipt-line" :title="chk" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ receiptLine(chk) }}</text>
-            <text class="nx-receipt-line" style="flex-shrink:0;margin-left:auto;font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ t.uiChrome.passed }}</text>
+            <text class="nx-receipt-line" :title="chk" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink)">{{ receiptLine(chk) }}</text>
+            <text class="nx-receipt-line" style="flex-shrink:0;margin-left:auto;font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-3)">{{ t.uiChrome.passed }}</text>
           </view>
         </view>
       </view>
+      </template>
       </view>
+      <template v-if="viewAllLabel" #footer>
+        <view class="nx-receipt-view-all" role="link" tabindex="0" @click="emit('viewAll')" @keydown.enter.prevent="emit('viewAll')" @keydown.space.prevent="emit('viewAll')"><text class="nx-after-chevron">{{ viewAllLabel }}</text></view>
+      </template>
   </NxSheet>
 </template>
 
 <script setup lang="ts">
 import { formatDisplayDateTime } from "@/lib/display-date";
-import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { creditedAmounts, formatAmount } from "@/lib/amount-display";
 import { receiptLine } from "@/lib/receipt-line";
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import { earningCreditCopy } from "@/i18n/earning-credit";
 import type { Receipt, ReceiptDetails } from "@/mock/receipt";
 import { shortenHex } from "@/mock/receipt";
 import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
@@ -88,8 +114,20 @@ import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { uiLocale, type UiLocale } from "@/i18n";
 
-const props = defineProps<{ receipt: Receipt | CanonicalComputeReceipt | null }>();
-const emit = defineEmits<{ (e: "close"): void }>();
+const props = withDefaults(defineProps<{
+  receipt: Receipt | CanonicalComputeReceipt | null;
+  /** Sheet title; without it the receipt kind's own title (receipts page). */
+  title?: string;
+  /** For a sheet opened before its receipt is read (04.5): loading shows the message's amount and still placeholders;
+   *  failed keeps that amount above the automatic-retry notice; unavailable states the result without an amount. */
+  state?: "ready" | "loading" | "failed" | "unavailable";
+  /** The message's own amount, shown while the detail is loading or failed. */
+  creditedAmount?: { usdt: string | null; uvt: string | null };
+  /** Fixed footer text link into the next level (03 §3.1), e.g. 查看全部收益; emits viewAll. */
+  viewAllLabel?: string;
+}>(), { state: "ready" });
+const emit = defineEmits<{ (e: "close"): void; (e: "viewAll"): void }>();
+const open = computed(() => props.receipt !== null || props.state !== "ready");
 
 const t = useT();
 const locale = useLocaleStore();
@@ -107,6 +145,9 @@ const copyByLocale = {
 };
 const receiptLocale = computed(() => uiLocale(locale.code));
 const copy = computed(() => copyByLocale[receiptLocale.value]);
+const stateCopy = computed(() => earningCreditCopy[receiptLocale.value]);
+// Still placeholders for two sections while the detail loads (value widths only vary the bars).
+const loadingRows = [[132, 120, 80, 170], [60]];
 const fieldLabels: Record<UiLocale, Record<string, string>> = {
   zh: { receipt_no:"凭证编号", task_no:"作业编号", task_type:"作业类型", task_name:"作业名称", model:"模型", client:"委托方", status:"结算状态", device:"设备", device_instance:"设备编号", device_type:"设备型号", gpu:"显卡", vram:"显存", started_at:"开始时间", duration:"执行时长", completed_at:"完成时间", reward_usdt:"USDT 收益", reward_nex:"UVT 奖励", proof_hash:"证明哈希", receipt_hash:"证明哈希", compliance_id:"核验编号", type:"类型", program:"核验程序", authority:"核验方", paired_wallet:"关联钱包", network:"网络", signature:"签名", deposit:"存入金额", purpose:"用途", credited:"到账金额", tx_hash:"交易哈希", block:"区块编号", verified_at:"核验时间", job_id:"作业编号", client_addr:"委托方地址", gpu_fingerprint:"显卡标识", vram_peak:"峰值显存 / 总显存", energy:"耗电量", unit_price:"单价", units:"计费数量", gross:"总收益", network_fee:"网络费用", net_paid:"到账金额", resolution:"分辨率", batch_size:"批次大小", output:"产出", clip_duration:"视频时长", fps:"帧率", frames:"帧数", model_size:"模型规模", input_tokens:"输入词元", output_tokens:"输出词元", latency:"响应延迟", training_steps:"训练步数", final_loss:"最终损失值", chunks:"文本分块", total_tokens:"总词元数", embedding_dim:"向量维度", audio_duration:"音频时长", wer:"词错误率", language:"识别语言" },
   en: { receipt_no:"Receipt number", task_no:"Job number", task_type:"Job type", task_name:"Job name", model:"Model", client:"Client", status:"Settlement status", device:"Device", device_instance:"Device number", device_type:"Device model", gpu:"GPU", vram:"Video memory", started_at:"Started", duration:"Duration", completed_at:"Completed", reward_usdt:"USDT reward", reward_nex:"UVT reward", proof_hash:"Proof hash", receipt_hash:"Receipt hash", compliance_id:"Verification number", type:"Type", program:"Verification program", authority:"Verifier", paired_wallet:"Linked wallet", network:"Network", signature:"Signature", deposit:"Deposited amount", purpose:"Purpose", credited:"Credited amount", tx_hash:"Transaction hash", block:"Block number", verified_at:"Verified", job_id:"Job number", client_addr:"Client address", gpu_fingerprint:"GPU identifier", vram_peak:"Peak / total memory", energy:"Energy used", unit_price:"Unit price", units:"Billed units", gross:"Gross reward", network_fee:"Network fee", net_paid:"Credited amount", resolution:"Resolution", batch_size:"Batch size", output:"Output", clip_duration:"Clip duration", fps:"Frame rate", frames:"Frame count", model_size:"Model size", input_tokens:"Input tokens", output_tokens:"Output tokens", latency:"Response latency", training_steps:"Training steps", final_loss:"Final loss", chunks:"Text chunks", total_tokens:"Total tokens", embedding_dim:"Embedding dimensions", audio_duration:"Audio duration", wer:"Word error rate", language:"Detected language" },
@@ -139,7 +180,6 @@ const isSimulatedNexReceipt = computed(() => props.receipt != null && isCanonica
   && isSimulatedReceipt.value && props.receipt.rewardUsdt === 0 && props.receipt.rewardNex > 0);
 const receiptTitle = computed(() => isLegacyVerification.value ? t.value.receipt.typeWalletPairing
   : isSimulatedReceipt.value ? copy.value.taskReceipt : t.value.receipt.proofOfCompute);
-const stampColor = computed(() => (isLegacyVerification.value ? "var(--v5-tech-cyan)" : "var(--v5-brand)"));
 const isReceiptSettled = computed(() => {
   const r = props.receipt;
   return !!r && (!isCanonicalComputeReceipt(r) || /^(POSTED|SUCCESS|SETTLED|CREDITED|PAID)$/.test(r.earningStatus.toUpperCase()));
@@ -161,11 +201,16 @@ const receiptTime = computed(() => {
   if (!isCanonicalComputeReceipt(r)) return fmtDate(r.settledAt);
   return r.settledAt === null ? `${fieldLabel("completed_at")} ${fmtDate(r.completedAt)}` : fmtDate(r.settledAt);
 });
-const summaryAmount = computed(() => {
+// One line per credited asset, composed per 01.2: whole part ink, fraction and unit ink-3. While the detail is loading
+// or failed, the message's own amount stands in.
+const summaryLines = computed(() => {
   const r = props.receipt;
-  if (!r) return "";
-  const amount = isCanonicalComputeReceipt(r) ? formatGroupedAmount(isSimulatedNexReceipt.value ? r.rewardNex : r.rewardUsdt, "full") : formatGroupedAmount(r.netPaid);
-  return (amount.startsWith("-") || amount === "0" || amount === "0.00" ? "" : "+") + amount + (isSimulatedNexReceipt.value ? " UVT" : " USDT");
+  const lines = props.state !== "ready" ? (props.creditedAmount ? creditedAmounts(props.creditedAmount.usdt, props.creditedAmount.uvt) : [])
+    : !r ? [] : isCanonicalComputeReceipt(r) ? creditedAmounts(r.rewardUsdt, r.rewardNex) : creditedAmounts(r.netPaid, null);
+  return lines.map(({ sign, value, unit }) => {
+    const [whole, fraction] = value.split(".");
+    return { sign, whole, fraction: fraction ? "." + fraction : "", unit };
+  });
 });
 
 // ── tap-to-copy (matches prototype RowCopy: copy on tap, transient ✓ icon) ──
@@ -322,7 +367,7 @@ const sections = computed<DescSection[]>(() => {
       {
         rows: [
           ...(!isSimulatedNexReceipt.value ? [{ k: "reward_usdt", v: `+${formatAmount(r.rewardUsdt, "full")} USDT`, accent: true, strong: true }] : []),
-          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex, "full")} UVT`, accent: true, strong: isSimulatedNexReceipt.value }] : []),
+          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex, "full")} UVT`, accent: true, strong: true }] : []),
         ],
       },
       {
@@ -420,9 +465,9 @@ const sections = computed<DescSection[]>(() => {
   ];
 });
 
-// The main amount is already presented above the sections.
+// The main amounts are already presented above the sections; a row without a value and a section without rows are not shown.
 const visibleSections = computed(() => sections.value
-  .map(section => ({ ...section, rows: section.rows.filter(row => !row.strong) }))
+  .map(section => ({ ...section, rows: section.rows.filter(row => !row.strong && (row.divider || !!row.copyValue || !!row.v?.trim())) }))
   .filter(section => section.rows.length > 0 || section.checks?.length));
 function sectionHeading(section: DescSection): string {
   const first = section.rows[0]?.k ?? "";
@@ -453,20 +498,6 @@ const headerStyle: CSSProperties = {
 };
 const bodyStyle: CSSProperties = { paddingBottom: "16px" };
 const summaryStyle: CSSProperties = { padding: "20px", borderBottom: "1px solid var(--v5-border)" };
-const stampStyle = computed<CSSProperties>(() => ({
-  alignItems: "center",
-  flexShrink: 0,
-  whiteSpace: "nowrap",
-  // Prototype: px-1.5 py-0.5 = 2px 6px, rounded-md = 6px, rotate(-4deg).
-  padding: "2px 6px",
-  borderRadius: "6px",
-  fontSize: "12px",
-  fontWeight: 600,
-  letterSpacing: "0.08em",
-  color: stampColor.value,
-  background: `color-mix(in srgb, ${stampColor.value} 8%, transparent)`,
-  transform: "rotate(-4deg)",
-}));
 function sectionStyle(si: number): CSSProperties {
   return {
     padding: "16px 20px",
@@ -476,7 +507,7 @@ function sectionStyle(si: number): CSSProperties {
 const sectionHeadStyle: CSSProperties = {
   marginBottom: "10px",
   fontSize: "14px",
-  fontWeight: 600,
+  fontWeight: 500,
   color: "var(--v5-ink)",
 };
 // Prototype Section uses `space-y-1` = 4px gap between rows. `padding: 2px 0`
@@ -491,7 +522,7 @@ const dividerStyle: CSSProperties = {
 function valueStyle(row: DescRow): CSSProperties {
   return {
     fontFamily: identifierFields.has(row.k) ? "var(--font-jet-mono), ui-monospace, monospace" : "var(--font-v5)",
-    color: row.muted ? "var(--v5-ink-2)" : "var(--v5-ink)",
+    color: row.muted ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: row.strong ? 600 : 400,
   };
 }
@@ -501,6 +532,27 @@ const copyRowStyle: CSSProperties = { gap: "6px", minHeight: "44px", minWidth: 0
 
 <style scoped>
 .nx-receipt-modal-root :deep(.nx-sheet__body) { padding: 0; }
+/* Before the receipt is read the sheet keeps its full height, so the content does not jump when it arrives (03.4). */
+.nx-receipt-modal-root--placeholder :deep(.nx-sheet) { height: min(88%, calc(100% - var(--nx-overlay-top))); }
+.nx-receipt-modal-root--placeholder :deep(.nx-sheet__body) { flex: 1; }
+.nx-receipt-modal-root :deep(.nx-sheet__footer) { display: flex; justify-content: center; padding: 4px 20px calc(4px + var(--nx-overlay-safe-bottom)); }
+.nx-receipt-stamp { gap: 4px; }
+.nx-receipt-amounts { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+/* Main amount (01.2): Montserrat digits, whole part ink; fraction and unit auxiliary; a unit under 30px uses the auxiliary-figure role. */
+.nx-receipt-amount { display: block; white-space: nowrap; color: var(--v5-ink); font: 500 26px/1.3 var(--font-amount); font-variant-numeric: tabular-nums; }
+.nx-receipt-amount__fraction { color: var(--v5-ink-3); }
+.nx-receipt-amount__unit { margin-left: 4px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-receipt-skeleton { border-radius: 6px; background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
+.nx-receipt-state { display: flex; flex-direction: column; align-items: center; padding: 40px 24px 24px; text-align: center; }
+.nx-receipt-state__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; color: var(--v5-ink-3); background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
+.nx-receipt-state__icon--warning { color: var(--v5-warning-ink); background: var(--v5-warning-soft); }
+.nx-receipt-state__title { display: block; margin-top: 12px; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); text-wrap: balance; }
+/* 空态说明 13/18 (10.1), as in EmptyState. */
+.nx-receipt-state__hint { display: block; max-width: 260px; margin-top: 6px; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); text-wrap: pretty; }
+.nx-receipt-view-all { display: inline-flex; align-items: center; min-height: 44px; color: var(--v5-ink-3); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); white-space: nowrap; cursor: pointer; }
+.nx-receipt-view-all > text { white-space: nowrap; }
+.nx-receipt-view-all:active { opacity: .6; }
+.nx-receipt-view-all:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 8px; }
 .nx-receipt-line {
   display: block;
   min-width: 0;
