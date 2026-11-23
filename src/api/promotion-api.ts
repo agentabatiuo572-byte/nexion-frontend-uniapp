@@ -31,6 +31,19 @@ export function checkoutQuoteBlock(cause: unknown, source: 'quote' | 'eligibilit
   }
   return null;
 }
+export type CheckoutCreateBlock = Exclude<CheckoutQuoteBlock, 'unavailable'> | 'promotionUnavailable' | 'promotionIneligible';
+
+/** Only explicit purchase refusals settle a create. Transport and idempotency errors still need readback. */
+export function checkoutCreateBlock(cause: unknown): CheckoutCreateBlock | null {
+  if (!(cause instanceof ApiError)) return null;
+  if (isApiRefusal(cause, 409, 'PURCHASE_GATE_BLOCKED')) return 'purchaseConditions';
+  if (isApiRefusal(cause, 409, 'PRODUCT_NOT_AVAILABLE', 'PRODUCT_NOT_RELEASED', 'BUNDLE_PRODUCT_NOT_RELEASED')) return 'productMissing';
+  if (isApiRefusal(cause, 409, 'PROMOTION_ELIGIBILITY_CHANGED')) return 'promotionIneligible';
+  if (isApiRefusal(cause, 409, 'PROMOTION_CAPACITY_UNAVAILABLE')) return 'promotionUnavailable';
+  if (isApiRefusal(cause, 409, 'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE')) return 'capacity';
+  const block = checkoutQuoteBlock(cause);
+  return block === 'unavailable' ? null : block;
+}
 export type PromotionOperation='createOrder'|'createBundle'|'payOrder'|'cancelOrder';
 let quoteSequence=0;
 // IDEMPOTENCY-FRESH-OK: Each explicit quote read is a new estimate without reservation; transport retries retain this request's key.
