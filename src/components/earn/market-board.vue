@@ -23,10 +23,10 @@
         <text v-if="!priceIndex.length && marketState === 'empty'" class="earn-market__status">{{ t.empty.listTitle }}</text>
         <view v-else-if="!priceIndex.length" class="earn-market__grid" aria-hidden="true" data-earn-market-placeholder="true">
           <view v-for="n in 3" :key="n" class="earn-market__tile earn-market__tile--placeholder"><view class="earn-market__face earn-market__face--on">
-            <view class="earn-market__bar" style="width: 70%; margin-block: 4px" />
-            <view class="earn-market__bar" style="width: 40%; margin-block: 4px" />
+            <view class="earn-market__bar" style="width: 70%; margin-block: var(--v5-space-1)" />
+            <view class="earn-market__bar" style="width: 40%; margin-block: var(--v5-space-1)" />
             <view class="earn-market__bar earn-market__bar--price" />
-            <view class="earn-market__bar" style="width: 36%; margin-block: 4px" />
+            <view class="earn-market__bar" style="width: 36%; margin-block: var(--v5-space-1)" />
             <view class="earn-market__spark" />
           </view></view>
         </view>
@@ -146,7 +146,8 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
 ];
 
 // Which of the three non-content states the board is in when a section has no rows (03 §3.4).
-const marketState = computed(() => !remoteApiEnabled || app.homeTruthStatus === "ready" ? "empty" : app.homeTruthStatus === "error" ? "failed" : "loading");
+// A succeeded read stays the answer while a refresh runs or fails (03 §3.4), so an empty board does not turn back into placeholders.
+const marketState = computed(() => !remoteApiEnabled || app.homeTruth ? "empty" : app.homeTruthStatus === "error" ? "failed" : "loading");
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
@@ -182,7 +183,8 @@ function spokenWorkload(w: WorkloadPrice): string {
   const signed = (delta: number) => `${shownDelta(delta) > 0 ? "+" : shownDelta(delta) < 0 ? "−" : ""}${Math.abs(shownDelta(delta)).toFixed(1)}%`;
   const delta = w.delta === null ? "—" : signed(w.delta);
   const flagship = w.flagshipDelta === null ? "" : `, ${en.market.flagshipRow} ${signed(w.flagshipDelta)}`;
-  return `${copy.name} ${copy.unit}: ${w.price === null ? "—" : formatUsd(w.price, "detail")}, ${delta}${flagship}`;
+  // Each value is read with its column name, so an unknown "—" is still tied to price or change.
+  return `${copy.name} ${copy.unit}: ${en.home.mbColPrice} ${w.price === null ? "—" : formatUsd(w.price, "detail")}, ${en.home.mbCol24h} ${delta}${flagship}`;
 }
 // The direction follows the shown one-decimal value: a change that rounds to 0.0 is flat, anything else keeps its sign
 // (−0.04 → 0.0%, ±0.05 → ±0.1%), as on the home market table.
@@ -232,7 +234,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__updated { display: inline-flex; align-items: center; gap: 6px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); }
 /* Card inset 16px (01 §1.3). */
-.earn-market__card { padding: 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.earn-market__card { padding: var(--ui-space-inset); border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .earn-market__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 /* Captions, tile name, unit and change use the aux figure role 12/16 (10 §10.1): words 400, the change 500. */
 .earn-market__caption { display: block; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
@@ -242,7 +244,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 /* Every face of a tile shares one grid cell, so the tile keeps the tallest face's height. A swap shows the next face
    at once on all three tiles, like a quote board's tick: no fade, never a blank or half-transparent tile. */
 /* An info block inside the card: 12px radius (01 §1.3). */
-.earn-market__tile { display: grid; min-width: 0; padding: 10px 10px 8px; border-radius: 12px; background: var(--v5-surface-2); }
+.earn-market__tile { display: grid; min-width: 0; padding: 10px 10px 8px; border-radius: var(--v5-radius-s); background: var(--v5-surface-2); }
 .earn-market__face { grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0; visibility: hidden; }
 .earn-market__face--on { visibility: visible; }
 [data-theme="light"] .earn-market__tile { background: var(--v5-bg); }
@@ -279,10 +281,11 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 /* The bar is the shared thin progress (.nx-progress in tokens.css); the ranking only sets its width and the device hue. */
 .earn-ranking-value__track { width: 96px; --nx-progress-hue: var(--v5-tech-cyan); }
 /* Still placeholders (no shimmer) in the shape of the tiles and rows they stand for. */
-.earn-market__bar { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
-.earn-market__bar--price { width: 62%; height: 14px; margin-top: 11px; margin-bottom: 3px; }
-.earn-market__bar--art { width: 34px; height: 28px; border-radius: 8px; justify-self: center; }
-.earn-ranking-row--placeholder .earn-ranking-value { gap: 8px; }
+.earn-market__bar { height: 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+/* 12 + 16 = the price line's 8px gap and 20px line box. */
+.earn-market__bar--price { width: 62%; height: 16px; margin-top: var(--v5-space-3); }
+.earn-market__bar--art { width: 34px; height: 28px; border-radius: var(--v5-radius-s); justify-self: center; }
+.earn-ranking-row--placeholder .earn-ranking-value { gap: var(--v5-space-2); }
 @media (max-width: 374px) {
   .earn-market__tile { padding: 10px 8px 8px; }
 }
