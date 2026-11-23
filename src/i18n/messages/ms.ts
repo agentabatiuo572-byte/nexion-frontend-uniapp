@@ -468,7 +468,6 @@ export const ms: Messages = {
     bankMethodHint: "Terima VND dalam akaun bank Vietnam anda",
     routeFrom: "Dompet UVEL",
     chooseNetwork: "Pilih rangkaian pengeluaran",
-    chooseNetworkHint: "Sila pilih rangkaian pengeluaran.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Yuran rangkaian ${fee}",
     noAddress: "Alamat belum ditetapkan",

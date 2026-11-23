@@ -3,7 +3,6 @@
     <SubPageHeader back="/pages/me/wallet-withdraw-method" :title="t.bankWithdrawal.chooseNetwork" />
     <!-- One route card per USDT network the server currently opens; tapping one opens the withdraw page with that network fixed. -->
     <view class="withdraw-networks">
-      <text class="intro">{{ t.bankWithdrawal.chooseNetworkHint }}</text>
       <view v-for="item in cards" :key="item.id" class="method" role="button" tabindex="0" :data-testid="`withdraw-network-${item.label}`" :aria-label="item.accessibleName" :aria-disabled="loading" @click="open(item.id)" @keydown.enter.prevent="open(item.id)" @keydown.space.prevent="open(item.id)">
         <view class="method-top">
           <view class="method-icon" aria-hidden="true"><view class="method-coin"><UsdtCoin /></view></view>
@@ -94,7 +93,6 @@ function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/page
 
 <style scoped>
 .withdraw-networks { padding: 0 var(--v5-space-4) var(--v5-space-8); color: var(--v5-ink); }
-.intro { display: block; margin: -1px 4px 12px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .method { position: relative; display: block; margin-bottom: var(--v5-space-3); padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); cursor: pointer; }
 .method-top { display: flex; align-items: center; gap: 14px; }
 .method-icon { display: grid; place-items: center; flex: none; width: 48px; height: 48px; }

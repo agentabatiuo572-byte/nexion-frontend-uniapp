@@ -468,7 +468,6 @@ export const kk: Messages = {
     bankMethodHint: "VND Вьетнамдағы банк шотыңызға",
     routeFrom: "UVEL әмияны",
     chooseNetwork: "Шығару желісін таңдау",
-    chooseNetworkHint: "Шығару желісін таңдаңыз.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Желі комиссиясы ${fee}",
     noAddress: "Мекенжай орнатылмаған",

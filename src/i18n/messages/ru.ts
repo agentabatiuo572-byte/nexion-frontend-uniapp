@@ -468,7 +468,6 @@ export const ru: Messages = {
     bankMethodHint: "VND на банковский счёт во Вьетнаме",
     routeFrom: "Кошелёк UVEL",
     chooseNetwork: "Выбор сети вывода",
-    chooseNetworkHint: "Выберите сеть для вывода.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Комиссия сети ${fee}",
     noAddress: "Адрес не указан",

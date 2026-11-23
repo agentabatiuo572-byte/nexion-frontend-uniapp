@@ -128,7 +128,6 @@ export const zh: Messages = {
     usdtMethodHint: "USDT 转入钱包地址", bankMethod: "银行卡", bankMethodHint: "VND 转入越南银行账户",
     routeFrom: "UVEL 钱包",
     chooseNetwork: "选择提现网络",
-    chooseNetworkHint: "请选择提现网络。",
     usdtNetwork: "USDT（{network}）",
     networkFee: "网络费 ${fee}",
     noAddress: "未设置地址",

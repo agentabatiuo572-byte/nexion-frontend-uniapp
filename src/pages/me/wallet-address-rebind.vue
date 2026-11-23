@@ -135,7 +135,7 @@
       </view>
 
       <!-- ── 默认态:当前地址 + 更换入口 + 历史(规格 ⑤)── -->
-      <view v-else class="mx-4" style="padding: 0 2px">
+      <view v-else class="mx-4">
         <!-- 冻结横幅(hh:mm:ss 真倒计时) -->
         <view v-if="frozenNow" class="nx-rebind-freeze-banner mt-3 flex items-start" :style="freezeBannerStyle">
           <view class="grid place-items-center shrink-0" :style="freezeIconStyle">
@@ -146,8 +146,8 @@
           </view>
         </view>
 
-        <view style="margin-top: 16px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.currentLabel }}</text></view>
-        <view class="nx-glass-card mt-2" :style="currentCardStyle">
+        <text class="rb-k" style="margin-top: 16px">{{ t.addrRebind.currentLabel }}</text>
+        <view class="nx-glass-card" :style="currentCardStyle">
           <view class="flex items-center" style="gap: 8px">
             <text class="font-mono flex-1 min-w-0" style="font-size: 13px; color: var(--v5-ink); white-space: nowrap">{{ maskAddressMid(current?.address ?? '') }}</text>
             <view v-if="current?.source === 'migrated'" class="shrink-0 grid place-items-center" :style="migratedBadgeStyle">
@@ -193,15 +193,6 @@
             </view>
           </view>
         </view>
-        <view
-          v-else-if="networkAvailable"
-          class="nx-rebind-change-cta w-full grid place-items-center active:opacity-90"
-          :style="primaryCtaStyle"
-          role="button" tabindex="0"
-          @click="startChange"
-        >
-          <text :style="ctaTextStyle">{{ t.addrRebind.changeCta }}</text>
-        </view>
 
         <!-- 历史地址(只读,含来源与停用时间;规格 ⑥「查看历史地址」展开区) -->
         <view v-if="history.length > 0" style="margin-top: 20px">
@@ -219,10 +210,13 @@
             </view>
           </view>
         </view>
+        <view v-if="changeAvailable" class="rb-bar-space" />
       </view>
     </view>
     <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <template #pageFixed>
+      <!-- 页面主操作在底部操作栏(04 DS-30):能更换时一个主要按钮 -->
+      <view v-if="changeAvailable" class="rb-bar nx-glass-bar"><NxButton class="rb-bar__single nx-rebind-change-cta" variant="primary" :label="t.addrRebind.changeCta" @click="startChange" /></view>
       <view v-if="step === 'form'" class="rb-bar nx-glass-bar">
         <view class="nx-rebind-cancel-link rb-bar__btn rb-bar__btn--ghost nx-tray-text" role="button" tabindex="0" @click="cancelForm" @keydown.enter.prevent="cancelForm" @keydown.space.prevent="cancelForm">
           <text>{{ t.addrRebind.cancelCta }}</text>
@@ -254,6 +248,7 @@ import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
@@ -365,6 +360,8 @@ const effectiveMode = computed<"add" | "change">(() => (current.value ? mode.val
 const changeBlock = computed(() => {
   return payout.changeBlockReason(network.value, projectedServerNow.value);
 });
+// The change action sits in the bottom bar only while a change can start (no in-flight withdrawal, cooldown or unknown time).
+const changeAvailable = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value);
 function startChange() {
   // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
   if (!networkAvailable.value || changeBlock.value) return;
@@ -835,13 +832,6 @@ function finish() {
 }
 
 // ── styles ──
-const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
 // 输入框零描边,贴页面底(容器无底色 → surface L1,与既有子页同型)。
 const addressInputStyle: CSSProperties = {
   width: "100%",
@@ -973,7 +963,7 @@ const successRowValStyle: CSSProperties = {
 <style scoped>
 /* P-45 address: network radio rows, address well with paste, plain safety note, fixed actions. */
 .rb-nets-wrap { margin-top: 15px; }
-.rb-k { display: block; margin: 0 4px 8px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.rb-k { display: block; margin: 0 4px 8px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .rb-nets { display: flex; flex-direction: column; gap: 8px; }
 .rb-net { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 16px; box-sizing: border-box; border-radius: var(--v5-radius-m); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
 .rb-net:active { transform: scale(.97); }
@@ -996,6 +986,7 @@ const successRowValStyle: CSSProperties = {
 .rb-lock { display: flex; align-items: center; gap: 8px; margin: 12px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .rb-lock > svg { flex: none; }
 .rb-bar-space { height: 110px; }
+.rb-bar__single { display: flex; flex: 1 1 0; }
 .rb-bar { position: absolute; z-index: 36; display: flex; }
 .rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
 .rb-bar__btn--on, .rb-bar__btn--ghost { cursor: pointer; }

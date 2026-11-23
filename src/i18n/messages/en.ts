@@ -127,7 +127,6 @@ export const en = {
     usdtMethodHint: "Send USDT to your wallet address", bankMethod: "Bank account", bankMethodHint: "Receive VND in your Vietnamese bank account",
     routeFrom: "UVEL wallet",
     chooseNetwork: "Choose withdrawal network",
-    chooseNetworkHint: "Select a withdrawal network.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Network fee ${fee}",
     noAddress: "No address set",
