@@ -10,7 +10,7 @@
 <template>
   <view>
     <SectionHeader :title="t.store.secNetworkLadder" :count="t.store.secNetworkLadderCount.replace('5', String(tiers.length))" />
-    <view class="nx-glass-card ladder-card">
+    <view class="nx-glass-card ladder-card" :style="{ '--ladder-figure-ch': figureChars }">
       <view
         v-for="(tier, index) in tiers"
         :key="tier.id"
@@ -84,6 +84,9 @@ const tiers = computed<Tier[]>(() => {
   return rows.map((row) => ({ ...row, width: maximum > 0 && row.amount > 0 ? Math.max(1, row.amount / maximum * 100) : 0 }));
 });
 
+// The widest figure sets the shared yield column (see .ladder-yield in the styles).
+const figureChars = computed(() => Math.max(1, ...tiers.value.map((tier) => tier.y.length)));
+
 // Same entrance as every .nx-progress row (07 §7.1.1): .nx-viz-grow once in view; rows are drawn bottom-up, so the
 // 80ms stagger counts from the bottom row (the phone) upward.
 function barStyle(tier: Tier, index: number): CSSProperties {
@@ -97,7 +100,7 @@ function yieldColor(tier: Tier): string {
 
 <style scoped>
 .ladder-card { display: flex; flex-direction: column-reverse; gap: var(--v5-space-1); padding: var(--ui-space-inline) var(--ui-space-inset); border-radius: var(--nx-glass-radius); background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); }
-.ladder-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 112px; align-items: center; column-gap: var(--ui-space-inline); min-height: 32px; }
+.ladder-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; column-gap: var(--ui-space-inline); min-height: 32px; }
 .ladder-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--v5-space-1); min-width: 0; }
 .ladder-name { white-space: nowrap; }
 .ladder-you { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand-2-ink); }
@@ -105,8 +108,11 @@ function yieldColor(tier: Tier): string {
    12% to 60% toward an end dot. Tier names are the row labels: list-subtitle role (10 §10.1). */
 .ladder-label { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 /* Side-by-side yield estimates use the inline-figure role (10 §10.1 行内数值, JetBrains Mono). */
-.ladder-yield { overflow: hidden; text-align: right; white-space: nowrap; font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
+.ladder-yield { text-align: right; white-space: nowrap; font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .ladder-unit { font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-/* uni <text> wraps on its own (pre-line); a range such as $5.5–6.9 stays on one line in the 112px column. */
+/* uni <text> wraps on its own (pre-line), so the figure and unit stay on one line. Every row's figure is as wide as the
+   longest one (JetBrains Mono: one ch per character), so the yield column matches in each row and the bars stay
+   aligned whatever the range ($2,700–3,300 included); nothing is clipped (01 §1.2). */
 .ladder-yield text { white-space: nowrap; }
+.ladder-yield .nx-num-metric { display: inline-block; min-width: calc(var(--ladder-figure-ch, 6) * 1ch); }
 </style>

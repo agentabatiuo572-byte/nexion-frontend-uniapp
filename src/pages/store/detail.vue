@@ -114,9 +114,10 @@
           <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionDetailHref(id))"><text>{{ t.promotion.ordinary }}</text></view>
         </view>
 
-        <!-- Estimated returns: every product uses the Cloud Share card (user 2026-11-23). Each figure shows the catalog's
-             range when it sends one and its single estimate otherwise; all follow the selected quantity. -->
-        <view v-if="isShare || !activityId" class="mx-4 mt-3 nx-glass-card detail-returns" data-testid="detail-returns">
+        <!-- Estimated returns: every product uses the Cloud Share card (user 2026-11-23), except a detail opened from an
+             activity, which is an activity page (04 §4.6). Each figure shows the catalog's range when it sends one and its
+             single estimate otherwise; all follow the selected quantity. -->
+        <view v-if="!activityId" class="mx-4 mt-3 nx-glass-card detail-returns" data-testid="detail-returns">
           <text class="detail-returns__title">{{ t.bundle.estimatedDaily }}</text>
           <text v-if="isShare" class="detail-returns__description">{{ t.store.shareFlexibleDescription }}</text>
           <view class="detail-returns__rows">
@@ -861,15 +862,17 @@ const faqQStyle: CSSProperties = {
    as a metric (01 §1.2); the short label stays in the interface font. */
 .detail-vs-mult { padding: var(--v5-space-1) 10px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-v5); white-space: nowrap; }
 .detail-vs-mult__value { font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
-/* Estimated returns: content card, 16px inset (01 §1.3), role variables only (10 §10.1). Field names in supporting ink
-   (01 §1.1.1 rule 1); the daily USDT figure is the card's one brand figure (rule 4); figures in JetBrains Mono (01 §1.2). */
+/* Estimated returns: content card, 16px inset (01 §1.3), role variables only (10 §10.1). Two text weights and three
+   sizes per card (10 §10.1): the title takes the subheading role (15, 500), figures the list-title size in JetBrains
+   Mono like row prices (15, 500), text 400 at 13/12. Field names in supporting ink (01 §1.1.1 rule 1); the daily USDT
+   figure is the card's one brand figure (rule 4). A detail opened from an activity is an activity page: no card (04 §4.6). */
 .detail-returns { padding: var(--ui-space-inset); }
-.detail-returns__title { display: block; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.detail-returns__title { display: block; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
 .detail-returns__description { display: block; margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .detail-returns__rows { display: flex; flex-direction: column; gap: var(--v5-space-3); margin: var(--v5-space-4) 0; }
 .detail-returns__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--v5-space-3); }
 .detail-returns__label { flex: none; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.detail-returns__value { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; color: var(--v5-ink); text-align: right; font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
+.detail-returns__value { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; color: var(--v5-ink); text-align: right; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 /* A range breaks only at its dash, never inside a figure. */
 .detail-returns__value text { white-space: nowrap; }
 .detail-returns__value--key { color: var(--v5-brand); }
