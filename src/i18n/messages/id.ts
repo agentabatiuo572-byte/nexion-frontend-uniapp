@@ -468,7 +468,6 @@ export const id: Messages = {
     bankMethodHint: "Terima VND di rekening bank Vietnam Anda",
     routeFrom: "Dompet UVEL",
     chooseNetwork: "Pilih jaringan penarikan",
-    chooseNetworkHint: "Silakan pilih jaringan penarikan.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Biaya jaringan ${fee}",
     noAddress: "Alamat belum diatur",

@@ -14,9 +14,10 @@
           v-for="nw in visibleNets"
           :key="nw.id"
           :class="['nx-dep-net', `nx-dep-net-${nw.label.toLowerCase()}`, { 'nx-dep-net--on': net === nw.id }]"
-          role="radio" tabindex="0"
+          role="radio" :tabindex="net === nw.id ? 0 : -1"
           :aria-checked="net === nw.id"
           @click="pickNet(nw.id)" @keydown.enter.prevent="pickNet(nw.id)" @keydown.space.prevent="pickNet(nw.id)"
+          @keydown.up.prevent="moveNet(-1)" @keydown.left.prevent="moveNet(-1)" @keydown.down.prevent="moveNet(1)" @keydown.right.prevent="moveNet(1)"
         >
           <view class="nx-dep-net__nm">
             <text class="nx-dep-net__name">{{ nw.label }}</text>
@@ -167,7 +168,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount as formatBaseAmount } from "@/lib/amount-display";
 import { exactDepositAmount, type CregisNetworkPolicy } from "@/api/cregis-deposit-api";
 const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 2);
-import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import { cregisDepositApi, fundsServerEnabled, sessionVault } from "@/api/runtime";
@@ -462,6 +463,17 @@ function pickNet(id: ChainDepositChannel) {
   }
 }
 
+// Arrow keys move the choice through the group and keep focus on it, as in the address and payment pickers.
+function moveNet(delta: number) {
+  const list = visibleNets.value;
+  const next = list[(list.findIndex((nw) => nw.id === net.value) + delta + list.length) % list.length];
+  if (!next) return;
+  pickNet(next.id);
+  void nextTick(() => {
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>('.nx-dep-net[tabindex="0"]')?.focus();
+  });
+}
+
 // ── 专属地址(同账号同网络恒定;中段省略防溢出,复制取全量)──
 const address = computed(() => fundsServerEnabled ? serverAddress.value
   : activeNet.value ? dep.depositAddress(activeNet.value) : "");
@@ -670,7 +682,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-net--on .nx-dep-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
 .nx-dep-ticket { position: relative; margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-ticket__top { padding: 20px 20px 18px; text-align: center; }
-.nx-dep-via { display: inline-flex; color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); letter-spacing: .04em; }
+.nx-dep-via { display: inline-flex; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-dep-qr-box { width: 184px; height: 184px; margin: 14px auto 0; padding: 10px; box-sizing: border-box; border-radius: 18px; background: #FFFFFF; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: nx-viz-pop 420ms cubic-bezier(.2,1.4,.4,1) 260ms both; }
 .nx-dep-qr-image { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .nx-dep-scan { display: block; margin-top: 12px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }

@@ -468,7 +468,6 @@ export const uz: Messages = {
     bankMethodHint: "Vyetnam bank hisobingizga VNDda olish",
     routeFrom: "UVEL hamyoni",
     chooseNetwork: "Yechish tarmogʻini tanlash",
-    chooseNetworkHint: "Yechish tarmogʻini tanlang.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Tarmoq komissiyasi ${fee}",
     noAddress: "Manzil oʻrnatilmagan",

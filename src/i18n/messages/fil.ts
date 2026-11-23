@@ -468,7 +468,6 @@ export const fil: Messages = {
     bankMethodHint: "VND sa bangko mo sa Vietnam",
     routeFrom: "UVEL wallet",
     chooseNetwork: "Pumili ng network",
-    chooseNetworkHint: "Pumili ng network para sa withdrawal.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Network fee ${fee}",
     noAddress: "Wala pang naka-set na address",

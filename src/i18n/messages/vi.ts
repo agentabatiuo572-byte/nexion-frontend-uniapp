@@ -128,7 +128,6 @@ export const vi: Messages = {
     usdtMethodHint: "Chuyển USDT đến địa chỉ ví", bankMethod: "Tài khoản ngân hàng", bankMethodHint: "Nhận VND vào tài khoản ngân hàng Việt Nam",
     routeFrom: "Ví UVEL",
     chooseNetwork: "Chọn mạng rút tiền",
-    chooseNetworkHint: "Vui lòng chọn mạng rút tiền.",
     usdtNetwork: "USDT ({network})",
     networkFee: "Phí mạng ${fee}",
     noAddress: "Chưa thiết lập địa chỉ",
