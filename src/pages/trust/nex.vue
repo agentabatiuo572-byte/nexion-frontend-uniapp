@@ -13,7 +13,7 @@
         <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeLoading }}</text>
       </view>
       <EmptyState v-else-if="narrative.state === 'error'" kind="recoverable-error" page :title="t.trust.nexNarrativeError" :cta-label="t.ui.reload" @cta="loadNarrative(true)" />
-      <EmptyState v-else-if="narrative.state === 'unpublished'" kind="empty-list" :title="t.trust.nexNarrativeUnavailable" :cta-label="w.ctaBack" @cta="goBack()" />
+      <EmptyState v-else-if="narrative.state === 'unpublished'" kind="empty-list" :title="t.trust.nexNarrativeUnavailable" :cta-label="w.ctaBack" cta-size="large" @cta="goBack()" />
 
       <template v-if="narrative.state !== 'error' && narrative.state !== 'unpublished'">
       <HowHero :label="narrative.state === 'ready' ? `${w.heroLabel} · ${narrative.version}` : w.heroLabel" :title="narrative.state === 'ready' ? narrative.hero : '—'" :sub="narrative.state === 'ready' ? narrative.subhero ?? '' : ''" accent="purple" />
