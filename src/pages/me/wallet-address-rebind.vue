@@ -52,9 +52,7 @@
             </view>
           </view>
         </view>
-        <view class="nx-rebind-done-cta w-full grid place-items-center active:opacity-90" :style="primaryCtaStyle" role="button" tabindex="0" @click="finish">
-          <text :style="ctaTextStyle">{{ t.addrRebind.successCta }}</text>
-        </view>
+        <view class="rb-bar-space" />
       </view>
 
       <!-- ── OTP 确认(添加/更换共用;走既有发码冷却 / 次数上限 / 失效重取)── -->
@@ -85,19 +83,7 @@
             </view>
           </view>
         </view>
-        <view
-          class="nx-rebind-otp-confirm w-full grid place-items-center"
-          :class="{ 'active:opacity-90 transition-opacity': otpReady && !otpVerifying }"
-          role="button" tabindex="0"
-          :aria-disabled="otpReady && !otpVerifying ? 'false' : 'true'"
-          :style="otpConfirmStyle"
-          @click="confirmOtp"
-        >
-          <text :style="ctaTextStyle">{{ otpVerifying ? t.wallet.submitChecking : t.addrRebind.otpConfirmCta }}</text>
-        </view>
-        <view class="nx-rebind-otp-cancel w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="returnToView">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
+        <view class="rb-bar-space" />
       </view>
 
       <!-- ── 表单(添加 / 更换共用:标题说明 + 地址井(可粘贴)+ 安全提示;主操作在底部栏)── -->
@@ -212,21 +198,16 @@
     <template #pageFixed>
       <!-- 页面主操作在底部操作栏(04 DS-30):能更换时一个主要按钮 -->
       <view v-if="changeAvailable" class="rb-bar nx-glass-bar"><NxButton class="rb-bar__single nx-rebind-change-cta" variant="primary" :label="t.addrRebind.changeCta" @click="startChange" /></view>
+      <!-- 表单、验证码、成功页的主操作也在底部操作栏,用共享按钮(03 §3.1):次要为托盘里的文字按钮 -->
       <view v-if="step === 'form'" class="rb-bar nx-glass-bar">
-        <view class="nx-rebind-cancel-link rb-bar__btn rb-bar__btn--ghost nx-tray-text" role="button" tabindex="0" @click="cancelForm" @keydown.enter.prevent="cancelForm" @keydown.space.prevent="cancelForm">
-          <text>{{ t.addrRebind.cancelCta }}</text>
-        </view>
-        <view
-          class="nx-rebind-start-cta rb-bar__btn"
-          :class="{ 'rb-bar__btn--on': canProceed && !otpSending }"
-          role="button" tabindex="0"
-          :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
-          @click="proceedToOtp"
-          @keydown.enter.prevent="proceedToOtp" @keydown.space.prevent="proceedToOtp"
-        >
-          <text>{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
-        </view>
+        <NxButton class="nx-rebind-cancel-link" variant="secondary" :label="t.addrRebind.cancelCta" @click="cancelForm" />
+        <NxButton class="rb-bar__main nx-rebind-start-cta" variant="primary" :label="t.addrRebind.otpSendCta" :disabled="!canProceed" :busy="otpSending" @click="proceedToOtp" />
       </view>
+      <view v-else-if="step === 'otp'" class="rb-bar nx-glass-bar">
+        <NxButton class="nx-rebind-otp-cancel" variant="secondary" :label="t.addrRebind.cancelCta" @click="returnToView" />
+        <NxButton class="rb-bar__main nx-rebind-otp-confirm" variant="primary" :label="t.addrRebind.otpConfirmCta" :disabled="!otpReady" :busy="otpVerifying" @click="confirmOtp" />
+      </view>
+      <view v-else-if="step === 'success'" class="rb-bar nx-glass-bar"><NxButton class="rb-bar__single nx-rebind-done-cta" variant="primary" :label="successCtaLabel" @click="finish" /></view>
     </template>
   </AppChassis>
 </template>
@@ -285,6 +266,14 @@ const withdrawReturnUrl = computed(() => `/pages/me/wallet-withdraw?network=${CH
 const networkAvailable = computed(() => (!payoutAddressServerEnabled || networkPolicyStatus.value === "ready")
   && NETWORKS.value.some((nw) => nw.id === network.value));
 
+// The success action names where finish()'s navBack lands: the page this one was opened from, else the withdraw page.
+const backTarget = ref<string | null>(null);
+onLoad(() => {
+  const pages = typeof getCurrentPages === "function" ? getCurrentPages() : [];
+  backTarget.value = pages.length > 1 ? pages[pages.length - 2]?.route ?? null : null;
+});
+const successCtaLabel = computed(() => backTarget.value === "pages/me/profile" ? t.value.addrRebind.backToProfileCta
+  : backTarget.value === null || backTarget.value === "pages/me/wallet-withdraw" ? t.value.addrRebind.backToWithdrawCta : t.value.profile.back);
 onLoad((options) => {
   const q = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-address-rebind")).get("network");
   if (q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
@@ -911,34 +900,12 @@ const historyRowStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
 };
-const otpConfirmStyle = computed<CSSProperties>(() => ({
-  marginTop: "20px",
-  height: "48px",
-  borderRadius: "999px",
-  background: otpReady.value && !otpVerifying.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: otpReady.value && !otpVerifying.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-}));
-const ctaTextStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-button)",
-  fontWeight: 600,
-};
 const primaryCtaStyle: CSSProperties = {
   marginTop: "16px",
   height: "48px",
   borderRadius: "999px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
-};
-const ghostBtnStyle: CSSProperties = {
-  marginTop: "10px",
-  minHeight: "44px",
-  borderRadius: "999px",
-};
-const ghostTextStyle: CSSProperties = {
-  fontSize: "var(--ui-type-list-subtitle)",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
 };
 const freezeBannerStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
@@ -1019,10 +986,8 @@ const successRowValStyle: CSSProperties = {
 .rb-bar-space { height: 110px; }
 .rb-bar__single { display: flex; flex: 1 1 0; }
 .rb-bar { position: absolute; z-index: 36; display: flex; }
-.rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
-.rb-bar__btn--on, .rb-bar__btn--ghost { cursor: pointer; }
-.rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: scale(.98); }
-@media (prefers-reduced-motion: reduce) { .rb-net { transition: none; } .rb-net:active, .rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: none; } }
+.rb-bar__main { display: flex; flex: 1 1 0; }
+@media (prefers-reduced-motion: reduce) { .rb-net { transition: none; } .rb-net:active { transform: none; } }
 .nx-rebind-resend-label { display: flex; align-items: center; white-space: pre; font-size: 12px; }
 .nx-rebind-resend-seconds { display: inline-block; flex-shrink: 0; text-align: center; font-family: monospace; font-variant-numeric: tabular-nums; }
 
