@@ -8,7 +8,7 @@ import { sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
 import { getProductMedia } from '@/lib/product-media';
 import { isLiteProduct } from '@/lib/lite-scope';
-import { productCatalogState } from '@/store/product-catalog';
+import { isProductCatalogDisplayCurrent, productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
 import { displayDeadline, localized, rewardAmount } from './promotion-display';
 
 /** Purchase offers with a dedicated landing page; other templates keep the store entry. */
@@ -56,18 +56,19 @@ export function litePromotion<T extends Pick<PublicPromotion, 'productNos' | 're
 export function landingProductImage(sku: string): string | undefined {
   return catalogReady() ? getProduct(sku)?.imageUrl : getProductMedia(sku)?.src;
 }
-export function landingProductName(activity: PublicPromotion, sku: string): string {
+/** A signed-out read takes the public catalog name; without one it says "eligible device", never the internal SKU. */
+export function landingProductName(activity: PublicPromotion, sku: string, language?: string): string {
   const gift = activity.rewardRules.flatMap(rule => [rule.buyerReward, rule.inviterReward])
     .find(reward => reward?.type === 'DEVICE' && reward.giftProductNo === sku);
-  return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? sku;
+  const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products.find(product => product.id === sku) : undefined;
+  return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? display?.name ?? (language ? landingCopy(language).devicesTitle : sku);
 }
 
 // An order discount lowers the order total at checkout; it is never credited as a USDT reward.
 export type RewardParts = { amount: string; unit: string; asset: 'UVT' | 'USDT' | 'DEVICE' | 'DISCOUNT' };
 export function rewardParts(activity: PublicPromotion, reward: PublicRewardSpec): RewardParts {
   if (reward.type === 'DEVICE') return { amount: String(reward.quantity), unit: reward.disclosure.deviceName ?? landingProductName(activity, reward.giftProductNo), asset: 'DEVICE' };
-  // Whole amounts drop the ".00"; any other fraction stays as published.
-  const amount = rewardAmount(reward).replace(/\.00$/, '');
+  const amount = rewardAmount(reward);
   return reward.type === 'UVT' ? { amount, unit: 'UVT', asset: 'UVT' } : { amount, unit: 'USDT', asset: reward.type === 'DISCOUNT_USDT' ? 'DISCOUNT' : 'USDT' };
 }
 export function rewardPartsText(parts: RewardParts, copy: Pick<Messages['promotion'], 'orderDiscount'>): string {
@@ -122,7 +123,7 @@ export function promotionTermsRules(activity: PublicPromotion, copy: Messages['p
   // A referral offer states how the friend's first purchase is counted, after the rules that pay for it.
   const condition = activity.firstPurchaseCondition;
   if (!condition) return rules;
-  return [...rules, { id: 'first-purchase', text: [condition.mode === 'FIRST_ELIGIBLE_UNIT' ? landing.firstPurchaseByUnit : landing.firstPurchaseByOrder, condition.restoreAfterRefund ? landing.firstPurchaseRefund : ''].filter(Boolean).join('\n') }];
+  return [...rules, { id: 'first-purchase', prose: true, text: [condition.mode === 'FIRST_ELIGIBLE_UNIT' ? landing.firstPurchaseByUnit : landing.firstPurchaseByOrder, condition.restoreAfterRefund ? landing.firstPurchaseRefund : ''].filter(Boolean).join('\n') }];
 }
 export function promotionTermsText(activity: PublicPromotion, copy: Messages['promotion'], language: string): string {
   return [localized(activity.terms, language), copy.deadline + ' · ' + displayDeadline(activity.endsAt, language)].join('\n\n');
