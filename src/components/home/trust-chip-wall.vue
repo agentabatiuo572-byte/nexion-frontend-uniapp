@@ -120,6 +120,6 @@ onMounted(() => {
 @media (max-width: 359px) {
   .home-trust__tags { gap:4px; }
   .home-trust__tag { gap:3px;padding:0 5px;font-size:11px; }
-  .home-trust__tag svg { width:12px;height:12px; }
+  .home-trust__tag svg, .home-trust__tag .nx-native-svg { width:12px;height:12px; }
 }
 </style>
