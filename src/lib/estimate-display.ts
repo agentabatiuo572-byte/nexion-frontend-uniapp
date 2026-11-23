@@ -11,6 +11,9 @@ function exponent(value: number): number {
 
 function twoFigures(value: number, rounding: Rounding): number {
   if (!(value > 0)) return 0;
+  // Server bounds arrive rounded to six decimals, so x 30 or x quantity can land a hair past a boundary
+  // (3.666667 x 30 = 110.00001). Snapping to five significant figures keeps that noise from moving an end.
+  if (rounding !== "round") value = Number(value.toPrecision(5));
   const step = 10 ** (exponent(value) - 1);
   const units = value / step;
   // The epsilon keeps binary fractions (0.57 / 0.01 = 56.999…) on the figure they print as.
