@@ -1609,7 +1609,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       direction:'IN',amount:rewardNex,at:now,category:'achievement'});
     return remember('earningMilestone',id,{...authority,fired:[{milestoneId:id,thresholdUsd,rewardNex,lifetimeEarningsUsd}],count:1},null);
   }
-  if(pathname==='/api/app/security') return {twoFactorEnabled:state.twoFactorEnabled??true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};
   if(pathname==='/api/app/referral-rewards'){
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
     const limit=Math.max(1,Math.min(20,Math.trunc(Number(url.searchParams.get('limit')??10))||10));
