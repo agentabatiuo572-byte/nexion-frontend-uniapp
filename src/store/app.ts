@@ -1,4 +1,5 @@
 import { homeDisplay } from "@/composables/use-home-display";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { runForegroundStoreRead, runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
@@ -579,9 +580,10 @@ export const useApp = defineStore("app", () => {
    * 都结清了才退回最近一笔。钱包入口与追踪页共用它,口径才不会打架。
    */
   const primaryWithdrawal = computed<Withdrawal | null>(() => {
-    const pending = inFlightWithdrawals.value;
+    const visible = withdrawals.value.filter(w => isVisibleUsdtNetwork(w.network));
+    const pending = visible.filter(w => occupiesWithdrawalSlot(w.status));
     if (pending.length) return pending.reduce((a, b) => (b.submittedAt < a.submittedAt ? b : a));
-    return latestWithdrawal.value;
+    return visible.length ? visible.reduce((a, b) => (b.submittedAt > a.submittedAt ? b : a)) : null;
   });
   /** 最近一笔(按提交时刻)。派生值,不是独立状态。 */
   const latestWithdrawal = computed<Withdrawal | null>(() =>

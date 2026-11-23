@@ -24,7 +24,7 @@
             role="radio" :tabindex="network === nw.id ? 0 : -1"
             :aria-checked="network === nw.id"
             @click="switchNetwork(nw.id)"
-            @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
+            @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)" @keydown.up.prevent="moveNetwork(-1)" @keydown.down.prevent="moveNetwork(1)"
           >
             <view class="rb-net__nm"><text class="rb-net__name">{{ nw.label }}</text></view>
             <view class="rb-net__ck" aria-hidden="true" />
@@ -32,38 +32,31 @@
         </view>
       </view>
 
-      <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 2px">
+      <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 0">
         <text class="block" :style="stateBodyStyle">{{ networkPolicyStatus === 'ready' && !NETWORKS.length ? t.wallet.withdrawalChannelsClosed : remoteReadFailed ? copy.addressUnavailable : copy.addressLoading }}</text>
         <text v-if="otpError" class="block nx-rebind-refusal" :style="errorTextStyle">{{ otpError }}</text>
         <view v-if="remoteReadFailed" class="nx-rebind-read-retry w-full grid place-items-center" :style="primaryCtaStyle" role="button" :aria-disabled="remoteRefreshPending" :tabindex="remoteRefreshPending ? -1 : 0" @click="retryRemoteSnapshot" @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"><text>{{ remoteRefreshPending ? copy.addressLoading : copy.retry }}</text></view>
       </view>
       <!-- ── 成功态 ── -->
-      <view v-else-if="step === 'success'" class="mx-4 nx-step-in" style="padding: 0 2px">
+      <view v-else-if="step === 'success'" class="mx-4 nx-step-in" :data-effective-at="currentEffectiveAt" :data-address-effective="addressEffective">
         <view class="flex flex-col items-center" style="padding: 32px 0 0">
           <view class="grid place-items-center" :style="successIconBoxStyle">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
           </view>
-          <view><text class="block text-center" :style="stateTitleStyle">{{ successIsChange ? t.addrRebind.successTitle : t.addrRebind.addSuccessTitle }}</text></view>
-          <view><text class="block text-center" :style="stateBodyStyle">{{ successIsChange ? t.addrRebind.successBody : t.addrRebind.addSuccessBody }}</text></view>
+          <view><text class="block text-center nx-rebind-success-title" tabindex="-1" :style="stateTitleStyle">{{ successTitleText }}</text></view>
+          <view v-if="successBodyText"><text class="block text-center" :style="stateBodyStyle">{{ successBodyText }}</text></view>
           <view style="margin-top: 14px" class="w-full">
             <view class="flex items-center justify-between" :style="successRowStyle">
               <text :style="successRowLabelStyle">{{ t.addrRebind.successNewAddr }}</text>
               <text class="font-mono tabular-nums" :style="successRowValStyle">{{ maskAddressMid(current?.address ?? '') }}</text>
             </view>
           </view>
-          <!-- 首次添加也进入新地址安全冻结(时长取后台配置,不写死) -->
-          <view v-if="!successIsChange" class="w-full flex" :style="warnlineStyle">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-            <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
-          </view>
         </view>
-        <view class="nx-rebind-done-cta w-full grid place-items-center active:opacity-90" :style="primaryCtaStyle" role="button" tabindex="0" @click="finish">
-          <text :style="ctaTextStyle">{{ t.addrRebind.successCta }}</text>
-        </view>
+        <view class="rb-bar-space" />
       </view>
 
       <!-- ── OTP 确认(添加/更换共用;走既有发码冷却 / 次数上限 / 失效重取)── -->
-      <view v-else-if="step === 'otp'" class="mx-4 nx-step-in" style="padding: 0 2px">
+      <view v-else-if="step === 'otp'" class="mx-4 nx-step-in">
         <view style="margin-top: 18px"><text class="block" :style="stateTitleStyle">{{ t.addrRebind.otpTitle }}</text></view>
         <view><text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.5">{{ otpBodyText }}</text></view>
         <input
@@ -90,24 +83,12 @@
             </view>
           </view>
         </view>
-        <view
-          class="nx-rebind-otp-confirm w-full grid place-items-center"
-          :class="{ 'active:opacity-90 transition-opacity': otpReady && !otpVerifying }"
-          role="button" tabindex="0"
-          :aria-disabled="otpReady && !otpVerifying ? 'false' : 'true'"
-          :style="otpConfirmStyle"
-          @click="confirmOtp"
-        >
-          <text :style="ctaTextStyle">{{ otpVerifying ? t.wallet.submitChecking : t.addrRebind.otpConfirmCta }}</text>
-        </view>
-        <view class="nx-rebind-otp-cancel w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="backToBase">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
+        <view class="rb-bar-space" />
       </view>
 
       <!-- ── 表单(添加 / 更换共用:标题说明 + 地址井(可粘贴)+ 安全提示;主操作在底部栏)── -->
       <view v-else-if="step === 'form'" class="mx-4 rb-form">
-        <text class="rb-title">{{ mode === 'add' ? t.addrRebind.emptyGuideTitle : t.addrRebind.newAddressLabel }}</text>
+        <text class="rb-title" tabindex="-1">{{ mode === 'add' ? t.addrRebind.emptyGuideTitle : t.addrRebind.newAddressLabel }}</text>
         <text v-if="mode === 'add'" class="rb-desc">{{ t.addrRebind.emptyGuideBody }}</text>
         <view class="rb-field">
           <input
@@ -135,7 +116,7 @@
       </view>
 
       <!-- ── 默认态:当前地址 + 更换入口 + 历史(规格 ⑤)── -->
-      <view v-else class="mx-4" style="padding: 0 2px">
+      <view v-else class="mx-4">
         <!-- 冻结横幅(hh:mm:ss 真倒计时) -->
         <view v-if="frozenNow" class="nx-rebind-freeze-banner mt-3 flex items-start" :style="freezeBannerStyle">
           <view class="grid place-items-center shrink-0" :style="freezeIconStyle">
@@ -146,15 +127,15 @@
           </view>
         </view>
 
-        <view style="margin-top: 16px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.currentLabel }}</text></view>
-        <view class="nx-glass-card mt-2" :style="currentCardStyle">
+        <text class="rb-k" style="margin-top: 16px">{{ t.addrRebind.currentLabel }}</text>
+        <view class="nx-glass-card" :style="currentCardStyle">
           <view class="flex items-center" style="gap: 8px">
             <text class="font-mono flex-1 min-w-0" style="font-size: 13px; color: var(--v5-ink); white-space: nowrap">{{ maskAddressMid(current?.address ?? '') }}</text>
             <view v-if="current?.source === 'migrated'" class="shrink-0 grid place-items-center" :style="migratedBadgeStyle">
               <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ t.addrRebind.sourceMigrated }}</text>
             </view>
           </view>
-          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(current?.addedAt ?? 0) }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ effectiveLabel }} · {{ fmtStamp(currentEffectiveAt ?? 0) }}</text>
           <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期)。
                冻结期不叠挂:冻结横幅说「禁提」时再说「可能需复核」= 同屏两种结论
                (审计 P1;与 wallet-withdraw 的 !frozenNow 反冗余门同型)。 -->
@@ -193,15 +174,6 @@
             </view>
           </view>
         </view>
-        <view
-          v-else
-          class="nx-rebind-change-cta w-full grid place-items-center active:opacity-90"
-          :style="primaryCtaStyle"
-          role="button" tabindex="0"
-          @click="startChange"
-        >
-          <text :style="ctaTextStyle">{{ t.addrRebind.changeCta }}</text>
-        </view>
 
         <!-- 历史地址(只读,含来源与停用时间;规格 ⑥「查看历史地址」展开区) -->
         <view v-if="history.length > 0" style="margin-top: 20px">
@@ -219,25 +191,23 @@
             </view>
           </view>
         </view>
+        <view v-if="changeAvailable" class="rb-bar-space" />
       </view>
     </view>
     <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <template #pageFixed>
+      <!-- 页面主操作在底部操作栏(04 DS-30):能更换时一个主要按钮 -->
+      <view v-if="changeAvailable" class="rb-bar nx-glass-bar"><NxButton class="rb-bar__single nx-rebind-change-cta" variant="primary" :label="t.addrRebind.changeCta" @click="startChange" /></view>
+      <!-- 表单、验证码、成功页的主操作也在底部操作栏,用共享按钮(03 §3.1):次要为托盘里的文字按钮 -->
       <view v-if="step === 'form'" class="rb-bar nx-glass-bar">
-        <view class="nx-rebind-cancel-link rb-bar__btn rb-bar__btn--ghost nx-tray-text" role="button" tabindex="0" @click="cancelForm" @keydown.enter.prevent="cancelForm" @keydown.space.prevent="cancelForm">
-          <text>{{ t.addrRebind.cancelCta }}</text>
-        </view>
-        <view
-          class="nx-rebind-start-cta rb-bar__btn"
-          :class="{ 'rb-bar__btn--on': canProceed && !otpSending }"
-          role="button" tabindex="0"
-          :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
-          @click="proceedToOtp"
-          @keydown.enter.prevent="proceedToOtp" @keydown.space.prevent="proceedToOtp"
-        >
-          <text>{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
-        </view>
+        <NxButton class="nx-rebind-cancel-link" variant="secondary" :label="t.addrRebind.cancelCta" @click="cancelForm" />
+        <NxButton class="rb-bar__main nx-rebind-start-cta" variant="primary" :label="t.addrRebind.otpSendCta" :disabled="!canProceed" :busy="otpSending" @click="proceedToOtp" />
       </view>
+      <view v-else-if="step === 'otp'" class="rb-bar nx-glass-bar">
+        <NxButton class="nx-rebind-otp-cancel" variant="secondary" :label="t.addrRebind.cancelCta" @click="returnToView" />
+        <NxButton class="rb-bar__main nx-rebind-otp-confirm" variant="primary" :label="t.addrRebind.otpConfirmCta" :disabled="!otpReady" :busy="otpVerifying" @click="confirmOtp" />
+      </view>
+      <view v-else-if="step === 'success'" class="rb-bar nx-glass-bar"><NxButton class="rb-bar__single nx-rebind-done-cta" variant="primary" :label="successCtaLabel" @click="finish" /></view>
     </template>
   </AppChassis>
 </template>
@@ -254,6 +224,7 @@ import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
@@ -268,6 +239,7 @@ import { otpSend, otpVerify } from "@/store/auth-otp";
 import { CHAIN_TO_WITHDRAW_NETWORK, formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
 import { advanceMonotonicHighWater, deadlineRemainingMs, projectServerNow, readTrustedMonotonicNowMs } from "@/lib/server-deadline-clock";
 import type { ChainDepositChannel } from "@/store/types";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 
 const t = useT();
@@ -286,18 +258,25 @@ const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
 ];
 const networkPolicy = ref<WithdrawalPolicy | null>(null);
 const networkPolicyStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
-const NETWORKS = computed(() => payoutAddressServerEnabled
-  ? ALL_NETWORKS.filter((nw) => networkPolicy.value?.withdrawalEnabled === true
-    && networkPolicy.value.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
-  : ALL_NETWORKS);
-const network = ref<ChainDepositChannel>("usdt-trc20");
+const NETWORKS = computed(() => ALL_NETWORKS.filter((nw) => canSelectNewUsdtNetwork(nw.id)
+  && (!payoutAddressServerEnabled || (networkPolicy.value?.withdrawalEnabled === true
+    && networkPolicy.value.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id)))));
+const network = ref<ChainDepositChannel>("usdt-bep20");
 const withdrawReturnUrl = computed(() => `/pages/me/wallet-withdraw?network=${CHAIN_TO_WITHDRAW_NETWORK[network.value]}`);
-const networkAvailable = computed(() => !payoutAddressServerEnabled
-  || (networkPolicyStatus.value === "ready" && NETWORKS.value.some((nw) => nw.id === network.value)));
+const networkAvailable = computed(() => (!payoutAddressServerEnabled || networkPolicyStatus.value === "ready")
+  && NETWORKS.value.some((nw) => nw.id === network.value));
 
+// The success action names where finish()'s navBack lands: the page this one was opened from, else the withdraw page.
+const backTarget = ref<string | null>(null);
+onLoad(() => {
+  const pages = typeof getCurrentPages === "function" ? getCurrentPages() : [];
+  backTarget.value = pages.length > 1 ? pages[pages.length - 2]?.route ?? null : null;
+});
+const successCtaLabel = computed(() => backTarget.value === "pages/me/profile" ? t.value.addrRebind.backToProfileCta
+  : backTarget.value === null || backTarget.value === "pages/me/wallet-withdraw" ? t.value.addrRebind.backToWithdrawCta : t.value.profile.back);
 onLoad((options) => {
   const q = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-address-rebind")).get("network");
-  if (q === "usdt-trc20" || q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
+  if (q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
 });
 
 // ── 视图状态机 ──
@@ -311,7 +290,8 @@ const history = computed(() => payout.stateFor(network.value).history);
 const historyDesc = computed(() => [...history.value].reverse());
 const historyOpen = ref(false);
 const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
-  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance || !networkAvailable.value)) return "unknown";
+  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance)) return "unknown";
+  if (!networkAvailable.value) return "unknown";
   if (explicitStep.value === "otp") return "otp";
   if (explicitStep.value === "success") return "success";
   if (explicitStep.value === "form") return "form";
@@ -342,7 +322,7 @@ function moveNetwork(delta: number) {
 // ── 表单 ──
 const newAddress = ref("");
 const addrError = ref("");
-const addressPlaceholder = computed(() => (network.value === "usdt-trc20" ? "TR7NHq..." : "0x..."));
+const addressPlaceholder = "0x...";
 const canProceed = computed(() => networkAvailable.value && newAddress.value.trim().length > 0);
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -352,7 +332,7 @@ function pasteAddress() {
   uni.getClipboardData({ success: (result) => { newAddress.value = String(result.data ?? "").trim(); addrError.value = ""; clearOtpError(); }, fail: () => {} });
 }
 // Cancel in the fixed bar: back to the current address when changing, otherwise leave the page.
-function cancelForm() { if (mode.value === "change") backToBase(); else leave(); }
+function cancelForm() { if (mode.value === "change") returnToView(); else leave(); }
 function onAddressInput(e: Event) {
   newAddress.value = detailVal(e);
   addrError.value = "";
@@ -364,11 +344,14 @@ const effectiveMode = computed<"add" | "change">(() => (current.value ? mode.val
 const changeBlock = computed(() => {
   return payout.changeBlockReason(network.value, projectedServerNow.value);
 });
+// The change action sits in the bottom bar only while a change can start (no in-flight withdrawal, cooldown or unknown time).
+const changeAvailable = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value);
 function startChange() {
   // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
   if (!networkAvailable.value || changeBlock.value) return;
   mode.value = "change";
   explicitStep.value = "form";
+  focusSoon([".rb-form .rb-title"]);
 }
 function goTracking() {
   navTo("/pages/me/wallet-withdraw-tracking");
@@ -626,7 +609,20 @@ async function applyAfterOtp(scope = captureCommandScope()) {
   explicitStep.value = "success";
   resetOtp();
 }
-function backToBase() {
+// A step's own control unmounts when it is used: keep keyboard focus on the page (the new step's title or the way back in).
+function focusSoon(selectors: string[]) {
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    for (const selector of selectors) {
+      const target = document.querySelector<HTMLElement>(selector);
+      if (target) { target.focus(); return; }
+    }
+  });
+}
+function returnToView() {
+  backToBase();
+  focusSoon([".nx-rebind-change-cta", ".rb-form .rb-title", '.nx-rebind-network-radio[tabindex="0"]']);
+}function backToBase() {
   invalidatePageCommand();
   explicitStep.value = "base";
   mode.value = "add";
@@ -651,8 +647,10 @@ watch([() => step.value !== "unknown", () => payout.stateFor(network.value).next
 const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
 const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
 watch(() => [networkPolicyStatus.value, remoteReadStatus.value] as const, ([policyStatus, addressStatus]) => {
-  if (policyStatus !== "ready" || addressStatus !== "ready" || networkAvailable.value) return;
-  const fallback = NETWORKS.value.find((nw) => payout.currentFor(nw.id)) ?? NETWORKS.value[0];
+  if ((payoutAddressServerEnabled && (policyStatus !== "ready" || addressStatus !== "ready"))
+      || networkAvailable.value) return;
+  const withAddress = NETWORKS.value.find((nw) => payout.currentFor(nw.id));
+  const fallback = withAddress ?? NETWORKS.value[0];
   if (fallback) switchNetwork(fallback.id);
 });
 let tickTimer: ReturnType<typeof setInterval> | undefined;
@@ -788,6 +786,17 @@ const projectedServerNow = computed<number | null>(() => {
     ? projectServerNow(anchor.serverNowEpochMs, anchor.receivedMonotonicAt, monotonicNow.value)
     : null;
 });
+const currentEffectiveAt = computed<number | null>(() => {
+  const address = current.value;
+  if (!address) return null;
+  const legacyEffectiveAt = address.source === "user" ? payout.stateFor(network.value).freezeUntil : null;
+  return address.effectiveAt ?? legacyEffectiveAt ?? address.addedAt;
+});
+const addressEffective = computed<boolean | null>(() => {
+  const now = projectedServerNow.value;
+  const effectiveAt = currentEffectiveAt.value;
+  return now === null || effectiveAt === null ? null : now >= effectiveAt;
+});
 const freezeLeftMs = computed<number | null>(() => {
   const now = projectedServerNow.value;
   return now === null ? null : deadlineRemainingMs(payout.stateFor(network.value).freezeUntil ?? now, now);
@@ -804,6 +813,14 @@ const cooldownDays = computed(() => payout.changeCooldownDays ?? cfg.config.with
 function fmtStamp(ts: number): string {
   return formatDisplayDateTime(ts, dateLocale());
 }
+// Effective-time wording follows the snapshot: pending, in effect, or unknown while the server clock is unavailable.
+const effectiveLabel = computed(() => addressEffective.value === true ? t.value.addrRebind.addedAtLabel
+  : addressEffective.value === false ? t.value.addrRebind.effectivePendingLabel : t.value.addrRebind.effectiveUnknownLabel);
+const successTitleText = computed(() => addressEffective.value === true
+  ? fmt(t.value.addrRebind.successEffectiveTitle, { network: ALL_NETWORKS.find((nw) => nw.id === network.value)?.label ?? "" })
+  : successIsChange.value ? t.value.addrRebind.successTitle : t.value.addrRebind.addSuccessTitle);
+const successBodyText = computed(() => addressEffective.value === null || currentEffectiveAt.value === null ? ""
+  : fmt(addressEffective.value ? t.value.addrRebind.successEffectiveBody : t.value.addrRebind.successPendingBody, { time: fmtStamp(currentEffectiveAt.value) }));
 // 频控拦截给绝对时刻(平台口径,不说「明天」;规格 ② 异常3)
 const cooldownUntilText = computed(() => {
   const at = payout.stateFor(network.value).nextChangeAt;
@@ -830,15 +847,15 @@ function finish() {
   invalidatePageCommand();
   navBack(withdrawReturnUrl.value); // 无页面栈时保留当前网络,地址由响应式 store 即时回填
 }
+// Registered after every value `step` reads, so its first evaluation sees them initialised.
+// The code step and the result replace the control that opened them: focus the code input, then the result title.
+watch(() => step.value, (next, previous) => {
+  if (next === previous) return;
+  if (next === "otp") focusSoon([".nx-rebind-otp-input input", ".nx-rebind-otp-input"]);
+  else if (next === "success") focusSoon([".nx-rebind-success-title"]);
+});
 
 // ── styles ──
-const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
 // 输入框零描边,贴页面底(容器无底色 → surface L1,与既有子页同型)。
 const addressInputStyle: CSSProperties = {
   width: "100%",
@@ -856,13 +873,6 @@ const errorTextStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-danger)",
   lineHeight: 1.4,
-};
-const warnlineStyle: CSSProperties = {
-  marginTop: "16px",
-  padding: "12px",
-  borderRadius: "12px",
-  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-  gap: "8px",
 };
 const warnTextStyle: CSSProperties = {
   fontSize: "12px",
@@ -890,34 +900,12 @@ const historyRowStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
 };
-const otpConfirmStyle = computed<CSSProperties>(() => ({
-  marginTop: "20px",
-  height: "48px",
-  borderRadius: "999px",
-  background: otpReady.value && !otpVerifying.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: otpReady.value && !otpVerifying.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-}));
-const ctaTextStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-button)",
-  fontWeight: 600,
-};
 const primaryCtaStyle: CSSProperties = {
   marginTop: "16px",
   height: "48px",
   borderRadius: "999px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
-};
-const ghostBtnStyle: CSSProperties = {
-  marginTop: "10px",
-  minHeight: "44px",
-  borderRadius: "999px",
-};
-const ghostTextStyle: CSSProperties = {
-  fontSize: "var(--ui-type-list-subtitle)",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
 };
 const freezeBannerStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
@@ -948,6 +936,8 @@ const stateBodyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.55,
   maxWidth: "300px",
+  // Short centred results wrap into even lines, never one character alone on the last line.
+  textWrap: "balance",
 };
 const successRowStyle: CSSProperties = {
   padding: "12px",
@@ -970,19 +960,20 @@ const successRowValStyle: CSSProperties = {
 <style scoped>
 /* P-45 address: network radio rows, address well with paste, plain safety note, fixed actions. */
 .rb-nets-wrap { margin-top: 15px; }
-.rb-k { display: block; margin: 0 4px 8px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.rb-k { display: block; margin: 0 4px 8px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .rb-nets { display: flex; flex-direction: column; gap: 8px; }
 .rb-net { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 16px; box-sizing: border-box; border-radius: var(--v5-radius-m); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
 .rb-net:active { transform: scale(.97); }
 .rb-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .rb-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
 .rb-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
-.rb-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.rb-net__name { color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .rb-net--on .rb-net__name { color: var(--v5-brand); }
 .rb-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .rb-net--on .rb-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
 .rb-net--on .rb-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
 .rb-form { margin-top: 24px; }
+.rb-title:focus, .nx-rebind-success-title:focus { outline: none; }
 .rb-title { display: block; padding: 0 4px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .rb-desc { display: block; margin-top: 4px; padding: 0 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .rb-field { display: flex; align-items: center; gap: 10px; min-height: 56px; margin-top: 8px; padding: 8px 8px 8px 14px; box-sizing: border-box; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
@@ -993,11 +984,10 @@ const successRowValStyle: CSSProperties = {
 .rb-lock { display: flex; align-items: center; gap: 8px; margin: 12px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .rb-lock > svg { flex: none; }
 .rb-bar-space { height: 110px; }
+.rb-bar__single { display: flex; flex: 1 1 0; }
 .rb-bar { position: absolute; z-index: 36; display: flex; }
-.rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
-.rb-bar__btn--on, .rb-bar__btn--ghost { cursor: pointer; }
-.rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: scale(.98); }
-@media (prefers-reduced-motion: reduce) { .rb-net { transition: none; } .rb-net:active, .rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: none; } }
+.rb-bar__main { display: flex; flex: 1 1 0; }
+@media (prefers-reduced-motion: reduce) { .rb-net { transition: none; } .rb-net:active { transform: none; } }
 .nx-rebind-resend-label { display: flex; align-items: center; white-space: pre; font-size: 12px; }
 .nx-rebind-resend-seconds { display: inline-block; flex-shrink: 0; text-align: center; font-family: monospace; font-variant-numeric: tabular-nums; }
 

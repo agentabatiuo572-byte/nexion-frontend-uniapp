@@ -310,6 +310,7 @@ import CheckoutRow from "@/components/store/checkout-row.vue";
 import ChainPayment from "@/components/store/chain-payment.vue";
 import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { commerceCopy } from '@/lib/commerce-review';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
 import { useLocaleStore } from "@/store/locale";
@@ -501,10 +502,10 @@ const orders = useOrders();
 const voucher = useVoucher();
 
 // wallet icon path (lucide Wallet), credit-card path
-// 平台支付收窄裁决:USDT 三网络 + 卡。
+// 本地付款选项和原单标签使用同一份方式定义。
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
-const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
+const ALL_PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
   if (remoteApiEnabled) return [{
     id: "nexgrid-wallet",
     label: t.value.wallet.title,
@@ -525,6 +526,7 @@ const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
     iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" });
   return methods;
 });
+const PAYMENT_METHODS = computed(() => ALL_PAYMENT_METHODS.value.filter((method) => canSelectNewUsdtNetwork(method.id)));
 
 const tradein = useTradeinSheet();
 const auditCopy = useAuditUiCopy(), tradeinAvailable = ref(false);
@@ -1470,7 +1472,7 @@ const { imageSrc: checkoutImage, imageError: checkoutImageError } = useProductIm
 const voucherDetailsOpen = ref(false);
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>(remoteApiEnabled ? "nexgrid-wallet" : "usdt-trc20");
+const payment = ref<string>(remoteApiEnabled ? "nexgrid-wallet" : "usdt-bep20");
 const quantitySwitching = ref(false);
 const quantityReady = ref(false);
 const orderId = ref<string | null>(null);
@@ -1650,7 +1652,7 @@ function totalStillConfirmed(confirmed: number) {
   return trialView.value.applied ? confirmationTotal.value <= confirmed : confirmationTotal.value === confirmed;
 }
 const cardFeeText = computed(() => formatAmount(cardFee.value));
-const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
+const paymentLabel = computed(() => ALL_PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
 const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
 // Display only: the tray names the full-slot reason in one short line; the page offers the ways out.
 const checkoutTrayCapacityNote = computed(() => checkoutCapacityMessage.value === slotsFullText.value
@@ -3192,7 +3194,10 @@ watch(step, async (s) => {
   // 发票绑的是那份报价,报价既然要重来,票就不能活着 —— 否则下一次 Pay now 会再开一张,
   // 两个地址同时催付、落单后旧票成孤儿继续拉人二次付款(独立审计 P0 族)。单一咽喉,
   // 不在十来处回弹点各写一遍。
-  if ((s === "select-payment" || s === "confirm") && activeSession.value) dropActiveSession();
+  if (s === "select-payment" || s === "confirm") {
+    if (activeSession.value) dropActiveSession();
+    if (!canSelectNewUsdtNetwork(payment.value)) payment.value = PAYMENT_METHODS.value[0].id;
+  }
   if (settledResultReplay.value && (s === "confirmed" || s === "activating")) {
     // CheckoutResult advances its rendered phases on animationend.
     return;

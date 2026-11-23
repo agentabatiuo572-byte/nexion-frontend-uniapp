@@ -183,6 +183,7 @@
 
 <script setup lang="ts">
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { dateLocale } from "@/i18n/format";
 import { commerceOrderAmount, commerceOrderHasPayment, commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
@@ -349,7 +350,7 @@ async function refreshOrder(discoverPayment = true) {
     try {
       const result = await orders.ensureRemoteOrder(scope.orderNo);
       if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
-        orderPresentation.value = result ?? null;
+        orderPresentation.value = result && isVisibleUsdtNetwork(result.paymentMethod) ? result : null;
         remoteOrderError.value = false;
         if (automaticPaymentDiscovery && discoverPayment && result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
             && !refusedPayment.value && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
@@ -396,7 +397,7 @@ onHide(() => {
   pendingPaymentIntentAccount = '';
 });
 
-const liveOrder = computed(() => orders.orders.find((o) => o.id === id.value));
+const liveOrder = computed(() => orders.visibleOrders.find((o) => o.id === id.value));
 const orderPresentation = ref<Order | null>(null);
 const orderEnvironmentInvalidated = ref(false);
 watch(() => apiRuntimeConfig?.environment, () => { orderEnvironmentInvalidated.value = true; orderPresentation.value = null; }, { flush: 'sync' });

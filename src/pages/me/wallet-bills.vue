@@ -134,6 +134,7 @@
 
 <script setup lang="ts">
 import { toast } from "@/store/ui";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { platformDisplayText } from "@/lib/brand-copy";
@@ -314,9 +315,9 @@ const REWARD_TYPES: BillType[] = ["refer", "bonus", "achievement"];
 // Rows repeat their unit only when the list mixes assets (a receipt lookup across the ledger).
 const listUnit = computed(() => { const units = new Set(filtered.value.map((b) => b.symbol)); return units.size === 1 ? platformDisplayText([...units][0]) : ""; });
 const filtered = computed<Bill[]>(() => {
-  if (ledgerBizNo.value) return activePager.value.rows.filter(b => b.ledgerBizNo === ledgerBizNo.value);
-  if (fundsServerEnabled) return activePager.value.rows;
-  const ofAsset = billsStore.bills.filter((b) => b.symbol === asset.value);
+  if (ledgerBizNo.value) return activePager.value.rows.filter(b => !b.hiddenNetwork && b.ledgerBizNo === ledgerBizNo.value);
+  if (fundsServerEnabled) return activePager.value.rows.filter(b => !b.hiddenNetwork);
+  const ofAsset = billsStore.bills.filter(b => b.symbol === asset.value && isVisibleUsdtNetwork(b.network ?? billNetwork(b)));
   if (tab.value === "all") return ofAsset;
   if (tab.value === "in") return ofAsset.filter((b) => b.amount > 0);
   if (tab.value === "reward") return ofAsset.filter((b) => REWARD_TYPES.includes(b.type));

@@ -1,4 +1,5 @@
 import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 /**
  * Ported from Nexion-prototype/lib/store/orders.ts
  * (zustand persist → Pinia + uni storage).
@@ -15,7 +16,7 @@ import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
  */
 
 import { defineStore } from "pinia";
-import { onScopeDispose, ref } from "vue";
+import { computed, onScopeDispose, ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
@@ -167,6 +168,7 @@ export const useOrders = defineStore("orders", () => {
   const boundAccountKey = ref("default");
   const boundAccountRevision = ref(0);
   const orders = ref<Order[]>([]);
+  const visibleOrders = computed(() => orders.value.filter(order => isVisibleUsdtNetwork(order.paymentMethod)));
   const nextCursor = ref<string | null>(null);
   const loadingMore = ref(false);
   const failedOrderReadbacks = ref(new Set<string>());
@@ -598,7 +600,7 @@ export const useOrders = defineStore("orders", () => {
   }
 
   return {
-    orders,
+    orders, visibleOrders,
     nextCursor,
     loadingMore,
     createOrder,

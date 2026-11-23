@@ -37,7 +37,7 @@
             <CheckoutAmount class="pp-prod__amt" :value="s.amount" currency="USD" />
           </view>
           <text class="pp-label">{{ copy.methodLabel }}</text>
-          <view class="pp-opts" role="radiogroup" :aria-label="copy.methodLabel" @keydown.down.prevent="moveFocus($event, 1)" @keydown.right.prevent="moveFocus($event, 1)" @keydown.up.prevent="moveFocus($event, -1)" @keydown.left.prevent="moveFocus($event, -1)">
+          <view class="pp-opts" role="radiogroup" :aria-label="copy.methodLabel" @keydown.down.prevent="moveFocus(1)" @keydown.right.prevent="moveFocus(1)" @keydown.up.prevent="moveFocus(-1)" @keydown.left.prevent="moveFocus(-1)">
             <view class="pp-opt" :class="{ on: s.method === 'WALLET' }" role="radio" :tabindex="s.method === 'WALLET' ? 0 : -1" :aria-checked="s.method === 'WALLET'" @click="payment.choose('WALLET')" @keydown.enter.prevent="payment.choose('WALLET')">
               <view class="pp-opt__row">
                 <view class="pp-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg></view>
@@ -69,7 +69,7 @@
 
         <template v-else-if="s.step === 'network'">
           <text class="pp-label">{{ copy.networkLabel }}</text>
-          <view class="pp-tabs" role="radiogroup" :aria-label="copy.networkLabel" @keydown.right.prevent="moveFocus($event, 1, true)" @keydown.down.prevent="moveFocus($event, 1, true)" @keydown.left.prevent="moveFocus($event, -1, true)" @keydown.up.prevent="moveFocus($event, -1, true)">
+          <view class="pp-tabs" role="radiogroup" :aria-label="copy.networkLabel" @keydown.right.prevent="moveFocus(1, true)" @keydown.down.prevent="moveFocus(1, true)" @keydown.left.prevent="moveFocus(-1, true)" @keydown.up.prevent="moveFocus(-1, true)">
             <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id }" role="radio" :tabindex="!s.originalRecovery && s.method === tab.id ? 0 : -1"
               :aria-disabled="!!s.originalRecovery" :aria-checked="s.method === tab.id" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
               <view class="pp-opt__tx"><text class="pp-tab__a">{{ tab.title }}</text><text class="pp-tab__b">{{ tab.chain }}</text></view><view class="pp-radio" aria-hidden="true" />
@@ -317,12 +317,12 @@ const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().sa
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
 const walletEnough = computed(() => Number(s.amount) === 0 || balanceKnown.value && app.user.usdtBalance >= Number(s.amount));
 const shortfall = computed(() => balanceKnown.value && Number(s.amount) > 0 ? Math.max(0, Number(s.amount) - app.user.usdtBalance) : 0);
-const usdtAvailable = computed(() => payment.available('CREGIS_USDT_BSC') || payment.available('CREGIS_USDT_ERC20') || payment.available('CREGIS_USDT_TRC20'));
 const networks = computed(() => [
   { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
   { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
   { id: 'CREGIS_USDT_TRC20' as const, title: copy.value.trc20, chain: copy.value.trc20Chain },
 ].filter(tab => payment.available(tab.id)));
+const usdtAvailable = computed(() => networks.value.length > 0);
 // A concluded payment has nothing left to offer behind its notice.
 const sheetOpen = computed(() => active.value && s.open && !s.pending && !s.concluded);
 const pageOpen = computed(() => active.value && s.open && !!s.pending && !s.concluded);
@@ -482,8 +482,10 @@ function copyText(data: string, message: string) { uni.setClipboardData({ data, 
 function copyAddress() { if (s.intent?.address) copyText(s.intent.address, copy.value.copied); }
 function copyAmount() { const value = fees.value?.totalUsdt; if (value) copyText(value, copy.value.amountCopied); }
 /** Arrow keys move through a radio group; in the network tabs they also choose the network. */
-function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
-  const items = Array.from((event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]:not([aria-disabled="true"])'));
+function moveFocus(delta: number, choose = false) {
+  // uni-app hands the handler a normalized currentTarget, not the element: start from the focused radio instead.
+  const group = (document.activeElement as HTMLElement | null)?.closest('[role="radiogroup"]');
+  const items = Array.from(group?.querySelectorAll<HTMLElement>('[role="radio"]:not([aria-disabled="true"])') ?? []);
   const next = items[(items.indexOf(document.activeElement as HTMLElement) + delta + items.length) % items.length];
   next?.focus();
   if (choose && next) next.click();
