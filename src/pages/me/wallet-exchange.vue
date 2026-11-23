@@ -33,8 +33,8 @@
         <view class="ex-how" role="button" tabindex="0" :aria-label="t.exchange.howItWorksEntry" @click="goHowItWorks"  @keydown.enter.prevent="goHowItWorks" @keydown.space.prevent="goHowItWorks">
           <text class="nx-after-chevron">{{ t.exchange.howItWorksEntry }}</text>
         </view>
-        <view class="ex-fresh">
-          <svg class="ex-fresh__ring" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle class="ex-fresh__trk" cx="9" cy="9" r="7" /><circle class="ex-fresh__val" cx="9" cy="9" r="7" :style="{ strokeDashoffset: `${(44 * (1 - rateFreshness)).toFixed(1)}` }" /></svg>
+        <view class="ex-fresh" :style="{ '--ex-fresh-offset': (44 * (1 - rateFreshness)).toFixed(1) }">
+          <svg class="ex-fresh__ring" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle class="ex-fresh__trk" cx="9" cy="9" r="7" /><circle class="ex-fresh__val" cx="9" cy="9" r="7" /></svg>
           <text class="ex-k ex-fresh__t">{{ updatedLabel }}</text>
         </view>
       </view>
@@ -101,8 +101,8 @@
       <!-- Daily cap as a ring card (risk-control dashboard), queue below when present. -->
       <view class="ex-quota">
         <view class="ex-quota__top">
-          <view class="ex-ring" role="img" :aria-label="`${t.exchange.yourDaily} ${userCapPct}%`">
-            <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="ex-ring__trk" cx="30" cy="30" r="26" /><circle class="ex-ring__val" cx="30" cy="30" r="26" :style="{ strokeDashoffset: `${(163 * (1 - userCapPct / 100)).toFixed(1)}` }" /></svg>
+          <view class="ex-ring" role="img" :aria-label="`${t.exchange.yourDaily} ${userCapPct}%`" :style="{ '--ex-ring-offset': (163 * (1 - userCapPct / 100)).toFixed(1) }">
+            <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="ex-ring__trk" cx="30" cy="30" r="26" /><circle class="ex-ring__val" cx="30" cy="30" r="26" /></svg>
             <text class="ex-ring__b">{{ remoteApiEnabled && !remoteState ? '—' : `${userCapPct}%` }}</text>
           </view>
           <view class="ex-quota__grow">
@@ -1090,7 +1090,9 @@ const historyEmptyStyle: CSSProperties = {
 .ex-fresh { display: flex; align-items: center; gap: 6px; min-width: 0; text-align: right; }
 .ex-fresh__ring { transform: rotate(-90deg); }
 .ex-fresh__trk { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 12%, transparent); stroke-width: 2.5; }
-.ex-fresh__val { fill: none; stroke: var(--v5-brand); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 44; transition: stroke-dashoffset .5s linear; }
+/* Both rings take their value from a CSS variable on the real wrapper: on the App the svg is written through
+   NxNativeSvg, and a changing attribute would rewrite it each tick (no transition, draw-in replayed). */
+.ex-fresh__val { fill: none; stroke: var(--v5-brand); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 44; stroke-dashoffset: var(--ex-fresh-offset); transition: stroke-dashoffset .5s linear; }
 .ex-refresh { display: grid; place-items: center; width: 44px; height: 44px; color: var(--v5-ink-3); cursor: pointer; }
 .ex-refresh[aria-disabled="true"] { opacity: .5; }
 .ex-pair { position: relative; display: flex; flex-direction: column; gap: 8px; margin: 0 16px; }
@@ -1117,7 +1119,7 @@ const historyEmptyStyle: CSSProperties = {
 .ex-coin--usdt { background: var(--v5-surface-3); color: var(--v5-ink); }
 .ex-swap { position: absolute; left: 50%; top: 50%; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand); cursor: pointer;
   box-shadow: 0 0 0 4px var(--v5-bg), var(--ui-glass-edge-shadow); transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
-.ex-swap > svg { animation: ex-flip 700ms 520ms cubic-bezier(.2,.8,.2,1) both; }
+.ex-swap > svg, .ex-swap > .nx-native-svg { animation: ex-flip 700ms 520ms cubic-bezier(.2,.8,.2,1) both; }
 @keyframes ex-flip { from { transform: rotate(-180deg); } }
 .ex-swap:active { transform: scale(.97); }
 .ex-fees { margin: 12px 16px 0; padding: 4px 16px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
@@ -1127,13 +1129,13 @@ const historyEmptyStyle: CSSProperties = {
 .ex-fees__v { color: var(--v5-ink); font: 500 14px/20px var(--font-metric); }
 .ex-tag-ok { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-success-soft); color: var(--v5-success-ink); font: 500 12px/16px var(--font-v5); }
 .ex-note { display: flex; align-items: flex-start; gap: 8px; margin: 12px 20px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.ex-note > svg { flex: none; margin-top: 2px; color: var(--v5-nex-ink); }
+.ex-note > svg, .ex-note > .nx-native-svg { flex: none; margin-top: 2px; color: var(--v5-nex-ink); }
 .ex-quota { margin: 16px 16px 0; padding: 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .ex-quota__top { display: flex; align-items: center; gap: 16px; }
 .ex-ring { position: relative; flex: none; width: 60px; height: 60px; }
-.ex-ring > svg { transform: rotate(-90deg); }
+.ex-ring > svg, .ex-ring > .nx-native-svg { transform: rotate(-90deg); }
 .ex-ring__trk { fill: none; stroke: var(--v5-surface-3); stroke-width: 6; }
-.ex-ring__val { fill: none; stroke: var(--v5-brand); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 163; animation: ex-ring-draw 1400ms cubic-bezier(.16,1,.3,1) both; }
+.ex-ring__val { fill: none; stroke: var(--v5-brand); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 163; stroke-dashoffset: var(--ex-ring-offset); animation: ex-ring-draw 1400ms cubic-bezier(.16,1,.3,1) both; }
 @keyframes ex-ring-draw { from { stroke-dashoffset: 163; } }
 .ex-ring__b { position: absolute; inset: 0; display: grid; place-items: center; color: var(--v5-ink); font: 500 12px/16px var(--font-metric); }
 .ex-quota__grow { flex: 1; min-width: 0; }
@@ -1154,5 +1156,5 @@ const historyEmptyStyle: CSSProperties = {
 .ex-confirm { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
 .ex-confirm--on { cursor: pointer; }
 .ex-confirm--on:active { transform: scale(.98); }
-@media (prefers-reduced-motion: reduce) { .ex-swap > svg, .ex-ring__val { animation: none; } .ex-swap:active, .ex-confirm--on:active { transform: none; } .ex-fresh__val { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ex-swap > svg, .ex-swap > .nx-native-svg, .ex-ring__val { animation: none; } .ex-swap:active, .ex-confirm--on:active { transform: none; } .ex-fresh__val { transition: none; } }
 </style>

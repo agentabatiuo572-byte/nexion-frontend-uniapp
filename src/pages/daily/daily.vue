@@ -1072,7 +1072,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-wlk { display: flex; align-items: center; justify-content: space-between; gap: 10px; box-sizing: content-box; min-height: 48px; margin: 0 -16px; padding: 0 16px; border-top: 1px solid var(--v5-border); font: 500 13px/18px var(--font-v5); color: var(--v5-ink); cursor: pointer; }
 .dly-wlk__l { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dly-wlk__l svg { flex: none; color: var(--v5-warning-ink); }
-.dly-wlk > svg { flex: none; color: var(--v5-ink-3); }
+.dly-wlk > svg, .dly-wlk > .nx-native-svg { flex: none; color: var(--v5-ink-3); }
 
 /* Recent */
 .dly-hs { margin: 0 18px; }

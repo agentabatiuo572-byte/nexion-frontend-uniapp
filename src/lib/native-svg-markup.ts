@@ -32,9 +32,15 @@ function childrenMarkup(nodes: unknown): string {
   if (node.type === Fragment) return childrenMarkup(node.children);
   if (node.type === Text) return escape(node.children ?? "");
   if (typeof node.type !== "string" || !SVG_TAGS.has(node.type)) return "";
-  return `<${node.type}${attrText(node.props ?? {})}>${childrenMarkup(node.children)}</${node.type}>`;
+  return `<${node.type}${attrText(node.props ?? {})}${scopeAttr(node.scopeId)}>${childrenMarkup(node.children)}</${node.type}>`;
 }
 
-export function svgMarkup(attrs: Record<string, unknown>, children: VNode[]): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg"${attrText(attrs)}>${childrenMarkup(children)}</svg>`;
+// Vue marks every element a scoped template renders with that template's data-v attribute; markup written
+// through v-html gets none, so it is added here and the page's own scoped rules reach the svg as on H5.
+function scopeAttr(scopeId: string | null | undefined): string {
+  return scopeId && /^data-v-[\w-]+$/.test(scopeId) ? ` ${scopeId}=""` : "";
+}
+
+export function svgMarkup(attrs: Record<string, unknown>, children: VNode[], scopeId?: string | null): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg"${attrText(attrs)}${scopeAttr(scopeId)}>${childrenMarkup(children)}</svg>`;
 }

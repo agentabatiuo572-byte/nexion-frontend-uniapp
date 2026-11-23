@@ -1105,7 +1105,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-fact__v { display: block; margin-top: 4px; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
 .nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.nx-bank-hint > svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
+.nx-bank-hint > svg, .nx-bank-hint > .nx-native-svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
 /* Hosted payment: countdown ring on the glass slab, order summary card. */
 /* Order/credited stages open right under the header (switch and rate line hidden); 15px clears its collapsing 12px margin as on the board. */
 .nx-step-in > .nx-bank-stage:first-child { margin-top: 15px; }
