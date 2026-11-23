@@ -1256,12 +1256,12 @@ async function handleRevoke(s: SessionListItem) {
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
   // Name the row the user tapped and what ends (03 §3.5): two installs can share a name, network and relative time, so
-  // the exact last-active time tells them apart.
+  // the exact last-active time tells them apart. The 「·」 never ends a line and the date and time stay together.
   const ok = await uiConfirm({
     title: t.value.security.sessionRevokeConfirm,
     message: fmt(t.value.security.sessionRevokeConfirmBody, {
-      device: sessionDeviceLabel(s),
-      time: formatDisplayDateTime(s.lastActiveMs, dateLocale()),
+      device: sessionDeviceLabel(s).replace(/ · /g, "\u00A0·\u00A0"),
+      time: formatDisplayDateTime(s.lastActiveMs, dateLocale()).replace(/ /g, "\u00A0"),
     }),
     danger: true,
     confirmLabel: t.value.security.sessionRevoke,

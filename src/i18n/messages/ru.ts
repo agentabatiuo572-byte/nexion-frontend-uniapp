@@ -3280,7 +3280,7 @@ export const ru: Messages = {
     sessionRevoke: "Выйти",
     sessionRevoked: "Выход выполнен",
     sessionRevokeConfirm: "Выйти на выбранном устройстве?",
-    sessionRevokeConfirmBody: "Все входы на устройстве {device} (последняя активность {time}) будут завершены, потребуется войти снова.",
+    sessionRevokeConfirmBody: "Все входы на устройстве {device} (последняя активность {time}) будут завершены.",
     revokeAll: "Выйти на всех других устройствах",
     revokeAllConfirm: "На других устройствах произойдёт выход, нужно будет войти снова.",
     revokeAllDone: "Выход на других устройствах выполнен",
