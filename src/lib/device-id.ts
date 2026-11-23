@@ -30,6 +30,7 @@ interface SysInfo {
   platform?: string;
   system?: string;
   osName?: string;
+  osVersion?: string;
 }
 
 function readSystemInfo(): SysInfo {
@@ -41,22 +42,62 @@ function readSystemInfo(): SysInfo {
   }
 }
 
-/** Build a friendly device name from system info (fail-soft to "Web device"). */
-function deriveDeviceName(info: SysInfo): string {
+function deviceModelName(info: SysInfo): string {
   const brand = (info.brand || "").trim();
   const model = (info.model || info.deviceModel || "").trim();
-  const platform = (info.platform || "").trim();
-  const system = (info.system || info.osName || "").trim();
-
-  if (brand && model) return `${brand} ${model}`;
-  if (model) return model;
-  if (platform && system) return `${cap(platform)} · ${system}`;
-  if (platform) return cap(platform);
-  return "Web device";
+  return brand && model ? `${brand} ${model}` : model;
 }
 
-function cap(s: string): string {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+function deriveDeviceName(info: SysInfo): string {
+  const platform = (info.platform || "").trim();
+  const system = (info.system || info.osName || "").trim();
+  return deviceModelName(info)
+    || (platform && system ? `${cap(platform)} · ${system}` : cap(platform))
+    || "Web device";
+}
+
+function nativeLoginDeviceName(info: SysInfo): string | undefined {
+  const brand = cap((info.brand || "").trim());
+  const device = deviceModelName({ ...info, brand }) || brand;
+  const osName = (info.osName || info.platform || "").trim();
+  const osVersion = (info.osVersion || "").trim();
+  const system = (info.system || "").trim();
+  const os = /^ios$/i.test(osName) ? "iOS" : cap(osName);
+  const systemLabel = system && system.toLowerCase() !== osName.toLowerCase()
+    ? system
+    : [os || system, osVersion].filter(Boolean).join(" ");
+  return [device, systemLabel].filter(Boolean).join(" · ") || undefined;
+}
+
+function cap(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** Read the label for a new login without reusing a historical installation label. */
+export function getLoginDeviceName(native: boolean): string | undefined {
+  if (native) return nativeLoginDeviceName(readSystemInfo());
+  if (typeof navigator === "undefined") return undefined;
+  const ua = navigator.userAgent;
+  const browsers = [
+    [/Edg(?:A|iOS)?\//, "Edge"],
+    [/OPR\//, "Opera"],
+    [/SamsungBrowser\//, "Samsung Internet"],
+    [/(?:Firefox|FxiOS)\//, "Firefox"],
+    [/(?:Chrome|CriOS)\//, "Chrome"],
+    [/Chromium\//, "Chromium"],
+    [/Version\/.*Safari\//, "Safari"],
+  ] as const;
+  const systems = [
+    [/Android/, "Android"],
+    [/iPad|iPhone|iPod/, "iOS"],
+    [/CrOS/, "ChromeOS"],
+    [/Windows/, "Windows"],
+    [/Macintosh|Mac OS X/, "macOS"],
+    [/Linux/, "Linux"],
+  ] as const;
+  const browser = browsers.find(([pattern]) => pattern.test(ua))?.[1];
+  const system = systems.find(([pattern]) => pattern.test(ua))?.[1];
+  return browser && system ? `${browser} · ${system}` : undefined;
 }
 
 /**

@@ -7,6 +7,7 @@ export interface LoginAttempt {
   recoveryProof: string;
   installationId: string;
   executionSupported: boolean;
+  deviceName?: string;
   authMethod: string;
   authReference: string;
   pending: boolean;
@@ -14,17 +15,18 @@ export interface LoginAttempt {
 }
 
 /** Credentials/OTP never enter this record. The proof uses the encrypted native adapter. */
-export function createLoginAttempt(deps: { storage?: KeyValueStorage; installationId: () => string; executionSupported: () => boolean }) {
+export function createLoginAttempt(deps: { clientSurface?: "APP" | "H5"; storage?: KeyValueStorage; installationId: () => string; executionSupported: () => boolean; deviceName?: () => string | undefined }) {
   let current: LoginAttempt | null = null;
   function read() {
-    if (current && current.installationId !== deps.installationId())
+    // H5 may recover an attempt with the legacy empty installation ID.
+    if (deps.clientSurface !== "H5" && current && current.installationId !== deps.installationId())
       throw new ApiError({ kind: "configuration", message: "LOGIN_INSTALLATION_CHANGED" });
     if (!current) {
       const saved = deps.storage?.get() as LoginAttempt | null;
       if (saved && /^[A-Za-z0-9_-]{16,80}$/.test(saved.loginAttemptId)
           && /^[A-Za-z0-9_-]{43,128}$/.test(saved.recoveryProof)
           && typeof saved.pending === "boolean") {
-        if (saved.installationId !== deps.installationId())
+        if (deps.clientSurface !== "H5" && saved.installationId !== deps.installationId())
           throw new ApiError({ kind: "configuration", message: "LOGIN_INSTALLATION_CHANGED" });
         current = saved;
       }
@@ -48,6 +50,7 @@ export function createLoginAttempt(deps: { storage?: KeyValueStorage; installati
       const attempt = { ...(continuation ? old : {
         loginAttemptId: requireCryptoUuid(), recoveryProof: (requireCryptoUuid() + requireCryptoUuid()).replace(/-/g, ""),
         installationId: deps.installationId(), executionSupported: deps.executionSupported(),
+        deviceName: deps.deviceName?.(),
       }), authMethod, authReference, context, pending: true } as LoginAttempt;
       save(attempt);
       return attempt;

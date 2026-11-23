@@ -58,9 +58,7 @@
           <text v-if="displayTwoFactorEnabled === null" :style="unavailableValueStyle">{{ unknownMark(remoteSecurityReadFailed) }}</text>
           <view v-else class="shrink-0 flex items-center justify-center transition-opacity" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'" style="width: 44px; height: 44px" role="switch"
             :tabindex="sessionWriteDisabled ? -1 : 0" :aria-label="withReadReason(t.security.twoFactorSwitchLabel, remoteSecurityReadFailed)" :aria-checked="displayTwoFactorEnabled" :aria-disabled="sessionWriteDisabled" @click="openTwoFactorSheet">
-            <view :style="toggleTrackStyle">
-              <view class="security-toggle-thumb" :style="toggleThumbStyle" />
-            </view>
+            <NxSwitch :checked="displayTwoFactorEnabled" />
           </view>
         </view>
 
@@ -82,7 +80,7 @@
       </view>
 
       <!-- ───── Active sessions ───── -->
-      <text class="block mx-4" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
+      <text class="block mx-4 security-section-head" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
       <view class="nx-glass-card mx-4" :style="[cardStyle, groupGap]">
         <view v-if="remoteApiEnabled && !securityPresentation" class="flex items-center" :style="rowStyle">
           <text :style="unavailableValueStyle">{{ unknownMark(remoteSecurityReadFailed) }}</text>
@@ -97,14 +95,20 @@
             <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
           </NxIconTile>
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="rowLabelStyle">{{ sessionDeviceLabel(s) }}</text>
-            <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
+            <view class="security-session-parts" :style="sessionLabelStyle">
+              <text class="security-session-parts__lead">{{ deviceNameParts(s)[0] }}</text>
+              <view v-for="(part, k) in deviceNameParts(s).slice(1)" :key="k" class="security-session-parts__tail"><text aria-hidden="true">·</text><text>{{ part }}</text></view>
+            </view>
+            <view class="security-session-parts security-session-meta" :style="sessionMetaStyle">
+              <text class="security-session-parts__lead">{{ sessionSecondaryParts(s)[0] }}</text>
+              <view class="security-session-parts__tail"><text aria-hidden="true">·</text><text>{{ sessionSecondaryParts(s)[1] }}</text></view>
+            </view>
           </view>
-          <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
+          <NxTag v-if="s.current" tone="success" :label="t.security.sessionCurrent" />
           <view v-else class="grid place-items-center" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'"
             :style="revokeBtnStyle" role="button" :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled"
             :data-disabled-reason="sessionWriteUnavailableReason" :aria-label="withReadReason(`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`, remoteSecurityReadFailed)" @click="handleRevoke(s)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
         <view v-if="displaySessions.some(s => !s.current)" class="flex items-center justify-center transition-transform"
@@ -243,6 +247,8 @@ import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import NxSwitch from "@/components/ui/nx-switch.vue";
 import AccountDeletionReason from "@/components/me/account-deletion-reason.vue";
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
@@ -266,7 +272,6 @@ import { useStaking } from "@/store/staking";
 import { useConfig } from "@/store/config";
 import { navReset, navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
-import { nexGridBrandText } from "@/lib/brand-copy";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { dialCodeForLocale, validateNationalPhone } from "@/auth/phone-number";
@@ -485,8 +490,8 @@ const modeLabel = computed(() => apiEnvironmentBadgeLabel(apiRuntimeConfig, t.va
 const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (remoteSecurity.value?.sessions ?? []).map((item) => ({
       id: item.id,
-      deviceName: nexGridBrandText(item.deviceName),
-      device: nexGridBrandText(item.deviceName),
+      deviceName: item.deviceName,
+      device: item.deviceName,
       location: item.ipMasked,
       ip: item.ipMasked,
       // 🔴 zentao #228:`lastActiveAt` 是 Java `LocalDateTime` 序列化出来的**无时区**串,
@@ -501,8 +506,8 @@ const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
 const displaySessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (securityPresentation.value?.sessions ?? []).map((item) => ({
       id: item.id,
-      deviceName: nexGridBrandText(item.deviceName),
-      device: nexGridBrandText(item.deviceName),
+      deviceName: item.deviceName,
+      device: item.deviceName,
       location: item.ipMasked,
       ip: item.ipMasked,
       // 🔴 zentao #228:`lastActiveAt` 是 Java `LocalDateTime` 序列化出来的**无时区**串,
@@ -1034,9 +1039,16 @@ function sessionDeviceLabel(s: SessionListItem): string {
   return remoteApiEnabled ? s.deviceName : `${s.deviceName} · ${surfaceLabel(s)}`;
 }
 
-function sessionSecondaryLabel(s: SessionListItem): string {
+// Display only: a device name reads 「品牌 型号 · 系统」 or 「浏览器 · 系统」, and its parts wrap as units (03 §3.6.1).
+// A model code such as SM-A5760 never breaks at its hyphen (non-breaking hyphen U+2011, also in the confirm).
+function deviceNameParts(s: SessionListItem): string[] {
+  return sessionDeviceLabel(s).replace(/-/g, "\u2011").split(" · ");
+}
+
+// Where and when, wrapped as units like the name.
+function sessionSecondaryParts(s: SessionListItem): [string, string] {
   const location = remoteApiEnabled ? s.ip : t.value.security.sessionLocation;
-  return `${location} · ${lastActiveLabel(s.lastActiveMs)}`;
+  return [location, lastActiveLabel(s.lastActiveMs)];
 }
 
 function lastActiveLabel(ms: number | null): string {
@@ -1244,9 +1256,14 @@ async function handleRevoke(s: SessionListItem) {
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  // Name the row the user tapped and what ends (03 §3.5): two installs can share a name, network and relative time, so
+  // the exact last-active time tells them apart. The 「·」 never ends a line and the date and time stay together.
   const ok = await uiConfirm({
-    title: t.value.security.sessionRevoke,
-    message: `${t.value.security.sessionRevokeConfirm}\n\n${sessionDeviceLabel(s)} · ${t.value.security.sessionLocation}`,
+    title: t.value.security.sessionRevokeConfirm,
+    message: fmt(t.value.security.sessionRevokeConfirmBody, {
+      device: sessionDeviceLabel(s).replace(/-/g, "\u2011").replace(/ · /g, "\u00A0·\u00A0"),
+      time: formatDisplayDateTime(s.lastActiveMs, dateLocale()).replace(/ /g, "\u00A0"),
+    }),
     danger: true,
     confirmLabel: t.value.security.sessionRevoke,
     owner: securityConfirmOwner,
@@ -1603,10 +1620,12 @@ const rowBorderedStyle: CSSProperties = {
   padding: "9.5px 0",
   borderTop: "1px solid var(--v5-border)",
 };
+// Settings rows (password, 2FA, phone) are menu rows: list-title role at 400 (03 §3.5, 10.1).
 const rowLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  lineHeight: "20px",
+  fontSize: "var(--ui-type-list-title)",
+  lineHeight: "var(--ui-type-list-title-lh)",
+  fontWeight: 400,
   color: "var(--v5-ink)",
 };
 const rowSubStyle: CSSProperties = {
@@ -1614,6 +1633,21 @@ const rowSubStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   lineHeight: "16px",
+  color: "var(--v5-ink-3)",
+};
+// A device row is a content row, its name over a subtitle: list-title role at 500, the list-subtitle role 4px under it
+// (03 §3.5, 01 §1.3, 10.1). The settings rows above stay menu rows at 400.
+const sessionLabelStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "var(--ui-type-list-title)",
+  lineHeight: "var(--ui-type-list-title-lh)",
+  fontWeight: "var(--ui-type-list-title-weight)",
+  color: "var(--v5-ink)",
+};
+const sessionMetaStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "var(--ui-type-list-subtitle)",
+  lineHeight: "var(--ui-type-list-subtitle-lh)",
   color: "var(--v5-ink-3)",
 };
 const passwordHintStyle: CSSProperties = { ...rowSubStyle, lineHeight: "16px", whiteSpace: "normal", overflowWrap: "break-word" };
@@ -1645,17 +1679,16 @@ const unavailableValueStyle: CSSProperties = {
   fontSize: "15px",
   color: "var(--v5-ink-4)",
 };
-// Section label (de-card spec): 15/600/ink.
+// Section title role (03 §3.9, 10.1); its tracking is in .security-section-head (01 §1.2).
 const sectionHeadStyle: CSSProperties = {
   marginLeft: "var(--v5-space-5)",
   marginRight: "var(--v5-space-5)",
   marginTop: "var(--v5-space-8)",
   marginBottom: "var(--v5-space-3)",
   fontFamily: "var(--font-v5)",
-  fontSize: "17px",
-  lineHeight: "24px",
-  fontWeight: 600,
-  letterSpacing: "-0.012em",
+  fontSize: "var(--ui-type-section)",
+  lineHeight: "var(--ui-type-section-lh)",
+  fontWeight: "var(--ui-type-section-weight)",
   color: "var(--v5-ink)",
 };
 const pwdFormStyle: CSSProperties = {
@@ -1701,35 +1734,6 @@ const pwdSaveLabelStyle: CSSProperties = {
   fontWeight: "var(--ui-type-button-weight)",
   color: "var(--v5-on-brand)",
 };
-const toggleTrackStyle = computed<CSSProperties>(() => ({
-  position: "relative",
-  width: "44px",
-  height: "26px",
-  borderRadius: "var(--v5-radius-full)",
-  background: displayTwoFactorEnabled.value ? "var(--v5-brand)" : "var(--v5-surface-3)",
-  boxShadow: displayTwoFactorEnabled.value ? "none" : "inset 0 0 0 1px var(--v5-border)",
-
-}));
-const toggleThumbStyle = computed<CSSProperties>(() => ({
-  position: "absolute",
-  top: "3px",
-  left: "3px",
-  width: "20px",
-  height: "20px",
-  borderRadius: "var(--v5-radius-full)",
-  background: "var(--ui-switch-thumb)",
-  boxShadow: "0 1px 3px var(--v5-bg-color-mask)",
-  transform: `translateX(${displayTwoFactorEnabled.value ? 18 : 0}px)`,
-  transition: "transform 200ms ease",
-}));
-const currentBadgeStyle: CSSProperties = {
-  flexShrink: 0,
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  lineHeight: "16px",
-  fontWeight: 400,
-  color: "var(--v5-success-ink)",
-};
 const revokeBtnStyle: CSSProperties = {
   width: "44px",
   height: "44px",
@@ -1766,6 +1770,21 @@ const dangerLabelStyle: CSSProperties = {
 .security-phone { margin-top:0!important; border-radius:0 0 22px 22px!important; }
 .security-phone > view:first-child { margin-inline:-16px; padding-inline:16px!important; border-top:1px solid var(--v5-border); }
 .security-session-meta { font-family:var(--font-metric)!important; }
+/* 17–23px titles track -0.01em; the 16px tier below 375 and Chinese take none (01 §1.2). */
+@media (min-width: 375px) { .security-section-head { letter-spacing:-.01em; } }
+.security-section-head:lang(zh) { letter-spacing:0; }
+/* A device row opens nothing, so its name and its IP and time line are never cut (03 §3.6.1): their parts (model,
+   system; IP, time) wrap as units, a part longer than the line wraps between words, and the "·" travels with the part
+   after it. When that part starts a new line, the separator (--sep wide) and its 4px gap fall into the space the line
+   is shifted left by and clipped at, as on the home feed. The revoke button keeps its 44px target beside the wrapped
+   text. The monospaced IP and time line gives its "·" a monospaced cell. */
+.security-session-parts { --sep:4px; display:flex; flex-wrap:wrap; column-gap:var(--v5-space-1); margin-left:calc(-4px - var(--sep)); clip-path:inset(-4px -4px -4px calc(4px + var(--sep))); }
+.security-session-parts > :first-child { margin-left:calc(4px + var(--sep)); }
+.security-session-parts__lead { min-width:0; overflow-wrap:break-word; }
+.security-session-parts__tail { display:inline-flex; gap:var(--v5-space-1); min-width:0; }
+.security-session-parts__tail > :first-child { flex:none; width:var(--sep); text-align:center; }
+.security-session-parts__tail > :last-child { min-width:0; overflow-wrap:break-word; }
+.security-session-parts.security-session-meta { --sep:.6em; }
 .security-providers :deep([data-provider="Google"] .auth-provider__icon) { width:22px; height:22px; flex-basis:22px; }
 .security-providers :deep([data-provider="Google"] svg) { width:22px; height:22px; flex-shrink:0; }
 .security-providers :deep([data-provider="Apple"] .auth-provider__icon) { color:var(--v5-ink); }
