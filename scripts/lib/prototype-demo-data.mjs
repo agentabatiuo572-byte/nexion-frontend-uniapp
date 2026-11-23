@@ -121,6 +121,14 @@ const skuDefinitions = [
   ['stellarrack-p2','UVELRack P2','Flagship',19999,2250,50,'8 × H100','1,024 GB',4000],
   ['cloud-share','Cloud Share','Share',19.9,18,3,'Distributed','—',0],
 ];
+const demoCatalogBadges = [
+  {badge:'Recommended',badgeKind:'recommended'},
+  {badge:'Best seller',badgeKind:'bestSeller'},
+  {badge:'Trending',badgeKind:'trending'},
+  {badge:'Upgrade pick',badgeKind:'upgradePick'},
+  {badge:'Flagship',badgeKind:'flagship'},
+  {badge:'Low barrier',badgeKind:'lowBarrier'},
+];
 const demoPromotionGift={orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',obligationId:'demo-reward-3',productNo:'stellarbox-s1',quantity:1};
 // The paid order keeps the gift terms of its published version even after the live offer changes.
 function promotionDeviceReward(giftName) {
@@ -148,7 +156,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     // The phased preset models a valid E1 phase id that has not been reached.
     return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
       vram:share?'not_applicable':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'not_applicable',hashRate:null,
-      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',badge:index===0?'Recommended':index===1?'Best seller':null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
+      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[index],imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
@@ -1193,7 +1201,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
     const sample=base('/api/promotions').items[0];
     const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
-    const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
+    const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share'],['DIRECT_REFERRAL','邀请好友购机礼（按台）','Referral purchase reward (per unit)','Quà giới thiệu (theo thiết bị)','stellarrack-p2']];
     const authenticated=Boolean(previewAccountId(state,request?.headers?.()??{}));
     const exact=state.repurchaseState==='boundary'||state.repurchaseState==='outside';
     const repurchaseWindow=exact?{minDays:30,maxDays:30}:{minDays:state.repurchaseState==='inside'?7:0,maxDays:90};
@@ -1223,7 +1231,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       }
       if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
       // The referral offer also publishes what the inviter gets for each friend's first purchase.
-      if(template==='DIRECT_REFERRAL')item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:structuredClone(item.rewardRules[0].buyerReward.disclosure)};
+      if(template==='DIRECT_REFERRAL'){
+        const byOrder=i===2;
+        item.firstPurchaseCondition={mode:byOrder?'FIRST_ELIGIBLE_ORDER':'FIRST_ELIGIBLE_UNIT',restoreAfterRefund:byOrder};
+        item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:{...structuredClone(item.rewardRules[0].buyerReward.disclosure),benefitDescription:{zh:'领取 50 UVT',en:'Receive 50 UVT',vi:'Nhận 50 UVT'}}};
+      }
       if(i>0){
         if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
         // Boundary scenarios flip on the clock, one minute after the switch.

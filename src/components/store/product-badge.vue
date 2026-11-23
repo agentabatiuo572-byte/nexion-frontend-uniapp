@@ -9,7 +9,7 @@
 import { computed } from "vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
-import type { ProductBadgeKind } from "@/lib/product-copy";
+import type { ProductBadgeKind } from "@/mock/products";
 
 const props = defineProps<{ label: string; kind: ProductBadgeKind; detail?: boolean }>();
 const TONE = { recommended: "brand", bestSeller: "coral", trending: "warning", upgradePick: "teal", flagship: "neutral", lowBarrier: "sky", custom: "neutral" } as const;
