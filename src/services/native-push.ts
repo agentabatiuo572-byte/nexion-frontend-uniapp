@@ -153,9 +153,12 @@ export function installNativePush(options: { client: ApiClient; vault: SessionVa
     if (captured === nativeEpoch) nativePushPermission.value = state;
     return state;
   };
+  const testIos = platform === "ios" && readHostPackage(platform) === "ai.uvel.app.test";
+  const build = Number(plus.runtime.versionCode);
   controller = createNativePushController(options.client, options.vault, {
     platform, appVersion: plus.runtime.version || "1.0.0", installationId: getDeviceId,
-    apnsTopic: platform === "ios" && readHostPackage(platform) === "ai.uvel.app.test" ? "ai.uvel.app.test" : undefined,
+    appBuild: testIos && Number.isSafeInteger(build) && build > 0 ? build : undefined,
+    apnsTopic: testIos ? "ai.uvel.app.test" : undefined,
     bindingToken() {
       const stored = uni.getStorageSync(proofKey);
       if (typeof stored === "string" && /^[a-f0-9]{64}$/.test(stored)) return stored;
