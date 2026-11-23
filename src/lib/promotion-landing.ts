@@ -8,7 +8,7 @@ import { getProduct } from '@/mock/products';
 import { getProductMedia } from '@/lib/product-media';
 import { isLiteProduct } from '@/lib/lite-scope';
 import { productCatalogState } from '@/store/product-catalog';
-import { displayDeadline, localized, rewardAmount, rewardSummary } from './promotion-display';
+import { displayDeadline, localized, rewardAmount } from './promotion-display';
 
 /** Purchase offers with a dedicated landing page; other templates keep the store entry. */
 export type LandingKind = 'gift' | 'first' | 'repurchase';
@@ -71,7 +71,7 @@ export function rewardParts(activity: PublicPromotion, reward: PublicRewardSpec)
 }
 export function rewardPartsText(parts: RewardParts, copy: Pick<Messages['promotion'], 'orderDiscount'>): string {
   if (parts.asset === 'DEVICE') return `${parts.unit} × ${parts.amount}`;
-  return parts.asset === 'DISCOUNT' ? `${copy.orderDiscount} · ${parts.amount} ${parts.unit}` : `${parts.amount} ${parts.unit}`;
+  return parts.asset === 'DISCOUNT' ? `${copy.orderDiscount} · ${parts.amount}\u00a0${parts.unit}` : `${parts.amount}\u00a0${parts.unit}`;
 }
 
 /** Remaining days use the published clock of the same read, never the device date. */
@@ -115,7 +115,7 @@ export function promotionRepurchaseInterval(activity: PublicPromotion | null) {
 export function promotionTermsRules(activity: PublicPromotion, copy: Messages['promotion'], productName: (sku: string) => string, language: string) {
   const rules = activity.rewardRules.map(rule => {
     const rewards = [rule.buyerReward, rule.inviterReward].filter((reward): reward is NonNullable<typeof reward> => !!reward);
-    return { id: rule.ruleId, text: productName(rule.productNo) + ' · ' + copy.rulePer + ' ' + rule.minBuyQty + ' · ' + (rule.repeatMode === 'PER_GROUP' ? copy.perGroup : copy.oncePerOrder) + '\n' + rewards.map(reward => (reward.beneficiaryRole === 'BUYER' ? copy.buyer : copy.inviter) + ' · ' + rewardSummary(reward, copy, reward.disclosure.deviceName)).join(' / ') + '\n' + [rule.maxGroups.mode === 'LIMITED' ? fmt(copy.orderRewardLimit, { n: rule.maxGroups.value }) : '', rule.maxGroupsPerPerson.mode === 'LIMITED' ? fmt(copy.personRewardLimit, { n: rule.maxGroupsPerPerson.value }) : ''].filter(Boolean).join(' · ') };
+    return { id: rule.ruleId, text: productName(rule.productNo) + ' · ' + copy.rulePer + ' ' + rule.minBuyQty + ' · ' + (rule.repeatMode === 'PER_GROUP' ? copy.perGroup : copy.oncePerOrder) + '\n' + rewards.map(reward => (reward.beneficiaryRole === 'BUYER' ? copy.buyer : copy.inviter) + ' · ' + rewardPartsText(rewardParts(activity, reward), copy)).join(' / ') + '\n' + [rule.maxGroups.mode === 'LIMITED' ? fmt(copy.orderRewardLimit, { n: rule.maxGroups.value }) : '', rule.maxGroupsPerPerson.mode === 'LIMITED' ? fmt(copy.personRewardLimit, { n: rule.maxGroupsPerPerson.value }) : ''].filter(Boolean).join(' · ') };
   });
   // A referral offer states how the friend's first purchase is counted, after the rules that pay for it.
   const condition = activity.firstPurchaseCondition, landing = landingCopy(language);
