@@ -6,7 +6,7 @@
     </view>
     <view class="nx-feed-copy">
       <text class="nx-feed-title">{{ visibility.mask(row.name) }}</text>
-      <view class="nx-feed-sub nx-feed-sub--split nx-feed-sub--wrap"><text class="nx-feed-sub__lead">{{ row.confirming ? computeCopy.confirming : row.simulated && row.status === 'RUNNING' ? computeCopy.running : row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text><text aria-hidden="true">·</text><text class="nx-feed-sub__time nx-feed-est">{{ t.home.feedEstimated }} {{ visibility.mask(row.rewardText) }}</text></view>
+      <view class="nx-feed-sub nx-feed-sub--split nx-feed-sub--wrap"><text class="nx-feed-sub__lead">{{ row.confirming ? computeCopy.confirming : row.simulated && row.status === 'RUNNING' ? computeCopy.running : row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text><view class="nx-feed-sub__tail"><text aria-hidden="true">·</text><text class="nx-feed-sub__time nx-feed-est">{{ t.home.feedEstimated }} {{ visibility.mask(row.rewardText) }}</text></view></view>
     </view>
     <view class="nx-feed-figure">
       <text class="nx-feed-pct font-mono-tabular">{{ visibility.mask(row.pct == null ? '—' : `${row.pct}%`) }}</text>
