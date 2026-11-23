@@ -10,7 +10,7 @@ export function eventDetailRules(rules: EventDetail["rules"], copy: typeof event
     const value = rules[key];
     if (value === undefined || value === null || value === "") return [];
     if (key === "weekdays" && Array.isArray(value)) return [{ label, value: value.map(day => copy.weekdays[Number(day) - 1]).filter(Boolean).join(" · ") }];
-    if (key === "windowDays" && (typeof value === "number" || typeof value === "string")) return [{ label, value: `${value}\u00a0${copy.days}` }];
+    if (key === "windowDays" && (typeof value === "number" || typeof value === "string")) return [{ label, value: `${value}\u00a0${Number(value) === 1 ? copy.day : copy.days}` }];
     if (key === "regions" && Array.isArray(value)) return [{ label, value: value.map(region => typeof region?.name === "string" ? region.name : "").filter(Boolean).join(" · ") }];
     return typeof value === "string" || typeof value === "number" ? [{ label, value: String(value) }] : [];
   }).filter(row => row.value);
