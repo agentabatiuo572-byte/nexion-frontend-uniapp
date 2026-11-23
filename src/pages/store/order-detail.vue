@@ -1246,7 +1246,7 @@ const sectionLabelStyle: CSSProperties = {
 .order-hero__pay { flex-grow: 2; }
 .order-sticky { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
 .order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
-.order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
+.order-sticky:not(.order-sticky--result) :deep(.nx-button__surface) { padding-inline: 16px; }
 /* Purchase result bar (board A): the one primary takes the free width, a secondary beside it keeps its label's width
    as a tray text button; two secondaries share the row. It slides up once when the exits appear. */
 .order-sticky--result { animation: order-result-bar-in 260ms cubic-bezier(.16, 1, .3, 1) both; }
