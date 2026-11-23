@@ -62,6 +62,7 @@
         </LoopScope>
       </view>
       <FleetStage />
+      <DeviceSlotReplacementStatus class="mx-4" />
 
       <EarningsLedgerCard class="mx-4 earn-block" />
       <MarketBoard class="earn-block" />
@@ -89,6 +90,7 @@ import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.v
 import EarnHeroTile from "@/components/earn/earn-hero-tile.vue";
 
 import FleetStage from "@/components/earn/fleet-stage.vue";
+import DeviceSlotReplacementStatus from "@/components/me/device-slot-replacement-status.vue";
 import SlotRing from "@/components/slot-ring.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import { useEarningsLedger } from "@/composables/use-earnings-ledger";

@@ -169,8 +169,8 @@
         </view>
       </view>
       <!-- Room for the bottom action bar: the hidden note copy tracks the tray note's height. -->
-      <view v-if="products.length > 0" class="bundle-bar-space" :class="{ 'bundle-bar-space--tray': checkoutUnavailable && checkoutHint }" aria-hidden="true">
-        <text v-if="checkoutUnavailable && checkoutHint" class="bundle-bar-space__note">{{ checkoutHint }}</text>
+      <view v-if="products.length > 0" class="bundle-bar-space" :class="{ 'bundle-bar-space--tray': bundleTrayNote }" aria-hidden="true">
+        <text v-if="bundleTrayNote" class="bundle-bar-space__note">{{ bundleTrayNote }}</text>
       </view>
       </template>
       </template>
@@ -190,7 +190,7 @@
         <view v-else class="promotion-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
       </view>
       <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure && products.length > 0" class="bundle-bar nx-glass-bar">
-        <text v-if="checkoutUnavailable && checkoutHint" class="nx-tray-note">{{ checkoutHint }}</text>
+        <text v-if="bundleTrayNote" class="nx-tray-note" role="status">{{ bundleTrayNote }}</text>
         <view
           class="bundle-bar__cta"
           role="button"
@@ -461,6 +461,15 @@ const checkoutHint = computed(() => {
   if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
   return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
 });
+const bundleTrayNote = computed(() => {
+  if (checkoutUnavailable.value && checkoutHint.value) return checkoutHint.value;
+  if (!remoteApiEnabled || products.value.length < 2 || app.remoteSlotsUsed === null) return "";
+  const slots = Math.max(0, app.slotCap - app.remoteSlotsUsed);
+  const inventory = products.value.length - slots;
+  if (inventory <= 0) return "";
+  return slots === 0 ? t.value.tradein.fullSlotsInventoryNotice
+    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: inventory });
+});
 const BUNDLE_RECEIPT_RECOVERY_KEY = "nexgrid-bundle-receipt-recovery-v1";
 type BundleReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderIds: string[] };
 const receiptWriteFailure = ref<BundleReceiptRecovery | null>(null);
@@ -618,21 +627,6 @@ async function openBundleReview(list:Product[]):Promise<boolean> {
         ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
     }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
     if (!original && list.some((p) => eligibilityUnavailable(p.id))) return true;
-    // Every device and Cloud Share takes one slot; the server refuses a bundle
-    // larger than the free slots, so say so before the review page.
-    const used=app.remoteSlotsUsed;
-    if(!original&&used!==null&&list.length>app.slotCap-used){
-      const scope=captureAccountScope();
-      const manage=await confirm({
-        title:t.value.bundle.slotsShortTitle,
-        message:fmt(t.value.bundle.slotsShortBody,{count:list.length,free:Math.max(0,app.slotCap-used)}),
-        confirmLabel:t.value.bundle.slotsShortManage,
-        cancelLabel:t.value.bundle.slotsShortAdjust,
-        icon:'warn',
-      });
-      if(manage&&isCurrentAccountScope(scope))void navTo('/pages/me/devices');
-      return true;
-    }
     await navTo(promotionCheckoutHref(items));
   }catch{toast.warn(t.value.bundle.checkoutOutcomeUnknown);}
   finally{submitting.value=false;}
@@ -732,15 +726,16 @@ async function onCheckout() {
         await orders.refreshRemote();
         if (!scopeIsCurrent()) return;
         const settled = orders.orders.find((order) => order.id === created.orderNo);
-        if (!settled || settled.status !== "activated") {
+        if (!settled || settled.status !== paid.canonicalStatus) {
           throw new Error("BUNDLE_WALLET_PAYMENT_READBACK_MISMATCH");
         }
         if(paymentKey)clearOrderAction(accountKey,created.orderNo,paymentKey);
         // Order + wallet receipt are already canonical. Fleet projection is
         // best effort and must never cause a second payment submission.
         void app.refreshRemoteFleet(walletReceiptScope);
-        toast.success(t.value.orders.statusActivated);
-        navTo(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`);
+        toast.success(settled.status === "inventory" ? t.value.orders.statusInventory : t.value.orders.statusActivated);
+        const orderHref = "/pages/store/order-detail?id=" + encodeURIComponent(created.orderNo);
+        navTo(settled.status === "inventory" ? orderHref + "&result=delivery" : orderHref);
       } catch (error) {
         const policyStale = error instanceof ApiError && error.message === "BUNDLE_DISCOUNT_POLICY_STALE";
         const quoteStale = error instanceof ApiError && error.message === "BUNDLE_QUOTE_STALE";

@@ -2,7 +2,7 @@
   <view class="promotion promotion-main" :class="{'promotion-main--result':order?.paymentStatus==='PAID'}">
     <view v-if="!auth.isAuthenticated" class="promotion-flat"><text class="promotion-title">{{ p.signIn }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ p.signIn }}</text></PromotionAction></view>
     <view v-else-if="loading" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
-    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" payment-confirmed :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?.imageUrl ?? undefined" :amount="order.paidTotalUsdt??order.amountUsdt" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices" @support="contactResultSupport" v-slot="{ done }">
+    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?.imageUrl ?? undefined" :amount="order.paidTotalUsdt??order.amountUsdt" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices" @support="contactResultSupport" v-slot="{ done }">
       <!-- A secondary action that waits for the result presentation; 查看设备 stays the one primary (PRD purchase payment, line 49). -->
       <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action" role="button" :tabindex="done&&resultSettled?0:-1" :aria-disabled="busy" :aria-hidden="!(done&&resultSettled)" :style="{visibility:done&&resultSettled?'visible':'hidden'}" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
@@ -93,6 +93,7 @@
         </view>
         <view v-if="order ? order.paymentStatus==='PENDING'&&order.payBy : promotion?.endsAt" class="promotion-row"><NxIcon class="promotion-row__icon" name="clock" :size="18" /><view class="promotion-grow"><text class="promotion-copy">{{ order ? p.payBy : p.deadline }}</text><text class="promotion-copy">{{ displayDeadline(order?.payBy??promotion!.endsAt,locale.code) }}</text></view></view>
       </view>
+      <text v-if="inventoryNotice" class="promotion-notice" role="status" data-testid="checkout-inventory-notice">{{ inventoryNotice }}</text>
       <view v-if="displayQuote?.warnings.length" class="promotion-notice"><text v-for="(warning,index) in displayQuote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text></view>
       <template v-if="auth.isAuthenticated">
         <template v-if="order">
@@ -149,7 +150,7 @@ import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { OrderReceipt, PromotionItem } from '@/api/promotion-api';
 import { checkoutQuoteBlock, validatePromotionItems, type CheckoutCreateBlock, type CheckoutQuoteBlock } from '@/api/promotion-api';
-import type { Quote } from '@/api/promotion-contracts';
+import type { Quote } from '@/api/promotion-api';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { useTradeinSheet } from '@/store/tradein-sheet';
@@ -340,10 +341,12 @@ const items=computed<Array<{productNo:string;quantity:number;productName?:string
 const hasDevicePolicy=computed(()=>items.value.some(item=>{const product=getProduct(item.productNo);return !!product&&product.productType!=='SHARE';}));
 function canChangeQuantity(productNo:string,delta:-1|1):boolean {
   const item=selection.value.find(item=>item.productNo===productNo);
+  const product=getProduct(productNo);
+  const stock=product?.inventoryMode==='FINITE'?product.stock:null;
   return current()&&visible.value&&auth.isAuthenticated&&!loading.value&&!busy.value
     &&!openedOriginal&&!props.orderNo&&!session.record.pending&&!order.value&&!unknown.value
     &&!!item&&item.quantity+delta>=1&&selection.value.reduce((sum,item)=>sum+item.quantity,0)+delta<=100
-    &&(delta<0||app.remoteSlotsUsed==null||selection.value.reduce((sum,item)=>sum+item.quantity,0)+delta<=app.slotCap-app.remoteSlotsUsed);
+    &&(delta<0||stock==null||item.quantity+delta<=stock);
 }
 async function changeQuantity(productNo:string,delta:-1|1,event?:KeyboardEvent):Promise<void> {
   if(event?.repeat||!canChangeQuantity(productNo,delta))return;
@@ -561,7 +564,24 @@ async function selectVoucher(id:string|null){
   if(voucherId.value!==id)quoteBlock.value=null;
   voucherId.value=id;voucherOpen.value=false;await loadQuote();
 }
-async function createOrder(){if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;await run(async()=>{createBlock.value=await session.create();});if(canPay.value&&current()&&visible.value){paymentSheetOpen.value=true;void confirmPayment();}}
+const inventoryNotice = computed(() => {
+  const quote = displayQuote.value;
+  if (!quote || order.value || openedOriginal || session.record.pending || unknown.value) return "";
+  const slots = quote.assignableSlots ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed));
+  const quantity = quote.inventoryQuantity ?? (slots === null ? 0 : Math.max(0, quote.quantity - slots));
+  if (quantity === 0) return "";
+  return slots === 0 ? t.value.tradein.fullSlotsInventoryNotice
+    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: quantity });
+});
+async function createOrder(){
+  if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;
+  let orderRequested=false;
+  await run(async()=>{
+    createBlock.value=await session.create();
+    orderRequested=true;
+  });
+  if(orderRequested&&canPay.value&&current()&&visible.value){paymentSheetOpen.value=true;void confirmPayment();}
+}
 const paymentDialogOwner=`promotion-payment:${Date.now()}:${Math.random()}`;
 // Photo signatures can renew while payment terms stay the same.
 function orderItemSignature(items:OrderReceipt['items']){return JSON.stringify(items?.map(({imageUrl,...line})=>line));}

@@ -12,9 +12,11 @@ export function isCanonicalPaidOrder(
   expectedItemCount?: number,
 ): boolean {
   if (!order || order.orderNo !== expectedOrderNo
-      || !["paid", "activated"].includes(order.canonicalStatus)) return false;
-  if (order.paymentStatus.toUpperCase() !== "PAID"
-      || !["PAID", "COMPLETED"].includes(order.orderStatus.toUpperCase())) return false;
-  if (order.canonicalStatus === "activated" && order.activationStatus.toUpperCase() !== "ACTIVATED") return false;
+      || !["paid", "activated", "inventory"].includes(order.canonicalStatus)) return false;
+  const orderStatus = order.orderStatus.toUpperCase();
+  if (order.paymentStatus.toUpperCase() !== "PAID" || !["PAID", "COMPLETED"].includes(orderStatus)) return false;
+  const status = order.canonicalStatus;
+  if (status !== "paid" && order.activationStatus.toUpperCase() !== status.toUpperCase()) return false;
+  if (status === "inventory" && orderStatus !== "COMPLETED") return false;
   return expectedItemCount === undefined || order.itemCount === expectedItemCount;
 }

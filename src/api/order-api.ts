@@ -55,7 +55,15 @@ export interface OrderTrialSettlement {
   rewardNex: number;
 }
 
+export interface OrderDeviceDelivery {
+  activatedDeviceIds: number[];
+  inventoryDeviceIds: number[];
+  activatedQuantity: number;
+  inventoryQuantity: number;
+}
+
 export interface CanonicalOrder {
+  deviceDelivery?: OrderDeviceDelivery;
   orderNo: string;
   productId: number;
   productNo: string;
@@ -133,12 +141,13 @@ export interface CancelledOrder {
 }
 
 export interface PaidOrderReceipt {
+  deviceDelivery?: OrderDeviceDelivery;
   orderNo: string;
   paymentNo: string;
   paymentStatus: "PAID";
   orderStatus: "COMPLETED";
-  activationStatus: "ACTIVATED";
-  canonicalStatus: "activated";
+  activationStatus: "ACTIVATED" | "INVENTORY";
+  canonicalStatus: "activated" | "inventory";
   amountUsdt: number;
   paymentMethod: "WALLET" | "VOUCHER" | "HDPAY_BANK" | "CREGIS_USDT_BSC" | "CREGIS_USDT_ERC20" | "CREGIS_USDT_TRC20";
   paidTotalUsdt?: string;
@@ -376,11 +385,15 @@ function canonicalOrder(value: unknown): CanonicalOrder {
       case "activated":
         return paymentStatus === "PAID" && orderStatus === "COMPLETED"
           && activationStatus === "ACTIVATED" && parsed.paidAt !== null;
-      case "inventory":
-        return parsed.orderType.toUpperCase() === "TRADE_IN" && parsed.tradeinNo !== null
-          && parsed.sourceDeviceId !== null && parsed.targetDeviceId !== null
-          && paymentStatus === "PAID" && orderStatus === "COMPLETED"
+      case "inventory": {
+        const orderType = parsed.orderType.toUpperCase();
+        const validOrderType = orderType === "SINGLE" || orderType === "BUNDLE"
+          || (orderType === "CAPACITY_KEEP" && parsed.targetDeviceId !== null)
+          || (orderType === "TRADE_IN" && parsed.tradeinNo !== null
+              && parsed.sourceDeviceId !== null && parsed.targetDeviceId !== null);
+        return validOrderType && paymentStatus === "PAID" && orderStatus === "COMPLETED"
           && activationStatus === "INVENTORY" && parsed.paidAt !== null && parsed.activatedAt === null;
+      }
       case "payment_failed":
         return paymentStatus === "FAILED" && orderStatus === "PAYMENT_FAILED"
           && activationStatus === "WAITING_PAYMENT";
@@ -402,7 +415,8 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     }
   })();
   if (!coherentStatus) return invalid();
-  return parsed;
+  const deviceDelivery = parseOrderDeviceDelivery(source);
+  return deviceDelivery ? { ...parsed, deviceDelivery } : parsed;
 }
 
 function createdOrder(value: unknown): CreatedOrder {
@@ -452,14 +466,31 @@ function cancelledOrder(value: unknown): CancelledOrder {
     idempotent: source.idempotent };
 }
 
+function parseOrderDeviceDelivery(source: Record<string, unknown>): OrderDeviceDelivery | undefined {
+  const { activatedDeviceIds, inventoryDeviceIds, activatedQuantity, inventoryQuantity } = source;
+  if (activatedDeviceIds === undefined && inventoryDeviceIds === undefined
+      && activatedQuantity === undefined && inventoryQuantity === undefined) return undefined;
+  if (!Array.isArray(activatedDeviceIds) || !Array.isArray(inventoryDeviceIds)) return invalid();
+  const activated = activatedDeviceIds.map(value => integer(value, 1));
+  const inventory = inventoryDeviceIds.map(value => integer(value, 1));
+  const ids = [...activated, ...inventory];
+  if (ids.some(id => !Number.isSafeInteger(id)) || new Set(ids).size !== ids.length
+      || activatedQuantity !== activated.length || inventoryQuantity !== inventory.length) return invalid();
+  return { activatedDeviceIds: activated, inventoryDeviceIds: inventory,
+    activatedQuantity: activated.length, inventoryQuantity: inventory.length };
+}
+
 export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
   const source = { ...record(value) };
   if ((source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC' || source.paymentMethod === 'CREGIS_USDT_ERC20' || source.paymentMethod === 'CREGIS_USDT_TRC20') && typeof source.amountUsdt === 'string') {
     if (!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(source.amountUsdt)) return invalid();
     source.amountUsdt = Number(source.amountUsdt);
   }
+  const activationStatus = source.activationStatus;
+  if (activationStatus !== "ACTIVATED" && activationStatus !== "INVENTORY") return invalid();
+  const canonicalStatus = activationStatus === "ACTIVATED" ? "activated" : "inventory";
   if (source.paymentStatus !== "PAID" || source.orderStatus !== "COMPLETED"
-      || source.activationStatus !== "ACTIVATED" || source.canonicalStatus !== "activated"
+      || source.canonicalStatus !== canonicalStatus
       || source.serverCanonical !== true || source.source !== "server"
       || source.sourceEnvironment !== "PRODUCTION" || source.runId !== "") return invalid();
   const amountUsdt = finiteNumber(source.amountUsdt);
@@ -471,13 +502,16 @@ export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
   const walletBalanceAfterUsdt = paymentMethod === "WALLET"
     ? finiteNumber(source.walletBalanceAfterUsdt, -Infinity)
     : source.walletBalanceAfterUsdt === null ? null : invalid();
+  const deviceDelivery = parseOrderDeviceDelivery(source);
+  if (deviceDelivery && (deviceDelivery.inventoryQuantity > 0) !== (canonicalStatus === "inventory")) return invalid();
   return {
+    ...(deviceDelivery && { deviceDelivery }),
     orderNo: nonEmptyString(source.orderNo),
     paymentNo: nonEmptyString(source.paymentNo),
     paymentStatus: "PAID",
     orderStatus: "COMPLETED",
-    activationStatus: "ACTIVATED",
-    canonicalStatus: "activated",
+    activationStatus,
+    canonicalStatus,
     amountUsdt,
     paymentMethod,
     ...paidTotalUsdt(source.paidTotalUsdt),

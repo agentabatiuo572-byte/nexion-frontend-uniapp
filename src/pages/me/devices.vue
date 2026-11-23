@@ -93,12 +93,16 @@
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
               :action-disabled="remoteApiEnabled && !!d.pendingDeactivate"
-              v-bind="tradeinStrip(d)"
+              v-bind="d.replacement ? {} : tradeinStrip(d)"
               :quote-info-open="quoteInfoDeviceId === d.id"
               @quote-info="quoteInfoDeviceId = $event ? d.id : null"
               @toggle="handleDeactivate(d)"
               @tradein="handleTradein(d)"
-            />
+            >
+              <template v-if="d.replacement" #replacement-status>
+                <text class="device-replacement-note" role="status">{{ fmt(replacementCopy.oldWaiting, { old: d.replacement.oldDeviceName, new: d.replacement.newDeviceName }) }}</text>
+              </template>
+            </DeviceInventoryRow>
           </view>
         </view>
 
@@ -112,6 +116,7 @@
             <DeviceInventoryRow
               v-for="d in inactiveDevices"
               :key="d.id"
+              :class="{ 'device-replacement-row': d.replacement || canStartSlotReplacement(d) }"
               :device="d"
               :active="false"
               :show-action="canControlDevice(d)"
@@ -121,14 +126,24 @@
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
-              v-bind="tradeinStrip(d)"
+              v-bind="d.replacement ? {} : tradeinStrip(d)"
               :quote-info-open="quoteInfoDeviceId === d.id"
               @quote-info="quoteInfoDeviceId = $event ? d.id : null"
               @toggle="handleActivate(d)"
               @tradein="handleTradein(d)"
-            />
+            >
+              <template v-if="d.replacement" #replacement-status>
+                <text class="device-replacement-note" role="status">{{ fmt(replacementCopy.newWaiting, { old: d.replacement.oldDeviceName, new: d.replacement.newDeviceName }) }}</text>
+              </template>
+              <template v-if="d.replacement || canStartSlotReplacement(d)" #inventory-action>
+                <NxButton v-if="d.replacement" size="small" variant="secondary" :label="replacementCopy.cancel"
+                  :disabled="replacementBusy" @click="cancelSlotReplacement(d)" />
+                <NxButton v-else size="small" variant="brand" :label="replacementCopy.replace"
+                  :disabled="replacementBusy" @click="openSlotReplacement(d)" />
+              </template>
+            </DeviceInventoryRow>
           </view>
-          <view v-if="slotsUsed !== null && slotsFull && inactiveDevices.length > 0" class="device-inventory-warn">
+          <view v-if="slotsFull && !inactiveDevices.some(canStartSlotReplacement)" class="device-inventory-warn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
             <text>{{ t.myDevices.inventorySlotsFullWarning }}</text>
           </view>
@@ -181,6 +196,12 @@
       @force="onSheetForce"
       @dismiss="sheetDevice = null"
     />
+    <NxSheet :open="replacementDevice !== null" :title="replacementCopy.choose" @close="replacementDevice = null">
+      <view class="device-replacement-choices">
+        <NxButton v-for="device in replacementCandidates" :key="device.id" variant="secondary"
+          :label="[deviceName(t, device), device.instanceNo].filter(Boolean).join(' · ')" @click="confirmSlotReplacement(device)" />
+      </view>
+    </NxSheet>
     <!-- Buying more devices is the page's main action, in the thumb zone (DS-30). -->
     <template #pageFixed>
       <view class="device-page__bar nx-glass-bar"><NxButton class="device-page__bar-btn" variant="primary" :label="t.myDevices.inventoryCtaGoStore" @click="goStore"><view class="device-page__bar-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg><text>{{ t.myDevices.inventoryCtaGoStore }}</text></view></NxButton></view>
@@ -192,7 +213,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -200,6 +221,7 @@ import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import DeviceBay from "@/components/me/device-bay.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TrialDeviceRow from "@/components/trial-device-row.vue";
@@ -207,6 +229,7 @@ import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
 import { useTradeinStrip } from "@/composables/use-tradein-strip";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
+import { useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
@@ -218,8 +241,10 @@ import { canControlDevice } from "@/lib/device-control-platform";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { useFreeTrial } from "@/store/free-trial";
 import type { Device } from "@/store/types";
-import { confirm as uiConfirm, toast } from "@/store/ui";
-import { apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
+import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
+import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import { isSettledRejection } from "@/api/errors";
+import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogState } from "@/store/product-catalog";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
@@ -227,6 +252,17 @@ import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/
 
 const t = useT();
 const app = useApp();
+const replacementCopy = useDeviceSlotReplacementCopy();
+const replacementDevice = ref<Device | null>(null);
+const replacementBusy = ref(false);
+const replacementDialogOwner = `device-slot-replacement:${Date.now()}:${Math.random()}`;
+let replacementPageEpoch = 0;
+function closeReplacementDialogs() {
+  replacementPageEpoch += 1;
+  replacementDevice.value = null;
+  useUI().clearConfirmsBy(replacementDialogOwner);
+}
+watch([() => app.accountKey, () => app.accountBindingEpoch], closeReplacementDialogs);
 const session = useSession();
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
@@ -236,7 +272,10 @@ onShow(() => {
   void trial.refreshVisible(false, true);
   if (remoteApiEnabled) void app.ensureRemoteFleet();
 });
-onHide(() => app.setTaskReadPageVisible("device-inventory", false));
+onHide(() => {
+  app.setTaskReadPageVisible("device-inventory", false);
+  closeReplacementDialogs();
+});
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
@@ -301,6 +340,13 @@ const slotMeterLabel = computed(() =>
 type Bay = { key: string; kind: "device" | "trial" | "reserved" | "empty" | "loading"; device?: Device; image?: string;
   name: string; online: boolean; label: string; target: string };
 const deviceOnline = (d: Device) => deviceOnlineState(d, Date.now(), !remoteApiEnabled || app.remoteFleetStatus === "ready" || app.remoteFleetStatus === "loading") === "online";
+const replacementCandidates = computed(() => activeDevices.value.filter((device) =>
+  device.kind !== "unknown" && deviceOnline(device) && !device.pendingDeactivate && !device.replacement));
+
+function canStartSlotReplacement(device: Device) {
+  return remoteApiEnabled && slotsUsed.value !== null && slotsFull.value && activationReady.value && device.kind !== "phone"
+    && canControlDevice(device) && !device.replacement;
+}
 // With a known count the tag counts the drawn bays, so it matches the grid.
 const onlineCount = computed(() => slotsUsed.value === null
   ? activeDevices.value.filter(deviceOnline).length + (trialListed.value && trial.status === "active" ? 1 : 0)
@@ -342,21 +388,104 @@ const { sheetDevice, handleDeactivate, onSheetWait, onSheetForce, runRemoteDevic
 let deactivateRequest = 0;
 onUnload(() => {
   app.setTaskReadPageVisible("device-inventory", false);
+  closeReplacementDialogs();
   deactivateRequest += 1;
 });
 onLoad(async options => {
   const query = new URLSearchParams(takeNavigationQuery('/pages/me/devices'));
   const id = options?.deactivate || query.get('deactivate') || '';
-  if (!id) return;
+  const replacementId = options?.replaceDeviceId || query.get('replaceDeviceId');
+  const cancelId = options?.cancelReplacementId || query.get('cancelReplacementId');
+  if (!id && !replacementId && !cancelId) return;
   const request = ++deactivateRequest;
   const scope = captureAccountScope();
+  const pageEpoch = replacementPageEpoch;
   if (remoteApiEnabled && !await refreshRemoteFleetAfterCatalog(app.accountKey)) return;
   if (request !== deactivateRequest || !isCurrentAccountScope(scope)) return;
+  if (replacementId || cancelId) {
+    if (pageEpoch !== replacementPageEpoch) return;
+    const device = inactiveDevices.value.find(item => item.id === (cancelId || replacementId));
+    if (!device) return;
+    if (cancelId) await cancelSlotReplacement(device);
+    else openSlotReplacement(device);
+    return;
+  }
   const device = app.visibleDevices.find(item => item.id === id && item.activatedAt !== null);
   if (device) await handleDeactivate(device);
 });
 
 const { tradeinStrip, handleTradein } = useTradeinStrip();
+
+function openSlotReplacement(device: Device) {
+  if (replacementBusy.value || device.kind === "phone" || device.replacement) return;
+  if (!replacementCandidates.value.length) {
+    toast.info(replacementCopy.value.noCandidate);
+    return;
+  }
+  replacementDevice.value = device;
+}
+
+async function confirmSlotReplacement(oldDevice: Device) {
+  const newDevice = replacementDevice.value;
+  if (!newDevice) return;
+  replacementDevice.value = null;
+  await runSlotReplacement(oldDevice, newDevice, false);
+}
+
+async function cancelSlotReplacement(newDevice: Device) {
+  const pair = newDevice.replacement;
+  if (!pair) return;
+  const oldDevice = activeDevices.value.find(device => device.id === String(pair.oldDeviceId));
+  if (oldDevice) await runSlotReplacement(oldDevice, newDevice, true);
+}
+
+async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: boolean) {
+  if (replacementBusy.value) return;
+  const oldVersion = oldDevice.rowVersion;
+  const newVersion = newDevice.rowVersion;
+  if (oldVersion == null || newVersion == null) {
+    toast.warn(replacementCopy.value.retry);
+    return;
+  }
+  const scope = captureAccountScope();
+  const accountKey = app.accountKey;
+  const pageEpoch = replacementPageEpoch;
+  const currentPage = () => pageEpoch === replacementPageEpoch && isCurrentAccountScope(scope);
+  const operation = cancel ? "cancel-replacement" : "replace";
+  const pairKey = `${oldDevice.id}:${newDevice.id}:${newVersion}`;
+  replacementBusy.value = true;
+  try {
+    const names = { old: deviceName(t.value, oldDevice), new: deviceName(t.value, newDevice) };
+    const accepted = await uiConfirm({
+      title: cancel ? replacementCopy.value.cancel : replacementCopy.value.replace,
+      message: fmt(cancel ? replacementCopy.value.cancelConfirm : replacementCopy.value.confirm, names),
+      confirmLabel: cancel ? replacementCopy.value.cancel : t.value.ui.confirm,
+      owner: replacementDialogOwner,
+    });
+    if (!accepted || !currentPage()) return;
+    const key = acquireDeviceCommandKey(accountKey, operation, pairKey, oldVersion);
+    const payload = { oldDeviceId: Number(oldDevice.id), newDeviceId: Number(newDevice.id),
+      oldExpectedVersion: oldVersion, newExpectedVersion: newVersion };
+    if (cancel) await deviceE3Api.cancelDeviceReplacement(payload, key);
+    else await deviceE3Api.replaceDevice(payload, key);
+    finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
+    if (!isCurrentAccountScope(scope)) return;
+    const read = await app.refreshRemoteFleet();
+    if (!currentPage()) return;
+    const device = read ? app.visibleDevices.find(item => item.id === newDevice.id) : undefined;
+    if (!cancel && device?.replacement) toast.info(replacementCopy.value.pending);
+    else if (!cancel && device?.activatedAt != null) toast.success(replacementCopy.value.completed);
+    else if (cancel && device?.activatedAt === null && !device.replacement) toast.success(replacementCopy.value.cancelled);
+    else toast.warn(replacementCopy.value.retry);
+  } catch (error) {
+    if (isSettledRejection(error)) finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
+    if (!isCurrentAccountScope(scope)) return;
+    void app.refreshRemoteFleet();
+    if (currentPage()) toast.warn(replacementCopy.value.retry);
+  } finally {
+    replacementBusy.value = false;
+  }
+}
 
 async function handleActivate(d: Device) {
   if (!canControlDevice(d)) return;
@@ -427,6 +556,14 @@ function goStore() {
 </script>
 
 <style scoped>
+.device-replacement-note { display: block; margin-top: 10px; font: 400 13px/18px var(--font-v5); overflow-wrap: anywhere; }
+.device-replacement-choices { display: grid; gap: 8px; padding: 12px 16px 20px; }
+.device-replacement-choices :deep(.nx-button) { width: 100%; min-width: 0; }
+.device-replacement-choices :deep(.nx-button__content),
+.device-replacement-choices :deep(.nx-button__content uni-text) { white-space: normal; overflow-wrap: anywhere; }
+.device-replacement-row :deep(.device-inventory-row__foot),
+.device-replacement-row :deep(.device-inventory-row__actions) { flex-wrap: wrap; }
+.device-replacement-row :deep(.device-inventory-row__actions) { max-width: 100%; justify-content: flex-end; }
 .device-stage { position: relative; margin-top: 15px; }
 .device-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
 .device-stage__aura > view { position: absolute; width: 190px; height: 150px; border-radius: 50%; filter: blur(42px); }

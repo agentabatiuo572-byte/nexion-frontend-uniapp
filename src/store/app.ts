@@ -747,6 +747,7 @@ export const useApp = defineStore("app", () => {
     const activationUnconfirmed = activeLifecycle && (device.activatedAt == null || device.deactivatedAt != null);
     return {
       id: String(device.id),
+      instanceNo: device.instanceNo,
       rowVersion: device.rowVersion,
       kind: canonicalKind(device),
       productCode: device.productCode,
@@ -765,6 +766,7 @@ export const useApp = defineStore("app", () => {
       activatedAt: active ? device.activatedAt : null,
       activationUnconfirmed,
       pendingDeactivate: device.pendingDeactivate,
+      ...(device.replacement && { replacement: device.replacement }),
       lastSettledAt: null,
       onlineHeartbeatAt: null,
       runtimeStatus: device.runtimeStatus ?? "UNKNOWN",

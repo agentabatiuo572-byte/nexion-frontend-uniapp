@@ -467,13 +467,8 @@ useSetPageHeader(() => ({
 
 // ── derived ROI math (mirrors page.tsx + _client.tsx) ──
 const qty = ref(1);
-// Single-device checkout can request a server replacement quote at capacity.
-const singleDeviceCheckout = computed(() => product.value?.productType === "DEVICE"
-  && !activityId.value && !voucherContext.value.voucherId);
 const maxQuantity = computed(() => Math.min(activityId.value ? 100 : 6,
-  remoteApiEnabled && app.remoteSlotsUsed != null
-    ? Math.max(singleDeviceCheckout.value ? 1 : 0, app.slotCap - app.remoteSlotsUsed)
-    : Infinity));
+  product.value?.inventoryMode === "FINITE" ? product.value.stock ?? Infinity : Infinity));
 watch(maxQuantity, max => { if (max > 0 && qty.value > max) qty.value = max; });
 const openFaq = ref(0);
 
@@ -699,11 +694,6 @@ function publishStickyCTA() {
           : t.value.store.gateLockedCta,
         showTabBar: false,
       }, stickyOwner);
-      return;
-    }
-    if (maxQuantity.value === 0) {
-      sticky.show({ href: '/pages/me/devices', amount: priceText.value,
-        amountSubtext: t.value.promotion.capacityUnavailable, buttonLabel: t.value.home.fleetManage, showTabBar: false }, stickyOwner);
       return;
     }
     sticky.show({

@@ -15,7 +15,7 @@ function write(value: PendingTable): void {
   uni.setStorageSync(STORAGE_KEY, value);
 }
 
-type DeviceCommandOperation = "activate" | "deactivate" | "deactivate-after-task";
+type DeviceCommandOperation = "activate" | "deactivate" | "deactivate-after-task" | "replace" | "cancel-replacement";
 
 function slot(accountKey: string, operation: DeviceCommandOperation, deviceId: string, rowVersion: number): string {
   const account = accountKey.trim().toLowerCase();

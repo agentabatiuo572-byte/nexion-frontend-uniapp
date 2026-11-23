@@ -24,7 +24,7 @@ import { createAccountRowCommit } from "./account-scoped-storage";
 import { beginOrderAction,clearOrderAction,readOrderAction } from '@/lib/order-command-fence';
 import { asApiError,isApiRefusal,isSettledRejection } from '@/api/errors';
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
-import type { CanonicalOrder, CanonicalOrderStatus, OrderCloseReasonCode, OrderRefundReasonCode } from "@/api/order-api";
+import type { CanonicalOrder, CanonicalOrderStatus, OrderCloseReasonCode, OrderDeviceDelivery, OrderRefundReasonCode } from "@/api/order-api";
 import type { OrderLineItem } from "@/lib/order-line-items";
 import {
   captureRuntimeRevision,
@@ -73,6 +73,7 @@ export interface Order {
   promotionQuoteId?: string;
   paymentMethod: string;    // "usdt-trc20" etc
   status: OrderStatus;
+  deviceDelivery?: OrderDeviceDelivery;
   placedAt: number;
   expiresAt?: number;
   paidAt?: number;
@@ -253,6 +254,7 @@ export const useOrders = defineStore("orders", () => {
       ...(row.promotionQuoteId && { promotionQuoteId: row.promotionQuoteId }),
       paymentMethod: row.paymentMethod ?? "wallet",
       status,
+      ...(row.deviceDelivery && { deviceDelivery: row.deviceDelivery }),
       placedAt: row.placedAt,
       ...(row.expiresAt != null && { expiresAt: row.expiresAt }),
       ...(row.paidAt != null && { paidAt: row.paidAt }),

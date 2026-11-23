@@ -7,6 +7,7 @@
     </view>
 
 
+    <DeviceSlotReplacementStatus />
     <view v-if="!fleet.fleetVisible.value" class="hf-dock" role="status" :aria-busy="app.remoteFleetStatus === 'loading'">
       <view class="hf-avatars" aria-hidden="true"><view v-for="n in app.slotCap" :key="n" class="hf-av hf-av--loading" /></view>
       <text class="hf-dock__sub">{{ app.remoteFleetStatus === 'error' ? '—' : copy.fleetLoading }}</text>
@@ -58,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import DeviceSlotReplacementStatus from "@/components/me/device-slot-replacement-status.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, ref } from "vue";
 import { onShow } from "@/composables/use-tab-page-lifecycle";

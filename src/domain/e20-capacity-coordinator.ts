@@ -1,4 +1,4 @@
-export type CapacityDecision = "CAPACITY_AVAILABLE" | "NO_ACTIVE_DEVICE" | "REPLACE_REQUIRED";
+export type CapacityDecision = "CAPACITY_AVAILABLE" | "INVENTORY_ONLY" | "NO_ACTIVE_DEVICE" | "REPLACE_REQUIRED";
 
 export interface NoActiveDeviceDecisionSteps {
   notify(): void;
@@ -36,7 +36,7 @@ export class RemoteCapacityGate {
       const quote = await load();
       if (!isCurrent()) return quote;
       this.decision = quote.decision;
-      this.blocked = quote.decision !== "CAPACITY_AVAILABLE";
+      this.blocked = quote.decision !== "CAPACITY_AVAILABLE" && quote.decision !== "INVENTORY_ONLY";
       await consume(quote);
       return quote;
     } catch (error) {

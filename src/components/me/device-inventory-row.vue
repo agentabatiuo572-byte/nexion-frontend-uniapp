@@ -34,7 +34,8 @@
     </view>
     <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" style="margin:12px 0 0" />
 
-    <view v-if="device.pendingDeactivate" class="device-inventory-row__pending">
+    <slot name="replacement-status" />
+    <view v-if="device.pendingDeactivate && !$slots['replacement-status']" class="device-inventory-row__pending">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
       <text>{{ pendingChipLabel }}</text>
     </view>
@@ -58,7 +59,9 @@
         <NxButton v-if="active" class="device-inventory-row__more" size="small" variant="text" :label="moreLabel" :disabled="moreDisabled"
           aria-haspopup="dialog" :aria-expanded="menuOpen" @click="menuOpen = true"><NxIcon name="more" :size="20" /></NxButton>
         <NxButton v-if="tradeinCtaLabel && !active" class="device-inventory-row__tradein-cta" size="small" variant="secondary" :label="tradeinCtaLabel" @click="emit('quote-info', false); emit('tradein')" />
-        <NxButton v-if="!active" class="device-inventory-row__action device-inventory-row__action--activate" size="small" variant="brand" :label="actionLabel" :disabled="actionDisabled" @click="onAction" />
+        <slot v-if="!active" name="inventory-action">
+          <NxButton class="device-inventory-row__action device-inventory-row__action--activate" size="small" variant="brand" :label="actionLabel" :disabled="actionDisabled" @click="onAction" />
+        </slot>
         <!-- display: contents keeps the closed host out of the button row; taps in the sheet stay off the page's close-on-tap. -->
         <view v-if="active" class="device-inventory-row__menu-host" @click.stop>
           <NxSheet :open="menuOpen" :title="deviceName(t, device)" @close="menuOpen = false">
