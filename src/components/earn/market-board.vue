@@ -76,7 +76,7 @@
           <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.kind ? getProductMedia(d.kind)?.src ?? null : null" />
           <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text></view>
           <view class="earn-ranking-value">
-            <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatEstimate(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
+            <text class="earn-ranking-value__amount">{{ d.dailyEarn === null && !d.dailyUsdtRange ? "—" : `$${formatEstimate(d.dailyEarn ?? 0, d.dailyUsdtRange)}${t.coreReview.perDay}` }}</text>
             <!-- Decorative (the amount is read); aria-valuenow is the shared bar's state hook: no fill when unknown, no head dot at 0. -->
             <view class="earn-ranking-value__track nx-progress" aria-hidden="true" :aria-valuenow="d.dailyEarn === null ? undefined : Math.round(rankShare(d))"><view v-viz-inview class="nx-progress__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
           </view>
@@ -91,6 +91,7 @@
 import { formatEstimate } from "@/lib/estimate-display";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
+import type { EstimateRange } from "@/api/estimate-range";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import type { DeviceKind, TaskCategory } from "@/store/types";
@@ -120,6 +121,7 @@ interface DeviceRanking {
   /** 商品品牌名(不翻译);手机档没有商品名,走 t.market.yourPhone。 */
   name?: string;
   dailyEarn: number | null;
+  dailyUsdtRange?: EstimateRange | null;
   isPhone?: boolean;
   kind?: Exclude<DeviceKind, "phone">;
 }
@@ -175,7 +177,7 @@ const workloadCopy = (row: WorkloadPrice) => {
   return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
 };
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share" && row.kind !== "phone").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share" && row.kind !== "phone").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, dailyUsdtRange: row.dailyUsdtRange, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
 
 function spokenWorkload(w: WorkloadPrice): string {

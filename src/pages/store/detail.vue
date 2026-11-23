@@ -538,27 +538,27 @@ const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0)
 // Estimates use the shared estimate format (estimate-display.ts): two significant figures, a range only when the
 // catalog sends one. Each range splits only at its dash and the monthly unit stays on the last figure (06 §6.2).
 // A Share without the server's daily range shows "—", never a figure derived from an annual rate.
-function rangeParts(low: number, high: number): string[] {
-  return estimateRangeParts(low, high).map((part, index) => index ? `–${part}` : part);
+function rangeParts(low: number, high: number, calculated = false): string[] {
+  return estimateRangeParts(low, high, calculated).map((part, index) => index ? `–${part}` : part);
 }
 const usdtUnitSuffix = "\u00A0USDT";
 const dailyEstimate = computed(() => product.value ? productDailyEstimateRange(product.value) : null);
 const hasUsdtRange = computed(() => product.value?.dailyEstimateLowUsdt != null && product.value?.dailyEstimateHighUsdt != null);
 const dailyUsdtParts = computed(() => dailyEstimate.value
-  ? rangeParts(dailyEstimate.value.low * qty.value, dailyEstimate.value.high * qty.value) : null);
+  ? rangeParts(dailyEstimate.value.low * qty.value, dailyEstimate.value.high * qty.value, qty.value !== 1) : null);
 // The server's range is monthly target × (1 ∓ band) ÷ 30, so × 30 gives the month back on the same basis;
 // a single estimate keeps the server's monthly figure.
 const monthlyUsdtParts = computed(() => {
   const estimate = dailyEstimate.value;
   if (!estimate) return null;
   return hasUsdtRange.value
-    ? rangeParts(estimate.low * 30 * qty.value, estimate.high * 30 * qty.value)
+    ? rangeParts(estimate.low * 30 * qty.value, estimate.high * 30 * qty.value, true)
     : rangeParts(monthlyYield.value, monthlyYield.value);
 });
 const dailyUvtParts = computed(() => {
   if (!product.value) return null;
   const uvt = productDailyUvtRange(product.value);
-  return rangeParts(uvt.low * qty.value, uvt.high * qty.value);
+  return rangeParts(uvt.low * qty.value, uvt.high * qty.value, qty.value !== 1);
 });
 const dailyEstimateLine = computed(() => dailyUsdtParts.value
   ? fmt(t.value.store.detDailyEstimateLine, { n: dailyUsdtParts.value.join("") }) : undefined);

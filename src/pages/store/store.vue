@@ -161,7 +161,7 @@ async function refreshVisibleStore() {
   await Promise.allSettled([
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     refreshServerProductPhase(true),
-    revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(),
+    revalidateProductCatalog(), phoneTierReadFailed() ? undefined : earnConfig.ensure(), app.ensureRemoteFleet(),
   ]);
 }
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -282,7 +282,7 @@ const liveYield = computed(() => buildStoreYieldAuthority(
 const yieldAuthority = computed(() => {
   if (!remoteApiEnabled) return liveYield.value;
   const catalog = productCatalogDisplayProof.value ? liveYield.value : readTabSnapshot("catalogYield");
-  const phone = earnConfig.status.value === "ready" ? liveYield.value.phone : readTabSnapshot("phoneYield");
+  const phone = earnConfig.phoneTiers.value ? liveYield.value.phone : readTabSnapshot("phoneYield");
   const entry = catalog?.entry ?? null, pro = catalog?.pro ?? null, rack = catalog?.rack ?? null;
   const rows = liveYield.value.ladder.map(row => ({ ...row, amount: row.id === "phone" ? phone : catalog?.ladder.find(item => item.id === row.id)?.amount ?? null }));
   const maximum = Math.max(0, ...rows.map(row => row.amount?.usd ?? 0));
@@ -369,6 +369,8 @@ const catalogProducts = computed(() => focusFeatured.value
 function retryCatalog() {
   void refreshProductCatalog(true);
 }
+const phoneTierReadFailed = () => earnConfig.status.value === "error";
+useAutoRecovery({ active: () => !publicOnly.value, failed: phoneTierReadFailed, retry: earnConfig.refresh });
 useAutoRecovery({ failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
 
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:
