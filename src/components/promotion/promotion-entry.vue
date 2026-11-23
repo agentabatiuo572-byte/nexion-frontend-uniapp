@@ -173,7 +173,7 @@ function homeRewardSummary(activity:EntryPromotion) {
 function homeRemaining(activity:EntryPromotion){return promotionRemaining(activity,t.value.promotion);}
 // Display only: a UVT or USDT reward splits into its number and unit so the unit takes the muted unit style; the
 // number keeps the precision the read published.
-function figureParts(text:string){const m=/^(.+) (UVT|USDT)$/.exec(text);return m?{amount:m[1],unit:m[2]}:null;}
+function figureParts(text:string){const m=/^([\d,.]+) (UVT|USDT)$/.exec(text);return m?{amount:m[1],unit:m[2]}:null;}
 function buyerFigure(rule:PublicPromotion['rewardRules'][number]){return figureParts(rewardSummary(rule.buyerReward,t.value.promotion,rule.buyerReward.disclosure.deviceName));}
 function nbspUnit(text:string){return text.replace(/ (UVT|USDT)$/,'\u00A0$1');}
 function cycleOffer(delta:number){if(items.value.length)activeIndex.value=(activeIndex.value+delta+items.value.length)%items.value.length;}
