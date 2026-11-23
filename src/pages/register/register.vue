@@ -58,7 +58,7 @@
           <view class="rg-phone" :class="{ 'rg-phone--err': phone && !phoneOk }">
             <view class="rg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true" @keydown.space.prevent="showCountries = true">
               <text class="rg-phone__cc-t">{{ country }}</text>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
+              <view :style="{ display: 'grid', flex: 'none', transform: showCountries ? 'rotate(180deg)' : '' }"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></view>
             </view>
             <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :aria-label="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" confirm-type="done" @input="onPhone" @blur="phoneTouched = true" @confirm="onCta" />
           </view>

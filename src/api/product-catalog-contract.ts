@@ -1,4 +1,4 @@
-import type { Product, ProductTaskLevel, PurchaseGate } from "@/mock/products";
+import type { Product, ProductBadgeKind, ProductTaskLevel, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
 
 export type CatalogProduct = Product;
@@ -26,6 +26,9 @@ const GATE_MODES = new Set<PurchaseGate["mode"]>(["all", "either"]);
 const GATE_PERIODS = new Set<NonNullable<PurchaseGate["quotaPeriod"]>>(["month", "lifetime"]);
 const PRODUCT_TYPES = new Set<NonNullable<Product["productType"]>>(["DEVICE", "SHARE"]);
 const INVENTORY_MODES = new Set<NonNullable<Product["inventoryMode"]>>(["FINITE", "UNLIMITED"]);
+const BADGE_KINDS = new Set<ProductBadgeKind>([
+  "recommended", "bestSeller", "trending", "upgradePick", "flagship", "lowBarrier", "custom",
+]);
 const TASK_LEVELS: readonly ProductTaskLevel[] = [1, 2, 3, 4];
 
 function invalid(): never {
@@ -52,6 +55,12 @@ function optionalString(value: unknown): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   if (typeof value !== "string") return invalid();
   return value;
+}
+
+function badgeKind(value: unknown): Product["badgeKind"] {
+  if (value === null || value === undefined) return value;
+  if (!BADGE_KINDS.has(value as ProductBadgeKind)) return invalid();
+  return value as ProductBadgeKind;
 }
 
 function finiteNumber(value: unknown, minimum = 0): number {
@@ -183,6 +192,7 @@ function product(value: unknown): CatalogProduct {
     tier: tier as Product["tier"],
     tagline: requiredString(source.tagline),
     badge: optionalString(source.badge),
+    badgeKind: badgeKind(source.badgeKind),
     gpu: displayString(source.gpu),
     vram: displayString(source.vram),
     hashRate: optionalString(source.hashRate),

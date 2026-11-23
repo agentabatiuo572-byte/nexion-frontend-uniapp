@@ -4,11 +4,14 @@
   area + polyline + last-point dot. Used by NetworkPulseCard metrics.
 -->
 <template>
+  <!-- A flex box around the svg keeps the App's NxNativeSvg box out of a text line, as the block svg is on H5. -->
+  <view style="display: flex; flex-direction: column">
   <svg width="100%" :viewBox="`0 0 ${W} ${height}`" preserveAspectRatio="none" style="display: block; overflow: visible">
     <polygon v-if="fill" :points="areaPts" :fill="color" opacity="0.10" />
     <polyline :points="linePts" fill="none" :stroke="color" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" />
     <circle :cx="lastX" :cy="lastY" r="1.6" :fill="color" />
   </svg>
+  </view>
 </template>
 
 <script setup lang="ts">

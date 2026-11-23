@@ -13,10 +13,11 @@
     <template v-if="expanded">
       <DisclosureDetails v-for="(entry,index) in disclosures" :key="index" :disclosure="entry" />
     </template>
-    <view @click.stop><PromotionTerms :open="termsOpen" :title="localized(activity.title,locale.code)" :terms="ruleTerms" :disclosures="disclosures" @close="termsOpen=false" /></view>
+    <view @click.stop><PromotionTerms :open="termsOpen" :title="localized(activity.title,locale.code)" :terms="ruleTerms" :rules="firstPurchaseTermsRules(activity.firstPurchaseCondition,locale.code)" :disclosures="disclosures" @close="termsOpen=false" /></view>
   </view>
 </template>
 <script setup lang="ts">
+import { firstPurchaseTermsRules } from '@/lib/promotion-landing';
 import { computed,ref } from 'vue';
 import type { PublicPromotion,PublicRewardSpec } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';

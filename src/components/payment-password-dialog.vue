@@ -172,7 +172,7 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-mask--standalone :deep(.payment-pin-input) { width:auto; margin:var(--v5-space-6) 16px 0; }
 .payment-pin-mask--standalone .payment-pin-notes { margin:var(--v5-space-5) 20px 0; display:flex; flex-direction:column; gap:6px; }
 .payment-pin-mask--standalone .payment-pin-note--info { display:flex; gap:var(--v5-space-2); font-size:12px; line-height:18px; color:var(--v5-ink-3); }
-.payment-pin-mask--standalone .payment-pin-note--info > svg { flex:none; margin-top:2px; }
+.payment-pin-mask--standalone .payment-pin-note--info > svg, .payment-pin-mask--standalone .payment-pin-note--info > .nx-native-svg { flex:none; margin-top:2px; }
 .payment-pin-mask--standalone .payment-pin-incomplete { position:absolute; width:1px; height:1px; clip-path:inset(50%); overflow:hidden; }
 /* The page's "next" is a lone button: the floating button form of the bottom action bar (04 §4.0), placed like the nav
    pill; .nx-tray-float gives it the shared disabled glass and light shadow. */

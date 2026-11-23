@@ -644,7 +644,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-state, .course-lesson { padding: var(--v5-space-5) 16px 0; }
 .course-result-header { display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; align-items: center; box-sizing: border-box; min-height: 56px; padding: 0 6px; }
 .course-result-header__close { position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-left: 6px; border-radius: 50%; color: var(--v5-ink-2); cursor: pointer; }
-.course-result-header__close > svg { position: relative; z-index: 1; }
+.course-result-header__close > svg, .course-result-header__close > .nx-native-svg { position: relative; z-index: 1; }
 .course-result-header__close:active { opacity: .7; }
 .course-result-header__close:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 /* The page's own title opens nothing else, so a long course name wraps in full; the header grows past 56px only if it needs a third line. */

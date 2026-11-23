@@ -12,7 +12,7 @@
         <view v-for="(dot, i) in DATA_DOTS" :key="i" class="nx-wallet-particle" data-wallet-particle :style="dotStyle(dot)" />
       </view>
       <view class="nx-wallet-heading">
-        <view class="nx-wallet-symbol" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 12h-5v5h5" /></svg></view>
+        <view class="nx-wallet-symbol" aria-hidden="true"><NxObjectIcon kind="wallet" /></view>
         <text class="nx-wallet-title">{{ t.me.myWallet }}</text>
         <DataVisibilityToggle />
         <view class="nx-wallet-heading-link" data-me-action="wallet-bills" role="link" tabindex="0" :aria-label="t.me.walletBillsShort" @click="goBills" @keydown.enter.prevent="goBills">
@@ -76,6 +76,7 @@
 
 <script setup lang="ts">
 import UvtCoin from "@/components/ui/uvt-coin.vue";
+import NxObjectIcon from "@/components/ui/nx-object-icon.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
@@ -297,7 +298,10 @@ export default countUpView;
 .nx-wallet-summary { position: relative; overflow: hidden; padding: 20px; isolation: isolate; }
 .nx-wallet-heading { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--v5-ink); }
 .nx-wallet-heading-link { margin-left: auto; display: flex; align-items: center; gap: 6px; min-height: 44px; min-width: 44px; justify-content: flex-end; }
-.nx-wallet-symbol { display: grid; place-items: center; width: 24px; height: 24px; color: var(--v5-nex); flex-shrink: 0; }
+/* The wallet object (nx-object-icon.vue) fills this slot. Its 64-unit box carries a floor shadow and the tucked card,
+   so it is 1.4× the UVT coin's box to read the same size as the coin: 39px beside the 28px coin, 28px beside the
+   compact card's 20px coin. Both fit the 44px heading row, so the row height does not change. */
+.nx-wallet-symbol { display: grid; place-items: center; width: 39px; height: 39px; flex-shrink: 0; }
 .nx-wallet-title { min-width: 0; font: 600 20px/1.3 var(--font-v5); }
 .nx-wallet-total { position: relative; z-index: 1; display: flex; align-items: baseline; margin: 28px 0 26px; gap: 3px; color: var(--v5-ink); font-family: var(--font-amount); font-weight: 500; letter-spacing: -.03em; line-height: 1.1; }
 .nx-wallet-currency { font-size: min(clamp(28px, 8vw, 38px), var(--nx-wallet-fit-size)); }
@@ -310,7 +314,7 @@ export default countUpView;
 .nx-wallet-debt__icon { flex-shrink: 0; margin-top: 1px; color: var(--v5-warning-ink); }
 .nx-wallet-nex { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; font: 500 20px/1.4 var(--font-amount); color: var(--v5-ink-2); overflow-wrap: break-word; }
 /* The shared UVT coin (uvt-coin.vue) fills this slot. */
-.nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; }
+.nx-wallet-coin { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; }
 .nx-wallet-arc { position: absolute; width: 360px; height: 300px; border-radius: 50%;  bottom: -220px; right: -190px; transform: rotate(-30deg); background: radial-gradient(ellipse at center, var(--v5-nex-soft), transparent 68%); box-shadow: 0 0 40px var(--v5-nex-soft); pointer-events: none; animation: wallet-arc-breathe 7s ease-in-out infinite alternate; }
 .nx-wallet-particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .nx-wallet-details { padding: 12px 4px 0; }
@@ -341,6 +345,7 @@ export default countUpView;
 .nx-wallet--compact .nx-wallet-nex { min-height: 44px; font-size: var(--v5-type-body-m); padding-bottom: 0; }
 .nx-wallet--compact .nx-wallet-token-amount { font-size: 18px; }
 .nx-wallet--compact .nx-wallet-coin { width: 20px; height: 20px; }
+.nx-wallet--compact .nx-wallet-symbol { width: 28px; height: 28px; }
 .nx-wallet--compact .nx-wallet-details { padding: 12px 0 0; }
 /* Keep compact feedback slots present; longer financial text can still wrap. */
 .nx-wallet--compact .nx-wallet-pending { min-height: 1.65em; overflow-wrap: break-word; }

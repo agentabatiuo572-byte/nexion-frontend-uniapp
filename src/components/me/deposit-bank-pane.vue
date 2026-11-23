@@ -90,11 +90,11 @@
             <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
             <view class="nx-bank-slab nx-bank-pay nx-tint">
               <template v-if="!hostedRejected">
-                <view class="nx-bank-ring" role="timer" :aria-label="`${t.bankPane.remainingLabel} ${countdownText}`">
-                  <svg width="148" height="148" viewBox="0 0 148 148" aria-hidden="true">
+                <view class="nx-bank-ring" role="timer" :aria-label="`${t.bankPane.remainingLabel} ${countdownText}`" :style="{ '--nx-bank-ring-offset': (427 * (1 - countdownRatio)).toFixed(1) }">
+                  <view class="nx-bank-ring__svg" aria-hidden="true"><svg width="148" height="148" viewBox="0 0 148 148">
                     <circle class="nx-bank-ring__track" cx="74" cy="74" r="68" />
-                    <circle class="nx-bank-ring__value" cx="74" cy="74" r="68" :style="{ strokeDashoffset: `${(427 * (1 - countdownRatio)).toFixed(1)}` }" />
-                  </svg>
+                    <circle class="nx-bank-ring__value" cx="74" cy="74" r="68" />
+                  </svg></view>
                   <view class="nx-bank-ring__c"><text class="nx-bank-ring__t">{{ countdownText }}</text><text class="nx-bank-k">{{ t.bankPane.remainingLabel }}</text></view>
                 </view>
                 <text class="nx-bank-cd">{{ countdownParts[0] }}<text class="nx-bank-cd__time">{{ countdownText }}</text>{{ countdownParts[1] }}</text>
@@ -1105,15 +1105,18 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-fact__v { display: block; margin-top: 4px; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
 .nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.nx-bank-hint > svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
+.nx-bank-hint > svg, .nx-bank-hint > .nx-native-svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
 /* Hosted payment: countdown ring on the glass slab, order summary card. */
 /* Order/credited stages open right under the header (switch and rate line hidden); 15px clears its collapsing 12px margin as on the board. */
 .nx-step-in > .nx-bank-stage:first-child { margin-top: 15px; }
 .nx-bank-pay { --nx-tint: var(--v5-tech-cyan); padding: 28px 20px 22px; text-align: center; }
 .nx-bank-ring { position: relative; width: 148px; height: 148px; margin: 0 auto; }
-.nx-bank-ring > svg { position: absolute; inset: 0; transform: rotate(-90deg); }
-.nx-bank-ring__track { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 9%, transparent); stroke-width: 8; }
-.nx-bank-ring__value { fill: none; stroke: var(--v5-brand); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 427; transition: stroke-dashoffset 1s linear; }
+/* The App draws the ring through NxNativeSvg: circles are reached with :deep(), and the countdown comes in as a CSS
+   variable so the svg is never rewritten and the 1s transition runs. */
+.nx-bank-ring__svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.nx-bank-ring__svg :deep(svg) { display: block; }
+.nx-bank-ring :deep(.nx-bank-ring__track) { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 9%, transparent); stroke-width: 8; }
+.nx-bank-ring :deep(.nx-bank-ring__value) { fill: none; stroke: var(--v5-brand); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 427; stroke-dashoffset: var(--nx-bank-ring-offset); transition: stroke-dashoffset 1s linear; }
 .nx-bank-ring__c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .nx-bank-ring__t { color: var(--v5-ink); font: 500 32px/38px var(--font-metric); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .nx-bank-cd { display: block; margin-top: 16px; color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
@@ -1137,5 +1140,5 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-sum--done { margin-top: 24px; }
 .nx-bank-sum--done .nx-bank-sum__v { font: 500 14px/20px var(--font-v5); }
 @keyframes nx-bank-ring-out { 0% { opacity: .55; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.14); } }
-@media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring__value { transition: none; } .nx-bank-done__medal, .nx-bank-done__medal::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring :deep(.nx-bank-ring__value) { transition: none; } .nx-bank-done__medal, .nx-bank-done__medal::after { animation: none; } }
 </style>

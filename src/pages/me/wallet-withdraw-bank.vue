@@ -70,9 +70,9 @@
           <view class="ticket" :aria-label="c.quoteTitle">
             <view class="ticket__top">
               <text class="ticket__title">{{ c.quoteTitle }}</text>
-              <view class="cdw" role="timer" :aria-label="`${c.expiresIn} ${quoteExpired ? c.quoteExpired : format(c.seconds, { s: secondsLeft })}`">
+              <view class="cdw" role="timer" :aria-label="`${c.expiresIn} ${quoteExpired ? c.quoteExpired : format(c.seconds, { s: secondsLeft })}`" :style="{ '--cdw-offset': (63 * (1 - quoteRatio)).toFixed(1) }">
                 <text class="k">{{ c.expiresIn }}</text>
-                <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle class="cdw__trk" cx="11" cy="11" r="10" /><circle class="cdw__val" cx="11" cy="11" r="10" :style="{ strokeDashoffset: `${(63 * (1 - quoteRatio)).toFixed(1)}` }" /></svg>
+                <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle class="cdw__trk" cx="11" cy="11" r="10" /><circle class="cdw__val" cx="11" cy="11" r="10" /></svg>
                 <text data-testid="bank-countdown" class="cdw__s" :class="{ warn: quoteExpired }">{{ quoteExpired ? c.quoteExpired : format(c.seconds, { s: secondsLeft }) }}</text>
               </view>
             </view>
@@ -622,7 +622,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .note { display: flex; align-items: flex-start; gap: 8px; margin: 14px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .note--debt { color: var(--v5-ink-2); }
 .note--debt svg { flex-shrink: 0; margin-top: 2px; color: var(--v5-warning-ink); }
-.note > svg { flex: none; margin-top: 2px; }
+.note > svg, .note > .nx-native-svg { flex: none; margin-top: 2px; }
 .acct { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-top: 15px; padding: 8px 14px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .acct__ico { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 10px; background: var(--v5-success-soft); color: var(--v5-success-ink); }
 .acct__grow { flex: 1; min-width: 0; }
@@ -649,9 +649,11 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .ticket__top { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
 .ticket__title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .cdw { display: flex; align-items: center; gap: 8px; }
-.cdw > svg { transform: rotate(-90deg); }
+.cdw > svg, .cdw > .nx-native-svg { transform: rotate(-90deg); }
 .cdw__trk { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 12%, transparent); stroke-width: 3; }
-.cdw__val { fill: none; stroke: var(--v5-brand); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 63; transition: stroke-dashoffset 1s linear; }
+/* The remaining time comes in as a CSS variable on the real .cdw view: on the App the svg is written through NxNativeSvg,
+   and a per-second attribute change would rewrite it (no transition). */
+.cdw__val { fill: none; stroke: var(--v5-brand); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 63; stroke-dashoffset: var(--cdw-offset); transition: stroke-dashoffset 1s linear; }
 .cdw__s { color: var(--v5-ink); font: 500 13px/18px var(--font-metric); }
 .ticket__rows { padding: 0 16px 12px; }
 .qrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }

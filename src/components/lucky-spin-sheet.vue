@@ -124,7 +124,7 @@
       <!-- 奖池一览(透明度)-->
       <view v-if="prizes.length > 0 && !spin.remoteEnded && !spin.remoteError" class="lss-pool-toggle" @click="poolOpen = !poolOpen">
         <text class="lss-pool-toggle-t">{{ t.luckySpin.poolTitle }}</text>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lss-pool-chev" :class="{ 'lss-pool-chev-open': poolOpen }"><path d="m9 18 6-6-6-6" /></svg>
+        <view class="lss-pool-chev" :class="{ 'lss-pool-chev-open': poolOpen }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg></view>
       </view>
       <view v-if="poolOpen && !spin.remoteEnded && !spin.remoteError" class="lss-pool-grid">
         <view v-for="sp in prizes" :key="sp.id" class="lss-pool-item" :style="{ opacity: sp.isReal && !realActive ? 0.45 : 1 }">
@@ -878,6 +878,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   color: var(--v5-ink-2);
 }
 .lss-pool-chev {
+  display: grid;
   transition: transform 0.2s ease;
 }
 .lss-pool-chev-open {

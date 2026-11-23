@@ -3,6 +3,7 @@ import { Comment, Fragment, Text, type VNode } from "vue";
 const SVG_TAGS = new Set([
   "svg", "g", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse",
   "defs", "linearGradient", "radialGradient", "stop", "clipPath", "mask", "use", "text", "tspan",
+  "filter", "feGaussianBlur", "animate", "animateMotion", "animateTransform",
 ]);
 
 function escape(value: unknown): string {
@@ -31,9 +32,16 @@ function childrenMarkup(nodes: unknown): string {
   if (node.type === Fragment) return childrenMarkup(node.children);
   if (node.type === Text) return escape(node.children ?? "");
   if (typeof node.type !== "string" || !SVG_TAGS.has(node.type)) return "";
-  return `<${node.type}${attrText(node.props ?? {})}>${childrenMarkup(node.children)}</${node.type}>`;
+  return `<${node.type}${attrText(node.props ?? {})}${scopeAttr(node.scopeId)}>${childrenMarkup(node.children)}</${node.type}>`;
 }
 
-export function svgMarkup(attrs: Record<string, unknown>, children: VNode[]): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg"${attrText(attrs)}>${childrenMarkup(children)}</svg>`;
+// Vue marks every element a scoped template renders with that template's data-v attribute; markup written
+// through v-html gets none, so it is added here and the page's own scoped rules reach the svg as on H5.
+function scopeAttr(scopeId: string | null | undefined): string {
+  return scopeId && /^data-v-[\w-]+$/.test(scopeId) ? ` ${scopeId}=""` : "";
+}
+
+export function svgMarkup(attrs: Record<string, unknown>, children: VNode[], rootScopeIds: readonly string[] = []): string {
+  const rootScope = [...new Set(rootScopeIds)].map(scopeAttr).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg"${attrText(attrs)}${rootScope}>${childrenMarkup(children)}</svg>`;
 }

@@ -3,7 +3,7 @@
   <view v-if="config.isEnabled('stakingVisible') && hasEligiblePool" class="stake-alternative mx-4 mt-3">
     <view class="stake-alternative-toggle" role="button" tabindex="0" :aria-expanded="expanded" aria-controls="stake-alternative-details" @click="expanded = !expanded" @keydown.enter.prevent="expanded = !expanded" @keydown.space.prevent="expanded = !expanded">
       <text>{{ w.label }}</text>
-      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" :style="{ transform: expanded ? 'rotate(180deg)' : undefined }"><path d="m6 9 6 6 6-6" /></svg>
+      <view aria-hidden="true" :style="{ display: 'grid', flexShrink: 0, transform: expanded ? 'rotate(180deg)' : undefined }"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 9 6 6 6-6" /></svg></view>
     </view>
     <view v-if="expanded" id="stake-alternative-details" class="stake-alternative-details">
       <text class="block">{{ fmt(w.basis, { amount: formatGroupedAmount(amountNum) }) }}</text>

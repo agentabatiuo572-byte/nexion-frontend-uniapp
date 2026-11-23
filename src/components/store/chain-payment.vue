@@ -43,7 +43,7 @@
         <view class="rounded-xl grid place-items-center" style="width: 140px; height: 140px; background: #ffffff">
           <!-- Faux-QR: deterministic dot grid (no real encoding — pure visual).
                #fff/#000 are a B/W contrast design asset, NOT theme-tokenized. -->
-          <svg viewBox="0 0 120 120" style="width: 120px; height: 120px">
+          <svg width="120" height="120" viewBox="0 0 120 120" style="width: 120px; height: 120px">
             <rect width="120" height="120" fill="#ffffff" />
             <rect v-for="c in qrCells" :key="c.i" :x="c.x" :y="c.y" :width="cell" :height="cell" fill="#000000" />
           </svg>
