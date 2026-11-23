@@ -29,17 +29,19 @@
         <text class="entry-eyebrow">{{ t.promotion.activityBadge }}</text>
         <text class="entry-title">{{ localized(activity.title,locale.code) }}</text>
         <view v-if="(liveActivity(activity)?.rewardRules.length ?? 0)" class="entry-benefits">
+          <!-- One reward per row: the amount first (number and unit never split), then one muted line with the condition and
+               the inviter's share. -->
           <view v-for="rule in liveActivity(activity)?.rewardRules ?? []" :key="rule.ruleId" class="entry-benefit-row">
-            <text v-if="activityKind(activity)==='spark'" class="entry-condition">{{ t.promotion.rulePer }} {{ rule.minBuyQty }}</text>
-            <text class="entry-benefit">{{ rewardSummary(rule.buyerReward,t.promotion,rule.buyerReward.disclosure.deviceName) }}</text>
-            <text v-if="rule.inviterReward" class="entry-inviter-benefit">{{ t.promotion.inviter }} · {{ rewardSummary(rule.inviterReward,t.promotion,rule.inviterReward.disclosure.deviceName) }}</text>
+            <text v-if="buyerFigure(rule)" class="entry-benefit entry-benefit--figure">{{ buyerFigure(rule)?.amount }}<text class="entry-benefit__unit" :class="{ 'entry-benefit__unit--uvt': buyerFigure(rule)?.unit==='UVT' }">{{ '\u00A0'+buyerFigure(rule)?.unit }}</text></text>
+            <text v-else class="entry-benefit">{{ rewardSummary(rule.buyerReward,t.promotion,rule.buyerReward.disclosure.deviceName) }}</text>
+            <text v-if="activityKind(activity)==='spark' || rule.inviterReward" class="entry-condition">{{ [activityKind(activity)==='spark' ? t.promotion.rulePer+'\u00A0'+rule.minBuyQty : '', rule.inviterReward ? t.promotion.inviter+'\u00A0'+nbspUnit(rewardSummary(rule.inviterReward,t.promotion,rule.inviterReward.disclosure.deviceName)) : ''].filter(Boolean).join(' · ') }}</text>
           </view>
         </view>
         <text v-if="liveActivity(activity)?.eligibilityMessage" class="promotion-copy entry-eligibility">{{ localized(liveActivity(activity)?.eligibilityMessage,locale.code) }}</text>
       </view>
       <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-footer">
-        <text class="entry-deadline">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
         <view class="entry-event-actions">
+          <NxTag class="entry-deadline" tone="warning" wrap :label="homeRemaining(activity)" />
           <!-- The card opens the same page on a tap; the wrapper keeps the button's own click from opening it twice. NxButton
                emits click without an event, so it takes no .stop itself. -->
           <view class="entry-cta-hit" @click.stop><NxButton class="entry-cta" size="medium" :label="localized(activity.title,locale.code)+' · '+landing.viewOffer" icon="arrow-right" @click="navTo(promotionLandingHref(activity.activityId))"><text>{{ landing.viewOffer }}</text></NxButton></view>
@@ -98,7 +100,7 @@ import { useT } from '@/i18n/use-t';
 import { getProduct } from '@/mock/products';
 import { productCatalogState,refreshProductCatalog,revalidateProductCatalog } from '@/store/product-catalog';
 import { navTo } from '@/lib/route';
-import { localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
+import { localized,rewardSummary } from '@/lib/promotion-display';
 import { createPromotionReadFence,isPromotionActive,promotionDisclosures,promotionStoreHref } from '@/lib/promotion-entry';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
@@ -167,6 +169,11 @@ function homeRewardSummary(activity:EntryPromotion) {
     || rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName || (reward.type==='DEVICE'?publicName(reward.giftProductNo):null));
 }
 function homeRemaining(activity:EntryPromotion){return promotionRemaining(activity,t.value.promotion);}
+// Display only: a UVT or USDT reward splits into its number and unit so the unit takes the muted unit style; the
+// number keeps the precision the read published.
+function figureParts(text:string){const m=/^(.+) (UVT|USDT)$/.exec(text);return m?{amount:m[1],unit:m[2]}:null;}
+function buyerFigure(rule:PublicPromotion['rewardRules'][number]){return figureParts(rewardSummary(rule.buyerReward,t.value.promotion,rule.buyerReward.disclosure.deviceName));}
+function nbspUnit(text:string){return text.replace(/ (UVT|USDT)$/,'\u00A0$1');}
 function cycleOffer(delta:number){if(items.value.length)activeIndex.value=(activeIndex.value+delta+items.value.length)%items.value.length;}
 // Home offers rotate on their own; any change of offer (auto or tapped) restarts the countdown.
 let autoplayTimer:ReturnType<typeof setInterval>|null=null;
@@ -262,7 +269,9 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-status.nx-inline-recovery { display:grid; align-items:center; gap:12px; }
 .entry-status.nx-inline-recovery .promotion-title { text-wrap: balance; }
 .entry-advert,.entry-event { position: relative; overflow: hidden; border: 1px solid var(--v5-border); border-radius: 24px; }
-.entry-event { background: var(--v5-surface); }
+/* Event cards are solid content cards like the landing cards beside them (01 §1.1.2): surface fill, the shared light shadow, no stroke. */
+.entry-event { background: var(--v5-surface); border: 0; box-shadow: var(--v5-glass-shadow); }
+.entry-event .entry-title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .entry-advert { min-height: 146px; border: 0; }
 /* A tinted entry (the store campaign) takes the shared .nx-tint fill and edge instead of the advert light. */
 .entry-advert:not(.nx-tint) { background: radial-gradient(70% 90% at 82% 72%,rgba(158,220,29,.24),transparent 62%),radial-gradient(50% 70% at 100% 0%,rgba(255,255,255,.08),transparent 60%),linear-gradient(135deg,#171717,#101010); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
@@ -304,14 +313,16 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-event-copy { position: relative; z-index: 1; grid-column: 1; grid-row: 1; }
 .entry-event-art { display: flex; align-items: center; justify-content: center; grid-column: 2; grid-row: 1; pointer-events: none; }
 .entry-event-art :deep(.team-art) { max-width: none; }
-.entry-event.entry-kind-gift { background: radial-gradient(ellipse at 88% 40%,color-mix(in srgb,var(--v5-brand) 9%,transparent),transparent 56%),var(--v5-surface); }
 .entry-event.entry-kind-gift .entry-event-art { align-self: center; }
 .entry-benefits { margin-top: var(--ui-space-inline); }
 .entry-benefit-row + .entry-benefit-row { margin-top: var(--ui-space-inline); }
-.entry-inviter-benefit,.entry-condition { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/1.5 var(--font-v5); }
+.entry-condition { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
+/* A reward under 30px is the in-card figure (10.1: 16/21, 500, Montserrat, main ink); its unit the 12/16 muted unit (01 §1.2). */
+.entry-benefit--figure { color: var(--v5-ink); font: 500 var(--ui-type-card-figure, 16px)/var(--ui-type-card-figure-lh, 21px) var(--font-amount); font-variant-numeric: tabular-nums; }
+.entry-benefit__unit { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.entry-benefit__unit--uvt { color: var(--v5-nex-ink); }
 .entry-eligibility { margin-top: var(--ui-space-row-y); }
 .entry-event-footer { position: relative; z-index: 1; grid-column: 1 / -1; }
-.entry-deadline { display: block; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .entry-event-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: var(--ui-space-row-y); }
 .promotion-link { gap: 8px; color: var(--v5-ink-2); }
 /* A text link and its chevron stay on one line; when the title row cannot hold both, the link drops to the right on its own line. */
@@ -330,7 +341,6 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-kind-spark .entry-benefits { margin-top: 18px; padding-left: 14px; border-left: 1px solid var(--v5-border); }
 .entry-kind-spark .entry-benefit-row { position: relative; }
 .entry-kind-spark .entry-benefit-row::before { content: ''; position: absolute; left: -18px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--v5-brand); }
-.entry-kind-spark .entry-benefit { font-size: 20px; }
 .entry-kind-plain .entry-event-copy { grid-column: 1 / -1; }
 .entry-pagination,.entry-navigation { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); }
 .entry-pagination { position: relative; justify-content: center; gap: 6px; min-height: 44px; margin: -9px 0 -19px; cursor: pointer; }
