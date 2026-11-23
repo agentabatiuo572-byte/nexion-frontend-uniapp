@@ -6,13 +6,39 @@
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <EmptyState
-          v-if="remoteApiEnabled && !ledger"
-          :kind="commission.eventsStatus === 'error' ? 'recoverable-error' : 'empty-list'"
-          :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionLoadingTitle"
-          :cta-label="commission.eventsStatus === 'error' ? t.ui.reload : undefined"
-          :page="commission.eventsStatus === 'error'"
+          v-if="remoteApiEnabled && !ledger && commission.eventsStatus === 'error'"
+          kind="recoverable-error"
+          page
+          :title="t.network.projectionErrorTitle"
+          :cta-label="t.ui.reload"
           @cta="commission.refreshCanonicalEvents()"
         />
+        <!-- No ledger yet (first read or a re-read): a still placeholder in the loaded layout, not the empty art (03 §3.4).
+             The empty state below is only for a read that succeeded with no rows. -->
+        <view v-else-if="remoteApiEnabled && !ledger" class="commission-loading" role="status" aria-busy="true" :aria-label="t.network.projectionLoadingTitle">
+          <view class="commission-loading__hero nx-tint" aria-hidden="true">
+            <view class="commission-loading__rules" />
+            <view class="commission-loading__bar commission-loading__bar--label" />
+            <view class="commission-loading__bar commission-loading__bar--amount" />
+            <view class="commission-loading__bar commission-loading__bar--uvt" />
+            <view class="commission-loading__bar commission-loading__bar--split" />
+            <view class="commission-loading__summary">
+              <view v-for="n in 2" :key="n"><view class="commission-loading__bar commission-loading__bar--caption" /><view class="commission-loading__bar commission-loading__bar--value" /><view class="commission-loading__bar commission-loading__bar--caption" /></view>
+            </view>
+            <view class="commission-loading__lifetime"><view class="commission-loading__bar commission-loading__bar--caption" /><view class="commission-loading__bar commission-loading__bar--total" /></view>
+          </view>
+          <view class="commission-loading__filter" aria-hidden="true"><view class="commission-loading__bar commission-loading__bar--caption" /><view class="commission-loading__pill" /></view>
+          <view class="commission-loading__day" aria-hidden="true">
+            <view class="commission-loading__bar commission-loading__bar--day" />
+            <view class="commission-day__card">
+              <view v-for="n in 3" :key="n" class="commission-loading__row">
+                <view class="commission-loading__icon" />
+                <view class="commission-loading__lines"><view class="commission-loading__bar commission-loading__bar--name" /><view class="commission-loading__bar commission-loading__bar--meta" /></view>
+                <view class="commission-loading__bar commission-loading__bar--row-amount" />
+              </view>
+            </view>
+          </view>
+        </view>
         <template v-if="!remoteApiEnabled || ledger !== null">
 
         <RewardHero class="commission-overview nx-tint" kind="ledger" panel :label="designCopy.monthRewards">
@@ -401,6 +427,38 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 .reward-income-lifetime { display: flex; justify-content: space-between; gap: var(--ui-space-inline); margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3); }
 .reward-income-lifetime__amounts { display: flex; gap: 6px; text-align: right; font-family: var(--font-metric); color: var(--v5-ink-2); font-variant-numeric: tabular-nums; }
 .commission-days { display: flex; flex-direction: column; gap: var(--v5-space-4); }
+/* First-load placeholder (03 §3.4): the loaded hero, filter row and one day card at their own sizes, with still
+   neutral bars in place of the figures. No shimmer: idle and unknown states stay still (07, design-rules). */
+.commission-loading { display: flex; flex-direction: column; gap: 12px; }
+.commission-loading__hero { --nx-tint: var(--v5-brand); position: relative; display: flex; flex-direction: column; align-items: flex-start; box-sizing: border-box; padding: 20px; border-radius: 28px; }
+/* Flex columns, so the bars' margins add up instead of collapsing. */
+.commission-loading__summary > view, .commission-loading__lines { display: flex; flex-direction: column; }
+.commission-loading__bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+/* Each bar sits on the line of the figure it stands for, so the hero keeps the loaded height (label 20, amount 58,
+   UVT 18, split 8, summary 19 + 26 + 19, lifetime 31). */
+.commission-loading__bar--label { width: 72px; height: 12px; margin: 4px 0; }
+.commission-loading__bar--amount { width: 156px; height: 36px; margin: 19px 0 11px; border-radius: 12px; }
+.commission-loading__bar--uvt { width: 96px; height: 12px; margin: 4px 0 3px; }
+.commission-loading__bar--split { align-self: stretch; height: 8px; margin-top: 14px; }
+.commission-loading__bar--caption { width: 64px; margin: 3px 0; }
+.commission-loading__summary .commission-loading__bar--caption { margin: 5px 0 4px; }
+.commission-loading__bar--value { width: 96px; height: 16px; margin: 5px 0; }
+.commission-loading__lifetime .commission-loading__bar { margin: 4px 0; }
+.commission-loading__bar--total { width: 120px; }
+.commission-loading__bar--day { width: 48px; margin: 3px 4px; }
+.commission-loading__bar--name { width: 96px; height: 12px; margin: 4px 0; }
+.commission-loading__bar--meta { width: 140px; margin: 3px 0; }
+.commission-loading__bar--row-amount { width: 64px; height: 12px; }
+.commission-loading__rules { position: absolute; right: 12px; top: 18px; width: 84px; height: 28px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.commission-loading__summary { align-self: stretch; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.commission-loading__lifetime { align-self: stretch; display: flex; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--v5-border); }
+.commission-loading__filter { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.commission-loading__pill { width: 88px; height: 32px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.commission-loading__day { display: flex; flex-direction: column; gap: var(--v5-space-2); }
+.commission-loading__row { display: flex; align-items: center; gap: 12px; min-height: 68px; box-sizing: border-box; padding: 12px 0; }
+.commission-loading__row + .commission-loading__row { border-top: 1px solid var(--v5-border); }
+.commission-loading__icon { flex: none; width: 36px; height: 36px; border-radius: 12px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.commission-loading__lines { flex: 1; min-width: 0; }
 .commission-code { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--v5-ink-3); }
 .commission-code__label { flex: 0 1 auto; min-width: 0; overflow-wrap: break-word; }
 .commission-code__value { min-width: 11ch; font-size: 12px; line-height: 16px; color: var(--v5-ink-3); }
