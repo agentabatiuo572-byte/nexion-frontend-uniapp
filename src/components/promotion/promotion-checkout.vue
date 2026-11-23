@@ -973,7 +973,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-rewards :deep(.promotion-grow > text:not([class])),.checkout-rewards :deep(.promotion-grow > uni-text:not([class])) { font:500 var(--ui-type-list-title)/20px var(--font-v5) !important; }
 .checkout-rewards :deep(.promotion-copy) { margin-top:2px; font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); }
 .checkout-reward-terms { margin:0 16px 0 64px; }
-.checkout-discount-value { color:var(--v5-brand); font-variant-numeric:tabular-nums; }
+.checkout-discount-value { color:var(--v5-ink); font-variant-numeric:tabular-nums; }
 .checkout-discount-row .checkout-discount-value { flex-shrink:0; max-width:45%; overflow-wrap:break-word; text-align:right; font:600 15px/20px var(--font-v5); }
 .checkout-wallet { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:var(--ui-space-inline); padding:var(--ui-space-inset); }
 .checkout-wallet-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:var(--ui-radius-icon); color:var(--v5-brand); background:var(--ui-content-surface-2); }
