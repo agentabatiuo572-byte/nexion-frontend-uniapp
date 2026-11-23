@@ -30,8 +30,8 @@
             <text class="earn-market__name">{{ workloadCopy(w).name }}</text>
             <text class="earn-market__unit">{{ workloadCopy(w).unit }}</text>
             <text class="earn-market__price">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
-            <text class="earn-market__delta" :class="w.delta === null ? undefined : arrow(w)" :style="{ color: arrowColor(w) }"><text v-if="w.delta !== null && Math.abs(w.delta) > 0.05" class="nx-sr-only">{{ w.delta > 0 ? "+" : "−" }}</text>{{ w.delta === null ? "—" : `${Math.abs(w.delta).toFixed(1)}%` }}</text>
-            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} <text class="earn-market__flagship-delta" :class="trendClass(w.flagshipDelta)"><text v-if="trendClass(w.flagshipDelta)" class="nx-sr-only">{{ w.flagshipDelta > 0 ? "+" : "−" }}</text>{{ Math.abs(w.flagshipDelta).toFixed(1) }}%</text></text>
+            <text class="earn-market__delta" :class="w.delta === null ? undefined : arrow(w)" :style="{ color: arrowColor(w) }"><text v-if="w.delta !== null && shownDelta(w.delta) !== 0" class="nx-sr-only">{{ w.delta > 0 ? "+" : "−" }}</text>{{ w.delta === null ? "—" : `${Math.abs(shownDelta(w.delta)).toFixed(1)}%` }}</text>
+            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} <text class="earn-market__flagship-delta" :class="trendClass(w.flagshipDelta)"><text v-if="trendClass(w.flagshipDelta)" class="nx-sr-only">{{ w.flagshipDelta > 0 ? "+" : "−" }}</text>{{ Math.abs(shownDelta(w.flagshipDelta)).toFixed(1) }}%</text></text>
             <view v-if="w.spark.length > 1" class="earn-market__spark"><svg data-native-svg class="earn-market-spark" width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="sparkPoints(w.spark)" fill="none" :stroke="arrowColor(w)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" /></svg></view>
           </view>
           </view>
@@ -160,20 +160,25 @@ const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
 
 function spokenWorkload(w: WorkloadPrice): string {
   const copy = workloadCopy(w);
-  const sign = (delta: number) => delta > 0.05 ? "+" : delta < -0.05 ? "−" : "";
-  const delta = w.delta === null ? "—" : `${sign(w.delta)}${Math.abs(w.delta).toFixed(1)}%`;
-  const flagship = w.flagshipDelta === null ? "" : `, ${en.market.flagshipRow} ${sign(w.flagshipDelta)}${Math.abs(w.flagshipDelta).toFixed(1)}%`;
+  const signed = (delta: number) => `${shownDelta(delta) > 0 ? "+" : shownDelta(delta) < 0 ? "−" : ""}${Math.abs(shownDelta(delta)).toFixed(1)}%`;
+  const delta = w.delta === null ? "—" : signed(w.delta);
+  const flagship = w.flagshipDelta === null ? "" : `, ${en.market.flagshipRow} ${signed(w.flagshipDelta)}`;
   return `${copy.name} ${copy.unit}: ${w.price === null ? "—" : formatUsd(w.price, "detail")}, ${delta}${flagship}`;
 }
+// The direction follows the shown one-decimal value: a change that rounds to 0.0 is flat, anything else keeps its sign
+// (−0.04 → 0.0%, ±0.05 → ±0.1%), as on the home market table.
+function shownDelta(delta: number): number {
+  return Number(delta.toFixed(1));
+}
 function arrow(w: WorkloadPrice): string {
-  return w.delta !== null && w.delta > 0.05 ? "nx-before-arrow-up" : w.delta !== null && w.delta < -0.05 ? "nx-before-arrow-down" : "nx-before-arrow-right";
+  return w.delta !== null && shownDelta(w.delta) > 0 ? "nx-before-arrow-up" : w.delta !== null && shownDelta(w.delta) < 0 ? "nx-before-arrow-down" : "nx-before-arrow-right";
 }
 function arrowColor(w: WorkloadPrice): string {
-  return w.delta !== null && w.delta > 0.05 ? "var(--v5-success-ink)" : w.delta !== null && w.delta < -0.05 ? "var(--v5-danger)" : "var(--v5-ink-3)";
+  return w.delta !== null && shownDelta(w.delta) > 0 ? "var(--v5-success-ink)" : w.delta !== null && shownDelta(w.delta) < 0 ? "var(--v5-danger)" : "var(--v5-ink-3)";
 }
-// Same thresholds as the workload delta: up arrow rising, down arrow falling, no arrow when flat.
+// Same rule as the workload delta: up arrow rising, down arrow falling, no arrow when it shows 0.0.
 function trendClass(delta: number): string | undefined {
-  return delta > 0.05 ? "nx-before-arrow-up" : delta < -0.05 ? "nx-before-arrow-down" : undefined;
+  return shownDelta(delta) > 0 ? "nx-before-arrow-up" : shownDelta(delta) < 0 ? "nx-before-arrow-down" : undefined;
 }
 // Bars scale to the best tier; a non-zero tier always keeps a visible sliver.
 const rankMax = computed(() => Math.max(0, ...deviceRankings.value.map((row) => row.dailyEarn ?? 0)));
