@@ -3539,6 +3539,7 @@ export const ms: Messages = {
     swapPaused: "Pertukaran dijeda. Lihat sejarah atau batalkan pesanan beratur yang layak.",
     pendingRecoveryHint: "Keputusan pertukaran belum disahkan dan sedang disemak secara automatik. Jangan tukar lagi.",
     remoteNotProvided: "—",
+    staleSnapshot: "Memaparkan data terakhir yang dikemas kini. Data akan dikemas kini secara automatik.",
     remoteUnavailableToast: "Gagal dimuatkan. Sila cuba lagi nanti",
     swapFailed: "Pertukaran tidak berjaya. Sila cuba lagi sebentar lagi.",
     swapCancelledReason: "Pesanan pertukaran dibatalkan — tiada apa-apa ditukar.",
