@@ -87,7 +87,7 @@
         <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label + '\u00A0·\u00A0' }}</text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
-      <NxTag v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status" tone="unavailable" wrap :label="buyLabel" />
+      <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
@@ -137,7 +137,6 @@ import PromotionProduct from '@/components/promotion/promotion-product.vue';
 import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDetailHref,type VoucherEntryContext } from '@/lib/promotion-entry';
 import { uiLocale } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
-import NxTag from "@/components/ui/nx-tag.vue";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean; compact?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean; voucherContext?:VoucherEntryContext }>(), {
   featured: false,
@@ -546,8 +545,9 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-estimate__value { white-space:nowrap; }
 /* Field name in the auxiliary colour, the figure in brand (01 §1.1.1 rules 1 and 4). */
 .product-compact-estimate__label { color:var(--v5-ink-3); }
-/* Why the product cannot be bought now is a state: the shared unavailable tag (03 §3.8), not recoloured text. */
-.product-compact-status { align-self:flex-start; margin-top:8px; }
+/* Why the product cannot be bought now: one status line in the warning ink (01 §1.1.1 rule 4). A pill would wrap to
+   two lines in the narrow card in long languages (ruler L1-pill), so it stays text. */
+.product-compact-status { display:block; margin-top:8px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-warning-ink); overflow-wrap:break-word; }
 .product-card--compact:nth-child(2n) .product-art { animation-delay:-1.1s; }
 .product-card--compact:nth-child(3n) .product-art { animation-delay:-2.2s; }
 .product-card--compact:nth-child(4n) .product-art { animation-delay:-3.1s; }
