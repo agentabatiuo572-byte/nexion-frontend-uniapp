@@ -50,7 +50,7 @@
           <view class="hb-icon" aria-hidden="true"><image class="hb-icon__img" :src="COUPON_ART" mode="aspectFit" /></view>
           <view class="hb-pend__text"><text class="hb-pend__title">{{ pendingName }}</text><text class="hb-pend__sub"><text class="hb-warn">{{ copy.benefitVoucherReady }}</text><template v-if="pendingCount === 1">{{ copy.benefitVoucherAuto }}</template></text></view>
           <text v-if="pendingCount === 1" class="hb-act nx-after-arrow">{{ copy.benefitVoucherUse }}</text>
-          <svg v-else class="hb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          <view v-else class="hb-chev" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
         </view>
         <view v-if="trialPending" class="hb-card hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popTrial }" :style="{ '--hb-i': offerCount + (voucherPending ? 1 : 0) }" :data-trial-state="status" role="button" tabindex="0" :aria-label="trialPendingAria" @click="openTrialDetails" @keydown.enter.prevent="openTrialDetails" @keydown.space.prevent="openTrialDetails">
           <view class="hb-icon" :class="{ 'hb-icon--dim': status === 'ended' }" aria-hidden="true"><image class="hb-icon__img" :src="trialArt" mode="aspectFit" /><view v-if="online" class="hb-online home-benefits__online" /></view>
@@ -65,7 +65,7 @@
           <text v-if="pendingCount === 1 && status === 'ended'" class="hb-act nx-after-arrow">{{ lifecycleCopy.buyDevice }}</text>
           <template v-else>
             <view v-if="pendingCount === 1" class="hb-val"><text>{{ copy.benefitCredit }}</text><text class="hb-val__amount">{{ visibility.mask(creditText) }}</text></view>
-            <svg class="hb-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            <view class="hb-chev" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
           </template>
         </view>
       </view>
@@ -324,6 +324,7 @@ const trialReadFailed = computed(() => trial.lastReadFailed || trial.authoritySt
 .hb-val { flex:none;text-align:right;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 .hb-val__amount { display:block;margin-top:2px;font:500 15px/20px var(--font-v5);color:var(--v5-ink); }
 .hb-chev { flex:none;width:16px;height:16px;color:var(--v5-ink-4); }
+.hb-chev :deep(svg) { display:block; }
 
 /* Motion: one entrance with a short stagger, one pop when an offer becomes a pending card. */
 .hb-stack--enter .hb-card { animation:hb-rise 420ms cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--hb-i, 0) * 70ms); }

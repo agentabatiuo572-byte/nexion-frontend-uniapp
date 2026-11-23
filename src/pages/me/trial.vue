@@ -32,11 +32,11 @@
             <NxTag :tone="isGrace ? 'warning' : 'brand'">{{ ribbon }}</NxTag>
             <view v-if="!isGrace" class="trial-online"><view class="trial-online__dot trial-detail__online" /><text>{{ t.earn.online }}</text></view>
           </view>
-          <view class="trial-ring">
-            <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true">
+          <view class="trial-ring" :style="{ '--trial-ring-offset': ringOffset }">
+            <view class="trial-ring__svg" aria-hidden="true"><svg width="208" height="208" viewBox="0 0 208 208">
               <circle class="trial-ring__track" cx="104" cy="104" r="96" fill="none" stroke-width="6" />
-              <circle class="trial-ring__arc" cx="104" cy="104" r="96" fill="none" stroke-width="6" stroke-linecap="round" :stroke-dasharray="RING_LENGTH" :stroke-dashoffset="ringOffset" transform="rotate(-90 104 104)" />
-            </svg>
+              <circle class="trial-ring__arc" cx="104" cy="104" r="96" fill="none" stroke-width="6" stroke-linecap="round" :stroke-dasharray="RING_LENGTH" transform="rotate(-90 104 104)" />
+            </svg></view>
             <CatalogMachineImage class="trial-ring__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-hero" />
           </view>
           <view class="trial-countdown">
@@ -144,7 +144,7 @@
       <!-- ═══ ended — credit expired terminal ═══ -->
       <view v-else-if="status === 'ended'" class="trial-state trial-state--terminal" data-testid="trial-ended">
         <view class="trial-ring trial-ring--terminal trial-ring--muted trial-rise">
-          <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true"><circle class="trial-ring__track" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg>
+          <view class="trial-ring__svg" aria-hidden="true"><svg width="208" height="208" viewBox="0 0 208 208"><circle class="trial-ring__track" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg></view>
           <CatalogMachineImage class="trial-ring__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-ended" />
           <view class="trial-ring__badge" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
         </view>
@@ -157,7 +157,7 @@
       <!-- ═══ converted, then refunded: the device is gone, say so ═══ -->
       <view v-else-if="conversionRefunded" class="trial-state trial-state--terminal" data-testid="trial-refunded">
         <view class="trial-ring trial-ring--terminal trial-ring--muted trial-rise">
-          <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true"><circle class="trial-ring__track" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg>
+          <view class="trial-ring__svg" aria-hidden="true"><svg width="208" height="208" viewBox="0 0 208 208"><circle class="trial-ring__track" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg></view>
           <CatalogMachineImage class="trial-ring__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-refunded" />
           <view class="trial-ring__badge" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-15-6.7L3 13" /></svg></view>
         </view>
@@ -172,7 +172,7 @@
       <view v-else class="trial-state trial-state--terminal">
         <view class="trial-glow trial-glow--owned" aria-hidden="true" />
         <view class="trial-ring trial-ring--terminal trial-ring--owned trial-rise">
-          <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true"><circle class="trial-ring__full" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg>
+          <view class="trial-ring__svg" aria-hidden="true"><svg width="208" height="208" viewBox="0 0 208 208"><circle class="trial-ring__full" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg></view>
           <CatalogMachineImage class="trial-ring__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-owned" />
           <view class="trial-ring__check" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></view>
         </view>
@@ -539,11 +539,14 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-online__dot { width:8px;height:8px;border-radius:50%;background:var(--v5-success); }
 .trial-ring { position:relative;flex:none;width:208px;height:208px;margin-top:12px; }
 .trial-ring--terminal { margin-top:0; }
+/* The ring is drawn through NxNativeSvg on the App: inner nodes are reached with :deep(), and the
+   remaining length comes in as a CSS variable so the per-second tick never rewrites the svg. */
 .trial-ring__svg { position:absolute;inset:0; }
-.trial-ring__track { stroke:color-mix(in srgb, var(--v5-ink) 8%, transparent); }
-.trial-ring__arc { stroke:var(--v5-tech-cyan);animation:trial-ring-draw .9s cubic-bezier(.16,1,.3,1) .15s both; }
-.trial-state--grace .trial-ring__arc { stroke:var(--v5-warning); }
-.trial-ring__full { stroke:var(--v5-tech-cyan); }
+.trial-ring__svg :deep(svg) { display:block; }
+.trial-ring :deep(.trial-ring__track) { stroke:color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.trial-ring :deep(.trial-ring__arc) { stroke:var(--v5-tech-cyan);stroke-dashoffset:var(--trial-ring-offset);animation:trial-ring-draw .9s cubic-bezier(.16,1,.3,1) .15s both; }
+.trial-state--grace .trial-ring :deep(.trial-ring__arc) { stroke:var(--v5-warning); }
+.trial-ring :deep(.trial-ring__full) { stroke:var(--v5-tech-cyan); }
 .trial-ring__machine { position:absolute;left:24px;top:20px;width:160px;height:160px; }
 .trial-state--grace .trial-ring__machine { filter:grayscale(1);opacity:.5; }
 .trial-ring--muted .trial-ring__machine { filter:grayscale(1);opacity:.45; }
@@ -614,7 +617,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-link { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 2px;border-top:1px solid var(--v5-border);font:400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .trial-link:active { opacity:.7; }
 .trial-link:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
-.trial-link > svg { flex:none; }
+.trial-link > svg, .trial-link > .nx-native-svg { flex:none; }
 
 /* ── Claim / terminal states ── */
 .trial-slot { position:relative;flex:none;width:248px;height:248px; }
@@ -655,7 +658,8 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 @keyframes trial-bar-in { from { transform:translateY(100%); } to { transform:none; } }
 @keyframes trial-pop { 0% { opacity:0;transform:scale(.6); } 70% { opacity:1;transform:scale(1.08); } 100% { opacity:1;transform:scale(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .trial-rise, .trial-glow, .trial-ring__arc, .trial-ring__check, .trial-bar { animation:none; }
+  .trial-rise, .trial-glow, .trial-ring__check, .trial-bar { animation:none; }
+  .trial-ring :deep(.trial-ring__arc) { animation:none; }
 }
 
 .trs-root {

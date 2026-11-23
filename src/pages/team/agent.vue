@@ -536,7 +536,7 @@ useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAge
 .agent-tile__range { display: block; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--tint-ink); overflow-wrap: break-word; }
 .agent-tile:focus-visible, .agent-path:focus-visible, .agent-link:focus-visible, .agent-preview:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .agent-hint { display: flex; gap: var(--v5-space-2); margin: var(--ui-space-inline) var(--v5-space-4) 0; font: var(--ui-type-note-weight, 400) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
-.agent-hint > svg { flex: none; margin-top: var(--v5-space-1); }
+.agent-hint > svg, .agent-hint > .nx-native-svg { flex: none; margin-top: var(--v5-space-1); }
 .agent-section > .agent-hint { margin-top: var(--v5-space-4); }
 .agent-preview { display: flex; align-items: center; justify-content: center; min-height: 48px; margin: var(--ui-space-section-gap) var(--v5-space-4) 0; padding: 0 var(--v5-space-5); border-radius: var(--v5-radius-full); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; }
 .agent-form { margin: 0 var(--v5-space-4); padding: var(--v5-space-1) var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
@@ -548,7 +548,7 @@ useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAge
 .agent-control__input { min-height: 44px; background: transparent; color: var(--v5-ink); font: inherit; }
 .agent-control__placeholder { color: var(--v5-ink-3); }
 .agent-control__prefix { flex: none; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-ink-3); }
-.agent-control > svg { flex: none; color: var(--v5-ink-3); }
+.agent-control > svg, .agent-control > .nx-native-svg { flex: none; color: var(--v5-ink-3); }
 .agent-control:focus-within, .agent-date-picker:focus-visible .agent-control { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .agent-field__help { display: block; margin-top: var(--v5-space-2); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 /* 12px under the form so the text button's 44px target stays off the last field. */

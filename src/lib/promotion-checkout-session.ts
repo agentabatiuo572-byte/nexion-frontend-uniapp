@@ -1,6 +1,6 @@
 import type { Quote } from '../api/promotion-contracts';
 import type { OrderReceipt, PromotionApi, PromotionOperation } from '../api/promotion-api';
-import { parsePromotedOrder } from '../api/promotion-api';
+import { checkoutCreateBlock, parsePromotedOrder, type CheckoutCreateBlock } from '../api/promotion-api';
 
 export interface PromotionPendingCommand { key: string; operation: PromotionOperation; targetId: string; paymentMethod?: 'WALLET' | 'EXTERNAL' }
 export interface PromotionCheckoutRecord { quote: Quote | null; order: OrderReceipt | null; pending: PromotionPendingCommand | null; previousPayment?: PromotionPendingCommand; voucherId?:string|null; voucherMode?:'auto'|'manual'; leavePromptShown?:boolean; paymentIntentRevision?:number }
@@ -24,6 +24,7 @@ export interface PromotionSessionPorts {
   read(): PromotionCheckoutRecord | null;
   save(record: PromotionCheckoutRecord): void;
   key(intent: string): string;
+  releaseKey(intent: string, key: string): boolean;
   current(): boolean;
   isExternalPaymentRefused(key: string): boolean;
 }
@@ -115,10 +116,22 @@ export class PromotionCheckoutSession {
     return !this.busy&&!this.unknown&&(!pending||(operation==='payOrder'||operation==='cancelOrder')&&this.externalPaymentRefused||(this.retryOriginal&&(pending.operation===operation
       ||operation==='cancelOrder'&&pending.operation==='payOrder'&&pending.key===this.unseenPaymentKey)));
   }
-  async create(): Promise<void> {
+  async create(): Promise<CheckoutCreateBlock | null> {
     const q = this.record.quote;
     if (!q || q.eligibility !== 'ELIGIBLE' || this.record.order) throw new Error('QUOTE_NOT_CONFIRMABLE');
-    await this.mutate(q.items.length > 1 ? 'createBundle' : 'createOrder', q.quoteId, key => this.ports.api.create(q, key,this.record.voucherId??null));
+    try {
+      await this.mutate(q.items.length > 1 ? 'createBundle' : 'createOrder', q.quoteId, key => this.ports.api.create(q, key,this.record.voucherId??null));
+      return null;
+    } catch (cause) {
+      const refusal = checkoutCreateBlock(cause);
+      if (!refusal || !this.ports.current()) throw cause;
+      const pending = this.record.pending;
+      if (!this.persist({ ...this.record, quote: null, pending: null })) throw cause;
+      if (pending) this.ports.releaseKey(`${pending.operation}:${pending.targetId}`, pending.key);
+      this.commandUnknown = false;
+      this.retryOriginal = false;
+      return refusal;
+    }
   }
   externalPaymentKey(): string {
     const order = this.record.order;

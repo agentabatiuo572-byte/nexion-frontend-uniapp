@@ -259,7 +259,7 @@ function completedTime(ts: number): string {
 .earn-tc__panel { padding-bottom: 4px; }
 @media (prefers-reduced-motion: reduce) { .earn-tc__arrow { transition: none; } }
 .earn-history-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 22px; align-items: center; gap: calc(var(--v5-space-1) / 2) var(--v5-space-2); }
-.earn-history-row > svg { grid-row: 1 / span 2; }
+.earn-history-row > svg, .earn-history-row > .nx-native-svg { grid-row: 1 / span 2; }
 /* History panel (10 §10.1): the label is an uppercase auxiliary caption (+.04em, 01 §1.2), 查看全部 a text link in the
    auxiliary colour with a chevron (03 §3.9), notes the description role. A row's job name is the row title in main ink on the
    list-subtitle role; it wraps in full, and rows that open a receipt (where the full name is shown) stop at two lines (03 §3.6.1). */

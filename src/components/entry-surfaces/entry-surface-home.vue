@@ -19,7 +19,7 @@
         </view>
 
         <view class="entry-visual nx-soft-glass" aria-hidden="true">
-          <svg class="entry-visual-svg" viewBox="0 0 236 236" fill="none">
+          <view class="entry-visual-svg"><svg width="100%" viewBox="0 0 236 236" fill="none">
             <rect x="52" y="18" width="132" height="200" rx="26" fill="var(--v5-surface)" stroke="var(--v5-border-strong)" stroke-width="2" />
             <rect x="68" y="44" width="100" height="148" rx="10" fill="var(--v5-bg)" stroke="var(--v5-border)" />
             <circle cx="118" cy="205" r="6" fill="var(--v5-surface-3)" />
@@ -29,7 +29,7 @@
             <path d="M86 156h52" stroke="var(--v5-ink-4)" stroke-width="7" stroke-linecap="round" />
             <circle cx="176" cy="64" r="22" fill="var(--v5-brand-soft)" stroke="var(--v5-brand-border)" />
             <path :d="data.iconPath" stroke="var(--v5-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
+          </svg></view>
         </view>
       </view>
 
@@ -208,6 +208,7 @@ function go(href: string) {
   width: min(160px, 100%);
   height: auto;
 }
+.entry-visual-svg :deep(svg) { display: block; }
 
 .entry-flow {
   margin-top: 12px;

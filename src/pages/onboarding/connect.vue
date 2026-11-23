@@ -69,10 +69,10 @@
       <view v-else-if="phase === 'result'" key="result" class="cn-phase anim-up">
         <view class="cn-score cn-score--hex" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore} ${t.onboarding.phoneComputeUnit}`">
           <view class="cn-score__aurora" aria-hidden="true" />
-          <svg class="cn-score__hex" viewBox="0 0 220 220" aria-hidden="true" focusable="false">
+          <view class="cn-score__hex" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 220 220" focusable="false">
             <path class="cn-score__ring cn-score__ring--halo" :d="scoreHexPath" />
             <path class="cn-score__ring cn-score__ring--edge" :d="scoreHexPath" />
-          </svg>
+          </svg></view>
           <view class="cn-score__num">
             <text class="cn-score__v">{{ shownScore }}</text>
             <text class="cn-score__d">{{ t.onboarding.phoneComputeUnit }}</text>
@@ -832,9 +832,10 @@ onUnmounted(() => {
 .cn-score--hex { --score-size: clamp(184px, 32vh, 306px); width: 100%; height: var(--score-size); box-sizing: border-box; display: grid; place-items: center; border: 0; background: transparent; box-shadow: none; padding: 0; overflow: visible; isolation: isolate; }
 .cn-score__aurora { grid-area: 1 / 1; width: min(70vw, 220px); height: min(70vw, 220px); border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--v5-brand) 42%, transparent), transparent 64%); filter: blur(24px); animation: cn-aurora 5s ease-in-out infinite alternate; }
 .cn-score__hex { grid-area: 1 / 1; width: calc(var(--score-size) - 16px); height: calc(var(--score-size) - 16px); animation: cn-hex-breathe 7s ease-in-out infinite; }
-.cn-score__ring { fill: none; stroke-linejoin: round; }
-.cn-score__ring--halo { stroke: color-mix(in oklab, var(--v5-brand) 18%, transparent); stroke-width: 8; }
-.cn-score__ring--edge { stroke: var(--v5-brand); stroke-width: 3.4; filter: drop-shadow(0 0 9px color-mix(in oklab, var(--v5-brand) 48%, transparent)); }
+.cn-score__hex :deep(svg) { display: block; }
+.cn-score__hex :deep(.cn-score__ring) { fill: none; stroke-linejoin: round; }
+.cn-score__hex :deep(.cn-score__ring--halo) { stroke: color-mix(in oklab, var(--v5-brand) 18%, transparent); stroke-width: 8; }
+.cn-score__hex :deep(.cn-score__ring--edge) { stroke: var(--v5-brand); stroke-width: 3.4; filter: drop-shadow(0 0 9px color-mix(in oklab, var(--v5-brand) 48%, transparent)); }
 .cn-score--hex .cn-score__num { grid-area: 1 / 1; z-index: 1; margin: 0; }
 .cn-policy-float { position: fixed; right: 20px; bottom: var(--nx-overlay-bottom); z-index: 20; }
 .cn-policy-float__button { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); background: var(--v5-surface); }

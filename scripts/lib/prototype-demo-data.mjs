@@ -1,7 +1,7 @@
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { createHash } from 'node:crypto';
-import { demoAccountId, previewAccountId } from './prototype-demo-identity.mjs';
+import { demoAccountId, demoPurchasingAccountId, demoReferralBuyer, previewAccountId } from './prototype-demo-identity.mjs';
 import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
@@ -29,6 +29,8 @@ import { demoCommissionGroups, demoStreakMilestones, demoReferralLedger, demoHas
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
 const demoStartedAt = Date.now();
+const promotionEndsAt = new Date(demoStartedAt + 6 * day - 19 * 60000).toISOString();
+const endedPromotionEndsAt = new Date(demoStartedAt - day).toISOString();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
 function demoVoucherGrant(state,voucherId,now){
@@ -59,7 +61,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,deviceTaskSampleState:'default'};
+export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,deviceTaskSampleState:'default'};
 export const demoOptions = {
   savedAttemptState: savedAttemptOptions,
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -98,6 +100,7 @@ export const demoOptions = {
   ambassadorIoState:[['normal','材料读写正常'],['upload-slow','上传慢（每次 4 秒）'],['upload-fail-once','下一次上传失败一次'],['save-reject-once','下一次提交被拒绝一次（422）'],['save-unknown-once','下一次提交结果未知一次（503）'],['save-lands-unknown-once','下一次提交已生效但回复丢失（503）'],['close-on-submit-once','下一次提交时申请已终结（409）'],['late-read-once','下一次材料读取迟到 4 秒（返回旧数据）'],['rereview-finance-once','下一次读取：同版本费用重新通过'],['history-fail-once','下一次申请记录读取失败一次']],
   ambassadorRank:[['follow','跟随“最高等级 V8”开关'],['v5','V5（刚满足资格）']],
   repurchaseState:['follow','inside','boundary','outside'].map(value=>[value,value]),
+  promotionBuyer:[['returning','购机活动 · 已购账号'],['sponsored-new','购机活动 · 受邀首购买家']],
   promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],
   sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
   promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
@@ -124,6 +127,14 @@ const skuDefinitions = [
 const catalogTaglineTranslations = {
   'stellarbox-pro': { zh:'全托管设备', vi:'Thiết bị vận hành trọn gói' },
 };
+const demoCatalogBadges = [
+  {badge:'Recommended',badgeKind:'recommended'},
+  {badge:'Best seller',badgeKind:'bestSeller'},
+  {badge:'Trending',badgeKind:'trending'},
+  {badge:'Upgrade pick',badgeKind:'upgradePick'},
+  {badge:'Flagship',badgeKind:'flagship'},
+  {badge:'Low barrier',badgeKind:'lowBarrier'},
+];
 const demoPromotionGift={orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',obligationId:'demo-reward-3',productNo:'stellarbox-s1',quantity:1};
 // The paid order keeps the gift terms of its published version even after the live offer changes.
 function promotionDeviceReward(giftName) {
@@ -151,7 +162,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     // The phased preset models a valid E1 phase id that has not been reached.
     return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
       vram:share?'not_applicable':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'not_applicable',hashRate:null,
-      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',badge:index===0?'Recommended':index===1?'Best seller':null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
+      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[index],imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
@@ -326,7 +337,7 @@ export function requireDemoPurchase(state,products,items,now,settlement=false,qu
 const orderDiscounts={1:10,4:5};
 const orderDiscountDisclosure=amount=>({deviceName:null,deviceRights:null,title:{zh:'订单立减',en:'Order discount',vi:'Giảm giá đơn hàng'},
   benefitDescription:{zh:'下单立减，不另发钱包奖励；退款按实际支付金额。',en:'Deducted at checkout, with no wallet reward. Refunds use the amount paid.',vi:'Giảm trực tiếp khi đặt hàng, không thưởng thêm vào ví. Hoàn tiền theo số tiền thực trả.'},
-  terms:{zh:'下单时直接减 '+amount+' USDT。',en:amount+' USDT comes off when you order.',vi:'Giảm trực tiếp '+amount+' USDT khi đặt hàng.'},
+  terms:{zh:'下单时直接减 '+amount+' USDT。',en:amount+' USDT comes off when you order.',vi:'Giảm trực tiếp '+amount+' USDT khi đặt hàng.'},
   refundTerms:{zh:'退款按实际支付金额处理。',en:'Refunds use the amount paid.',vi:'Hoàn tiền theo số tiền thực trả.'}});
 const orderStates={placed:['PENDING','PENDING_PAYMENT','WAITING_PAYMENT'],paid:['PAID','PAID','WAITING_PROVISIONING'],provisioning:['PAID','PROCESSING','PROVISIONING'],activated:['PAID','COMPLETED','ACTIVATED'],payment_failed:['FAILED','PAYMENT_FAILED','WAITING_PAYMENT'],expired:['EXPIRED','EXPIRED','WAITING_PAYMENT'],provisioning_failed:['PAID','PROVISIONING_FAILED','PROVISIONING_FAILED'],refunded:['REFUNDED','REFUNDED','REFUNDED'],chargeback:['CHARGEBACK','CHARGEBACK','DEACTIVATED'],cancelled:['CANCELLED','CANCELLED','WAITING_PAYMENT']};
 // Sample times are facts of the scenario: fixed when it is seeded, not regenerated per read. Like the backend's
@@ -391,7 +402,9 @@ const demoTrialSlots=(url,locale,state)=>['ACTIVE','GRACE','EXTENDED'].includes(
 // account (dataState=empty) has no sample rows, only what this session creates. An unpaid sample the deadline task has
 // closed reads as expired, as that task (modelled for session orders by the checkout fixture) leaves it.
 function demoScenarioOrders(products,state,now,device41) {
-  const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
+  const own=state.createdOrders||[];
+  if(state.promotionBuyer==='sponsored-new')return own;
+  const ids=new Set(own.map(order=>order.orderNo));
   return [...own,...demoOrders(products,state,now,device41).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
     &&(device41||order.orderNo!=='DEMO-ORDER-004'))
@@ -453,7 +466,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
     dailyNex:products.find(product=>product.id.toUpperCase()===code).dailyEarnNEX*previewCapacity({...template,productCode:code,...extra},capacitySchedule,Date.now()).capacityPct/100,
     actualPaidUsdt:paid,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,...extra});
   const live=device=>!retired.includes(device.id);
-  if(state.dataState==='empty')return [];
+  if(state.dataState==='empty'||state.promotionBuyer==='sponsored-new')return [];
   let devices=state.fleetState==='none'?[]:[template,{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}];
   if(state.fleetState==='inventory')devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='decayed'){
@@ -1046,24 +1059,25 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const activity=input.activityId
       ? demoFixture(new URL('/api/promotions/'+input.activityId,url.origin),locale,state,request,now)
       : null;
-    const repurchase=activity?.template==='REPURCHASE';
     const matches=items.flatMap(line=>{
       const rule=activity?.rewardRules?.find(candidate=>candidate.productNo===line.productNo
-        &&(!repurchase||line.quantity>=candidate.minBuyQty));
+        &&line.quantity>=candidate.minBuyQty);
       return rule?[{line,rule}]:[];
     });
     if(input.activityId&&(!activity?.activityId||activity.state!=='ACTIVE'
-        ||activity.eligibility!=='ESTIMATE_ELIGIBLE'||(repurchase&&!matches.length))){
+        ||activity.eligibility!=='ESTIMATE_ELIGIBLE'||!matches.length)){
       refuse('PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
     }
     requireDemoPurchase(state,products,input.items,now);
     if(!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
     const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
     for(const {line,rule} of matches){
-      const {disclosure,...reward}=rule.buyerReward;
-      quote.expectedRewards.push({lineId:line.lineId,activityId:activity.activityId,version:activity.version,
-        ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,
-        groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});
+      for(const spec of [rule.buyerReward,rule.inviterReward].filter(Boolean)){
+        const {disclosure,...reward}=spec;
+        quote.expectedRewards.push({lineId:line.lineId,activityId:activity.activityId,version:activity.version,
+          ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,
+          groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});
+      }
     }
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
     const voucher=demoVoucherRedemption(state,quote.voucherId,items,Number(subtotal),now);
@@ -1096,6 +1110,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
+    if(quote?.activityId&&quote.expectedRewards.length){
+      const current=demoFixture(new URL('/api/promotions/'+quote.activityId,url.origin),locale,state,{...request,method:()=>'GET'},now);
+      if(current.state==='ACTIVE'&&current.eligibility==='INELIGIBLE')refuse('PROMOTION_ELIGIBILITY_CHANGED');
+    }
     const bundle=pathname==='/api/orders/bundle';
     const quantityRequested=input.quantity??1;
     let productNo=input.productNo,voucherId=input.voucherId;
@@ -1126,8 +1144,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }else{
       if(lineProducts.some(p=>!p.available))refuse('PRODUCT_NOT_RELEASED');
       if(lineProducts.some((p,i)=>p.inventoryMode==='FINITE'&&p.stock<lines[i].quantity))refuse('PRODUCT_OUT_OF_STOCK');
-      requireDemoPurchase(state,products,lines,now);
-      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
+      if(quote){
+        if(lineProducts.some(p=>!demoE1PurchaseRule(state,p,now).eligible))refuse('PURCHASE_GATE_BLOCKED');
+      }else requireDemoPurchase(state,products,lines,now);
+      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse(quote?'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE':'PROMOTION_CAPACITY_UNAVAILABLE');
     }
     const quantity=lines.reduce((s,l)=>s+l.quantity,0),subtotal=lines.reduce((s,l)=>s+products.find(p=>p.id===l.productNo).price*l.quantity,0),discountRate=bundleRate(lines.length),bundleDiscount=Number((subtotal*discountRate).toFixed(2));
     const voucher=demoVoucherRedemption(state,quote?quote.voucherId:voucherId,lines,subtotal,now);
@@ -1137,7 +1157,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       if(!(Math.abs(input.expectedAmountUsdt-amount)<=0.000001))refuse('BUNDLE_QUOTE_STALE');
       if(lineProducts.some(p=>!p.available))refuse('BUNDLE_PRODUCT_NOT_RELEASED');
       if(lineProducts.some(p=>!demoE1PurchaseRule(state,p,now).eligible))refuse('PURCHASE_GATE_BLOCKED');
-      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('CAPACITY_REPLACEMENT_REQUIRED');
+      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse(quote?'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE':'CAPACITY_REPLACEMENT_REQUIRED');
     }
     const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:quote?amount.toFixed(2):amount,placedAt:now,
       computePoints:lines.reduce((total,line)=>total+products.find(p=>p.id===line.productNo).computePoints*line.quantity,0),orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
@@ -1202,25 +1222,29 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
     const sample=base('/api/promotions').items[0];
     const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
-    const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
-    const authenticated=Boolean(previewAccountId(state,request?.headers?.()??{}));
+    const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share'],['DIRECT_REFERRAL','首台设备邀请礼','First device referral gift','Quà giới thiệu thiết bị đầu tiên','stellarrack-p2']];
+    const accountId=previewAccountId(state,request?.headers?.()??{});
+    const authenticated=accountId!==null;
+    const sponsorId=accountId===String(demoReferralBuyer.user.userId)?demoReferralBuyer.sponsorUserId:null;
     const exact=state.repurchaseState==='boundary'||state.repurchaseState==='outside';
     const repurchaseWindow=exact?{minDays:30,maxDays:30}:{minDays:state.repurchaseState==='inside'?7:0,maxDays:90};
-    const readsPurchaseHistory=authenticated&&!empty&&state.eventState!=='empty';
+    const readsPurchaseHistory=accountId===demoPurchasingAccountId(state)&&!empty&&state.eventState!=='empty';
     // The initial order snapshot cannot be newer than this projection's server time.
     if(readsPurchaseHistory)state.sampleOrdersAt??=now;
-    const latestPaid=readsPurchaseHistory
-      ? demoAccountOrders(url,locale,state,now).reduce((latest,order)=>
-          order.paymentStatus==='PAID'&&!['REFUNDED','CANCELLED'].includes(order.orderStatus)
-            && typeof order.paidAt==='number'&&(latest===null||order.paidAt>latest)?order.paidAt:latest,null)
-      : null;
+    const paidOrders=readsPurchaseHistory
+      ? demoAccountOrders(url,locale,state,now).filter(order=>typeof order.paidAt==='number'&&order.paidAt<=now)
+      : [];
+    const latestPaid=paidOrders.reduce((latest,order)=>
+      order.paymentStatus==='PAID'&&!['REFUNDED','CANCELLED'].includes(order.orderStatus)
+        &&(latest===null||order.paidAt>latest)?order.paidAt:latest,null);
+    const hasValidPurchase=paidOrders.some(demoPaidPurchase);
     const items=empty||state.eventState==='empty'?[]:configs.map(([template,zh,en,vi,productNo],i)=>{
-      const item=structuredClone(sample);item.activityId='demo-promo-'+i;item.template=template;item.title={zh,en,vi};item.productNos=template==='MULTI_PRODUCT'?['stellarbox-pro','stellarrack-p1','stellarbox-s1']:[productNo];item.placement=[0,1,4].includes(i)?'home.purchase-promotion':null;
+      const item=structuredClone(sample);item.activityId='demo-promo-'+i;item.template=template;item.title={zh,en,vi};item.placement=[0,1,4].includes(i)?'home.purchase-promotion':null;
       item.rewardRules[0].productNo=productNo;item.rewardRules[0].ruleId='demo-rule-'+i;
       item.serverTime=iso;
       // Landing pages (P-58): eligibility follows the panel switch; first purchase and repurchase end in under six days.
       item.eligibility={eligible:'ESTIMATE_ELIGIBLE','sign-in':'SIGN_IN_REQUIRED',ineligible:'INELIGIBLE',unknown:'UNKNOWN'}[state.promotionEligibility]||'ESTIMATE_ELIGIBLE';
-      if(i>0)item.endsAt=new Date(now+6*day-19*60000).toISOString();
+      if(i>0)item.endsAt=promotionEndsAt;
       if(i===0){
         const window=demoH4PromotionWindow(state,now);
         Object.assign(item,{state:window.state==='ongoing'?'ACTIVE':window.state==='upcoming'?'SCHEDULED':'ENDED',
@@ -1230,27 +1254,47 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         item.rewardRules[0].buyerReward=reward;
         if(state.promotionRewardType==='gift-discount')item.rewardRules[0].buyerReward={rewardRuleId:reward.rewardRuleId,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:'100',disclosure:orderDiscountDisclosure(100)};
       }
-      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
+      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',calculation:'FIXED',amount:String(i*50),disclosure:d};}
       // The referral offer also publishes what the inviter gets for each friend's first purchase.
-      if(template==='DIRECT_REFERRAL')item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:structuredClone(item.rewardRules[0].buyerReward.disclosure)};
+      if(template==='DIRECT_REFERRAL'){
+        const byOrder=i===2;
+        item.firstPurchaseCondition={mode:byOrder?'FIRST_ELIGIBLE_ORDER':'FIRST_ELIGIBLE_UNIT',restoreAfterRefund:byOrder};
+        item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:{...structuredClone(item.rewardRules[0].buyerReward.disclosure),benefitDescription:{zh:'领取 50 UVT',en:'Receive 50 UVT',vi:'Nhận 50 UVT'}}};
+      }
       if(i>0){
-        if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
+        if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=endedPromotionEndsAt;}
         // Boundary scenarios flip on the clock, one minute after the switch.
-        const edge=(state.promotionTimingAt||now)+60000;
+        const edge=(state.promotionTimingAt??demoStartedAt)+60000;
         if(state.promotionTiming==='starting'){item.startsAt=new Date(edge).toISOString();item.state=now<edge?'SCHEDULED':'ACTIVE';}
         else if(state.promotionTiming==='ending'){item.endsAt=new Date(edge).toISOString();item.state=now<edge?'ACTIVE':'ENDED';}
+      }
+      if(!authenticated&&item.eligibility!=='INELIGIBLE')item.eligibility='SIGN_IN_REQUIRED';
+      if(authenticated&&item.eligibility==='ESTIMATE_ELIGIBLE'&&['FIRST_PURCHASE','DIRECT_REFERRAL'].includes(template)){
+        const alreadyPurchased=item.firstPurchaseCondition?.restoreAfterRefund ? hasValidPurchase : paidOrders.length>0;
+        if(alreadyPurchased||(template==='DIRECT_REFERRAL'&&(!sponsorId||sponsorId===accountId)))item.eligibility='INELIGIBLE';
       }
       if(template==='REPURCHASE'){
         item.repurchaseWindow=repurchaseWindow;
         item.lastValidPurchaseAt=latestPaid===null?null:new Date(latestPaid).toISOString();
         const days=latestPaid===null?null:Math.floor((now-latestPaid)/day);
-        item.eligibility=!authenticated?'SIGN_IN_REQUIRED'
-          :days!==null&&days>=repurchaseWindow.minDays&&days<=repurchaseWindow.maxDays&&state.promotionEligibility!=='ineligible'
-            ?'ESTIMATE_ELIGIBLE':'INELIGIBLE';
+        if(authenticated)item.eligibility=days!==null&&days>=repurchaseWindow.minDays&&days<=repurchaseWindow.maxDays&&state.promotionEligibility!=='ineligible'
+          ?'ESTIMATE_ELIGIBLE':'INELIGIBLE';
       }
       // Like PromotionPublicService, an offer that is not running is never eligible.
       if(item.state!=='ACTIVE')item.eligibility='INELIGIBLE';
+      if(item.rewardRules[0].buyerReward.type==='DISCOUNT_USDT')item.terms=item.rewardRules[0].buyerReward.disclosure.benefitDescription;
+      if(template==='MULTI_PRODUCT'){
+        const primary=item.rewardRules[0];
+        for(const sku of ['stellarbox-pro','stellarbox-s1']){
+          const rule=structuredClone(primary);
+          rule.productNo=sku;
+          rule.ruleId+='-'+sku;
+          rule.buyerReward.rewardRuleId+='-'+sku;
+          item.rewardRules.push(rule);
+        }
+      }
       if(state.machineImageState==='banner'&&item.state==='ACTIVE')item.bannerImageUrl=`/api/promotions/${item.activityId}/banner/${item.version}`;
+      item.productNos=[...new Set(item.rewardRules.map(rule=>rule.productNo))];
       const imageSkus=new Set(item.productNos);
       for(const rule of item.rewardRules){
         for(const reward of [rule.buyerReward,rule.inviterReward]){

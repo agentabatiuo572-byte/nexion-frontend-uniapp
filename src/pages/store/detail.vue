@@ -218,7 +218,7 @@
           <view v-for="(f, i) in faqs" :key="i" :style="faqItemStyle(i)">
             <view class="w-full flex items-center justify-between text-left active:opacity-80" :style="faqQStyle" role="button" tabindex="0" :aria-label="f.q" :aria-expanded="openFaq === i" @click.stop="toggleFaq(i)">
               <text class="flex-1" style="padding-right: 8px">{{ f.q }}</text>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" :style="{ transform: openFaq === i ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }"><path d="m9 18 6-6-6-6" /></svg>
+              <view class="shrink-0" :style="{ display: 'grid', transform: openFaq === i ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg></view>
             </view>
             <view v-if="openFaq === i" style="padding-bottom: 12px; padding-right: 24px; margin-top: -4px">
               <text style="font-size: 12px; font-weight: 400; color: var(--v5-ink-2); line-height: 1.625; white-space: pre-line">{{ f.a }}</text>
