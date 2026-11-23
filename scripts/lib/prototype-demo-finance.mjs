@@ -16,9 +16,20 @@ const bankFx={baseRateVndPerUsdt:25000,buySpreadPct:0,quoteRateVndPerUsdt:25000,
 const refuse=(status,message)=>{throw Object.assign(new Error(message),{status});};
 export const demoUsdtWithdrawalNetworks = ["USDT-BEP20", "USDT-ERC20"];
 export const demoWithdrawalNetworks = state => ({ "bep20-erc20": demoUsdtWithdrawalNetworks, bep20: ["USDT-BEP20"], erc20: ["USDT-ERC20"], closed: [] }[state.withdrawNetworksState] ?? demoUsdtWithdrawalNetworks);
+export const demoPayoutAddressDelayHours = 24;
+export const demoPayoutAddressCooldownDays = 7;
 // The list, eligibility and address writes must read the same per-network address book.
 export function demoPayoutAddresses(state, now = Date.now()) {
-  const defaults = state.dataState === 'empty' ? {} : { 'USDT-BEP20': { source: 'server', serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '', network: 'USDT-BEP20', address: `0x${'1'.repeat(40)}`, status: 'ACTIVE', effectiveAt: new Date(now - day).toISOString(), createdAt: new Date(now - 8 * day).toISOString(), nextChangeAllowedAt: new Date(now).toISOString() } };
+  const createdAt = (state.previewFactsAt ?? now) - 8 * day;
+  const defaults = state.dataState === 'empty' ? {} : {
+    'USDT-BEP20': {
+      source: 'server', serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '',
+      network: 'USDT-BEP20', address: '0x' + '1'.repeat(40), status: 'ACTIVE',
+      createdAt: new Date(createdAt).toISOString(),
+      effectiveAt: new Date(createdAt + demoPayoutAddressDelayHours * 3600000).toISOString(),
+      nextChangeAllowedAt: new Date(createdAt + demoPayoutAddressCooldownDays * day).toISOString(),
+    },
+  };
   return Object.values({ ...defaults, ...state.bankDemo?.addresses }).map(row => ({ ...row, changePending: Date.parse(row.effectiveAt) > now }));
 }
 export function demoWithdrawalPolicy(state, facts) {
@@ -213,7 +224,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     const input = method === 'GET' ? Object.fromEntries(url.searchParams) : request.postDataJSON();
     return demoWithdrawalEligibility(state, input, now, facts, demoWithdrawalPolicy(state, facts)).view;
   }
-  if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: 7, effectiveDelayHours: 24, inFlightWithdrawalBlocked: true };
+  if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: demoPayoutAddressCooldownDays, effectiveDelayHours: demoPayoutAddressDelayHours, inFlightWithdrawalBlocked: true };
   if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { ...bankConfig, enabled: state.topupChannels !== "bank-off" } };
   if (p === "/api/app/payments/fx-quote") {
     if(url.searchParams.get('fiat')?.toUpperCase()!=='VND'||url.searchParams.get('asset')?.toUpperCase()!=='USDT')refuse(422,'FX_PAIR_NOT_SUPPORTED');

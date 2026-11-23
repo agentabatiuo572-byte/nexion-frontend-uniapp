@@ -3,11 +3,10 @@ import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { computed, onScopeDispose, ref } from "vue";
 import { apiRuntimeConfig, payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
 import type { ApiRuntimeConfig } from "@/api/runtime-config";
-import {
-  payoutAddressEpochMs,
-  type PayoutAddressNetwork,
-  type PayoutAddressProvenance,
-  type PayoutAddressSnapshot,
+import type {
+  PayoutAddressNetwork,
+  PayoutAddressProvenance,
+  PayoutAddressSnapshot,
 } from "@/api/payout-address-api";
 import type { ChainDepositChannel } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
@@ -69,19 +68,19 @@ function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
   for (const row of snapshot.addresses) {
     const network = PAYOUT_NETWORKS.find((candidate) => TO_SERVER_NETWORK[candidate] === row.network);
     if (!network || !isVisibleUsdtNetwork(network)) continue;
-    const createdAt = payoutAddressEpochMs(row.createdAt)!;
-    const effectiveAt = payoutAddressEpochMs(row.effectiveAt)!;
+    const { createdAtEpochMs: createdAt, effectiveAtEpochMs: effectiveAt } = row;
     result[network] = {
       current: {
         address: row.address,
         addedAt: createdAt,
+        effectiveAt,
         // Compatibility-imported addresses carry an effective time no later than their
         // import row; user-managed addresses always have a future effective time.
         source: effectiveAt <= createdAt ? "migrated" : "user",
       },
       history: [],
       freezeUntil: row.changePending ? effectiveAt : null,
-      nextChangeAt: payoutAddressEpochMs(row.nextChangeAllowedAt),
+      nextChangeAt: row.nextChangeAllowedAtEpochMs,
     };
   }
   return result;
