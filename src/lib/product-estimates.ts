@@ -1,4 +1,12 @@
+import type { EstimateRange } from "@/api/estimate-range";
 import type { Product } from "@/mock/products";
+
+export function productPublishedDailyUsdtRange(
+  product: Pick<Product, "dailyEstimateLowUsdt" | "dailyEstimateHighUsdt">,
+): EstimateRange | null {
+  const { dailyEstimateLowUsdt: low, dailyEstimateHighUsdt: high } = product;
+  return low != null && high != null ? { low, high } : null;
+}
 
 /**
  * Per-unit catalog USDT estimate. The catalog's daily range wins for every product; a device without one keeps its
@@ -7,10 +15,8 @@ import type { Product } from "@/mock/products";
 export function productDailyEstimateRange(
   product: Pick<Product, "productType" | "dailyEarn" | "dailyEstimateLowUsdt" | "dailyEstimateHighUsdt">,
 ): { low: number; high: number } | null {
-  if (product.dailyEstimateLowUsdt != null && product.dailyEstimateHighUsdt != null) {
-    return { low: product.dailyEstimateLowUsdt, high: product.dailyEstimateHighUsdt };
-  }
-  return product.productType === "SHARE" ? null : { low: product.dailyEarn, high: product.dailyEarn };
+  return productPublishedDailyUsdtRange(product)
+    ?? (product.productType === "SHARE" ? null : { low: product.dailyEarn, high: product.dailyEarn });
 }
 
 /** Per-unit catalog UVT estimate: the catalog's daily range when sent, otherwise the single daily figure. */
