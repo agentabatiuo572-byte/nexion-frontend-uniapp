@@ -95,11 +95,14 @@
             <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
           </NxIconTile>
           <view class="flex-1 min-w-0">
-            <view class="security-session-name" :style="sessionLabelStyle">
-              <text class="security-session-name__lead">{{ deviceNameParts(s)[0] }}</text>
-              <view v-for="(part, k) in deviceNameParts(s).slice(1)" :key="k" class="security-session-name__tail"><text aria-hidden="true">·</text><text>{{ part }}</text></view>
+            <view class="security-session-parts" :style="sessionLabelStyle">
+              <text class="security-session-parts__lead">{{ deviceNameParts(s)[0] }}</text>
+              <view v-for="(part, k) in deviceNameParts(s).slice(1)" :key="k" class="security-session-parts__tail"><text aria-hidden="true">·</text><text>{{ part }}</text></view>
             </view>
-            <text class="block security-session-meta" :style="sessionMetaStyle">{{ sessionSecondaryLabel(s) }}</text>
+            <view class="security-session-parts security-session-meta" :style="sessionMetaStyle">
+              <text class="security-session-parts__lead">{{ sessionSecondaryParts(s)[0] }}</text>
+              <view class="security-session-parts__tail"><text aria-hidden="true">·</text><text>{{ sessionSecondaryParts(s)[1] }}</text></view>
+            </view>
           </view>
           <NxTag v-if="s.current" tone="success" :label="t.security.sessionCurrent" />
           <view v-else class="grid place-items-center" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'"
@@ -1041,9 +1044,10 @@ function deviceNameParts(s: SessionListItem): string[] {
   return sessionDeviceLabel(s).split(" · ");
 }
 
-function sessionSecondaryLabel(s: SessionListItem): string {
+// Where and when, wrapped as units like the name.
+function sessionSecondaryParts(s: SessionListItem): [string, string] {
   const location = remoteApiEnabled ? s.ip : t.value.security.sessionLocation;
-  return `${location} · ${lastActiveLabel(s.lastActiveMs)}`;
+  return [location, lastActiveLabel(s.lastActiveMs)];
 }
 
 function lastActiveLabel(ms: number | null): string {
@@ -1768,16 +1772,18 @@ const dangerLabelStyle: CSSProperties = {
 /* 17–23px titles track -0.01em; Chinese takes none (01 §1.2). */
 .security-section-head { letter-spacing:-.01em; }
 .security-section-head:lang(zh) { letter-spacing:0; }
-/* A device row opens nothing, so its name is never cut (03 §3.6.1): the name's parts (model, system) wrap as units, a
-   part longer than the line wraps between words, and the "·" travels with the part after it. When that part starts a
-   new line, the 4px separator and its 4px gap fall into the 8px the name is shifted left by and clipped at, as on the
-   home feed. The revoke button keeps its 44px target beside the wrapped name. */
-.security-session-name { display:flex; flex-wrap:wrap; column-gap:4px; margin-left:-8px; clip-path:inset(-4px -4px -4px 8px); }
-.security-session-name > :first-child { margin-left:8px; }
-.security-session-name__lead { min-width:0; overflow-wrap:break-word; }
-.security-session-name__tail { display:inline-flex; gap:4px; min-width:0; }
-.security-session-name__tail > :first-child { flex:none; width:4px; text-align:center; }
-.security-session-name__tail > :last-child { min-width:0; overflow-wrap:break-word; }
+/* A device row opens nothing, so its name and its IP and time line are never cut (03 §3.6.1): their parts (model,
+   system; IP, time) wrap as units, a part longer than the line wraps between words, and the "·" travels with the part
+   after it. When that part starts a new line, the separator (--sep wide) and its 4px gap fall into the space the line
+   is shifted left by and clipped at, as on the home feed. The revoke button keeps its 44px target beside the wrapped
+   text. The monospaced IP and time line gives its "·" a monospaced cell. */
+.security-session-parts { --sep:4px; display:flex; flex-wrap:wrap; column-gap:4px; margin-left:calc(-4px - var(--sep)); clip-path:inset(-4px -4px -4px calc(4px + var(--sep))); }
+.security-session-parts > :first-child { margin-left:calc(4px + var(--sep)); }
+.security-session-parts__lead { min-width:0; overflow-wrap:break-word; }
+.security-session-parts__tail { display:inline-flex; gap:4px; min-width:0; }
+.security-session-parts__tail > :first-child { flex:none; width:var(--sep); text-align:center; }
+.security-session-parts__tail > :last-child { min-width:0; overflow-wrap:break-word; }
+.security-session-parts.security-session-meta { --sep:.6em; }
 .security-providers :deep([data-provider="Google"] .auth-provider__icon) { width:22px; height:22px; flex-basis:22px; }
 .security-providers :deep([data-provider="Google"] svg) { width:22px; height:22px; flex-shrink:0; }
 .security-providers :deep([data-provider="Apple"] .auth-provider__icon) { color:var(--v5-ink); }
