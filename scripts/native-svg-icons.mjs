@@ -4,8 +4,10 @@ import { parse } from "@vue/compiler-sfc";
 // and never paint. Every template SVG therefore goes through NxNativeSvg, which writes
 // the markup through the App view layer's v-html path (SVG namespace). Rules for SVG
 // written this way:
-// - scoped styles reach the svg and its inner nodes only through :deep() on a real
-//   scoped wrapper (the inner nodes carry no data-v attribute);
+// - the markup carries the writing template's data-v on every node (and, on the root
+//   svg, each parent component's while the box is that component's root), so plain
+//   scoped rules apply; the svg sits inside the .nx-native-svg box, so a rule written
+//   as `X > svg` must also name `X > .nx-native-svg`;
 // - inner nodes keep attributes only: events and refs are dropped, so interaction
 //   lives on a real element around the svg;
 // - any change to the markup replaces the whole svg, so a value that changes over time
