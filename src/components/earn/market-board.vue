@@ -9,7 +9,7 @@
   route to that tier's store detail. Rankings show earnings estimates only.
 -->
 <template>
-  <view class="nx-earn-market-board">
+  <view class="nx-earn-market-board" :aria-busy="marketState === 'loading' && (!priceIndex.length || !deviceRankings.length) ? 'true' : undefined">
     <view class="earn-market__head">
       <text class="earn-market__title" role="heading" aria-level="2">{{ t.market.title }}</text>
       <view v-if="!remoteApiEnabled || app.homeTruthStatus === 'ready'" class="earn-market__updated"><view class="earn-market__dot" aria-hidden="true" /><text>{{ t.market.liveLabel }}</text></view>
@@ -21,7 +21,7 @@
         <!-- Empty (a read that succeeded with no workloads) is one short line; loading and a failed first read keep three
              still placeholder tiles with no status text, and the failed read recovers on its own (03 §3.4, §3.5.2). -->
         <text v-if="!priceIndex.length && marketState === 'empty'" class="earn-market__status">{{ t.empty.listTitle }}</text>
-        <view v-else-if="!priceIndex.length" class="earn-market__grid" aria-hidden="true" :aria-busy="marketState === 'loading' ? 'true' : undefined" data-earn-market-placeholder="true">
+        <view v-else-if="!priceIndex.length" class="earn-market__grid" aria-hidden="true" data-earn-market-placeholder="true">
           <view v-for="n in 3" :key="n" class="earn-market__tile earn-market__tile--placeholder"><view class="earn-market__face earn-market__face--on">
             <view class="earn-market__bar" style="width: 70%; margin-block: 3px" />
             <view class="earn-market__bar" style="width: 40%; margin-block: 3px" />
@@ -54,7 +54,7 @@
       <view class="earn-market__rank">
         <text class="earn-market__caption earn-market__caption--plain">{{ t.market.deviceRanking }}</text>
         <text v-if="!deviceRankings.length && marketState === 'empty'" class="earn-market__status">{{ t.empty.listTitle }}</text>
-        <view v-else-if="!deviceRankings.length" aria-hidden="true" :aria-busy="marketState === 'loading' ? 'true' : undefined" data-earn-ranking-placeholder="true">
+        <view v-else-if="!deviceRankings.length" aria-hidden="true" data-earn-ranking-placeholder="true">
           <view v-for="n in 3" :key="n" class="earn-ranking-row earn-ranking-row--placeholder">
             <view class="earn-market__bar" style="width: 18px" />
             <view class="earn-market__bar earn-market__bar--art" />
