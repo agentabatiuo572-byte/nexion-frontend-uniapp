@@ -32,13 +32,13 @@
         </view>
       </view>
 
-      <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 2px">
+      <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 0">
         <text class="block" :style="stateBodyStyle">{{ networkPolicyStatus === 'ready' && !NETWORKS.length ? t.wallet.withdrawalChannelsClosed : remoteReadFailed ? copy.addressUnavailable : copy.addressLoading }}</text>
         <text v-if="otpError" class="block nx-rebind-refusal" :style="errorTextStyle">{{ otpError }}</text>
         <view v-if="remoteReadFailed" class="nx-rebind-read-retry w-full grid place-items-center" :style="primaryCtaStyle" role="button" :aria-disabled="remoteRefreshPending" :tabindex="remoteRefreshPending ? -1 : 0" @click="retryRemoteSnapshot" @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"><text>{{ remoteRefreshPending ? copy.addressLoading : copy.retry }}</text></view>
       </view>
       <!-- ── 成功态 ── -->
-      <view v-else-if="step === 'success'" class="mx-4 nx-step-in" style="padding: 0 2px">
+      <view v-else-if="step === 'success'" class="mx-4 nx-step-in">
         <view class="flex flex-col items-center" style="padding: 32px 0 0">
           <view class="grid place-items-center" :style="successIconBoxStyle">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
@@ -63,7 +63,7 @@
       </view>
 
       <!-- ── OTP 确认(添加/更换共用;走既有发码冷却 / 次数上限 / 失效重取)── -->
-      <view v-else-if="step === 'otp'" class="mx-4 nx-step-in" style="padding: 0 2px">
+      <view v-else-if="step === 'otp'" class="mx-4 nx-step-in">
         <view style="margin-top: 18px"><text class="block" :style="stateTitleStyle">{{ t.addrRebind.otpTitle }}</text></view>
         <view><text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.5">{{ otpBodyText }}</text></view>
         <input
@@ -100,14 +100,14 @@
         >
           <text :style="ctaTextStyle">{{ otpVerifying ? t.wallet.submitChecking : t.addrRebind.otpConfirmCta }}</text>
         </view>
-        <view class="nx-rebind-otp-cancel w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="backToBase">
+        <view class="nx-rebind-otp-cancel w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="returnToView">
           <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
         </view>
       </view>
 
       <!-- ── 表单(添加 / 更换共用:标题说明 + 地址井(可粘贴)+ 安全提示;主操作在底部栏)── -->
       <view v-else-if="step === 'form'" class="mx-4 rb-form">
-        <text class="rb-title">{{ mode === 'add' ? t.addrRebind.emptyGuideTitle : t.addrRebind.newAddressLabel }}</text>
+        <text class="rb-title" tabindex="-1">{{ mode === 'add' ? t.addrRebind.emptyGuideTitle : t.addrRebind.newAddressLabel }}</text>
         <text v-if="mode === 'add'" class="rb-desc">{{ t.addrRebind.emptyGuideBody }}</text>
         <view class="rb-field">
           <input
@@ -348,7 +348,7 @@ function pasteAddress() {
   uni.getClipboardData({ success: (result) => { newAddress.value = String(result.data ?? "").trim(); addrError.value = ""; clearOtpError(); }, fail: () => {} });
 }
 // Cancel in the fixed bar: back to the current address when changing, otherwise leave the page.
-function cancelForm() { if (mode.value === "change") backToBase(); else leave(); }
+function cancelForm() { if (mode.value === "change") returnToView(); else leave(); }
 function onAddressInput(e: Event) {
   newAddress.value = detailVal(e);
   addrError.value = "";
@@ -367,6 +367,7 @@ function startChange() {
   if (!networkAvailable.value || changeBlock.value) return;
   mode.value = "change";
   explicitStep.value = "form";
+  focusSoon([".rb-form .rb-title"]);
 }
 function goTracking() {
   navTo("/pages/me/wallet-withdraw-tracking");
@@ -623,6 +624,20 @@ async function applyAfterOtp(scope = captureCommandScope()) {
   successIsChange.value = true;
   explicitStep.value = "success";
   resetOtp();
+}
+// A step's own control unmounts when it is used: keep keyboard focus on the page (the new step's title or the way back in).
+function focusSoon(selectors: string[]) {
+  void nextTick(() => {
+    if (typeof document === "undefined") return;
+    for (const selector of selectors) {
+      const target = document.querySelector<HTMLElement>(selector);
+      if (target) { target.focus(); return; }
+    }
+  });
+}
+function returnToView() {
+  backToBase();
+  focusSoon([".nx-rebind-change-cta", '.nx-rebind-network-radio[tabindex="0"]']);
 }
 function backToBase() {
   invalidatePageCommand();
@@ -976,6 +991,7 @@ const successRowValStyle: CSSProperties = {
 .rb-net--on .rb-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
 .rb-net--on .rb-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
 .rb-form { margin-top: 24px; }
+.rb-title:focus { outline: none; }
 .rb-title { display: block; padding: 0 4px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .rb-desc { display: block; margin-top: 4px; padding: 0 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .rb-field { display: flex; align-items: center; gap: 10px; min-height: 56px; margin-top: 8px; padding: 8px 8px 8px 14px; box-sizing: border-box; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
