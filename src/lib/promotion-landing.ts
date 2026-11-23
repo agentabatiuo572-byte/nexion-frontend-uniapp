@@ -61,7 +61,7 @@ export function landingProductName(activity: PublicPromotion, sku: string, langu
   const gift = activity.rewardRules.flatMap(rule => [rule.buyerReward, rule.inviterReward])
     .find(reward => reward?.type === 'DEVICE' && reward.giftProductNo === sku);
   const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products.find(product => product.id === sku) : undefined;
-  return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? display?.name ?? (language ? landingCopy(language).devicesTitle : sku);
+  return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? display?.name ?? (language ? landingCopy(language).deviceFallback : sku);
 }
 
 // An order discount lowers the order total at checkout; it is never credited as a USDT reward.
