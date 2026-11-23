@@ -145,14 +145,16 @@ export function revalidateProductCatalog(): Promise<boolean> {
 }
 
 /** Follow a replacement read; a superseded response is never a catalog failure. */
-export async function settleProductCatalogRefresh(read: Promise<boolean>): Promise<boolean> {
+export async function settleProductCatalogRefresh(read: Promise<boolean>, { requireFresh = false } = {}): Promise<boolean> {
   const binding = catalogBindingEpoch;
   for (;;) {
     await read;
     if (binding !== catalogBindingEpoch) return false;
     const latest = refreshInFlight?.promise;
     if (latest && latest !== read) { read = latest; continue; }
-    if (productCatalogState.status !== "loading") return productCatalogState.status === "ready";
+    if (productCatalogState.status !== "loading") {
+      return productCatalogState.status === "ready" && (!requireFresh || !languageReadFailed.value);
+    }
     read = refreshProductCatalog(true);
   }
 }
@@ -178,7 +180,8 @@ function readProductCatalog(force: boolean, languageOnly: boolean): Promise<bool
   }
   const alreadyReady = productCatalogState.status === "ready";
   if (!force && alreadyReady && publishedCatalogLocale === locale && !languageReadFailed.value) return Promise.resolve(true);
-  const keepReady = alreadyReady && (languageOnly || pending?.keepReady === true || publishedCatalogLocale !== locale);
+  const keepReady = alreadyReady && (languageOnly || pending?.keepReady === true
+    || publishedCatalogLocale !== locale || languageReadFailed.value);
 
   // A visible-page refresh is a newer observation, not merely another caller
   // waiting for an older request. Advance the epoch so its late success/failure
@@ -246,7 +249,7 @@ function readProductCatalog(force: boolean, languageOnly: boolean): Promise<bool
       if (!current()) return false;
       const transient = transientCatalogRead(error);
       if (transient && error instanceof ApiError && error.kind === "http" && error.status === 429) retryAt = Date.now() + (error.retryAfterMs ?? 30_000);
-      if (languageOnly && keepReady && transient) {
+      if (keepReady && transient) {
         languageReadFailed.value = true;
         return false;
       }
