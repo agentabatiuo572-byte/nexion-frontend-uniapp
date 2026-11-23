@@ -37,7 +37,7 @@
     </view>
     <view v-if="error && !activities.length" class="referral-activity nx-tint"><text class="referral-title">{{ copy.firstPurchase }}</text><text class="referral-number">—</text></view>
     <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" icon="arrow-right" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text></NxButton>
-    <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="termsActivity ? promotionTermsText(termsActivity,t.promotion,locale.code) : ''" :rules="termsActivity ? promotionTermsRules(termsActivity,t.promotion,id=>landingProductName(termsActivity!,id,locale.code),locale.code) : []" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
+    <PromotionTerms audience="inviter" :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="termsActivity ? promotionTermsText(termsActivity,t.promotion,locale.code) : ''" :rules="termsActivity ? promotionTermsRules(termsActivity,t.promotion,id=>landingProductName(termsActivity!,id,locale.code),locale.code) : []" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>
 <script setup lang="ts">

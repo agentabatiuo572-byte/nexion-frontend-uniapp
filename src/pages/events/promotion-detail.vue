@@ -246,7 +246,7 @@
       <view class="lp-bar-space" aria-hidden="true" />
     </view>
 
-    <PromotionTerms v-if="activity" :open="termsOpen" :title="localized(activity.title, locale.code)" :terms="promotionTermsText(activity, t.promotion, locale.code)" :rules="promotionTermsRules(activity, t.promotion, productName, locale.code)" :disclosures="promotionDisclosures(activity)" @close="termsOpen = false" />
+    <PromotionTerms v-if="activity" :open="termsOpen" :title="localized(activity.title, locale.code)" :terms="promotionTermsText(activity, t.promotion, locale.code)" audience="inviter" :rules="promotionTermsRules(activity, t.promotion, productName, locale.code)" :disclosures="promotionDisclosures(activity)" @close="termsOpen = false" />
 
     <SharePosterSheet v-if="kind === 'referral'" :open="posterOpen" @close="closePoster" />
 
@@ -316,9 +316,8 @@ const inviteHero = computed(() => {
   const a = activity.value, r = rule.value;
   if (!a || !r) return null;
   const buyer = rewardParts(a, r.buyerReward);
-  const firstPurchaseCondition = a.firstPurchaseCondition ?? null;
-  if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward), friend: partsText(buyer), firstPurchaseCondition };
-  return { label: c.value.friendGets, parts: buyer, friend: '', firstPurchaseCondition };
+  if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward), friend: partsText(buyer) };
+  return { label: c.value.friendGets, parts: buyer, friend: '' };
 });
 // Share of the line in brand colour: up to the furthest step that is done or current (0, half or all).
 const trackFill = computed(() => { const last = trackSteps.value.reduce((at, step, index) => step.state === 'todo' ? at : index, 0); return last / (trackSteps.value.length - 1); });

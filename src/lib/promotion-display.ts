@@ -26,7 +26,9 @@ export function rewardAmount(reward: PublicRewardSpec | RewardSpec, groups=1): s
   const [whole, fraction='']=reward.amount.split('.');
   const scaled=BigInt(whole+fraction.padEnd(6,'0'))*BigInt(groups);
   const raw=scaled.toString().padStart(7,'0');
-  return formatGroupedAmount(raw.slice(0,-6)+'.'+raw.slice(-6),'full');
+  const value=raw.slice(0,-6)+'.'+raw.slice(-6);
+  // UVT keeps every published digit; USDT and order discounts are money with two decimals, whole amounts without ".00" (06 §6.2).
+  return reward.type==='UVT'?formatGroupedAmount(value,'full'):formatGroupedAmount(value,2).replace(/\.00$/,'');
 }
 export function rewardSummary(reward: PublicRewardSpec | RewardSpec, copy: {unknown:string;orderDiscount:string}, deviceName?:string|null, groups=1): string {
   const amount=rewardAmount(reward,groups);

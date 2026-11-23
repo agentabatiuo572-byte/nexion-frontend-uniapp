@@ -79,7 +79,7 @@
       <view v-for="(_,index) in items" :key="index" class="entry-page-dot" :class="{selected:activeIndex===index}" aria-hidden="true" />
     </view>
     <NxButton v-if="hasMore&&mode==='events'" class="entry-cta" size="medium" :busy="status==='loading'" :label="t.promotion.more" :busy-label="t.promotion.loading" icon="arrow-right" @click="load(false)"><text>{{ t.promotion.more }}</text></NxButton>
-    <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="termsText" :rules="termsRules" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
+    <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" audience="inviter" :terms="termsText" :rules="termsRules" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>
 <script setup lang="ts">
