@@ -22,7 +22,7 @@
       <circle cx="32" cy="32" r="27" :fill="'url(#' + ids.face + ')'" />
       <circle cx="32" cy="32" r="26.5" fill="none" class="uvt-coin__inner-line" stroke-width="1" />
       <ellipse cx="24" cy="19" rx="13" ry="6.5" transform="rotate(-28 24 19)" class="uvt-coin__gloss" />
-      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" transform="translate(14.5 14.5) scale(1.46)" fill="none" class="uvt-coin__mark" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM9 8.5v4a3 3 0 0 0 6 0v-4" transform="translate(14.5 14.5) scale(1.46)" fill="none" class="uvt-coin__mark" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   </view>
 </template>
