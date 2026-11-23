@@ -69,7 +69,7 @@ import {
 import { refreshBusinessCalendar } from "@/lib/business-calendar-sync";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route';
-import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
+import { prepareProductCatalog, productCatalogLanguageReadFailed, productCatalogRetryAt, refreshProductCatalog, refreshProductCatalogLanguage } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
 import { installFieldNaming } from "@/lib/a11y-field-label";
 import { ensureEarnConfig } from "@/store/earn-config";
@@ -460,6 +460,14 @@ function installForegroundReadSignals() {
 
 if (remoteApiEnabled) {
   const repeatWithoutPull = () => !hasVisiblePullRefresh();
+  useAutoRecovery({
+    failed: () => productCatalogLanguageReadFailed.value,
+    retry: refreshProductCatalogLanguage,
+    retryNotBefore: productCatalogRetryAt,
+    repeatMs: 30_000,
+    repeatWhile: repeatWithoutPull,
+    quiet: true,
+  });
   useAutoRecovery({
     failed: () => serverProductPhaseState.retryableError,
     retry: () => refreshServerProductPhase(true),
@@ -1327,6 +1335,9 @@ onLaunch(() => {
     // unauthenticated launch must not turn its expected 401 into a fake catalog
     // failure before the user has even signed in.
     prepareProductCatalog();
+    watch(() => useLocaleStore().code, () => {
+      if (canRefreshRemoteAccount(auth)) void refreshProductCatalogLanguage();
+    });
     void beginServerSessionRestore();
     if (canRefreshRemoteAccount(auth)) {
       void useApp().refreshHomeTruth();
