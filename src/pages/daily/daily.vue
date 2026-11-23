@@ -42,7 +42,7 @@
             </view>
           </template>
           <view class="dly-ctr" aria-hidden="true">
-            <svg v-if="dailyFactsVisible" class="dly-flame" :class="{ 'dly-flame--off': successFx && successFx.atRing }" width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="dly-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color: var(--v5-brand-2)" /><stop offset="1" style="stop-color: var(--v5-warning)" /></linearGradient></defs><path fill="url(#dly-flame)" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+            <view class="dly-flame" :class="{ 'dly-flame--off': successFx && successFx.atRing }" v-if="dailyFactsVisible"><svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="dly-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color: var(--v5-brand-2)" /><stop offset="1" style="stop-color: var(--v5-warning)" /></linearGradient></defs><path fill="url(#dly-flame)" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg></view>
             <text class="dly-num" :class="{ 'dly-num--q': !dailyFactsVisible }">{{ dailyFactsVisible ? displayStreak : '—' }}</text>
             <text class="dly-lbl">{{ t.daily.activeStreak }}</text>
           </view>
@@ -958,7 +958,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-burst__ray { position: absolute; left: -1.5px; top: -24px; width: 3px; height: 9px; border-radius: 2px; background: var(--v5-warning); transform-origin: 1.5px 24px; }
 .dly-burst__ray:nth-child(even) { top: -22px; height: 6px; background: var(--v5-brand-2); transform-origin: 1.5px 22px; }
 /* The reward rests where the flame sits (below the gift), and the flame steps aside meanwhile. */
-.dly-flame { transition: opacity 240ms ease; }
+.dly-flame { display: grid; transition: opacity 240ms ease; }
 .dly-flame--off { opacity: 0; }
 .dly-fly { position: absolute; left: -30px; right: -30px; top: 58px; font: 500 22px/28px var(--font-metric); letter-spacing: -.01em; color: var(--v5-brand); animation: dly-fly 1900ms linear both; pointer-events: none; }
 .dly-fly--bar { left: 0; right: 0; top: auto; bottom: 100%; margin-bottom: 12px; display: flex; justify-content: center; animation-name: dly-fly-bar; }

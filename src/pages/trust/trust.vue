@@ -121,7 +121,7 @@
                   <text class="block trust-row__title">{{ item.title }}</text>
                   <text class="block trust-row__body">{{ center.serviceSubtitles[item.key] }}</text>
                 </view>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="trust-row__chevron" :class="{ 'trust-row__chevron--open': openCategory === item.key }"><path d="m9 18 6-6-6-6"/></svg>
+                <view class="trust-row__chevron" :class="{ 'trust-row__chevron--open': openCategory === item.key }" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></view>
               </view>
               <view v-if="openCategory === item.key" class="trust-category-body">
                 <text v-if="loading" role="status" aria-live="polite">{{ auditCopy.loading }}</text>
@@ -430,7 +430,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && status.value === "error", re
 .trust-row + .trust-row, .trust-person + .trust-person { border-top: 1px solid var(--v5-border); }
 .trust-row__title { font: 600 15px/20px var(--font-v5); color: var(--v5-ink); }
 .trust-row__body { margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
-.trust-row__chevron { flex-shrink: 0; color: var(--v5-ink-3); transition: transform 160ms ease; }
+.trust-row__chevron { display: grid; flex-shrink: 0; color: var(--v5-ink-3); transition: transform 160ms ease; }
 .trust-row__chevron--open { transform: rotate(90deg); }
 .trust-person__avatar { width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand-deep); font: 700 15px/20px var(--font-v5); }
 .trust-category + .trust-category { border-top: 1px solid var(--v5-border); }
