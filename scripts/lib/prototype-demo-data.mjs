@@ -144,6 +144,13 @@ function promotionDeviceReward(giftName) {
       deviceRights:{activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:null,taskEnabled:true,countsAsDeviceHolding:true,
         countsForRank:false,transferable:false,exchangeable:false,revocationMode:'MANUAL_IF_USED'}}};
 }
+const demoBandPct = 10;
+// Monthly USDT is configured in cents and this fixture uses whole percentages.
+function demoDailyUsdt(monthlyTarget, percent = 100) {
+  const cents = Math.round(monthlyTarget * 100);
+  return Math.round(cents * percent * 100 / 30) / 1e6;
+}
+
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
   return skuDefinitions.map(([id,name,tier,listPrice,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const price=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
@@ -151,7 +158,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
     const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
       .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
-    const dailyEarn=monthlyEstimateUsdt/30,b=.1;
+    const dailyEarn=demoDailyUsdt(monthlyEstimateUsdt),b=demoBandPct/100;
     const outOfStock=state.outOfStockProductNo===id||(state.catalogState==='outofstock'&&id==='stellarbox-s1');
     const stock=share?null:outOfStock?0:
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
@@ -166,10 +173,10 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
       purchaseGate:state.catalogState==='restricted'&&id==='stellarbox-s1'?{mode:'all',enforce:true,rankMin:8}:null,
       purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
-      // Every SKU gets the backend's band ranges so previews show the coming contract: B75 (device USDT daily range) and
-      // B75-BE-02 (UVT daily range; field names provisional until the backend ships).
-      dailyEstimateLowUsdt:monthlyEstimateUsdt*(1-b)/30,dailyEstimateHighUsdt:monthlyEstimateUsdt*(1+b)/30,
-      dailyEstimateLowNex:dailyEarnNEX*(1-b),dailyEstimateHighNex:dailyEarnNEX*(1+b),
+      // B75 USDT follows the backend's six-decimal HALF_UP projection. UVT remains simulated (B75-BE-02).
+      dailyEstimateLowUsdt:demoDailyUsdt(monthlyEstimateUsdt,100-demoBandPct),dailyEstimateHighUsdt:demoDailyUsdt(monthlyEstimateUsdt,100+demoBandPct),
+      dailyEstimateLowNex:Math.round(dailyEarnNEX*(100-demoBandPct)*10_000)/1e6,
+      dailyEstimateHighNex:Math.round(dailyEarnNEX*(100+demoBandPct)*10_000)/1e6,
       shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
     };
   }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
@@ -626,7 +633,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin);
-  const imageFor=sku=>products.find(product=>product.id===sku)?.imageUrl??null;
+  const productFor=sku=>products.find(product=>product.id===sku);
+  const imageFor=sku=>productFor(sku)?.imageUrl??null;
   if (pathname === '/api/config/phone-tiers') return { tiers: [1,2,3,4,5].map(tier => ({
     tier, name:`Tier ${tier}`, baseRateUsdt:[.02,.04,.06,.09,.12][tier-1], baseRateNex:tier*.1, effectiveAt:iso,
   })), sources:['Local prototype demo'] };
@@ -771,9 +779,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         {code:'EM',name:'BGE-M3',unit:null,price:.0008,deltaPct:2.1,sparkline:[.4,.45,.4,.5,.52,.55,.57],flagshipDeltaPct:null},
         {code:'SP',name:'Whisper v3',unit:null,price:.0003,deltaPct:-.6,sparkline:[.56,.55,.57,.53,.52,.53,.5],flagshipDeltaPct:null},
       ],deviceRankings:[
-        {rank:1,kind:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,bestFor:null,imageUrl:imageFor('stellarbox-pro')},
-        {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null,imageUrl:imageFor('stellarbox-s1')},
-        {rank:3,kind:'phone',name:null,dailyUsdt:.06,bestFor:null,imageUrl:null},
+        ...['stellarbox-pro','stellarbox-s1'].map((kind,index)=>{
+          const {name,dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt,imageUrl}=productFor(kind);
+          return {rank:index+1,kind,name,dailyUsdt:dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt,bestFor:null,imageUrl};
+        }),
+        {rank:3,kind:'phone',name:null,dailyUsdt:.06,dailyEstimateLowUsdt:null,dailyEstimateHighUsdt:null,bestFor:null,imageUrl:null},
       ]};
       const devices=demoFleetFacts(url,locale,state).devices;
       const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);

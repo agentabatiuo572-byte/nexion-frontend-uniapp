@@ -53,6 +53,7 @@ export function ensureEarnConfig(): Promise<boolean> {
 }
 
 export function refreshEarnConfig(): Promise<boolean> {
+  if (inFlight) return inFlight;
   invalidateBeforePassiveTabRead("earn-config");
   const promise = readEarnConfig();
   inFlight = promise;
@@ -81,9 +82,11 @@ async function readEarnConfig(): Promise<boolean> {
     return true;
   } catch (cause) {
     if (version !== loadVersion) return false;
-    phoneTiers.value = null;
-    if (!isTransientReadFailure(cause)) invalidateTabSnapshots(["phoneYield"], snapshotWrite);
-    applyCanonicalPhoneTierYields([]);
+    if (!isTransientReadFailure(cause)) {
+      phoneTiers.value = null;
+      invalidateTabSnapshots(["phoneYield"], snapshotWrite);
+      applyCanonicalPhoneTierYields([]);
+    }
     status.value = "error";
     error.value = cause instanceof Error ? cause.message : "E2_CONFIG_UNAVAILABLE";
     return false;

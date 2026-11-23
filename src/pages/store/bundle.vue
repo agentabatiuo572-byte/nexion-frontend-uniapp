@@ -337,7 +337,7 @@ const cumulativeDailyEarnText = computed(() => {
     low += estimate.low;
     high += estimate.high;
   }
-  return formatEstimateRange(low, high);
+  return formatEstimateRange(low, high, products.value.length > 1);
 });
 function bundleProductYieldText(p: Product): string {
   const estimate = productDailyEstimateRange(p);

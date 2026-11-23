@@ -1,3 +1,4 @@
+import { parseEstimateRange } from "./estimate-range";
 import type { Product, ProductBadgeKind, ProductTaskLevel, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
 
@@ -184,6 +185,9 @@ function product(value: unknown): CatalogProduct {
   const shareYieldMax = optionalNumber(source.shareYieldMax);
   if (productType === "SHARE" && ((shareYieldMin === undefined) !== (shareYieldMax === undefined)
     || (shareYieldMin !== undefined && (shareYieldMin <= 0 || shareYieldMax! < shareYieldMin)))) return invalid();
+  const usdtRange = parseEstimateRange(source.dailyEstimateLowUsdt, source.dailyEstimateHighUsdt);
+  // UVT range field names are provisional until backend B75-BE-02 ships.
+  const nexRange = parseEstimateRange(source.dailyEstimateLowNex, source.dailyEstimateHighNex);
   const taskLevels: unknown[] = Array.isArray(source.taskLevels) ? source.taskLevels : [];
 
   return {
@@ -207,11 +211,10 @@ function product(value: unknown): CatalogProduct {
     dailyEarn: finiteNumber(source.dailyEarn),
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
     monthlyEstimateUsdt: optionalEstimate(source.monthlyEstimateUsdt),
-    dailyEstimateLowUsdt: optionalEstimate(source.dailyEstimateLowUsdt),
-    dailyEstimateHighUsdt: optionalEstimate(source.dailyEstimateHighUsdt),
-    // UVT daily range (backend B75-BE-02). The field names are provisional: this is the only place that reads them.
-    dailyEstimateLowNex: optionalEstimate(source.dailyEstimateLowNex),
-    dailyEstimateHighNex: optionalEstimate(source.dailyEstimateHighNex),
+    dailyEstimateLowUsdt: usdtRange?.low,
+    dailyEstimateHighUsdt: usdtRange?.high,
+    dailyEstimateLowNex: nexRange?.low,
+    dailyEstimateHighNex: nexRange?.high,
     shareYieldMin,
     shareYieldMax,
     computePoints: optionalInteger(source.computePoints),

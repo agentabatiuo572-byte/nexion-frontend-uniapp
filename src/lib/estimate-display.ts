@@ -1,44 +1,45 @@
-/**
- * Estimated earnings only: never prices, balances, credited earnings or fees, which keep their exact amounts.
- * Two significant figures, no trailing zeros, thousands grouped (user 2026-11-23: an estimate to the cent reads false).
- * A range rounds its low end down and its high end up; ends that meet show one value. A single estimate rounds to nearest.
- */
+import type { EstimateRange } from "@/api/estimate-range";
+
+/** Two significant figures for estimates. Prices, balances, credited earnings and fees use exact amounts. */
 type Rounding = "floor" | "ceil" | "round";
 
-function exponent(value: number): number {
-  return Number(value.toExponential().split("e")[1]);
+function twoFigures(value: number, rounding: Rounding): string {
+  if (value <= 0 || !Number.isFinite(value)) return "0";
+
+  const [mantissa, exponent] = value.toExponential().split("e");
+  const digits = mantissa.replace(".", "").padEnd(2, "0");
+  const rest = digits.slice(2);
+  const increment = rounding === "ceil" ? /[1-9]/.test(rest) : rounding === "round" && rest >= "5";
+  const figures = String(Number(digits.slice(0, 2)) + Number(increment));
+
+  const places = 1 - Number(exponent);
+  const padded = places > 0 ? figures.padStart(places + 1, "0") : figures + "0".repeat(-places);
+  const whole = places > 0 ? padded.slice(0, -places) : padded;
+  const fraction = places > 0 ? padded.slice(-places).replace(/0+$/, "") : "";
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction ? `.${fraction}` : "");
 }
 
-function twoFigures(value: number, rounding: Rounding): number {
-  if (!(value > 0)) return 0;
-  // Server bounds arrive rounded to six decimals, so x 30 or x quantity can land a hair past a boundary
-  // (3.666667 x 30 = 110.00001). Snapping to five significant figures keeps that noise from moving an end.
-  if (rounding !== "round") value = Number(value.toPrecision(5));
-  const step = 10 ** (exponent(value) - 1);
-  const units = value / step;
-  // The epsilon keeps binary fractions (0.57 / 0.01 = 56.999…) on the figure they print as.
-  const rounded = rounding === "floor" ? Math.floor(units + 1e-9) : rounding === "ceil" ? Math.ceil(units - 1e-9) : Math.round(units);
-  return rounded * step;
+export function formatEstimate(value: number, range?: EstimateRange | null): string {
+  return range ? formatEstimateRange(range.low, range.high) : twoFigures(value, "round");
 }
 
-function estimateText(value: number): string {
-  if (value === 0) return "0";
-  const [whole, fraction = ""] = value.toFixed(Math.max(0, 1 - exponent(value))).split(".");
-  const kept = fraction.replace(/0+$/, "");
-  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (kept ? `.${kept}` : "");
-}
-
-export function formatEstimate(value: number): string {
-  return estimateText(twoFigures(value, "round"));
+// Only computed totals can have arithmetic noise. Preserve every digit of a server-supplied endpoint.
+function normalizeCalculatedAmount(value: number): number {
+  const decimal = Number(value.toPrecision(15));
+  return Math.abs(value - decimal) <= Number.EPSILON * Math.abs(value) ? decimal : value;
 }
 
 /** One part for a single value, two for a range; callers join them with an en dash or let a line break there. */
-export function estimateRangeParts(low: number, high: number): string[] {
+export function estimateRangeParts(low: number, high: number, calculated = false): string[] {
+  if (calculated) {
+    low = normalizeCalculatedAmount(low);
+    high = normalizeCalculatedAmount(high);
+  }
   if (low === high) return [formatEstimate(low)];
-  const lowText = estimateText(twoFigures(low, "floor")), highText = estimateText(twoFigures(high, "ceil"));
+  const lowText = twoFigures(low, "floor"), highText = twoFigures(high, "ceil");
   return lowText === highText ? [lowText] : [lowText, highText];
 }
 
-export function formatEstimateRange(low: number, high: number): string {
-  return estimateRangeParts(low, high).join("–");
+export function formatEstimateRange(low: number, high: number, calculated = false): string {
+  return estimateRangeParts(low, high, calculated).join("–");
 }
