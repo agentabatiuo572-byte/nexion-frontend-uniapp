@@ -174,7 +174,7 @@ function cycleOffer(delta:number){if(items.value.length)activeIndex.value=(activ
 let autoplayTimer:ReturnType<typeof setInterval>|null=null;
 function stopAutoplay(){if(autoplayTimer!==null){clearInterval(autoplayTimer);autoplayTimer=null;}}
 function startAutoplay(){stopAutoplay();if(props.mode==='home'&&props.active&&visible&&items.value.length>1&&!termsActivity.value)autoplayTimer=setInterval(()=>cycleOffer(1),5000);}
-const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,publicName):[]);
+const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,publicName,locale.code):[]);
 const termsText=computed(()=>termsActivity.value?promotionTermsText(termsActivity.value,t.value.promotion,locale.code):'');
 // Purchase gift, first purchase and repurchase have a landing page; other offers keep the store filter.
 function offerHref(activity:EntryPromotion){if ('displayOnly' in activity) return activity.href;return activityPageKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
