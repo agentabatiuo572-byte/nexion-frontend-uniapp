@@ -18,9 +18,8 @@
           <text class="block" :style="titleStyle">{{ t.deactivateSheet.title }}</text>
           <text class="nx-deactivate-desc">{{ descLine }}</text>
         </view>
-        <view class="grid place-items-center shrink-0 transition active:bg-[var(--v5-surface-3)]" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('dismiss')"  @keydown.enter.prevent="emit('dismiss')" @keydown.space.prevent="emit('dismiss')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-        </view>
+        <!-- The shared sheet close (same as NxSheet): neutral glass M with the close icon, 03 §3.1／§3.5. -->
+        <NxButton class="nx-deactivate-close" :label="t.ui.close" size="medium" @click="emit('dismiss')"><NxIcon name="close" :size="18" /></NxButton>
       </view>
 
       <!-- Task progress preview -->
@@ -72,6 +71,7 @@ import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 
 const props = defineProps<{ device: Device | null }>();
 const emit = defineEmits<{ (e: "wait"): void; (e: "force"): void; (e: "dismiss"): void }>();
@@ -152,15 +152,6 @@ const titleStyle: CSSProperties = {
   fontWeight: "var(--ui-type-hero-title-weight)",
   color: "var(--v5-ink)",
 };
-const closeBtnStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  boxSizing: "border-box",
-  padding: "4px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  backgroundClip: "content-box",
-};
 const taskCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
@@ -182,5 +173,6 @@ const taskCardStyle: CSSProperties = {
 .nx-deactivate-action { width: 100%; }
 .nx-deactivate-action--danger { --ui-button-ink: var(--v5-danger); color: var(--v5-danger); }
 .nx-deactivate-back { align-self: center; }
+.nx-deactivate-close { flex: none; }
 @media (prefers-reduced-motion: reduce) { .nx-deactivate-progress .nx-progress__fill { transition: none; } }
 </style>
