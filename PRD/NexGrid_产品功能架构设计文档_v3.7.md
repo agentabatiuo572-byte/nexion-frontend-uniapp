@@ -1489,28 +1489,28 @@ Cloud Share variant:Cloud Share 是数字份额(`productType=SHARE`,`inventoryMo
 
 #### 7.2.1 预估每日与每月
 
-硬件详情保留「预估每日收益」「预估每月」两格，Cloud Share 使用上文的专用收益卡。数量使用底部购买栏已有步进和服务端购买上限；调整数量只改变合计，不重复应用数量或设备产能。页面不再显示旧原型的 ROI、回本、首年净利、12 月累计图或「实际收益 ±15%」说明。
+商品详情（硬件与 Cloud Share）用同一张收益卡：标题「预估每日收益」，USDT、UVT、预估每月三行，分隔线下一句脚注（Share「按所选份数」、硬件「按所选台数」，均「以实际到账为准」）；Share 另有副标题「直接购买算力份额，更加灵活。」。数量使用底部购买栏已有步进和服务端购买上限；调整数量只改变合计，不重复应用数量或设备产能。页面不再显示旧原型的 ROI、回本、首年净利、12 月累计图或「实际收益 ±15%」说明。
 
 **目录与显示规则（H5 Lite，2026-11-09；移植自 App 提交 a66385a7、42703bb5）**：
 
 - `GET /api/store/catalog` 增加 `monthlyEstimateUsdt`、`dailyEstimateLowUsdt`、`dailyEstimateHighUsdt`。允许数值或十进制字符串，在目录解析边界转成数值；缺省或 null 表示沿用旧展示，合法 0 必须保留。
-- 有月收益配置时，服务端下发精确月值 `monthlyEstimateUsdt = T`、`dailyEarn = T / 30`；Share 另下发日区间 `T × (1∓b) / 30`。客户端只消费服务端派生金额，不从舍入后的日值或参考年奖励率反算月值。T、b 及计算方式仅为内部合同说明，不展示给用户。
+- 有月收益配置时，服务端下发精确月值 `monthlyEstimateUsdt = T`、`dailyEarn = T / 30`；Share 另下发日区间 `T × (1∓b) / 30`，硬件的同一日区间待后端 B75 下发，下发后客户端同样显示区间。UVT 日区间待后端 B75-BE-02（字段名暂按 `dailyEstimateLowNex`／`dailyEstimateHighNex`，以交付为准，只在目录解析处读取）。客户端只消费服务端派生金额，不从舍入后的日值或参考年奖励率反算月值。T、b 及计算方式仅为内部合同说明，不展示给用户。
 - 无月收益配置时，新增字段为空，硬件沿用日值乘 30 的旧月估算，Share 沿用原参考年奖励率分支。`dailyEarnNEX` 不变，Cloud Share 原有每日 3 UVT 权益独立保留。手机不纳入月目标；Lite 设备视图继续隐藏手机，账号资金记录仍完整包含手机收益（§5.0）。
 - 商品卡、详情与组合套餐使用同一目录日值；套餐分别合计各商品的日区间两端，硬件日值计入两端。旧 Share 无日区间时仍只展示参考年奖励率，不计入套餐日合计。套餐每个已选 SKU 计一次；详情按所选数量计一次。
-- 估算文案保留「预估／预计，以实际到账为准」。九种语言的 `detEstReturnsMeta` 复用各语言 `shareYieldDisclaimer`，仅去掉末尾句号，不再表示历史 30 天平均。
+- 估算文案保留「预估／预计，以实际到账为准」，写在收益卡脚注（`shareDailyEstimateNote`／`deviceDailyEstimateNote`）。
 
 **金额来源**：
 
 | 展示 | 来源 |
 |---|---|
-| 硬件预估每日 | `dailyEarn × qty` |
-| 硬件预估每月 | `(monthlyEstimateUsdt ?? dailyEarn × 30) × qty` |
+| 硬件预估每日 | `dailyEstimateLowUsdt × qty` – `dailyEstimateHighUsdt × qty`；未下发日区间时 `dailyEarn × qty` |
+| 硬件预估每月 | 有日区间时日区间两端 × 30 × qty；否则 `(monthlyEstimateUsdt ?? dailyEarn × 30) × qty` |
 | Share 新日区间 | `dailyEstimateLowUsdt × qty` – `dailyEstimateHighUsdt × qty` |
-| Share 新月估值 | `monthlyEstimateUsdt × qty` |
+| Share 新月估值 | `dailyEstimateLowUsdt × 30 × qty` – `dailyEstimateHighUsdt × 30 × qty` |
 | Share 旧日区间 | `price × shareYieldMin/Max ÷ 100 ÷ 365 × qty` |
-| Share UVT 日值 | `dailyEarnNEX × qty` |
+| UVT 日值 | `dailyEstimateLowNex × qty` – `dailyEstimateHighNex × qty`；未下发时 `dailyEarnNEX × qty` |
 
-金额先按源值合计再格式化：月值沿用两位小数金额展示，Share 日区间两端按两位小数显示，两端显示相同时只显示一个值；商品卡、商品详情和组合购买一致。不将显示舍入后的值重新参与估算。当前设备日产为 `T / 30 × 当前产能`；设备列表消费服务端已含产能的 `dailyUsdt`，沿用 Lite 现有还原满产能再投影流程，不再次乘产能。新商品仍显示目录满产能估值。Lite 的注册成功页、手机隐藏、网页风控标识与其他 §5.0 差异保持原规则。
+金额先按源值合计再格式化，不将显示舍入后的值重新参与估算。预估数字统一写法（Lite `src/lib/estimate-display.ts`，与 App 相同）：两位有效数字，区间下端向下取、上端向上取，单值四舍五入；去掉末尾的 0 和多余小数点，10 及以上写整数并带千分位；两端相同只写一个值（40.50–49.50 → 40–50，1,215–1,485 → 1,200–1,500，0.54–0.66 不变，8.00 → 8）。用于商品卡、组合购、算力阶梯、升级建议和商品详情（收益卡、底部栏）；首页设备对比、赚取页少赚提示、行情看板设备排行按此写单值，区间待首页接口。价格、余额、已到账收益和手续费仍两位小数；新手估算器、设备实际收益和试用收益不用此写法。当前设备日产为 `T / 30 × 当前产能`；设备列表消费服务端已含产能的 `dailyUsdt`，沿用 Lite 现有还原满产能再投影流程，不再次乘产能。新商品仍显示目录满产能估值。Lite 的注册成功页、手机隐藏、网页风控标识与其他 §5.0 差异保持原规则。
 
 #### 7.2.2 LiveSocialProof 实时购买动态
 
