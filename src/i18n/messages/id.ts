@@ -3532,6 +3532,7 @@ export const id: Messages = {
     swapPaused: "Penukaran dijeda. Lihat riwayat atau batalkan pesanan antrean yang memenuhi syarat.",
     pendingRecoveryHint: "Hasil penukaran belum terkonfirmasi dan sedang diperiksa otomatis. Jangan tukar lagi.",
     remoteNotProvided: "—",
+    staleSnapshot: "Menampilkan data terakhir yang diperbarui. Data akan diperbarui otomatis.",
     remoteUnavailableToast: "Gagal memuat. Coba lagi nanti",
     swapFailed: "Penukaran tidak berhasil. Coba lagi sebentar lagi.",
     swapCancelledReason: "Pesanan penukaran dibatalkan — tidak ada yang ditukar.",

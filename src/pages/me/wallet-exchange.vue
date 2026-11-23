@@ -239,7 +239,7 @@ const exchangeAuthorityStatus = computed(() => {
 });
 const exchangeSnapshotCurrent = computed(() => exchangeAuthorityStatus.value === "ready");
 const exchangeAuthorityHint = computed(() => {
-  if (exchangeAuthorityStatus.value === "stale") return t.value.wallet.fundsStaleBody;
+  if (exchangeAuthorityStatus.value === "stale") return t.value.exchange.staleSnapshot;
   if (exchangeAuthorityStatus.value === "loading") return t.value.wallet.loadingTransactions;
   if (exchangeAuthorityStatus.value === "unavailable") return t.value.exchange.remoteUnavailableClosed;
   return "";
