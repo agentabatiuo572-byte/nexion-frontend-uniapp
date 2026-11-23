@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { ServerLanguage } from "@/i18n";
 import {
   parseProductCatalogPayload,
   ProductCatalogContractError,
@@ -9,7 +10,7 @@ import {
 export type { ProductCatalogSnapshot } from "./product-catalog-contract";
 
 export interface ProductCatalogApi {
-  catalog(): Promise<ProductCatalogSnapshot>;
+  catalog(locale: ServerLanguage): Promise<ProductCatalogSnapshot>;
 }
 
 function invalid(): never {
@@ -18,13 +19,14 @@ function invalid(): never {
 
 export function createProductCatalogApi(client: ApiClient): ProductCatalogApi {
   return {
-    async catalog(): Promise<ProductCatalogSnapshot> {
+    async catalog(locale): Promise<ProductCatalogSnapshot> {
       const payload = await client.request<unknown>({
         method: "GET",
-        path: "/api/store/catalog",
+        path: `/api/store/catalog?locale=${encodeURIComponent(locale)}`,
       });
       try {
-        return parseProductCatalogPayload(payload);
+        const snapshot = parseProductCatalogPayload(payload);
+        return { ...snapshot, products: snapshot.products.map(product => ({ ...product, catalogRequestLocale: locale })) };
       } catch (error) {
         if (error instanceof ProductCatalogContractError) return invalid();
         throw error;
