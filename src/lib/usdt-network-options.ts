@@ -1,10 +1,8 @@
-// New USDT selections only. Keep parsing and displaying original records with their own network.
-const HIDDEN_USDT_NETWORK_OPTIONS: readonly string[] = [
-  "usdt-trc20",        // Deposit, payout address and local checkout
-  "USDT-TRC20",        // Withdrawal
-  "CREGIS_USDT_TRC20", // External purchase payment
-];
+// Apply the same policy to new options and to records after their API contract has been parsed.
+const HIDDEN_USDT_NETWORKS: readonly string[] = ["TRC20", "USDT-TRC20", "CREGIS_USDT_TRC20"];
 
-export function canSelectNewUsdtNetwork(option: string): boolean {
-  return !HIDDEN_USDT_NETWORK_OPTIONS.includes(option);
+export function isVisibleUsdtNetwork(value?: string | null): boolean {
+  return value == null || !HIDDEN_USDT_NETWORKS.includes(value.toUpperCase());
 }
+
+export const canSelectNewUsdtNetwork = isVisibleUsdtNetwork;
