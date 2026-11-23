@@ -10,9 +10,12 @@ type Count = Parameters<typeof ambassadorCount>[0];
 const zh = {
   // Referral and bundle activity pages: hero, step track and card entry.
   navReferral: '邀请购机礼', navBundle: '组合礼',
-  subtitleReferral: '邀请好友购买指定设备，好友首单付款后发放奖励', subtitleBundle: '活动期内购买指定设备，额外得 {unit} 奖励',
+  subtitleReferral: '邀请好友购买指定设备，好友付款后发放奖励', subtitleBundle: '活动期内购买指定设备，额外得 {unit} 奖励',
   youGet: '每位好友首购，你得', friendGets: '好友购机得', friendAlso: '好友购机也得 ',
-  referralSteps: '三步拿邀请奖励', stepShare: '分享邀请', stepShareNote: '海报或链接', stepFriendBuys: '好友购机', stepFriendBuysNote: '首单付款后计入', stepRewardPaid: '奖励发放', stepRewardPaidNote: '在我的奖励查看',
+  referralSteps: '三步拿邀请奖励', stepShare: '分享邀请', stepShareNote: '海报或链接', stepFriendBuys: '好友购机', stepFriendBuysNote: '付款后计入', stepRewardPaid: '奖励发放', stepRewardPaidNote: '在我的奖励查看',
+  firstPurchaseByOrder: '首购按好友的第一笔合格订单计算', firstPurchaseByUnit: '首购按好友购买的第一台合格设备计算', firstPurchaseRefund: '退款后，好友之后的合格购买可重新计算',
+  termsFriendReward: '好友购机奖励', termsInviterReward: '邀请奖励',
+  rewardLimitOrder: '每单最多可获 {n} 次奖励' as Count, rewardLimitPerson: '每人累计最多可获 {n} 次奖励' as Count,
   friendsBought: '{n} 位好友已首购' as Count, rewardsPaid: '已发放 {n} 笔' as Count,
   friendDevices: '好友可购设备', invite: '邀请好友', signInInvite: '登录后邀请', viewOffer: '查看活动', buyBundle: '组合购买', inviteAfterStart: '开始后可邀请',
   navGift: '购机赠礼', navFirst: '首购礼', navRepurchase: '老用户加购', navPending: '活动',
@@ -80,9 +83,12 @@ const zh = {
 type LandingCopy = typeof zh;
 const en: LandingCopy = {
   navReferral: 'Referral gift', navBundle: 'Bundle offer',
-  subtitleReferral: 'Invite friends to buy a listed device. Rewards follow their first paid order', subtitleBundle: 'Buy listed devices during the offer and earn extra {unit}',
+  subtitleReferral: 'Invite friends to buy a listed device. Rewards follow their paid order', subtitleBundle: 'Buy listed devices during the offer and earn extra {unit}',
   youGet: "For each friend's first purchase, you get", friendGets: 'Your friend gets', friendAlso: 'Your friend also gets ',
-  referralSteps: 'Three steps to your reward', stepShare: 'Share', stepShareNote: 'Poster or link', stepFriendBuys: 'Friend buys', stepFriendBuysNote: 'First paid order', stepRewardPaid: 'Reward paid', stepRewardPaidNote: 'See My rewards',
+  referralSteps: 'Three steps to your reward', stepShare: 'Share', stepShareNote: 'Poster or link', stepFriendBuys: 'Friend buys', stepFriendBuysNote: 'Counts once paid', stepRewardPaid: 'Reward paid', stepRewardPaidNote: 'See My rewards',
+  firstPurchaseByOrder: "Your friend's first eligible order counts as their first purchase", firstPurchaseByUnit: "The first eligible device your friend buys counts as their first purchase", firstPurchaseRefund: "If it's refunded, a later eligible purchase can count instead",
+  termsFriendReward: "Friend's purchase reward", termsInviterReward: 'Referral reward',
+  rewardLimitOrder: { one: 'Up to {n} reward per order', other: 'Up to {n} rewards per order' }, rewardLimitPerson: { one: 'Up to {n} reward per person in total', other: 'Up to {n} rewards per person in total' },
   friendsBought: { one: '{n} friend bought', other: '{n} friends bought' }, rewardsPaid: '{n} paid' as Count,
   friendDevices: 'Devices friends can buy', invite: 'Invite friends', signInInvite: 'Sign in to invite', viewOffer: 'View offer', buyBundle: 'Buy as a bundle', inviteAfterStart: 'Invite once it starts',
   navGift: 'Purchase gift', navFirst: 'First purchase', navRepurchase: 'Buy again', navPending: 'Offer',
@@ -147,9 +153,12 @@ const en: LandingCopy = {
 };
 const vi: LandingCopy = {
   navReferral: 'Quà giới thiệu', navBundle: 'Ưu đãi kết hợp',
-  subtitleReferral: 'Mời bạn bè mua thiết bị áp dụng, thưởng được chi trả sau đơn đầu tiên đã thanh toán của bạn bè', subtitleBundle: 'Mua thiết bị áp dụng trong thời gian ưu đãi để nhận thêm {unit}',
-  youGet: 'Mỗi bạn bè mua lần đầu, bạn nhận', friendGets: 'Bạn bè mua máy nhận', friendAlso: 'Bạn bè mua máy cũng nhận ',
-  referralSteps: '3 bước nhận thưởng giới thiệu', stepShare: 'Chia sẻ lời mời', stepShareNote: 'Poster hoặc liên kết', stepFriendBuys: 'Bạn bè mua máy', stepFriendBuysNote: 'Tính khi đơn đầu đã thanh toán', stepRewardPaid: 'Chi trả thưởng', stepRewardPaidNote: 'Xem ở Phần thưởng',
+  subtitleReferral: 'Mời bạn bè mua thiết bị áp dụng, thưởng được chi trả sau khi bạn bè thanh toán đơn hàng', subtitleBundle: 'Mua thiết bị áp dụng trong thời gian ưu đãi để nhận thêm {unit}',
+  youGet: 'Mỗi bạn bè mua lần\u00a0đầu, bạn\u00a0nhận', friendGets: 'Bạn bè mua máy nhận', friendAlso: 'Bạn bè mua máy cũng nhận ',
+  referralSteps: '3 bước nhận thưởng giới thiệu', stepShare: 'Chia sẻ lời mời', stepShareNote: 'Poster hoặc liên\u00a0kết', stepFriendBuys: 'Bạn bè mua máy', stepFriendBuysNote: 'Tính khi đã thanh\u00a0toán', stepRewardPaid: 'Chi trả thưởng', stepRewardPaidNote: 'Xem ở Phần\u00a0thưởng',
+  firstPurchaseByOrder: 'Lần mua đầu được tính theo đơn hợp lệ đầu tiên của bạn\u00a0bè', firstPurchaseByUnit: 'Lần mua đầu được tính theo thiết bị hợp lệ đầu tiên bạn\u00a0bè\u00a0mua', firstPurchaseRefund: 'Nếu được hoàn tiền, lần mua hợp lệ sau đó của bạn\u00a0bè có thể được tính\u00a0lại',
+  termsFriendReward: 'Thưởng bạn bè mua máy', termsInviterReward: 'Thưởng giới thiệu',
+  rewardLimitOrder: 'Tối đa {n} lần nhận thưởng mỗi đơn', rewardLimitPerson: 'Tổng cộng tối đa {n} lần nhận thưởng mỗi người',
   friendsBought: '{n} bạn bè đã mua lần đầu' as Count, rewardsPaid: 'Đã chi trả {n} khoản' as Count,
   friendDevices: 'Thiết bị bạn bè có thể mua', invite: 'Mời bạn bè', signInInvite: 'Đăng nhập để mời', viewOffer: 'Xem ưu đãi', buyBundle: 'Mua kết hợp', inviteAfterStart: 'Mời được khi ưu đãi bắt đầu',
   navGift: 'Quà mua máy', navFirst: 'Quà đơn đầu', navRepurchase: 'Mua thêm', navPending: 'Ưu đãi',
@@ -214,9 +223,12 @@ const vi: LandingCopy = {
 };
 const id: LandingCopy = {
   navReferral: 'Hadiah referal', navBundle: 'Promo paket',
-  subtitleReferral: 'Ajak teman membeli perangkat yang tercantum. Hadiah diberikan setelah pesanan pertama mereka dibayar', subtitleBundle: 'Beli perangkat yang tercantum selama promo dan dapatkan {unit} ekstra',
+  subtitleReferral: 'Ajak teman membeli perangkat yang tercantum. Hadiah diberikan setelah pesanan mereka dibayar', subtitleBundle: 'Beli perangkat yang tercantum selama promo dan dapatkan {unit} ekstra',
   youGet: 'Tiap pembelian pertama teman, Anda dapat', friendGets: 'Teman Anda dapat', friendAlso: 'Teman Anda juga dapat ',
-  referralSteps: '3 langkah dapat hadiah', stepShare: 'Bagikan', stepShareNote: 'Poster atau tautan', stepFriendBuys: 'Teman membeli', stepFriendBuysNote: 'Pesanan pertama dibayar', stepRewardPaid: 'Hadiah dibayar', stepRewardPaidNote: 'Lihat di Hadiah saya',
+  referralSteps: '3 langkah dapat hadiah', stepShare: 'Bagikan', stepShareNote: 'Poster atau tautan', stepFriendBuys: 'Teman membeli', stepFriendBuysNote: 'Dihitung setelah dibayar', stepRewardPaid: 'Hadiah dibayar', stepRewardPaidNote: 'Lihat di Hadiah saya',
+  firstPurchaseByOrder: 'Pembelian pertama dihitung dari pesanan pertama teman yang memenuhi syarat', firstPurchaseByUnit: 'Pembelian pertama dihitung dari perangkat pertama teman yang memenuhi syarat', firstPurchaseRefund: 'Jika dananya dikembalikan, pembelian berikutnya yang memenuhi syarat bisa dihitung',
+  termsFriendReward: 'Hadiah pembelian teman', termsInviterReward: 'Hadiah referal',
+  rewardLimitOrder: 'Maksimal {n} hadiah per pesanan', rewardLimitPerson: 'Maksimal total {n} hadiah per orang',
   friendsBought: '{n} teman sudah membeli' as Count, rewardsPaid: '{n} sudah dibayar' as Count,
   friendDevices: 'Perangkat untuk teman', invite: 'Ajak teman', signInInvite: 'Masuk untuk mengajak', viewOffer: 'Lihat promo', buyBundle: 'Beli paket', inviteAfterStart: 'Bisa mengajak setelah dimulai',
   navGift: 'Hadiah pembelian', navFirst: 'Pembelian pertama', navRepurchase: 'Beli lagi', navPending: 'Promo',
@@ -281,9 +293,12 @@ const id: LandingCopy = {
 };
 const ms: LandingCopy = {
   navReferral: 'Hadiah rujukan', navBundle: 'Tawaran pakej',
-  subtitleReferral: 'Jemput rakan membeli peranti tersenarai. Ganjaran diberi selepas pesanan pertama mereka dibayar', subtitleBundle: 'Beli peranti tersenarai dalam tempoh tawaran dan dapat {unit} tambahan',
+  subtitleReferral: 'Jemput rakan membeli peranti tersenarai. Ganjaran diberi selepas pesanan mereka dibayar', subtitleBundle: 'Beli peranti tersenarai dalam tempoh tawaran dan dapat {unit} tambahan',
   youGet: 'Setiap pembelian pertama rakan, anda dapat', friendGets: 'Rakan anda dapat', friendAlso: 'Rakan anda juga dapat ',
-  referralSteps: '3 langkah dapat ganjaran', stepShare: 'Kongsi', stepShareNote: 'Poster atau pautan', stepFriendBuys: 'Rakan membeli', stepFriendBuysNote: 'Pesanan pertama dibayar', stepRewardPaid: 'Ganjaran dibayar', stepRewardPaidNote: 'Lihat di Ganjaran saya',
+  referralSteps: '3 langkah dapat ganjaran', stepShare: 'Kongsi', stepShareNote: 'Poster atau pautan', stepFriendBuys: 'Rakan membeli', stepFriendBuysNote: 'Dikira selepas dibayar', stepRewardPaid: 'Ganjaran dibayar', stepRewardPaidNote: 'Lihat di Ganjaran saya',
+  firstPurchaseByOrder: 'Pembelian pertama dikira daripada pesanan layak pertama rakan', firstPurchaseByUnit: 'Pembelian pertama dikira daripada peranti layak pertama yang dibeli rakan', firstPurchaseRefund: 'Jika dibayar balik, pembelian layak seterusnya boleh dikira',
+  termsFriendReward: 'Ganjaran pembelian rakan', termsInviterReward: 'Ganjaran rujukan',
+  rewardLimitOrder: 'Sehingga {n} ganjaran setiap pesanan', rewardLimitPerson: 'Sehingga {n} ganjaran setiap orang secara keseluruhan',
   friendsBought: '{n} rakan sudah membeli' as Count, rewardsPaid: '{n} sudah dibayar' as Count,
   friendDevices: 'Peranti untuk rakan', invite: 'Jemput rakan', signInInvite: 'Log masuk untuk menjemput', viewOffer: 'Lihat tawaran', buyBundle: 'Beli pakej', inviteAfterStart: 'Boleh menjemput selepas bermula',
   navGift: 'Hadiah pembelian', navFirst: 'Pembelian pertama', navRepurchase: 'Beli lagi', navPending: 'Tawaran',
@@ -348,9 +363,12 @@ const ms: LandingCopy = {
 };
 const fil: LandingCopy = {
   navReferral: 'Regalo sa referral', navBundle: 'Bundle offer',
-  subtitleReferral: 'Imbitahan ang mga kaibigan na bumili ng nakalistang device. Darating ang reward pagkatapos ng una nilang bayad na order', subtitleBundle: 'Bumili ng nakalistang device habang may offer at makakuha ng dagdag na {unit}',
+  subtitleReferral: 'Imbitahan ang mga kaibigan na bumili ng nakalistang device. Darating ang reward pagkatapos nilang magbayad ng order', subtitleBundle: 'Bumili ng nakalistang device habang may offer at makakuha ng dagdag na {unit}',
   youGet: 'Sa bawat unang bili ng kaibigan, makukuha mo', friendGets: 'Makukuha ng kaibigan mo', friendAlso: 'Makukuha rin ng kaibigan mo ',
-  referralSteps: '3 hakbang sa reward', stepShare: 'Ibahagi', stepShareNote: 'Poster o link', stepFriendBuys: 'Bibili ang kaibigan', stepFriendBuysNote: 'Unang bayad na order', stepRewardPaid: 'Bayad na reward', stepRewardPaidNote: 'Tingnan sa Aking mga reward',
+  referralSteps: '3 hakbang sa reward', stepShare: 'Ibahagi', stepShareNote: 'Poster o link', stepFriendBuys: 'Bibili ang kaibigan', stepFriendBuysNote: 'Bilang kapag bayad na', stepRewardPaid: 'Bayad na reward', stepRewardPaidNote: 'Tingnan sa Aking mga reward',
+  firstPurchaseByOrder: 'Ang unang kwalipikadong order ng kaibigan ang bilang na unang bili', firstPurchaseByUnit: 'Ang unang kwalipikadong device na bibilhin ng kaibigan ang bilang na unang bili', firstPurchaseRefund: 'Kapag na-refund, puwedeng bilangin ang susunod na kwalipikadong bili',
+  termsFriendReward: 'Reward sa bili ng kaibigan', termsInviterReward: 'Reward sa referral',
+  rewardLimitOrder: 'Hanggang {n} reward bawat order', rewardLimitPerson: 'Hanggang {n} reward bawat tao sa kabuuan',
   friendsBought: '{n} kaibigan ang bumili na' as Count, rewardsPaid: '{n} ang nabayaran' as Count,
   friendDevices: 'Device para sa kaibigan', invite: 'Mag-imbita', signInInvite: 'Mag-log in para mag-imbita', viewOffer: 'Tingnan ang offer', buyBundle: 'Bilhin nang bundle', inviteAfterStart: 'Puwedeng mag-imbita pagkasimula',
   navGift: 'Regalo sa pagbili', navFirst: 'Unang pagbili', navRepurchase: 'Bumili ulit', navPending: 'Offer',
@@ -415,9 +433,12 @@ const fil: LandingCopy = {
 };
 const ru: LandingCopy = {
   navReferral: 'Подарок за друга', navBundle: 'Комплект',
-  subtitleReferral: 'Пригласите друзей купить устройство из списка. Награда — после их первого оплаченного заказа', subtitleBundle: 'Купите устройства из списка во время акции и получите доп. {unit}',
+  subtitleReferral: 'Пригласите друзей купить устройство из списка. Награда — после оплаты их заказа', subtitleBundle: 'Купите устройства из списка во время акции и получите доп. {unit}',
   youGet: 'За первую покупку друга вы получаете', friendGets: 'Друг получает', friendAlso: 'Друг тоже получает ',
-  referralSteps: 'Три шага к награде', stepShare: 'Поделитесь', stepShareNote: 'Постер или ссылка', stepFriendBuys: 'Друг покупает', stepFriendBuysNote: 'Первый оплаченный заказ', stepRewardPaid: 'Выплата', stepRewardPaidNote: 'См. «Мои награды»',
+  referralSteps: 'Три шага к награде', stepShare: 'Поделитесь', stepShareNote: 'Постер или ссылка', stepFriendBuys: 'Друг покупает', stepFriendBuysNote: 'После оплаты', stepRewardPaid: 'Выплата', stepRewardPaidNote: 'См. «Мои награды»',
+  firstPurchaseByOrder: 'Первой покупкой считается первый подходящий заказ друга', firstPurchaseByUnit: 'Первой покупкой считается первое подходящее устройство, купленное другом', firstPurchaseRefund: 'После возврата денег может засчитаться следующая подходящая покупка',
+  termsFriendReward: 'Награда другу за покупку', termsInviterReward: 'Награда за приглашение',
+  rewardLimitOrder: 'Максимум наград на заказ: {n}', rewardLimitPerson: 'Общий лимит наград на человека: {n}',
   friendsBought: { one: '{n} друг купил', few: '{n} друга купили', other: '{n} друзей купили' }, rewardsPaid: 'Выплачено: {n}' as Count,
   friendDevices: 'Устройства для друзей', invite: 'Пригласить друзей', signInInvite: 'Войти и пригласить', viewOffer: 'Открыть акцию', buyBundle: 'Купить комплектом', inviteAfterStart: 'Приглашать можно после старта',
   navGift: 'Подарок', navFirst: 'Первая покупка', navRepurchase: 'Докупить', navPending: 'Акция',
@@ -482,9 +503,12 @@ const ru: LandingCopy = {
 };
 const kk: LandingCopy = {
   navReferral: 'Шақыру сыйлығы', navBundle: 'Жиынтық акция',
-  subtitleReferral: 'Достарыңызды тізімдегі құрылғыны алуға шақырыңыз. Сыйақы олардың алғашқы төленген тапсырысынан кейін беріледі', subtitleBundle: 'Акция кезінде тізімдегі құрылғыларды алып, қосымша {unit} алыңыз',
+  subtitleReferral: 'Достарыңызды тізімдегі құрылғыны алуға шақырыңыз. Сыйақы олардың тапсырысы төленгеннен кейін беріледі', subtitleBundle: 'Акция кезінде тізімдегі құрылғыларды алып, қосымша {unit} алыңыз',
   youGet: 'Әр достың алғашқы сатып алуы үшін сіз аласыз', friendGets: 'Досыңыз алады', friendAlso: 'Досыңыз да алады ',
-  referralSteps: 'Сыйақыға үш қадам', stepShare: 'Бөлісіңіз', stepShareNote: 'Постер не сілтеме', stepFriendBuys: 'Дос сатып алады', stepFriendBuysNote: 'Алғашқы төлемнен кейін', stepRewardPaid: 'Сыйақы төленеді', stepRewardPaidNote: 'Сыйақылар бөлімінде',
+  referralSteps: 'Сыйақыға үш қадам', stepShare: 'Бөлісіңіз', stepShareNote: 'Постер не сілтеме', stepFriendBuys: 'Дос сатып алады', stepFriendBuysNote: 'Төлемнен кейін', stepRewardPaid: 'Сыйақы төленеді', stepRewardPaidNote: 'Сыйақылар бөлімінде',
+  firstPurchaseByOrder: 'Алғашқы сатып алу достың алғашқы жарамды тапсырысы бойынша есептеледі', firstPurchaseByUnit: 'Алғашқы сатып алу дос алған алғашқы жарамды құрылғы бойынша есептеледі', firstPurchaseRefund: 'Ақшасы қайтарылса, келесі жарамды сатып алу есептелуі мүмкін',
+  termsFriendReward: 'Достың сатып алу сыйақысы', termsInviterReward: 'Шақыру сыйақысы',
+  rewardLimitOrder: 'Бір тапсырысқа ең көбі {n} сыйақы', rewardLimitPerson: 'Бір адамға барлығы ең көбі {n} сыйақы',
   friendsBought: '{n} дос сатып алды' as Count, rewardsPaid: 'Төленді: {n}' as Count,
   friendDevices: 'Достарға арналған құрылғылар', invite: 'Достарды шақыру', signInInvite: 'Кіріп, шақырыңыз', viewOffer: 'Акцияны ашу', buyBundle: 'Жиынтықпен алу', inviteAfterStart: 'Басталғаннан кейін шақыруға болады',
   navGift: 'Сатып алу сыйлығы', navFirst: 'Алғашқы сатып алу', navRepurchase: 'Қайта сатып алу', navPending: 'Акция',
@@ -549,9 +573,12 @@ const kk: LandingCopy = {
 };
 const uz: LandingCopy = {
   navReferral: 'Taklif sovgʻasi', navBundle: 'Toʻplam aksiyasi',
-  subtitleReferral: 'Doʻstlaringizni roʻyxatdagi qurilmani olishga taklif qiling. Mukofot ularning birinchi toʻlangan buyurtmasidan keyin beriladi', subtitleBundle: 'Aksiya davomida roʻyxatdagi qurilmalarni oling va qoʻshimcha {unit} oling',
+  subtitleReferral: 'Doʻstlaringizni roʻyxatdagi qurilmani olishga taklif qiling. Mukofot ularning buyurtmasi toʻlangandan keyin beriladi', subtitleBundle: 'Aksiya davomida roʻyxatdagi qurilmalarni oling va qoʻshimcha {unit} oling',
   youGet: 'Har bir doʻstning birinchi xaridi uchun siz olasiz', friendGets: 'Doʻstingiz oladi', friendAlso: 'Doʻstingiz ham oladi ',
-  referralSteps: 'Mukofotga uch qadam', stepShare: 'Ulashing', stepShareNote: 'Poster yoki havola', stepFriendBuys: 'Doʻst xarid qiladi', stepFriendBuysNote: 'Birinchi toʻlovdan keyin', stepRewardPaid: 'Mukofot toʻlanadi', stepRewardPaidNote: 'Mukofotlarda koʻring',
+  referralSteps: 'Mukofotga uch qadam', stepShare: 'Ulashing', stepShareNote: 'Poster yoki havola', stepFriendBuys: 'Doʻst xarid qiladi', stepFriendBuysNote: 'Toʻlovdan keyin', stepRewardPaid: 'Mukofot toʻlanadi', stepRewardPaidNote: 'Mukofotlarda koʻring',
+  firstPurchaseByOrder: 'Birinchi xarid doʻstning birinchi mos buyurtmasi boʻyicha hisoblanadi', firstPurchaseByUnit: 'Birinchi xarid doʻst olgan birinchi mos qurilma boʻyicha hisoblanadi', firstPurchaseRefund: 'Pul qaytarilsa, keyingi mos xarid hisoblanishi mumkin',
+  termsFriendReward: 'Doʻst xaridi uchun mukofot', termsInviterReward: 'Taklif mukofoti',
+  rewardLimitOrder: 'Har bir buyurtmada {n} martagacha mukofot', rewardLimitPerson: 'Bir kishiga jami {n} martagacha mukofot',
   friendsBought: '{n} doʻst xarid qildi' as Count, rewardsPaid: 'Toʻlandi: {n}' as Count,
   friendDevices: 'Doʻstlar uchun qurilmalar', invite: 'Doʻstlarni taklif qilish', signInInvite: 'Kirib taklif qiling', viewOffer: 'Aksiyani ochish', buyBundle: 'Toʻplam qilib olish', inviteAfterStart: 'Boshlangach taklif qilish mumkin',
   navGift: 'Xarid sovgʻasi', navFirst: 'Birinchi xarid', navRepurchase: 'Yana xarid', navPending: 'Aksiya',

@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoFixture,demoOrderTimedOut,demoTimedOutOrder} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
-import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
+import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const pin = createPaymentPinFlowFixture();
@@ -51,9 +51,9 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     const handlesOrder = path === '/api/orders' || path.startsWith('/api/orders/') || path.startsWith('/api/promotion-commands/');
     const headers = request.headers();
     const owner = handlesOrder ? previewAccountId(state, headers) : null;
-    if (handlesOrder && path !== '/api/orders/commands' && owner !== demoAccountId) {
+    if (handlesOrder && path !== '/api/orders/commands' && owner !== demoPurchasingAccountId(state)) {
       if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
-      // The preview has one purchasing account. Other demo accounts have no orders or purchase commands.
+      // The selected purchasing account owns this scenario's orders and purchase commands.
       if (path === '/api/orders' && method === 'GET') {
         const projection = demoFixture(url,locale(),state,request);
         return ok({...projection,orders:[],nextCursor:null});
