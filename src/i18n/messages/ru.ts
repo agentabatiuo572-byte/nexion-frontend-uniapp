@@ -2956,6 +2956,8 @@ export const ru: Messages = {
       learning: "Обучение",
     },
     scanAppOnly: "Сканер доступен в приложении.",
+    shortcutNewAria: "{entry}, есть новые данные",
+    shortcutPendingPaymentAria: "{entry}, есть заказы, ожидающие оплаты",
     bills: "История операций",
     billsThisMonth: "Операций за месяц: {n}",
     viewAllOrders: "Все заказы",

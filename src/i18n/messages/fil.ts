@@ -2956,6 +2956,8 @@ export const fil: Messages = {
       learning: "Matuto",
     },
     scanAppOnly: "Gamitin ang Scan sa app.",
+    shortcutNewAria: "{entry}, may bagong nilalaman",
+    shortcutPendingPaymentAria: "{entry}, may mga order na naghihintay ng bayad",
     bills: "Talaan",
     billsThisMonth: "{n} transaksyon ngayong buwan",
     viewAllOrders: "Lahat ng order",

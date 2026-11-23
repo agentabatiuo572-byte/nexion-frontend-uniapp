@@ -10,7 +10,7 @@
       <NxSection :title="t.me.frequentFunctions" :action="t.me.deviceAddLabel" class="me-shortcuts" @action="navTo('/pages/store/store')">
         <view class="me-shortcut-grid">
           <template v-for="item in frequentItems" :key="item.key">
-          <view class="me-shortcut" :data-quick-key="item.key" role="button" tabindex="0" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
+          <view class="me-shortcut" :data-quick-key="item.key" role="button" tabindex="0" :aria-label="item.dot && item.key !== 'rewards' ? fmt(item.key === 'orders' && placedOrder ? t.me.shortcutPendingPaymentAria : t.me.shortcutNewAria, { entry: item.label }) : undefined" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
             <NxIconTile :tone="tileTone(item.tone)" size="m"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg><view v-if="item.dot || item.badge" class="me-row-dot" /></NxIconTile>
             <text class="me-shortcut__label">{{ item.label }}</text>
           </view>
@@ -31,7 +31,7 @@
           <NxListRow v-for="item in section.items" :key="item.key" :data-quick-key="item.key" :title="item.label" :value="['inventory', 'slots', 'orders', 'genesis'].includes(item.key) && item.meta ? visibility.mask(item.meta) : item.meta" @click="handleQuickItem(item)">
             <template #leading><NxIconTile :tone="tileTone(item.tone)" size="s">
               <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg>
-              <view v-if="item.dot || item.badge" class="me-row-dot" />
+              <view v-if="item.dot || item.badge" class="me-row-dot me-row-dot--surface" />
             </NxIconTile></template>
           </NxListRow>
         </NxListGroup>
@@ -826,7 +826,9 @@ const signOutStyle: CSSProperties = {
 .me-shortcut-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--v5-space-3) var(--v5-space-1); padding: var(--v5-space-3) 0 var(--v5-space-1); }
 .me-shortcut { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); min-width: 0; min-height: 80px; cursor: pointer; }
 .me-shortcut__label { font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); text-align: center; overflow-wrap: break-word; }
-.me-row-dot { position: absolute; right: 0; top: 0; width: var(--v5-space-2); height: var(--v5-space-2); border-radius: var(--v5-radius-full); background: var(--ui-unread-badge); box-shadow: 0 0 0 2px var(--v5-bg); }
+.me-row-dot { position: absolute; right: 0; top: 0; width: var(--v5-space-2); height: var(--v5-space-2); border-radius: var(--v5-radius-full); background: var(--ui-unread-dot); box-shadow: 0 0 0 2px var(--v5-bg); }
+/* List-row dots sit on the settings card, so the ring takes the card surface. */
+.me-row-dot--surface { box-shadow: 0 0 0 2px var(--v5-surface); }
 .me-network-item__meta { margin-top: -4px; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); text-align: center; overflow-wrap: break-word; }
 .me-shortcut:focus-visible, .me-network-item:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: var(--v5-radius-s); }
 .me-shortcut:active, .me-network-item:active { opacity: .72; }

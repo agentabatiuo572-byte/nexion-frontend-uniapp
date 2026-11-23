@@ -2956,6 +2956,8 @@ export const id: Messages = {
       learning: "Belajar",
     },
     scanAppOnly: "Gunakan fitur Pindai di aplikasi.",
+    shortcutNewAria: "{entry}, ada konten baru",
+    shortcutPendingPaymentAria: "{entry}, ada pesanan menunggu pembayaran",
     bills: "Riwayat transaksi",
     billsThisMonth: "{n} transaksi bulan ini",
     viewAllOrders: "Semua pesanan",
