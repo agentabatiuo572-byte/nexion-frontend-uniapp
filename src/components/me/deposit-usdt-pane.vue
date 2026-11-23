@@ -1,6 +1,6 @@
 <!--
   DepositUsdtPane — 充值页「USDT 链上」通道段(PAY-规格 [FEAT-PAY01] ⑤⑥)。
-  正式模式支持 BEP20 / ERC20 / TRC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
+  新充值可选 BEP20 / ERC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
   → 常驻错网络警示 → 指引/工单入口 → 最近入金
   列表(confirming n/N 实时进度 · credited / dust_hold / returned 态)。
   4 态:骨架(匹配形状)/ 空列表 / 断网 inline 重试;服务端报告未配置或已关闭的网络不显示。
@@ -170,6 +170,7 @@ import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useDeposits } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import {
@@ -196,15 +197,12 @@ const remoteSessionReady = computed(() => {
 });
 
 // ── 网络 chip(标签为链名专有名词,非文案)──
-const NETWORKS: { id: ChainDepositChannel; label: string }[] = fundsServerEnabled ? [
+const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
   { id: "usdt-bep20", label: "BEP20" },
   { id: "usdt-erc20", label: "ERC20" },
   { id: "usdt-trc20", label: "TRC20" },
-] : [
-  { id: "usdt-trc20", label: "TRC20" },
-  { id: "usdt-bep20", label: "BEP20" },
-  { id: "usdt-erc20", label: "ERC20" },
 ];
+const NETWORKS = ALL_NETWORKS.filter((nw) => canSelectNewUsdtNetwork(nw.id));
 const CHANNEL_SHORT: Record<DepositChannel, string> = {
   "usdt-trc20": "TRC20",
   "usdt-bep20": "BEP20",
@@ -215,7 +213,7 @@ const CHANNEL_SHORT: Record<DepositChannel, string> = {
 /** confirming 超过 30 分钟未走满 → 「网络拥堵」提示([FEAT-PAY01] ② 异常3)。 */
 const CONFIRM_DELAY_NOTE_MS = 30 * 60 * 1000;
 
-const net = ref<ChainDepositChannel>(fundsServerEnabled ? "usdt-bep20" : "usdt-trc20");
+const net = ref<ChainDepositChannel>("usdt-bep20");
 // Policy is read without allocating addresses, including before the first selection.
 const networkPolicies = ref<CregisNetworkPolicy[]>([]);
 const visibleNets = computed(() => NETWORKS.filter((nw) => fundsServerEnabled
