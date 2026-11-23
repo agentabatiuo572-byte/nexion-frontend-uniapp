@@ -121,10 +121,11 @@
         </PromotionAction>
       </view>
     </NxSheet>
-    <PromotionTerms :open="termsOpen" :title="localized(promotion?.title,locale.code)" :terms="order ? '' : localized(promotion?.terms,locale.code)" :disclosures="disclosures" @close="termsOpen=false" />
+    <PromotionTerms :open="termsOpen" :title="localized(promotion?.title,locale.code)" :terms="order ? '' : localized(promotion?.terms,locale.code)" :rules="firstPurchaseTermsRules(checkoutFirstPurchaseCondition,locale.code)" :disclosures="disclosures" @close="termsOpen=false" />
   </view>
 </template>
 <script setup lang="ts">
+import { firstPurchaseTermsRules } from '@/lib/promotion-landing';
 import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
@@ -357,6 +358,11 @@ function disclosure(reward: ExpectedReward): PromotionDisclosure | null {
   return complete ? { ...d, role: reward.beneficiaryRole } : null;
 }
 const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is PromotionDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
+const checkoutFirstPurchaseCondition=computed(()=>{
+  const activity=promotion.value;
+  if(activity && activity.activityId===quote.value?.activityId && activity.version===quote.value.activityVersion)
+    return activity.firstPurchaseCondition;
+});
 const hasRewardTerms=computed(()=>auth.isAuthenticated&&!loading.value&&disclosures.value.length>0);
 // The compact gift row is only for a simple, eligible buyer gift before order
 // creation. Multiple rewards, inviter benefits and receipt states keep their
@@ -667,12 +673,16 @@ function recover(foreground=false):Promise<boolean>{
 async function readCheckout(foreground=false):Promise<boolean>{
   const generation=readGeneration;
   recoveryGeneration=generation;
+  const operation=session.record.pending?.operation;
+  const recoveringCreation=operation==='createOrder'||operation==='createBundle';
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
     &&!session.record.pending&&!unknown.value&&!recoveryReadFailed.value;
   try{
     if(!clockOnly)await session.recover();
     if(!readCurrent(generation))return false;
-    if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
+    if(recoveringCreation&&session.confirmed&&!session.record.pending&&session.record.order){
+      error.value='';activityConflict.value=false;
+    }else if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
     const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';

@@ -29,6 +29,8 @@ import { demoCommissionGroups, demoStreakMilestones, demoReferralLedger, demoHas
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
 const demoStartedAt = Date.now();
+const promotionEndsAt = new Date(demoStartedAt + 6 * day - 19 * 60000).toISOString();
+const endedPromotionEndsAt = new Date(demoStartedAt - day).toISOString();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
 function demoVoucherGrant(state,voucherId,now){
@@ -1227,7 +1229,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       item.serverTime=iso;
       // Landing pages (P-58): eligibility follows the panel switch; first purchase and repurchase end in under six days.
       item.eligibility={eligible:'ESTIMATE_ELIGIBLE','sign-in':'SIGN_IN_REQUIRED',ineligible:'INELIGIBLE',unknown:'UNKNOWN'}[state.promotionEligibility]||'ESTIMATE_ELIGIBLE';
-      if(i>0)item.endsAt=new Date(now+6*day-19*60000).toISOString();
+      if(i>0)item.endsAt=promotionEndsAt;
       if(i===0){
         const window=demoH4PromotionWindow(state,now);
         Object.assign(item,{state:window.state==='ongoing'?'ACTIVE':window.state==='upcoming'?'SCHEDULED':'ENDED',
@@ -1245,9 +1247,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:{...structuredClone(item.rewardRules[0].buyerReward.disclosure),benefitDescription:{zh:'领取 50 UVT',en:'Receive 50 UVT',vi:'Nhận 50 UVT'}}};
       }
       if(i>0){
-        if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
+        if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=endedPromotionEndsAt;}
         // Boundary scenarios flip on the clock, one minute after the switch.
-        const edge=(state.promotionTimingAt||now)+60000;
+        const edge=(state.promotionTimingAt??demoStartedAt)+60000;
         if(state.promotionTiming==='starting'){item.startsAt=new Date(edge).toISOString();item.state=now<edge?'SCHEDULED':'ACTIVE';}
         else if(state.promotionTiming==='ending'){item.endsAt=new Date(edge).toISOString();item.state=now<edge?'ACTIVE':'ENDED';}
       }
