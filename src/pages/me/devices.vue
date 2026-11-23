@@ -460,7 +460,7 @@ function goStore() {
 .device-inventory-section { margin-top: var(--ui-space-section-gap, 32px); min-width: 0; }
 .device-inventory-section__head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; margin-bottom: 12px; }
 .device-inventory-section__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
-.device-inventory-section__count { color: var(--v5-ink-3); font: 500 13px/18px var(--font-metric); }
+.device-inventory-section__count { color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .device-inventory-list { display: flex; flex-direction: column; gap: 12px; }
 .device-inventory-warn { display: flex; align-items: center; gap: 6px; margin: 10px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .device-inventory-connections:empty { display: none; }

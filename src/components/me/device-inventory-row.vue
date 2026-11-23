@@ -216,7 +216,8 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__today-box { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 /* Field names (今日、当前作业) use the auxiliary-figure role; the job title beside them the list-subtitle role (10 §10.1). */
 .device-inventory-row__label { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
-.device-inventory-row__today { color: var(--v5-success-ink); font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric, var(--font-jet-mono)); white-space: nowrap; }
+/* Today's earnings are the card's own main amount: card-figure role, Montserrat (10 §10.1 卡内主数值, 01 §1.2). */
+.device-inventory-row__today { color: var(--v5-success-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .device-inventory-row__task { margin-top: 12px; padding: 12px; border-radius: var(--v5-radius-s); background: var(--v5-surface-2); }
 .device-inventory-row__task-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .device-inventory-row__eq { display: flex; align-items: flex-end; gap: 2px; width: 12px; height: 12px; flex: none; }
