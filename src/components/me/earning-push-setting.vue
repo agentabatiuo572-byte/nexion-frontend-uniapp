@@ -67,6 +67,7 @@ async function choose(option: EarningPush) {
 // Arrow keys move focus between the rows; Enter or Space chooses (each choice is a save, so moving focus does not save).
 const groupId = `earning-push-options-${getCurrentInstance()?.uid}`;
 function moveFocus(index: number, step: number) {
+  if (typeof document === "undefined") return;
   const rows = document.querySelectorAll<HTMLElement>(`#${groupId} .earning-push-option`);
   rows[(index + step + OPTIONS.length) % OPTIONS.length]?.focus();
 }
