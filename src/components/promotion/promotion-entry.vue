@@ -15,7 +15,7 @@
       <view v-if="mode==='home'" class="entry-advert-target" role="button" :tabindex="active && index===activeIndex ? 0 : -1" :aria-hidden="!active || index!==activeIndex" :aria-label="localized(activity.title,locale.code)+' · '+t.promotion.browse" @click="active && navTo(offerHref(activity))" @keydown.enter.prevent="active && navTo(offerHref(activity))" @keydown.space.prevent="active && navTo(offerHref(activity))" />
       <CatalogMachineImage v-if="mode==='home'&&bannerUrl(activity)" :key="bannerKey(activity)" v-show="bannerReady(activity)" class="entry-artwork" v-bind="bannerImageProps(activity)" />
       <view v-if="mode==='home'&&!bannerReady(activity)&&promoSlots(activity).length" class="entry-product-art" aria-hidden="true"><CatalogMachineImage v-for="slot in promoSlots(activity)" :key="slot.role" :sku="slot.sku" :image-url="slot.imageUrl" :scope-key="activity.activityId+':'+slot.role" :refresh-key="catalogRefreshKey" :class="slot.role==='purchase' ? 'entry-main-image' : 'entry-gift-image'" /></view>
-      <text v-if="mode==='home'" class="entry-remaining">{{ homeRemaining(activity) }}</text>
+      <NxTag v-if="mode==='home'" class="entry-remaining" tone="warning" :label="homeRemaining(activity)" />
       <view v-if="mode==='events'&&!eventLanding(activity)&&activityKind(activity)!=='plain'" class="entry-event-art"><TeamArt :kind="activityArt(activity)" :size="activityKind(activity)==='spark'?88:144" /></view>
       <view v-if="mode==='home'" class="entry-copy">
         <template v-if="!bannerReady(activity)">
@@ -34,7 +34,7 @@
           <view v-for="rule in liveActivity(activity)?.rewardRules ?? []" :key="rule.ruleId" class="entry-benefit-row">
             <text v-if="buyerFigure(activity,rule)" class="entry-benefit entry-benefit--figure">{{ buyerFigure(activity,rule)?.amount }}<text class="entry-benefit__unit" :class="{ 'entry-benefit__unit--uvt': buyerFigure(activity,rule)?.unit==='UVT' }">{{ '\u00A0'+buyerFigure(activity,rule)?.unit }}</text></text>
             <text v-else class="entry-benefit">{{ partsText(activity,rule.buyerReward) }}</text>
-            <text v-if="activityKind(activity)==='spark' || rule.inviterReward" class="entry-condition">{{ [activityKind(activity)==='spark' ? t.promotion.rulePer+'\u00A0'+rule.minBuyQty : '', rule.inviterReward ? t.promotion.inviter+'\u00A0'+nbspUnit(partsText(activity,rule.inviterReward)) : ''].filter(Boolean).join(' · ') }}</text>
+            <text v-if="activityKind(activity)==='spark' || rule.inviterReward" class="entry-condition">{{ [activityKind(activity)==='spark' ? t.promotion.rulePer+'\u00A0'+rule.minBuyQty : '', rule.inviterReward ? t.promotion.inviter+'\u00A0'+partsText(activity,rule.inviterReward) : ''].filter(Boolean).join(' · ') }}</text>
           </view>
         </view>
         <text v-if="liveActivity(activity)?.eligibilityMessage" class="promotion-copy entry-eligibility">{{ localized(liveActivity(activity)?.eligibilityMessage,locale.code) }}</text>
@@ -165,16 +165,18 @@ function homeRewardSummary(activity:EntryPromotion) {
   if ('displayOnly' in activity) return activity.benefit;
   const reward=activity.rewardRules[0]?.buyerReward;
   if(!reward)return '';
-  return localized(reward.disclosure.benefitDescription,locale.code)
-    || rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName || (reward.type==='DEVICE'?publicName(reward.giftProductNo):null));
+  return keepUnits(localized(reward.disclosure.benefitDescription,locale.code)
+    || rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName || (reward.type==='DEVICE'?publicName(reward.giftProductNo):null)));
 }
 function homeRemaining(activity:EntryPromotion){return promotionRemaining(activity,t.value.promotion);}
 // Display only, written like the landing cards beside them (rewardParts: whole amounts without 「.00」). A UVT or USDT
 // reward splits into figure and muted unit; device gifts and order discounts stay one line of text.
 type RewardRule=PublicPromotion['rewardRules'][number];
-function partsText(activity:EntryPromotion,reward:RewardRule['buyerReward']){const live=liveActivity(activity);return live?rewardPartsText(rewardParts(live,reward),t.value.promotion):rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName);}
+function partsText(activity:EntryPromotion,reward:RewardRule['buyerReward']){const live=liveActivity(activity);return keepUnits(live?rewardPartsText(rewardParts(live,reward),t.value.promotion):rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName));}
 function buyerFigure(activity:EntryPromotion,rule:RewardRule){const live=liveActivity(activity);if(!live)return null;const parts=rewardParts(live,rule.buyerReward);return parts.asset==='UVT'||parts.asset==='USDT'?{amount:parts.amount,unit:parts.unit}:null;}
-function nbspUnit(text:string){return text.replace(/ (UVT|USDT)$/,'\u00A0$1');}
+// A number never parts from the unit or counter after it, nor from its 「×」 (06 §6.2): those joins become no-break
+// spaces; labels such as 「订单优惠 ·」 keep their ordinary space and may wrap before the amount.
+function keepUnits(text:string){return text.replace(/ × (?=\d)/g,'\u00A0×\u00A0').replace(/(\d) (?=\S)/g,'$1\u00A0');}
 function cycleOffer(delta:number){if(items.value.length)activeIndex.value=(activeIndex.value+delta+items.value.length)%items.value.length;}
 // Home offers rotate on their own; any change of offer (auto or tapped) restarts the countdown.
 let autoplayTimer:ReturnType<typeof setInterval>|null=null;
@@ -193,7 +195,7 @@ function landingCards(activity:EntryPromotion){
   if(!kind||!rule)return [];
   void app.accountKey;void app.accountBindingEpoch;
   const reward=rule.buyerReward,parts=rewardParts(activity,reward),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
-  return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:rewardPartsText(parts,t.value.promotion),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:activity.productImages?.[rule.productNo],giftSku,giftImage:giftSku?activity.productImages?.[giftSku]:undefined}];
+  return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:keepUnits(rewardPartsText(parts,t.value.promotion)),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:activity.productImages?.[rule.productNo],giftSku,giftImage:giftSku?activity.productImages?.[giftSku]:undefined}];
 }
 async function openTerms(activity:EntryPromotion){
   if (!('displayOnly' in activity)) {termsActivity.value=activity;return;}
@@ -295,8 +297,8 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-advert.entry-kind-gift .entry-benefit { margin-top: 4px; color: var(--v5-brand); font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); }
 .entry-home-deadline { position: relative; z-index: 2; align-self: flex-start; margin-top: auto; padding: 13px 0; margin-bottom: -13px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); white-space: nowrap; }
 .entry-home-deadline:focus-visible { outline: 2px solid var(--v5-brand); }
-.entry-remaining { position: absolute; top: 12px; right: 16px; z-index: 2; pointer-events: none; color: var(--v5-warning-ink); font: 500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); white-space: nowrap; }
-.entry-advert--banner .entry-remaining { padding:2px 7px;border-radius:6px;background:var(--v5-surface); }
+/* Remaining days: the shared warning tag the activity list uses (03 §3.8, 04.2), on the artwork as on the plain card. */
+.entry-remaining { position: absolute; top: 12px; right: 16px; z-index: 2; pointer-events: none; }
 .entry-advert--banner .entry-home-deadline { padding-inline:8px;border-radius:8px;background:var(--v5-surface);color:var(--v5-ink-2); }
 .entry-product-art { position: absolute; right: 0; width: 160px; inset-block: 0; pointer-events: none; }
 .entry-product-art::before { content: ''; position: absolute; right: 18px; bottom: 16px; width: 120px; height: 20px; background: radial-gradient(ellipse,rgba(200,242,90,.4),transparent 70%); }
