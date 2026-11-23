@@ -208,7 +208,7 @@ export function secondaryDemo(url,state,request,walletBills){
     if(state.fleetState==='earning-credit')state.notificationPreferences.earningPush??='DAILY';
     if(request.method()==='PATCH'){
       const patch=request.postDataJSON();
-      if('earningPush' in patch&&!['DAILY','HALF_HOURLY','OFF'].includes(patch.earningPush))
+      if('earningPush' in patch&&!['REALTIME','HALF_HOURLY','DAILY','OFF'].includes(patch.earningPush))
         throw Object.assign(new Error('NOTIFICATION_PREFERENCES_PATCH_INVALID'),{status:400});
       Object.assign(state.notificationPreferences,patch,{system:true});
     }

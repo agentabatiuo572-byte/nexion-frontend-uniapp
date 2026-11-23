@@ -156,7 +156,7 @@
 
     </view>
     <template #pageFixed>
-      <ReceiptModal :receipt="open" @close="open = null" />
+      <ReceiptModal :receipt="open" :title="remoteReceiptsMode ? earningCopy.receiptTitle : undefined" @close="open = null" />
     </template>
   </AppChassis>
 </template>
@@ -184,6 +184,9 @@ import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { remoteApiEnabled, sessionVault, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
+import { earningCreditCopy } from "@/i18n/earning-credit";
+import { uiLocale } from "@/i18n";
+import { useLocaleStore } from "@/store/locale";
 import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
 import { useApp } from "@/store/app";
 import { takeNavigationQuery } from "@/lib/route";
@@ -201,6 +204,9 @@ const PAGE_SIZE = 10;
 
 const t = useT();
 const computeCopy = useComputeV2Copy();
+const locale = useLocaleStore();
+// One receipt opened on this page is titled with the page's own name (收益凭证), whatever its execution mode.
+const earningCopy = computed(() => earningCreditCopy[uiLocale(locale.code)]);
 const app = useApp();
 const depositsStore = useDeposits();
 const receiptsPageFence = createReceiptsPageRequestFence(

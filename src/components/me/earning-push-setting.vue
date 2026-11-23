@@ -44,7 +44,7 @@ import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { toast } from "@/store/ui";
 import type { EarningPush } from "@/api/notification-preferences-api";
 
-const OPTIONS: EarningPush[] = ["DAILY", "HALF_HOURLY", "OFF"];
+const OPTIONS: EarningPush[] = ["REALTIME", "HALF_HOURLY", "DAILY", "OFF"];
 const t = useT();
 const locale = useLocaleStore();
 const copy = computed(() => earningCreditCopy[uiLocale(locale.code)]);

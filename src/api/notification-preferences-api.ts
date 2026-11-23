@@ -2,7 +2,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 
 export type NotificationPreferenceKey = "commission" | "team" | "staking" | "market" | "genesis" | "system";
-export type EarningPush = "DAILY" | "HALF_HOURLY" | "OFF";
+export type EarningPush = "REALTIME" | "HALF_HOURLY" | "DAILY" | "OFF";
 export type NotificationPreferences = Record<NotificationPreferenceKey, boolean> & { earningPush?: EarningPush };
 export type NotificationPreferencesPatch = Partial<NotificationPreferences>;
 
@@ -14,7 +14,7 @@ export interface NotificationPreferencesApi {
 const KEYS: NotificationPreferenceKey[] = ["commission", "team", "staking", "market", "genesis", "system"];
 
 function isEarningPush(value: unknown): value is EarningPush {
-  return value === "DAILY" || value === "HALF_HOURLY" || value === "OFF";
+  return value === "REALTIME" || value === "HALF_HOURLY" || value === "DAILY" || value === "OFF";
 }
 
 function parse(value: unknown): NotificationPreferences {
