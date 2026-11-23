@@ -41,6 +41,7 @@ function scopeAttr(scopeId: string | null | undefined): string {
   return scopeId && /^data-v-[\w-]+$/.test(scopeId) ? ` ${scopeId}=""` : "";
 }
 
-export function svgMarkup(attrs: Record<string, unknown>, children: VNode[], scopeId?: string | null): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg"${attrText(attrs)}${scopeAttr(scopeId)}>${childrenMarkup(children)}</svg>`;
+export function svgMarkup(attrs: Record<string, unknown>, children: VNode[], rootScopeIds: readonly string[] = []): string {
+  const rootScope = [...new Set(rootScopeIds)].map(scopeAttr).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg"${attrText(attrs)}${rootScope}>${childrenMarkup(children)}</svg>`;
 }
