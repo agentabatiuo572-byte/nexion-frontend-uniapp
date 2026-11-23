@@ -2,10 +2,12 @@ import type { PublicPromotion, PublicRewardSpec } from '@/api/promotion-contract
 import { parseServerTimestamp } from '@/api/server-time';
 import type { Messages } from '@/i18n/messages/en';
 import { fmt } from '@/i18n/format';
+import { landingCopy } from '@/i18n/promotion-landing';
+import { ambassadorCount } from '@/i18n/ambassador';
 import { sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
-import { productCatalogState } from '@/store/product-catalog';
-import { displayDeadline, localized, rewardAmount, rewardSummary } from './promotion-display';
+import { isProductCatalogDisplayCurrent, productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
+import { displayDeadline, localized, rewardAmount } from './promotion-display';
 
 /** Purchase offers with a dedicated landing page; other templates keep the store entry. */
 export type LandingKind = 'gift' | 'first' | 'repurchase';
@@ -29,23 +31,24 @@ function catalogReady(): boolean {
 export function landingProduct(sku: string) {
   return catalogReady() ? getProduct(sku) : undefined;
 }
-export function landingProductName(activity: PublicPromotion, sku: string): string {
+/** A signed-out read takes the public catalog name; without one it says "eligible device", never the internal SKU. */
+export function landingProductName(activity: PublicPromotion, sku: string, language?: string): string {
   const gift = activity.rewardRules.flatMap(rule => [rule.buyerReward, rule.inviterReward])
     .find(reward => reward?.type === 'DEVICE' && reward.giftProductNo === sku);
-  return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? sku;
+  const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products.find(product => product.id === sku) : undefined;
+  return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? display?.name ?? (language ? landingCopy(language).devicesTitle : sku);
 }
 
 // An order discount lowers the order total at checkout; it is never credited as a USDT reward.
 export type RewardParts = { amount: string; unit: string; asset: 'UVT' | 'USDT' | 'DEVICE' | 'DISCOUNT' };
 export function rewardParts(activity: PublicPromotion, reward: PublicRewardSpec): RewardParts {
   if (reward.type === 'DEVICE') return { amount: String(reward.quantity), unit: reward.disclosure.deviceName ?? landingProductName(activity, reward.giftProductNo), asset: 'DEVICE' };
-  // Whole amounts drop the ".00"; any other fraction stays as published.
-  const amount = rewardAmount(reward).replace(/\.00$/, '');
+  const amount = rewardAmount(reward);
   return reward.type === 'UVT' ? { amount, unit: 'UVT', asset: 'UVT' } : { amount, unit: 'USDT', asset: reward.type === 'DISCOUNT_USDT' ? 'DISCOUNT' : 'USDT' };
 }
 export function rewardPartsText(parts: RewardParts, copy: Pick<Messages['promotion'], 'orderDiscount'>): string {
   if (parts.asset === 'DEVICE') return `${parts.unit} × ${parts.amount}`;
-  return parts.asset === 'DISCOUNT' ? `${copy.orderDiscount} · ${parts.amount} ${parts.unit}` : `${parts.amount} ${parts.unit}`;
+  return parts.asset === 'DISCOUNT' ? `${copy.orderDiscount} · ${parts.amount}\u00a0${parts.unit}` : `${parts.amount}\u00a0${parts.unit}`;
 }
 
 /** Remaining days use the published clock of the same read, never the device date. */
@@ -86,11 +89,20 @@ export function promotionRepurchaseInterval(activity: PublicPromotion | null) {
 }
 
 /** Rule summaries and terms for the shared PromotionTerms sheet. */
-export function promotionTermsRules(activity: PublicPromotion, copy: Messages['promotion'], productName: (sku: string) => string) {
-  return activity.rewardRules.map(rule => {
+export function promotionTermsRules(activity: PublicPromotion, copy: Messages['promotion'], productName: (sku: string) => string, language: string) {
+  const landing = landingCopy(language);
+  const rules = activity.rewardRules.map(rule => {
     const rewards = [rule.buyerReward, rule.inviterReward].filter((reward): reward is NonNullable<typeof reward> => !!reward);
-    return { id: rule.ruleId, text: productName(rule.productNo) + ' · ' + copy.rulePer + ' ' + rule.minBuyQty + ' · ' + (rule.repeatMode === 'PER_GROUP' ? copy.perGroup : copy.oncePerOrder) + '\n' + rewards.map(reward => (reward.beneficiaryRole === 'BUYER' ? copy.buyer : copy.inviter) + ' · ' + rewardSummary(reward, copy, reward.disclosure.deviceName)).join(' / ') + '\n' + [rule.maxGroups.mode === 'LIMITED' ? fmt(copy.orderRewardLimit, { n: rule.maxGroups.value }) : '', rule.maxGroupsPerPerson.mode === 'LIMITED' ? fmt(copy.personRewardLimit, { n: rule.maxGroupsPerPerson.value }) : ''].filter(Boolean).join(' · ') };
+    return { id: rule.ruleId, text: productName(rule.productNo) + ' · ' + copy.rulePer + ' ' + rule.minBuyQty + ' · ' + (rule.repeatMode === 'PER_GROUP' ? copy.perGroup : copy.oncePerOrder) + '\n' + rewards.map(reward => (reward.beneficiaryRole === 'BUYER' ? copy.buyer : copy.inviter) + ' · ' + rewardPartsText(rewardParts(activity, reward), copy)).join(' / ') + '\n' + [rule.maxGroups.mode === 'LIMITED' ? ambassadorCount(landing.rewardLimitOrder, rule.maxGroups.value) : '', rule.maxGroupsPerPerson.mode === 'LIMITED' ? ambassadorCount(landing.rewardLimitPerson, rule.maxGroupsPerPerson.value) : ''].filter(Boolean).join(' · ') };
   });
+  return [...rules, ...firstPurchaseTermsRules(activity.firstPurchaseCondition, language)];
+}
+
+export function firstPurchaseTermsRules(condition: PublicPromotion['firstPurchaseCondition'], language: string) {
+  if (!condition) return [];
+  const landing = landingCopy(language);
+  const mode = condition.mode === 'FIRST_ELIGIBLE_UNIT' ? landing.firstPurchaseByUnit : landing.firstPurchaseByOrder;
+  return [{ id: 'first-purchase', prose: true, text: condition.restoreAfterRefund ? mode + '\n' + landing.firstPurchaseRefund : mode }];
 }
 export function promotionTermsText(activity: PublicPromotion, copy: Messages['promotion'], language: string): string {
   return [localized(activity.terms, language), copy.deadline + ' · ' + displayDeadline(activity.endsAt, language)].join('\n\n');

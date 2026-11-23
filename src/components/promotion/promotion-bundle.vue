@@ -50,7 +50,7 @@
     </view>
     <view v-if="activity" class="promotion-link bundle-link" role="button" tabindex="0" @click="termsOpen=true" @keydown.enter.prevent="termsOpen=true" @keydown.space.prevent="termsOpen=true"><text class="nx-after-chevron">{{ t.promotion.rulesLink }}</text></view>
     <view class="promotion-link bundle-link" role="button" tabindex="0" @click="navTo(promotionStoreHref(scopeId))" @keydown.enter.prevent="navTo(promotionStoreHref(scopeId))" @keydown.space.prevent="navTo(promotionStoreHref(scopeId))"><text class="nx-after-chevron">{{ t.promotion.buyMore }}</text></view>
-    <PromotionTerms :open="termsOpen" :title="localized(activity?.title,locale.code)" :terms="ruleTerms" :disclosures="promotionDisclosures(activity)" @close="termsOpen=false" />
+    <PromotionTerms :open="termsOpen" :title="localized(activity?.title,locale.code)" :terms="ruleTerms" :rules="firstPurchaseTermsRules(activity?.firstPurchaseCondition,locale.code)" :disclosures="promotionDisclosures(activity)" @close="termsOpen=false" />
     </template>
     <view v-if="scopeId" class="promotion-link bundle-link" role="button" tabindex="0" @click="clearScope" @keydown.enter.prevent="clearScope" @keydown.space.prevent="clearScope"><text class="nx-after-chevron">{{ activity?t.promotion.ordinary:t.promotion.allProducts }}</text></view>
     <!-- Keeps the last link clear of the page's bottom action tray (04 §4.0): an invisible copy of the tray's rows. -->
@@ -62,6 +62,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { firstPurchaseTermsRules } from '@/lib/promotion-landing';
 import NxIcon from "@/components/ui/nx-icon.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';

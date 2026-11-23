@@ -121,10 +121,11 @@
         </PromotionAction>
       </view>
     </NxSheet>
-    <PromotionTerms :open="termsOpen" :title="localized(promotion?.title,locale.code)" :terms="order ? '' : localized(promotion?.terms,locale.code)" :disclosures="disclosures" @close="termsOpen=false" />
+    <PromotionTerms :open="termsOpen" :title="localized(promotion?.title,locale.code)" :terms="order ? '' : localized(promotion?.terms,locale.code)" :rules="firstPurchaseTermsRules(checkoutFirstPurchaseCondition,locale.code)" :disclosures="disclosures" @close="termsOpen=false" />
   </view>
 </template>
 <script setup lang="ts">
+import { firstPurchaseTermsRules } from '@/lib/promotion-landing';
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -147,7 +148,7 @@ import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { OrderReceipt, PromotionItem } from '@/api/promotion-api';
 import { checkoutQuoteBlock, validatePromotionItems, type CheckoutQuoteBlock } from '@/api/promotion-api';
-import type { RewardDisclosure,Quote } from '@/api/promotion-contracts';
+import type { Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { useTradeinSheet } from '@/store/tradein-sheet';
@@ -164,7 +165,7 @@ import { acquireAccountCommandKey,readAccountRow,writeAccountRow } from '@/store
 import { registerCheckoutLeaveGuard } from '@/lib/promotion-leave-guard';
 import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadline-clock';
 import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
-import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
+import { promotionCheckoutHref, promotionStoreHref, type PromotionDisclosure } from '@/lib/promotion-entry';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
 import { onPurchaseRecordReleased, pendingOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
@@ -350,8 +351,19 @@ async function changeQuantity(productNo:string,delta:-1|1,event?:KeyboardEvent):
   selection.value=next;
   await loadQuote();
 }
-function disclosure(r:ExpectedReward):RewardDisclosure|null {const d=r.disclosure;return d&&[d.title,d.terms,d.refundTerms,d.benefitDescription].every(x=>x&&(['zh','en','vi'] as const).every(l=>typeof x[l]==='string'&&x[l].trim()))?d:null;}
-const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is RewardDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
+function disclosure(reward: ExpectedReward): PromotionDisclosure | null {
+  const d = reward.disclosure;
+  const complete = d && [d.title,d.terms,d.refundTerms,d.benefitDescription].every(
+    text => text && (['zh','en','vi'] as const).every(lang => typeof text[lang] === 'string' && text[lang].trim()),
+  );
+  return complete ? { ...d, role: reward.beneficiaryRole } : null;
+}
+const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is PromotionDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
+const checkoutFirstPurchaseCondition=computed(()=>{
+  const activity=promotion.value;
+  if(activity && activity.activityId===quote.value?.activityId && activity.version===quote.value.activityVersion)
+    return activity.firstPurchaseCondition;
+});
 const hasRewardTerms=computed(()=>auth.isAuthenticated&&!loading.value&&disclosures.value.length>0);
 // The compact gift row is only for a simple, eligible buyer gift before order
 // creation. Multiple rewards, inviter benefits and receipt states keep their
@@ -662,12 +674,16 @@ function recover(foreground=false):Promise<boolean>{
 async function readCheckout(foreground=false):Promise<boolean>{
   const generation=readGeneration;
   recoveryGeneration=generation;
+  const operation=session.record.pending?.operation;
+  const recoveringCreation=operation==='createOrder'||operation==='createBundle';
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
     &&!session.record.pending&&!unknown.value&&!recoveryReadFailed.value;
   try{
     if(!clockOnly)await session.recover();
     if(!readCurrent(generation))return false;
-    if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
+    if(recoveringCreation&&session.confirmed&&!session.record.pending&&session.record.order){
+      error.value='';activityConflict.value=false;
+    }else if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
     const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
