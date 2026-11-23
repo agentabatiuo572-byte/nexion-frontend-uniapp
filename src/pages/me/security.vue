@@ -97,13 +97,13 @@
             <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
           </NxIconTile>
           <view class="flex-1 min-w-0">
-            <view class="security-session-name" :style="rowLabelStyle">
+            <view class="security-session-name" :style="sessionLabelStyle">
               <text class="security-session-name__lead">{{ deviceNameParts(s)[0] }}</text>
               <view v-for="(part, k) in deviceNameParts(s).slice(1)" :key="k" class="security-session-name__tail"><text aria-hidden="true">·</text><text>{{ part }}</text></view>
             </view>
-            <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
+            <text class="block security-session-meta" :style="sessionMetaStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
-          <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
+          <NxTag v-if="s.current" tone="success" :label="t.security.sessionCurrent" />
           <view v-else class="grid place-items-center" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'"
             :style="revokeBtnStyle" role="button" :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled"
             :data-disabled-reason="sessionWriteUnavailableReason" :aria-label="withReadReason(`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`, remoteSecurityReadFailed)" @click="handleRevoke(s)">
@@ -246,6 +246,7 @@ import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import AccountDeletionReason from "@/components/me/account-deletion-reason.vue";
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
@@ -1628,6 +1629,21 @@ const rowSubStyle: CSSProperties = {
   lineHeight: "16px",
   color: "var(--v5-ink-3)",
 };
+// A device row is a content row, its name over a subtitle: list-title role at 500, the list-subtitle role 4px under it
+// (03 §3.5, 01 §1.3, 10.1). The settings rows above stay menu rows at 400.
+const sessionLabelStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "var(--ui-type-list-title)",
+  lineHeight: "var(--ui-type-list-title-lh)",
+  fontWeight: "var(--ui-type-list-title-weight)",
+  color: "var(--v5-ink)",
+};
+const sessionMetaStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "var(--ui-type-list-subtitle)",
+  lineHeight: "var(--ui-type-list-subtitle-lh)",
+  color: "var(--v5-ink-3)",
+};
 const passwordHintStyle: CSSProperties = { ...rowSubStyle, lineHeight: "16px", whiteSpace: "normal", overflowWrap: "break-word" };
 const chevronStyle: CSSProperties = { flexShrink: 0 };
 const footerStyle: CSSProperties = {
@@ -1734,14 +1750,6 @@ const toggleThumbStyle = computed<CSSProperties>(() => ({
   transform: `translateX(${displayTwoFactorEnabled.value ? 18 : 0}px)`,
   transition: "transform 200ms ease",
 }));
-const currentBadgeStyle: CSSProperties = {
-  flexShrink: 0,
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  lineHeight: "16px",
-  fontWeight: 400,
-  color: "var(--v5-success-ink)",
-};
 const revokeBtnStyle: CSSProperties = {
   width: "44px",
   height: "44px",
