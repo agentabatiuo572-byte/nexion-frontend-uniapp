@@ -360,7 +360,10 @@ function disclosure(reward: ExpectedReward): PromotionDisclosure | null {
 const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is PromotionDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
 const checkoutFirstPurchaseCondition=computed(()=>{
   const activity=promotion.value;
-  if(activity && activity.activityId===quote.value?.activityId && activity.version===quote.value.activityVersion)
+  const reward=order.value?.rewards?.[0];
+  const activityId=order.value?reward?.activityId:quote.value?.activityId;
+  const version=order.value?reward?.version:quote.value?.activityVersion;
+  if(activity && activity.activityId===activityId && activity.version===version)
     return activity.firstPurchaseCondition;
 });
 const hasRewardTerms=computed(()=>auth.isAuthenticated&&!loading.value&&disclosures.value.length>0);
@@ -416,6 +419,15 @@ async function run(action:()=>Promise<void>){
   finally{if(current()){writeBusy.value=false;revision.value++;updateClock();}}
 }
 let foregroundQuoteAt = -Infinity;
+function readCheckoutPromotion(activityId:string,generation:number,orderVersion?:number){
+  const sampledAt=readTrustedMonotonicNowMs();
+  void promotionApi.get(activityId,auth.isAuthenticated).then(value=>{
+    if(!readCurrent(generation)||value.activityId!==activityId)return;
+    const matches=orderVersion===undefined?value.state==='ACTIVE':value.version===orderVersion;
+    promotion.value=matches?value:null;
+    if(orderVersion===undefined){promotionReceivedAt=sampledAt;updateClock();}
+  }).catch(()=>{});
+}
 async function loadQuote(recheckCapacity=false,foreground=false){
   const block=quoteBlock.value;
   if(block&&block!=='unavailable'&&!(recheckCapacity&&block==='capacity'))return;
@@ -442,9 +454,7 @@ async function loadQuote(recheckCapacity=false,foreground=false){
       }
     }
     const sampledAt=readTrustedMonotonicNowMs();
-    if(!foreground&&props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
-      if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?value:null;promotionReceivedAt=sampledAt;updateClock();}
-    }).catch(()=>{});
+    if(!foreground&&props.activityId)readCheckoutPromotion(props.activityId,generation);
     try{
       const requestedItems=selection.value.map(item=>({...item}));
       let result:Quote;
@@ -685,6 +695,9 @@ async function readCheckout(foreground=false):Promise<boolean>{
     }else if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
+    const reward=order.value?.rewards?.[0];
+    if(reward&&(promotion.value?.activityId!==reward.activityId||promotion.value.version!==reward.version))
+      readCheckoutPromotion(reward.activityId,generation,reward.version);
     const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
     // If recovery was part of Back, let that navigation finish.
     if (!foreground && openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
