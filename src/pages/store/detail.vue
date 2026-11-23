@@ -114,48 +114,36 @@
           <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionDetailHref(id))"><text>{{ t.promotion.ordinary }}</text></view>
         </view>
 
-        <!-- Cloud Share daily estimates follow the selected quantity. -->
-        <view v-if="isShare" class="mx-4 mt-3 nx-glass-card share-returns">
-          <text class="share-returns__title">{{ t.bundle.estimatedDaily }}</text>
-          <text class="share-returns__description">{{ t.store.shareFlexibleDescription }}</text>
-          <view class="share-returns__metrics">
-            <view class="share-returns__row">
-              <text class="share-returns__currency">USDT</text>
-              <view v-if="shareDailyUsdt" class="share-returns__value font-mono-tabular">
-                <text>{{ shareDailyUsdt.min }}</text>
-                <text v-if="shareDailyUsdt.min !== shareDailyUsdt.max">– {{ shareDailyUsdt.max }}</text>
+        <!-- Estimated returns: every product uses the Cloud Share card (user 2026-11-23). Each figure shows the catalog's
+             range when it sends one and its single estimate otherwise; all follow the selected quantity. -->
+        <view v-if="isShare || !activityId" class="mx-4 mt-3 nx-glass-card detail-returns" data-testid="detail-returns">
+          <text class="detail-returns__title">{{ t.bundle.estimatedDaily }}</text>
+          <text v-if="isShare" class="detail-returns__description">{{ t.store.shareFlexibleDescription }}</text>
+          <view class="detail-returns__rows">
+            <view class="detail-returns__row">
+              <text class="detail-returns__label">USDT</text>
+              <view class="detail-returns__value detail-returns__value--key">
+                <text v-for="part in dailyUsdtParts ?? ['—']" :key="part">{{ part }}</text>
               </view>
-              <text v-else class="share-returns__unavailable">—</text>
             </view>
-            <view class="share-returns__row">
-              <text class="share-returns__currency">UVT</text>
-              <text class="share-returns__value font-mono-tabular">{{ shareDailyUvtText }}</text>
+            <view class="detail-returns__row">
+              <text class="detail-returns__label">UVT</text>
+              <view class="detail-returns__value">
+                <text v-for="part in dailyUvtParts ?? ['—']" :key="part">{{ part }}</text>
+              </view>
             </view>
-            <view v-if="shareDailyEstimate && product.monthlyEstimateUsdt != null" class="share-returns__row">
-              <text class="share-returns__currency">{{ t.store.detMonthly }}</text>
-              <text class="share-returns__value font-mono-tabular">{{ monthlyYieldText }} USDT</text>
+            <view class="detail-returns__row">
+              <text class="detail-returns__label">{{ t.store.detMonthly }}</text>
+              <view class="detail-returns__value">
+                <template v-if="monthlyUsdtParts">
+                  <text v-for="(part, index) in monthlyUsdtParts" :key="part">{{ part }}<text v-if="index === monthlyUsdtParts.length - 1" class="detail-returns__unit">{{ usdtUnitSuffix }}</text></text>
+                </template>
+                <text v-else>—</text>
+              </view>
             </view>
           </view>
-          <text class="share-returns__note">{{ t.store.shareDailyEstimateNote }}</text>
+          <text class="detail-returns__note">{{ isShare ? t.store.shareDailyEstimateNote : t.store.deviceDailyEstimateNote }}</text>
         </view>
-
-        <!-- === Section 4: ROI calc — qty stepper + 4-cell grid === -->
-        <template v-if="!isShare&&!activityId">
-          <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detEstReturns" :count="t.store.detEstReturnsMeta" /></view>
-          <view class="mx-4 nx-glass-card" :style="roiCardStyle">
-            <!-- Daily and monthly estimates from the current catalog; no cost-recovery estimate. -->
-            <view class="grid" style="grid-template-columns: 1fr 1fr">
-              <view :style="roiCellStyle(0)">
-                <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.bundle.estimatedDaily }}</text>
-                <text class="block tabular-nums" :style="roiValStyle('success')">${{ dailyYieldText }}</text>
-              </view>
-              <view :style="roiCellStyle(1)">
-                <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detMonthly }}</text>
-                <text class="block tabular-nums" :style="roiValStyle('success')">${{ monthlyYieldText }}</text>
-              </view>
-            </view>
-          </view>
-        </template>
 
         <!-- === Section 5: Hardware spec === -->
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detHardware" /></view>
@@ -225,7 +213,8 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
-import { productDailyEstimateRange } from "@/lib/product-estimates";
+import { productDailyEstimateRange, productDailyUvtRange } from "@/lib/product-estimates";
+import { estimateRangeParts } from "@/lib/estimate-display";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
@@ -546,18 +535,33 @@ const computePointsLine = computed(() => {
   return { before, value: formatComputePoints(points, locale.code).split(" ")[0], after };
 });
 const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0));
-const shareDailyEstimate = computed(() => product.value && isShare.value ? productDailyEstimateRange(product.value) : null);
-const shareDailyUsdt = computed(() => {
-  // Only the server's daily estimate; without one the row shows "—", never a figure derived from an annual rate.
-  const estimate = shareDailyEstimate.value;
-  return estimate ? {
-    min: formatAmount(estimate.low * qty.value),
-    max: formatAmount(estimate.high * qty.value),
-  } : null;
+// Estimates use the shared estimate format (estimate-display.ts): two significant figures, a range only when the
+// catalog sends one. Each range splits only at its dash and the monthly unit stays on the last figure (06 §6.2).
+// A Share without the server's daily range shows "—", never a figure derived from an annual rate.
+function rangeParts(low: number, high: number): string[] {
+  return estimateRangeParts(low, high).map((part, index) => index ? `–${part}` : part);
+}
+const usdtUnitSuffix = "\u00A0USDT";
+const dailyEstimate = computed(() => product.value ? productDailyEstimateRange(product.value) : null);
+const hasUsdtRange = computed(() => product.value?.dailyEstimateLowUsdt != null && product.value?.dailyEstimateHighUsdt != null);
+const dailyUsdtParts = computed(() => dailyEstimate.value
+  ? rangeParts(dailyEstimate.value.low * qty.value, dailyEstimate.value.high * qty.value) : null);
+// The server's range is monthly target × (1 ∓ band) ÷ 30, so × 30 gives the month back on the same basis;
+// a single estimate keeps the server's monthly figure.
+const monthlyUsdtParts = computed(() => {
+  const estimate = dailyEstimate.value;
+  if (!estimate) return null;
+  return hasUsdtRange.value
+    ? rangeParts(estimate.low * 30 * qty.value, estimate.high * 30 * qty.value)
+    : rangeParts(monthlyYield.value, monthlyYield.value);
 });
-const shareDailyUvtText = computed(() => formatPlainAmount((product.value?.dailyEarnNEX ?? 0) * qty.value, 6));
-const dailyYieldText = computed(() => formatAmount(dailyYield.value));
-const monthlyYieldText = computed(() => formatAmount(monthlyYield.value));
+const dailyUvtParts = computed(() => {
+  if (!product.value) return null;
+  const uvt = productDailyUvtRange(product.value);
+  return rangeParts(uvt.low * qty.value, uvt.high * qty.value);
+});
+const dailyEstimateLine = computed(() => dailyUsdtParts.value
+  ? fmt(t.value.store.detDailyEstimateLine, { n: dailyUsdtParts.value.join("") }) : undefined);
 const annualYieldText = computed(() => formatAmount(annualYield.value));
 const monthlyPctText = computed(() =>
   totalPrice.value > 0 ? ((monthlyYield.value / totalPrice.value) * 100).toFixed(1) : "0",
@@ -608,7 +612,7 @@ function publishStickyCTA() {
       if(!allowed){
         const warming = promotionStatus.value === 'loading' && canPreviewPromotion(activity.value) && !!activity.value?.productNos.includes(product.value.id);
         const label = warming ? activity.value?.eligibility === 'SIGN_IN_REQUIRED' ? t.value.promotion.signIn : t.value.store.cardBuyNow : t.value.promotion.unavailable;
-        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:warming ? isShare.value ? undefined : fmt(t.value.store.detDailyEstimateLine, { n: dailyYieldText.value }) : t.value.promotion.disabledNote,buttonLabel:label,disabled:true,showTabBar:false},stickyOwner);
+        sticky.show({href:'/pages/store/detail?id='+encodeURIComponent(product.value.id),amount:`${priceText.value}`,amountSubtext:warming ? dailyEstimateLine.value : t.value.promotion.disabledNote,buttonLabel:label,disabled:true,showTabBar:false},stickyOwner);
         return;
       }
       if(activity.value?.eligibility==='SIGN_IN_REQUIRED'){
@@ -670,13 +674,13 @@ function publishStickyCTA() {
       href: isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1 ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value,voucherContext.value) : `/pages/store/checkout?product=${product.value.id}`,
       quantity: { value:qty.value,min:1,max:maxQuantity.value,decrease:dec,increase:inc },
       amount: `${priceText.value}`,
-      amountSubtext: isShare.value ? undefined : fmt(t.value.store.detDailyEstimateLine, { n: dailyYieldText.value }),
+      amountSubtext: dailyEstimateLine.value,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
 }
 watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext],
   publishStickyCTA,
   { immediate: true },
 );
@@ -722,10 +726,6 @@ const multBadgeStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
   whiteSpace: "nowrap",
 };
-const roiCardStyle: CSSProperties = {
-  padding: "var(--v5-space-4)",
-  background: "var(--v5-surface)",
-};
 const stepperStyle: CSSProperties = {
   borderRadius: "999px",
   border: "1px solid var(--v5-border)",
@@ -751,25 +751,6 @@ const qtyNumStyle: CSSProperties = {
   color: "var(--v5-ink)",
   letterSpacing: "-0.014em",
 };
-function roiCellStyle(index: number): CSSProperties {
-  return {
-    padding: "14px 16px",
-    borderRight: index % 2 === 0 ? "1px solid color-mix(in srgb, var(--v5-border) 50%, transparent)" : "none",
-  };
-}
-const roiLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
-function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
-  const color =
-    tone === "success" ? "var(--v5-brand)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
-  return {
-    fontFamily: "var(--font-metric)",
-    fontSize: "var(--ui-type-metric-value)",
-    lineHeight: "var(--ui-type-metric-value-lh)",
-    fontWeight: "var(--ui-type-metric-value-weight)",
-    color,
-    marginTop: "4px",
-  };
-}
 const trustCardStyle: CSSProperties = { padding: "var(--v5-space-4)" };
 const mediaStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -830,20 +811,26 @@ const faqQStyle: CSSProperties = {
 .detail-sales-stat__value { font-size: var(--ui-type-metric-value); font-weight: var(--ui-type-metric-value-weight); line-height: var(--ui-type-metric-value-lh); overflow-wrap: break-word; }
 .detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
 .detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--ui-type-metric-value-lh) var(--font-v5); overflow-wrap: break-word; }
-.detail-sales-stat:only-child { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+/* A lone sales figure spans the row but keeps the figure-over-label stack of the two-column layout. */
+.detail-sales-stat:only-child { grid-column: 1 / -1; }
 .detail-compute-points { display: flex; align-items: flex-start; gap: 5px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .detail-compute-points svg { flex: none; margin-top: 2px; }
 .detail-compute-points__value { margin: 0 2px; color: var(--v5-ink-2); font-family: var(--font-metric); font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.share-returns { padding: var(--v5-space-5); }
-.share-returns__title { display: block; font: 600 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
-.share-returns__description { display: block; margin-top: var(--v5-space-1); font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }
-.share-returns__metrics { display: flex; flex-direction: column; gap: var(--v5-space-3); margin: var(--v5-space-5) 0; }
-.share-returns__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--v5-space-3); }
-.share-returns__currency { flex: none; font: 500 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-2); }
-.share-returns__value { display: flex; flex-wrap: wrap; justify-content: flex-end; column-gap: var(--v5-space-1); min-width: 0; font-size: var(--v5-type-card-title); font-weight: 600; line-height: var(--v5-type-card-title-lh); color: var(--v5-brand); text-align: right; }
-.share-returns__value text { white-space: nowrap; }
-.share-returns__unavailable { font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }
-.share-returns__note { display: block; padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); font: 400 var(--v5-type-caption)/var(--v5-type-caption-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* Estimated returns: content card, 16px inset (01 §1.3), role variables only (10 §10.1). Field names in supporting ink
+   (01 §1.1.1 rule 1); the daily USDT figure is the card's one brand figure (rule 4); figures in JetBrains Mono (01 §1.2). */
+.detail-returns { padding: var(--ui-space-inset); }
+.detail-returns__title { display: block; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.detail-returns__description { display: block; margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.detail-returns__rows { display: flex; flex-direction: column; gap: var(--v5-space-3); margin: var(--v5-space-4) 0; }
+.detail-returns__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--v5-space-3); }
+.detail-returns__label { flex: none; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.detail-returns__value { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; color: var(--v5-ink); text-align: right; font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
+/* A range breaks only at its dash, never inside a figure. */
+.detail-returns__value text { white-space: nowrap; }
+.detail-returns__value--key { color: var(--v5-brand); }
+/* A unit under a 30px figure takes the supporting-numeral role in supporting ink (01 §1.2). */
+.detail-returns__unit { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.detail-returns__note { display: block; padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 /* One outer corner clip; the catalog image and its pedestal keep their full size. */
 .detail-hero :deep(.detail-product-render) { border-radius:0 !important; }
 .detail-hero :deep(.detail-product-render > [aria-hidden]:not(:first-child)) {
