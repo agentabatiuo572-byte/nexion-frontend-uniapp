@@ -17,9 +17,9 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.exchange.title" />
-      <view v-if="remoteApiEnabled && exchangeAuthorityStatus !== 'ready'" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-ink-3)" role="status" aria-live="polite" :aria-busy="exchangeAuthorityStatus === 'loading' ? 'true' : 'false'">
+      <view v-if="exchangeAuthorityHint" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-ink-3)" role="status" aria-live="polite" :aria-busy="exchangeAuthorityStatus === 'loading' ? 'true' : 'false'">
         <text :style="exchangeAuthorityStatus === 'unavailable' ? { color: 'var(--v5-danger)' } : undefined">
-          {{ exchangeAuthorityStatus === "loading" ? t.wallet.loadingTransactions : t.exchange.remoteUnavailableClosed }}
+          {{ exchangeAuthorityHint }}
         </text>
       </view>
       <view v-else-if="exchangePaused" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)" role="status" aria-live="polite">
@@ -85,7 +85,7 @@
       </view>
 
       <!-- Error -->
-      <view v-if="overBalance || underMin || feeInvalid" :style="errorStyle">
+      <view v-if="exchangeSnapshotCurrent && (overBalance || underMin || feeInvalid)" :style="errorStyle">
         <text>{{ errorLabel }}</text>
       </view>
 
@@ -102,7 +102,7 @@
       <view class="ex-quota">
         <view class="ex-quota__top">
           <view class="ex-ring" role="img" :aria-label="`${t.exchange.yourDaily} ${quotaPctText}`" :style="{ '--ex-ring-offset': (163 * (1 - userCapPct / 100)).toFixed(1) }">
-            <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="ex-ring__trk" cx="30" cy="30" r="26" /><circle v-if="quotaKnown" class="ex-ring__val" cx="30" cy="30" r="26" /></svg>
+            <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="ex-ring__trk" cx="30" cy="30" r="26" /><circle v-if="exchangeSnapshotKnown" class="ex-ring__val" cx="30" cy="30" r="26" /></svg>
             <text class="ex-ring__b">{{ quotaPctText }}</text>
           </view>
           <view class="ex-quota__grow">
@@ -129,7 +129,7 @@
             <view class="flex items-center min-w-0" style="gap: 8px">
               <text class="font-mono-tabular truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ q.id }} · {{ q.direction === "nex2usdt" ? "UVT → USDT" : "USDT → UVT" }}</text>
               <view
-                v-if="remoteApiEnabled"
+                v-if="remoteApiEnabled && exchangeSnapshotCurrent"
                 class="shrink-0"
                 role="button"
                 tabindex="0"
@@ -146,7 +146,7 @@
       </view>
 
       <!-- History -->
-      <view v-if="!remoteApiEnabled || exchangeAuthorityStatus === 'ready'" class="ex-hist">
+      <view v-if="exchangeSnapshotKnown" class="ex-hist">
         <text class="ex-sec">{{ t.exchange.historyTitle }}</text>
         <EmptyState v-if="history.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
         <view v-else class="ex-rows">
@@ -224,12 +224,26 @@ const v3 = useExchangeV3();
 const remoteState = ref<ExchangeSnapshot | null>(null);
 const remoteError = ref<string | null>(null);
 const remoteSnapshotReceivedAt = ref(0);
-const exchangeAuthorityStatus = computed(() => remoteAuthorityStatus({
-  remoteApiEnabled,
-  hasSnapshot: remoteState.value !== null,
-  hasError: remoteError.value !== null,
-}));
-const exchangeSnapshotReady = computed(() => exchangeAuthorityStatus.value === "ready");
+const remoteSnapshotNeedsRefresh = ref(false);
+const exchangeSnapshotKnown = computed(() => !remoteApiEnabled || remoteState.value !== null);
+const exchangeAuthorityStatus = computed(() => {
+  if (remoteState.value) {
+    if (remoteError.value === "G2_REMOTE_AUTHORITY_UNAVAILABLE") return "stale";
+    if (remoteSnapshotNeedsRefresh.value) return "loading";
+  }
+  return remoteAuthorityStatus({
+    remoteApiEnabled,
+    hasSnapshot: remoteState.value !== null,
+    hasError: remoteError.value !== null,
+  });
+});
+const exchangeSnapshotCurrent = computed(() => exchangeAuthorityStatus.value === "ready");
+const exchangeAuthorityHint = computed(() => {
+  if (exchangeAuthorityStatus.value === "stale") return t.value.wallet.fundsStaleBody;
+  if (exchangeAuthorityStatus.value === "loading") return t.value.wallet.loadingTransactions;
+  if (exchangeAuthorityStatus.value === "unavailable") return t.value.exchange.remoteUnavailableClosed;
+  return "";
+});
 const pendingExchangeMutations = createExchangePendingMutationStore();
 const pendingExchangeRevision = ref(0);
 const pendingExchangeLeases = computed(() => {
@@ -286,6 +300,7 @@ const remoteFirstPagePending = ref(false);
 function commitRemoteSnapshot(snapshot: ExchangeSnapshot | null) {
   remoteSnapshotVersion += 1;
   remoteState.value = snapshot;
+  remoteSnapshotNeedsRefresh.value = false;
 }
 function invalidateRemoteReads() {
   remoteReadGeneration += 1;
@@ -326,8 +341,7 @@ async function syncRemoteState(
     return true;
   } catch {
     if (!current()) return false;
-    // Failure-close: local balances, rates, queues and history are not a remote fallback.
-    commitRemoteSnapshot(null);
+    // Retain the last accepted snapshot for display while the read recovers.
     remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
     throw new Error(remoteError.value);
   } finally {
@@ -336,6 +350,7 @@ async function syncRemoteState(
 }
 
 const canLoadMoreHistory = computed(() => remoteApiEnabled
+  && exchangeSnapshotCurrent.value
   && !remoteFirstPagePending.value
   && !!remoteState.value
   && remoteState.value.orders.length < remoteState.value.ordersPage.total);
@@ -383,7 +398,7 @@ async function cancelRemoteOrder(exchangeNo: string): Promise<"cancelled" | "unk
   if (!remoteApiEnabled) return "unknown";
   const scope = captureExchangeScope();
   const runScope = captureRuntimeRevision();
-  if (!remoteScopeCurrent(scope, runScope)) return "stale";
+  if (!remoteScopeCurrent(scope, runScope) || !exchangeSnapshotCurrent.value) return "stale";
   const current = remoteState.value?.orders.find((order) => order.exchangeNo === exchangeNo);
   if (!exchangeOrderCanCancel(current)) {
     toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(t.value.exchange.cancelNotAllowed));
@@ -535,8 +550,7 @@ onHide(() => {
   pendingRecoveryGeneration += 1;
   recoveringExchange.value = false;
   invalidateRemoteReads();
-  commitRemoteSnapshot(null);
-  remoteSnapshotReceivedAt.value = 0;
+  remoteSnapshotNeedsRefresh.value = remoteState.value !== null;
   if (rateTimer) clearInterval(rateTimer);
   if (agoTimer) clearInterval(agoTimer);
   rateTimer = null;
@@ -616,10 +630,10 @@ const remoteMinimumReady = computed(() => !remoteApiEnabled || (remoteState.valu
 // A readable snapshot is insufficient authority to submit: the platform can
 // explicitly pause swaps while retaining balances, history and queue recovery.
 const exchangeSubmissionAllowed = computed(() => !remoteApiEnabled
-  || (exchangeSnapshotReady.value && remoteState.value?.caps.swapEnabled === true
+  || (exchangeSnapshotCurrent.value && remoteState.value?.caps.swapEnabled === true
     && pendingExchangeLeases.value.length === 0));
 const exchangePaused = computed(() => remoteApiEnabled
-  && exchangeSnapshotReady.value && remoteState.value?.caps.swapEnabled === false);
+  && exchangeSnapshotCurrent.value && remoteState.value?.caps.swapEnabled === false);
 
 /**
  * 🔴 **账本精度 = 2 位,两个币种都是**:app.ts 的 creditBalance / debitBalance /
@@ -654,7 +668,7 @@ const remoteQuote = computed(() => {
 });
 const feeInvalid = computed(() => remoteApiEnabled && fromAmount.value > 0 && remoteState.value !== null && !remoteQuote.value);
 const toAmount = computed(() => remoteApiEnabled ? (remoteQuote.value?.toAmount ?? 0) : quoteTo(direction.value, fromAmount.value, rate.value));
-const overBalance = computed(() => exchangeSnapshotReady.value && fromAmount.value > fromBal.value);
+const overBalance = computed(() => exchangeSnapshotCurrent.value && fromAmount.value > fromBal.value);
 const underMin = computed(() => fromAmount.value > 0 && minFrom.value !== null && fromAmount.value < minFrom.value);
 const valid = computed(() => exchangeSubmissionAllowed.value
   && remoteMinimumReady.value && fromAmount.value > 0 && !overBalance.value && !underMin.value && !feeInvalid.value);
@@ -1002,29 +1016,28 @@ async function handleConfirm() {
 }
 
 // ── derived labels ──
-const minLabel = computed(() => exchangeSnapshotReady.value
+const minLabel = computed(() => exchangeSnapshotKnown.value
   ? t.value.exchange.minAmount.replace("{n}", minFrom.value === null ? "—" : formatAmount(minFrom.value)).replace("{sym}", platformDisplayText(fromSym.value))
   : t.value.exchange.remoteNotProvided);
-const fromBalLabel = computed(() => exchangeSnapshotReady.value
+const fromBalLabel = computed(() => exchangeSnapshotKnown.value
   ? formatAmount(fromBal.value).replace(/^-/, "−")
   : "-");
-const toAmountLabel = computed(() => !exchangeSnapshotReady.value || feeInvalid.value ? "—" : amtLabel(toAmount.value));
-const rateLabel = computed(() => exchangeSnapshotReady.value
+const toAmountLabel = computed(() => !exchangeSnapshotKnown.value || feeInvalid.value ? "—" : amtLabel(toAmount.value));
+const rateLabel = computed(() => exchangeSnapshotKnown.value
   ? t.value.exchange.rate.replace("{rate}", rate.value.toFixed(5))
   : "-");
-const updatedLabel = computed(() => exchangeSnapshotReady.value
+const updatedLabel = computed(() => exchangeSnapshotKnown.value
   ? t.value.exchange.rateLastUpdated.replace("{n}", String(secsAgo.value))
   : t.value.exchange.remoteNotProvided);
 // Rate freshness ring: the share of the 15 s refresh window still ahead (resets on every refresh).
-const rateFreshness = computed(() => exchangeSnapshotReady.value ? Math.max(0, 1 - Math.min(secsAgo.value, 15) / 15) : 0);
+const rateFreshness = computed(() => exchangeSnapshotKnown.value ? Math.max(0, 1 - Math.min(secsAgo.value, 15) / 15) : 0);
 // Receive amount anatomy: cents in ink-3; "—" stays whole.
 const toParts = computed<[string, string]>(() => {
   const text = toAmountLabel.value, at = text.lastIndexOf(".");
   return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
 });
 // Without a snapshot the used amount is unknown: the ring shows only its track, and text and name read "—".
-const quotaKnown = computed(() => !remoteApiEnabled || remoteState.value !== null);
-const quotaPctText = computed(() => quotaKnown.value ? `${userCapPct.value}%` : "—");
+const quotaPctText = computed(() => exchangeSnapshotKnown.value ? `${userCapPct.value}%` : "—");
 const userCapPct = computed(() => displayUserCap.value > 0 ? Math.min(100, Math.max(0, Math.round(displayUserUsed.value / displayUserCap.value * 100))) : 0);
 const errorLabel = computed(() =>
   overBalance.value
