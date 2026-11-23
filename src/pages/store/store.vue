@@ -11,7 +11,7 @@
           <image class="store-voucher-ticket__art" src="/static/img/home-glass-20260928/coupon.webp" mode="aspectFit" aria-hidden="true" />
         </LoopScope>
         <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" tinted />
-        <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :target="upgrade.target" />
+        <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :base-daily-range="upgradeBaseDailyRange" :target="upgrade.target" />
         <template v-if="!voucherContext.voucherId">
           <StoreHero :multiplier="upgrade?.multiplier ?? null" />
           <ClusterLadder :authority="yieldAuthority" :owned="ownedHardware" />
@@ -115,6 +115,7 @@ import StoreHero from "@/components/store/store-hero.vue";
 import ClusterLadder from "@/components/store/cluster-ladder.vue";
 import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
+import { productPublishedDailyUsdtRange } from "@/lib/product-estimates";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
 import { useApp } from "@/store/app";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -307,6 +308,13 @@ const upgrade = computed(() => storeUpgrade(unlockedProducts.value, ownedDevices
 const upgradeBaseImageUrl = computed(() => {
   const base = upgrade.value?.base;
   return base ? displayProducts.value.find(p => p.id === base.kind)?.imageUrl : undefined;
+});
+const upgradeBaseDailyRange = computed(() => {
+  const base = upgrade.value?.base;
+  if (!base) return null;
+  const sku = base.productCode?.toLowerCase() ?? base.kind;
+  const product = displayProducts.value.find(p => p.id.toLowerCase() === sku);
+  return product ? productPublishedDailyUsdtRange(product) : null;
 });
 const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentationClaimable : voucher.claimableVouchers).filter(offer => voucherSupportsSurface(offer, 'store')));
 const voucherOffers = computed(() => remoteApiEnabled
