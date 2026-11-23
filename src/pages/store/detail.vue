@@ -77,7 +77,7 @@
           </view>
 
           <view class="detail-summary relative">
-            <text class="detail-summary__name" :style="nameStyle">{{ product.name }}</text>
+            <text class="detail-summary__name">{{ product.name }}</text>
             <text class="detail-summary__tagline">{{ copy.tagline }}</text>
 
             <view class="detail-sales-proof">
@@ -714,13 +714,6 @@ const heroCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderColor: "var(--v5-border)",
 };
-const nameStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
-  letterSpacing: "-0.024em",
-  color: "var(--v5-ink)",
-};
 const multBadgeStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
@@ -823,7 +816,8 @@ const faqQStyle: CSSProperties = {
 <style src="@/components/promotion/promotion.css"></style>
 <style scoped>
 .detail-summary { padding: var(--v5-space-5); }
-.detail-summary__name { display: block; overflow-wrap: break-word; }
+/* The product name heads the detail hero: display-title role (10 §10.1, 26/34 600 at 390), -0.02em at 24px and up (01 §1.2). */
+.detail-summary__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-display-title-weight) var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-v5); letter-spacing: -0.02em; }
 .detail-summary__tagline { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-list-subtitle); line-height: var(--v5-type-body-s-lh); color: var(--v5-ink-3); }
 .detail-sales-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--v5-space-6); margin-top: var(--v5-space-5); }
 .detail-sales-stat { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }

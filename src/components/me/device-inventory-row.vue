@@ -208,13 +208,16 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__image { position: absolute; left: 0; top: 50%; display: block; width: 100px; height: 100px; transform: translateY(-56%); pointer-events: none; }
 .device-inventory-row__art--inactive .device-inventory-row__image { filter: grayscale(.85); opacity: .55; }
 .device-inventory-row__identity { min-width: 0; }
-.device-inventory-row__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+/* The card opens no device page (更多 only exists on active cards), so a long name wraps in full instead of being cut (03 §3.6.1). */
+.device-inventory-row__name { display: block; overflow-wrap: break-word; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .device-inventory-row__state { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .device-inventory-row__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); flex: none; }
-.device-inventory-row__status { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); overflow-wrap: break-word; }
+.device-inventory-row__status { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
 .device-inventory-row__today-box { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.device-inventory-row__label { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); white-space: nowrap; }
-.device-inventory-row__today { color: var(--v5-success-ink); font: 500 18px/24px var(--font-metric, var(--font-jet-mono)); white-space: nowrap; }
+/* Field names (今日、当前作业) use the auxiliary-figure role; the job title beside them the list-subtitle role (10 §10.1). */
+.device-inventory-row__label { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
+/* Today's earnings are the card's own main amount: card-figure role, Montserrat (10 §10.1 卡内主数值, 01 §1.2). */
+.device-inventory-row__today { color: var(--v5-success-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .device-inventory-row__task { margin-top: 12px; padding: 12px; border-radius: var(--v5-radius-s); background: var(--v5-surface-2); }
 .device-inventory-row__task-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .device-inventory-row__eq { display: flex; align-items: flex-end; gap: 2px; width: 12px; height: 12px; flex: none; }
@@ -222,16 +225,16 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__eq > view:nth-child(2) { animation-delay: -.3s; }
 .device-inventory-row__eq > view:nth-child(3) { animation-delay: -.6s; }
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .device-inventory-row__eq > view { animation-play-state: paused; }
-.device-inventory-row__task-name { flex: 1; min-width: 0; font: 500 13px/18px var(--font-v5); }
+.device-inventory-row__task-name { flex: 1; min-width: 0; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 /* The card opens no device detail, so the task name wraps in full; the label stays on the first line beside it. */
 .device-inventory-row__task-value { overflow-wrap: break-word; }
 .device-inventory-row__task-name .device-inventory-row__label { margin-right: 6px; }
-.device-inventory-row__pct { font: 500 12px/16px var(--font-metric, var(--font-jet-mono)); }
+.device-inventory-row__pct { font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric, var(--font-jet-mono)); }
 .device-inventory-row__bar { margin-top: 10px; }
 .device-inventory-row__fill { transition: width .6s linear; }
-.device-inventory-row__task--idle { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.device-inventory-row__task--idle { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .device-inventory-row__wait { width: 14px; height: 14px; flex: none; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed var(--v5-ink-3); }
-.device-inventory-row__pending { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
+.device-inventory-row__pending { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .device-inventory-row__pending svg { flex: none; margin-top: 3px; }
 /* The buttons never shrink (03 §3.6.1): when amounts and buttons do not fit on one line, the buttons wrap to the next line, right-aligned. */
 .device-inventory-row__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 12px; min-height: 44px; }

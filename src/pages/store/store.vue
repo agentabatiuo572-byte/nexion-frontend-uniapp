@@ -442,7 +442,6 @@ const goalFocusRetryStyle: CSSProperties = {
 .store-content { padding:12px 16px 16px; color:var(--v5-ink); }
 .store-content > * + * { margin-top:16px; }
 .store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); --nx-tint:var(--v5-brand); }
-.store-campaign :deep(.entry-label) { top:18px; left:18px; padding:0; border:0; background:transparent; color:var(--ui-lime-soft); font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .store-campaign :deep(.entry-title) { font-size:19px; line-height:25px; }
 .store-catalogue { margin-top:20px; }
 .store-catalogue :deep(.nx-section__heading) { padding:0 2px; }

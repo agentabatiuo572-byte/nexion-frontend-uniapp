@@ -46,7 +46,7 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 .device-bay__floor { position: absolute; left: 26%; right: 26%; bottom: 2%; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
 [data-theme="light"] .device-bay__floor { background: radial-gradient(closest-side, rgba(20,16,8,.20), transparent); }
 .device-bay:not(.device-bay--online) .device-bay__image { filter: grayscale(.7); opacity: .55; }
-.device-bay__name { position: relative; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; align-self: stretch; margin-top: auto; padding-top: 6px; overflow: hidden; text-align: center; white-space: normal; overflow-wrap: break-word; color: var(--v5-ink); font: 500 12px/16px var(--font-v5); }
+.device-bay__name { position: relative; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; align-self: stretch; margin-top: auto; padding-top: 6px; overflow: hidden; text-align: center; white-space: normal; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
 .device-bay__strip { position: absolute; left: 14px; right: 14px; bottom: 8px; height: 2px; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--v5-success) 22%, transparent); }
 .device-bay__strip > view { width: 36%; height: 100%; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--v5-success), transparent); animation: device-bay-flow 2.4s cubic-bezier(.45, 0, .55, 1) infinite; animation-delay: calc(var(--i, 0) * .3s); }
 [role="button"] { cursor: pointer; }
