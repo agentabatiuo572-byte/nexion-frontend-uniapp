@@ -27,7 +27,7 @@
       <view v-else-if="remoteTradeinRecoveryError" class="checkout-recovery-state nx-empty--page" role="status">
         <text>{{ t.tradein.recoveryChecking }}</text>
       </view>
-      <CheckoutResult ref="storeResult" v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" :order-no="orderId" payment-confirmed :state="checkoutResultState" :delivery="completedOrder?.deviceDelivery" :product-name="completedOrder?.productName ?? product?.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? null" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @support="contactResultSupport" @order="goTrack" />
+      <CheckoutResult ref="storeResult" v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" :order-no="orderId" payment-confirmed :state="checkoutResultState" :delivery="completedOrder?.deviceDelivery" :inventory-fallback-device-id="completedOrder?.status === 'inventory' ? completedOrder.deviceId : undefined" :product-name="completedOrder?.productName ?? product?.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? null" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @support="contactResultSupport" @order="goTrack" />
       <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
