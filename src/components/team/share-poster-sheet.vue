@@ -49,9 +49,7 @@
 
       <view class="ps-toggle" role="switch" tabindex="0" :aria-checked="showUsername" :aria-label="t.share.showUsername" @click="toggleUsername">
         <text class="ps-toggle__lb">{{ t.share.showUsername }}</text>
-        <view class="ps-sw active:opacity-70" :class="{ 'ps-sw--on': showUsername }" aria-hidden="true">
-          <view class="ps-sw__knob" />
-        </view>
+        <NxSwitch class="active:opacity-70" :checked="showUsername" />
       </view>
 
       <!-- 链接渠道(与渠道面板同一 intent 实现);保存 / 复制在底部固定操作区 -->
@@ -90,6 +88,7 @@
 import { formatDisplayDate, formatDisplayDateTime } from "@/lib/display-date";
 import LiquidGlass from '@/components/liquid-glass.vue';
 import NxButton from '@/components/ui/nx-button.vue';
+import NxSwitch from "@/components/ui/nx-switch.vue";
 import NxIcon from '@/components/ui/nx-icon.vue';
 import { useLocaleStore } from '@/store/locale';
 import { teamLogicCopy } from '@/i18n/team-logic-copy';
@@ -681,10 +680,6 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 .ps-toggle { display: flex; align-items: center; justify-content: space-between; margin: var(--ui-space-row-y) 18px 0; min-height: 44px; }
 /* A settings row: list title at the menu-row weight (03 §3.5, 10 §10.1). */
 .ps-toggle__lb { flex: 1; min-width: 0; overflow-wrap: break-word; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
-.ps-sw { flex: none; width: 44px; height: 26px; border-radius: 9999px; background: var(--v5-surface-3); position: relative; transition: background 0.18s; }
-.ps-sw--on { background: var(--v5-brand); }
-.ps-sw__knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 9999px; background: var(--v5-surface); transition: left 0.18s; }
-.ps-sw--on .ps-sw__knob { left: 21px; }
 .ps-chrow { margin: var(--ui-space-inset) 20px 0; }
 .ps-ch { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 58px; padding: var(--ui-space-row-y) 0; border-top: 1px solid var(--v5-border); color: var(--v5-ink); }
 .ps-ch--off { opacity: .5; cursor: default; }
@@ -694,5 +689,5 @@ const templateOptions = computed(() => availableTpls.value.map(item => ({ value:
 /* NxIcon renders a bare svg without this component's scope attribute, so the colour reaches it through the row. */
 .ps-ch :deep(.ps-ch__arrow) { flex: none; color: var(--v5-ink-4); }
 .ps-sheet [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .ps-sheet,.ps-skeleton::after { animation: none; } .ps-sw,.ps-sw__knob { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ps-sheet,.ps-skeleton::after { animation: none; } }
 </style>
