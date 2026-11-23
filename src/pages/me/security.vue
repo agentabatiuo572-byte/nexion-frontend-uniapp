@@ -80,7 +80,7 @@
       </view>
 
       <!-- ───── Active sessions ───── -->
-      <text class="block mx-4" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
+      <text class="block mx-4 security-section-head" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
       <view class="nx-glass-card mx-4" :style="[cardStyle, groupGap]">
         <view v-if="remoteApiEnabled && !securityPresentation" class="flex items-center" :style="rowStyle">
           <text :style="unavailableValueStyle">{{ unknownMark(remoteSecurityReadFailed) }}</text>
@@ -105,7 +105,7 @@
           <view v-else class="grid place-items-center" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'"
             :style="revokeBtnStyle" role="button" :tabindex="sessionWriteDisabled ? -1 : 0" :aria-disabled="sessionWriteDisabled"
             :data-disabled-reason="sessionWriteUnavailableReason" :aria-label="withReadReason(`${t.security.sessionRevoke} · ${sessionDeviceLabel(s)}`, remoteSecurityReadFailed)" @click="handleRevoke(s)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
         <view v-if="displaySessions.some(s => !s.current)" class="flex items-center justify-center transition-transform"
@@ -1615,10 +1615,12 @@ const rowBorderedStyle: CSSProperties = {
   padding: "9.5px 0",
   borderTop: "1px solid var(--v5-border)",
 };
+// Settings rows (password, 2FA, phone) are menu rows: list-title role at 400 (03 §3.5, 10.1).
 const rowLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  lineHeight: "20px",
+  fontSize: "var(--ui-type-list-title)",
+  lineHeight: "var(--ui-type-list-title-lh)",
+  fontWeight: 400,
   color: "var(--v5-ink)",
 };
 const rowSubStyle: CSSProperties = {
@@ -1672,17 +1674,16 @@ const unavailableValueStyle: CSSProperties = {
   fontSize: "15px",
   color: "var(--v5-ink-4)",
 };
-// Section label (de-card spec): 15/600/ink.
+// Section title role (03 §3.9, 10.1); its tracking is in .security-section-head (01 §1.2).
 const sectionHeadStyle: CSSProperties = {
   marginLeft: "var(--v5-space-5)",
   marginRight: "var(--v5-space-5)",
   marginTop: "var(--v5-space-8)",
   marginBottom: "var(--v5-space-3)",
   fontFamily: "var(--font-v5)",
-  fontSize: "17px",
-  lineHeight: "24px",
-  fontWeight: 600,
-  letterSpacing: "-0.012em",
+  fontSize: "var(--ui-type-section)",
+  lineHeight: "var(--ui-type-section-lh)",
+  fontWeight: "var(--ui-type-section-weight)",
   color: "var(--v5-ink)",
 };
 const pwdFormStyle: CSSProperties = {
@@ -1764,6 +1765,9 @@ const dangerLabelStyle: CSSProperties = {
 .security-phone { margin-top:0!important; border-radius:0 0 22px 22px!important; }
 .security-phone > view:first-child { margin-inline:-16px; padding-inline:16px!important; border-top:1px solid var(--v5-border); }
 .security-session-meta { font-family:var(--font-metric)!important; }
+/* 17–23px titles track -0.01em; Chinese takes none (01 §1.2). */
+.security-section-head { letter-spacing:-.01em; }
+.security-section-head:lang(zh) { letter-spacing:0; }
 /* A device row opens nothing, so its name is never cut (03 §3.6.1): the name's parts (model, system) wrap as units, a
    part longer than the line wraps between words, and the "·" travels with the part after it. When that part starts a
    new line, the 4px separator and its 4px gap fall into the 8px the name is shifted left by and clipped at, as on the
