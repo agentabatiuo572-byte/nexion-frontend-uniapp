@@ -70,7 +70,7 @@
       </view>
     </view>
     <view v-if="selectedTask" style="padding:12px;background:var(--v5-surface-2);border-radius:12px" data-compute-task-detail="true">
-      <view class="flex items-center justify-between"><text>{{ computeCopy.details }} #{{ visibility.mask(selectedTask.id) }}</text><view role="button" tabindex="0" @click="selectedTask = null" @keydown.enter.stop.prevent="selectedTask = null" @keydown.space.stop.prevent="selectedTask = null"><text>{{ computeCopy.close }}</text></view></view>
+      <view class="flex items-center justify-between"><text class="earn-task-detail__title">{{ computeCopy.details }} #{{ visibility.mask(selectedTask.id) }}</text><NxButton variant="text" size="small" :label="computeCopy.close" @click="closeTaskDetail" /></view>
       <TaskV2Status :task="selectedTask" />
       <view v-if="selectedTask.receiptNo && selectedTask.settlementStatus === 'POSTED'" role="button" tabindex="0" @click="openTaskReceipt(selectedTask, true)" @keydown.enter.stop.prevent="openTaskReceipt(selectedTask, true)" @keydown.space.stop.prevent="openTaskReceipt(selectedTask, true)"><text>{{ computeCopy.receipt }} #{{ visibility.mask(selectedTask.receiptNo) }}</text></view>
     </view>
@@ -91,7 +91,7 @@ import { useHomeDisplay } from "@/composables/use-home-display";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatTaskReward, taskRewardUnit } from "@/lib/task-reward-display";
 import { navTo } from "@/lib/route";
-import { computed, inject, onUnmounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { dateLocale } from "@/i18n/format";
@@ -106,6 +106,7 @@ import TaskV2Status from "@/components/earn/task-v2-status.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import ComputeSettlements from "@/components/earn/compute-settlements.vue";
 import NxTickNumber from "@/components/ui/nx-tick-number.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { networkPopulationBand } from "@/lib/platform-stats";
 import { useLocaleStore } from "@/store/locale";
 
@@ -116,6 +117,13 @@ const app = useApp();
 const t = useT();
 const computeCopy = useComputeV2Copy();
 const selectedTask = ref<CompletedTask | null>(null);
+// Closing the inline job detail hands focus back to the history row that opened it (03 §3.5 关闭后焦点归还).
+function closeTaskDetail() {
+  const id = selectedTask.value?.id;
+  selectedTask.value = null;
+  if (!id || typeof document === "undefined") return;
+  void nextTick(() => (document.querySelector(`.nx-earn-task-center [data-task-id="${CSS.escape(id)}"]`) as HTMLElement | null)?.focus());
+}
 const historyOpen = ref(false);
 const settlementsOpen = ref(false);
 const settlementsAvailable = ref(false);
@@ -262,6 +270,8 @@ function completedTime(ts: number): string {
 .earn-history-status { grid-column: 3; grid-row: 2; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: right; white-space: nowrap; }
 .earn-history-head { min-height: 16px; }
 .earn-history-unit { grid-column: 3; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; text-align: right; }
+/* Inline job detail: its heading is a list title (10 §10.1); 关闭 is a text button (03 §3.1). */
+.earn-task-detail__title { min-width: 0; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .earn-history-time { grid-column: 2; grid-row: 2; min-width: 0; white-space: nowrap; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .earn-history-document { grid-column: 4; grid-row: 1 / span 2; }
 </style>
