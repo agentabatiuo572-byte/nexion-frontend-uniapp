@@ -16,12 +16,8 @@
       </view>
       <text v-if="!policy && loading" class="status" role="status">{{ t.bankWithdrawal.loading }}</text>
       <text v-else-if="readFailed" class="status" role="status">{{ t.bankWithdrawal.recoveryUnavailable }}</text>
-      <!-- 全部网络关闭:页面中央一句结果 + 一个出口(03 §3.4),回到提现方式选择,银行卡提现可能仍可用 -->
-      <view v-else-if="policy && cards.length === 0" class="closed" role="status">
-        <view class="closed-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="m5.7 5.7 12.6 12.6" /></svg></view>
-        <text class="closed-title">{{ t.bankWithdrawal.usdtClosedTitle }}</text>
-        <NxButton class="closed-cta" variant="secondary" size="medium" :label="t.bankWithdrawal.otherMethodCta" @click="toMethods" />
-      </view>
+      <!-- 全部网络关闭:共享整页结果居中(03 §3.4、§3.5.2),一个出口回到提现方式选择,银行卡提现可能仍可用 -->
+      <EmptyState v-else-if="policy && cards.length === 0" kind="locked-or-no-permission" page role="status" :title="t.bankWithdrawal.usdtClosedTitle" :cta-label="t.bankWithdrawal.otherMethodCta" @cta="toMethods" />
       <text v-else-if="remoteApiEnabled && payout.readStatusFor(app.accountKey) === 'error'" class="status" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
       <view v-if="readFailed && !loading" class="reload" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
     </view>
@@ -34,7 +30,7 @@ import { computed, ref, watch } from "vue";
 import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import UsdtCoin from "@/components/ui/usdt-coin.vue";
-import NxButton from "@/components/ui/nx-button.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -116,10 +112,6 @@ function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/page
 .route-tag { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-v5); white-space: nowrap; }
 .route-to { color: var(--v5-ink); font: 500 13px/18px var(--font-metric); white-space: nowrap; }
 .route-to--empty { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); text-align: right; white-space: normal; overflow-wrap: break-word; }
-.closed { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 56vh; text-align: center; }
-.closed-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--v5-surface); color: var(--v5-ink-3); }
-.closed-title { margin-top: 12px; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.closed-cta { margin-top: 12px; }
 .status { display: block; margin: var(--v5-space-1) var(--v5-space-1) 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .reload { display: inline-flex; align-items: center; min-height: 44px; margin-left: var(--v5-space-1); color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .method[aria-disabled="true"] { opacity: .5; cursor: default; }
