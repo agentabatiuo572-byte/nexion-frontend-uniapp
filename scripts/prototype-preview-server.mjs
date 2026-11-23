@@ -215,6 +215,7 @@ const server=http.createServer(async(req,res)=>{
         if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
         if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
+        if(['normal','device-limit'].includes(update.registrationState))state.registrationState=update.registrationState;
         if(['none','overview','deletion','phone-policy','next-page'].includes(update.securityReadFailure))state.securityReadFailure=update.securityReadFailure;
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         const promotionBuyerChanged=state.promotionBuyer!==wasPromotionBuyer;
@@ -340,12 +341,13 @@ const server=http.createServer(async(req,res)=>{
       const modeledBankTopup=req.method==='POST'&&/^\/api\/app\/deposits\/vietqr\/intents(?:\/[^/]+\/cancel)?$/.test(url.pathname);
       const bankTopupEndpoint=/^\/api\/app\/(payments\/(config|fx-quote)|deposits\/vietqr\/(receipts|intents(?:\/[^/]+(?:\/cancel)?)?))$/.test(url.pathname);
       if(bankTopupEndpoint&&!(req.method==='GET'&&!url.pathname.endsWith('/cancel'))&&!modeledBankTopup)return sendJson(res,{code:405,message:'METHOD_NOT_ALLOWED',data:null});
+      const securityRevoke=req.method==='POST'&&/^\/api\/app\/security\/sessions\/(?:[^/]+\/revoke|revoke-others)$/.test(url.pathname);
       const realtimeTicket=req.method==='POST'&&url.pathname==='/api/app/support/realtime-ticket';
       const trialWrite=req.method==='POST'&&/^\/api\/trial\/(start|cancel|convert)$/.test(url.pathname);
       // AppStakingService.open refuses an unacknowledged risk disclosure before recording the command.
       if(req.method==='POST'&&url.pathname==='/api/stakes'&&state.stakingOpenState==='disclosure')return sendJson(res,{code:409,message:'RISK_DISCLOSURE_ACK_REQUIRED',data:null});
       const conversationDelete=req.method==='DELETE'&&/^\/api\/app\/support\/conversations\/DEMO-SUPPORT-\d+$/.test(url.pathname);
-      if(req.method!=='GET'&&!realtimeTicket&&!trialWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
+      if(req.method!=='GET'&&!securityRevoke&&!realtimeTicket&&!trialWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
       if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='error')
         return sendJson(res,{code:503,message:'TRIAL_STATE_UNAVAILABLE',data:null},503);
       if(req.method==='GET'&&url.pathname==='/api/notifications'&&url.searchParams.has('cursor')&&state.notificationPageState==='error')

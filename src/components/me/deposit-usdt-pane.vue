@@ -1,6 +1,6 @@
 <!--
   DepositUsdtPane — 充值页「USDT 链上」通道段(PAY-规格 [FEAT-PAY01] ⑤⑥)。
-  正式模式支持 BEP20 / ERC20 / TRC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
+  新充值可选 BEP20 / ERC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
   → 常驻错网络警示 → 指引/工单入口 → 最近入金
   列表(confirming n/N 实时进度 · credited / dust_hold / returned 态)。
   4 态:骨架(匹配形状)/ 空列表 / 断网 inline 重试;服务端报告未配置或已关闭的网络不显示。
@@ -14,9 +14,10 @@
           v-for="nw in visibleNets"
           :key="nw.id"
           :class="['nx-dep-net', `nx-dep-net-${nw.label.toLowerCase()}`, { 'nx-dep-net--on': net === nw.id }]"
-          role="radio" tabindex="0"
+          role="radio" :tabindex="net === nw.id ? 0 : -1"
           :aria-checked="net === nw.id"
           @click="pickNet(nw.id)" @keydown.enter.prevent="pickNet(nw.id)" @keydown.space.prevent="pickNet(nw.id)"
+          @keydown.up.prevent="moveNet(-1)" @keydown.left.prevent="moveNet(-1)" @keydown.down.prevent="moveNet(1)" @keydown.right.prevent="moveNet(1)"
         >
           <view class="nx-dep-net__nm">
             <text class="nx-dep-net__name">{{ nw.label }}</text>
@@ -79,7 +80,7 @@
           <!-- 费用/最低额/确认数 — 服务端或 deposits-core 常量单源 -->
           <view class="nx-dep-trio">
             <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">${{ formatAmount(minDeposit) }}</text></view>
-            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ formatAmount(feeUsdt) }} USDT</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ formatAmount(feeUsdt) + '\u00A0USDT' }}</text></view>
             <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
         </view>
@@ -91,6 +92,16 @@
         <text>{{ t.topupChrome.depositAddrNote }}</text>
       </view>
       <view v-if="activeNet" class="nx-dep-amount-note"><text>{{ t.topupChrome.amountAtSenderNote }}</text></view>
+
+      <!-- ── 没有开放的网络:说明暂未开放 + 一个出口(03 §3.4);最近入金照常显示 ── -->
+      <view v-if="channelClosed" class="nx-dep-closed" role="status">
+        <view class="grid place-items-center" :style="stateIconBoxStyle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m5.7 5.7 12.6 12.6" /></svg>
+        </view>
+        <text class="nx-dep-closed__t">{{ t.topupChrome.railsClosedTitle }}</text>
+        <NxButton v-if="bankAvailable" class="nx-dep-closed__cta" variant="secondary" size="medium" :label="t.topupChrome.useBankInstead" @click="emit('use-bank')" />
+        <NxButton v-else class="nx-dep-closed__cta" variant="secondary" size="medium" icon="arrow-right" :label="t.help.contactSupport" @click="goSupport" />
+      </view>
 
       <!-- ── 指引 / 工单入口 ── -->
       <view class="nx-dep-rows nx-dep-links">
@@ -106,48 +117,49 @@
         </view>
       </view>
 
-      <!-- ── 最近入金 ── -->
-      <view>
-        <text class="nx-dep-sec">{{ t.topupChrome.recentDeposits }}</text>
+    </template>
 
-        <view v-if="bankHistoryStatus === 'idle' || bankHistoryStatus === 'loading'" class="nx-dep-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
-        <view v-if="fundsServerEnabled && !chainHistoryLoaded && !chainHistoryFailed" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
-        <!-- A failed history read is unknown, not empty: a still placeholder that recovers on its own (03 §3.5.2). -->
-        <text v-if="historyUnknown" class="block" :style="historyUnknownStyle">—</text>
+    <!-- ── 最近入金 ── -->
+    <view>
+      <text class="nx-dep-sec">{{ t.topupChrome.recentDeposits }}</text>
 
-        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || (chainHistoryLoaded && !addressRefreshFailed))" class="flex flex-col items-center" style="padding: 26px 0 18px">
-          <view class="grid place-items-center" :style="stateIconBoxStyle">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
-          </view>
-          <view><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4)">{{ t.topupChrome.noDepositsYet }}</text></view>
+      <view v-if="bankHistoryStatus === 'idle' || bankHistoryStatus === 'loading'" class="nx-dep-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
+      <view v-if="fundsServerEnabled && !chainHistoryLoaded && !chainHistoryFailed" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
+      <!-- A failed history read is unknown, not empty: a still placeholder that recovers on its own (03 §3.5.2). -->
+      <text v-if="historyUnknown" class="block" :style="historyUnknownStyle">—</text>
+
+      <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || chainHistoryLoaded)" class="flex flex-col items-center" style="padding: 26px 0 18px">
+        <view class="grid place-items-center" :style="stateIconBoxStyle">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
         </view>
+        <view><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4)">{{ t.topupChrome.noDepositsYet }}</text></view>
+      </view>
 
-        <view v-else-if="sortedRecords.length > 0" class="nx-dep-rows">
-          <view
-            v-for="r in sortedRecords"
-            :key="r.depositId"
-            class="nx-dep-record-row"
-            :role="recordClickable(r) ? 'button' : undefined"
-            :tabindex="recordClickable(r) ? 0 : undefined"
-            v-on="recordRowOn(r)"
-          >
-            <NxIconTile :tone="r.status === 'credited' ? 'teal' : 'muted'" size="m">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7" /></svg>
-            </NxIconTile>
-            <view class="nx-dep-record-row__main">
-              <text class="nx-dep-record-row__title">{{ rowTitle(r) }}</text>
-              <view class="nx-dep-record-row__sub"><text class="nx-dep-record-row__net">{{ netShort(r.channel) }} · </text><NxCodeValue class="nx-dep-record-row__id" :value="r.depositId" :label="t.bills.detailRef" :copyable="!recordClickable(r)" /></view>
-              <view v-if="isInFlight(r) && r.requiredConfirmations != null" class="nx-dep-progress" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
-              <view v-if="noteText(r)"><text class="block" :style="noteStyle">{{ noteText(r) }}</text></view>
-            </view>
-            <view class="nx-dep-record-row__side">
-              <text class="nx-dep-record-row__amt" :style="rowAmtStyle(r)">{{ r.status === "credited" ? "+" : "" }}{{ rowAmount(r) }}</text>
-              <text v-if="stateText(r)" class="nx-dep-record-row__state" :style="stateTextStyle(r)">{{ stateText(r) }}</text>
-            </view>
+      <view v-else-if="sortedRecords.length > 0" class="nx-dep-rows">
+        <view
+          v-for="r in sortedRecords"
+          :key="r.depositId"
+          class="nx-dep-record-row"
+          :role="recordClickable(r) ? 'button' : undefined"
+          :tabindex="recordClickable(r) ? 0 : undefined"
+          v-on="recordRowOn(r)"
+        >
+          <NxIconTile :tone="r.status === 'credited' ? 'teal' : 'muted'" size="m">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7" /></svg>
+          </NxIconTile>
+          <view class="nx-dep-record-row__main">
+            <text class="nx-dep-record-row__title">{{ rowTitle(r) }}</text>
+            <view class="nx-dep-record-row__sub"><text class="nx-dep-record-row__net">{{ netShort(r.channel) }} · </text><NxCodeValue class="nx-dep-record-row__id" :value="r.depositId" :label="t.bills.detailRef" :copyable="!recordClickable(r)" /></view>
+            <view v-if="isInFlight(r)" class="nx-dep-progress nx-progress" role="progressbar" :aria-label="t.topupChrome.confirmationsLabel" aria-valuemin="0" :aria-valuemax="r.requiredConfirmations ?? undefined" :aria-valuenow="confirmPct(r) === null ? undefined : r.confirmations"><view v-viz-inview class="nx-progress__fill nx-viz-grow" :style="{ width: `${confirmPct(r) ?? 0}%` }" /></view>
+            <view v-if="noteText(r)"><text class="block" :style="noteStyle">{{ noteText(r) }}</text></view>
+          </view>
+          <view class="nx-dep-record-row__side">
+            <text class="nx-dep-record-row__amt" :style="rowAmtStyle(r)">{{ r.status === "credited" ? "+" : "" }}{{ rowAmount(r) }}</text>
+            <text v-if="stateText(r)" class="nx-dep-record-row__state" :style="stateTextStyle(r)">{{ stateText(r) }}</text>
           </view>
         </view>
       </view>
-    </template>
+    </view>
   </view>
 </template>
 
@@ -156,7 +168,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount as formatBaseAmount } from "@/lib/amount-display";
 import { exactDepositAmount, type CregisNetworkPolicy } from "@/api/cregis-deposit-api";
 const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 2);
-import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import { cregisDepositApi, fundsServerEnabled, sessionVault } from "@/api/runtime";
@@ -167,9 +179,11 @@ import { useAuth } from "@/store/auth";
 import { useT } from "@/i18n/use-t";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
+import { canSelectNewUsdtNetwork, isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { useDeposits } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import {
@@ -181,6 +195,9 @@ import {
 import type { ChainDepositChannel, DepositChannel, DepositRecord } from "@/store/types";
 
 const t = useT();
+// The page knows whether its bank channel is open; with no USDT network open, that is the way on.
+defineProps<{ bankAvailable?: boolean }>();
+const emit = defineEmits<{ (event: "use-bank"): void }>();
 const dep = useDeposits();
 const app = useApp();
 const auth = useAuth();
@@ -196,15 +213,12 @@ const remoteSessionReady = computed(() => {
 });
 
 // ── 网络 chip(标签为链名专有名词,非文案)──
-const NETWORKS: { id: ChainDepositChannel; label: string }[] = fundsServerEnabled ? [
+const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
   { id: "usdt-bep20", label: "BEP20" },
   { id: "usdt-erc20", label: "ERC20" },
   { id: "usdt-trc20", label: "TRC20" },
-] : [
-  { id: "usdt-trc20", label: "TRC20" },
-  { id: "usdt-bep20", label: "BEP20" },
-  { id: "usdt-erc20", label: "ERC20" },
 ];
+const NETWORKS = ALL_NETWORKS.filter((nw) => canSelectNewUsdtNetwork(nw.id));
 const CHANNEL_SHORT: Record<DepositChannel, string> = {
   "usdt-trc20": "TRC20",
   "usdt-bep20": "BEP20",
@@ -215,7 +229,7 @@ const CHANNEL_SHORT: Record<DepositChannel, string> = {
 /** confirming 超过 30 分钟未走满 → 「网络拥堵」提示([FEAT-PAY01] ② 异常3)。 */
 const CONFIRM_DELAY_NOTE_MS = 30 * 60 * 1000;
 
-const net = ref<ChainDepositChannel>(fundsServerEnabled ? "usdt-bep20" : "usdt-trc20");
+const net = ref<ChainDepositChannel>("usdt-bep20");
 // Policy is read without allocating addresses, including before the first selection.
 const networkPolicies = ref<CregisNetworkPolicy[]>([]);
 const visibleNets = computed(() => NETWORKS.filter((nw) => fundsServerEnabled
@@ -230,6 +244,9 @@ let loadGeneration = 0;
 let pageVisible = true;
 const requestRunning = ref(false);
 let nextPollAt = 0;
+let historyGeneration = 0;
+let nextHistoryPollAt = 0;
+const historyRunning = ref(false);
 function pollDelay(state: "preparing" | "ready"): number {
   if (state === "preparing") return 5_000 + Math.floor(Math.random() * 5_001);
   return 30_000 + Math.floor(Math.random() * 15_001);
@@ -258,6 +275,45 @@ async function refreshBankHistory(): Promise<void> {
   if (fundsServerEnabled && remoteSessionReady.value && dep.currentAccountKey() === app.accountKey
       && dep.remoteReceiptInitialStatus !== "loading") await dep.refreshRemoteVietQrDeposits();
 }
+async function refreshChainHistory(): Promise<void> {
+  if (!fundsServerEnabled || !remoteSessionReady.value || !pageVisible || historyRunning.value) return;
+  const generation = historyGeneration;
+  const current = () => generation === historyGeneration && remoteSessionReady.value && pageVisible;
+  historyRunning.value = true;
+  try {
+    const deposits = await cregisDepositApi.list();
+    if (!current()) return;
+    chainHistoryLoaded.value = true;
+    chainHistoryFailed.value = false;
+    serverRecords.value = deposits.filter(row => isVisibleUsdtNetwork(row.network)).map((row) => ({
+      depositId: row.depositId, channel: row.network === "ERC20" ? "usdt-erc20" : "usdt-bep20", txHash: row.txHash,
+      address: row.address, grossAmountUsdt: row.grossAmountUsdt,
+      grossExact: exactDepositAmount(row.grossAmountUsdt, row.grossAmountUsdtExact),
+      creditedExact: exactDepositAmount(row.creditedUsdt, row.creditedUsdtExact),
+      feeUsdt: row.creditedUsdt > 0 ? row.grossAmountUsdt - row.creditedUsdt : 0,
+      creditedUsdt: row.creditedUsdt,
+      confirmations: row.confirmations, requiredConfirmations: row.requiredConfirmations ?? undefined,
+      reviewHold: row.status === "REVIEW_HOLD",
+      status: row.status === "CREDITED" ? "credited"
+        : row.status === "REORG_INVESTIGATING" ? "reorg_investigating"
+        : row.status === "PROVIDER_CONFLICT_HOLD" ? "provider_conflict_hold"
+        : row.status === "REFUNDED" ? "returned"
+        : row.status === "REORG_REVERSED" ? "reorg_reversed"
+        : row.status === "CONFIRMING" ? "confirming" : "dust_hold",
+      createdAt: row.createdAt, creditedAt: row.creditedAt ?? undefined,
+    }));
+    nextHistoryPollAt = Date.now() + pollDelay("ready");
+  } catch (cause) {
+    if (!current()) return;
+    if (!isTransientReadFailure(cause)) {
+      chainHistoryLoaded.value = false;
+      serverRecords.value = [];
+    }
+    chainHistoryFailed.value = true;
+  } finally {
+    if (current()) historyRunning.value = false;
+  }
+}
 async function load(background = false): Promise<void> {
   if (fundsServerEnabled && (!remoteSessionReady.value || !pageVisible)) return;
   if (background && requestRunning.value) return;
@@ -265,7 +321,6 @@ async function load(background = false): Promise<void> {
   if (!background) phase.value = "loading";
   if (loadTimer) clearTimeout(loadTimer);
   if (fundsServerEnabled) {
-    if (!background) refreshBankHistory();
     const generation = ++loadGeneration;
     requestRunning.value = true;
     nextPollAt = Number.POSITIVE_INFINITY;
@@ -299,46 +354,6 @@ async function load(background = false): Promise<void> {
         serverCreditEnabled.value = snapshot?.creditEnabled === true;
         serverAddress.value = snapshot?.enabled ? snapshot.address ?? "" : "";
         phase.value = snapshot?.reason === "CREGIS_ADDRESS_PREPARING" && !snapshot.enabled ? "preparing" : "ready";
-        if (phase.value === "preparing") {
-          nextPollAt = Date.now() + pollDelay(phase.value);
-          return;
-        }
-        let deposits;
-        try {
-          deposits = await cregisDepositApi.list();
-        } catch (cause) {
-          if (generation === loadGeneration && account === app.accountKey
-              && bindingEpoch === app.accountBindingEpoch && remoteSessionReady.value) {
-            if (!isTransientReadFailure(cause)) {
-              chainHistoryLoaded.value = false;
-              serverRecords.value = [];
-            }
-            chainHistoryFailed.value = true;
-          }
-          return;
-        }
-        if (generation !== loadGeneration || account !== app.accountKey
-            || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
-        chainHistoryLoaded.value = true;
-        chainHistoryFailed.value = false;
-        serverRecords.value = deposits.map((row) => ({
-          depositId: row.depositId, channel: row.network === "TRC20" ? "usdt-trc20" : row.network === "ERC20" ? "usdt-erc20" : "usdt-bep20", txHash: row.txHash,
-          address: row.address, grossAmountUsdt: row.grossAmountUsdt,
-          grossExact: exactDepositAmount(row.grossAmountUsdt, row.grossAmountUsdtExact),
-          creditedExact: exactDepositAmount(row.creditedUsdt, row.creditedUsdtExact),
-          feeUsdt: row.creditedUsdt > 0 ? row.grossAmountUsdt - row.creditedUsdt : 0,
-          creditedUsdt: row.creditedUsdt,
-          confirmations: row.confirmations, requiredConfirmations: row.requiredConfirmations ?? undefined,
-          reviewHold: row.status === "REVIEW_HOLD",
-          status: row.status === "CREDITED" ? "credited"
-            : row.status === "REORG_INVESTIGATING" ? "reorg_investigating"
-            : row.status === "PROVIDER_CONFLICT_HOLD" ? "provider_conflict_hold"
-            : row.status === "REFUNDED" ? "returned"
-            : row.status === "REORG_REVERSED" ? "reorg_reversed"
-            : row.status === "CONFIRMING" ? "confirming" : "dust_hold",
-          createdAt: row.createdAt, creditedAt: row.creditedAt ?? undefined,
-        }));
-        phase.value = "ready";
         nextPollAt = Date.now() + pollDelay(phase.value);
       } catch {
         if (generation === loadGeneration && account === app.accountKey
@@ -365,10 +380,15 @@ async function load(background = false): Promise<void> {
 useAutoRecovery({
   // The regular poll resumes after a successful read. Recovery owns failed reads.
   failed: () => fundsServerEnabled && remoteSessionReady.value && !requestRunning.value
-    && (phase.value === "error" || (phase.value === "ready" && (addressRefreshFailed.value || chainHistoryFailed.value))),
+    && (phase.value === "error" || addressRefreshFailed.value),
   retry: () => refresh(true),
   repeatMs: 30_000,
   quiet: false,
+});
+useAutoRecovery({
+  failed: () => fundsServerEnabled && remoteSessionReady.value && !historyRunning.value && chainHistoryFailed.value,
+  retry: refreshChainHistory,
+  repeatMs: 30_000,
 });
 useAutoRecovery({
   failed: () => fundsServerEnabled && remoteSessionReady.value && dep.remoteReceiptInitialStatus === "error",
@@ -377,6 +397,8 @@ useAutoRecovery({
 watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch], ([ready]) => {
   if (!fundsServerEnabled) return;
   loadGeneration++;
+  historyGeneration++;
+  historyRunning.value = false;
   serverAddress.value = "";
   serverEnabled.value = false;
   serverCreditEnabled.value = false;
@@ -387,20 +409,32 @@ watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch],
   addressRefreshFailed.value = false;
   copied.value = false;
   phase.value = "loading";
-  if (ready) load();
+  if (ready) { void load(); void refreshChainHistory(); void refreshBankHistory(); }
 }, { immediate: true, flush: "sync" });
 onMounted(() => {
   if (!fundsServerEnabled) load();
   if (fundsServerEnabled) pollTimer = setInterval(() => {
     if (!pageVisible || (typeof document !== "undefined" && document.hidden)) return;
-    if (phase.value !== "loading" && Date.now() >= nextPollAt) void load(true);
+    const now = Date.now();
+    if (phase.value !== "loading" && now >= nextPollAt) void load(true);
+    if (!chainHistoryFailed.value && now >= nextHistoryPollAt) void refreshChainHistory();
   }, 1_000);
 });
-onShow(() => { pageVisible = true; if (fundsServerEnabled) refresh(true); });
-onHide(() => { pageVisible = false; loadGeneration++; requestRunning.value = false; });
+onShow(() => {
+  pageVisible = true;
+  if (fundsServerEnabled) { void refresh(true); void refreshChainHistory(); void refreshBankHistory(); }
+});
+onHide(() => {
+  pageVisible = false;
+  loadGeneration++;
+  historyGeneration++;
+  requestRunning.value = false;
+  historyRunning.value = false;
+});
 onUnmounted(() => {
   pageVisible = false;
   loadGeneration++;
+  historyGeneration++;
   if (loadTimer) clearTimeout(loadTimer);
   if (pollTimer) clearInterval(pollTimer);
 });
@@ -416,6 +450,8 @@ const activeNet = computed<ChainDepositChannel | null>(() => {
   const fallback = NETWORKS.find((n) => isEnabled(n.id));
   return fallback ? fallback.id : null;
 });
+// The policy was read and opens no network for new deposits.
+const channelClosed = computed(() => phase.value === "ready" && !addressRefreshFailed.value && visibleNets.value.length === 0);
 const activeLabel = computed(() => (activeNet.value ? CHANNEL_SHORT[activeNet.value] : ""));
 function pickNet(id: ChainDepositChannel) {
   if (id === net.value || !visibleNets.value.some((nw) => nw.id === id)) return;
@@ -425,6 +461,17 @@ function pickNet(id: ChainDepositChannel) {
     minDeposit.value = null; feeUsdt.value = null; addressRefreshFailed.value = false;
     load();
   }
+}
+
+// Arrow keys move the choice through the group and keep focus on it, as in the address and payment pickers.
+function moveNet(delta: number) {
+  const list = visibleNets.value;
+  const next = list[(list.findIndex((nw) => nw.id === net.value) + delta + list.length) % list.length];
+  if (!next) return;
+  pickNet(next.id);
+  void nextTick(() => {
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>('.nx-dep-net[tabindex="0"]')?.focus();
+  });
 }
 
 // ── 专属地址(同账号同网络恒定;中段省略防溢出,复制取全量)──
@@ -476,7 +523,7 @@ const bankHistoryStatus = computed(() => {
   return remoteSessionReady.value && dep.currentAccountKey() === app.accountKey ? status : "idle";
 });
 const sortedRecords = computed(() => {
-  if (!fundsServerEnabled) return [...dep.records].sort((a, b) => b.createdAt - a.createdAt);
+  if (!fundsServerEnabled) return dep.records.filter(row => isVisibleUsdtNetwork(row.channel)).sort((a, b) => b.createdAt - a.createdAt);
   if (!remoteSessionReady.value) return [];
   const bankRecords = dep.records;
   return [...serverRecords.value, ...(dep.currentAccountKey() === app.accountKey
@@ -523,7 +570,7 @@ function stateText(r: PaneDepositRecord): string {
   if (r.status === "credited") return tc.depositCredited;
   if (r.status === "returned") return tc.depositReturned;
   if (isInFlight(r)) {
-    return fmt(tc.confirmingProgress, { n: r.confirmations ?? 0, total: r.requiredConfirmations ?? "-" });
+    return fmt(tc.confirmingProgress, { n: r.confirmations ?? "—", total: r.requiredConfirmations ?? "—" });
   }
   return ""; // dust_hold:右侧留空,整句人工处理说明走 note 行
 }
@@ -591,23 +638,10 @@ function stateTextStyle(r: PaneDepositRecord): CSSProperties {
     color: isRiskHold(r) ? "var(--v5-warning)" : r.status === "credited" ? "var(--v5-success-ink)" : ["returned", "reorg_reversed"].includes(r.status) ? "var(--v5-ink-4)" : "var(--v5-ink-3)",
   };
 }
-const progTrackStyle: CSSProperties = {
-  height: "4px",
-  marginTop: "8px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-3)",
-  overflow: "hidden",
-};
-function progFillStyle(r: PaneDepositRecord): CSSProperties {
-  const total = Math.max(1, r.requiredConfirmations ?? 1);
-  const pct = Math.max(4, Math.round(((r.confirmations ?? 0) / total) * 100));
-  return {
-    height: "100%",
-    width: `${Math.min(100, pct)}%`,
-    borderRadius: "999px",
-    background: "var(--v5-brand)",
-    transition: "width 0.4s ease",
-  };
+// Confirmations as reported by the API: 0 leaves the empty track, unknown draws no fill (03 §3.6).
+function confirmPct(r: PaneDepositRecord): number | null {
+  if (r.confirmations == null || !r.requiredConfirmations) return null;
+  return Math.min(100, Math.round((r.confirmations / r.requiredConfirmations) * 100));
 }
 const historyUnknownStyle: CSSProperties = { marginTop: "8px", padding: "18px 0", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
 const noteStyle: CSSProperties = {
@@ -640,7 +674,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
 .nx-dep-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
-.nx-dep-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.nx-dep-net__name { color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .nx-dep-net--on .nx-dep-net__name { color: var(--v5-brand); }
 .nx-dep-net__sub { min-width: 0; overflow: hidden; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); text-overflow: ellipsis; white-space: nowrap; }
 .nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
@@ -648,7 +682,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-net--on .nx-dep-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
 .nx-dep-ticket { position: relative; margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-ticket__top { padding: 20px 20px 18px; text-align: center; }
-.nx-dep-via { display: inline-flex; color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); letter-spacing: .04em; }
+.nx-dep-via { display: inline-flex; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-dep-qr-box { width: 184px; height: 184px; margin: 14px auto 0; padding: 10px; box-sizing: border-box; border-radius: 18px; background: #FFFFFF; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: nx-viz-pop 420ms cubic-bezier(.2,1.4,.4,1) 260ms both; }
 .nx-dep-qr-image { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .nx-dep-scan { display: block; margin-top: 12px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
@@ -676,6 +710,11 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-link + .nx-dep-link, .nx-dep-record-row + .nx-dep-record-row { border-top: 1px solid var(--v5-border); }
 .nx-dep-link > svg, .nx-dep-link > .nx-native-svg { flex: none; color: var(--v5-ink-4); }
 .nx-dep-link:active { opacity: .7; }
+.nx-dep-closed { display: flex; flex-direction: column; align-items: center; padding: 32px 0 8px; text-align: center; }
+.nx-dep-closed__t { margin-top: 12px; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
+.nx-dep-closed__cta { margin-top: 12px; }
+.nx-dep-progress { margin-top: 8px; }
+.nx-dep-progress .nx-progress__fill { transition: width 400ms ease; }
 .nx-dep-sec { display: block; margin: 32px 2px 12px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
 .nx-dep-sec + view > .nx-dep-rows, .nx-dep-sec ~ .nx-dep-rows { margin-top: 0; }
 .nx-dep-record-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; }
@@ -694,7 +733,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-record-row__side { flex: none; max-width: 50%; text-align: right; }
 .nx-dep-record-row__amt { display: block; font: 500 16px/20px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-dep-record-row__state { display: block; margin-top: 2px; font: 400 12px/16px var(--font-v5); }
-@media (prefers-reduced-motion: reduce) { .nx-dep-net, .nx-dep-copy-address-cta { transition: none; } .nx-dep-net:active, .nx-dep-copy-address-cta:active { transform: none; } .nx-dep-qr-box { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .nx-dep-net, .nx-dep-copy-address-cta, .nx-dep-progress .nx-progress__fill { transition: none; } .nx-dep-net:active, .nx-dep-copy-address-cta:active { transform: none; } .nx-dep-qr-box { animation: none; } }
 /* 骨架 shimmer(匹配形状占位;通用 spinner 禁用) */
 .nx-dep-sk {
   border-radius: 16px;

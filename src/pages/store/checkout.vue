@@ -58,7 +58,7 @@
 
         <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
-          <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="product.tagline" class="checkout-product-meta">{{ product.tagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="checkoutTagline" class="checkout-product-meta">{{ checkoutTagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
           <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><view class="checkout-quantity-controls">
             <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" :size="20" /></button>
             <text class="checkout-quantity-value" aria-live="polite">1</text>
@@ -310,6 +310,7 @@ import CheckoutRow from "@/components/store/checkout-row.vue";
 import ChainPayment from "@/components/store/chain-payment.vue";
 import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { commerceCopy } from '@/lib/commerce-review';
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
 import { useLocaleStore } from "@/store/locale";
@@ -363,7 +364,8 @@ import { monthlyQuotaExhausted, resolvePurchaseEligibilityMessage } from "@/lib/
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
+import { productCatalogLanguageReadFailed, productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
+import { serverTagline } from "@/lib/product-copy";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -500,10 +502,10 @@ const orders = useOrders();
 const voucher = useVoucher();
 
 // wallet icon path (lucide Wallet), credit-card path
-// 平台支付收窄裁决:USDT 三网络 + 卡。
+// 本地付款选项和原单标签使用同一份方式定义。
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
-const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
+const ALL_PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
   if (remoteApiEnabled) return [{
     id: "nexgrid-wallet",
     label: t.value.wallet.title,
@@ -524,6 +526,7 @@ const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
     iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" });
   return methods;
 });
+const PAYMENT_METHODS = computed(() => ALL_PAYMENT_METHODS.value.filter((method) => canSelectNewUsdtNetwork(method.id)));
 
 const tradein = useTradeinSheet();
 const auditCopy = useAuditUiCopy(), tradeinAvailable = ref(false);
@@ -646,6 +649,15 @@ function isCurrentCheckoutRoute(scope: CheckoutRouteScope): boolean {
     && checkoutRouteFence.isCurrent(scope, checkoutRouteIdentity());
 }
 
+const checkoutCatalogCheckFailed = ref(false);
+async function settleCheckoutCatalogRefresh(scope: CheckoutRouteScope, read: Promise<boolean>): Promise<boolean> {
+  const ready = await settleProductCatalogRefresh(read, { requireFresh: true });
+  if (isCurrentCheckoutRoute(scope)) {
+    checkoutCatalogCheckFailed.value = !ready && productCatalogLanguageReadFailed.value;
+  }
+  return ready;
+}
+
 function clearRemotePurchaseEligibility(): void {
   purchaseEligibilityRequestSequence += 1;
   eligibilityCatalogUnconfirmed.value = false;
@@ -686,7 +698,7 @@ async function refreshPurchaseEligibility(scope = captureCheckoutRoute(), refres
     remotePurchaseEligibility.value = null;
     remotePurchaseEligibilityStatus.value = "error";
     if (refreshCatalogOnMissing && isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
-      const ready = await settleProductCatalogRefresh(refreshProductCatalog(true));
+      const ready = await settleProductCatalogRefresh(refreshProductCatalog(true), { requireFresh: true });
       if (!current()) return "stale";
       if (ready) {
         const listing = productCatalogPresentation.value?.products.find(entry => entry.id === scope.productNo);
@@ -830,7 +842,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
     ]);
     if (!isCurrentCheckoutRoute(routeScope)) return;
     // A retry may have replaced the failed read while phase and trial were still loading.
-    catalogReady = await settleProductCatalogRefresh(read);
+    catalogReady = await settleCheckoutCatalogRefresh(routeScope, read);
     // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
     if (!isCurrentCheckoutRoute(routeScope) || !catalogReady) return;
     // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
@@ -910,11 +922,17 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
   }
 }
 
-const catalogStatus = computed(() => productCatalogState.status);
+const catalogStatus = computed(() => checkoutCatalogCheckFailed.value && productCatalogState.status === "ready"
+  ? "error" : productCatalogState.status);
 const product = computed<Product | undefined>(() => !productId.value || (remoteApiEnabled && catalogStatus.value !== "ready") ? undefined
   : remoteApiEnabled
     ? productCatalogPresentation.value?.products.find((entry) => entry.id === productId.value)
     : getProduct(productId.value));
+const checkoutTagline = computed(() => {
+  const listing = product.value;
+  if (!listing) return "";
+  return remoteApiEnabled ? serverTagline(t.value, listing, locale.code) : listing.tagline;
+});
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
 function productOutOfStock(product: Product | undefined): boolean {
   return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
@@ -1465,7 +1483,7 @@ const { imageSrc: checkoutImage, imageError: checkoutImageError } = useProductIm
 const voucherDetailsOpen = ref(false);
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>(remoteApiEnabled ? "nexgrid-wallet" : "usdt-trc20");
+const payment = ref<string>(remoteApiEnabled ? "nexgrid-wallet" : "usdt-bep20");
 const quantitySwitching = ref(false);
 const quantityReady = ref(false);
 const orderId = ref<string | null>(null);
@@ -1645,7 +1663,7 @@ function totalStillConfirmed(confirmed: number) {
   return trialView.value.applied ? confirmationTotal.value <= confirmed : confirmationTotal.value === confirmed;
 }
 const cardFeeText = computed(() => formatAmount(cardFee.value));
-const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
+const paymentLabel = computed(() => ALL_PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
 const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
 // Display only: the tray names the full-slot reason in one short line; the page offers the ways out.
 const checkoutTrayCapacityNote = computed(() => checkoutCapacityMessage.value === slotsFullText.value
@@ -2990,7 +3008,10 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
   // An original payment can finish before the ordinary checkout reaches eligibility.
   if (!quantityReady.value || (!ordinaryCheckoutInitialized.value && !activeSession.value)) {
     void initializeCheckout(beginCheckoutRoute(), mode);
-  } else void resumeReadyCheckout(captureCheckoutRoute(), settleProductCatalogRefresh(refreshProductCatalog(true)), mode);
+  } else {
+    const scope = captureCheckoutRoute();
+    void resumeReadyCheckout(scope, settleCheckoutCatalogRefresh(scope, refreshProductCatalog(true)), mode);
+  }
 }
 
 function showCheckout() {
@@ -3189,7 +3210,10 @@ watch(step, async (s) => {
   // 发票绑的是那份报价,报价既然要重来,票就不能活着 —— 否则下一次 Pay now 会再开一张,
   // 两个地址同时催付、落单后旧票成孤儿继续拉人二次付款(独立审计 P0 族)。单一咽喉,
   // 不在十来处回弹点各写一遍。
-  if ((s === "select-payment" || s === "confirm") && activeSession.value) dropActiveSession();
+  if (s === "select-payment" || s === "confirm") {
+    if (activeSession.value) dropActiveSession();
+    if (!canSelectNewUsdtNetwork(payment.value)) payment.value = PAYMENT_METHODS.value[0].id;
+  }
   if (settledResultReplay.value && (s === "confirmed" || s === "activating")) {
     // CheckoutResult advances its rendered phases on animationend.
     return;

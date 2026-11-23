@@ -114,7 +114,7 @@ function cancelFromUser() {
 }
 function errorMessage(cause: unknown): string {
   const error = cause instanceof ApiError ? cause.message : "";
-  if (error === "USER_REGISTRATION_K1_IP_LIMIT") return t.value.register.errorSignupLimited;
+  if (["USER_REGISTRATION_K1_IP_LIMIT", "USER_REGISTRATION_DEVICE_LIMIT"].includes(error)) return t.value.register.errorSignupLimited;
   if (error === "OAUTH_LOGIN_EXPIRED") return t.value.thirdParty.restartExpired;
   if (error === "OAUTH_ACCOUNT_LINK_REQUIRED") return t.value.thirdParty.linkRequired;
   if (error === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || error === "USER_REGISTRATION_SPONSOR_INVALID") return t.value.register.inviteInvalid;

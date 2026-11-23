@@ -3,6 +3,7 @@
 // + 2 pure helpers; copied faithfully so the store page renders the same 6 tiers).
 
 import type { PhaseId } from "@/store/product-phase";
+import type { ServerLanguage } from "@/i18n";
 
 export type ProductTaskLevel = 1 | 2 | 3 | 4;
 export type ProductBadgeKind = "recommended" | "bestSeller" | "trending" | "upgradePick" | "flagship" | "lowBarrier" | "custom";
@@ -28,6 +29,7 @@ export interface Product {
   name: string;
   tier: "Entry" | "Pro" | "Flagship" | "Share";
   tagline: string;
+  catalogRequestLocale?: ServerLanguage;
   badge?: string;
   badgeKind?: ProductBadgeKind | null;
   // 🔴 全部服务端显示规格一律可选:后端字段可空(运营在后台表单留空即不下发)。

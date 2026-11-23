@@ -1,12 +1,12 @@
 import { defineStore } from "pinia";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { computed, onScopeDispose, ref } from "vue";
 import { apiRuntimeConfig, payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
 import type { ApiRuntimeConfig } from "@/api/runtime-config";
-import {
-  payoutAddressEpochMs,
-  type PayoutAddressNetwork,
-  type PayoutAddressProvenance,
-  type PayoutAddressSnapshot,
+import type {
+  PayoutAddressNetwork,
+  PayoutAddressProvenance,
+  PayoutAddressSnapshot,
 } from "@/api/payout-address-api";
 import type { ChainDepositChannel } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
@@ -67,20 +67,20 @@ function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
   const result = emptyBook();
   for (const row of snapshot.addresses) {
     const network = PAYOUT_NETWORKS.find((candidate) => TO_SERVER_NETWORK[candidate] === row.network);
-    if (!network) continue;
-    const createdAt = payoutAddressEpochMs(row.createdAt)!;
-    const effectiveAt = payoutAddressEpochMs(row.effectiveAt)!;
+    if (!network || !isVisibleUsdtNetwork(network)) continue;
+    const { createdAtEpochMs: createdAt, effectiveAtEpochMs: effectiveAt } = row;
     result[network] = {
       current: {
         address: row.address,
         addedAt: createdAt,
+        effectiveAt,
         // Compatibility-imported addresses carry an effective time no later than their
         // import row; user-managed addresses always have a future effective time.
         source: effectiveAt <= createdAt ? "migrated" : "user",
       },
       history: [],
       freezeUntil: row.changePending ? effectiveAt : null,
-      nextChangeAt: payoutAddressEpochMs(row.nextChangeAllowedAt),
+      nextChangeAt: row.nextChangeAllowedAtEpochMs,
     };
   }
   return result;
@@ -354,7 +354,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   /** 单网络状态(缺省网络回落空态,不抛)。 */
   function stateFor(network: ChainDepositChannel): NetworkPayoutState {
-    return book.value[network] ?? emptyNetworkState();
+    return (isVisibleUsdtNetwork(network) ? book.value[network] : undefined) ?? emptyNetworkState();
   }
 
   /** 当前地址(null = 未设置 → 提现页空态引导卡)。 */
@@ -368,7 +368,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   }
 
   /** 任一网络已设地址(钱包面「管理」入口态)。 */
-  const hasAnyAddress = computed(() => PAYOUT_NETWORKS.some((network) => book.value[network]?.current));
+  const hasAnyAddress = computed(() => PAYOUT_NETWORKS.some((network) => currentFor(network)));
 
   /** 更换前的禁止动作判定(null = 可更换;页面与提交动作共用同一判据)。 */
   function changeBlockReason(

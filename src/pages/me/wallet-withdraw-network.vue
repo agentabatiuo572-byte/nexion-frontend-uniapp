@@ -3,7 +3,6 @@
     <SubPageHeader back="/pages/me/wallet-withdraw-method" :title="t.bankWithdrawal.chooseNetwork" />
     <!-- One route card per USDT network the server currently opens; tapping one opens the withdraw page with that network fixed. -->
     <view class="withdraw-networks">
-      <text class="intro">{{ t.bankWithdrawal.chooseNetworkHint }}</text>
       <view v-for="item in cards" :key="item.id" class="method" role="button" tabindex="0" :data-testid="`withdraw-network-${item.label}`" :aria-label="item.accessibleName" :aria-disabled="loading" @click="open(item.id)" @keydown.enter.prevent="open(item.id)" @keydown.space.prevent="open(item.id)">
         <view class="method-top">
           <view class="method-icon" aria-hidden="true"><view class="method-coin"><UsdtCoin /></view></view>
@@ -17,7 +16,8 @@
       </view>
       <text v-if="!policy && loading" class="status" role="status">{{ t.bankWithdrawal.loading }}</text>
       <text v-else-if="readFailed" class="status" role="status">{{ t.bankWithdrawal.recoveryUnavailable }}</text>
-      <text v-else-if="policy && cards.length === 0" class="status" role="status">{{ t.wallet.withdrawalChannelsClosed }}</text>
+      <!-- 全部网络关闭:共享整页结果居中(03 §3.4、§3.5.2),一个出口回到提现方式选择,银行卡提现可能仍可用 -->
+      <EmptyState v-else-if="policy && cards.length === 0" kind="locked-or-no-permission" page role="status" :title="t.bankWithdrawal.usdtClosedTitle" :cta-label="t.bankWithdrawal.otherMethodCta" @cta="toMethods" />
       <text v-else-if="remoteApiEnabled && payout.readStatusFor(app.accountKey) === 'error'" class="status" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
       <view v-if="readFailed && !loading" class="reload" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
     </view>
@@ -30,15 +30,17 @@ import { computed, ref, watch } from "vue";
 import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import UsdtCoin from "@/components/ui/usdt-coin.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 import { useApp } from "@/store/app";
 import { usePayoutAddress } from "@/store/payout-address";
 import { fromWithdrawNetwork } from "@/store/payout-address-core";
-import { navTo } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
 import { remoteApiEnabled, withdrawalApi } from "@/api/runtime";
 import type { SupportedWithdrawalNetwork, WithdrawalPolicy } from "@/api/withdrawal-api";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
@@ -55,7 +57,7 @@ const cards = computed(() => {
   if (!current?.withdrawalEnabled) return [];
   // The address is decoration: until the address book is read, the card shows no destination rather than "not set".
   const addressesKnown = payout.readStatusFor(app.accountKey) === "ready";
-  return NETWORK_ORDER.filter(id => current.enabledNetworks.includes(id)).map(id => {
+  return NETWORK_ORDER.filter(id => canSelectNewUsdtNetwork(id) && current.enabledNetworks.includes(id)).map(id => {
     const label = id.slice(5), address = payout.currentFor(fromWithdrawNetwork(id))?.address ?? "";
     const fee = current.networkConfirmFeeUsd[label.toLowerCase() as keyof WithdrawalPolicy["networkConfirmFeeUsd"]];
     const to = !addressesKnown ? null : address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
@@ -88,12 +90,12 @@ const stopRuntime = subscribeRuntimeRevision(() => { revision++; if (visible) vo
 onShow(() => { visible = true; if (remoteApiEnabled) void payout.refreshRemote(); void load(); });
 onHide(() => { visible = false; revision++; });
 onUnload(() => { visible = false; revision++; stopRuntime(); });
+function toMethods() { navBack("/pages/me/wallet-withdraw-method"); }
 function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/pages/me/wallet-withdraw?network=${id}`); }
 </script>
 
 <style scoped>
 .withdraw-networks { padding: 0 var(--v5-space-4) var(--v5-space-8); color: var(--v5-ink); }
-.intro { display: block; margin: -1px 4px 12px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .method { position: relative; display: block; margin-bottom: var(--v5-space-3); padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); cursor: pointer; }
 .method-top { display: flex; align-items: center; gap: 14px; }
 .method-icon { display: grid; place-items: center; flex: none; width: 48px; height: 48px; }

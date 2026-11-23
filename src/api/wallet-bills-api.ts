@@ -23,6 +23,8 @@ export interface WalletBillRow {
   /** Controlled App projection. Absent only while reading an older server. */
   category?: WalletBillCategory;
   presentationCode?: string;
+  network?: string;
+  paymentMethod?: string;
   /** A server-approved identifier that is safe to show or route from an App bill. */
   publicReference?: string;
 }
@@ -121,6 +123,8 @@ function bill(value: unknown): WalletBillRow {
     createdAt,
     category: category(row.category),
     presentationCode: optionalText(row.presentationCode),
+    network: optionalText(row.network),
+    paymentMethod: optionalText(row.paymentMethod),
     publicReference: orderRefund && typeof row.publicReference === "string" ? row.publicReference : optionalText(row.publicReference),
   };
 }

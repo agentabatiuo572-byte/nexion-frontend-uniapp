@@ -117,6 +117,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
@@ -202,7 +203,10 @@ function applyTrackedWithdrawal(detail: WithdrawalDetailSnapshot): void {
 }
 
 const trackedWithdrawalRead = createWithdrawalTrackingRead<WithdrawalDetailSnapshot>({
-  read: withdrawalApi.get,
+  read: async (id) => {
+    const detail = await withdrawalApi.get(id);
+    return detail && isVisibleUsdtNetwork(detail.withdrawal.chain) ? detail : null;
+  },
   currentScope: trackingReadScope,
   apply: applyTrackedWithdrawal,
   setStatus: (status) => { trackingReadStatus.value = status; },
@@ -220,7 +224,7 @@ const wd = computed(() => {
   if (deepLinkId.value && exact) return exact;
   return resolveTrackedWithdrawal(
     exact,
-    app.withdrawals.find((row) => row.id === id) ?? null,
+    app.withdrawals.find((row) => row.id === id && isVisibleUsdtNetwork(row.network)) ?? null,
     storeRowAtTrackedRead.value,
   );
 });
