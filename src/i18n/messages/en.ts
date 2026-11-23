@@ -2896,6 +2896,7 @@ autoDetect: "auto-detect coming soon",
     sessionRevoke: "Sign out",
     sessionRevoked: "Device signed out",
     sessionRevokeConfirm: "Sign out this device?",
+    sessionRevokeConfirmBody: "Every sign-in on {device} (last active {time}) will end, and it will need to sign in again.",
     revokeAll: "Sign out all other devices",
     revokeAllConfirm:
       "Other devices will be signed out and need to sign in again.",
