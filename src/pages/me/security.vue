@@ -266,7 +266,6 @@ import { useStaking } from "@/store/staking";
 import { useConfig } from "@/store/config";
 import { navReset, navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
-import { nexGridBrandText } from "@/lib/brand-copy";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { dialCodeForLocale, validateNationalPhone } from "@/auth/phone-number";
@@ -485,8 +484,8 @@ const modeLabel = computed(() => apiEnvironmentBadgeLabel(apiRuntimeConfig, t.va
 const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (remoteSecurity.value?.sessions ?? []).map((item) => ({
       id: item.id,
-      deviceName: nexGridBrandText(item.deviceName),
-      device: nexGridBrandText(item.deviceName),
+      deviceName: item.deviceName,
+      device: item.deviceName,
       location: item.ipMasked,
       ip: item.ipMasked,
       // 🔴 zentao #228:`lastActiveAt` 是 Java `LocalDateTime` 序列化出来的**无时区**串,
@@ -501,8 +500,8 @@ const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
 const displaySessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (securityPresentation.value?.sessions ?? []).map((item) => ({
       id: item.id,
-      deviceName: nexGridBrandText(item.deviceName),
-      device: nexGridBrandText(item.deviceName),
+      deviceName: item.deviceName,
+      device: item.deviceName,
       location: item.ipMasked,
       ip: item.ipMasked,
       // 🔴 zentao #228:`lastActiveAt` 是 Java `LocalDateTime` 序列化出来的**无时区**串,

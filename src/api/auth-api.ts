@@ -314,8 +314,9 @@ function oauthDevelopmentChallengeFromResponse(value: unknown): string {
 export function createAuthApi(
   client: ApiClient,
   vault: SessionVault,
-  options: { refreshCredentialMode?: RefreshCredentialMode; clientSurface?: "APP";
+  options: { refreshCredentialMode?: RefreshCredentialMode; clientSurface?: "APP" | "H5";
     installationId?: () => string; executionSupported?: () => boolean; attemptStorage?: KeyValueStorage;
+    deviceName?: () => string | undefined;
     beforeSessionEnd?: (snapshot: SessionSnapshot) => Promise<void>;
     sessionEndCancelled?: (snapshot: SessionSnapshot) => void } = {},
 ): AuthApi {
@@ -324,11 +325,12 @@ export function createAuthApi(
   const cookieHeaders = refreshCredentialMode === "cookie"
     ? { "X-Nexion-Refresh-Mode": "cookie" }
     : undefined;
-  const sessionIssuanceHeaders = options.clientSurface === "APP"
-    ? { ...cookieHeaders, "X-NexGrid-Client-Surface": "APP" }
+  const sessionIssuanceHeaders = options.clientSurface
+    ? { ...cookieHeaders, "X-NexGrid-Client-Surface": options.clientSurface }
     : cookieHeaders;
-  const attempts = createLoginAttempt({ storage: options.attemptStorage,
-    installationId: options.installationId ?? (() => ""), executionSupported: options.executionSupported ?? (() => false) });
+  const attempts = createLoginAttempt({ clientSurface: options.clientSurface, storage: options.attemptStorage,
+    installationId: options.installationId ?? (() => ""), executionSupported: options.executionSupported ?? (() => false),
+    deviceName: options.deviceName });
   const contextHeaders = (attempt: LoginAttempt) => ({ ...sessionIssuanceHeaders,
     "X-NexGrid-Installation-Id": attempt.installationId,
     "X-NexGrid-Execution-Supported": String(attempt.executionSupported),
@@ -369,7 +371,11 @@ export function createAuthApi(
         await options.beforeSessionEnd(previous);
         if (vault.revision() !== revision) throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
       }
-      const data = await client.request<AuthSessionResponse>({ ...request, headers: contextHeaders(attempt) });
+      const data = await client.request<AuthSessionResponse>({
+        ...request,
+        body: { ...body, ...(typeof attempt.deviceName === "string" ? { deviceName: attempt.deviceName } : {}) },
+        headers: contextHeaders(attempt),
+      });
       if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
       const result = oauth ? oauthExchangeFromResponse(data, vault, revision, refreshCredentialMode)
         : consumeLoginResponse(data, vault, revision, refreshCredentialMode);

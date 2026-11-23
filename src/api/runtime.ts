@@ -70,7 +70,7 @@ import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
 import type { RefreshCredentialMode } from "./session-vault";
 import { createNativeSessionStorage, type NativeSessionStorage } from "./native-session-storage";
-import { getDeviceId } from "@/lib/device-id";
+import { getDeviceId, getLoginDeviceName } from "@/lib/device-id";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { revokeNativePush, resumeNativePush } from "@/services/native-push";
 
@@ -107,7 +107,10 @@ export async function prepareSessionVault(): Promise<void> {
   await nativeAttemptStorage?.ready();
   sessionVault.hydrate();
 }
-let clientSurface: "APP" | undefined;
+let clientSurface: "APP" | "H5" | undefined;
+// #ifdef H5
+clientSurface = "H5";
+// #endif
 // #ifdef APP-PLUS
 clientSurface = "APP";
 // #endif
@@ -137,8 +140,9 @@ export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentia
     await revokeNativePush(context);
   },
   sessionEndCancelled: resumeNativePush,
-  installationId: () => clientSurface === "APP" ? getDeviceId() : "",
+  installationId: () => clientSurface ? getDeviceId() : "",
   executionSupported: () => clientSurface === "APP" && hasNativePhoneRuntime(),
+  deviceName: () => getLoginDeviceName(clientSurface === "APP"),
   attemptStorage: nativeAttemptStorage ?? (typeof sessionStorage !== "undefined" ? {
     get: () => { const value = sessionStorage.getItem("uvel-login-attempt"); return value ? JSON.parse(value) : null; },
     set: value => sessionStorage.setItem("uvel-login-attempt", JSON.stringify(value)),

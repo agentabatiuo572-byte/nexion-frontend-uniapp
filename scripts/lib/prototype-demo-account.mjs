@@ -15,21 +15,24 @@ export function demoAccountPasswordMatches(state, password) {
     && passwordDigest(password) === (securityCredentials.get(state.securityDemo)?.digest ?? initialPasswordDigest);
 }
 
+const browserNames = ['Chrome · Android', 'Safari · iOS', 'Safari · macOS', 'Chrome · Windows'];
+
 function activeOtherSecuritySessions(state, security) {
   if (state.securitySessionState !== 'paginated' || security.otherSessionsRevoked) return [];
+  // Each row is a distinct installation's representative. The first two share a model.
   return Array.from({ length: 23 }, (_, index) => {
     const rowId = 3023 - index;
     return {
       rowId,
       session: {
         id: 'demo-h5-session-' + rowId,
-        deviceName: index < 20 ? ['Android · Chrome', 'iPad · Safari', 'Mac · Safari'][index % 3] : 'Windows · Chrome',
-        ipMasked: index < 20 ? '198.51.100.*' : '203.0.113.*',
+        deviceName: index < 2 ? 'Samsung SM-A5760 · Android 16' : browserNames[index % browserNames.length],
+        ipMasked: index < 2 ? '198.51.100.*' : '203.0.113.*',
         lastActiveAt: new Date(state.previewFactsAt - (index + 1) * 60000).toISOString(),
         current: false,
       },
     };
-  });
+  }).filter(({ session }) => !security.revokedSessionIds?.includes(session.id));
 }
 
 // Java StringUtils.hasText and String.trim use different whitespace sets.
@@ -77,14 +80,27 @@ export function accountDemo(url, locale, state, request) {
     }
     if (state.securityReadFailure === (cursor === null ? 'overview' : 'next-page')) reject('DEMO_SECURITY_READ_UNAVAILABLE', 503);
     const security = state.securityDemo ??= { passwordChangedAt: new Date(state.previewFactsAt).toISOString() };
-    const other = activeOtherSecuritySessions(state, security).filter(row => cursor === null || row.rowId < Number(cursor));
-    const sessions = other.slice(0, 20).map(row => row.session);
-    if (cursor === null) sessions.unshift({
-      id: 'demo-session', deviceName: 'iPhone · Safari', ipMasked: '192.0.2.*',
+    const rows = activeOtherSecuritySessions(state, security).filter(row => cursor === null || row.rowId < Number(cursor));
+    if (cursor === null) rows.unshift({ rowId: 3024, session: {
+      id: 'demo-session', deviceName: state.loginDeviceName ?? 'Safari · iOS', ipMasked: '192.0.2.*',
       lastActiveAt: new Date().toISOString(), current: true,
-    });
-    return { twoFactorEnabled: true, passwordChangedAt: security.passwordChangedAt, sessions,
-      nextCursor: other.length > 20 ? String(other[19].rowId) : null };
+    } });
+    return { twoFactorEnabled: state.twoFactorEnabled ?? true, passwordChangedAt: security.passwordChangedAt,
+      sessions: rows.slice(0, 20).map(row => row.session), nextCursor: rows.length > 20 ? String(rows[19].rowId) : null };
+  }
+  const sessionRevoke = method === 'POST' && path.match(/^\/api\/app\/security\/sessions\/([^/]+)\/revoke$/);
+  if (sessionRevoke || (method === 'POST' && path === '/api/app/security/sessions/revoke-others')) {
+    const security = state.securityDemo ??= { passwordChangedAt: new Date(state.previewFactsAt).toISOString() };
+    const others = activeOtherSecuritySessions(state, security);
+    if (!sessionRevoke) {
+      security.otherSessionsRevoked = true;
+      return { revokedSessionCount: others.length };
+    }
+    const id = sessionRevoke[1];
+    if (id === 'demo-session') reject('CURRENT_SESSION_REVOKE_FORBIDDEN');
+    if (!others.some(({ session }) => session.id === id)) reject('SESSION_NOT_ACTIVE_OR_NOT_OWNED', 404);
+    (security.revokedSessionIds ??= []).push(id);
+    return { revokedSessionCount: 1 };
   }
   if (method === 'GET' && path === '/api/app/security/phone-number') {
     if (state.securityReadFailure === 'phone-policy') reject('DEMO_SECURITY_READ_UNAVAILABLE', 503);
