@@ -35,21 +35,14 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && resultShown" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :delivery="resultOrder.deviceDelivery ?? paymentResultReceipt?.deviceDelivery" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices" @support="contactOrderSupport" v-slot="{ done }">
-        <!-- "Running" is the end of the replay: it waits, in place, for the head to reach 设备已激活 so both tell one progress. -->
-        <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">{{ resultRunningText }}</text>
+        <!-- The trial purchase's 「… 已在 … 开始运行」 takes the product line's place once the head reaches 设备已激活, and 共节省
+             sits beside the paid amount (board A). Its exits are in the bottom bar below (#pageFixed). -->
+        <CheckoutResult ref="paymentResult" :order-no="resultOrder.id" :state="paymentResultState" :delivery="resultOrder.deviceDelivery ?? paymentResultReceipt?.deviceDelivery" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" :complete-line="showTrialResult && paymentResultState === 'activated' ? resultRunningText : undefined" :saved="showTrialResult && orderSaved > 0 ? orderSaved : undefined" @devices="goDevices" @support="contactOrderSupport" @order="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false">
+        <!-- Credited trial rewards: the one tinted card of the screen, amber for rewards (01 §1.1.2). -->
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit nx-tint" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
           <view v-if="resultOrder.trialReward.usdt > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUsdt }}</text><text class="trial-result-usdt">+{{ formatAmount(resultOrder.trialReward.usdt) }}<text class="trial-result-unit">{{ '\u00A0USDT' }}</text></text></view>
           <view v-if="resultOrder.trialReward.nex > 0" class="trial-result-row"><text>{{ purchaseCopy.resultUvt }}</text><text class="trial-result-uvt">+{{ formatAmount(resultOrder.trialReward.nex) }}<text class="trial-result-unit">{{ '\u00A0UVT' }}</text></text></view>
-        </view>
-        <view v-if="showTrialResult && orderSaved > 0" class="trial-result-summary">
-          <view class="trial-result-line"><text>{{ purchaseCopy.resultSaved }}</text><text class="trial-result-saved">{{ resultSavings }}</text></view>
-        </view>
-        <!-- The exit keeps its place but stays hidden and untouchable until the result animation has finished. -->
-        <view class="trial-result-actions" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">
-          <!-- The second exit is the shared neutral glass L (03 §3.1), not a page-private outlined pill. -->
-          <NxButton variant="secondary" :label="purchaseCopy.resultOrder" @click="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false" />
         </view>
         </CheckoutResult>
       </view>
@@ -154,6 +147,14 @@
     </view>
     <template #pageFixed>
       <!-- The order's next actions sit in the thumb zone at the bottom of the page (DS-30), whatever its state. -->
+      <!-- The purchase result's exits (PRD purchase payment, line 49; 04 §4.0): none until its presentation completes,
+           then 查看订单 as a tray text button beside the result's own exits (查看设备, or 设备仓库, or 联系客服 on a failure,
+           whose 查看订单 the result itself offers). A delivery to inventory keeps only its own two exits. The bar keeps its
+           place, hidden and untouchable, until the presentation completes, so the result reserves its final height. -->
+      <view v-if="resultShown && paymentResult" class="order-sticky order-sticky--result checkout-result-tray nx-glass-bar" :class="{ 'is-waiting': !paymentResult.done }">
+        <NxButton v-if="paymentResultState !== 'failed' && paymentResultState !== 'inventory'" variant="secondary" :label="purchaseCopy.resultOrder" @click="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false" />
+        <NxButton v-for="exit in paymentResult.exits" :key="exit.key" :variant="exit.primary ? 'primary' : 'secondary'" :label="exit.label" @click="exit.run()" />
+      </view>
       <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel nx-reverse-action" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
@@ -185,7 +186,7 @@
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { dateLocale } from "@/i18n/format";
-import { commerceOrderAmount, commerceOrderHasPayment, commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
+import { commerceOrderAmount, commerceOrderHasPayment, commerceOrderIsPaid, commerceOrderTitle, commercePaidOrderAmount, commerceCopy } from "@/lib/commerce-review";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
@@ -219,7 +220,7 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { apiClient,orderApi,purchaseEligibilityApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
-import { advisorChatRoute } from "@/lib/advisor-chat-route";
+import { openOrderAdvisorChat } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import { asApiError } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
@@ -244,8 +245,9 @@ const autoPayRequested = ref(false);
 let automaticPaymentDiscovery = true;
 let pendingPaymentIntentAccount = '';
 // FEAT-TRIAL05: `?result=trial` (set by checkout) opens the purchase result once; the order view is one tap away.
-const showTrialResult = ref(false);
+const trialResultRequested = ref(false);
 const showInventoryResult = ref(false);
+const paymentResult = ref<InstanceType<typeof CheckoutResult> | null>(null);
 const paymentResultVisible = ref(false);
 const orderOrigin = ref("");
 const ordersBackHref = ref("/store/orders");
@@ -285,7 +287,7 @@ onLoad((options) => {
   const queryMatchesOrder = Boolean(id.value) && queryIds.length === 1 && queryIds[0] === id.value;
   const from = o.from ?? (queryMatchesOrder && query.getAll("from").length === 1 ? query.get("from") : "");
   const result = o.result ?? (queryMatchesOrder && query.getAll("result").length === 1 ? query.get("result") : "");
-  showTrialResult.value = result === "trial";
+  trialResultRequested.value = result === "trial";
   showInventoryResult.value = result === "delivery";
   autoPayRequested.value = (o.pay ?? (queryMatchesOrder && query.getAll('pay').length === 1 ? query.get('pay') : '')) === '1';
   automaticPaymentDiscovery = (o.readback ?? (queryMatchesOrder ? query.get('readback') : null)) !== '1';
@@ -498,14 +500,18 @@ const noticeCancelFailed = ref(false);
 const paymentResultOrder = ref<Order|null>(null);
 const paymentResultReceipt = ref<PaidOrderReceipt|null>(null);
 const resultOrder = computed(() => order.value ?? paymentResultOrder.value);
+const showTrialResult = computed({
+  get: () => trialResultRequested.value && !!order.value && commerceOrderIsPaid(order.value),
+  set: (requested: boolean) => { trialResultRequested.value = requested; },
+});
 const paymentResultAmount = computed<{ value: Order['total']; currency: 'USD' | 'USDT' } | undefined>(() => {
+  const current = order.value;
+  if (current && commerceOrderIsPaid(current)) return commercePaidOrderAmount(current);
   const receipt = paymentResultReceipt.value;
-  if (receipt) return {
+  if (receipt?.orderNo === id.value) return {
     value: receipt.paidTotalUsdt ?? receipt.amountUsdt,
     currency: receipt.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT',
   };
-  const current = resultOrder.value;
-  if (current && commerceOrderHasPayment(current)) return commerceOrderAmount(current);
 });
 // Same branch as the template's result view: the header drops back and retitles only while that view is on screen.
 const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value
@@ -524,9 +530,13 @@ useSetPageHeader(() => ({
 }));
 
 const pendingCopy = computed(() => checkoutFlowCopy(locale.code));
-// A confirmed provisioning failure stays the result through a later transient read error; only unconfirmed results fall back to the clock.
-const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'|'failed'>(() => resultOrder.value?.status === 'provisioning_failed' ? 'failed' : remoteOrderError.value ? 'error' : resultOrder.value?.status === 'activated'
-  ? 'activated' : resultOrder.value?.status === 'inventory' ? 'inventory' : walletPaymentConfirmed.value || resultOrder.value?.status === 'paid' || resultOrder.value?.status === 'provisioning' ? 'processing' : 'error');
+const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'|'failed'>(() => {
+  const status = resultOrder.value?.status;
+  if (status === 'provisioning_failed') return 'failed';
+  if (status === 'activated' || status === 'inventory') return status;
+  if (remoteOrderError.value) return 'error';
+  return walletPaymentConfirmed.value || status === 'paid' || status === 'provisioning' ? 'processing' : 'error';
+});
 const payingFromWallet = ref(false);
 const cancellingOrder = ref(false);
 const orderAction = ref<PendingOrderAction|null>(null);
@@ -671,11 +681,7 @@ function goStore() { if(canBuyAgain.value)void navTo('/store'); }
 function contactOrderSupport() {
   if(!needsRecovery.value||!order.value)return;
   const scope=captureDetailScope();
-  uni.setClipboardData({data:order.value.id,success:async()=>{
-    if(!isCurrentDetailScope(scope))return;
-    const route=await advisorChatRoute(conversations);
-    if(isCurrentDetailScope(scope))void navTo(route);
-  }});
+  void openOrderAdvisorChat(conversations, order.value.id, () => isCurrentDetailScope(scope));
 }
 // Hero glow, fallback icon and the current track step share the status tag's tone (design system 03 §3.8).
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -945,7 +951,7 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
       if (!liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
       original = liveOrder.value;
     }
-    if (original.status === 'activated' || original.status === 'inventory' || original.status === 'paid' || original.status === 'provisioning' || original.status === 'provisioning_failed') {
+    if (commerceOrderIsPaid(original)) {
       paymentResultVisible.value = true;
       return;
     }
@@ -1171,15 +1177,14 @@ const trialRewardText = computed(() => {
 });
 const orderSaved = computed(() => {
   const current = order.value;
-  if (!current) return 0;
+  if (!current?.trialReward) return 0;
   const saved = Number(current.subtotal) - Number(current.total);
   return Number.isFinite(saved) && saved > 0 ? +saved.toFixed(2) : 0;
 });
-const resultSavings = computed(() => paymentResultAmount.value?.currency === 'USD'
-  ? `$${formatAmount(orderSaved.value)}` : usdt(orderSaved.value));
 const resultRunningText = computed(() => {
   const current = order.value;
-  const device = current ? commerceOrderTitle(current, locale.code) : "";
+  if (!current?.trialReward) return undefined;
+  const device = commerceOrderTitle(current, locale.code);
   return current?.dataCenter?.trim()
     ? fmt(purchaseCopy.value.resultRunning, { device, dc: dataCenterInText.value })
     : fmt(purchaseCopy.value.resultRunningNoDc, { device });
@@ -1242,6 +1247,14 @@ const sectionLabelStyle: CSSProperties = {
 .order-sticky { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
 .order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
 .order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
+/* Purchase result bar (board A): the one primary takes the free width, a secondary beside it keeps its label's width
+   as a tray text button; two secondaries share the row. It slides up once when the exits appear. */
+.order-sticky--result { animation: order-result-bar-in 260ms cubic-bezier(.16, 1, .3, 1) both; }
+.order-sticky--result.is-waiting { visibility: hidden; animation: none; }
+.order-sticky--result > * { flex: 1 1 0; min-width: fit-content; }
+.order-sticky--result:has(> .nx-button--primary) > .nx-button--secondary { flex: 0 0 auto; }
+@keyframes order-result-bar-in { from { opacity: 0; transform: translateY(16px); } }
+@media (prefers-reduced-motion: reduce) { .order-sticky--result { animation: none; } }
 /* Paired buttons share a card row, so they take the M side padding (16px) to fit two labels. */
 /* Progress track: 24px steps joined by 2px segments; done segments grow in (DS-29). */
 .order-track { display: grid; margin-top: 20px; }
@@ -1285,7 +1298,8 @@ const sectionLabelStyle: CSSProperties = {
 </style>
 
 <style scoped>
-.order-payment-result { display:flex; flex-direction:column; gap:var(--v5-space-3); }
+/* The result's head sits 8 under the nav, as on the result board (A: icon 60 on 844); the page's 24 breathing is for the order view. */
+.order-payment-result { display:flex; flex-direction:column; gap:var(--v5-space-3); margin-top:calc(var(--v5-space-2) - 24px); }
 .order-summary :deep(.copy-code-button) { width:44px; height:44px; margin:-6px -12px -6px -4px; }
 .order-summary :deep(.copy-code-button svg) { width:16px; height:16px; }
 .pending-notice-error { display:block; margin-top:var(--v5-space-3); font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color:var(--v5-danger); }
@@ -1294,20 +1308,18 @@ const sectionLabelStyle: CSSProperties = {
 .trial-result-head { display:flex;flex-direction:column;align-items:center;gap:var(--v5-space-2);padding:var(--v5-space-4) 0;text-align:center; }
 .trial-result-icon { width:64px;height:64px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand); }
 .trial-result-title { font-size:var(--ui-type-page-title);line-height:var(--ui-type-page-title-lh);font-weight:600;color:var(--v5-ink); }
-.trial-result-body { display:block;text-align:center;font-size:var(--ui-type-body);line-height:var(--ui-type-body-lh);color:var(--v5-ink-2);overflow-wrap:break-word; }
-/* Credited rewards: the shared tinted card (01 §1.1.2 整体底色, brand hue, soft inner rim), no hard stroke. */
-.trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l); }
+/* Credited rewards: the shared tinted card (01 §1.1.2 整体底色, soft inner rim, no hard stroke) in the reward hue, amber;
+   it is the result screen's one tinted card, 16 under the summary (board A, 试用转购). */
+.trial-result-credit { --nx-tint: var(--v5-warning); flex:none; display:flex;flex-direction:column;gap:var(--v5-space-2);margin-top:var(--v5-space-4);padding:var(--v5-space-4);border-radius:var(--ui-radius-surface); }
 /* The card's heading takes the subheading role in main ink (10.1, 01 §1.1.1); amounts stay 500 (01 §1.2), the unit is the
    12/16 auxiliary part of the amount, joined by a no-break space (01 §1.2, 06 §6.2), and UVT text uses nex-ink (01 §1.1.1). */
 .trial-result-credit-label { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);color:var(--v5-ink); }
-.trial-result-row, .trial-result-line { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);color:var(--v5-ink-3); }
-.trial-result-row > text:last-child { font-size:var(--ui-type-list-title);line-height:var(--ui-type-list-title-lh);font-weight:var(--ui-type-list-title-weight);font-variant-numeric:tabular-nums; }
+.trial-result-row { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);color:var(--v5-ink-3); }
+.trial-result-row > text:first-child { white-space:nowrap; }
+.trial-result-row > text:last-child { font-weight:var(--ui-type-list-title-weight);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-result-unit { font-size:var(--ui-type-meta);line-height:var(--ui-type-meta-lh);font-weight:inherit;color:var(--v5-ink-3); }
-.trial-result-usdt, .trial-result-saved { color:var(--v5-brand); }
+.trial-result-usdt { color:var(--v5-brand); }
 .trial-result-uvt { color:var(--v5-nex-ink); }
-.trial-result-summary { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-3) var(--v5-space-4);border-radius:var(--v5-radius-l);background:var(--v5-surface); }
-.trial-result-line > text:last-child { color:var(--v5-ink-2);font-variant-numeric:tabular-nums; }
-.trial-result-actions { display:flex;flex-direction:column;gap:var(--v5-space-3);margin-top:var(--v5-space-2); }
 .trial-result-primary { display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--v5-radius-full);font-size:var(--ui-type-button);line-height:var(--ui-type-button-lh);font-weight:600; }
 .trial-result-primary { background:var(--v5-brand);color:var(--v5-on-brand); }
 </style>

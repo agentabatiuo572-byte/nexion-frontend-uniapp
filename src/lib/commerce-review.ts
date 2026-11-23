@@ -18,11 +18,14 @@ export function commerceAmount(value:Parameters<typeof formatAmount>[0]) { retur
 export function commerceOrderHasPayment(order: Pick<Order, 'paidTotal' | 'paidAt'>): boolean {
   return order.paidTotal != null || order.paidAt != null;
 }
+export function commerceOrderIsPaid(order: Pick<Order, 'status'>): boolean {
+  return ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status);
+}
+export function commercePaidOrderAmount(order: Pick<Order, 'total' | 'paidTotal' | 'paymentMethod'>): { value: Order['total']; currency: 'USD' | 'USDT' } {
+  return { value: order.paidTotal ?? order.total, currency: order.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT' };
+}
 export function commerceOrderAmount(order: Pick<Order, 'total' | 'paidTotal' | 'paidAt' | 'paymentMethod'>): { value: Order['total']; currency: 'USD' | 'USDT' } {
-  return {
-    value: order.paidTotal ?? order.total,
-    currency: commerceOrderHasPayment(order) && order.paymentMethod !== 'HDPAY_BANK' ? 'USDT' : 'USD',
-  };
+  return commerceOrderHasPayment(order) ? commercePaidOrderAmount(order) : { value: order.total, currency: 'USD' };
 }
 export function commerceOrderTitle(order:{productName:string;quantity:number;lineItems?:{sku:string;quantity:number}[]},locale:string) {
   const lines=order.lineItems??[];

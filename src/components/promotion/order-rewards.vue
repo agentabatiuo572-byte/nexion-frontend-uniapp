@@ -14,8 +14,8 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import PromotionAction from '@/components/promotion/promotion-action.vue';
-import {ref,computed,watch,onBeforeUnmount} from 'vue';import {useT} from '@/i18n/use-t';import {useApp} from '@/store/app';import {promotionApi,remoteApiEnabled} from '@/api/runtime';import type{OrderReceipt,Reward} from '@/api/promotion-api';import {navTo} from '@/lib/route';import RewardRows from './reward-rows.vue';
-const props=defineProps<{orderNo:string;paymentAllowed:boolean}>();const t=useT(),app=useApp();const receipt=ref<OrderReceipt|null>(null),rewards=ref<Reward[]>([]),error=ref(false),loading=ref(false);let generation=0,alive=true;
+import {ref,computed,watch,onBeforeUnmount} from 'vue';import {useT} from '@/i18n/use-t';import {useApp} from '@/store/app';import {promotionApi,remoteApiEnabled} from '@/api/runtime';import type{PromotionOrder,Reward} from '@/api/promotion-api';import {navTo} from '@/lib/route';import RewardRows from './reward-rows.vue';
+const props=defineProps<{orderNo:string;paymentAllowed:boolean}>();const t=useT(),app=useApp();const receipt=ref<PromotionOrder|null>(null),rewards=ref<Reward[]>([]),error=ref(false),loading=ref(false);let generation=0,alive=true;
 function canResume():boolean {
   return props.paymentAllowed&&!loading.value&&!error.value&&receipt.value?.orderNo===props.orderNo
     &&Boolean(receipt.value.promotionQuoteId)&&receipt.value.paymentStatus==='PENDING'

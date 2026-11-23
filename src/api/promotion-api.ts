@@ -9,6 +9,9 @@ export type { PublicPromotion, Reward, ExpectedReward, PublicRewardSpec, RewardS
 const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USDT_BSC','CREGIS_USDT_ERC20','CREGIS_USDT_TRC20'] as const;
 export type Quote=ContractQuote&{assignableSlots?:number;inventoryQuantity?:number};
 export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null};
+export type PromotionOrder = Omit<OrderReceipt, 'orderStatus'> & {
+  orderStatus: OrderReceipt['orderStatus'] | 'PAID' | 'PROCESSING' | 'PROVISIONING' | 'PROVISIONING_FAILED';
+};
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
 export type CheckoutQuoteBlock = 'outOfStock' | 'soldOut' | 'monthlyQuota' | 'purchaseConditions' | 'productMissing' | 'capacity' | 'unavailable';
@@ -133,7 +136,7 @@ function reward(value:unknown):Reward{
   if(r.assetReceipt!==null){const receipt=object(r.assetReceipt);array(receipt.deviceIds).forEach(positiveInteger);array(receipt.instanceNos).forEach(string);if(!['PROMOTION_GIFT','PROMOTION_REWARD'].includes(string(receipt.source)))return invalid();if(receipt.issuedAt!==null)time(receipt.issuedAt);for(const key of ['ledgerBizNo','earningsEntryNo'])if(receipt[key]!==null)string(receipt[key]);}
   return r as Reward;
 }
-export function parsePromotedOrder(value:unknown):OrderReceipt{
+function parsePromotionOrder(value: unknown, history: boolean): PromotionOrder {
   const r=object(value);string(r.orderNo);
   if(r.recoveredQuoteId!==undefined && (!r.promotionQuoteId || string(r.recoveredQuoteId)===r.promotionQuoteId))return invalid();
   // Legacy non-promotion receipts retain their existing transport shape.
@@ -142,12 +145,23 @@ export function parsePromotedOrder(value:unknown):OrderReceipt{
     const items=array(r.items).map(value=>{const item=object(value);readItemImage(item);return {lineId:string(item.lineId),productNo:string(item.productNo),productName:string(item.productName),quantity:quantity(item.quantity)};});
     validatePromotionItems(items);if(new Set(items.map(item=>item.lineId)).size!==items.length||r.quantity!==items.reduce((sum,item)=>sum+item.quantity,0))return invalid();
     array(r.rewards).forEach(value=>{expected(value);if(!items.some(item=>item.lineId===object(value).lineId))return invalid();});
-    if(!['PENDING','PAID','CANCELLED','EXPIRED','REFUNDED'].includes(string(r.paymentStatus))||!['PENDING_PAYMENT','COMPLETED','CANCELLED','EXPIRED','REFUNDED'].includes(string(r.orderStatus)))return invalid();
+    const orderStatus = string(r.orderStatus);
+    const historyFulfillment = history && r.paymentStatus === 'PAID' && (
+      (orderStatus === 'PAID' && r.activationStatus === 'WAITING_PROVISIONING' && r.canonicalStatus === 'paid'
+        && typeof r.paidAt === 'number' && Number.isSafeInteger(r.paidAt) && r.paidAt >= 0 && r.activatedAt == null)
+      || ((orderStatus === 'PROVISIONING' || orderStatus === 'PROCESSING') && r.activationStatus === 'PROVISIONING' && r.canonicalStatus === 'provisioning')
+      || (orderStatus === 'PROVISIONING_FAILED' && r.activationStatus === 'PROVISIONING_FAILED' && r.canonicalStatus === 'provisioning_failed')
+    );
+    if (!['PENDING','PAID','CANCELLED','EXPIRED','REFUNDED'].includes(string(r.paymentStatus))
+      || (!['PENDING_PAYMENT','COMPLETED','CANCELLED','EXPIRED','REFUNDED'].includes(orderStatus) && !historyFulfillment)) return invalid();
   }
   else {string(r.paymentStatus);string(r.orderStatus);}
   if(r.paymentMethod!==undefined&&r.paymentMethod!==null&&!PAYMENT_METHODS.includes(r.paymentMethod as typeof PAYMENT_METHODS[number]))return invalid();
   if(r.paidTotalUsdt!==undefined&&r.paidTotalUsdt!==null&&(typeof r.paidTotalUsdt!=='string'||!/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(r.paidTotalUsdt)))return invalid();
-  return r as OrderReceipt;
+  return r as PromotionOrder;
+}
+export function parsePromotedOrder(value: unknown): OrderReceipt {
+  return parsePromotionOrder(value, false) as OrderReceipt;
 }
 function page<T>(value:unknown,parse:(value:unknown)=>T):{items:T[];nextCursor:string|null;hasMore:boolean}{const p=object(value);if(typeof p.hasMore!=='boolean'||(p.nextCursor!==null&&typeof p.nextCursor!=='string'))return invalid();return {items:array(p.items).map(parse),nextCursor:p.nextCursor as string|null,hasMore:p.hasMore};}
 function query(fields:Record<string,unknown>):string{return Object.entries(fields).filter(([,v])=>v!==null&&v!==undefined&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&');}
@@ -159,7 +173,7 @@ export function createPromotionApi(client:ApiClient){return {
   async pay(orderNo:string,key:string,authorization?:import('./payment-password-api').PaymentPasswordAuthorization):Promise<OrderReceipt>{return parsePromotedOrder(await client.request({method:'POST',path:'/api/orders/'+encodeURIComponent(orderNo)+'/pay',idempotencyKey:key,body:authorization,retryAfterAuth:false}));},
   async paymentCommand(key:string){const result=await readPaymentCommand(client,'order-pay',key);return {...result,...(result.status==='SUCCEEDED'?{order:parsePromotedOrder(result.receipt)}:{})};},
   async cancel(orderNo:string,key:string):Promise<OrderReceipt>{return parsePromotedOrder(await client.request({method:'POST',path:'/api/orders/'+encodeURIComponent(orderNo)+'/cancel',idempotencyKey:key}));},
-  async findOrder(orderNo:string):Promise<OrderReceipt|null>{
+  async findOrder(orderNo:string):Promise<PromotionOrder|null>{
     let cursor:string|null=null;
     const seen=new Set<string>();
     do{
@@ -168,7 +182,7 @@ export function createPromotionApi(client:ApiClient){return {
       if(found){
         const order=object(found);
         // Order history marks the absence of a selected payment method as PENDING.
-        return parsePromotedOrder(order.paymentMethod==='PENDING'?{...order,paymentMethod:null}:order);
+        return parsePromotionOrder(order.paymentMethod==='PENDING'?{...order,paymentMethod:null}:order, true);
       }
       cursor=typeof p.nextCursor==='string'?p.nextCursor:null;
       if(cursor&&seen.has(cursor))return invalid();
