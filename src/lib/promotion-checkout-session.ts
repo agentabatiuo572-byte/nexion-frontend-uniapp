@@ -1,9 +1,9 @@
 import type { Quote } from '../api/promotion-api';
-import type { OrderReceipt, PromotionApi, PromotionOperation } from '../api/promotion-api';
+import type { OrderReceipt, PromotionApi, PromotionOperation, PromotionOrder } from '../api/promotion-api';
 import { checkoutCreateBlock, parsePromotedOrder, type CheckoutCreateBlock } from '../api/promotion-api';
 
 export interface PromotionPendingCommand { key: string; operation: PromotionOperation; targetId: string; paymentMethod?: 'WALLET' | 'EXTERNAL' }
-export interface PromotionCheckoutRecord { quote: Quote | null; order: OrderReceipt | null; pending: PromotionPendingCommand | null; previousPayment?: PromotionPendingCommand; voucherId?:string|null; voucherMode?:'auto'|'manual'; leavePromptShown?:boolean; paymentIntentRevision?:number }
+export interface PromotionCheckoutRecord { quote: Quote | null; order: PromotionOrder | null; pending: PromotionPendingCommand | null; previousPayment?: PromotionPendingCommand; voucherId?:string|null; voucherMode?:'auto'|'manual'; leavePromptShown?:boolean; paymentIntentRevision?:number }
 export const PROMOTION_CHECKOUT_TABLE='nexgrid-promotion-checkout-v1';
 /** A record without the payment the server no longer holds: the next payment takes a new key, and only the user starts it. */
 export function withoutPromotionPayment(record:PromotionCheckoutRecord,key:string):PromotionCheckoutRecord{
@@ -193,7 +193,7 @@ export class PromotionCheckoutSession {
       throw error;
     } finally { this.busy = false; }
   }
-  private validateOrder(order: OrderReceipt, q = this.record.quote): void {
+  private validateOrder(order: PromotionOrder, q = this.record.quote): void {
     const previous = this.record.order;
     if (previous && previous.orderNo !== order.orderNo) throw new Error('ORIGINAL_ORDER_MISMATCH');
     const decimal = (value: unknown) => String(value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
@@ -220,7 +220,7 @@ export class PromotionCheckoutSession {
       if(stable(rewards(order.rewards,order.items,q))!==stable(rewards(q.expectedRewards,q.items)))throw new Error('ORDER_REWARDS_MISMATCH');
     }
   }
-  private acceptOrder(order: OrderReceipt, retireRejectedPayment=false, createReceipt=false): void {
+  private acceptOrder(order: PromotionOrder, retireRejectedPayment=false, createReceipt=false): void {
     let quote = this.record.quote;
     if (order.recoveredQuoteId !== undefined) {
       const pending = this.record.pending;
@@ -237,7 +237,7 @@ export class PromotionCheckoutSession {
     this.confirmed = true;
     this.unseenPaymentKey=null;
   }
-  resume(order:OrderReceipt):void {
+  resume(order:PromotionOrder):void {
     if(this.record.pending||this.record.order||this.busy)throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
     this.acceptOrder(order);
   }
@@ -291,7 +291,7 @@ export class PromotionCheckoutSession {
         if (!this.ports.current()) return;
         if (result.status === 'SUCCEEDED' && result.order) {
           const creation = pending.operation === 'createOrder' || pending.operation === 'createBundle';
-          let order = result.order;
+          let order: PromotionOrder = result.order;
           if (creation && order.paymentStatus === 'PENDING') {
             // A recovered creation receipt can still carry the status at creation time.
             const liveOrder = await this.ports.api.findOrder(order.orderNo);

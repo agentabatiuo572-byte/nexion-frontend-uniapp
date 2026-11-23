@@ -2,10 +2,8 @@
   <view class="promotion promotion-main" :class="{'promotion-main--result':order?.paymentStatus==='PAID'}">
     <view v-if="!auth.isAuthenticated" class="promotion-flat"><text class="promotion-title">{{ p.signIn }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ p.signIn }}</text></PromotionAction></view>
     <view v-else-if="loading" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
-    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?getProduct(items[0].productNo)?.imageUrl:undefined" :amount="order.paidTotalUsdt??order.amountUsdt" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices" @support="contactResultSupport" v-slot="{ done }">
-      <!-- A secondary action that waits for the result presentation; 查看设备 stays the one primary (PRD purchase payment, line 49). -->
-      <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action" role="button" :tabindex="done&&resultSettled?0:-1" :aria-disabled="busy" :aria-hidden="!(done&&resultSettled)" :style="{visibility:done&&resultSettled?'visible':'hidden'}" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
-    </CheckoutResult>
+    <!-- The result's exits (查看设备, and 再买一台 via resultBuyAgain) sit in the page's bottom bar (checkout.vue #pageFixed, 04 §4.0). -->
+    <CheckoutResult ref="resultView" v-else-if="order?.paymentStatus==='PAID'" :order-no="order.orderNo" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?getProduct(items[0].productNo)?.imageUrl:undefined" :amount="resultAmount?.value" :currency="resultAmount?.currency" :error="resultError" @devices="viewDevices" @support="contactResultSupport" @order="viewOrder" />
     <template v-else>
       <!-- Original purchase state: a page-floor hint (icon + text, no card, no stripe) above the products: the result, which purchase it is, what not to do. -->
       <view v-if="keepRecoveryTarget" class="checkout-keep-recovery" role="status">
@@ -147,8 +145,8 @@ import { onBeforeRouteLeave } from 'vue-router';
 import { promotionApi,deviceE3Api,purchaseEligibilityApi,sessionVault } from '@/api/runtime';
 import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api';
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
-import type { PromotionItem } from '@/api/promotion-api';
-import { checkoutQuoteBlock, validatePromotionItems, type CheckoutCreateBlock, type CheckoutQuoteBlock, type OrderReceipt } from '@/api/promotion-api';
+import type { PromotionItem, PromotionOrder } from '@/api/promotion-api';
+import { checkoutQuoteBlock, validatePromotionItems, type CheckoutCreateBlock, type CheckoutQuoteBlock } from '@/api/promotion-api';
 import type { Quote } from '@/api/promotion-api';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
@@ -173,7 +171,8 @@ import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
 import { onPurchaseRecordReleased, pendingOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
-import { advisorChatRoute } from '@/lib/advisor-chat-route';
+import { openOrderAdvisorChat } from '@/lib/advisor-chat-route';
+import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-review';
 import { useConversations } from '@/store/conversations';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
 const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string}>();
@@ -225,6 +224,16 @@ function quotePresentationKey(){return JSON.stringify([app.accountKey,app.accoun
 const resultState=ref<'activated'|'inventory'|'processing'|'error'|'failed'>('processing'),resultError=ref(''),resultReading=ref(false);
 // 再买一单 waits for a confirmed result as well as the finished presentation.
 const resultSettled=computed(()=>resultState.value==='activated'||resultState.value==='inventory'||resultState.value==='failed');
+const resultAmount = computed(() => {
+  const receipt = order.value;
+  if (receipt?.paymentStatus !== 'PAID') return undefined;
+  const canonical = orders.visibleOrders.find(row => row.id === receipt.orderNo);
+  if (canonical && commerceOrderIsPaid(canonical)) return commercePaidOrderAmount(canonical);
+  return {
+    value: receipt.paidTotalUsdt ?? receipt.amountUsdt,
+    currency: receipt.paymentMethod === 'HDPAY_BANK' ? 'USD' as const : 'USDT' as const,
+  };
+});
 let resultGeneration=0;
 watch(()=>order.value?.orderNo,()=>{
   resultGeneration++;resultReading.value=false;resultState.value='processing';resultError.value='';
@@ -610,10 +619,10 @@ async function createOrder(){
 }
 const paymentDialogOwner=`promotion-payment:${Date.now()}:${Math.random()}`;
 // Photo signatures can renew while payment terms stay the same.
-function orderItemSignature(items:OrderReceipt['items']) {
-  return JSON.stringify(items?.map(({imageUrl,...line}: NonNullable<OrderReceipt['items']>[number] & {imageUrl?: string | null})=>line));
+function orderItemSignature(items:PromotionOrder['items']) {
+  return JSON.stringify(items?.map(({imageUrl,...line}: NonNullable<PromotionOrder['items']>[number] & {imageUrl?: string | null})=>line));
 }
-function paymentEntryFence(expected:OrderReceipt):()=>boolean {
+function paymentEntryFence(expected:PromotionOrder):()=>boolean {
   const generation=readGeneration,runtime=captureRuntimeRevision(),sessionRevision=sessionVault.revision();
   const signature=JSON.stringify([expected.orderNo,expected.amountUsdt,expected.payBy,orderItemSignature(expected.items)]);
   return ()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
@@ -621,7 +630,7 @@ function paymentEntryFence(expected:OrderReceipt):()=>boolean {
     &&session.confirmed&&!session.unknown&&order.value?.paymentStatus==='PENDING'
     &&JSON.stringify([order.value.orderNo,order.value.amountUsdt,order.value.payBy,orderItemSignature(order.value.items)])===signature;
 }
-async function checkPaymentEligibility(expected:OrderReceipt,entryCurrent:()=>boolean){
+async function checkPaymentEligibility(expected:PromotionOrder,entryCurrent:()=>boolean){
   const productNos=[...new Set((expected.items??[]).map(item=>item.productNo))];
   const results=await Promise.allSettled(productNos.map(productNo=>purchaseEligibilityApi.get(productNo)));
   updateClock();if(!entryCurrent()||payWindow.value!==true)return;
@@ -777,10 +786,9 @@ async function readCheckout(foreground=false):Promise<boolean>{
   finally{recoveryGeneration=null;}
 }
 const conversations=useConversations();
-// The failed result's exit, as on the order detail: copy the order number, then open support.
 function contactResultSupport(){
   const orderNo=order.value?.orderNo;if(!orderNo)return;
-  uni.setClipboardData({data:orderNo,success:async()=>{if(!current())return;const route=await advisorChatRoute(conversations);if(current())void navTo(route);}});
+  void openOrderAdvisorChat(conversations, orderNo, () => current() && visible.value);
 }
 async function readActivation(){
   if(!current()||!visible.value||resultReading.value||order.value?.paymentStatus!=='PAID')return;
@@ -790,17 +798,24 @@ async function readActivation(){
   try{
     if(catalogRefresh)await catalogRefresh;
     if(!valid())return;
-    const [canonical,fleetReady]=await Promise.all([orders.ensureRemoteOrder(orderNo),app.refreshRemoteFleet(app.captureRemoteAccountRequest())]);
+    // The order determines fulfillment. Refresh the wallet and fleet independently.
+    void refreshWallet(true,true);
+    const canonical=await orders.ensureRemoteOrder(orderNo);
     if(!valid())return;
-    walletState.value=fleetReady&&app.remoteFleetHasSnapshot?'ready':'error';
-    // A server-confirmed provisioning failure is the result, not a read-back problem (03 §3.5.2).
-    if(canonical&&canonical.id===orderNo&&canonical.status==='provisioning_failed'){resultState.value='failed';resultError.value='';return;}
-    if(!canonical||canonical.id!==orderNo||!fleetReady)throw new Error('ACTIVATION_READBACK_UNAVAILABLE');
-    if(canonical.status==='activated'||canonical.status==='inventory')resultState.value=canonical.status;
+    if(!canonical||canonical.id!==orderNo)throw new Error('ACTIVATION_READBACK_UNAVAILABLE');
+    if(canonical.status==='provisioning_failed')resultState.value='failed';
+    else if(canonical.status==='activated'||canonical.status==='inventory')resultState.value=canonical.status;
     else if(['paid','provisioning'].includes(canonical.status))resultState.value='processing';
     else throw new Error('ACTIVATION_READBACK_UNCONFIRMED');
     resultError.value='';
-  }catch{if(valid()){resultState.value='error';resultError.value=t.value.orders.walletPaymentConfirmedRefreshPending;if(walletState.value==='loading')walletState.value='error';}}
+  }catch{
+    if(valid()){
+      if(!resultSettled.value){
+        resultState.value='error';
+        resultError.value=t.value.orders.walletPaymentConfirmedRefreshPending;
+      }
+    }
+  }
   finally{if(generation===resultGeneration)resultReading.value=false;}
 }
 const purchaseReadBusy=()=>loading.value||busy.value||session.busy||!!recoveryRead.value||resultReading.value
@@ -862,6 +877,7 @@ let disposeGuard:(()=>void)|null=null;
 let paymentLeaveApproved=false;
 async function requestLeave():Promise<boolean>{
   if(nativeBackApproved||paymentLeaveApproved)return true;
+  if(order.value?.paymentStatus==='PAID')return current()&&visible.value;
   // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
   const pending=session.record.pending;
   if(pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)return !writeBusy.value&&!paymentConfirming.value;
@@ -883,7 +899,7 @@ async function requestLeave():Promise<boolean>{
 }
 function allowAuxiliaryNavigation():Promise<boolean>{
   // Recharge and legal links are auxiliary navigation, not checkout cancel.
-  return Promise.resolve(!writeBusy.value&&!paymentConfirming.value&&!leaving.value);
+  return Promise.resolve(order.value?.paymentStatus==='PAID' || !writeBusy.value&&!paymentConfirming.value&&!leaving.value);
 }
 function routeLeavesPurchase(path:string):boolean{
   return /\/(?:pages\/)?store(?:\/store|\/detail|\/bundle)?(?:\?|$)/.test(path);
@@ -966,9 +982,14 @@ const footer = computed(() => {
     return { amount, amountValue, currency, amountless: true, label: p.value.buyAgain, disabled: busy.value||leaving.value, action: startNewPurchase };
   return null;
 });
-const backDisabled=computed(()=>writeBusy.value||leaving.value||paymentConfirming.value||!!order.value&&order.value.paymentStatus==='PENDING'&&payWindow.value===null);
+const backDisabled=computed(()=>order.value?.paymentStatus!=='PAID'
+  && (writeBusy.value||leaving.value||paymentConfirming.value||order.value?.paymentStatus==='PENDING'&&payWindow.value===null));
 const resultVisible = computed(() => order.value?.paymentStatus === 'PAID');
-defineExpose({back,hide,show,footer,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,keepRecoveryReadError,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
+const resultView=ref<InstanceType<typeof CheckoutResult>|null>(null);
+// 再买一台 waits for a settled result (PRD purchase payment, line 49); the page puts it in the bar beside 查看设备. A failure
+// offers support instead, and a delivery to inventory has only its own two exits (替换一台在线设备, 稍后再说).
+const resultBuyAgain=computed(()=>!openedOriginal&&!props.orderNo&&props.items.length>0&&canStartNew.value&&resultState.value==='activated');
+defineExpose({back,hide,show,footer,resultView,resultBuyAgain,startNewPurchase,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,keepRecoveryReadError,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{
@@ -1001,7 +1022,8 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 
 <style scoped>
 .promotion-main { padding-bottom:140px; }
-.promotion-main--result { padding-bottom:var(--ui-space-inset); min-height:calc(100dvh - var(--nx-overlay-top) - var(--ui-space-section-gap) * 3); box-sizing:border-box; }
+/* The purchase result fills the screen itself (CheckoutResult), so the wrapper adds no height or foot of its own. */
+.promotion-main--result { box-sizing:border-box; }
 /* Original purchase state: title in the main ink, order line and note in the description role (01 §1.1.1 pairing 2, 10.1); no query button (03 §3.5.2). */
 .checkout-keep-recovery { display:flex; align-items:flex-start; gap:var(--v5-space-2); }
 .checkout-keep-recovery__icon { flex:none; margin-top:1px; color:var(--v5-warning-ink); }

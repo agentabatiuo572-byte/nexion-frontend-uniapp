@@ -27,7 +27,7 @@
       <view v-else-if="remoteTradeinRecoveryError" class="checkout-recovery-state nx-empty--page" role="status">
         <text>{{ t.tradein.recoveryChecking }}</text>
       </view>
-      <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" payment-confirmed :state="checkoutResultState" :delivery="completedOrder?.deviceDelivery" :product-name="completedOrder?.productName ?? product?.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? null" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @support="contactResultSupport" />
+      <CheckoutResult ref="storeResult" v-else-if="remoteApiEnabled && settledResultReplay && (!receiptWriteFailure || activeSession)" :order-no="orderId" payment-confirmed :state="checkoutResultState" :delivery="completedOrder?.deviceDelivery" :product-name="completedOrder?.productName ?? product?.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? null" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @support="contactResultSupport" @order="goTrack" />
       <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
@@ -241,6 +241,13 @@
       </view>
     </NxSheet>
     <template #pageFixed>
+      <!-- The purchase result's exits (store or activity checkout): the one primary 查看设备 with any secondary exit as a
+           tray text button (PRD purchase payment, line 49; 04 §4.0). The bar keeps its place, hidden and untouchable,
+           until the presentation completes, so the result reserves its final height from the start. -->
+      <view v-if="resultBar && (resultBar.exits.length || promotionBuyAgain)" class="checkout-sticky checkout-sticky--result checkout-result-tray nx-glass-bar" :class="{ 'is-waiting': !resultBar.done }">
+        <NxButton v-if="promotionBuyAgain" data-testid="checkout-buy-again" variant="secondary" :label="t.promotion.buyAgain" @click="promotionCheckout?.startNewPurchase()" />
+        <NxButton v-for="exit in resultBar.exits" :key="exit.key" :variant="exit.primary ? 'primary' : 'secondary'" :label="exit.label" @click="exit.run()" />
+      </view>
       <view v-if="promotionRoute && promotionCheckout?.footer" class="checkout-sticky nx-glass-bar" :class="{ 'checkout-sticky--single': promotionCheckout.footer.amountless }">
         <text v-if="promotionCheckout.footer.note" class="nx-tray-note w-full" role="status">{{ promotionCheckout.footer.note }}</text>
         <view v-if="!promotionCheckout.footer.amountless" class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
@@ -286,7 +293,7 @@ import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
 import { capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, originalCapacityCheckoutHref, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
-import { advisorChatRoute } from '@/lib/advisor-chat-route';
+import { advisorChatRoute, openOrderAdvisorChat } from '@/lib/advisor-chat-route';
 import { useConversations } from '@/store/conversations';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
@@ -484,6 +491,9 @@ const keepResumeAllowed = computed(() => {
 const keepRecoveryNotice = computed(() => capacityRecoveryNotice(t.value, keepCheckoutReadError.value, keepRecoveryOperation.value, keepResumeAllowed.value));
 defineExpose({ keepRecoveryOperation, keepRecoveryProduct, keepResumeAllowed, openKeepResume });
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
+const storeResult=ref<InstanceType<typeof CheckoutResult>|null>(null);
+const resultBar=computed(()=>promotionRoute.value?promotionCheckout.value?.resultView:storeResult.value);
+const promotionBuyAgain=computed(()=>!!promotionRoute.value&&promotionCheckout.value?.resultBuyAgain===true);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
 // An open payment layer registers its own back handler on this page; checkout leaves that press to it. So does any
@@ -1501,12 +1511,11 @@ function presentSettledPurchase(firstHardwareOrder: boolean, onResultShown: (() 
 }
 const checkoutResultState = computed(() => completedOrder.value?.status === 'activated' ? 'activated'
   : completedOrder.value?.status === 'inventory' ? 'inventory' : completedOrder.value?.status === 'provisioning_failed' ? 'failed' : 'processing');
-// The failed result's exit, as on the order detail: copy the order number, then open support.
 const conversations = useConversations();
 function contactResultSupport() {
   const orderNo = completedOrder.value?.id;
   if (!orderNo) return;
-  uni.setClipboardData({ data: orderNo, success: async () => { if (!pageAlive) return; const route = await advisorChatRoute(conversations); if (pageAlive) void navTo(route); } });
+  void openOrderAdvisorChat(conversations, orderNo, () => pageAlive);
 }
 // Support from the unreadable original-purchase state: there is no order number to copy, only the chat to open.
 const recoverySupportOpening = ref(false);
@@ -3726,7 +3735,9 @@ const doneBtnStyle: CSSProperties = {
 <style scoped>
 .checkout-header { margin-bottom:0; }
 .checkout-content { color:var(--v5-ink); padding-top:8px; padding-bottom:120px; }
-.checkout-content--result { padding-block: 0; }
+/* The design header row is 56 tall; the result root starts 52 down, as on the result board (A: icon 60), so its
+   full-height layout ends where the chassis foot pad starts and the page does not scroll. */
+.checkout-content--result { padding-block: 0; margin-top: calc(-1 * var(--v5-space-1)); }
 .checkout-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--v5-space-2); margin:0 16px; }
 .checkout-step-track { height:3px; border-radius:999px; background:var(--v5-surface-3); }
 .checkout-step-fill { height:100%; border-radius:inherit; }
@@ -3819,6 +3830,14 @@ button.checkout-policy-link::after { border:0; }
 .checkout-sticky--single :deep(.nx-button) { flex:1 1 auto; }
 /* Two exits share the row; if a long language still wraps, each button takes the full width (03 §3.6.1). */
 .checkout-sticky--exits :deep(.nx-button) { flex:1 1 auto; }
+/* Purchase result bar (board A): the one primary takes the free width, a secondary beside it keeps its label's width
+   as a tray text button; a lone exit or two secondaries share the row. It slides up once when the exits appear. */
+.checkout-sticky--result { animation: checkout-result-bar-in 260ms cubic-bezier(.16, 1, .3, 1) both; }
+.checkout-sticky--result.is-waiting { visibility: hidden; animation: none; }
+.checkout-sticky--result :deep(.nx-button) { flex:1 1 0; min-width:fit-content; }
+.checkout-sticky--result:has(> .nx-button--primary) :deep(.nx-button--secondary) { flex:0 0 auto; }
+@keyframes checkout-result-bar-in { from { opacity:0; transform:translateY(16px); } }
+@media (prefers-reduced-motion: reduce) { .checkout-sticky--result { animation:none; } }
 .checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }
 .checkout-summary-total :deep(.checkout-amount) { font-size:var(--ui-type-section); }
 /* Whole-page pending result (03 §3.4, §3.5.2): one centred status, no query button; short-body role (10.1). */
@@ -3850,7 +3869,7 @@ button.checkout-policy-link::after { border:0; }
 .checkout-receipt-failure__actions { display:flex; justify-content:flex-end; margin:var(--v5-space-1) -8px -8px 0; }
 /* Same top offset as the single-item card (content padding 8 + card margin 20). */
 .checkout-promotion { padding:calc(var(--v5-space-2) + var(--v5-space-5)) var(--v5-space-4) 120px; color:var(--v5-ink); }
-.checkout-promotion--result { padding: 0; }
+.checkout-promotion--result { padding: 0; margin-top: calc(-1 * var(--v5-space-1)); }
 .checkout-promotion :deep(.promotion-flat) { border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); padding:var(--v5-space-4); }
 .checkout-promotion :deep(.promotion-summary) { min-height:40px; font-size:14px; }
 .checkout-promotion :deep(.promotion-summary.total) { min-height:55px; font-size:18px; }
