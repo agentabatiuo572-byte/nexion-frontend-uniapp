@@ -124,6 +124,9 @@ const skuDefinitions = [
   ['stellarrack-p2','UVELRack P2','Flagship',19999,2250,50,'8 × H100','1,024 GB',4000],
   ['cloud-share','Cloud Share','Share',19.9,18,3,'Distributed','—',0],
 ];
+const catalogTaglineTranslations = {
+  'stellarbox-pro': { zh:'全托管设备', vi:'Thiết bị vận hành trọn gói' },
+};
 const demoCatalogBadges = [
   {badge:'Recommended',badgeKind:'recommended'},
   {badge:'Best seller',badgeKind:'bestSeller'},
@@ -860,7 +863,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
   if(pathname==='/auth/users/oauth/provider/linked')return ['GOOGLE'];
-  if(pathname==='/api/store/catalog') return {...authority,source:'nx_product',revision:null,products:empty?[]:products};
+  if(pathname==='/api/store/catalog') {
+    const requested=(url.searchParams.get('locale')?.trim()||state.profile?.language||locale).toLowerCase().split(/[-_]/)[0];
+    const language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(requested)?requested:'en';
+    return {...authority,source:'nx_product',revision:null,products:empty?[]:products.map(product=>({
+      ...product,tagline:catalogTaglineTranslations[product.id]?.[language]??product.tagline,
+    }))};
+  }
   if(pathname==='/api/product/phase') return {phase:'P2',source:'H1_GROWTH_RHYTHM',devOverrideAllowed:false};
   if(pathname==='/api/store/purchase-eligibility'||pathname==='/api/app/team/quota'){
     const members=demoTeamNetworkMembers(state,now);
