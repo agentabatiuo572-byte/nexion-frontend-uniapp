@@ -237,7 +237,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.spv-glass svg { width: 20px; height: 20px; }
+.spv-glass svg, .spv-glass .nx-native-svg { width: 20px; height: 20px; }
 .spv-sub {
   max-width: 100%;
   margin-top: 2px;
@@ -262,7 +262,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 .spv--design { display:grid;grid-template-columns:minmax(72px,max-content) minmax(0,1fr) minmax(72px,max-content);gap:0;margin:0 0 12px;padding:6px;border-radius:0; }
 .spv--design .spv-back { margin-left:6px; }
 .spv--design .spv-glass { width:44px;height:44px;border-radius:50%; }
-.spv--design .spv-glass svg { width:20px;height:20px; }
+.spv--design .spv-glass svg, .spv--design .spv-glass .nx-native-svg { width:20px;height:20px; }
 .spv-title:lang(zh) { letter-spacing: 0; }
 .spv--design .spv-action { min-width:72px;padding:0 4px;font-size:14px; }
 </style>
