@@ -1,3 +1,4 @@
+import { parseEstimateRange } from "@/api/estimate-range";
 import { ref, shallowRef, watch } from "vue";
 import { parseServerTimestamp } from "@/api/server-time";
 import type { SessionSnapshot, SessionVault } from "@/api/session-vault";
@@ -49,12 +50,14 @@ let context: Context | null = null, accepted = false, binding = 0;
 let restored = new Set<TabSnapshotKey>();
 
 // The storage boundary validates this new format once. No migration or whole-store hydration.
-type Schema = "signedNumber" | "number" | "count" | "percent" | "string" | "boolean" | { nullable: Schema } | { list: Schema } | { oneOf: readonly unknown[] } | { anyOf: Schema[] } | { fields: Record<string, Schema> };
+type Schema = "estimateRange" | "signedNumber" | "number" | "count" | "percent" | "string" | "boolean" | { nullable: Schema } | { list: Schema } | { oneOf: readonly unknown[] } | { anyOf: Schema[] } | { fields: Record<string, Schema> };
 const n: Schema = "number", c: Schema = "count", pct: Schema = "percent", s: Schema = "string", b: Schema = "boolean";
 const nullable = (value: Schema): Schema => ({ nullable: value });
 const fields = (value: Record<string, Schema>): Schema => ({ fields: value });
 const list = (value: Schema): Schema => ({ list: value });
-const amount = nullable(fields({ usd: n, nex: n }));
+const range = nullable("estimateRange");
+// Catalog amounts carry the catalog's daily ranges; the phone tier and snapshots written before ranges have none.
+const amount = nullable({ anyOf: [fields({ usd: n, nex: n }), fields({ usd: n, nex: n, usdRange: range, nexRange: range })] });
 const period = fields({ usdt: nullable(n), nex: nullable(n), jobCount: nullable(c) });
 const localized = fields({ zh: s, en: s, vi: s });
 const promotionSlot = { role: { oneOf: ["purchase", "gift"] }, sku: s };
@@ -76,6 +79,8 @@ const schemas: Record<TabSnapshotKey, Schema> = {
 };
 function record(value: unknown): value is Record<string, unknown> { return !!value && typeof value === "object" && !Array.isArray(value); }
 function valid(value: unknown, schema: Schema): boolean {
+  if (schema === "estimateRange") return record(value)
+    && Object.entries(value).every(([key, end]) => (key === "low" || key === "high") && valid(end, nullable(n)));
   if (schema === "signedNumber") return typeof value === "number" && Number.isFinite(value);
   if (schema === "number" || schema === "count" || schema === "percent") return typeof value === "number" && Number.isFinite(value) && value >= 0
     && (schema !== "count" || Number.isSafeInteger(value)) && (schema !== "percent" || value <= 100);
@@ -95,7 +100,15 @@ function parseRow(value: unknown): Row | null {
       || !(block.generatedAt === null || parseServerTimestamp(block.generatedAt) !== null)
       || !valid(block.data, schemas[key as TabSnapshotKey])) return null;
   }
-  return value as unknown as Row;
+  const row = value as unknown as Row;
+  // Existing rows may have been written before the catalog enforced ordered pairs.
+  const catalog = row.blocks.catalogYield?.data;
+  for (const amount of [row.blocks.phoneYield?.data, catalog?.entry, catalog?.pro, catalog?.rack,
+    ...(catalog?.ladder.map(({ amount }) => amount) ?? [])]) {
+    if (amount?.usdRange) amount.usdRange = parseEstimateRange(amount.usdRange.low, amount.usdRange.high);
+    if (amount?.nexRange) amount.nexRange = parseEstimateRange(amount.nexRange.low, amount.nexRange.high);
+  }
+  return row;
 }
 function remove(accountKey: string): void {
   if (accountKey !== "default" && !removeAccountRow(TAB_FIRST_SCREEN_TABLE, accountKey)) console.warn("[tab-first-screen] storage removal unavailable");

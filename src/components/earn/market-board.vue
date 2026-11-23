@@ -67,6 +67,7 @@
           :key="d.rank"
           class="earn-ranking-row"
           :class="{ 'earn-ranking-row--link': d.kind }"
+          :style="{ '--rank-figure-ch': rankFigureChars }"
           :role="d.kind ? 'link' : undefined"
           :tabindex="d.kind ? 0 : undefined"
           @click="d.kind && goDetail(d.kind)"
@@ -76,7 +77,7 @@
           <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.imageUrl" />
           <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text></view>
           <view class="earn-ranking-value">
-            <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
+            <text class="earn-ranking-value__amount">{{ rankAmountText(d) }}</text>
             <!-- Decorative (the amount is read); aria-valuenow is the shared bar's state hook: no fill when unknown, no head dot at 0. -->
             <view class="earn-ranking-value__track nx-progress" aria-hidden="true" :aria-valuenow="d.dailyEarn === null ? undefined : Math.round(rankShare(d))"><view v-viz-inview class="nx-progress__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
           </view>
@@ -88,9 +89,10 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatEstimate } from "@/lib/estimate-display";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
+import type { EstimateRange } from "@/api/estimate-range";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import type { DeviceKind, TaskCategory } from "@/store/types";
@@ -121,6 +123,7 @@ interface DeviceRanking {
   /** 商品品牌名(不翻译);手机档没有商品名,走 t.market.yourPhone。 */
   name?: string;
   dailyEarn: number | null;
+  dailyUsdtRange?: EstimateRange | null;
   isPhone?: boolean;
   kind?: Exclude<DeviceKind, "phone">;
 }
@@ -177,7 +180,7 @@ const workloadCopy = (row: WorkloadPrice) => {
   return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
 };
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, imageUrl: row.imageUrl, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, dailyUsdtRange: row.dailyUsdtRange, imageUrl: row.imageUrl, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS.map(row => ({ ...row, imageUrl: getProductMedia(row.kind)?.src })));
 
 function spokenWorkload(w: WorkloadPrice): string {
@@ -205,6 +208,11 @@ function trendClass(delta: number): string | undefined {
 }
 // Bars scale to the best tier; a non-zero tier always keeps a visible sliver.
 const rankMax = computed(() => Math.max(0, ...deviceRankings.value.map((row) => row.dailyEarn ?? 0)));
+function rankAmountText(row: DeviceRanking): string {
+  return row.dailyEarn === null && !row.dailyUsdtRange ? "—" : `$${formatEstimate(row.dailyEarn ?? 0, row.dailyUsdtRange)}${t.value.coreReview.perDay}`;
+}
+// The longest amount sets the shared value column (see .earn-ranking-value in the styles).
+const rankFigureChars = computed(() => Math.max(1, ...deviceRankings.value.map((row) => rankAmountText(row).length)));
 function rankShare(row: DeviceRanking): number {
   return row.dailyEarn && rankMax.value > 0 ? Math.max(3, row.dailyEarn / rankMax.value * 100) : 0;
 }
@@ -265,7 +273,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__spark { height: 22px; margin-top: auto; padding-top: 6px; box-sizing: content-box; line-height: 0; }
 .earn-market__spark :deep(.earn-market-spark) { display: block; width: 100%; height: 100%; overflow: visible; }
 .earn-market__rank { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border); }
-.earn-ranking-row { display: grid; grid-template-columns: 22px 48px minmax(0, 1fr) 96px; align-items: center; gap: 8px; min-height: 48px; }
+.earn-ranking-row { display: grid; grid-template-columns: 22px 48px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 48px; }
 .earn-ranking-row--link { cursor: pointer; }
 .earn-ranking-row--link:active { opacity: .7; }
 .earn-ranking-row--link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
@@ -277,11 +285,13 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
 /* A long name (the phone row in kk, ru…) wraps in full instead of being cut (03 §3.6.1); the row grows with it. */
 .earn-ranking-row__name { min-width: 0; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
-.earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
+/* The value column is as wide as the longest amount (JetBrains Mono: one ch per character, at least the bar's 96px), so
+   every row matches and a range such as $5.5–6.9/ngày is never cut (01 §1.2). */
+.earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: max(96px, calc(var(--rank-figure-ch, 13) * 1ch)); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); }
 /* A plain estimate in the main ink: amber is the business hue for icons and graphics, not for amount text (01 §1.1.1, §1.1.2). */
 .earn-ranking-value__amount { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* The bar is the shared thin progress (.nx-progress in tokens.css); the ranking only sets its width and the device hue. */
-.earn-ranking-value__track { width: 96px; --nx-progress-hue: var(--v5-tech-cyan); }
+.earn-ranking-value__track { width: 100%; --nx-progress-hue: var(--v5-tech-cyan); }
 /* Still placeholders (no shimmer) in the shape of the tiles and rows they stand for. */
 .earn-market__bar { height: 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 /* 12 + 16 = the price line's 8px gap and 20px line box. */
@@ -292,10 +302,10 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
   .earn-market__tile { padding: 10px 8px 8px; }
 }
 @media (max-width: 374px) {
-  .earn-ranking-row { grid-template-columns: 22px 40px minmax(0, 1fr) 88px; }
+  .earn-ranking-row { grid-template-columns: 22px 40px minmax(0, 1fr) auto; }
+  .earn-ranking-value { min-width: max(88px, calc(var(--rank-figure-ch, 13) * 1ch)); }
   .earn-ranking-row__art { width: 40px; height: 36px; }
   .earn-ranking-row__art :deep(.device-art__image) { width: 52px; height: 52px; }
-  .earn-ranking-value__track { width: 88px; }
 }
 @media (max-width: 350px) {
   .earn-ranking-row { grid-template-columns: 22px 40px minmax(0, 1fr) 84px; }

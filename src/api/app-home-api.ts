@@ -1,3 +1,4 @@
+import { parseEstimateRange, type EstimateRange } from "./estimate-range";
 import { productMediaUrl } from "@/api/product-catalog-contract";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
@@ -27,6 +28,7 @@ export interface AppHomeDeviceRanking {
   name: string | null;
   kind: DeviceKind | null;
   dailyUsdt: number | null;
+  dailyUsdtRange: EstimateRange | null;
 }
 
 export interface AppHomeOnGridClient {
@@ -39,8 +41,8 @@ export interface AppHomeOnGridClient {
 
 export interface AppHomeDoTheMath {
   basis: "OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT";
-  base: { kind: DeviceKind; productNo?: string; imageUrl?: string; name: string; dailyUsdt: number };
-  target: { productNo: string; kind: DeviceKind; imageUrl?: string; name: string; dailyUsdt: number; priceUsdt: number };
+  base: { kind: DeviceKind; productNo?: string; imageUrl?: string; name: string; dailyUsdt: number; dailyUsdtRange: EstimateRange | null };
+  target: { productNo: string; kind: DeviceKind; imageUrl?: string; name: string; dailyUsdt: number; dailyUsdtRange: EstimateRange | null; priceUsdt: number };
   multiplier: number;
   paybackDays: number;
 }
@@ -129,13 +131,16 @@ function workload(v: unknown): AppHomeWorkload {
   const result = { code: v.code as TaskCategory, name: text(v.name), unit: text(v.unit), price: optional("price"), deltaPct: v.deltaPct == null ? null : (typeof v.deltaPct === "number" && Number.isFinite(v.deltaPct) ? v.deltaPct : invalid()), sparkline: nullableSeries(v.sparkline), flagshipDeltaPct: v.flagshipDeltaPct == null ? null : (typeof v.flagshipDeltaPct === "number" && Number.isFinite(v.flagshipDeltaPct) ? v.flagshipDeltaPct : invalid()) };
   return result;
 }
+function dailyUsdtRange(row: Row): EstimateRange | null {
+  return parseEstimateRange(row.dailyEstimateLowUsdt, row.dailyEstimateHighUsdt);
+}
 function ranking(v: unknown): AppHomeDeviceRanking {
   if (!isRow(v)) return invalid();
   const rank = integer(v.rank);
   const kind = v.kind == null ? null : (typeof v.kind === "string" && DEVICE_KINDS.has(v.kind as DeviceKind) ? v.kind as DeviceKind : null);
   const dailyUsdt = v.dailyUsdt == null ? null : nonNegative(v.dailyUsdt);
   if (rank === null || rank < 1 || (v.kind != null && kind === null) || (v.dailyUsdt != null && dailyUsdt === null)) return invalid();
-  return { rank, name: text(v.name), kind, dailyUsdt, imageUrl: productMediaUrl(v.imageUrl) };
+  return { rank, name: text(v.name), kind, dailyUsdt, dailyUsdtRange: dailyUsdtRange(v), imageUrl: productMediaUrl(v.imageUrl) };
 }
 function client(v: unknown): AppHomeOnGridClient {
   if (!isRow(v)) return invalid();
@@ -164,8 +169,8 @@ function doTheMath(v: unknown): AppHomeDoTheMath | null {
       || paybackDays !== Math.round(priceUsdt / targetDaily)) return invalid();
   return {
     basis: v.basis,
-    base: { kind: baseKind, productNo: text(v.base.productNo) ?? undefined, imageUrl: productMediaUrl(v.base.imageUrl), name: baseName, dailyUsdt: baseDaily },
-    target: { productNo, kind: targetKind, imageUrl: productMediaUrl(v.target.imageUrl), name: targetName, dailyUsdt: targetDaily, priceUsdt },
+    base: { kind: baseKind, productNo: text(v.base.productNo) ?? undefined, imageUrl: productMediaUrl(v.base.imageUrl), name: baseName, dailyUsdt: baseDaily, dailyUsdtRange: dailyUsdtRange(v.base) },
+    target: { productNo, kind: targetKind, imageUrl: productMediaUrl(v.target.imageUrl), name: targetName, dailyUsdt: targetDaily, dailyUsdtRange: dailyUsdtRange(v.target), priceUsdt },
     multiplier, paybackDays,
   };
 }

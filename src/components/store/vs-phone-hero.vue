@@ -14,8 +14,8 @@
            the card, while the same device reads 「你的手机」 on Home / Earn / inventory. -->
       <view>
         <text class="block" :style="deviceStyle">{{ baseName }}</text>
-        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsd(authority.phone)" :style="phoneNumStyle">
-          <text>{{ storefrontUsd(authority.phone) }}</text><text :style="unitStyle">{{ t.store.vsPerDay }}</text>
+        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdPoint(authority.phone)" :style="phoneNumStyle">
+          <text>{{ storefrontUsdPoint(authority.phone) }}</text><text :style="unitStyle">{{ t.store.vsPerDay }}</text>
         </view>
         <!-- 「/天」后缀恒用弱化色(与本卡美元侧同档 ink-4),不跟数字的强调色走 -->
         <view class="block mt-1 min-w-0 overflow-hidden nx-num-metric whitespace-nowrap" :aria-label="phoneNexFullText" style="font-size: 12px; color: var(--v5-brand); font-weight: 500"><text>{{ phoneNexText }}</text><text :style="subUnitStyle">{{ t.store.vsPerDay }}</text></view>
@@ -28,8 +28,8 @@
       <!-- S1 -->
       <view class="text-right">
         <text class="block" :style="deviceStyle">{{ t.store.ladderS1 }}</text>
-        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsd(authority.entry)" :style="s1NumStyle">
-          <text>{{ storefrontUsd(authority.entry) }}</text><text :style="unitStyle">{{ t.store.vsPerDay }}</text>
+        <view class="mt-1 tabular-nums whitespace-nowrap overflow-hidden" :aria-label="storefrontUsdPoint(authority.entry)" :style="s1NumStyle">
+          <text>{{ storefrontUsdPoint(authority.entry) }}</text><text :style="unitStyle">{{ t.store.vsPerDay }}</text>
         </view>
         <view class="block mt-1 min-w-0 overflow-hidden nx-num-metric whitespace-nowrap" :aria-label="entryNexFullText" style="font-size: 12px; color: var(--v5-brand); font-weight: 500"><text>{{ entryNexText }}</text><text :style="subUnitStyle">{{ t.store.vsPerDay }}</text></view>
       </view>
@@ -41,15 +41,15 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { storefrontNex, storefrontNexFull, storefrontUsd, type StoreYieldAuthority } from "@/lib/store-yield-authority";
+import { storefrontNexFull, storefrontNexPoint, storefrontUsdPoint, type StoreYieldAuthority } from "@/lib/store-yield-authority";
 
 const t = useT();
 const props = defineProps<{ authority: StoreYieldAuthority }>();
 const authority = computed(() => props.authority);
 const baseName = computed(() => t.value.store.ladderPhone);
 const multiplierText = computed(() => props.authority.multiplier === null ? '—' : `${props.authority.multiplier}×`);
-const phoneNexText = computed(() => `+${storefrontNex(authority.value.phone)}\u00A0UVT`);
-const entryNexText = computed(() => `+${storefrontNex(authority.value.entry)}\u00A0UVT`);
+const phoneNexText = computed(() => `+${storefrontNexPoint(authority.value.phone)}\u00A0UVT`);
+const entryNexText = computed(() => `+${storefrontNexPoint(authority.value.entry)}\u00A0UVT`);
 const phoneNexFullText = computed(() => `+${storefrontNexFull(authority.value.phone)}${t.value.store.vsPerDay}`);
 const entryNexFullText = computed(() => `+${storefrontNexFull(authority.value.entry)}${t.value.store.vsPerDay}`);
 

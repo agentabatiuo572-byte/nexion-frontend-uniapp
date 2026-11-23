@@ -112,7 +112,8 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
-import { productDailyEstimateRange } from "@/lib/product-estimates";
+import { productDailyEstimateRange, productDailyUvtRange } from "@/lib/product-estimates";
+import { formatEstimateRange } from "@/lib/estimate-display";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import type { DeviceKind } from "@/store/types";
@@ -310,27 +311,17 @@ function toggleGateDetails() {
 
 // Text helpers (toFixed / toLocaleString / fmt) — kept out of template for clarity
 const dailyEstimate = computed(() => productDailyEstimateRange(props.product));
-const dailyEarnText = computed(() => {
-  const estimate = dailyEstimate.value;
-  if (!estimate) return "";
-  if (!isShare.value) return formatGroupedAmount(estimate.low);
-  const low = formatGroupedAmount(estimate.low), high = formatGroupedAmount(estimate.high);
-  return low === high ? low : `${low}–${high}`;
-});
+// Estimates use the shared estimate format: the catalog range when sent, two significant figures (estimate-display.ts).
+const dailyEarnText = computed(() => dailyEstimate.value ? formatEstimateRange(dailyEstimate.value.low, dailyEstimate.value.high) : "");
 const compactEstimate = computed(() => {
-  if (isShare.value) {
-    const value = dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—";
-    // Same short label as the device cards; the accessible name keeps the full wording.
-    return { label: estimateLabel.value, value, ariaLabel: `${t.value.bundle.estimatedDaily} · ${value}` };
-  }
-  const daily = `$${formatGroupedAmount(props.product.dailyEarn)}`;
-  return {
-    label: estimateLabel.value,
-    value: `${daily}${t.value.store.cardPerDaySuffix}`,
-    ariaLabel: `${t.value.store.cardYouEarn} · ${daily}${t.value.store.cardPerDaySuffix}`,
-  };
+  const value = dailyEstimate.value ? `$${dailyEarnText.value}${t.value.store.cardPerDaySuffix}` : "—";
+  // Same short label for every product; the accessible name keeps the full wording.
+  return { label: estimateLabel.value, value, ariaLabel: `${isShare.value ? t.value.bundle.estimatedDaily : t.value.store.cardYouEarn} · ${value}` };
 });
-const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: formatAmount(props.product.dailyEarnNEX) }));
+const nexPerDayText = computed(() => {
+  const uvt = productDailyUvtRange(props.product);
+  return fmt(t.value.store.cardNexPerDay, { n: formatEstimateRange(uvt.low, uvt.high) });
+});
 const tradeCreditText = computed(() =>
   fmt(t.value.store.cardTradeCredit, { n: formatAmount(bestTradeinCredit.value) }),
 );
