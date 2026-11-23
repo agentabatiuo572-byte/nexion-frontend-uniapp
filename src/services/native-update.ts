@@ -158,8 +158,12 @@ export async function openInstaller(onFailure: () => void) {
     const status = await new Promise<number>((resolve, reject) => uni.request({ url: p.downloadUrl, method: "HEAD",
       timeout: 10000, success: response => resolve(response.statusCode), fail: reject }));
     if (status !== 200) throw Error("installer unavailable");
-  } else if (!/^https:\/\/apps\.apple\.com\/(?:[a-z]{2}\/)?app\/(?:[\w%-]+\/)?id[0-9]+$/.test(p.downloadUrl)) {
-    throw Error("untrusted store");
+  } else {
+    const appStore = /^https:\/\/apps\.apple\.com\/(?:[a-z]{2}\/)?app\/(?:[\w%-]+\/)?id[0-9]+$/.test(p.downloadUrl);
+    const testInstaller = apiRuntimeConfig.baseUrl === "https://api-test.uvel.ai"
+      && installed.value.hostPackage === "ai.uvel.app.test" && /^[0-9a-f]{64}$/.test(p.sha256)
+      && /^https:\/\/[a-z0-9-]+\.wvedkov\.cn:8443\/api\/c\/[a-zA-Z0-9]+$/.test(p.downloadUrl);
+    if (!appStore && !testInstaller) throw Error("untrusted store");
   }
   // The OS handles installation and signature validation. Opening the URL gives no installation receipt.
   plus.runtime.openURL(p.downloadUrl, onFailure);

@@ -13,6 +13,7 @@ export function validNativePushToken(value: NativePushToken, platform: "android"
 export interface NativePushPort {
   platform: "android" | "ios";
   appVersion: string;
+  appBuild?: number;
   apnsTopic?: string;
   installationId(): string;
   bindingToken(): string;
@@ -41,6 +42,7 @@ export function pushNotificationId(value: unknown): string | null {
 // Explicit read-only entry points. No payment/activation commands or arbitrary query keys.
 const ROUTES: Record<string, readonly string[]> = {
   "/pages/me/notifications": [],
+  "/pages/me/app-update": [],
   "/pages/me/security": [],
   "/pages/me/wallet-bills": [],
   "/pages/me/wallet-withdraw-tracking": ["id"],
@@ -154,7 +156,7 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
       await authenticatedRequest({ path: `/api/me/push-installations/${encodeURIComponent(id)}`, method: "PUT",
         headers: { "X-Push-Binding-Token": token },
         body: { clientId, provider, platform: port.platform, permission, appVersion: port.appVersion,
-          apnsTopic: port.apnsTopic } }, snapshot, captured);
+          appBuild: port.appBuild, apnsTopic: port.apnsTopic } }, snapshot, captured);
       if (current(snapshot, captured)) {
         registered = key;
         if (tokenRevision === capturedTokenRevision) port.registrationUnavailable?.(false);
