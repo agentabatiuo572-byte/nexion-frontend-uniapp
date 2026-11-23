@@ -162,7 +162,7 @@ function bannerImageProps(activity:EntryPromotion){
 function clear(resetBanners=true){liveItems.value=[];liveListRead.value=false;cursor.value=null;hasMore.value=false;activeIndex.value=0;termsActivity.value=null;if(resetBanners){imageRefresh.value++;loadedBanners.value.clear();}}
 function publicName(id:string){void productCatalogState.status;return sessionVault.read()?getProduct(id)?.name??id:id;}
 function homeRewardSummary(activity:EntryPromotion) {
-  if ('displayOnly' in activity) return activity.benefit;
+  if ('displayOnly' in activity) return keepUnits(activity.benefit);
   const reward=activity.rewardRules[0]?.buyerReward;
   if(!reward)return '';
   return keepUnits(localized(reward.disclosure.benefitDescription,locale.code)
