@@ -18,7 +18,8 @@
         <view v-if="state === 'loading'" class="nx-receipt-skeleton" style="width: 180px; height: 14px" aria-hidden="true" />
         <view v-else class="flex items-center" style="gap: 8px">
           <NxTag v-if="isReceiptSettled" tone="success" class="nx-receipt-stamp"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</NxTag>
-          <text class="nx-receipt-line" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ receiptStatus }} · {{ receiptTime }}</text>
+          <!-- Wraps instead of cutting off: a status and a completion time in long languages need the room (03 §3.6.1). -->
+          <text class="nx-receipt-status-line">{{ receiptStatus }} · {{ receiptTime }}</text>
         </view>
       </view>
 
@@ -511,6 +512,7 @@ const copyRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap
 .nx-receipt-modal-root--placeholder :deep(.nx-sheet__body) { flex: 1; }
 .nx-receipt-modal-root :deep(.nx-sheet__footer) { display: flex; justify-content: center; padding: 4px 20px calc(4px + var(--nx-overlay-safe-bottom)); }
 .nx-receipt-stamp { gap: 4px; }
+.nx-receipt-status-line { flex: 1; min-width: 0; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
 .nx-receipt-amounts { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
 /* Main amount (01.2): Montserrat digits, whole part ink; fraction and unit auxiliary; a unit under 30px uses the auxiliary-figure role. */
 .nx-receipt-amount { display: block; white-space: nowrap; color: var(--v5-ink); font: 500 26px/1.3 var(--font-amount); font-variant-numeric: tabular-nums; }
