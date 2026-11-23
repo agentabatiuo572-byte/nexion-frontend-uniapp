@@ -1243,9 +1243,14 @@ async function handleRevoke(s: SessionListItem) {
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+  // Name the row the user tapped and what ends (03 §3.5): two installs can share a name, network and relative time, so
+  // the exact last-active time tells them apart.
   const ok = await uiConfirm({
-    title: t.value.security.sessionRevoke,
-    message: `${t.value.security.sessionRevokeConfirm}\n\n${sessionDeviceLabel(s)} · ${t.value.security.sessionLocation}`,
+    title: t.value.security.sessionRevokeConfirm,
+    message: fmt(t.value.security.sessionRevokeConfirmBody, {
+      device: sessionDeviceLabel(s),
+      time: formatDisplayDateTime(s.lastActiveMs, dateLocale()),
+    }),
     danger: true,
     confirmLabel: t.value.security.sessionRevoke,
     owner: securityConfirmOwner,

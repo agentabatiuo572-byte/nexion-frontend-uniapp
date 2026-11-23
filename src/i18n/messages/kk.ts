@@ -3288,6 +3288,7 @@ export const kk: Messages = {
     sessionRevoke: "Шығу",
     sessionRevoked: "Құрылғыдағы сеанс аяқталды",
     sessionRevokeConfirm: "Сеансты аяқтайсыз ба?",
+    sessionRevokeConfirmBody: "{device} құрылғысындағы барлық сеанс (соңғы белсенділік {time}) аяқталады, қайта кіру керек болады.",
     revokeAll: "Басқа құрылғылардың бәрінен шығу",
     revokeAllConfirm: "Басқа құрылғылар аккаунттан шығарылады және қайта кіруі керек болады.",
     revokeAllDone: "Басқа құрылғылардағы сеанстар аяқталды",

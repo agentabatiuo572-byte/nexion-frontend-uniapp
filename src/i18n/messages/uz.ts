@@ -3288,6 +3288,7 @@ export const uz: Messages = {
     sessionRevoke: "Chiqarish",
     sessionRevoked: "Qurilma chiqarildi",
     sessionRevokeConfirm: "Bu qurilmadan chiqilsinmi?",
+    sessionRevokeConfirmBody: "{device} qurilmasidagi barcha seanslar (oxirgi faollik {time}) yakunlanadi va qayta kirish kerak boʻladi.",
     revokeAll: "Boshqa qurilmalardan chiqish",
     revokeAllConfirm: "Boshqa qurilmalar akkauntdan chiqariladi va qayta kirishi kerak boʻladi.",
     revokeAllDone: "Boshqa barcha qurilmalar chiqarildi",
