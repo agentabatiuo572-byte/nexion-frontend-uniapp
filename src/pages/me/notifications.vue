@@ -31,9 +31,11 @@
         <EmptyState v-if="!notifs.loading && !notifs.readFailedWithoutData && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
         <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
           <text v-if="index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts)" class="notification-date" role="heading" aria-level="2">{{ dateHeading(n.ts) }}</text>
-          <view class="notification-row" role="button" tabindex="0" :aria-label="platformDisplayText(n.title)" :aria-expanded="directNotice(n) ? undefined : expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
+          <view class="notification-row" role="button" tabindex="0" :aria-label="n.earning ? earningRowLabel(n.earning) : platformDisplayText(n.title)" :aria-haspopup="n.earning ? 'dialog' : undefined" :aria-expanded="n.earning || directNotice(n) ? undefined : expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
             <NxIconTile class="notification-tile" :tone="CATEGORY_TONES[notificationCategory(n)]" size="m"><view class="notification-glyph" v-html="kindIcon(n)" /></NxIconTile>
-            <view class="notification-content"><view class="notification-top"><view class="notification-heading"><text class="notification-title">{{ keepUnits(platformDisplayText(n.title)) }}</text><text v-if="n.priority === 'critical' || n.priority === 'high'" class="notification-important">{{ t.notifs.important }}</text></view></view><text v-if="n.body && expandedId !== n.id" class="notification-preview">{{ keepUnits(platformDisplayText(n.body)) }}</text></view>
+            <!-- Earnings credited (04.5): the amount takes the title slot; 收益到账 · device · job is the summary. -->
+            <view v-if="n.earning" class="notification-content"><view class="notification-amounts"><text v-for="(amount, ai) in earningAmounts(n.earning)" :key="amount.unit" class="notification-amount">{{ amount.sign }}{{ amountsHidden ? '••••' : amount.value }}&nbsp;<text class="notification-amount__unit">{{ amount.unit }}</text><text v-if="ai === 0 && earningAmounts(n.earning).length > 1" class="notification-amount__sep">&nbsp;·</text></text></view><text class="notification-preview notification-earning-summary"><template v-for="(part, pi) in earningSummary(n.earning)" :key="pi"><text v-if="pi">&nbsp;· </text><text :class="{ 'notification-earning-device': part.device }">{{ part.text }}</text></template></text></view>
+            <view v-else class="notification-content"><view class="notification-top"><view class="notification-heading"><text class="notification-title">{{ keepUnits(platformDisplayText(n.title)) }}</text><NxTag v-if="n.priority === 'critical' || n.priority === 'high'" tone="warning" :label="t.notifs.important" /></view></view><text v-if="n.body && expandedId !== n.id" class="notification-preview">{{ keepUnits(platformDisplayText(n.body)) }}</text></view>
 <view class="notification-meta"><text class="notification-time">{{ timeAgo(n.ts) }}</text><view v-if="!n.readAt" class="message-status-dot" aria-hidden="true" /></view>
           </view>
           <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ keepUnits(platformDisplayText(n.body)) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="16" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
@@ -48,6 +50,7 @@
         <NxButton variant="secondary" size="medium" :disabled="clearingRead || markingAll || notifs.loading" @click="confirmClearRead">{{ actionCopy.clearRead }}</NxButton>
       </view>
     </view>
+    <ReceiptModal :receipt="earningDetail?.receipt ?? null" :state="earningDetail ? earningDetail.state : 'ready'" :title="earningCopy.detailTitle" :credited-amount="earningDetail?.earning" :view-all-label="earningCopy.viewAll" @view-all="viewAllEarnings" @close="closeEarningDetail" />
     </template>
   </AppChassis>
 </template>
@@ -63,6 +66,8 @@ import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { earningCreditCopy } from "@/i18n/earning-credit";
 import { creditedAmounts } from "@/lib/amount-display";
 import { workloadLabel } from "@/lib/workload-label";
@@ -221,15 +226,9 @@ function kindIcon(n: Notification) { return `<svg width="24" height="24" viewBox
 function countOf(id: Filter) { return id === "all" ? notifs.items.length : notifs.items.filter(n => notificationCategory(n) === id).length; }
 const filtered = computed(() => {
   const rows = filter.value === "all" ? notifs.items : notifs.items.filter(n => notificationCategory(n) === filter.value);
-  return rows.map(n => {
-    if (!n.earning) return n;
-    return {
-      ...n,
-      title: earningAmountText(n.earning),
-      body: earningSummary(n.earning),
-      readAt: notifs.earningsReadConfirmed ? n.readAt ?? n.ts : n.readAt,
-    };
-  });
+  if (!notifs.earningsReadConfirmed) return rows;
+  // The existing row uses readAt for its dot and emphasis. Project it for display only.
+  return rows.map(n => n.earning && n.readAt === null ? { ...n, readAt: n.ts } : n);
 });
 function filterLabel(id: Filter) { return id === "all" ? t.value.notifs.filterAll : t.value.notifs[categoryKeys[id]]; }
 const emptyTitle = computed(() => filter.value === "all" ? t.value.notifs.emptyAllTitle : fmt(t.value.notifs.emptyFilterTitle, { filter: filterLabel(filter.value) }));
@@ -304,22 +303,23 @@ function timeAgo(ts: number): string {
   return fmt(t.value.notifs.timeHoursAgo, { n: Math.floor(mins / 60) });
 }
 
-function earningAmountText(earning: NotificationEarning) {
-  return creditedAmounts(earning.usdt, earning.uvt)
-    .map(({ sign, value, unit }) => `${sign}${amountsHidden.value ? "••••" : value}\u00a0${unit}`)
-    .join("\u00a0· ");
-}
-
+// Earnings credited rows (04.5). Amount lines and summary are rendered here from the message's earning data.
+function earningAmounts(earning: NotificationEarning) { return creditedAmounts(earning.usdt, earning.uvt); }
 function earningSummary(earning: NotificationEarning) {
-  return [earningCopy.value.credited, earning.deviceName,
-    earning.taskClass && workloadLabel(t.value, earning.taskClass)].filter(Boolean).join("\u00a0· ");
+  return [{ text: earningCopy.value.credited, device: false },
+    ...(earning.deviceName ? [{ text: earning.deviceName, device: true }] : []),
+    ...(earning.taskClass ? [{ text: workloadLabel(t.value, earning.taskClass), device: false }] : [])];
 }
-
-// The message center sheet will bind to this state when its markup is available.
+// Screen readers get the same words as the screen, masked the same way.
+function earningRowLabel(earning: NotificationEarning) {
+  const amounts = earningAmounts(earning).map(({ sign, value, unit }) => `${sign}${amountsHidden.value ? "••••" : value}\u00a0${unit}`).join(" · ");
+  return `${amounts}, ${earningSummary(earning).map(part => part.text).join(" · ")}`;
+}
 type EarningDetailState = "loading" | "ready" | "failed" | "unavailable";
 const earningDetail = ref<{ earning: NotificationEarning; state: EarningDetailState; receipt: CanonicalComputeReceipt | null } | null>(null);
 let pendingEarningAction: ReturnType<typeof captureIntent> | null = null;
 let detailReadGeneration = 0;
+let earningReturnScroll: number | undefined;
 
 async function readEarningDetail() {
   const detail = earningDetail.value;
@@ -378,6 +378,33 @@ function openEarningDetail(n: Notification, earning: NotificationEarning) {
 
 function closeEarningDetail() {
   earningDetail.value = null;
+}
+
+function earningMessageScroller() {
+  if (typeof document === "undefined") return;
+  return document.querySelector<HTMLElement>('.nx-chassis[data-page-visible="true"] .message-scroll .uni-scroll-view-scrollbar-hidden');
+}
+
+function viewAllEarnings() {
+  // H5 may scroll the retained list when shared focus handling selects a heading on return.
+  const scrollTop = earningMessageScroller()?.scrollTop;
+  earningReturnScroll = scrollTop;
+  earningDetail.value = null;
+  void navTo("/pages/me/receipts").then(navigated => {
+    if (!navigated && earningReturnScroll === scrollTop) earningReturnScroll = undefined;
+  });
+}
+
+function restoreEarningReturnScroll() {
+  const scrollTop = earningReturnScroll;
+  earningReturnScroll = undefined;
+  if (scrollTop === undefined) return;
+  const intent = captureIntent();
+  void nextTick(() => requestAnimationFrame(() => {
+    if (!isCurrentIntent(intent)) return;
+    const scroller = earningMessageScroller();
+    if (scroller) scroller.scrollTop = scrollTop;
+  }));
 }
 
 async function onTap(n: Notification) {
@@ -447,6 +474,7 @@ function invalidatePage() {
 }
 watch(() => [app.accountKey, app.accountBindingEpoch], () => {
   closeEarningDetail();
+  earningReturnScroll = undefined;
   invalidatePendingIntents();
 }, { flush: "sync" });
 onShow(() => {
@@ -455,6 +483,7 @@ onShow(() => {
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshHealthyNotifications, "pages/me/notifications");
   preserveSectionInH5();
+  restoreEarningReturnScroll();
 });
 watch([pageVisible, foregroundReadAllowed], ([visible, allowed], [wasVisible]) => {
   if (disposed || !visible || !allowed) return;
@@ -544,11 +573,11 @@ watch(filter, value => {
 .message-center .message-filters { align-self:flex-start; width:fit-content; max-width:100%; box-sizing:border-box; height:44px; min-height:44px; margin:6px 0 -6px; padding:6px 0; gap:var(--v5-space-1); border-radius:0; background:transparent; }
 .message-center .message-filters :deep(.nx-glass-option) { min-height:32px; height:32px; padding:0 12px; gap:var(--v5-space-1); border:0; border-radius:var(--v5-radius-full); font-size:13px; line-height:18px; font-weight:500; }
 .message-center .message-filters :deep(.nx-glass-option:not(.nx-glass-option--selected)) { color:var(--v5-ink-3); }
-.message-category-dot { width:5px; height:5px; border-radius:50%; background:var(--v5-brand); flex-shrink:0; align-self:center; }
+.message-category-dot { width:5px; height:5px; border-radius:50%; background:var(--ui-unread-dot); flex-shrink:0; align-self:center; }
 .message-center .message-scroll--notifications { width:calc(100% + 32px); margin-inline:-16px; }
 .message-center .notification-feed { padding:0 16px 100px; }
 .message-center .notification-item { border:0; }
-.message-center .notification-date { margin:var(--v5-space-5) 4px 8px; font-size:12px; line-height:16px; font-weight:400; }
+.message-center .notification-date { margin:var(--v5-space-5) 4px 8px; font-size:var(--ui-type-message-meta); line-height:var(--ui-type-message-meta-lh); font-weight:500; }
 .message-center .notification-row { padding:14px 16px; background:var(--v5-surface); }
 .message-center .notification-item--group-first .notification-row { border-top-left-radius:22px; border-top-right-radius:22px; }
 .message-center .notification-item--group-last .notification-row { border-bottom-left-radius:22px; border-bottom-right-radius:22px; }
@@ -558,14 +587,23 @@ watch(filter, value => {
 .message-center .notification-tile :deep(svg) { width:20px; height:20px; }
 /* A long title keeps whole words: the 重要 tag drops below it instead of squeezing the title mid-word. */
 .message-center .notification-heading { flex-wrap:wrap;gap:2px var(--v5-space-2); }
-.message-center .notification-title { font-size:14px; line-height:20px; overflow-wrap:break-word; }
+.message-center .notification-title { overflow-wrap:break-word; }
 .message-center .notification-preview { margin-top:2px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
 .message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
 .message-center .notification-time { font-size:12px; line-height:16px; }
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }
-.message-center .notification-important { height:24px; background:var(--v5-warning-soft); font-size:12px; line-height:16px; padding:0 var(--v5-space-2); border-radius:var(--v5-radius-full); }
 .message-center .notification-detail { padding:0 16px 14px 68px; background:var(--v5-surface); }
+/* Earnings credited row (04.5, 10.1): each amount is the card figure in Montserrat and the success colour, its unit the
+   auxiliary figure; an amount and its unit never split, a second amount wraps whole. */
+.message-center .notification-amounts { display:flex; flex-wrap:wrap; align-items:baseline; column-gap:6px; min-width:0; }
+.message-center .notification-amount { white-space:nowrap; color:var(--v5-success-ink); font:var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric:tabular-nums; }
+.message-center .notification-amount__unit { color:var(--v5-ink-3); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
+.message-center .notification-amount__sep { color:var(--v5-ink-4); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
+.message-center .notification-earning-summary { margin-top:2px; }
+/* A device name stays whole on its line; one longer than the line ends in an ellipsis (the row's label and the detail carry it in full). */
+.message-center .notification-earning-device { display:inline-block; max-width:100%; vertical-align:bottom; }
+/* uni-app puts the words in an inner span; the clip and ellipsis sit on it, the element that holds the text. */
+.message-center .notification-earning-device :deep(span) { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .notification-management { position:absolute; right:16px; bottom:var(--nx-overlay-bottom); padding:0; }
-:global([data-theme="dark"] .message-center .notification-important) { background:color-mix(in srgb,var(--v5-warning) 16%,transparent); }
 :global([data-theme="light"] .message-center .notification-row) { box-shadow:var(--v5-glass-shadow); }
 </style>

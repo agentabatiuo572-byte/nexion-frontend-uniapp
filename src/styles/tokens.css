@@ -46,6 +46,8 @@
   /* Notification badges share one palette across both themes and entry points. */
   --ui-unread-badge: #FFCB4D;
   --ui-unread-badge-ink: #0A0A0A;
+  /* A dot without a number (message rows, the unread line, tabs, categories); light keeps 3:1 on white and the page floor (01 §1.1). */
+  --ui-unread-dot: #A86B0C;
   /* Overlay spacing reserves native gestures and the H5 preview indicator. */
   --nx-overlay-safe-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
   --nx-overlay-bottom: calc(16px + var(--nx-overlay-safe-bottom));
@@ -496,6 +498,7 @@
   /* 语义色文字档:暗主题沿用 base(暗底实测本就达标),保持视觉零变化 */
   --v5-warning-ink: #FFCB4D;
   --v5-success-ink: #9EDC1D;
+  --ui-unread-dot: #FFCB4D;
   --v5-tech-cyan-ink: #2DD4BF;
   --ui-device-ink: #65C9F4;
   --ui-device-soft: #142C38;

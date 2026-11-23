@@ -57,17 +57,20 @@
               :style="rowStyle(0)"
               role="button"
               tabindex="0"
+              :aria-label="computeRowLabel(r)"
               @click.stop="openRemoteComputeReceipt(r)"
 
               @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate font-mono-code" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
-                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
+                <!-- The shown number, middle-ellipsized with its last 6 kept (03 §3.6.1); the row's label carries it whole. -->
+                <NxCodeValue :value="r.displayReceiptNo || r.receiptNo" label="" :copyable="false" :style="rowTitleStyle" />
+                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(computeTaskLine(r)) }}</text>
               </view>
-              <view class="text-right shrink-0 min-w-0" style="margin-left: 8px; max-width: 42%">
-                <text class="block truncate tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 'full')} UVT` : `+$${formatAmount(r.rewardUsdt, 'full')}` }}</text>
-                <text class="block truncate" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
+              <!-- Each credited asset on its own line, same figure role as the message row (04.5, 10.1). -->
+              <view class="text-right shrink-0" style="margin-left: 8px">
+                <text v-for="amount in creditedAmounts(r.rewardUsdt, r.rewardNex)" :key="amount.unit" class="block" :style="computeAmountStyle">{{ amount.sign }}{{ amount.value }}&nbsp;<text :style="computeUnitStyle">{{ amount.unit }}</text></text>
+                <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
           </template>
@@ -154,7 +157,7 @@
 
     </view>
     <template #pageFixed>
-      <ReceiptModal :receipt="open" @close="closeReceiptDetail" />
+      <ReceiptModal :receipt="open" :title="remoteReceiptsMode ? earningCopy.receiptTitle : undefined" :state="linkedReceiptDetail?.state ?? 'ready'" @close="closeReceiptDetail" />
     </template>
   </AppChassis>
 </template>
@@ -163,11 +166,12 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { displayTimestamp, formatDisplayDate, formatDisplayTime } from "@/lib/display-date";
 import { receiptLine } from "@/lib/receipt-line";
-import { formatAmount } from "@/lib/amount-display";
+import { creditedAmounts, formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ReceiptCatIcon from "@/components/me/receipt-cat-icon.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
@@ -176,13 +180,15 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { workloadLabel } from "@/lib/workload-label";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
-import { shortenHex } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { isReceiptUnavailable } from "@/lib/earning-receipt-status";
 import { remoteApiEnabled, sessionVault, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
+import { earningCreditCopy } from "@/i18n/earning-credit";
+import { uiLocale } from "@/i18n";
+import { useLocaleStore } from "@/store/locale";
 import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
 import { useApp } from "@/store/app";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
@@ -201,6 +207,9 @@ const PAGE_SIZE = 10;
 
 const t = useT();
 const computeCopy = useComputeV2Copy();
+const locale = useLocaleStore();
+// One receipt opened on this page is titled with the page's own name (收益凭证), whatever its execution mode.
+const earningCopy = computed(() => earningCreditCopy[uiLocale(locale.code)]);
 const app = useApp();
 const depositsStore = useDeposits();
 const receiptsPageFence = createReceiptsPageRequestFence(
@@ -631,6 +640,15 @@ function copySig(r: Receipt) {
 function rowAmount(r: Receipt): string {
   return r.category === "KY" ? formatAmount(r.netPaid) : `+${formatAmount(r.netPaid)}`;
 }
+function computeTaskLine(r: CanonicalComputeReceiptSummary): string {
+  // The page is already 收益凭证, so a compute row shows only its model (no second name for the same receipt).
+  return r.executionMode === "SIMULATED" ? (r.taskName || computeCopy.value.taskReceipt) : r.model;
+}
+// The row shows a shortened receipt number and clamps the job line to two lines (the detail shows both in full);
+// screen readers get the full text (03 §3.6.1).
+function computeRowLabel(r: CanonicalComputeReceiptSummary): string {
+  return [r.displayReceiptNo || r.receiptNo, computeTaskLine(r), ...creditedAmounts(r.rewardUsdt, r.rewardNex).map(a => `${a.sign}${a.value}\u00a0${a.unit}`), shortDate(r.completedAt)].join(", ");
+}
 function shortDate(ts: number | string): string {
   const timestamp = displayTimestamp(ts);
   if (timestamp === null) return "—";
@@ -727,7 +745,16 @@ function rowAmountStyle(r: Receipt): CSSProperties {
     color: "var(--v5-brand)",
   };
 }
-const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
+const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
+// Compute receipt amounts: card figure in Montserrat and the success colour, unit as the auxiliary figure (10.1).
+const computeAmountStyle: CSSProperties = {
+  whiteSpace: "nowrap", color: "var(--v5-success-ink)", fontFamily: "var(--font-amount)", fontVariantNumeric: "tabular-nums",
+  fontSize: "var(--ui-type-card-figure)", lineHeight: "var(--ui-type-card-figure-lh)", fontWeight: "var(--ui-type-card-figure-weight)" as CSSProperties["fontWeight"],
+};
+const computeUnitStyle: CSSProperties = {
+  whiteSpace: "nowrap", color: "var(--v5-ink-3)", fontFamily: "var(--font-v5)",
+  fontSize: "var(--ui-type-meta)", lineHeight: "var(--ui-type-meta-lh)", fontWeight: "var(--ui-type-meta-weight)" as CSSProperties["fontWeight"],
+};
 const remoteAmountStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "13px",
