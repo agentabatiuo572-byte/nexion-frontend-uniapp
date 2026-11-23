@@ -607,20 +607,27 @@ const goalRemoveStyle: CSSProperties = {
   borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-surface-2)",
 };
+// Row meta (deadline, progress figures): the 10.1 auxiliary-value role, 12/16, 400, muted.
 const goalDeadlineStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "12px",
+  fontSize: "var(--ui-type-meta)",
+  lineHeight: "var(--ui-type-meta-lh)",
+  fontWeight: 400,
   color: "var(--v5-ink-3)",
 };
 const goalFootMutedStyle: CSSProperties = {
   fontFamily: "var(--font-metric)",
-  fontSize: "12px",
+  fontSize: "var(--ui-type-meta)",
+  lineHeight: "var(--ui-type-meta-lh)",
+  fontWeight: 400,
   color: "var(--v5-ink-3)",
 };
 const goalFootPctStyle: CSSProperties = {
   fontFamily: "var(--font-metric)",
-  fontSize: "12px",
+  fontSize: "var(--ui-type-meta)",
+  lineHeight: "var(--ui-type-meta-lh)",
+  fontWeight: 400,
   color: "var(--v5-ink-3)",
 };
 const achievedBadgeStyle: CSSProperties = {
@@ -666,7 +673,10 @@ const emptyStateStyle: CSSProperties = {
 .goal-list-row { display:flex; align-items:center; gap:12px; box-sizing:border-box; min-height:86px; padding:14px 16px !important; }
 .goal-list-row__body { flex:1; min-width:0; }.goal-list-row__heading { display:flex; align-items:center; gap:8px; min-height:22px; }.goal-list-row__heading > text { margin-top:0 !important; }
 /* 44px target (01 §1.3) around the same 16px icon; the -4px margin keeps the row's spacing, so it takes nothing from the text beside it. */
-.goal-delete { flex:none; width:44px; height:44px; margin:-4px; border-radius:50%; color:var(--v5-ink-3); }.goal-sticky :deep(.nx-button--disabled) { opacity:1; }
+.goal-delete { flex:none; width:44px; height:44px; margin:-4px; border-radius:50%; color:var(--v5-ink-3); transition:opacity 160ms ease; }
+/* Press and keyboard feedback (07.1, 07.2): the icon dims while pressed; focus draws the brand ring inside the 44px box. */
+.goal-delete:active { opacity:.6; }
+.goal-delete:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }.goal-sticky :deep(.nx-button--disabled) { opacity:1; }
 
 .growth-goals--featured :deep(.spv) { margin-bottom:0; padding-bottom:13px; }
 .goal-hero {margin-top:8px;}.goal-recommendation {min-height:167.5px;box-sizing:border-box;}
