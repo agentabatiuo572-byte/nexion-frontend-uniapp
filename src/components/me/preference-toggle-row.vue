@@ -58,6 +58,7 @@ const iconBoxStyle: CSSProperties = {
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
 };
-const labelStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", fontWeight: 500, color: "var(--v5-ink)" };
-const hintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
+// A settings row (03 §3.5, 10.1): list-title role at the menu-row weight 400; the hint is the list-subtitle role, 4px under it.
+const labelStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", lineHeight: "var(--ui-type-list-title-lh)", fontWeight: 400, color: "var(--v5-ink)" };
+const hintStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", lineHeight: "var(--ui-type-list-subtitle-lh)", color: "var(--v5-ink-3)", marginTop: "4px" };
 </script>
