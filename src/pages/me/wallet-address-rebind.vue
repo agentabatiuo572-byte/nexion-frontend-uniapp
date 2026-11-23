@@ -207,7 +207,7 @@
         <view v-if="history.length > 0" style="margin-top: 20px">
           <view class="nx-rebind-history-toggle inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" tabindex="0" :aria-expanded="historyOpen ? 'true' : 'false'" @click="historyOpen = !historyOpen">
             <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ historyOpen ? t.addrRebind.historyTitle : t.addrRebind.historyToggle }}</text>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ marginLeft: '4px', transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform 160ms ease' }"><path d="m6 9 6 6 6-6" /></svg>
+            <view :style="{ display: 'grid', marginLeft: '4px', transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform 160ms ease' }"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></view>
           </view>
           <view v-if="historyOpen" class="space-y-2" style="margin-top: 4px">
             <view v-for="(h, i) in historyDesc" :key="i" :style="historyRowStyle">
