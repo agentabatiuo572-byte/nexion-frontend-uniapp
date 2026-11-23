@@ -3288,7 +3288,7 @@ export const id: Messages = {
     sessionRevoke: "Keluarkan",
     sessionRevoked: "Perangkat dikeluarkan",
     sessionRevokeConfirm: "Keluarkan perangkat tersebut?",
-    sessionRevokeConfirmBody: "Semua sesi masuk di {device} (terakhir aktif {time}) akan berakhir dan perlu masuk lagi.",
+    sessionRevokeConfirmBody: "Semua sesi masuk di {device} (terakhir aktif {time}) akan berakhir.",
     revokeAll: "Keluarkan semua perangkat lain",
     revokeAllConfirm: "Perangkat lain akan dikeluarkan dan perlu masuk lagi.",
     revokeAllDone: "Semua perangkat lain dikeluarkan",

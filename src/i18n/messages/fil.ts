@@ -3288,7 +3288,7 @@ export const fil: Messages = {
     sessionRevoke: "Mag-log out",
     sessionRevoked: "Na-log out ang device",
     sessionRevokeConfirm: "I-log out ang device na iyan?",
-    sessionRevokeConfirmBody: "Matatapos ang lahat ng pag-log in sa {device} (huling aktibo {time}) at kailangang mag-log in ulit.",
+    sessionRevokeConfirmBody: "Matatapos ang lahat ng pag-log in sa {device} (huling aktibo {time}).",
     revokeAll: "I-log out ang lahat ng ibang device",
     revokeAllConfirm: "Mala-log out ang ibang device at kailangan nilang mag-log in ulit.",
     revokeAllDone: "Na-log out ang lahat ng ibang device",

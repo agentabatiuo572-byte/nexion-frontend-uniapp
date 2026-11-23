@@ -3288,7 +3288,7 @@ export const ms: Messages = {
     sessionRevoke: "Log keluar",
     sessionRevoked: "Peranti dilog keluar",
     sessionRevokeConfirm: "Log keluar peranti tersebut?",
-    sessionRevokeConfirmBody: "Semua sesi log masuk pada {device} (kali terakhir aktif {time}) akan tamat dan perlu log masuk semula.",
+    sessionRevokeConfirmBody: "Semua sesi log masuk pada {device} (kali terakhir aktif {time}) akan tamat.",
     revokeAll: "Log keluar semua peranti lain",
     revokeAllConfirm: "Peranti lain akan dilog keluar dan perlu log masuk semula.",
     revokeAllDone: "Semua peranti lain dilog keluar",
