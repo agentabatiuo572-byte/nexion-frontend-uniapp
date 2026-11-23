@@ -3531,7 +3531,7 @@ export const fil: Messages = {
     remoteUnavailableClosed: "Hindi available ang exchange ngayon. Subukan ulit mamaya.",
     swapPaused: "Naka-pause ang exchange. Tingnan ang history o i-cancel ang kwalipikadong nakapilang order.",
     pendingRecoveryHint: "Hindi pa kumpirmado ang resulta ng exchange at awtomatiko itong sinusuri. Huwag mag-exchange ulit.",
-    remoteNotProvided: "-",
+    remoteNotProvided: "—",
     remoteUnavailableToast: "Hindi ma-load. Subukan ulit mamaya",
     swapFailed: "Hindi natuloy ang exchange. Subukan ulit mamaya.",
     swapCancelledReason: "Kinansela ang order ng swap — walang na-exchange.",

@@ -3531,7 +3531,7 @@ export const uz: Messages = {
     remoteUnavailableClosed: "Hozir almashtirib boʻlmaydi. Birozdan keyin urinib koʻring.",
     swapPaused: "Almashuv toʻxtatilgan. Tarixni koʻring yoki mos navbatdagi buyurtmalarni bekor qiling.",
     pendingRecoveryHint: "Almashuv natijasi tasdiqlanmagan va avtomatik tekshirilmoqda. Qayta almashmang.",
-    remoteNotProvided: "-",
+    remoteNotProvided: "—",
     remoteUnavailableToast: "Yuklab boʻlmadi. Keyinroq qayta urining",
     swapFailed: "Almashuv amalga oshmadi. Birozdan keyin urinib koʻring.",
     swapCancelledReason: "Almashuv bekor qilindi — hech narsa almashtirilmadi.",
