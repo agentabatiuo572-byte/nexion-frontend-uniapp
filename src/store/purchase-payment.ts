@@ -1,5 +1,5 @@
 import { reactive } from 'vue';
-import { canSelectNewUsdtNetwork } from '@/lib/usdt-network-options';
+import { canSelectNewUsdtNetwork, isVisibleUsdtNetwork } from '@/lib/usdt-network-options';
 import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
@@ -154,11 +154,20 @@ function readIntent(pending: PendingExternal) {
   if (!pending.intentNo) return api.find(pending.kind, pending.commandKey);
   return pending.lookupOnly ? api.snapshot(pending.intentNo) : api.get(pending.intentNo);
 }
+function isVisiblePayment(row: Pick<PendingExternal, 'paymentMethod' | 'network'>): boolean {
+  return isVisibleUsdtNetwork(row.paymentMethod) && isVisibleUsdtNetwork(row.network);
+}
+function hideOriginalPayment(accountKey: string, pending: PendingExternal, intent: PurchasePaymentIntent): void {
+  if (pending.commandKey !== intent.commandKey || pending.kind !== intent.kind || pending.paymentQuoteId !== intent.paymentQuoteId) return;
+  try {
+    save({ ...pending, paymentMethod: intent.paymentMethod, network: intent.network, intentNo: intent.intentNo }, accountKey);
+  } catch { /* Keep the read silent if storage is unavailable. */ }
+}
 function displayRecords() {
   state.revision;
   const accountKey = account();
   const expired = unsavedExpiries.get(accountKey);
-  return Object.values(rows(accountKey).records).filter(row => !row.quotaRefusal).map(row => expired?.get(row.commandKey) === row.kind
+  return Object.values(rows(accountKey).records).filter(row => !row.quotaRefusal && isVisiblePayment(row)).map(row => expired?.get(row.commandKey) === row.kind
     ? { ...row, lastStatus: 'EXPIRED' } : row);
 }
 function pendingPayments() {
@@ -210,6 +219,7 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
     }
     return;
   }
+  if (!isVisiblePayment(intent)) { hideOriginalPayment(accountKey, pending, intent); return; }
   matches(intent, pending);
   if (intent.status === pending.lastStatus || !settled(intent)) return;
   if (intent.status === 'EXPIRED') {
@@ -238,6 +248,7 @@ export async function readCheckoutCapacityPayment(accountKey: string, kind: 'CAP
   });
   if (!current()) return;
   projectPassivePayment(accountKey, pending, intent);
+  if (intent && !isVisiblePayment(intent)) return;
   if (!intent) return pending.intentNo ? null : undefined;
   if (intent.status === 'EXPIRED') return { status: 'REJECTED', canResumeSameKey: false, message: 'PURCHASE_PAYMENT_EXPIRED' };
   if (intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED') {
@@ -257,6 +268,11 @@ export function purchaseConclusion(intent: PurchasePaymentIntent | null): Purcha
   return '';
 }
 function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
+  if (!isVisiblePayment(intent)) {
+    hideOriginalPayment(state.accountKey, pending, intent);
+    finish(null);
+    return;
+  }
   matches(intent, pending);
   // Legacy recovery rows have only the quote identity; bind their first validated original intent for subsequent reads.
   const known = { ...pending, paymentMethod: intent.paymentMethod, network: intent.network,
@@ -344,7 +360,7 @@ export function refusedPurchasePayment(accountKey: string, commandKey: string): 
   state.revision;
   try {
     const pending = rows(accountKey).records[commandKey];
-    return pending?.quotaRefusal ? pending : null;
+    return pending?.quotaRefusal && isVisiblePayment(pending) ? pending : null;
   } catch { return null; }
 }
 
@@ -475,6 +491,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     const after = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
     if (!owns(version, accountKey) || !acceptQuoteContext(after)) return;
+    if (!isVisiblePayment(quote)) { finish(null); return; }
     // A trial's offset grows with accrual under one quote version, so only its rise needs a new confirmation.
     const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
     if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged) throw new Error('PURCHASE_CONTEXT_CHANGED');
@@ -567,6 +584,11 @@ async function query() {
       if (!owns(version, accountKey) || state.concluded) return;
       if (intent && (intent.intentNo !== recovery.intentNo || intent.kind !== recovery.kind)) {
         throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
+      }
+      if (intent && !isVisiblePayment(intent)) {
+        if (pending) hideOriginalPayment(accountKey, pending, intent);
+        finish(null);
+        return;
       }
       if (pending && pending.commandKey !== intent?.commandKey) releaseUncreatedPayment(pending, accountKey);
       state.retrying = false;
@@ -793,8 +815,10 @@ export function requestPurchasePayment(value: PurchasePaymentContext): Promise<P
   if (state.open) throw new Error('PURCHASE_PAYMENT_ALREADY_OPEN');
   const records = rows(account()).records;
   const scope = fingerprint(value);
-  const existing = value.refusedPaymentKey ? records[value.refusedPaymentKey]
-    : Object.values(records).find(row => row.fingerprint === scope && row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+  const refused = value.refusedPaymentKey ? records[value.refusedPaymentKey] : undefined;
+  if (refused && !isVisiblePayment(refused)) return Promise.resolve(null);
+  const existing = value.refusedPaymentKey ? refused
+    : Object.values(records).find(row => isVisiblePayment(row) && row.fingerprint === scope && row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
   if (value.refusedPaymentKey && (!existing?.quotaRefusal || existing.fingerprint !== scope)) throw new Error('ORIGINAL_PAYMENT_MISMATCH');
   context = value;
   open(value, existing ?? null);
@@ -805,7 +829,7 @@ export function requestPurchasePayment(value: PurchasePaymentContext): Promise<P
 type DeliveredPayment = Extract<PurchaseChoice, { method: 'EXTERNAL' }>;
 type CheckoutCapacityResume = { onDelivered: (result: DeliveredPayment) => void; onExpired: () => void };
 async function resume(pending: PendingExternal, checkout?: CheckoutCapacityResume) {
-  if (state.open) return;
+  if (state.open || !isVisiblePayment(pending)) return;
   context = null;
   const payload = JSON.parse(pending.fingerprint)[1] as Record<string, unknown>;
   open({ summary: pending.summary, kind: pending.kind, payload, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
@@ -880,7 +904,7 @@ export function acknowledgePurchasePayment(result: Extract<PurchaseChoice, { met
 /** The order detail asks whether this order already has an external payment underway. */
 export function pendingOrderPayment(accountKey: string, orderNo: string, knownOnly = false): PendingExternal | null {
   try {
-    const records = Object.values(rows(accountKey).records).filter(row => row.kind === 'ORDER_PAY' && JSON.parse(row.fingerprint)[1]?.orderNo === orderNo
+    const records = Object.values(rows(accountKey).records).filter(row => row.kind === 'ORDER_PAY' && isVisiblePayment(row) && JSON.parse(row.fingerprint)[1]?.orderNo === orderNo
       && !row.quotaRefusal && !['EXPIRED', 'DELIVERED'].includes(row.lastStatus ?? '') && !row.businessDelivered
       && (row.lastStatus !== 'MANUAL_REVIEW' || row.lookupOnly && !!row.intentNo));
     return records.find(row => row.intentNo) ?? (knownOnly ? null : records[0] ?? null);
@@ -897,6 +921,7 @@ export async function discoverOrderPayment(accountKey: string, orderNo: string, 
     active = true;
     if (pendingOrderPayment(accountKey, orderNo, true)?.intentNo === intentNo) return 'active';
     const intent = await api.get(intentNo);
+    if (current() && intent && !isVisiblePayment(intent)) return 'none';
     if (current() && intent?.intentNo === intentNo && intent.kind === 'ORDER_PAY'
         && intent.status !== 'EXPIRED' && intent.status !== 'DELIVERED') {
       save({ fingerprint: JSON.stringify(['ORDER_PAY', { orderNo }]), kind: intent.kind, commandKey: intent.commandKey,

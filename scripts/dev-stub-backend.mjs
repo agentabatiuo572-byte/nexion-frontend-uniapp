@@ -22,6 +22,7 @@ import { createServer } from "node:http";
 
 const portArg = process.argv.indexOf("--port");
 const PORT = portArg > 0 ? Number(process.argv[portArg + 1]) : 8110;
+const networks = ["USDT-BEP20", "USDT-ERC20"];
 
 /** 可注入的失败模式。用 POST /__stub/mode {"submit":"..."} 切换。 */
 const state = {
@@ -50,13 +51,14 @@ function policy() {
     smallAmountThresholdUsd: 50,
     strongReviewThresholdUsdt: 1000,
     payoutSlaHours: 24,
-    networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 },
+    // Required by the withdrawal policy contract even when the network is inactive.
+    networkConfirmFeeUsd: { trc20: 0, bep20: 1, erc20: 5 },
     nexFeeOffsetRate: 0.5,
     policyVersion: "stub-v1",
     cooldownDays: 1,
     complianceHoldEnabled: false,
     withdrawalEnabled: true,
-    enabledNetworks: ["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"],
+    enabledNetworks: networks,
     currentPhase: "P1",
     currentMonth: 1,
     gateSource: "J1",
@@ -171,10 +173,12 @@ const server = createServer(async (req, res) => {
   if (path === "/api/payout-addresses" && req.method === "GET") {
     const iso = new Date(Date.now() - 30 * 86400000).toISOString();
     return send(res, 200, envelope({
-      addresses: [{ network: "USDT-TRC20", address: "TXstub00000000000000000000000000001",
+      addresses: [{ source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
+        network: "USDT-BEP20", address: "0x" + "1".repeat(40),
         status: "ACTIVE", effectiveAt: iso, createdAt: iso,
         nextChangeAllowedAt: new Date(Date.now() - 86400000).toISOString(), changePending: false }],
-      serverCanonical: true,
+      source: "server", sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
+      serverNowEpochMs: Date.now(),
       changeCooldownDays: 7,
       effectiveDelayHours: 24,
       inFlightWithdrawalBlocked: true,
@@ -186,6 +190,8 @@ const server = createServer(async (req, res) => {
     if (key && state.byKey.has(key)) return send(res, 200, envelope(state.byKey.get(key)));
 
     const payload = JSON.parse(body || "{}");
+    const chain = payload.chain ?? networks[0];
+    if (!networks.includes(chain)) return send(res, 422, envelope(null, 422, "WITHDRAWAL_CHAIN_INVALID"));
 
     // 🔴🔴 真正危险的那一档:**单已经建好了,响应才丢**。
     // 第一版我把 504 写成「建单前就返回」—— 于是服务端根本没建单,实验必然显示「没重复」,
@@ -193,7 +199,7 @@ const server = createServer(async (req, res) => {
     // (同 memory 里「优化必须在真实运行时里量」那族坑)。这几档必须**先建单再失败**。
     const failAfterCreate = ["createdThen504", "createdThenDrop", "createdThenSlow"].includes(state.submit);
     if (failAfterCreate) {
-      const order = buildOrder(Number(payload.amount) || 0, payload.chain || "USDT-TRC20", key);
+      const order = buildOrder(Number(payload.amount) || 0, chain, key);
       state.orders.push(order);
       if (key) state.byKey.set(key, order);
       if (state.submit === "createdThenDrop") { req.socket.destroy(); return; }
@@ -218,7 +224,7 @@ const server = createServer(async (req, res) => {
       return send(res, 429, envelope(null, 42901, "WITHDRAWAL_DAILY_LIMIT_EXCEEDED"));
     }
 
-    const order = buildOrder(Number(payload.amount) || 0, payload.chain || "USDT-TRC20", key);
+    const order = buildOrder(Number(payload.amount) || 0, chain, key);
     state.orders.push(order);
     if (key) state.byKey.set(key, order);
     return send(res, 200, envelope(order));

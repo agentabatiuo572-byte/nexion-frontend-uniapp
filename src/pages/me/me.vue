@@ -231,7 +231,7 @@ interface QuickSection {
 }
 
 const profileName = computed(() => displayNickname(profile.displayName));
-const orderCount = computed(() => orders.orders.length);
+const orderCount = computed(() => orders.visibleOrders.length);
 const localeUpper = computed(() => locale.code.toUpperCase());
 const trialReady = computed(() => !remoteApiEnabled || trial.authorityStatus === "ready"
   || (trial.authorityStatus === "loading" && trial.authorityServerState !== null));

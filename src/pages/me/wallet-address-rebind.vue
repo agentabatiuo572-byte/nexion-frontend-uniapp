@@ -158,7 +158,7 @@
           <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期)。
                冻结期不叠挂:冻结横幅说「禁提」时再说「可能需复核」= 同屏两种结论
                (审计 P1;与 wallet-withdraw 的 !frozenNow 反冗余门同型)。 -->
-          <text v-if="retainedAddress || (holdActive && !frozenNow)" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ retainedAddress ? t.bankWithdrawal.networkUnavailable : holdNoteText }}</text>
+          <text v-if="holdActive && !frozenNow" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ holdNoteText }}</text>
         </view>
 
         <!-- 更换入口 / 拦截态(在途单 > 频控,原因 + 下一步;规格 ② 异常2/3) -->
@@ -297,7 +297,7 @@ const networkAvailable = computed(() => (!payoutAddressServerEnabled || networkP
 
 onLoad((options) => {
   const q = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-address-rebind")).get("network");
-  if (q === "usdt-trc20" || q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
+  if (q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
 });
 
 // ── 视图状态机 ──
@@ -307,13 +307,11 @@ const explicitStep = ref<Step>("base");
 const mode = ref<"add" | "change">("add");
 const successIsChange = ref(false);
 const current = computed(() => payout.currentFor(network.value));
-const retainedAddress = computed(() => !canSelectNewUsdtNetwork(network.value) && !!current.value);
 const history = computed(() => payout.stateFor(network.value).history);
 const historyDesc = computed(() => [...history.value].reverse());
 const historyOpen = ref(false);
 const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
   if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance)) return "unknown";
-  if (retainedAddress.value) return "view";
   if (!networkAvailable.value) return "unknown";
   if (explicitStep.value === "otp") return "otp";
   if (explicitStep.value === "success") return "success";
@@ -345,7 +343,7 @@ function moveNetwork(delta: number) {
 // ── 表单 ──
 const newAddress = ref("");
 const addrError = ref("");
-const addressPlaceholder = computed(() => (network.value === "usdt-trc20" ? "TR7NHq..." : "0x..."));
+const addressPlaceholder = "0x...";
 const canProceed = computed(() => networkAvailable.value && newAddress.value.trim().length > 0);
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -655,8 +653,8 @@ const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading"
 const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
 watch(() => [networkPolicyStatus.value, remoteReadStatus.value] as const, ([policyStatus, addressStatus]) => {
   if ((payoutAddressServerEnabled && (policyStatus !== "ready" || addressStatus !== "ready"))
-      || networkAvailable.value || retainedAddress.value) return;
-  const withAddress = canSelectNewUsdtNetwork(network.value) ? NETWORKS.value.find((nw) => payout.currentFor(nw.id)) : undefined;
+      || networkAvailable.value) return;
+  const withAddress = NETWORKS.value.find((nw) => payout.currentFor(nw.id));
   const fallback = withAddress ?? NETWORKS.value[0];
   if (fallback) switchNetwork(fallback.id);
 });

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { demoWithdrawalPolicy, seedDemoConfirmedWithdrawal, submitDemoWithdrawal } from './prototype-demo-finance.mjs';
+import { demoUsdtWithdrawalNetworks, demoWithdrawalPolicy, seedDemoConfirmedWithdrawal, submitDemoWithdrawal } from './prototype-demo-finance.mjs';
 import { demoWithdrawalFacts, demoWithdrawalUser } from './prototype-demo-secondary.mjs';
 
 export const withdrawRecoveryOptions = [
@@ -108,7 +108,7 @@ export function withdrawalRecoveryResponse(state, path, method, headers, body) {
     return fail(422, 'WITHDRAWAL_AMOUNT_SCALE_INVALID');
   }
   const network = typeof body.chain === 'string' ? body.chain.trim().toUpperCase() : '';
-  if (!['USDT-BEP20', 'USDT-ERC20', 'USDT-TRC20'].includes(network)) return fail(422, 'WITHDRAWAL_CHAIN_INVALID');
+  if (!demoUsdtWithdrawalNetworks.includes(network)) return fail(422, 'WITHDRAWAL_CHAIN_INVALID');
   const address = typeof body.address === 'string' ? body.address.trim() : '';
   if (!/^[A-Za-z0-9:_-]{11,128}$/.test(address)) return fail(422, 'WITHDRAWAL_ADDRESS_INVALID');
   const policyVersion = typeof body.policyVersion === 'string' ? body.policyVersion.trim() : '';

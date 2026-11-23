@@ -3,7 +3,7 @@ import { demoWalletUsdt, postDemoWalletEntries } from './prototype-demo-wallet.m
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
 import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawals, secondaryDemo, updateDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
-import { demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
+import { demoUsdtWithdrawalNetworks, demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, longBankOrderNo } from './prototype-demo-long-content.mjs';
 
 const DAY = 86400000;
@@ -183,9 +183,8 @@ export function bankDemo(url, state, request) {
   if (path === '/api/payout-addresses' && method === 'PUT') return command('address', () => {
     const body = input();
     const network = String(body.network ?? '').trim().toUpperCase(), address = String(body.address ?? '').trim();
-    if (!['USDT-TRC20', 'USDT-BEP20', 'USDT-ERC20'].includes(network)) fail('PAYOUT_ADDRESS_NETWORK_INVALID', 422);
-    const addressValid = network === 'USDT-TRC20' ? /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address) : /^0x[0-9a-fA-F]{40}$/.test(address);
-    if (!addressValid) fail('PAYOUT_ADDRESS_FORMAT_INVALID', 422);
+    if (!demoUsdtWithdrawalNetworks.includes(network)) fail('PAYOUT_ADDRESS_NETWORK_INVALID', 422);
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) fail('PAYOUT_ADDRESS_FORMAT_INVALID', 422);
     if (!demoWithdrawalNetworks(state).includes(network)) fail('WITHDRAWAL_NETWORK_DISABLED');
     validateOtp('address');
     // verifyAndConsume commits in REQUIRES_NEW: later in-flight/cooldown refusals still burn this code.
@@ -195,7 +194,7 @@ export function bankDemo(url, state, request) {
     if (demoWithdrawals(state, now).some(row => !terminal.includes(row.status.toUpperCase()))) fail('PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL');
     const current = demoPayoutAddresses(state, now).find(row => row.network === network);
     if (current && Date.parse(current.nextChangeAllowedAt) > now) fail('PAYOUT_ADDRESS_CHANGE_COOLDOWN');
-    if (current && (network === 'USDT-TRC20' ? address === current.address : address.toLowerCase() === current.address.toLowerCase())) return snapshot(current);
+    if (current && address.toLowerCase() === current.address.toLowerCase()) return snapshot(current);
     demo.addresses ??= {};
     demo.addresses[network] = { ...proof, network, address, status: 'ACTIVE', effectiveAt: new Date(now + DAY).toISOString(), createdAt: current?.createdAt ?? new Date(now).toISOString(), nextChangeAllowedAt: new Date(now + 7 * DAY).toISOString(), changePending: true };
     return snapshot(demo.addresses[network]);
