@@ -153,7 +153,7 @@ export function demoNotifications(locale, state, now, device, order) {
         uvt: sample.rewardNex > 0 ? String(sample.rewardNex) : null,
         deviceName: sample.hideMetadata ? null : sample.device.name, taskClass: sample.hideMetadata ? null : sample.taskClass },
     }));
-    const summaries = [999, 998].map((id, index) => ({
+    const summaries = [999].map((id, index) => ({
       id, kind: 'NOVA_DAILYSUMMARY', priority: 'low',
       title: text('今日收益总结', 'Today’s earnings summary', 'Tổng kết thu nhập hôm nay'),
       body: text('查看今天的任务和收益进度', 'View today’s tasks and earnings', 'Xem tiến độ nhiệm vụ và thu nhập hôm nay'),
