@@ -809,7 +809,7 @@ export const ms: Messages = {
     nativeSessionReloadNotice: "Sila log masuk semula untuk terus menggunakan app.",
   },
   register: {
-    errorDeviceSignupLimited: "Pelayar ini telah mencapai had pendaftaran. Log masuk dengan akaun sedia ada.",
+    errorDeviceSignupLimited: "Pendaftaran dihadkan buat sementara. Cuba lagi nanti atau hubungi khidmat pelanggan.",
     registrationSignInRequired: "Akaun anda telah dicipta. Log masuk untuk meneruskan.",
     title: "Cipta akaun",
     subtitleHighlight: "Ganjaran alu-aluan: {reward}",
@@ -850,7 +850,7 @@ export const ms: Messages = {
     errorInvalidCode: "Sila masukkan kod 6 digit yang sah.",
     accountExistsTitle: "Nombor ini sudah didaftarkan",
     accountExistsSigningIn: "Pengesahan selesai. Melog masuk anda…",
-    errorSignupLimited: "Rangkaian ini telah mencapai had pendaftaran. Cuba lagi nanti atau hubungi khidmat pelanggan.",
+    errorSignupLimited: "Pendaftaran dihadkan buat sementara. Cuba lagi nanti atau hubungi khidmat pelanggan.",
     registrationOutcomeUnknown: "Akaun mungkin telah dicipta, tetapi log masuk belum disahkan. Pergi ke halaman log masuk untuk pengesahan automatik. Jangan daftar semula.",
     registrationSignedIn: "Akaun dicipta · log masuk secara automatik",
     sponsorEnvironmentMismatch: "Kod jemputan ini tidak tersedia. Semak kod dan cuba lagi.",

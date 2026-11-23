@@ -809,7 +809,7 @@ export const kk: Messages = {
     nativeSessionReloadNotice: "Қолданбаны пайдалануды жалғастыру үшін қайта кіріңіз.",
   },
   register: {
-    errorDeviceSignupLimited: "Бұл браузерден тіркелу шегіне жетті. Бар аккаунтпен кіріңіз.",
+    errorDeviceSignupLimited: "Тіркелу уақытша шектелген. Кейінірек қайталаңыз немесе қолдауға жазыңыз.",
     registrationSignInRequired: "Аккаунтыңыз жасалды. Жалғастыру үшін кіріңіз.",
     title: "Аккаунт жасау",
     subtitleHighlight: "Құттықтау сыйлығы: {reward}",
@@ -850,7 +850,7 @@ export const kk: Messages = {
     errorInvalidCode: "6 таңбалы дұрыс кодты енгізіңіз.",
     accountExistsTitle: "Бұл нөмір бұрын тіркелген",
     accountExistsSigningIn: "Расталды. Кіріп жатырмыз…",
-    errorSignupLimited: "Бұл желіден тіркелу шегіне жетті. Кейінірек қайталаңыз немесе қолдауға жазыңыз.",
+    errorSignupLimited: "Тіркелу уақытша шектелген. Кейінірек қайталаңыз немесе қолдауға жазыңыз.",
     registrationOutcomeUnknown: "Аккаунт жасалған болуы мүмкін, бірақ кіру расталмады. Автоматты растау үшін кіру бетіне өтіңіз. Қайта тіркелмеңіз.",
     registrationSignedIn: "Аккаунт жасалды · автоматты кірдіңіз",
     sponsorEnvironmentMismatch: "Бұл шақыру коды қолжетімсіз. Кодты тексеріп, қайталап көріңіз.",

@@ -455,7 +455,7 @@ export const zh: Messages = {
     nativeSessionReloadNotice: "请重新登录以继续使用 App。",
   },
   register: {
-    errorDeviceSignupLimited: "此浏览器的注册数量已达上限，请使用已有账号登录。",
+    errorDeviceSignupLimited: "注册暂时受限，请稍后重试或联系客服。",
     registrationSignInRequired: "账号已创建，请登录后继续。",
     title: "创建账号",
     subtitleHighlight: "新人礼包：{reward}",
@@ -496,7 +496,7 @@ export const zh: Messages = {
     errorInvalidCode: "请输入 6 位验证码。",
     accountExistsTitle: "该手机号已注册",
     accountExistsSigningIn: "验证通过,正在登录…",
-    errorSignupLimited: "当前网络的注册数量已达上限，请稍后重试或联系客服。",
+    errorSignupLimited: "注册暂时受限，请稍后重试或联系客服。",
     registrationOutcomeUnknown: "账号可能已创建，登录结果尚未确认。前往登录页会自动确认，请勿重复注册。",
     registrationSignedIn: "注册成功，已自动登录",
     sponsorEnvironmentMismatch: "该邀请码不可用,请核对后重试",

@@ -466,7 +466,7 @@ export const vi: Messages = {
     nativeSessionReloadNotice: "Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.",
   },
   register: {
-    errorDeviceSignupLimited: "Trình duyệt này đã đạt giới hạn đăng ký. Vui lòng đăng nhập bằng tài khoản hiện có.",
+    errorDeviceSignupLimited: "Đăng ký tạm thời bị giới hạn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.",
     registrationSignInRequired: "Tài khoản đã được tạo. Đăng nhập để tiếp tục.",
     title: "Tạo tài khoản",
     subtitleHighlight: "Thưởng chào mừng người mới: {reward}",
@@ -507,7 +507,7 @@ export const vi: Messages = {
     errorInvalidCode: "Vui lòng nhập mã 6 số hợp lệ.",
     accountExistsTitle: "Số này đã được đăng ký",
     accountExistsSigningIn: "Xác minh xong. Đang đăng nhập cho bạn…",
-    errorSignupLimited: "Mạng này đã đạt giới hạn đăng ký. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.",
+    errorSignupLimited: "Đăng ký tạm thời bị giới hạn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.",
     registrationOutcomeUnknown: "Tài khoản có thể đã được tạo nhưng đăng nhập chưa được xác nhận. Vào trang đăng nhập để tự động xác nhận. Không đăng ký lại.",
     registrationSignedIn: "Đã tạo tài khoản · tự động đăng nhập",
     sponsorEnvironmentMismatch: "Mã mời này không khả dụng. Vui lòng kiểm tra và thử lại.",

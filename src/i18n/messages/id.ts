@@ -809,7 +809,7 @@ export const id: Messages = {
     nativeSessionReloadNotice: "Masuk lagi untuk terus menggunakan aplikasi.",
   },
   register: {
-    errorDeviceSignupLimited: "Browser ini sudah mencapai batas pendaftaran. Masuk dengan akun yang sudah ada.",
+    errorDeviceSignupLimited: "Pendaftaran dibatasi sementara. Coba lagi nanti atau hubungi layanan pelanggan.",
     registrationSignInRequired: "Akun Anda sudah dibuat. Masuk untuk melanjutkan.",
     title: "Buat akun",
     subtitleHighlight: "Hadiah selamat datang: {reward}",
@@ -850,7 +850,7 @@ export const id: Messages = {
     errorInvalidCode: "Masukkan kode 6 digit yang valid.",
     accountExistsTitle: "Nomor ini sudah terdaftar",
     accountExistsSigningIn: "Verifikasi selesai. Sedang masuk…",
-    errorSignupLimited: "Jaringan ini sudah mencapai batas pendaftaran. Coba lagi nanti atau hubungi layanan pelanggan.",
+    errorSignupLimited: "Pendaftaran dibatasi sementara. Coba lagi nanti atau hubungi layanan pelanggan.",
     registrationOutcomeUnknown: "Akun mungkin sudah dibuat, tetapi proses masuk belum terkonfirmasi. Buka halaman masuk untuk konfirmasi otomatis. Jangan mendaftar lagi.",
     registrationSignedIn: "Akun dibuat · otomatis masuk",
     sponsorEnvironmentMismatch: "Kode undangan ini tidak dapat digunakan. Periksa kodenya, lalu coba lagi.",
