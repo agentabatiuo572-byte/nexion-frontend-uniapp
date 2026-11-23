@@ -365,7 +365,7 @@ const stageMode = computed(() => phase.value === 'ended' ? 'ended' : signInNeede
 const readIdentity = () => `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
 
 // Catalog names follow the signed-in session; reading the account keys keeps them reactive.
-function productName(sku: string): string { void app.accountKey; void app.accountBindingEpoch; return activity.value ? landingProductName(activity.value, sku) : sku; }
+function productName(sku: string): string { void app.accountKey; void app.accountBindingEpoch; return activity.value ? landingProductName(activity.value, sku, locale.code) : sku; }
 function productImage(sku: string): string | undefined { return activity.value?.productImages?.[sku]; }
 const priceText = (price: number) => formatGroupedAmount(price);
 // Long published amounts step down before they could clip (01.2).

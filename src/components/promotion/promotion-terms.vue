@@ -5,10 +5,10 @@
       <DisclosureDetails :disclosure="entry" :shared-terms="!!shared.terms" :shared-refund="!!shared.refund" />
     </view>
     <view v-if="shared.terms || shared.refund" class="promotion-rule-section">
-      <text v-if="shared.terms" class="promotion-copy" style="white-space:pre-wrap">{{ shared.terms }}</text>
-      <template v-if="shared.refund"><text class="promotion-title promotion-title--sub" :style="shared.terms ? 'margin-top:16px' : ''">{{ t.promotion.returnPolicy }}</text><text class="promotion-copy" style="white-space:pre-wrap">{{ shared.refund }}</text></template>
+      <text v-if="shared.terms" class="promotion-copy promotion-copy--rules" style="white-space:pre-wrap">{{ shared.terms }}</text>
+      <template v-if="shared.refund"><text class="promotion-title promotion-title--sub" :style="shared.terms ? 'margin-top:16px' : ''">{{ t.promotion.returnPolicy }}</text><text class="promotion-copy promotion-copy--rules" style="white-space:pre-wrap">{{ shared.refund }}</text></template>
     </view>
-    <view v-for="rule in rules" :key="rule.id" class="promotion-rule-section"><text class="promotion-copy" style="white-space:pre-wrap">{{ rule.text }}</text></view>
+    <view v-for="rule in rules" :key="rule.id" class="promotion-rule-section"><text class="promotion-copy" :class="{ 'promotion-copy--rules': rule.prose }" style="white-space:pre-wrap">{{ rule.text }}</text></view>
     <text v-if="uniqueTerms" class="promotion-copy" style="white-space:pre-wrap;margin-top:14px">{{ uniqueTerms }}</text>
   </NxSheet>
 </template>
@@ -22,7 +22,7 @@ import type { PromotionDisclosure } from '@/lib/promotion-entry';
 import { landingCopy } from '@/i18n/promotion-landing';
 import DisclosureDetails from './disclosure-details.vue';
 import { uniquePromotionParagraphs } from '@/lib/promotion-paragraphs';
-const props=defineProps<{open:boolean;title?:string;terms?:string;disclosures?:PromotionDisclosure[];rules?:{id:string;text:string}[]}>();
+const props=defineProps<{open:boolean;title?:string;terms?:string;disclosures?:PromotionDisclosure[];rules?:{id:string;text:string;prose?:boolean}[]}>();
 const emit=defineEmits<{(e:'close'):void}>();const t=useT();const locale=useLocaleStore();
 const uniqueDisclosures = computed(() => Array.from(new Map((props.disclosures ?? []).map(entry => [JSON.stringify(entry), entry])).values()));
 // Referral offers publish the buyer's and the inviter's reward under the same title, so the groups are named by who gets them.
