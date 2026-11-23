@@ -57,13 +57,14 @@
               :style="rowStyle(0)"
               role="button"
               tabindex="0"
+              :aria-label="computeRowLabel(r)"
               @click.stop="openRemoteComputeReceipt(r)"
 
               @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
                 <text class="block truncate font-mono-code" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
-                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
+                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(computeTaskLine(r)) }}</text>
               </view>
               <!-- Each credited asset on its own line, same figure role as the message row (04.5, 10.1). -->
               <view class="text-right shrink-0" style="margin-left: 8px">
@@ -603,6 +604,14 @@ function copySig(r: Receipt) {
 
 function rowAmount(r: Receipt): string {
   return r.category === "KY" ? formatAmount(r.netPaid) : `+${formatAmount(r.netPaid)}`;
+}
+function computeTaskLine(r: CanonicalComputeReceiptSummary): string {
+  return r.executionMode === "SIMULATED" ? (r.taskName || computeCopy.value.taskReceipt) : `${t.value.receipt.computeTitle} · ${r.model}`;
+}
+// The row shows a shortened receipt number and clamps the job line to two lines (the detail shows both in full);
+// screen readers get the full text (03 §3.6.1).
+function computeRowLabel(r: CanonicalComputeReceiptSummary): string {
+  return [r.receiptNo, computeTaskLine(r), ...creditedAmounts(r.rewardUsdt, r.rewardNex).map(a => `${a.sign}${a.value} ${a.unit}`), shortDate(r.completedAt)].join(", ");
 }
 function shortDate(ts: number | string): string {
   const timestamp = displayTimestamp(ts);
