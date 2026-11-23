@@ -818,6 +818,8 @@ const faqQStyle: CSSProperties = {
 .detail-summary { padding: var(--v5-space-5); }
 /* The product name heads the detail hero: display-title role (10 §10.1, 26/34 600 at 390), -0.02em at 24px and up (01 §1.2). */
 .detail-summary__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-display-title-weight) var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-v5); letter-spacing: -0.02em; }
+/* Chinese takes no negative tracking (01 §1.2). */
+:lang(zh) .detail-summary__name { letter-spacing: 0; }
 .detail-summary__tagline { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-list-subtitle); line-height: var(--v5-type-body-s-lh); color: var(--v5-ink-3); }
 .detail-sales-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--v5-space-6); margin-top: var(--v5-space-5); }
 .detail-sales-stat { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }

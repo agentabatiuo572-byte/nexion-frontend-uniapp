@@ -30,12 +30,13 @@
             <text class="nx-deactivate-meta">{{ taskRewardLine }}</text>
           </view>
           <view class="text-right shrink-0">
-            <text class="nx-deactivate-pct">{{ progressPct }}%</text>
+            <text class="nx-deactivate-pct">{{ progressPct == null ? "—" : `${progressPct}%` }}</text>
             <text class="nx-deactivate-meta">{{ etaLine }}</text>
           </view>
         </view>
-        <view class="nx-deactivate-progress nx-progress" aria-hidden="true" :aria-valuenow="progressPct">
-          <view class="nx-progress__fill" :style="{ width: `${progressPct}%` }" />
+        <!-- An unknown progress (queued, recovering, no start time) stays unknown: 「—」 and a bare track (03 §3.6). -->
+        <view class="nx-deactivate-progress nx-progress" aria-hidden="true" :aria-valuenow="progressPct ?? undefined">
+          <view v-if="progressPct != null" class="nx-progress__fill" :style="{ width: `${progressPct}%` }" />
         </view>
       </view>
 
@@ -51,6 +52,8 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
           <text>{{ forceLabel }}</text>
         </NxButton>
+        <!-- The button names only the action; what forcing costs is one auxiliary line right under it (03 §3.1). -->
+        <text class="nx-deactivate-note">{{ forceNote }}</text>
         <NxButton class="nx-deactivate-back" variant="text" size="large" :label="t.deactivateSheet.backCta" @click="emit('dismiss')" />
       </view>
     </view>
@@ -95,11 +98,11 @@ const descLine = computed(() =>
   props.device ? fmt(task.value?.executionMode === "SIMULATED" ? computeCopy.value.stopDescription : t.value.deactivateSheet.desc,
     { name: deviceName(t.value, props.device) }) : "",
 );
-const progressPct = computed(() => {
+const progressPct = computed<number | null>(() => {
   const tk = task.value;
-  if (!tk) return 0;
+  if (!tk) return null;
   return taskProgressPercent(tk, taskNow.value, props.device?.interruptedAt,
-    props.device?.kind === "phone" ? props.device.phoneValidUntil : null) ?? 0;
+    props.device?.kind === "phone" ? props.device.phoneValidUntil : null);
 });
 const etaSec = computed(() => {
   const tk = task.value;
@@ -110,6 +113,7 @@ const etaLabel = computed(() =>
   etaSec.value >= 60 ? `~${Math.ceil(etaSec.value / 60)}m` : `~${etaSec.value}s`,
 );
 const forceLabel = computed(() => task.value?.executionMode === "SIMULATED" ? computeCopy.value.stopNow : t.value.deactivateSheet.forceCta);
+const forceNote = computed(() => task.value?.executionMode === "SIMULATED" ? computeCopy.value.stopNowNote : t.value.deactivateSheet.forceNote);
 const etaLine = computed(() => fmt(t.value.deactivateSheet.etaRemaining, { eta: etaLabel.value }));
 const taskRewardLine = computed(() => {
   const tk = task.value;
@@ -132,13 +136,13 @@ const scrimStyle: CSSProperties = {
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
-const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0", boxShadow: "var(--nx-glass-edge)",
+// Fill and edge come from the shared .nx-glass-sheet (03 §3.5: one top highlight, no side or bottom rim).
+const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0",
   position: "fixed",
   left: 0,
   right: 0,
   bottom: 0,
   zIndex: 800,
-  background: "var(--nx-glass-fill)",
   borderTop: "none",
   boxSizing: "border-box",
   maxHeight: "calc(100vh - var(--nx-overlay-top))",
@@ -164,7 +168,8 @@ const taskCardStyle: CSSProperties = {
 <style scoped>
 /* Sheet copy and task preview on the 10 §10.1 roles; the preview bar is the shared .nx-progress (03 §3.6). */
 .nx-deactivate-desc { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.nx-deactivate-task { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+/* A long job name wraps in full: the sheet offers no other place to read it (03 §3.6.1). */
+.nx-deactivate-task { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .nx-deactivate-meta { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-deactivate-pct { display: block; color: var(--v5-brand); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .nx-deactivate-progress { margin-top: 8px; }
@@ -172,6 +177,7 @@ const taskCardStyle: CSSProperties = {
 .nx-deactivate-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 16px; }
 .nx-deactivate-action { width: 100%; }
 .nx-deactivate-action--danger { --ui-button-ink: var(--v5-danger); color: var(--v5-danger); }
+.nx-deactivate-note { display: block; margin-top: -4px; padding: 0 12px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: break-word; text-wrap: pretty; }
 .nx-deactivate-back { align-self: center; }
 .nx-deactivate-close { flex: none; }
 @media (prefers-reduced-motion: reduce) { .nx-deactivate-progress .nx-progress__fill { transition: none; } }

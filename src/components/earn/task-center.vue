@@ -71,6 +71,8 @@
     </view>
     <view v-if="selectedTask" style="padding:12px;background:var(--v5-surface-2);border-radius:12px" data-compute-task-detail="true">
       <view class="flex items-center justify-between"><text class="earn-task-detail__title">{{ computeCopy.details }} #{{ visibility.mask(selectedTask.id) }}</text><NxButton variant="text" size="small" :label="computeCopy.close" @click="closeTaskDetail" /></view>
+      <!-- The full job name lives here, so the history row above may stop at two lines (03 §3.6.1). -->
+      <text class="earn-task-detail__name">{{ selectedTask.type }}</text>
       <TaskV2Status :task="selectedTask" />
       <view v-if="selectedTask.receiptNo && selectedTask.settlementStatus === 'POSTED'" role="button" tabindex="0" @click="openTaskReceipt(selectedTask, true)" @keydown.enter.stop.prevent="openTaskReceipt(selectedTask, true)" @keydown.space.stop.prevent="openTaskReceipt(selectedTask, true)"><text>{{ computeCopy.receipt }} #{{ visibility.mask(selectedTask.receiptNo) }}</text></view>
     </view>
@@ -273,6 +275,7 @@ function completedTime(ts: number): string {
 .earn-history-unit { grid-column: 3; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; text-align: right; }
 /* Inline job detail: its heading is a list title (10 §10.1); 关闭 is a text button (03 §3.1). */
 .earn-task-detail__title { min-width: 0; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
+.earn-task-detail__name { display: block; margin-top: 4px; color: var(--v5-ink); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
 .earn-history-time { grid-column: 2; grid-row: 2; min-width: 0; white-space: nowrap; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .earn-history-document { grid-column: 4; grid-row: 1 / span 2; }
 </style>
