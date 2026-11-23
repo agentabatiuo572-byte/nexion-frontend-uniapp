@@ -33,7 +33,7 @@ const n = Math.random().toString(36).slice(2, 10);
 const ids = { rim: 'uvt-rim-' + n, face: 'uvt-face-' + n };
 </script>
 <style scoped>
-.uvt-coin { position: relative; display: block; width: 100%; height: 100%; filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--v5-nex) 30%, transparent)); }
+.uvt-coin { position: relative; display: grid; width: 100%; height: 100%; filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--v5-nex) 30%, transparent)); }
 .uvt-coin :deep(.uvt-coin__svg) { display: block; }
 .uvt-coin :deep(.uvt-coin__rim-hi) { stop-color: color-mix(in srgb, var(--v5-nex) 35%, white); }
 .uvt-coin :deep(.uvt-coin__rim-lo) { stop-color: color-mix(in srgb, var(--v5-nex) 62%, black); }

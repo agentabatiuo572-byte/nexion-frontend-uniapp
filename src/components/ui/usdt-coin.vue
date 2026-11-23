@@ -34,7 +34,7 @@ const ids = { rim: 'usdt-rim-' + n, face: 'usdt-face-' + n };
 </script>
 <style scoped>
 /* Tether green, the token's own colour; it is an identifier, not a theme accent. */
-.usdt-coin { --usdt: #26a17b; position: relative; display: block; width: 100%; height: 100%; filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--usdt) 30%, transparent)); }
+.usdt-coin { --usdt: #26a17b; position: relative; display: grid; width: 100%; height: 100%; filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--usdt) 30%, transparent)); }
 .usdt-coin :deep(.usdt-coin__svg) { display: block; }
 .usdt-coin :deep(.usdt-coin__rim-hi) { stop-color: color-mix(in srgb, var(--usdt) 35%, white); }
 .usdt-coin :deep(.usdt-coin__rim-lo) { stop-color: color-mix(in srgb, var(--usdt) 62%, black); }

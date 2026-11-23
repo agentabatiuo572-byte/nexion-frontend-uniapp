@@ -71,7 +71,7 @@ const url = (id: string) => 'url(#' + id + ')';
 const hue = computed(() => props.kind === 'gift' ? 'var(--v5-warning)' : props.tone);
 </script>
 <style scoped>
-.nx-object-icon { --obj-soft: color-mix(in srgb, var(--obj) 72%, #9AA0AB); --obj2-soft: color-mix(in srgb, var(--v5-brand-2) 72%, #9AA0AB); position: relative; display: block; width: 100%; height: 100%; }
+.nx-object-icon { --obj-soft: color-mix(in srgb, var(--obj) 72%, #9AA0AB); --obj2-soft: color-mix(in srgb, var(--v5-brand-2) 72%, #9AA0AB); position: relative; display: grid; width: 100%; height: 100%; }
 .nx-object-icon :deep(.nx-object-icon__svg) { display: block; overflow: visible; }
 .nx-object-icon :deep(.o-floor) { fill: rgba(0,0,0,.16); }
 .nx-object-icon :deep(.o-gloss) { fill: rgba(255,255,255,.22); }
