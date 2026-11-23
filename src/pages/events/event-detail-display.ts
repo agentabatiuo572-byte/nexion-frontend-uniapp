@@ -1,7 +1,7 @@
 import type { EventDetail } from "@/api/event-detail-api";
 import { asApiError, isAmbiguousEnvelopeOutcome } from "@/api/errors";
 import type { eventDetailCopy } from "@/i18n/event-detail";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { promotionStoreHref } from "@/lib/promotion-entry";
 import { promotionLandingHref } from "@/lib/promotion-landing";
 
@@ -10,13 +10,21 @@ export function eventDetailRules(rules: EventDetail["rules"], copy: typeof event
     const value = rules[key];
     if (value === undefined || value === null || value === "") return [];
     if (key === "weekdays" && Array.isArray(value)) return [{ label, value: value.map(day => copy.weekdays[Number(day) - 1]).filter(Boolean).join(" · ") }];
+    if (key === "windowDays" && (typeof value === "number" || typeof value === "string")) return [{ label, value: `${value}\u00a0${copy.days}` }];
     if (key === "regions" && Array.isArray(value)) return [{ label, value: value.map(region => typeof region?.name === "string" ? region.name : "").filter(Boolean).join(" · ") }];
     return typeof value === "string" || typeof value === "number" ? [{ label, value: String(value) }] : [];
   }).filter(row => row.value);
 }
+/** Counts and progress: whole numbers without decimals, others with two; thousands grouped (06 §6.2). */
+export function eventDetailNumber(value: number): string {
+  return formatGroupedAmount(value, Number.isInteger(value) ? "full" : 2);
+}
 export function eventDetailReward(reward: EventDetail["rewards"][number], copy: typeof eventDetailCopy.en): string {
   const label = ({ UVT: "UVT", USDT: "USDT", DEVICE: copy.device, STREAK_SAVER: copy.saver, GENESIS_TICKET: copy.tickets } as Record<string, string>)[reward.type] ?? copy.reward;
-  return `${reward.pool ? `${copy.labels.poolUsdt} · ` : ""}${formatAmount(reward.quantity ?? reward.amount)} ${label}`;
+  const value = reward.quantity ?? reward.amount;
+  const shown = ["DEVICE", "STREAK_SAVER", "GENESIS_TICKET"].includes(reward.type) ? eventDetailNumber(Number(value)) : formatGroupedAmount(value);
+  // The number and its unit stay on one line (06 §6.2).
+  return `${reward.pool ? `${copy.labels.poolUsdt} · ` : ""}${shown}\u00a0${label}`;
 }
 export function eventClaimCommandKey(code: string, claimKeys: readonly string[] = []): string {
   return `h4-event-claim:${code}${claimKeys[0] && claimKeys[0] !== "ONCE" ? `:${claimKeys[0]}` : ""}`;

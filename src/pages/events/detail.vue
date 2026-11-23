@@ -25,7 +25,7 @@
         <view v-for="row in ruleRows" :key="row.label" class="event-row" :class="{'event-rule-paragraph':[copy.labels.description,copy.labels.terms].includes(row.label)}"><text>{{ row.label }}</text><text>{{ row.value }}</text></view>
       </view>
       <view v-if="hasMeasuredProgress" class="event-section event-section--plain">
-        <view class="event-row"><text class="event-subheading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
+        <view class="event-row"><text class="event-subheading">{{ copy.progress }}</text><text>{{ eventDetailNumber(detail.progressValue) }} / {{ eventDetailNumber(detail.targetValue) }}</text></view>
         <view class="event-progress" role="progressbar" :aria-label="copy.progress" :aria-valuenow="Math.min(detail.progressValue, detail.targetValue)" :aria-valuemin="0" :aria-valuemax="detail.targetValue"><view v-viz-inview class="nx-viz-grow" :style="{ width: `${Math.min(100, detail.progressValue / detail.targetValue * 100)}%` }" /></view>
       </view>
       <view v-if="detail.myRewardAmount != null" class="nx-glass-card event-section">
@@ -75,9 +75,8 @@ import { eventDetailCopy } from "@/i18n/event-detail";
 import { eventReminderCopy } from "@/i18n/event-detail";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { displayDeadline } from "@/lib/promotion-display";
-import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
-import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref, eventCommandFailure, isEventNotFound, type EventCommandFailure } from "./event-detail-display";
+import { eventDetailAction, eventDetailRules, eventDetailReward, eventDetailNumber, eventClaimCommandKey, eventDetailHref, eventCommandFailure, isEventNotFound, type EventCommandFailure } from "./event-detail-display";
 import { toast } from "@/store/ui";
 import { forgetPendingEventCommand, isPendingEventCommandExpired, readPendingEventCommand, rememberPendingEventCommand, type PendingEventCommand } from "@/lib/event-pending-command";
 import { uiLocale, serverLanguage } from "@/i18n";
@@ -137,7 +136,9 @@ function showCommandFailure(failure: Exclude<EventCommandFailure, "unknown">) {
   // Each says what happened and the next step (06 §6.1): slots reuse the warehouse line, stock and account add a line.
   else if (failure === "slots") toast.error(uiT.value.myDevices.inventorySlotsFullWarning);
   else if (failure === "stock") toast.error(copy.value.failed.stock, copy.value.failed.stockNext);
-  else if (failure === "account") toast.error(copy.value.failed.account, copy.value.failed.accountNext);
+  else if (failure === "account") toast.error(copy.value.failed.account, copy.value.failed.contactSupport);
+  // A rule or data refusal the user cannot fix in the app: say where to go next (06 §6.1).
+  else if (failure === "generic") toast.error(copy.value.failed.generic, copy.value.failed.contactSupport);
   else toast.error(failure === "notEligible" ? copy.value.eligibility.NOT_ELIGIBLE : copy.value.failed[failure]);
 }
 async function load() {
