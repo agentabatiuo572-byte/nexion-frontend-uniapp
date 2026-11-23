@@ -110,15 +110,26 @@ function goEarn() {
 </script>
 
 <style scoped>
-/* Columns: NxTag (03 §3.8) · name · 1h line · price · 24h change. The price column fits a list-title-sized mono price. */
-.home-market { --home-market-columns: 44px minmax(0, 1fr) 40px 68px 50px; }
-.home-market-grid { grid-template-columns: var(--home-market-columns); gap: 6px; }
+/* Columns: edge · NxTag (03 §3.8) · name · 1h line · price · 24h change · edge. The table is one grid and each row a
+   subgrid, so the price and change columns take their longest value in any row and the name takes what is left, wrapping
+   when it must (03 §3.6.1). A subgrid's own side padding would eat into its first and last tracks, so the 12px side inset
+   is a 6px edge track plus the 6px column gap. Without subgrid the rows keep fixed columns sized for the usual prices. */
+.home-market { --home-market-columns: 6px 44px minmax(0, 1fr) 40px max-content max-content 6px; }
+.home-market-table, .home-market-grid { column-gap: 6px; }
+.home-market-table { display: grid; grid-template-columns: var(--home-market-columns); }
+.home-market-grid { grid-column: 1 / -1; grid-template-columns: subgrid; }
+.home-market-grid > :first-child { grid-column: 2; }
+@supports not (grid-template-columns: subgrid) {
+  .home-market { --home-market-columns: 6px 44px minmax(0, 1fr) 40px 68px 50px 6px; }
+  .home-market-table { display: block; }
+  .home-market-grid { grid-template-columns: var(--home-market-columns); }
+}
 .home-market__title-note { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); letter-spacing: 0; }
 /* A solid content card (01 §1.1.2): surface, light theme adds the soft shadow. */
-.home-market-table { overflow: hidden; border-radius: 16px; background: var(--v5-surface); }
+.home-market-table { overflow: hidden; border-radius: var(--v5-radius-m); background: var(--v5-surface); }
 [data-theme="light"] .home-market-table { box-shadow: var(--v5-glass-shadow); }
-.home-market-head { align-items: center; min-height: 34px; box-sizing: border-box; padding: 9px 12px; background: var(--v5-surface-2); border-bottom: 1px solid var(--v5-border); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.home-market-row { padding: 10px 12px; min-width: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity .16s ease; }
+.home-market-head { align-items: center; min-height: 34px; box-sizing: border-box; padding: 9px 0; background: var(--v5-surface-2); border-bottom: 1px solid var(--v5-border); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.home-market-row { padding: var(--ui-space-row-y) 0; min-width: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity .16s ease; }
 .home-market-row + .home-market-row { border-top: 1px solid var(--v5-border); }
 /* Rows give press feedback by opacity, never by scaling (03 §3.1, 07 §7.1.1). */
 .home-market-row:active { opacity: .6; transition-duration: .08s; }
@@ -129,15 +140,16 @@ function goEarn() {
 .home-market-row__price { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .home-market-row__meta { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .home-market-row__delta { text-align: right; font: 500 var(--ui-type-inline-figure, var(--ui-type-list-subtitle))/var(--ui-type-inline-figure-lh, var(--ui-type-list-subtitle-lh)) var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.home-market-empty { display: flex; align-items: center; min-height: 60px; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; background: var(--v5-surface); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.home-market-empty { display: flex; align-items: center; min-height: 60px; box-sizing: border-box; padding: var(--v5-space-3) var(--ui-space-inset); border-radius: var(--v5-radius-m); background: var(--v5-surface); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 [data-theme="light"] .home-market-empty { box-shadow: var(--v5-glass-shadow); }
 /* Still placeholders (no shimmer): the same row height as a loaded row. */
 .home-market-row--placeholder, .home-market-row--placeholder:active { min-height: 56px; box-sizing: border-box; cursor: default; opacity: 1; }
-.home-market-bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.home-market-bar { height: 10px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .home-market-bar--tag { width: 40px; height: 24px; }
 @media (max-width: 360px) {
-  .home-market { --home-market-columns: 44px minmax(0, 1fr) 68px 50px; }
+  .home-market { --home-market-columns: 6px 44px minmax(0, 1fr) max-content max-content 6px; }
   .home-market-spark { display: none; }
+  @supports not (grid-template-columns: subgrid) { .home-market { --home-market-columns: 6px 44px minmax(0, 1fr) 68px 50px 6px; } }
 }
 .market-board-open:focus,
 .market-board-open:focus-visible {
