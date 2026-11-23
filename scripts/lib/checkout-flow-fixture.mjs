@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoFixture,demoOrderTimedOut,demoTimedOutOrder} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
-import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
+import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const pin = createPaymentPinFlowFixture();
@@ -45,15 +45,28 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     }
     return null;
   }
+  function createFailure(error, operation, key, quoteId) {
+    if (!(error.status >= 400 && error.status < 500)) throw error;
+    if (quoteId && state.quotes?.[quoteId]) {
+      // Returned business envelopes retain the refusal detail. A rolled-back promotion exception only retains FAILED.
+      const hasDetail = ['PRODUCT_OUT_OF_STOCK','PRODUCT_NOT_AVAILABLE','PURCHASE_GATE_BLOCKED','PRODUCT_NOT_RELEASED',
+        'BUNDLE_PRODUCT_NOT_AVAILABLE','BUNDLE_PRODUCT_NOT_RELEASED','BUNDLE_QUOTE_STALE','BUNDLE_DISCOUNT_POLICY_STALE',
+        'CAPACITY_REPLACEMENT_REQUIRED'].includes(error.message);
+      state.commands ??= {};
+      state.commands[key] = {idempotencyKey:key,operation,targetId:quoteId,status:'FAILED',order:null,
+        error:hasDetail?{code:error.status,message:error.message,data:null}:null};
+    }
+    return {status:error.status,message:error.message,data:null};
+  }
   async function handle(url, request) {
     syncScenario();
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     const handlesOrder = path === '/api/orders' || path.startsWith('/api/orders/') || path.startsWith('/api/promotion-commands/');
     const headers = request.headers();
     const owner = handlesOrder ? previewAccountId(state, headers) : null;
-    if (handlesOrder && path !== '/api/orders/commands' && owner !== demoAccountId) {
+    if (handlesOrder && path !== '/api/orders/commands' && owner !== demoPurchasingAccountId(state)) {
       if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
-      // The preview has one purchasing account. Other demo accounts have no orders or purchase commands.
+      // The selected purchasing account owns this scenario's orders and purchase commands.
       if (path === '/api/orders' && method === 'GET') {
         const projection = demoFixture(url,locale(),state,request);
         return ok({...projection,orders:[],nextCursor:null});
@@ -117,8 +130,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         creating.updatedAt = new Date().toISOString();
         return ok(creating.receipt);
       } catch (error) {
-        if (!(error.status >= 400 && error.status < 500)) throw error;
-        creating.failure = {status:error.status,message:error.message,data:null};
+        creating.failure = createFailure(error, 'createOrder', trimmed, input.promotionQuoteId);
         creating.updatedAt = new Date().toISOString();
         return creating.failure;
       } finally {
@@ -160,10 +172,12 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     if (path === '/api/orders' && method === 'GET') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/quote') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/bundle' && method === 'POST') {
-      if (receipts.has(path+key)) return ok(receipts.get(path+key));
-      const result = demoFixture(url,locale(),state,request);
-      receipts.set(path+key,result);
-      return ok(result);
+      if (receipts.has(path+key)) return receipts.get(path+key);
+      let response;
+      try { response = ok(demoFixture(url,locale(),state,request)); }
+      catch (error) { response = createFailure(error, 'createBundle', key, request.postDataJSON().promotionQuoteId); }
+      receipts.set(path+key,response);
+      return response;
     }
     const action = path.match(/^\/api\/orders\/([^/]+)\/(pay|cancel)$/);
     if (action && method === 'POST') {

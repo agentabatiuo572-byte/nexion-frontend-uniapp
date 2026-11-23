@@ -1,14 +1,14 @@
 // Loopback fixtures for password, passwordless SMS, and the separate second factor.
 import { randomBytes } from 'node:crypto';
 import { demoAccountPasswordMatches, demoSecurityAccount, demoTwoFactorAccountId } from './prototype-demo-account.mjs';
-import { demoAccountId } from './prototype-demo-identity.mjs';
+import { demoAccountId, demoReferralBuyer } from './prototype-demo-identity.mjs';
 
 export const demoExistingUser = {
   userId: Number(demoAccountId), countryCode: '+86', phone: '13800000000', nickname: 'Alex', onboardingComplete: true,
 };
 const twoFactorUser = { ...demoExistingUser, userId: demoTwoFactorAccountId, phone: '13800000004' };
 export function findDemoSignInUser(countryCode, phone) {
-  return [demoExistingUser, twoFactorUser].find(row => row.countryCode === countryCode && row.phone === phone);
+  return [demoExistingUser, twoFactorUser, demoReferralBuyer.user].find(row => row.countryCode === countryCode && row.phone === phone);
 }
 
 const signInPaths = ['/auth/users/login', '/auth/users/login/otp/send', '/auth/users/login/otp/verify', '/auth/users/login/2fa'];

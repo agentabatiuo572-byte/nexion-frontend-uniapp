@@ -26,12 +26,10 @@
         <view class="wallet-metric" data-wallet-metric="reviewing" role="button" tabindex="0" @click="showPendingSheet" @keydown.enter.prevent="showPendingSheet" @keydown.space.prevent="showPendingSheet">
           <text class="wallet-metric-label">{{ t.wallet.reviewingEarnings }}</text>
           <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(bucketsReadable ? `$${formatAmount(pendingReview)}` : '—'), 22, true)">{{ visibility.mask(bucketsReadable ? `$${formatAmount(pendingReview)}` : "—") }}</text>
-          <text class="wallet-metric-sub wallet-metric-sub--release">{{ t.wallet.reviewingEarningsSub }}</text>
         </view>
         <view class="wallet-metric" data-wallet-metric="locked" role="button" tabindex="0" @click="showLockedSheet" @keydown.enter.prevent="showLockedSheet" @keydown.space.prevent="showLockedSheet">
           <text class="wallet-metric-label">{{ t.wallet.lockedRewards }}</text>
           <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(bucketsReadable ? `$${formatAmount(lockedRewards)}` : '—'), 22, true)">{{ visibility.mask(bucketsReadable ? `$${formatAmount(lockedRewards)}` : "—") }}</text>
-          <text class="wallet-metric-sub wallet-metric-sub--release">{{ t.wallet.lockedRewardsSub }}</text>
         </view>
       </view>
 
@@ -196,7 +194,6 @@ function amountStyle(value: string, size: number, half = false): CSSProperties {
 .wallet-metric-amount { font-family: var(--font-metric); display: block; min-height: 26.4px; margin-top: var(--v5-space-1); font-weight: 500; line-height: 1.2; letter-spacing: -.025em; white-space: nowrap; }
 .wallet-metric--today .wallet-metric-amount { color: var(--v5-brand); }
 .wallet-metric-sub { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-note); color: var(--v5-ink-3); line-height: var(--ui-type-note-lh); overflow-wrap: break-word; }
-.wallet-metric-sub--release { font-size: 10px; line-height: 1.4; }
 .wallet-metric-breakdown { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; max-width: 100%; min-height: 16px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
 .wallet-metric-breakdown::-webkit-scrollbar { display: none; }
 .wallet-metric-breakdown:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: var(--v5-radius-s); }

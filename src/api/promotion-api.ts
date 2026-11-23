@@ -31,6 +31,19 @@ export function checkoutQuoteBlock(cause: unknown, source: 'quote' | 'eligibilit
   }
   return null;
 }
+export type CheckoutCreateBlock = Exclude<CheckoutQuoteBlock, 'unavailable'> | 'promotionUnavailable' | 'promotionIneligible';
+
+/** Only explicit purchase refusals settle a create. Transport and idempotency errors still need readback. */
+export function checkoutCreateBlock(cause: unknown): CheckoutCreateBlock | null {
+  if (!(cause instanceof ApiError)) return null;
+  if (isApiRefusal(cause, 409, 'PURCHASE_GATE_BLOCKED')) return 'purchaseConditions';
+  if (isApiRefusal(cause, 409, 'PRODUCT_NOT_AVAILABLE', 'PRODUCT_NOT_RELEASED', 'BUNDLE_PRODUCT_NOT_RELEASED')) return 'productMissing';
+  if (isApiRefusal(cause, 409, 'PROMOTION_ELIGIBILITY_CHANGED')) return 'promotionIneligible';
+  if (isApiRefusal(cause, 409, 'PROMOTION_CAPACITY_UNAVAILABLE')) return 'promotionUnavailable';
+  if (isApiRefusal(cause, 409, 'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE')) return 'capacity';
+  const block = checkoutQuoteBlock(cause);
+  return block === 'unavailable' ? null : block;
+}
 export type PromotionOperation='createOrder'|'createBundle'|'payOrder'|'cancelOrder';
 let quoteSequence=0;
 // IDEMPOTENCY-FRESH-OK: Each explicit quote read is a new estimate without reservation; transport retries retain this request's key.
@@ -74,7 +87,14 @@ function repurchaseFields(p: Record<string, unknown>): void {
     if (!/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(purchaseAt) || parseServerTimestamp(purchaseAt) === null) invalid();
   }
 }
-function promotion(value:unknown):PublicPromotion{const p=object(value);bannerImage(p);repurchaseFields(p);string(p.activityId);if(typeof p.version!=='number'||!Number.isSafeInteger(p.version)||p.version<1)return invalid();if(!['SKU_GIFT','FIRST_PURCHASE','DIRECT_REFERRAL','MULTI_PRODUCT','REPURCHASE'].includes(string(p.template))||!['DRAFT','SCHEDULED','ACTIVE','PAUSED','ENDED','ARCHIVED'].includes(string(p.state))||!['SIGN_IN_REQUIRED','ESTIMATE_ELIGIBLE','INELIGIBLE','UNKNOWN'].includes(string(p.eligibility)))return invalid();array(p.minimumClientCapabilities).forEach(c=>{if(!PROMOTION_CAPABILITIES.includes(c as typeof PROMOTION_CAPABILITIES[number]))return invalid();});time(p.serverTime);time(p.startsAt);time(p.endsAt);for(const key of ['title','terms']){const l=object(p[key]);['zh','en','vi'].forEach(lang=>string(l[lang]));}array(p.productNos).forEach(string);array(p.rewardRules).forEach(v=>{const r=object(v);string(r.ruleId);string(r.productNo);quantity(r.minBuyQty);if(!['PER_GROUP','ONCE_PER_ORDER'].includes(string(r.repeatMode)))return invalid();for(const key of ['maxGroups','maxGroupsPerPerson']){const limit=object(r[key]);if(limit.mode!=='UNLIMITED'&&(limit.mode!=='LIMITED'||typeof limit.value!=='number'||!Number.isSafeInteger(limit.value)||limit.value<1))return invalid();}rewardSpec(r.buyerReward);disclosure(object(r.buyerReward).disclosure,object(r.buyerReward).type==='DEVICE');if(r.inviterReward){rewardSpec(r.inviterReward);if(object(r.inviterReward).type==='DISCOUNT_USDT')return invalid();disclosure(object(r.inviterReward).disclosure,object(r.inviterReward).type==='DEVICE');}});return p as PublicPromotion;}
+function firstPurchaseCondition(value: unknown): void {
+  if (value === null || value === undefined) return;
+  const condition = object(value);
+  if ((condition.mode !== 'FIRST_ELIGIBLE_ORDER' && condition.mode !== 'FIRST_ELIGIBLE_UNIT')
+    || typeof condition.restoreAfterRefund !== 'boolean' || Object.keys(condition).length !== 2) invalid();
+}
+
+function promotion(value:unknown):PublicPromotion{const p=object(value);bannerImage(p);repurchaseFields(p);firstPurchaseCondition(p.firstPurchaseCondition);string(p.activityId);if(typeof p.version!=='number'||!Number.isSafeInteger(p.version)||p.version<1)return invalid();if(!['SKU_GIFT','FIRST_PURCHASE','DIRECT_REFERRAL','MULTI_PRODUCT','REPURCHASE'].includes(string(p.template))||!['DRAFT','SCHEDULED','ACTIVE','PAUSED','ENDED','ARCHIVED'].includes(string(p.state))||!['SIGN_IN_REQUIRED','ESTIMATE_ELIGIBLE','INELIGIBLE','UNKNOWN'].includes(string(p.eligibility)))return invalid();array(p.minimumClientCapabilities).forEach(c=>{if(!PROMOTION_CAPABILITIES.includes(c as typeof PROMOTION_CAPABILITIES[number]))return invalid();});time(p.serverTime);time(p.startsAt);time(p.endsAt);for(const key of ['title','terms']){const l=object(p[key]);['zh','en','vi'].forEach(lang=>string(l[lang]));}array(p.productNos).forEach(string);array(p.rewardRules).forEach(v=>{const r=object(v);string(r.ruleId);string(r.productNo);quantity(r.minBuyQty);if(!['PER_GROUP','ONCE_PER_ORDER'].includes(string(r.repeatMode)))return invalid();for(const key of ['maxGroups','maxGroupsPerPerson']){const limit=object(r[key]);if(limit.mode!=='UNLIMITED'&&(limit.mode!=='LIMITED'||typeof limit.value!=='number'||!Number.isSafeInteger(limit.value)||limit.value<1))return invalid();}rewardSpec(r.buyerReward);disclosure(object(r.buyerReward).disclosure,object(r.buyerReward).type==='DEVICE');if(r.inviterReward){rewardSpec(r.inviterReward);if(object(r.inviterReward).type==='DISCOUNT_USDT')return invalid();disclosure(object(r.inviterReward).disclosure,object(r.inviterReward).type==='DEVICE');}});return p as PublicPromotion;}
 function quote(value:unknown):Quote{
   const p=object(value);string(p.quoteId);string(p.quoteHash);time(p.serverTime);time(p.expiresAt);
   ['subtotalUsdt','discountUsdt','amountUsdt'].forEach(k=>amount(p[k]));

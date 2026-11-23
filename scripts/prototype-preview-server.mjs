@@ -15,7 +15,7 @@ import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { restoreSupportConversationNumbers, setTransferSampleOutcome, supportStateFor } from './lib/prototype-demo-support.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
-import { demoAccountId, previewAccountId, previewSelectedAccountId } from './lib/prototype-demo-identity.mjs';
+import { demoAccountId, demoPurchasingAccountId, previewAccountId, previewSelectedAccountId } from './lib/prototype-demo-identity.mjs';
 import { demoPaymentIntentMissing, demoPaymentScenario, selectDemoPaymentState } from './lib/prototype-demo-payment-mode.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
@@ -74,8 +74,13 @@ const fixtureFor=(url,request)=>{
 };
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
-await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor,realtimeAccount:headers=>previewAccountId(state,headers)});
-const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{explicitChoice:'zh'}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
+await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push(()=>{
+  const snapshot=arg?.accountId==='user:'+demoAccountId
+    ? {...arg,accountId:'user:'+demoPurchasingAccountId(state)}
+    : arg;
+  return '('+fn.toString()+')('+JSON.stringify(snapshot)+');';
+}),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor,realtimeAccount:headers=>previewAccountId(state,headers)});
+const seed=()=>'<script>'+init.map(script=>script()).join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{explicitChoice:'zh'}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, event commands awaiting confirmation, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
@@ -201,7 +206,7 @@ const server=http.createServer(async(req,res)=>{
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
         const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,
           wasPaymentMode=demoPaymentScenario(state),wasMissing=demoPaymentIntentMissing(state),
-          wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
+          wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState,wasPromotionBuyer=state.promotionBuyer;
         if(update.reset){
           const {accountCreatedAt,supportConversationSequence}=state;
           for(const key of Object.keys(state))delete state[key];
@@ -227,7 +232,8 @@ const server=http.createServer(async(req,res)=>{
         selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
         const paymentMode=demoPaymentScenario(state);
         if(state.dataState==='empty')state.withdrawLimitState='open';
-        if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
+        const promotionBuyerChanged=state.promotionBuyer!==wasPromotionBuyer;
+        if(update.reset||update.authState||update.savedAttemptState||promotionBuyerChanged)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.authState)delete state.scopeCalls;
         if(update.stakingOpenState){delete state.stakingAttempts;delete state.stakingStatusReads;}
@@ -238,7 +244,7 @@ const server=http.createServer(async(req,res)=>{
         // late) is one too. Presentation knobs keep them.
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
-        const scenarioChange=state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
+        const scenarioChange=promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -439,7 +445,7 @@ const server=http.createServer(async(req,res)=>{
     const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
     const savedAttempt=path.extname(file)==='.html'?authDemo.savedAttempt():null;
     const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
-    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed(url)+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed(url)+seed()+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);

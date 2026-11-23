@@ -1092,7 +1092,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 }
 
 /* Retained page shown again: no second entrance. */
-.dly--instant .dly-hero, .dly--instant .dly-ring__dn, .dly--instant .dly-rail__item > .dly-tk, .dly--instant .dly-tk__sheen > view { animation: none; }
+.dly--instant .dly-hero, .dly--instant .dly-ring__dn:not(.dly-ring__dn--new), .dly--instant .dly-rail__item > .dly-tk, .dly--instant .dly-tk__sheen > view { animation: none; }
 
 @keyframes dly-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes dly-slidein { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
