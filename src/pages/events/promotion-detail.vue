@@ -316,8 +316,9 @@ const inviteHero = computed(() => {
   const a = activity.value, r = rule.value;
   if (!a || !r) return null;
   const buyer = rewardParts(a, r.buyerReward);
-  if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward), friend: partsText(buyer) };
-  return { label: c.value.friendGets, parts: buyer, friend: '' };
+  const firstPurchaseCondition = a.firstPurchaseCondition ?? null;
+  if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward), friend: partsText(buyer), firstPurchaseCondition };
+  return { label: c.value.friendGets, parts: buyer, friend: '', firstPurchaseCondition };
 });
 // Share of the line in brand colour: up to the furthest step that is done or current (0, half or all).
 const trackFill = computed(() => { const last = trackSteps.value.reduce((at, step, index) => step.state === 'todo' ? at : index, 0); return last / (trackSteps.value.length - 1); });
