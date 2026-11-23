@@ -246,7 +246,7 @@
       <view class="lp-bar-space" aria-hidden="true" />
     </view>
 
-    <PromotionTerms v-if="activity" :open="termsOpen" :title="localized(activity.title, locale.code)" :terms="promotionTermsText(activity, t.promotion, locale.code)" :rules="promotionTermsRules(activity, t.promotion, productName)" :disclosures="promotionDisclosures(activity)" @close="termsOpen = false" />
+    <PromotionTerms v-if="activity" :open="termsOpen" :title="localized(activity.title, locale.code)" :terms="promotionTermsText(activity, t.promotion, locale.code)" :rules="promotionTermsRules(activity, t.promotion, productName, locale.code)" :disclosures="promotionDisclosures(activity)" @close="termsOpen = false" />
 
     <SharePosterSheet v-if="kind === 'referral'" :open="posterOpen" @close="closePoster" />
 

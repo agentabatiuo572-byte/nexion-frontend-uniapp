@@ -2,6 +2,7 @@ import type { PublicPromotion, PublicRewardSpec } from '@/api/promotion-contract
 import { parseServerTimestamp } from '@/api/server-time';
 import type { Messages } from '@/i18n/messages/en';
 import { fmt } from '@/i18n/format';
+import { landingCopy } from '@/i18n/promotion-landing';
 import { sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
 import { productCatalogState } from '@/store/product-catalog';
@@ -86,11 +87,15 @@ export function promotionRepurchaseInterval(activity: PublicPromotion | null) {
 }
 
 /** Rule summaries and terms for the shared PromotionTerms sheet. */
-export function promotionTermsRules(activity: PublicPromotion, copy: Messages['promotion'], productName: (sku: string) => string) {
-  return activity.rewardRules.map(rule => {
+export function promotionTermsRules(activity: PublicPromotion, copy: Messages['promotion'], productName: (sku: string) => string, language: string) {
+  const rules = activity.rewardRules.map(rule => {
     const rewards = [rule.buyerReward, rule.inviterReward].filter((reward): reward is NonNullable<typeof reward> => !!reward);
     return { id: rule.ruleId, text: productName(rule.productNo) + ' · ' + copy.rulePer + ' ' + rule.minBuyQty + ' · ' + (rule.repeatMode === 'PER_GROUP' ? copy.perGroup : copy.oncePerOrder) + '\n' + rewards.map(reward => (reward.beneficiaryRole === 'BUYER' ? copy.buyer : copy.inviter) + ' · ' + rewardSummary(reward, copy, reward.disclosure.deviceName)).join(' / ') + '\n' + [rule.maxGroups.mode === 'LIMITED' ? fmt(copy.orderRewardLimit, { n: rule.maxGroups.value }) : '', rule.maxGroupsPerPerson.mode === 'LIMITED' ? fmt(copy.personRewardLimit, { n: rule.maxGroupsPerPerson.value }) : ''].filter(Boolean).join(' · ') };
   });
+  // A referral offer states how the friend's first purchase is counted, after the rules that pay for it.
+  const condition = activity.firstPurchaseCondition, landing = landingCopy(language);
+  if (!condition) return rules;
+  return [...rules, { id: 'first-purchase', text: [condition.mode === 'FIRST_ELIGIBLE_UNIT' ? landing.firstPurchaseByUnit : landing.firstPurchaseByOrder, condition.restoreAfterRefund ? landing.firstPurchaseRefund : ''].filter(Boolean).join('\n') }];
 }
 export function promotionTermsText(activity: PublicPromotion, copy: Messages['promotion'], language: string): string {
   return [localized(activity.terms, language), copy.deadline + ' · ' + displayDeadline(activity.endsAt, language)].join('\n\n');
