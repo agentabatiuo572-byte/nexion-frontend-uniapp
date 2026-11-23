@@ -36,7 +36,7 @@
           <view class="nx-receipt-skeleton" :style="{ width: si ? '64px' : '84px', height: '14px', margin: '2px 0 14px' }" />
           <view v-for="(width, ri) in widths" :key="ri" class="nx-receipt-row" :style="rowStyle">
             <view class="nx-receipt-skeleton" style="width: 56px; height: 12px" />
-            <view class="nx-receipt-skeleton" :style="{ justifySelf: 'end', width: width + 'px', height: '12px' }" />
+            <view class="nx-receipt-skeleton" :style="{ marginLeft: 'auto', width: width + 'px', height: '12px' }" />
           </view>
         </view>
       </view>
@@ -59,22 +59,23 @@
           class="nx-receipt-row"
           :style="rowStyle"
         >
-          <text class="nx-receipt-line" :title="fieldLabel(row.k)" style="color:var(--v5-ink-3)">{{ fieldLabel(row.k) }}</text>
+          <text class="nx-receipt-label">{{ fieldLabel(row.k) }}</text>
           <view v-if="row.divider" :style="dividerStyle" />
           <!-- Long codes (03 §3.6.1): one line, middle ellipsis keeping the last 6; screen readers and the copy button get the
                same whole value that is shown. -->
           <view v-else-if="row.copyValue" :style="copyRowStyle">
             <NxCodeValue :value="row.copyValue" :label="fieldLabel(row.k)" fill />
-            <text v-if="row.hint" class="nx-receipt-line" style="flex-shrink:0;color:var(--v5-ink-3);font-size:12px">({{ row.hint }})</text>
+            <text v-if="row.hint" style="flex-shrink:0;white-space:nowrap;color:var(--v5-ink-3);font-size:12px">({{ row.hint }})</text>
           </view>
-          <text v-else class="nx-receipt-line text-right" :style="valueStyle(row)" :title="row.v" @longpress="row.v && copyRow(row.v)">{{ receiptLine(row.v) }}</text>
+          <!-- A value nobody can open further is shown whole: it wraps, right-aligned, and is never cut off (03 §3.6.1). -->
+          <text v-else class="nx-receipt-value" :style="valueStyle(row)" @longpress="row.v && copyRow(row.v)">{{ receiptLine(row.v) }}</text>
         </view>
         <!-- 历史验证回执的核验清单(渲染兜底,仅存量数据) -->
         <view v-if="sec.checks" style="margin-top: 4px">
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
-            <text class="nx-receipt-line" :title="chk" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink)">{{ receiptLine(chk) }}</text>
-            <text class="nx-receipt-line" style="flex-shrink:0;margin-left:auto;font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-3)">{{ t.uiChrome.passed }}</text>
+            <text style="flex:1;min-width:0;overflow-wrap:break-word;font-size:var(--ui-type-list-subtitle);color:var(--v5-ink)">{{ receiptLine(chk) }}</text>
+            <text style="flex-shrink:0;margin-left:auto;white-space:nowrap;font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-3)">{{ t.uiChrome.passed }}</text>
           </view>
         </view>
       </view>
@@ -487,7 +488,9 @@ const sectionHeadStyle: CSSProperties = {
 };
 // Prototype Section uses `space-y-1` = 4px gap between rows. `padding: 2px 0`
 // on every row yields the same 4px inter-row spacing.
-const rowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.4fr)", alignItems: "center", gap: "12px", fontSize: "var(--ui-type-list-subtitle)", lineHeight: 1.5, padding: "6px 0" };
+// Label | value: the label keeps one line (it wraps only past half the row); the value takes the rest, right-aligned, and
+// wraps. Baseline alignment keeps the label on the value's first line and on a code's line.
+const rowStyle: CSSProperties = { display: "flex", alignItems: "baseline", gap: "12px", fontSize: "var(--ui-type-list-subtitle)", lineHeight: 1.5, padding: "6px 0" };
 const dividerStyle: CSSProperties = {
   flex: "1",
   height: "1px",
@@ -502,7 +505,7 @@ function valueStyle(row: DescRow): CSSProperties {
   };
 }
 // A code row: NxCodeValue (value + its copy button) and an optional hint, right-aligned in the value column.
-const copyRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", minWidth: 0, justifyContent: "flex-end", flexWrap: "nowrap" };
+const copyRowStyle: CSSProperties = { display: "flex", flex: "1 1 0", alignItems: "center", gap: "6px", minHeight: "44px", minWidth: 0, justifyContent: "flex-end", flexWrap: "nowrap" };
 </script>
 
 <style scoped>
@@ -530,11 +533,8 @@ const copyRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap
 .nx-receipt-view-all > text { white-space: nowrap; }
 .nx-receipt-view-all:active { opacity: .6; }
 .nx-receipt-view-all:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 8px; }
-.nx-receipt-line {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
+/* Field name: one line while it fits in half the row, then it wraps (never cut off). */
+.nx-receipt-label { flex: 0 0 auto; max-width: 50%; color: var(--v5-ink-3); overflow-wrap: break-word; }
+/* Plain value: takes the rest of the row, right-aligned, wraps at word boundaries; a single word longer than the line breaks. */
+.nx-receipt-value { flex: 1 1 0; min-width: 0; text-align: right; overflow-wrap: break-word; }
 </style>
