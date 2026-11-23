@@ -19,17 +19,17 @@
       <view v-if="orderPanels.showSourceOutage && !orderList.length" class="mx-4 rounded-2xl" :style="remoteErrorStyle"><text style="color:var(--v5-ink-3)">—</text></view>
 
       <!-- An empty claim requires every order source to have loaded successfully. -->
-      <EmptyState v-if="orderPanels.mainPresentation === 'empty'" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
+      <EmptyState v-if="orderPanels.mainPresentation === 'empty' && !paymentCards.length" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
-      <GlassSegments v-if="orderPanels.mainPresentation === 'list'" v-model="statusFilter" :options="filterOptions" layout="scroll" selection="flat" semantics="radio" :label="t.orders.filterGroupLabel" class="orders-filters mx-4">
+      <GlassSegments v-if="listShown" v-model="statusFilter" :options="filterOptions" layout="scroll" selection="flat" semantics="radio" :label="t.orders.filterGroupLabel" class="orders-filters mx-4">
         <template #option="{ option }"><text class="orders-filter__label">{{ option.label }}</text><text v-if="option.value === 'pending' && pendingCount > 0" class="orders-filter__badge">{{ pendingCount }}</text></template>
       </GlassSegments>
-      <text v-if="orderPanels.mainPresentation === 'list' && filteredOrders.length === 0 && filteredPaymentCards.length === 0" class="orders-filter-empty">{{ t.orders.filterEmpty }}</text>
+      <text v-if="listShown && filteredOrders.length === 0 && filteredPaymentCards.length === 0" class="orders-filter-empty">{{ t.orders.filterEmpty }}</text>
       <!-- Order cards: machine art + status tag; the whole card opens the detail,
            the pending row's own button goes straight to payment. -->
-      <view v-if="orderPanels.mainPresentation === 'list' && (filteredOrders.length > 0 || filteredPaymentCards.length > 0)" class="orders-list">
+      <view v-if="listShown && (filteredOrders.length > 0 || filteredPaymentCards.length > 0)" class="orders-list">
         <!-- Payments with no order card of their own (trade-in, slot capacity, trial purchase, or an order no longer awaiting
              payment) use the order card's layout; the whole card resumes that payment (user 2026-11-24). -->
         <view v-for="card in filteredPaymentCards" :key="card.key" class="order-card" role="button" tabindex="0" :aria-label="card.title + ' · ' + card.tag"
@@ -232,6 +232,10 @@ const paymentCards = computed<PaymentCard[]>(() => paymentRows.value.flatMap((ro
   const sku = (payload.targetProductNo ?? payload.productNo) as string | undefined;
   return [{ ...base, sku, imageUrl: getProductMedia(sku)?.src, kindLabel, method, placedAt: null, amount: { value, currency: "USDT" } }];
 }));
+// Payment records live on this device and do not wait for the order read (user 2026-11-24): with payment cards the list
+// (filters and cards) shows even with no orders or after a failed first read, under that read's failure line; the empty
+// state needs neither orders nor payment cards.
+const listShown = computed(() => orderPanels.value.mainPresentation === "list" || orderPanels.value.mainPresentation !== "loading" && paymentCards.value.length > 0);
 // 由逻辑项接: payment cards count as 待支付 and sit above the orders until records carry a start time.
 const filteredPaymentCards = computed(() => (statusFilter.value === "all" || statusFilter.value === "pending" ? paymentCards.value : []));
 function openPaymentCard(card: PaymentCard) { void payment.resume(card.row); }
