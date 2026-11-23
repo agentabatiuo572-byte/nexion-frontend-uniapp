@@ -10,6 +10,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   pin.state.loggedIn = true;
   const receipts = new Map();
   const orderCreates = new Map();
+  let orderListScene;
   const commandKeys = new Intl.Collator("en", {sensitivity:"base"});
   let delayCreate;
   const configureCreateDelay = () => { delayCreate = { scenario: state.scenarioEpoch }; };
@@ -28,6 +29,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     if (epoch !== state.scenarioEpoch) {
       epoch = state.scenarioEpoch; receipts.clear();
       orderCreates.clear();
+      orderListScene = undefined;
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
   }
@@ -169,7 +171,15 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       pin.commands.set(command,{kind,commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt});
       return ok(receipt);
     }
-    if (path === '/api/orders' && method === 'GET') return ok(demoFixture(url,locale(),state,request));
+    if (path === '/api/orders' && method === 'GET') {
+      const page = demoFixture(url,locale(),state,request);
+      if (!orderListScene) return ok(page);
+      const expired = page.orders.filter(order=>order.orderNo==='DEMO-ORDER-006'&&order.canonicalStatus==='expired');
+      if (orderListScene === 'only-expired') return ok({...page,orders:expired});
+      if (url.searchParams.get('beforeOrderNo') === 'unpaid-float-next')
+        return ok({...page,orders:page.orders.filter(order=>order.orderNo!=='DEMO-ORDER-006')});
+      return ok({...page,orders:expired,nextCursor:'unpaid-float-next'});
+    }
     if (path === '/api/orders/quote') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/bundle' && method === 'POST') {
       if (receipts.has(path+key)) return receipts.get(path+key);
@@ -215,5 +225,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     return ok(demoFixture(url,locale(),state,request));
   }
   return {handles,handle,pin,syncScenario,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
+    observeLateOrderPayment:external.observeLateOrderPayment,
+    selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
     selectPaymentMode:external.selectPaymentMode};
 }

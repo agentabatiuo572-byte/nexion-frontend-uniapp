@@ -182,6 +182,9 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.dropNextPayment==='boolean')checkoutFlow.pin.state.dropNextPayment=update.dropNextPayment;
         if(update.observePayments===true)checkoutFlow.observePayments();
         if(update.delayNextCreate===true)checkoutFlow.delayCreate();
+        if('orderListScene' in update)checkoutFlow.selectOrderListScene(update.orderListScene);
+        if(typeof update.observeLateOrderPayment==='string'&&!checkoutFlow.observeLateOrderPayment(update.observeLateOrderPayment))
+          return sendJson(res,{simulation:true,message:'PREVIEW_AWAITING_ORDER_PAYMENT_REQUIRED'},409);
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }

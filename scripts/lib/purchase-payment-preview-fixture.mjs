@@ -457,5 +457,19 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return handlePayment(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}), true);
   }
-  return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments};
+  // Compress the wait for a late receipt of a payment created by this preview's App.
+  function observeLateOrderPayment(orderNo) {
+    const intent = openOrderPayment(orderNo);
+    if (intent?.status !== 'AWAITING_PAYMENT') return false;
+    const now = Date.now(), deadline = now - graceEnd(intent.paymentMethod, 0) - 1000;
+    const order = closeUnpaidOrder(intent);
+    if (!order) return false;
+    Object.assign(order, {placedAt: deadline - paymentWindow, expiresAt: deadline});
+    Object.assign(intent, {createdAt: deadline - 60000, deadline, expiresAt: new Date(deadline).toISOString(),
+      deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(intent.paymentMethod, deadline)).toISOString()});
+    expire(intent, 'PAYMENT_TIMEOUT');
+    lateArrival(intent, now);
+    return true;
+  }
+  return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments, observeLateOrderPayment};
 }

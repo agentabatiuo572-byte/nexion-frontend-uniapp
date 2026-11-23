@@ -19,86 +19,88 @@
       <view v-if="orderPanels.showSourceOutage && !orderList.length" class="mx-4 rounded-2xl" :style="remoteErrorStyle"><text style="color:var(--v5-ink-3)">—</text></view>
 
       <!-- An empty claim requires every order source to have loaded successfully. -->
-      <EmptyState v-if="orderPanels.mainPresentation === 'empty' && !paymentCards.length" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
+      <EmptyState v-if="orderPanels.mainPresentation === 'empty' && !paymentCards.length && !hasMoreOrders" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
       <GlassSegments v-if="listShown" v-model="statusFilter" :options="filterOptions" layout="scroll" selection="flat" semantics="radio" :label="t.orders.filterGroupLabel" class="orders-filters mx-4">
         <template #option="{ option }"><text class="orders-filter__label">{{ option.label }}</text><text v-if="option.value === 'pending' && pendingCount > 0" class="orders-filter__badge">{{ pendingCount }}</text></template>
       </GlassSegments>
-      <text v-if="listShown && filteredOrders.length === 0 && filteredPaymentCards.length === 0" class="orders-filter-empty">{{ t.orders.filterEmpty }}</text>
+      <text v-if="listShown && filteredCards.length === 0" class="orders-filter-empty">{{ t.orders.filterEmpty }}</text>
       <!-- Order cards: machine art + status tag; the whole card opens the detail,
            the pending row's own button goes straight to payment. -->
-      <view v-if="listShown && (filteredOrders.length > 0 || filteredPaymentCards.length > 0)" class="orders-list">
+      <view v-if="listShown && (filteredCards.length > 0)" class="orders-list">
+        <template v-for="item in filteredCards" :key="item.kind === 'payment' ? item.key : item.id">
         <!-- Payments with no order card of their own (trade-in, slot capacity, trial purchase, or an order no longer awaiting
              payment) use the order card's layout; the whole card resumes that payment (user 2026-11-24). -->
-        <view v-for="card in filteredPaymentCards" :key="card.key" class="order-card" role="button" tabindex="0" :aria-label="card.title + ' · ' + card.tag"
-          @click="openPaymentCard(card)" @keydown.enter.prevent="!$event.repeat && openPaymentCard(card)" @keydown.space.prevent="!$event.repeat && openPaymentCard(card)">
+        <view v-if="item.kind === 'payment'" class="order-card" role="button" tabindex="0" :aria-label="item.title + ' · ' + item.tag"
+          @click="openPaymentCard(item)" @keydown.enter.prevent="!$event.repeat && openPaymentCard(item)" @keydown.space.prevent="!$event.repeat && openPaymentCard(item)">
           <view class="order-card__row">
             <LoopScope class="order-card__thumb" aria-hidden="true">
-              <CatalogMachineImage class="order-card__image nx-home-art-float" :sku="card.sku" :image-url="card.imageUrl" :scope-key="card.key" />
+              <CatalogMachineImage class="order-card__image nx-home-art-float" :sku="item.sku" :image-url="item.imageUrl" :scope-key="item.key" />
             </LoopScope>
             <view class="order-card__info">
               <view class="order-card__top">
-                <text class="order-card__title">{{ card.title }}</text>
-                <NxTag tone="warning" :label="card.tag" />
+                <text class="order-card__title">{{ item.title }}</text>
+                <NxTag tone="warning" :label="item.tag" />
               </view>
-              <view v-if="card.orderNo" class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="card.orderNo" :label="t.orders.orderId" :copyable="false" /></view>
-              <text v-else class="order-card__meta order-card__meta--wrap">{{ card.kindLabel }} · {{ card.method }}</text>
+              <view v-if="item.orderNo" class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="item.orderNo" :label="t.orders.orderId" :copyable="false" /></view>
+              <text v-else class="order-card__meta order-card__meta--wrap">{{ item.kindLabel }} · {{ item.method }}</text>
               <view class="order-card__bottom">
-                <text v-if="card.placedAt !== null" class="order-card__date">{{ dateText(card.placedAt) }}</text>
-                <CheckoutAmount class="order-card__amount" v-bind="card.amount" />
+                <text v-if="item.startedAt !== undefined" class="order-card__date">{{ dateText(item.startedAt) }}</text>
+                <CheckoutAmount class="order-card__amount" v-bind="item.amount" />
               </view>
             </view>
           </view>
         </view>
         <!-- Only an expired order swipes left to its delete action (03 §3.5); every other card keeps the same wrapper, inert. -->
-        <ConversationSwipeRow v-for="o in filteredOrders" :key="o.id" class="order-swipe" :class="{ 'order-swipe--live': swipeable(o) }"
-          :label="commerceOrderTitle(o, locale.code) + ' · ' + o.id" :delete-label="t.orders.expiredDelete" :disabled="!swipeable(o)"
-          :open="swipeOpenId === o.id" @update:open="swipeOpenId = $event ? o.id : ''" @delete="deleteTarget = o">
+        <ConversationSwipeRow v-else class="order-swipe" :class="{ 'order-swipe--live': swipeable(item) }"
+          :label="commerceOrderTitle(item, locale.code) + ' · ' + item.id" :delete-label="t.orders.expiredDelete" :disabled="!swipeable(item)"
+          :open="swipeOpenId === item.id" @update:open="swipeOpenId = $event ? item.id : ''" @delete="deleteTarget = item">
         <view
           class="order-card"
-          :class="{ 'order-card--pending': o.kind === 'commerce' && o.status === 'placed', 'nx-tint': o.id === tintedPendingId }"
-          :role="o.kind === 'genesis' ? undefined : 'button'"
-          :tabindex="o.kind === 'genesis' ? undefined : 0"
-          :aria-label="o.kind === 'genesis' ? undefined : orderCardLabel(o)"
-          @click="o.kind !== 'genesis' && goOrder(o)"
+          :class="{ 'order-card--pending': item.kind === 'commerce' && item.status === 'placed', 'nx-tint': item.id === tintedPendingId }"
+          :role="item.kind === 'genesis' ? undefined : 'button'"
+          :tabindex="item.kind === 'genesis' ? undefined : 0"
+          :aria-label="item.kind === 'genesis' ? undefined : orderCardLabel(item)"
+          @click="item.kind !== 'genesis' && goOrder(item)"
         >
           <!-- A Genesis card opens the holdings overview, where this order number is not shown: only its main row
                opens it, and the order number with its copy button sits below, outside that tap area. -->
-          <view class="order-card__row" :role="o.kind === 'genesis' ? 'button' : undefined" :tabindex="o.kind === 'genesis' ? 0 : undefined" :aria-label="o.kind === 'genesis' ? orderCardLabel(o) : undefined" @click="o.kind === 'genesis' && goOrder(o)">
-            <LoopScope class="order-card__thumb" :class="{ 'order-card__thumb--genesis': o.kind === 'genesis' }" aria-hidden="true">
-              <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="o.imageUrl" :scope-key="o.id" />
+          <view class="order-card__row" :role="item.kind === 'genesis' ? 'button' : undefined" :tabindex="item.kind === 'genesis' ? 0 : undefined" :aria-label="item.kind === 'genesis' ? orderCardLabel(item) : undefined" @click="item.kind === 'genesis' && goOrder(item)">
+            <LoopScope class="order-card__thumb" :class="{ 'order-card__thumb--genesis': item.kind === 'genesis' }" aria-hidden="true">
+              <CatalogMachineImage v-if="item.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="item.lineItems?.[0]?.sku ?? item.productId" :image-url="item.imageUrl" :scope-key="item.id" />
               <image v-else class="order-card__image order-card__image--genesis nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
             </LoopScope>
             <view class="order-card__info">
               <view class="order-card__top">
-                <text class="order-card__title">{{ commerceOrderTitle(o,locale.code) }}</text>
-                <NxTag :tone="badge(o.status).tone" :label="badge(o.status).label" />
+                <text class="order-card__title">{{ commerceOrderTitle(item,locale.code) }}</text>
+                <NxTag :tone="badge(item.status).tone" :label="badge(item.status).label" />
               </view>
-              <view v-if="o.kind !== 'genesis'" class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="o.id" :label="t.orders.orderId" :copyable="false" /></view>
-              <text v-if="o.meta" class="order-card__meta">{{ o.meta }}</text>
+              <view v-if="item.kind !== 'genesis'" class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="item.id" :label="t.orders.orderId" :copyable="false" /></view>
+              <text v-if="item.meta" class="order-card__meta">{{ item.meta }}</text>
               <view class="order-card__bottom">
-                <text class="order-card__date">{{ dateText(o.placedAt) }}</text>
-                <CheckoutAmount class="order-card__amount" v-bind="o.kind === 'commerce' ? commerceOrderAmount(o) : { value: o.total, currency: 'USDT' }" />
+                <text class="order-card__date">{{ dateText(item.placedAt) }}</text>
+                <CheckoutAmount class="order-card__amount" v-bind="item.kind === 'commerce' ? commerceOrderAmount(item) : { value: item.total, currency: 'USDT' }" />
               </view>
             </view>
           </view>
-          <view v-if="o.kind === 'genesis'" class="order-card__meta order-card__code order-card__code--copy"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="o.id" :label="t.orders.orderId" /></view>
-          <view v-if="o.kind === 'commerce' && o.status === 'placed'" class="nx-card-footer order-card__pending">
-            <view v-if="pendingCloseMinutes(o)" class="order-card__countdown">
+          <view v-if="item.kind === 'genesis'" class="order-card__meta order-card__code order-card__code--copy"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="item.id" :label="t.orders.orderId" /></view>
+          <view v-if="item.kind === 'commerce' && item.status === 'placed'" class="nx-card-footer order-card__pending">
+            <view v-if="pendingCloseMinutes(item)" class="order-card__countdown">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-              <text>{{ fmt(t.orders.pendingCloseIn, { min: pendingCloseMinutes(o)! }) }}</text>
+              <text>{{ fmt(t.orders.pendingCloseIn, { min: pendingCloseMinutes(item)! }) }}</text>
             </view>
             <!-- Stops the tap here so the card does not also open the plain detail. -->
             <view class="order-card__pay" @click.stop>
-              <view class="nx-card-action" role="button" tabindex="0" @click="goOrderPayment(o)" @keydown.enter.prevent="!$event.repeat && goOrderPayment(o)" @keydown.space.prevent="!$event.repeat && goOrderPayment(o)"><text>{{ t.orders.pendingContinue }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view>
+              <view class="nx-card-action" role="button" tabindex="0" @click="goOrderPayment(item)" @keydown.enter.prevent="!$event.repeat && goOrderPayment(item)" @keydown.space.prevent="!$event.repeat && goOrderPayment(item)"><text>{{ t.orders.pendingContinue }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view>
             </view>
           </view>
         </view>
         </ConversationSwipeRow>
+        </template>
       </view>
-      <view v-if="orderPanels.mainPresentation === 'list'" class="orders-pagination mx-4">
+      <view v-if="orderPanels.mainPresentation === 'list' || hasMoreOrders" class="orders-pagination mx-4">
         <view ref="scrollAnchor" style="height: 1px" />
         <view
           v-if="remoteApiEnabled && orders.nextCursor"
@@ -131,7 +133,7 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { commerceOrderAmount, commerceOrderTitle } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { commerceAmount as formatAmount } from "@/lib/commerce-review";
-import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { computed, nextTick, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -141,7 +143,7 @@ import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import ConversationSwipeRow from "@/components/support/conversation-swipe-row.vue";
-import { usePurchasePayment } from "@/store/purchase-payment";
+import { hasUnfinishedOrderPayment, isUnfinishedPurchaseRecord, purchaseRecordPayload, refreshPendingPayments, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { GENESIS_MEDIA, getProductMedia } from "@/lib/product-media";
@@ -152,6 +154,7 @@ import { useGenesis } from "@/store/genesis";
 import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-order-list";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useNow } from "@/composables/use-now";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -196,7 +199,7 @@ type OrderListItem = CommerceOrderListItem | GenesisOrderListItem;
 const orderList = computed<OrderListItem[]>(() => [
   ...orders.visibleOrders.map((order): CommerceOrderListItem => ({ ...order, kind: "commerce" })),
   ...genesisOrderListItems(genesis.remoteOrders, t.value.me.genesisNode, t.value.orders.quantity),
-].sort((a, b) => b.placedAt - a.placedAt));
+]);
 // Status categories. "To pay" matches the home to-do count (placed or payment failed).
 function orderCategory(order: OrderListItem): Exclude<OrderFilter, "all"> {
   if (order.kind === "genesis") return "done";
@@ -204,57 +207,67 @@ function orderCategory(order: OrderListItem): Exclude<OrderFilter, "all"> {
   if (order.status === "paid" || order.status === "provisioning") return "active";
   return order.status === "activated" || order.status === "inventory" ? "done" : "closed";
 }
-const filteredOrders = computed(() => statusFilter.value === "all" ? orderList.value : orderList.value.filter(order => orderCategory(order) === statusFilter.value));
 // Unfinished payments with no order card of their own (user 2026-11-24: Orders shows them instead of the floating bar).
-// 由逻辑项接: which records show, de-duplication, order, filter and the time shown are first-pass choices here.
 const payment = usePurchasePayment();
 const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
 const slotCopy = useDeviceSlotReplacementCopy();
 type PaymentRow = ReturnType<typeof payment.records>[number];
-type PaymentCard = { key: string; row: PaymentRow; title: string; tag: string; sku?: string; imageUrl?: string; orderNo?: string; kindLabel: string; method: string; placedAt: number | null; amount: { value: string | number | null; currency: "USD" | "USDT" } };
-const paymentRows = computed(() => { app.accountKey; payment.state.revision; return payment.records().filter(row => !row.validated && !row.businessDelivered && row.lastStatus !== "DELIVERED" && row.lastStatus !== "EXPIRED"); });
-function paymentPayload(row: PaymentRow): Record<string, unknown> { return JSON.parse(row.fingerprint)[1] ?? {}; }
-const paymentCards = computed<PaymentCard[]>(() => paymentRows.value.flatMap((row): PaymentCard[] => {
-  const payload = paymentPayload(row), c = paymentCopy.value;
-  const base = { key: row.commandKey, row, title: row.summary, tag: row.lastStatus === "MANUAL_REVIEW" ? c.confirming : c.waiting };
+type PaymentCard = { kind: "payment"; key: string; row: PaymentRow; title: string; tag: string; sku?: string; imageUrl?: string; orderNo?: string; kindLabel: string; method: string; startedAt?: number; amount: { value: string | number | null; currency: "USD" | "USDT" } };
+const paymentCards = computed<PaymentCard[]>(() => payment.records().flatMap((row): PaymentCard[] => {
+  // Lookup-only records without a local start time can come from another device.
+  if (!isUnfinishedPurchaseRecord(row) || row.lookupOnly && row.startedAt === undefined) return [];
+  const payload = purchaseRecordPayload(row), c = paymentCopy.value;
+  const base = { kind: "payment" as const, key: row.commandKey, row, title: row.summary,
+    tag: row.lastStatus === "MANUAL_REVIEW" ? c.confirming : c.waiting,
+    startedAt: Number.isFinite(row.startedAt) ? row.startedAt : undefined };
   if (row.kind === "ORDER_PAY") {
-    // An order still awaiting payment already has 继续支付 on its own card; only one that has left it gets a payment card.
-    const order = orderList.value.find(item => item.id === payload.orderNo);
-    if (!order || order.kind !== "commerce" || order.status === "placed") return [];
-    return [{ ...base, sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, orderNo: order.id, kindLabel: "", method: "", placedAt: order.placedAt, amount: commerceOrderAmount(order) }];
+    if (typeof payload.orderNo !== "string") return [];
+    // Only a known order that has left placed needs a payment card.
+    const order = orders.getById(payload.orderNo);
+    if (!order || order.status === "placed") return [];
+    return [{ ...base, sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, orderNo: order.id, kindLabel: "", method: "", amount: commerceOrderAmount(order) }];
   }
   const kindLabel = row.kind === "TRADE_IN" ? t.value.search.routes.tradeIn.label : row.kind === "CAPACITY_REPLACE" ? slotCopy.value.replace
     : row.kind === "CAPACITY_KEEP" ? c.kindCapacityKeep : c.kindTrialConvert;
   const method = row.paymentMethod === "HDPAY_BANK" ? c.bank : row.paymentMethod === "CREGIS_USDT_ERC20" ? c.erc20 : row.paymentMethod === "CREGIS_USDT_TRC20" ? c.trc20 : c.bep20;
   // The amount the purchase asked for, as saved with the payment (before channel and network fees).
-  const value = (payload.expectedPayableUsdt ?? payload.expectedAmountUsdt ?? null) as number | string | null;
-  // 由逻辑项接: the image comes from the storefront catalog; until this page has read it the card shows the neutral placeholder.
-  const sku = (payload.targetProductNo ?? payload.productNo) as string | undefined;
-  return [{ ...base, sku, imageUrl: getProductMedia(sku)?.src, kindLabel, method, placedAt: null, amount: { value, currency: "USDT" } }];
+  const amount = payload.expectedPayableUsdt ?? payload.expectedAmountUsdt;
+  const productNo = payload.targetProductNo ?? payload.productNo;
+  const sku = typeof productNo === "string" ? productNo : undefined;
+  return [{ ...base, sku, imageUrl: getProductMedia(sku)?.src, kindLabel, method,
+    amount: { value: typeof amount === "string" || typeof amount === "number" ? amount : null, currency: "USDT" } }];
 }));
-// Payment records live on this device and do not wait for the order read (user 2026-11-24): with payment cards the list
-// (filters and cards) shows even with no orders or after a failed first read, under that read's failure line; the empty
-// state needs neither orders nor payment cards.
-const listShown = computed(() => orderPanels.value.mainPresentation === "list" || orderPanels.value.mainPresentation !== "loading" && paymentCards.value.length > 0);
-// 由逻辑项接: payment cards count as 待支付 and sit above the orders until records carry a start time.
-const filteredPaymentCards = computed(() => (statusFilter.value === "all" || statusFilter.value === "pending" ? paymentCards.value : []));
+type ListCard = OrderListItem | PaymentCard;
+function cardCategory(card: ListCard) {
+  return card.kind === "payment" ? "pending" : orderCategory(card);
+}
+function cardTime(card: ListCard) {
+  return card.kind === "payment" ? card.startedAt ?? 0 : card.placedAt;
+}
+const filteredCards = computed(() => [...orderList.value, ...paymentCards.value]
+  .filter(card => statusFilter.value === "all" || cardCategory(card) === statusFilter.value)
+  .sort((a, b) => cardTime(b) - cardTime(a)));
+const hasMoreOrders = computed(() => remoteApiEnabled && Boolean(orders.nextCursor || genesis.orderPage.cursor));
+// A next page can still provide orders even if every card on the current page was hidden.
+const listShown = computed(() => orderPanels.value.mainPresentation === "list"
+  || orderPanels.value.mainPresentation !== "loading" && (paymentCards.value.length > 0 || hasMoreOrders.value));
 function openPaymentCard(card: PaymentCard) { void payment.resume(card.row); }
-// The 待支付 badge counts the cards that filter shows: orders and payment cards (user 2026-11-24).
 const pendingCount = computed(() => orderList.value.filter(order => orderCategory(order) === "pending").length + paymentCards.value.length);
-// Swipe-delete of expired orders (user 2026-11-24). 由逻辑项接: an order whose payment is still unfinished does not swipe.
 const swipeOpenId = ref("");
 const deleteTarget = ref<OrderListItem | null>(null);
 function swipeable(order: OrderListItem): boolean {
-  return order.kind === "commerce" && order.status === "expired" && !paymentRows.value.some(row => row.kind === "ORDER_PAY" && paymentPayload(row).orderNo === order.id);
+  return order.kind === "commerce" && order.status === "expired" && !hasUnfinishedOrderPayment(app.accountKey, order.id);
 }
 function confirmDeleteExpired() {
-  const order = deleteTarget.value;
+  const id = deleteTarget.value?.id;
   deleteTarget.value = null;
   swipeOpenId.value = "";
-  if (order) orders.hideExpiredOrder(order.id);
+  const order = orderList.value.find(item => item.kind === "commerce" && item.id === id);
+  if (order && swipeable(order)) orders.hideExpiredOrder(order.id);
 }
 // One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
-const tintedPendingId = computed(() => filteredOrders.value.find(order => order.kind === "commerce" && order.status === "placed")?.id);
+const tintedPendingId = computed(() => filteredCards.value.find((order): order is CommerceOrderListItem =>
+  order.kind === "commerce" && order.status === "placed")?.id);
 // Minutes left on an unpaid order's server deadline; null once it lapses or when unknown.
 const nowSeconds = useNow();
 function pendingCloseMinutes(order: OrderListItem): number | null {
@@ -288,6 +301,13 @@ const orderPanels = computed(() => orderListPanels({
 const ordersReadFailed = ref(false);
 let refreshEpoch = 0;
 let ordersPageActive = true;
+const watchesPayments = () => listShown.value && paymentCards.value.length > 0 && !payment.state.open && foregroundReadAllowed();
+useVisibleInterval(() => {
+  const accountKey = app.accountKey;
+  void nextTick(() => refreshPendingPayments(accountKey,
+    () => ordersPageActive && watchesPayments(),
+    row => paymentCards.value.some(card => card.key === row.commandKey)));
+}, 15000, watchesPayments);
 async function refreshOrders() {
   if (!remoteApiEnabled || !remoteSessionReady.value) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
@@ -371,6 +391,8 @@ onUnmounted(() => {
   unsubscribeRuntimeRevision();
 });
 watch(() => app.accountBindingEpoch, () => {
+  deleteTarget.value = null;
+  swipeOpenId.value = "";
   remoteOrdersResolved.value = false;
   if (ordersPageActive) void refreshOrders();
 });

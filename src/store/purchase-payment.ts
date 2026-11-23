@@ -31,7 +31,8 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
 export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
-  intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
+  intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
+  lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
@@ -97,7 +98,9 @@ const account = () => useApp().accountKey;
 function rows(accountKey = account()): PendingRow { return readAccountRow<PendingRow>(TABLE, accountKey, true) ?? { records: {} }; }
 function save(pending: PendingExternal, accountKey = state.accountKey) {
   const value = rows(accountKey);
-  if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: pending } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
+  const startedAt = value.records[pending.commandKey]?.startedAt;
+  const record = startedAt === undefined ? pending : { ...pending, startedAt };
+  if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: record } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
   state.revision++;
 }
 function saveExpiry(accountKey: string, commandKey: string, kind: PurchaseKind, observed?: PendingExternal) {
@@ -192,14 +195,14 @@ function unsettledCheckoutPayments(includeTradein: boolean) {
 }
 
 /** The progress bar can outlive both a closed payment layer and a released checkout pointer. */
-// Checkout and the floating bar read the same unfinished payments: one read at a time, at most every 10 seconds, shared by both.
+// Checkout, the floating bar and Orders share one passive read, at most every 10 seconds.
 let passiveRead: Promise<unknown> | null = null, passiveReadAt = 0;
 function sharedPassiveRead(run: () => Promise<unknown>): Promise<unknown> {
   if (passiveRead || Date.now() - passiveReadAt < 10_000) return passiveRead ?? Promise.resolve();
   passiveRead = run().finally(() => { passiveRead = null; passiveReadAt = Date.now(); });
   return passiveRead;
 }
-/** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
+/** Read the currently displayed payments and project their latest confirmed result. */
 export function refreshPendingPayments(accountKey: string, current: () => boolean, shouldRead: (row: PendingExternal) => boolean = () => true): Promise<unknown> {
   if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
   const app = useApp();
@@ -224,11 +227,11 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   }
   if (!isVisiblePayment(intent)) { hideOriginalPayment(accountKey, pending, intent); return; }
   matches(intent, pending);
-  if (intent.status === pending.lastStatus || !settled(intent)) return;
+  const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
+  if (!businessDelivered && (intent.status === pending.lastStatus || !settled(intent))) return;
   if (intent.status === 'EXPIRED') {
     saveExpiry(accountKey, pending.commandKey, pending.kind);
   } else {
-    const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
     if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
     save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
   }
@@ -773,7 +776,7 @@ async function confirm() {
   const original = rows(state.accountKey).records[commandKey];
   if (original) { state.pending = original; await query(); return; }
   const pending = { fingerprint: scope, kind: expected.kind, commandKey, paymentQuoteId: quote.paymentQuoteId,
-    paymentMethod: quote.paymentMethod, network: quote.network, summary: expected.summary };
+    paymentMethod: quote.paymentMethod, network: quote.network, summary: expected.summary, startedAt: Date.now() };
   save(pending); state.pending = pending;
   await submitOriginal();
 }
@@ -904,6 +907,33 @@ export function acknowledgePurchasePayment(result: Extract<PurchaseChoice, { met
     toast.error(getT().errors.billMissingTitle);
   }
 }
+
+export function purchaseRecordPayload(row: PendingExternal): Record<string, unknown> {
+  try {
+    const payload: unknown = JSON.parse(row.fingerprint)[1];
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) return payload as Record<string, unknown>;
+  } catch { /* An unreadable local record has no purchase fields to display. */ }
+  return {};
+}
+
+export function isUnfinishedPurchaseRecord(row: PendingExternal): boolean {
+  return !row.validated && !row.businessDelivered && !row.quotaRefusal
+    && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'DELIVERED';
+}
+
+/** An order with a known unfinished payment cannot be hidden, even during confirmation. */
+export function hasUnfinishedOrderPayment(accountKey: string, orderNo: string): boolean {
+  state.revision;
+  try {
+    const expired = unsavedExpiries.get(accountKey);
+    return Object.values(rows(accountKey).records).some(row => row.kind === 'ORDER_PAY'
+      && isUnfinishedPurchaseRecord(row) && expired?.get(row.commandKey) !== row.kind
+      && purchaseRecordPayload(row).orderNo === orderNo);
+  } catch {
+    return true;
+  }
+}
+
 /** The order detail asks whether this order already has an external payment underway. */
 export function pendingOrderPayment(accountKey: string, orderNo: string, knownOnly = false): PendingExternal | null {
   try {
