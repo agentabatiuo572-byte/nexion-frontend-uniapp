@@ -107,7 +107,7 @@
         <view :style="goalGroupStyle">
           <view v-for="(g, gi) in goals" :key="g.id" class="goal-list-row" :style="goalRowStyle(gi === goals.length - 1)">
             <view class="goal-list-row__body">
-              <view class="goal-list-row__heading"><text :style="goalTargetStyle">${{ formatAmount(g.targetUSDT) }}</text><text v-if="!g.achieved" :style="goalDeadlineStyle">{{ deadlineLine(g.deadlineMs) }}</text><text v-else class="goal-achieved">{{ t.goals.achievedBadge }}</text></view>
+              <view class="goal-list-row__heading"><text :style="goalTargetStyle">${{ formatAmount(g.targetUSDT) }}</text><text v-if="!g.achieved" :style="goalDeadlineStyle">{{ deadlineLine(g.deadlineMs) }}</text><NxTag v-else tone="success" :label="t.goals.achievedBadge" /></view>
               <GoalProgressBar :pct="goalPct(g.targetUSDT)" />
               <view class="flex items-center justify-between" style="margin-top:6px"><text :style="goalFootMutedStyle">${{ formatAmount(lifeTimeEarnings) }} / ${{ formatAmount(g.targetUSDT) }}</text><text :style="goalFootPctStyle">{{ goalPct(g.targetUSDT).toFixed(0) }}%</text></view>
             </view>
@@ -130,6 +130,7 @@ import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import GrowthProgress from "@/components/ui/growth-progress.vue";
 import GoalProgressBar from "@/components/me/goal-progress-bar.vue";
 import { useT } from "@/i18n/use-t";
@@ -663,8 +664,9 @@ const emptyStateStyle: CSSProperties = {
 .goal-device-well { box-sizing:border-box; width:100%; min-height:66px !important; gap:12px !important; padding:10px 12px; border-radius:14px; background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent),inset 0 0 0 1px var(--v5-border); }
 .goal-device-copy { flex:1; min-width:0; }.goal-device-label { display:block; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.goal-device-name { display:block; margin:0; font:500 15px/22px var(--font-v5); }
 .goal-list-row { display:flex; align-items:center; gap:12px; box-sizing:border-box; min-height:86px; padding:14px 16px !important; }
-.goal-list-row__body { flex:1; min-width:0; }.goal-list-row__heading { display:flex; align-items:center; gap:8px; min-height:22px; }.goal-list-row__heading > text { margin-top:0 !important; }.goal-achieved { padding:4px 8px; border-radius:var(--v5-radius-full); background:var(--v5-success-soft); color:var(--v5-success-ink); font:500 12px/16px var(--font-v5); }
-.goal-delete { flex:none; width:36px; height:36px; border-radius:50%; color:var(--v5-ink-3); }.goal-sticky :deep(.nx-button--disabled) { opacity:1; }
+.goal-list-row__body { flex:1; min-width:0; }.goal-list-row__heading { display:flex; align-items:center; gap:8px; min-height:22px; }.goal-list-row__heading > text { margin-top:0 !important; }
+/* 44px target (01 §1.3) around the same 16px icon; the -4px margin keeps the row's spacing, so it takes nothing from the text beside it. */
+.goal-delete { flex:none; width:44px; height:44px; margin:-4px; border-radius:50%; color:var(--v5-ink-3); }.goal-sticky :deep(.nx-button--disabled) { opacity:1; }
 
 .growth-goals--featured :deep(.spv) { margin-bottom:0; padding-bottom:13px; }
 .goal-hero {margin-top:8px;}.goal-recommendation {min-height:167.5px;box-sizing:border-box;}
