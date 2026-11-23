@@ -40,6 +40,10 @@ export function createAuthDemo(state) {
     state.authState='signed-in';state.authUser=user;
     return ok({accessToken:issuePreviewAccessToken(state,user.userId),refreshToken:null,tokenType:'Bearer',user,...(registrationReceipt?{registrationReceipt}:{})});
   }
+  function issueLogin(user, registrationReceipt, deviceName) {
+    state.loginDeviceName = deviceName || 'UVEL H5';
+    return session(user, registrationReceipt);
+  }
   return {
     trace,
     savedAttempt() {
@@ -55,7 +59,7 @@ export function createAuthDemo(state) {
       attempts.set(attempt.loginAttemptId,{...attempt,response:{user,...(registration?{registrationReceipt:receipt(null)}:{})}});
       return attempt;
     },
-    reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();delete state.authUser;clearPreviewAccessToken(state);delete state.captchaInvalidReturned;},
+    reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();delete state.authUser;delete state.loginDeviceName;clearPreviewAccessToken(state);delete state.captchaInvalidReturned;},
     // Only the paths modelled below; any other /auth/users/* request (e.g. the linked-provider read) falls
     // through to the App fixture instead of being answered AUTH_PREVIEW_NOT_MODELLED.
     handles(path){return MODELLED_AUTH.test(path)||path.startsWith('/api/auth/captcha/')||['/api/app/security/phone/challenge','/api/app/security/phone','/api/app/security/two-factor/challenge','/api/app/security/two-factor'].includes(path);},
@@ -69,7 +73,7 @@ export function createAuthDemo(state) {
           ? session(state.authUser??existing) : fail(401,'USER_REFRESH_TOKEN_REQUIRED');
       if(['/auth/users/logout','/auth/users/session/discard'].includes(path)){
         if(headers.authorization&&!previewAccountId(state,headers))return fail(401,'AUTH_REQUIRED');
-        state.authState='signed-out';delete state.authUser;clearPreviewAccessToken(state);return ok(null);
+        state.authState='signed-out';delete state.authUser;delete state.loginDeviceName;clearPreviewAccessToken(state);return ok(null);
       }
       if(/^\/auth\/users\/login\/attempts\/[^/]+\/recover$/.test(path)) {
         const attempt=attempts.get(path.split('/').at(-2));
@@ -81,7 +85,7 @@ export function createAuthDemo(state) {
           ||attempt.executionSupported!==body.executionSupported||String(attempt.executionSupported)!==headers['x-nexgrid-execution-supported']
           ||attempt.authMethod!==body.authMethod||attempt.authReference!==body.authReference)return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
         if(attempt.waitForReplay&&!attempt.replayed)return fail(503,'PREVIEW_RECOVERY_UNAVAILABLE');
-        return session(attempt.response.user,attempt.response.registrationReceipt);
+        return issueLogin(attempt.response.user,attempt.response.registrationReceipt,attempt.deviceName);
       }
       if(path==='/api/app/security/two-factor/challenge') {
         if(!state.authUser?.phone)return fail(422,'USER_PHONE_REQUIRED');
@@ -139,14 +143,14 @@ export function createAuthDemo(state) {
         if(state.oauthState==='invite-refused')return fail(422,'USER_REGISTRATION_SPONSOR_INVALID');
         if(state.oauthState==='device-limit')return fail(409,'USER_REGISTRATION_DEVICE_LIMIT');
         if(state.oauthState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
-        if(state.oauthState==='existing')return session(existing);
+        if(state.oauthState==='existing')return issueLogin(existing,null,body.deviceName);
         if(['lost-unissued','lost-issued'].includes(state.oauthState)) {
           // Accelerated server expiry avoids a ten-minute preview wait. An issued
           // session remains recoverable with its original fingerprint and proof.
           flow.expired=true;
           if(state.oauthState==='lost-issued')attempts.set(headers['x-nexgrid-login-attempt-id'],{
             recoveryProof:headers['x-nexgrid-login-recovery-key'],installationId:headers['x-nexgrid-installation-id'],
-            executionSupported:false,authMethod:'OAUTH',authReference:flow.provider+':'+flow.flowId,waitForReplay:true,
+            executionSupported:false,authMethod:'OAUTH',authReference:flow.provider+':'+flow.flowId,waitForReplay:true,deviceName:body.deviceName,
             response:{user:existing}});
           // A gateway failure is deterministic here; a destroyed socket may be
           // transparently retried by Chromium before the UI observes the loss.
@@ -160,10 +164,10 @@ export function createAuthDemo(state) {
           if(retained.recoveryProof!==recoveryProof)return fail(401,'LOGIN_ATTEMPT_RECOVERY_INVALID');
           if(retained.installationId!==installationId||retained.authMethod!=='OAUTH'||retained.authReference!==authReference)
             return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
-          return session(retained.response.user,retained.response.registrationReceipt);
+          return issueLogin(retained.response.user,retained.response.registrationReceipt,retained.deviceName);
         }
-        const response=session({...existing,userId:900003,countryCode:'',phone:'',nickname:'Preview identity',onboardingComplete:false},receipt(flow.sponsorCode));
-        attempts.set(attemptId,{recoveryProof,installationId,executionSupported:false,authMethod:'OAUTH',authReference,response:response.body.data});
+        const response=issueLogin({...existing,userId:900003,countryCode:'',phone:'',nickname:'Preview identity',onboardingComplete:false},receipt(flow.sponsorCode),body.deviceName);
+        attempts.set(attemptId,{recoveryProof,installationId,executionSupported:false,authMethod:'OAUTH',authReference,deviceName:body.deviceName,response:response.body.data});
         return response;
       }
       if(path==='/api/auth/captcha/challenge') {
@@ -188,7 +192,7 @@ export function createAuthDemo(state) {
       }
       if(path==='/auth/users/login') {
         accountDemo(url, 'en', state, {method:()=>method,postDataJSON:()=>body});
-        return session(existing);
+        return issueLogin(existing,null,body.deviceName);
       }
       if(path==='/auth/users/register') {
         const attempt=attempts.get(headers['x-nexgrid-login-attempt-id']);
@@ -196,7 +200,7 @@ export function createAuthDemo(state) {
           if(attempt.recoveryProof!==headers['x-nexgrid-login-recovery-key'])return fail(401,'LOGIN_ATTEMPT_RECOVERY_INVALID');
           if(attempt.installationId!==(headers['x-nexgrid-installation-id']??'')||headers['x-nexgrid-execution-supported']!=='false'
             ||attempt.authReference!==body.countryCode+':'+body.phone)return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
-          return session(attempt.response.user,attempt.response.registrationReceipt);
+          return issueLogin(attempt.response.user,attempt.response.registrationReceipt,attempt.deviceName);
         }
       }
       if(['/auth/users/register','/auth/users/register/otp/verify','/auth/users/login/otp/verify','/auth/users/password-reset/otp/verify','/auth/users/password-reset/otp/complete'].includes(path)) {
@@ -204,9 +208,9 @@ export function createAuthDemo(state) {
         if(path==='/auth/users/register') {
           if(state.registrationState==='device-limit')return fail(409,'USER_REGISTRATION_DEVICE_LIMIT');
           if(state.registrationState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
-          return session({...existing,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode));
+          return issueLogin({...existing,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode),body.deviceName);
         }
-        if(path==='/auth/users/login/otp/verify')return session(existing);
+        if(path==='/auth/users/login/otp/verify')return issueLogin(existing,null,body.deviceName);
         if(path.endsWith('/complete'))return ok({status:'PASSWORD_RESET',revokedSessionCount:0});
         return ok({status:path.includes('/register/')?'REGISTRATION_OTP_VERIFIED':'PASSWORD_RESET_OTP_VERIFIED'});
       }
