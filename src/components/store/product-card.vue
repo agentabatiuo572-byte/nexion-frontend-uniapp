@@ -11,7 +11,7 @@
     · Footer: price + frosted Buy CTA.
 -->
 <template>
-  <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': artInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? (product.name) : undefined" @click="goDetail">
+  <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': artInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? compactAriaLabel : undefined" @click="goDetail">
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
     <view ref="mediaRef" class="product-media relative overflow-hidden" :style="renderWrapStyle" :role="compact ? undefined : 'button'" :tabindex="compact ? -1 : 0" :aria-label="compact ? undefined : (product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
@@ -87,7 +87,7 @@
         <text class="product-compact-price">${{ formatGroupedAmount(product.price) }}</text>
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label + '\u00A0·\u00A0' }}</text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
-      <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
+      <text v-if="compactUnavailable" class="product-compact-status">{{ buyLabel }}</text>
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
@@ -259,6 +259,13 @@ const buyLabel = computed(() =>
       ? t.value.store.gateLockedEyebrow
       : t.value.store.cardBuyNow,
 );
+// The compact card is one link: its name reads what the card shows, in the order it shows it (badge, name, price,
+// and why it cannot be bought now), so a screen reader hears the same facts as a sighted user (03 §3.8, 07 §7.2).
+const compactUnavailable = computed(() => stockUnavailable.value || catalogUnavailable.value
+  || (remoteApiEnabled && eligibility.value.status === "ready" && !eligibility.value.eligible));
+const compactAriaLabel = computed(() => [copy.value.badge, props.product.name,
+  `${t.value.store.cardPriceLabel} $${formatGroupedAmount(props.product.price)}`,
+  compactUnavailable.value ? buyLabel.value : ""].filter(Boolean).join(" · "));
 function onBuy() {
   if (buyUnavailable.value) return;
   if(promotionSignIn.value){navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId)));return;}
