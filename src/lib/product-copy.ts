@@ -68,6 +68,13 @@ for (const store of [en.store, zh.store, vi.store, ru.store, kk.store, uz.store,
   add(store.trending, "trending");
   for (const id of Object.keys(CATALOG_BADGE_KIND) as CatalogId[]) add(store.catalog[id].badge, CATALOG_BADGE_KIND[id]);
 }
+// Labels earlier App versions offered, which saved products can still carry: they keep their kind and show today's label.
+const LEGACY_BADGES: [string, KnownBadgeKind][] = [
+  ["Upgrade Pick", "upgradePick"], ["Low Barrier", "lowBarrier"], ["升级首选", "upgradePick"], ["正热", "trending"], ["上升", "trending"],
+  ["Bán chạy nhất", "bestSeller"], ["Bán chạy", "bestSeller"], ["Xu hướng", "trending"], ["Đang hot", "trending"], ["Lựa chọn nâng cấp", "upgradePick"],
+  ["Hàng đầu", "flagship"], ["Rào cản thấp", "lowBarrier"], ["Жақсартуға ұсынылады", "upgradePick"],
+];
+for (const [label, kind] of LEGACY_BADGES) if (!KNOWN_BADGES.has(badgeKey(label))) KNOWN_BADGES.set(badgeKey(label), kind);
 
 function serverBadge(t: Messages, badge: string | undefined): Pick<ProductCopy, "badge" | "badgeKind"> {
   const text = badge?.trim() ?? "";
