@@ -14,8 +14,8 @@ import { readMonotonicNowMs } from "../lib/server-deadline-clock";
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { phoneRuntimePauseReason } from "@/lib/phone-runtime";
-import { hasNativePhoneRuntime, nativePhonePlatform } from "@/lib/native-phone-runtime";
-import { iosPhoneRecoveryKey } from "@/lib/ios-phone-recovery-key";
+import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
+import { phoneRecoveryCredential } from "@/lib/phone-recovery-credential";
 import { getDeviceId } from "@/lib/device-id";
 import { accountTotalHashrate } from "@/lib/account-hashrate";
 import { isActiveSlotDevice } from "@/lib/device-slot-policy";
@@ -480,7 +480,7 @@ export const useApp = defineStore("app", () => {
   const remotePendingEarned = ref<import("@/api/task-assignment-api").PendingComputeEarning[] | null>(null);
   const remoteComputeProtocolVersion = ref<1 | 2 | 3>(1);
   let nativePhoneBinding: { accountKey: string; epoch: number; deviceId: number } | null = null;
-  let iosRecovery: { sessionKey: string; retryAfter: number } | null = null;
+  let phoneRecovery: { sessionKey: string; retryAfter: number } | null = null;
   let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments; receivedMonotonicAt: number } | null = null;
   let remoteTaskSyncInFlightKey: string | null = null;
   let remoteTaskSyncAfter = 0;
@@ -511,7 +511,7 @@ export const useApp = defineStore("app", () => {
     nativePhoneConfigWaitDeviceId.value = null;
     nativePhoneTaskRecoveryDeviceId.value = null;
     nativePhoneBinding = null;
-    iosRecovery = null;
+    phoneRecovery = null;
     invalidateRemoteTaskAssignments();
     void syncRemoteTaskAssignments();
   }
@@ -991,20 +991,20 @@ export const useApp = defineStore("app", () => {
     }
   }
 
-  async function checkIosPhoneRecovery(request: RemoteAccountRequest, sessionVersion: number | null | undefined) {
+  async function checkPhoneRecovery(request: RemoteAccountRequest, sessionVersion: number | null | undefined) {
     const sessionKey = `${request.accountKey}:${request.epoch}:${sessionVersion ?? ""}`;
-    if (iosRecovery?.sessionKey === sessionKey && Date.now() < iosRecovery.retryAfter) return;
-    const key = iosPhoneRecoveryKey(apiRuntimeConfig.baseUrl, request.accountKey);
-    const attempt = { sessionKey, retryAfter: key ? Infinity : Date.now() + REMOTE_TASK_RETRY_MS };
-    iosRecovery = attempt;
-    if (!key) return;
+    if (phoneRecovery?.sessionKey === sessionKey && Date.now() < phoneRecovery.retryAfter) return;
+    const credential = phoneRecoveryCredential(apiRuntimeConfig.baseUrl, request.accountKey);
+    const attempt = { sessionKey, retryAfter: credential ? Infinity : Date.now() + REMOTE_TASK_RETRY_MS };
+    phoneRecovery = attempt;
+    if (!credential) return;
     const isCurrent = () => {
       const current = sessionVault.read();
-      return iosRecovery === attempt && remoteAccountEpoch.isCurrent(request) && current
+      return phoneRecovery === attempt && remoteAccountEpoch.isCurrent(request) && current
         && request.accountKey === `user:${current.user.userId}` && current.appSessionVersion === sessionVersion;
     };
     try {
-      const status = await onboardingCalibrationApi.recoverIosPhone(getDeviceId(), key);
+      const status = await onboardingCalibrationApi.recoverPhone(getDeviceId(), credential);
       if (!isCurrent() || status === "UNAVAILABLE") return;
       const session = useSession();
       if (status === "BOUND" && session.isCurrentDeviceCalibrated(request.accountKey)) return;
@@ -1031,7 +1031,7 @@ export const useApp = defineStore("app", () => {
     const request = remoteAccountEpoch.snapshot();
     const activeSession = sessionVault.read();
     if (!activeSession || request.accountKey !== `user:${activeSession.user.userId}`) return;
-    if (nativePhonePlatform() === "ios") void checkIosPhoneRecovery(request, activeSession.appSessionVersion);
+    if (hasNativePhoneRuntime()) void checkPhoneRecovery(request, activeSession.appSessionVersion);
     if (miningPaused.value || calledAt < remoteTaskSyncAfter) return;
     const foregroundEpoch = remoteTaskForegroundEpoch;
     const syncKey = `${request.accountKey}:${request.epoch}:${foregroundEpoch}`;
