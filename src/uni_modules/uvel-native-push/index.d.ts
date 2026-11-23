@@ -15,3 +15,6 @@ export function addNativePushListener(callback: (event: NativePushResult) => voi
 export function removeNativePushListener(id: number): void
 export function getInitialNotification(callback: (result: NativePushResult) => void): void
 export function shutdownNativePush(): void
+export function supportsIOSSessionKeychain(): boolean
+export function readIOSSessionKeychain(scope: string): string | null
+export function writeIOSSessionKeychain(scope: string, value: string): boolean

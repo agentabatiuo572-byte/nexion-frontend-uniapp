@@ -52,3 +52,7 @@ export function getInitialNotification(callback: (result: UTSJSONObject) => void
   NativePushBridge.initial((value: string) => { callback(JSON.parseObject(value)!) })
 }
 export function shutdownNativePush(): void { NativePushBridge.shutdown() }
+
+export function supportsIOSSessionKeychain(): boolean { return NativeSessionKeychain.supported() }
+export function readIOSSessionKeychain(scope: string): string | null { return NativeSessionKeychain.read(scope) }
+export function writeIOSSessionKeychain(scope: string, value: string): boolean { return NativeSessionKeychain.write(scope, value) }
