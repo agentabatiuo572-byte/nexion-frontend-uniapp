@@ -18,7 +18,18 @@
       <!-- Price Index -->
       <view class="earn-price-index" lang="en">
         <text class="earn-market__caption">{{ en.market.priceIndex }}</text>
-        <text v-if="!priceIndex.length" class="earn-market__status">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
+        <!-- Empty (a read that succeeded with no workloads) is one short line; loading and a failed first read keep three
+             still placeholder tiles with no status text, and the failed read recovers on its own (03 §3.4, §3.5.2). -->
+        <text v-if="!priceIndex.length && marketState === 'empty'" class="earn-market__status">{{ t.empty.listTitle }}</text>
+        <view v-else-if="!priceIndex.length" class="earn-market__grid" aria-hidden="true" :aria-busy="marketState === 'loading' ? 'true' : undefined" data-earn-market-placeholder="true">
+          <view v-for="n in 3" :key="n" class="earn-market__tile earn-market__tile--placeholder"><view class="earn-market__face earn-market__face--on">
+            <view class="earn-market__bar" style="width: 70%; margin-block: 3px" />
+            <view class="earn-market__bar" style="width: 40%; margin-block: 3px" />
+            <view class="earn-market__bar earn-market__bar--price" />
+            <view class="earn-market__bar" style="width: 36%; margin-block: 3px" />
+            <view class="earn-market__spark" />
+          </view></view>
+        </view>
         <!-- Three fixed tiles. With more than three workloads, tile i owns workloads i, i+3, … and every
              ROTATE_MS all three tiles switch to their next one at once, like a quote screen. Screen readers
              get the full list once; the rotating faces are hidden from them. -->
@@ -42,7 +53,15 @@
       <!-- Device earnings ranking -->
       <view class="earn-market__rank">
         <text class="earn-market__caption earn-market__caption--plain">{{ t.market.deviceRanking }}</text>
-        <text v-if="!deviceRankings.length" class="earn-market__status">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
+        <text v-if="!deviceRankings.length && marketState === 'empty'" class="earn-market__status">{{ t.empty.listTitle }}</text>
+        <view v-else-if="!deviceRankings.length" aria-hidden="true" :aria-busy="marketState === 'loading' ? 'true' : undefined" data-earn-ranking-placeholder="true">
+          <view v-for="n in 3" :key="n" class="earn-ranking-row earn-ranking-row--placeholder">
+            <view class="earn-market__bar" style="width: 18px" />
+            <view class="earn-market__bar earn-market__bar--art" />
+            <view class="earn-market__bar" style="width: 64%" />
+            <view class="earn-ranking-value"><view class="earn-market__bar" style="width: 56px" /><view class="earn-ranking-value__track nx-progress" /></view>
+          </view>
+        </view>
         <view
           v-for="d in deviceRankings"
           :key="d.rank"
@@ -126,6 +145,8 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
   { rank: 3, name: "UVELBox S1", dailyEarn: 7, kind: "stellarbox-s1" },
 ];
 
+// Which of the three non-content states the board is in when a section has no rows (03 §3.4).
+const marketState = computed(() => !remoteApiEnabled || app.homeTruthStatus === "ready" ? "empty" : app.homeTruthStatus === "error" ? "failed" : "loading");
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
@@ -205,24 +226,26 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .nx-earn-market-board { margin: 0 16px; color: var(--v5-ink); }
 .earn-market__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 2px 8px; }
 .earn-market__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
-.earn-market__updated { display: inline-flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-market__updated { display: inline-flex; align-items: center; gap: 6px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); }
 .earn-market__card { padding: 14px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .earn-market__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 /* The board's caption line box sits 4.5px lower than its 14px line height. */
 .earn-market__caption { display: block; padding-top: 4.5px; font: 500 11px/14px var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
 .earn-market__caption--plain { letter-spacing: 0; text-transform: none; }
-.earn-market__status { display: block; padding: 10px 0; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-market__status { display: block; padding: 10px 0; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 /* Every face of a tile shares one grid cell, so the tile keeps the tallest face's height. A swap shows the next face
    at once on all three tiles, like a quote board's tick: no fade, never a blank or half-transparent tile. */
-.earn-market__tile { display: grid; min-width: 0; padding: 10px 10px 8px; border-radius: 14px; background: var(--v5-surface-2); }
+/* An info block inside the card: 12px radius (01 §1.3). */
+.earn-market__tile { display: grid; min-width: 0; padding: 10px 10px 8px; border-radius: 12px; background: var(--v5-surface-2); }
 .earn-market__face { grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0; visibility: hidden; }
 .earn-market__face--on { visibility: visible; }
 [data-theme="light"] .earn-market__tile { background: var(--v5-bg); }
 .earn-market__name { font: 500 11px/14px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-market__unit { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.earn-market__price { margin-top: 8px; font: 500 15px/20px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Market list price: list-title size and line height, JetBrains Mono 500 (10.1, 01 §1.2). */
+.earn-market__price { margin-top: 8px; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-market__delta { font: 500 11px/14px var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-market__flagship { margin-top: 2px; font: 500 11px/14px var(--font-v5); color: var(--v5-warning-ink); overflow-wrap: break-word; }
 .earn-market__flagship-delta { font: 500 11px/14px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -235,21 +258,26 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-row--link { cursor: pointer; }
 .earn-ranking-row--link:active { opacity: .7; }
 .earn-ranking-row--link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.earn-ranking-row__no { font: 500 12px/16px var(--font-metric); color: var(--v5-ink-3); }
+.earn-ranking-row__no { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); }
 /* The catalog art leaves about 40% empty around the machine: the square image is drawn larger than its 48×40 cell and
    its transparent margins overlap the row gaps, so the machine itself reads at about 34px. */
 .earn-ranking-row__art { position: relative; width: 48px; height: 40px; }
 .earn-ranking-row__art :deep(.device-art__image) { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; transform: translate(-50%, -50%); pointer-events: none; }
 .earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
 /* A long name (the phone row in kk, ru…) wraps in full instead of being cut (03 §3.6.1); the row grows with it. */
-.earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.earn-ranking-row__name { min-width: 0; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
-.earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* A plain estimate in the main ink: amber is the business hue for icons and graphics, not for amount text (01 §1.1.1, §1.1.2). */
+.earn-ranking-value__amount { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* The bar is the shared thin progress (.nx-progress in tokens.css); the ranking only sets its width and the device hue. */
 .earn-ranking-value__track { width: 96px; --nx-progress-hue: var(--v5-tech-cyan); }
+/* Still placeholders (no shimmer) in the shape of the tiles and rows they stand for. */
+.earn-market__bar { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.earn-market__bar--price { width: 62%; height: 14px; margin-top: 11px; margin-bottom: 3px; }
+.earn-market__bar--art { width: 34px; height: 28px; border-radius: 8px; justify-self: center; }
+.earn-ranking-row--placeholder .earn-ranking-value { gap: 8px; }
 @media (max-width: 374px) {
   .earn-market__tile { padding: 10px 8px 8px; }
-  .earn-market__price { font-size: 13px; line-height: 18px; }
 }
 @media (max-width: 374px) {
   .earn-ranking-row { grid-template-columns: 22px 40px minmax(0, 1fr) 88px; }
