@@ -200,6 +200,7 @@ const footerStyle: CSSProperties = {
 .push-settings-row:active { opacity: .75; }
 .push-settings-icon { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; background: var(--v5-surface-2); color: var(--v5-brand); }
 .push-settings-status { flex: 1; min-width: 0; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
-.push-settings-action { max-width: 48%; font-size: var(--ui-type-list-subtitle); color: var(--v5-brand); text-align: right; }
+/* A short action stays on one line; the status beside it wraps instead (design-rules: short buttons never fold). */
+.push-settings-action { flex-shrink: 0; font-size: var(--ui-type-list-subtitle); color: var(--v5-brand); text-align: right; white-space: nowrap; }
 .push-settings-chevron { flex-shrink: 0; color: var(--v5-ink-4); }
 </style>

@@ -104,7 +104,7 @@ export const earningCreditCopy = {
     loadFailedTitle: "Мәлімет әзірге жүктелмеді", loadFailedHint: "Автоматты түрде қайталануда", unavailable: "Бұл табыстың түбіртегі қолжетімсіз", removed: "Бұл хабар енді қолжетімсіз",
     pushTitle: "Табыс хабарландыруы", pushHint: "Тек телефон хабарландырулары; қолданбадағы хабарлар өзгермейді",
     pushOptions: {
-      DAILY: { label: "Күніне бір рет", hint: "Әдепкі · Күндік жиынтық шамамен 21:00-де" },
+      DAILY: { label: "Күніне бір рет", hint: "Әдепкі · Күндік жиынтық шамамен 21:00\u2011де" /* non-breaking hyphen keeps the time and its suffix together */ },
       HALF_HOURLY: { label: "Әр 30 минут сайын", hint: "Табыс түскенде; 23:00–08:00 аралығында жіберілмейді" },
       OFF: { label: "Өшірулі", hint: "Табыс хабарландыруы жіберілмейді" },
     },
