@@ -1,6 +1,9 @@
 import { sha256 } from "js-sha256";
 import { ApiError } from "./errors";
 import type { KeyValueStorage } from "./session-vault";
+// #ifdef APP-PLUS
+import { readIOSSessionKeychain, supportsIOSSessionKeychain, writeIOSSessionKeychain } from "@/uni_modules/uvel-native-push";
+// #endif
 
 type AndroidBridge = Pick<PlusAndroid, "invoke" | "newObject" | "importClass" | "runtimeMainActivity">;
 type NativePlatform = { os?: { name?: string }; android?: AndroidBridge };
@@ -98,7 +101,7 @@ function waitForPlus(): Promise<NativePlatform> {
   }, { once: true }));
 }
 
-/** Android >=23 only. Unsupported platforms retain the existing memory session. */
+/** Android uses its Keystore. The isolated iOS TEST app uses its local Keychain. */
 export function createNativeSessionStorage(options: {
   baseUrl: string;
   /** Separate encrypted records and keys; URL paths are intentionally ignored. */
@@ -110,6 +113,26 @@ export function createNativeSessionStorage(options: {
   let initialized = false;
   let inFlight: Promise<void> | undefined;
   function open(platform: NativePlatform): KeyValueStorage | undefined {
+    // #ifdef APP-PLUS
+    if (platform.os?.name === "iOS" && options.purpose !== "login-attempt") {
+      const origin = new URL(options.baseUrl).origin;
+      if (origin !== "https://api-test.uvel.ai" || !synchronous(supportsIOSSessionKeychain)) return undefined;
+      const scope = sha256(JSON.stringify([origin, options.installationId()]));
+      return {
+        get() {
+          const record = synchronous(() => readIOSSessionKeychain(scope));
+          requireValue(typeof record === "string");
+          return record ? JSON.parse(record) : null;
+        },
+        set(value) {
+          requireValue(synchronous(() => writeIOSSessionKeychain(scope, JSON.stringify(value))) === true);
+        },
+        remove() {
+          requireValue(synchronous(() => writeIOSSessionKeychain(scope, "")) === true);
+        },
+      };
+    }
+    // #endif
     if (platform.os?.name !== "Android") {
       reportNativeSessionStage(platform.os?.name ? "PLATFORM_UNSUPPORTED" : "PLATFORM_UNINITIALIZED");
       return undefined;
