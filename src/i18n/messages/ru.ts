@@ -3539,7 +3539,7 @@ export const ru: Messages = {
     remoteUnavailableClosed: "Обмен сейчас недоступен. Повторите чуть позже.",
     swapPaused: "Обмен приостановлен. Можно посмотреть историю или отменить заявки в очереди, где это доступно.",
     pendingRecoveryHint: "Результат обмена не подтверждён и проверяется автоматически. Не повторяйте обмен.",
-    remoteNotProvided: "-",
+    remoteNotProvided: "—",
     remoteUnavailableToast: "Не удалось загрузить. Повторите попытку позже",
     swapFailed: "Обмен не прошёл. Повторите чуть позже.",
     swapCancelledReason: "Заявка на обмен отменена — ничего не обменено.",

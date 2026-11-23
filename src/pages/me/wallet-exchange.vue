@@ -111,7 +111,7 @@
             <view class="ex-quota__row">
               <text class="ex-k">{{ t.exchange.yourDaily }}</text>
               <view class="ex-quota__v font-mono-tabular tabular-nums">
-                <text>{{ remoteApiEnabled && !remoteState ? '-' :`$${formatAmount(displayUserUsed)}` }} </text>
+                <text>{{ remoteApiEnabled && !remoteState ? '—' :`$${formatAmount(displayUserUsed)}` }} </text>
                 <text v-if="!remoteApiEnabled || remoteState" class="ex-quota__cap">/ ${{ formatAmount(displayUserCap) }}</text>
               </view>
               <text class="ex-k">&nbsp;· {{ fmt(t.exchange.capsReset, { zone: businessOffsetLabel("LEGACY") }) }}</text>
@@ -1021,11 +1021,11 @@ const minLabel = computed(() => exchangeSnapshotKnown.value
   : t.value.exchange.remoteNotProvided);
 const fromBalLabel = computed(() => exchangeSnapshotKnown.value
   ? formatAmount(fromBal.value).replace(/^-/, "−")
-  : "-");
+  : "—");
 const toAmountLabel = computed(() => !exchangeSnapshotKnown.value || feeInvalid.value ? "—" : amtLabel(toAmount.value));
 const rateLabel = computed(() => exchangeSnapshotKnown.value
   ? t.value.exchange.rate.replace("{rate}", rate.value.toFixed(5))
-  : "-");
+  : "—");
 const updatedLabel = computed(() => exchangeSnapshotKnown.value
   ? t.value.exchange.rateLastUpdated.replace("{n}", String(secsAgo.value))
   : t.value.exchange.remoteNotProvided);

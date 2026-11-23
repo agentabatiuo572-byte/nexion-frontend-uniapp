@@ -3539,7 +3539,7 @@ export const id: Messages = {
     remoteUnavailableClosed: "Penukaran sedang tidak tersedia. Coba lagi sebentar lagi.",
     swapPaused: "Penukaran dijeda. Lihat riwayat atau batalkan pesanan antrean yang memenuhi syarat.",
     pendingRecoveryHint: "Hasil penukaran belum terkonfirmasi dan sedang diperiksa otomatis. Jangan tukar lagi.",
-    remoteNotProvided: "-",
+    remoteNotProvided: "—",
     remoteUnavailableToast: "Gagal memuat. Coba lagi nanti",
     swapFailed: "Penukaran tidak berhasil. Coba lagi sebentar lagi.",
     swapCancelledReason: "Pesanan penukaran dibatalkan — tidak ada yang ditukar.",
