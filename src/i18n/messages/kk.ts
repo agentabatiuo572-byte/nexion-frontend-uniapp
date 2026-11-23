@@ -1566,7 +1566,7 @@ export const kk: Messages = {
       },
       receipts: {
         label: "Табыс түбіртектері",
-        sub: "Proof-of-Compute түбіртектері",
+        sub: "Әр тапсырма бойынша түскен табыс жазбалары",
       },
       notifications: {
         label: "Хабарландырулар",

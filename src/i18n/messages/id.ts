@@ -1566,7 +1566,7 @@ export const id: Messages = {
       },
       receipts: {
         label: "Kuitansi pendapatan",
-        sub: "Kuitansi Proof-of-Compute",
+        sub: "Catatan pendapatan masuk dari setiap tugas",
       },
       notifications: {
         label: "Notifikasi",

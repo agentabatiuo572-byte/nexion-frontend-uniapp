@@ -1566,7 +1566,7 @@ export const fil: Messages = {
       },
       receipts: {
         label: "Mga resibo ng kita",
-        sub: "Proof-of-Compute receipt",
+        sub: "Talaan ng pumasok na kita sa bawat job",
       },
       notifications: {
         label: "Mga notification",

@@ -612,7 +612,8 @@ function rowAmount(r: Receipt): string {
   return r.category === "KY" ? formatAmount(r.netPaid) : `+${formatAmount(r.netPaid)}`;
 }
 function computeTaskLine(r: CanonicalComputeReceiptSummary): string {
-  return r.executionMode === "SIMULATED" ? (r.taskName || computeCopy.value.taskReceipt) : `${t.value.receipt.computeTitle} · ${r.model}`;
+  // The page is already 收益凭证, so a compute row shows only its model (no second name for the same receipt).
+  return r.executionMode === "SIMULATED" ? (r.taskName || computeCopy.value.taskReceipt) : r.model;
 }
 // The row shows a shortened receipt number and clamps the job line to two lines (the detail shows both in full);
 // screen readers get the full text (03 §3.6.1).

@@ -1566,7 +1566,7 @@ export const uz: Messages = {
       },
       receipts: {
         label: "Daromad cheklari",
-        sub: "Hisoblash isboti cheklari",
+        sub: "Har bir vazifa boʻyicha tushgan daromad yozuvlari",
       },
       notifications: {
         label: "Bildirishnomalar",

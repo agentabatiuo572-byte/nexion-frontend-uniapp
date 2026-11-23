@@ -1566,7 +1566,7 @@ export const ru: Messages = {
       },
       receipts: {
         label: "Квитанции о доходе",
-        sub: "Квитанции за вычисления",
+        sub: "Записи о зачислении дохода по каждой задаче",
       },
       notifications: {
         label: "Уведомления",

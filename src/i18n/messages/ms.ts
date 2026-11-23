@@ -1566,7 +1566,7 @@ export const ms: Messages = {
       },
       receipts: {
         label: "Resit pendapatan",
-        sub: "Resit bukti pengkomputeran",
+        sub: "Rekod pendapatan dikreditkan bagi setiap tugasan",
       },
       notifications: {
         label: "Pemberitahuan",
