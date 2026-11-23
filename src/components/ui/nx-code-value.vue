@@ -2,7 +2,8 @@
   NxCodeValue — one long code (order, withdrawal, bill, quote, receipt or ticket number, hash,
   invite code) as a value. JetBrains Mono on one line; when the space runs out the middle gives way
   to an ellipsis and the start and the last `tail` characters stay, so the code never breaks at a
-  random place. Screen readers get the whole code; the copy button copies the whole code.
+  random place. Screen readers get the whole displayed code. Pass copyValue when the
+  clipboard needs a different identifier, such as a receipt's original business number.
   On its own line the root shrinks to fit. In a label | value row pass `fill`: the code takes the
   free space (right-aligned) with a floor of prefix … tail, so it gives way first and the label
   (give it `flex: 0 1 auto; min-width: 0`) wraps only once the code is at that floor.
@@ -18,7 +19,7 @@
       <text class="nx-code__sr">{{ value }}</text>
       <view class="nx-code__line" aria-hidden="true"><text class="nx-code__head">{{ head }}</text><text v-if="end" class="nx-code__tail">{{ end }}</text></view>
     </template>
-    <CopyCodeButton v-if="copyable" :value="value" :label="label" />
+    <CopyCodeButton v-if="copyable" :value="copyValue ?? value" :label="label" />
   </view>
 </template>
 
@@ -26,7 +27,7 @@
 import { computed } from "vue";
 import CopyCodeButton from "@/components/copy-code-button.vue";
 
-const props = withDefaults(defineProps<{ value: string; label: string; copyable?: boolean; full?: boolean; fill?: boolean; tail?: number }>(), { copyable: true, full: false, fill: false, tail: 6 });
+const props = withDefaults(defineProps<{ value: string; copyValue?: string; label: string; copyable?: boolean; full?: boolean; fill?: boolean; tail?: number }>(), { copyable: true, full: false, fill: false, tail: 6 });
 const cut = computed(() => props.value.length > props.tail * 2 ? props.value.length - props.tail : props.value.length);
 const head = computed(() => props.value.slice(0, cut.value));
 const end = computed(() => props.value.slice(cut.value));

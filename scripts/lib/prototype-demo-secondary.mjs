@@ -8,6 +8,19 @@ import { demoEarningReceipts, demoEarningReceipt } from './prototype-demo-notifi
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
+
+// AppComputeReceiptSummaryView is the wire shape for a receipt list item.
+function demoReceiptSummary({
+  receiptNo, taskNo, taskClass, model, client, rewardUsdt, rewardNex, earningStatus, completedAt,
+  taskName = null, executionMode = 'MODEL', proofKind = 'MODEL_EXECUTION', modelExecuted = true,
+  displayReceiptNo = null, settledAt = null,
+}) {
+  return {
+    receiptNo, taskNo, taskClass, model, client, rewardUsdt, rewardNex, earningStatus, completedAt,
+    taskName, executionMode, proofKind, modelExecuted, displayReceiptNo, settledAt,
+  };
+}
+
 // Receipt cursors retain the issuance cutoff while ordering by completion.
 export function demoReceiptPage(params, receipts) {
   const offset=Number(params.get('offset')??0),limit=Number(params.get('limit')??20);
@@ -250,9 +263,10 @@ export function secondaryDemo(url,state,request,walletBills){
       ...(task.simulation&&{displayReceiptNo:'UVEL-RC-'+task.receiptId.toString(36).toUpperCase().padStart(6,'0'),
         postingTimeVerified:task.postedAt!=null}),
       proofHash:task.simulation?null:String(i+1).repeat(64)}));
-    if(p==='/api/tasks/receipts')return demoReceiptPage(url.searchParams,[
-      ...items,...earningReceipts.filter(sample=>sample.receiptStatus!==404).map(sample=>demoEarningReceipt(sample)),
-    ]);
+    if(p==='/api/tasks/receipts'){
+      const receipts=[...items,...earningReceipts.filter(sample=>sample.receiptStatus!==404).map(sample=>demoEarningReceipt(sample))];
+      return demoReceiptPage(url.searchParams,state.fleetState==='earning-credit'?receipts.map(demoReceiptSummary):receipts);
+    }
     const index=items.findIndex(r=>r.receiptNo===p.split('/').pop());
     if(index<0)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     const receipt=items[index],task=tasks[index];

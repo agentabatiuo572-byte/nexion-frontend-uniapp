@@ -17,7 +17,7 @@
       <view v-if="state === 'ready' || state === 'loading'" :style="headerStyle">
         <view v-if="state === 'loading'" class="nx-receipt-skeleton" style="width: 180px; height: 14px" aria-hidden="true" />
         <view v-else class="flex items-center" style="gap: 8px">
-          <NxTag v-if="isReceiptSettled" tone="success" class="nx-receipt-stamp"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</NxTag>
+          <NxTag v-if="showReceiptStamp" tone="success" class="nx-receipt-stamp"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</NxTag>
           <!-- Wraps instead of cutting off: a status and a completion time in long languages need the room (03 §3.6.1). -->
           <text class="nx-receipt-status-line">{{ receiptStatus }} · {{ receiptTime }}</text>
         </view>
@@ -61,10 +61,9 @@
         >
           <text class="nx-receipt-label">{{ fieldLabel(row.k) }}</text>
           <view v-if="row.divider" :style="dividerStyle" />
-          <!-- Long codes (03 §3.6.1): one line, middle ellipsis keeping the last 6; screen readers and the copy button get the
-               same whole value that is shown. -->
+          <!-- Long codes (03 §3.6.1) keep the last six and expose the whole display value to screen readers. -->
           <view v-else-if="row.copyValue" :style="copyRowStyle">
-            <NxCodeValue :value="row.copyValue" :label="fieldLabel(row.k)" fill />
+            <NxCodeValue :value="row.v ?? row.copyValue" :copy-value="row.copyValue" :label="fieldLabel(row.k)" fill />
             <text v-if="row.hint" style="flex-shrink:0;white-space:nowrap;color:var(--v5-ink-3);font-size:12px">({{ row.hint }})</text>
           </view>
           <!-- A value nobody can open further is shown whole: it wraps, right-aligned, and is never cut off (03 §3.6.1). -->
@@ -171,9 +170,12 @@ const isSimulatedNexReceipt = computed(() => props.receipt != null && isCanonica
   && isSimulatedReceipt.value && props.receipt.rewardUsdt === 0 && props.receipt.rewardNex > 0);
 const receiptTitle = computed(() => isLegacyVerification.value ? t.value.receipt.typeWalletPairing
   : isSimulatedReceipt.value ? copy.value.taskReceipt : t.value.receipt.proofOfCompute);
-const isReceiptSettled = computed(() => {
+const showReceiptStamp = computed(() => {
   const r = props.receipt;
-  return !!r && (!isCanonicalComputeReceipt(r) || /^(POSTED|SUCCESS|SETTLED|CREDITED|PAID)$/.test(r.earningStatus.toUpperCase()));
+  if (!r) return false;
+  if (!isCanonicalComputeReceipt(r)) return true;
+  if (isSimulatedReceipt.value && r.rewardUsdt === 0 && r.rewardNex === 0 && r.settledAt === null) return false;
+  return /^(POSTED|SUCCESS|SETTLED|CREDITED|PAID)$/.test(r.earningStatus.toUpperCase());
 });
 const receiptStatus = computed(() => {
   const r = props.receipt;
@@ -311,7 +313,7 @@ const sections = computed<DescSection[]>(() => {
     return [
       {
         rows: [
-          { k: "receipt_no", v: r.displayReceiptNo || r.receiptNo, copyValue: r.displayReceiptNo || r.receiptNo },
+          { k: "receipt_no", v: r.displayReceiptNo || r.receiptNo, copyValue: r.receiptNo },
           { k: "task_no", v: r.taskNo, copyValue: r.taskNo },
           { k: "task_type", v: workloadLabel(t.value, r.taskClass) },
           { k: "task_name", v: r.taskName },
