@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
 
 const earningSamples = [
+  { id: 1009, deviceId: 43, deviceName: 'UVELBox Pacific Research Compute Cluster International West 0043',
+    taskClass: 'VG', usdt: '1234.5678', uvt: '2500', minutesAgo: 1 },
   { id: 1008, deviceId: 41, taskClass: 'IG', usdt: '0.15', minutesAgo: 3 },
-  { id: 1007, deviceId: 43, taskClass: 'VG', usdt: '1.05', uvt: '0.75', minutesAgo: 16 },
+  { id: 1007, deviceId: 43, taskClass: 'VG', usdt: '1.05', uvt: '0.75', minutesAgo: 16, modelReceipt: true },
   { id: 1006, deviceId: 42, taskClass: 'LL', uvt: '0.5', minutesAgo: 29 },
   { id: 1005, deviceId: 41, taskClass: 'EM', usdt: '0.0025', minutesAgo: 48, read: true },
   { id: 1004, deviceId: 42, taskClass: 'SP', usdt: '0.12', minutesAgo: 60, hideMetadata: true, read: true },
-  { id: 1003, deviceId: 43, taskClass: 'FT', usdt: '0.42', minutesAgo: 70, receiptStatus: 503 },
+  { id: 1003, deviceId: 43, taskClass: 'FT', usdt: '0.42', minutesAgo: 70, receiptFailures: 2 },
   { id: 1002, deviceId: 41, taskClass: 'IG', usdt: '0.15', minutesAgo: 80, receiptStatus: 404 },
   { id: 1001, deviceId: 42, taskClass: 'SP', usdt: '0.12', minutesAgo: 90, actionMissing: true, read: true },
 ];
@@ -19,7 +21,7 @@ export function demoEarningCredits(state) {
   return earningSamples.flatMap(sample => {
     const device = state.fleetSeed?.find(row => row.id === sample.deviceId);
     if (!device) return [];
-    return [{ ...sample, device, receiptNo: `CTR-DEMO-EARN-${sample.id}`,
+    return [{ ...sample, device, deviceName: sample.deviceName ?? device.name, receiptNo: `CTR-DEMO-EARN-${sample.id}`,
       settledAt: state.previewFactsAt - sample.minutesAgo * 60_000 }];
   });
 }
@@ -27,15 +29,19 @@ export function demoEarningCredits(state) {
 export function demoEarningReceipt(sample) {
   const { device, id, taskClass, receiptNo, settledAt } = sample;
   const completedAt = settledAt - 60_000;
+  const hash = createHash('sha256').update(receiptNo).digest('hex');
   return {
     source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true,
     receiptNo, taskNo: `DEMO-EARN-TASK-${id}`, taskClass, taskId: `demo-earn-${id}`,
     taskName: taskNames[taskClass], model: taskNames[taskClass], client: 'UVEL',
-    deviceId: device.id, deviceInstanceNo: device.instanceNo, deviceName: device.name,
+    deviceId: device.id, deviceInstanceNo: device.instanceNo, deviceName: sample.deviceName,
     deviceType: device.deviceType ?? 'BOX', deviceGpu: device.gpuModel ?? '', vramTotalGb: device.vramTotalGb,
     rewardUsdt: sample.usdt ?? '0', rewardNex: sample.uvt ?? '0',
     earningStatus: 'SETTLED', settledAt, completedAt, startedAt: completedAt - 300_000, durationSec: 300,
-    proofHash: createHash('sha256').update(receiptNo).digest('hex'),
+    ...(sample.modelReceipt ? { proofHash: hash } : {
+      executionMode: 'SIMULATED', proofKind: 'TASK_RECEIPT', modelExecuted: false,
+      proofHash: null, receiptHash: hash, postingTimeVerified: true,
+    }),
   };
 }
 
@@ -81,7 +87,7 @@ export function demoNotifications(locale, state, now, device, order) {
       ctaHref: `/pages/me/receipts?receiptNo=${sample.receiptNo}`, createdAt: sample.settledAt,
       readAt: sample.read ? sample.settledAt + 60_000 : null,
       earning: { receiptNo: sample.receiptNo, usdt: sample.usdt ?? null, uvt: sample.uvt ?? null,
-        deviceName: sample.hideMetadata ? null : sample.device.name, taskClass: sample.hideMetadata ? null : sample.taskClass },
+        deviceName: sample.hideMetadata ? null : sample.deviceName, taskClass: sample.hideMetadata ? null : sample.taskClass },
     }));
     const summaries = [999, 998].map((id, index) => ({
       id, kind: 'NOVA_DAILYSUMMARY', priority: 'low',

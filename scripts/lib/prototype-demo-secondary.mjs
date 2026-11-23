@@ -230,7 +230,14 @@ export function secondaryDemo(url,state,request,walletBills){
     const credits=demoEarningCredits(state);
     const credit=credits.find(sample=>sample.receiptNo===p.split('/').pop());
     if(credit){
-      if(credit.receiptStatus===503)throw Object.assign(new Error('TASK_RECEIPT_UNAVAILABLE'),{status:503});
+      if(credit.receiptFailures){
+        if(!state.earningReceiptAttempts||state.earningReceiptAttempts.epoch!==state.scenarioEpoch)
+          state.earningReceiptAttempts={epoch:state.scenarioEpoch,counts:{}};
+        const counts=state.earningReceiptAttempts.counts;
+        counts[credit.receiptNo]=(counts[credit.receiptNo]??0)+1;
+        if(counts[credit.receiptNo]<=credit.receiptFailures)
+          throw Object.assign(new Error('TASK_RECEIPT_UNAVAILABLE'),{status:503});
+      }
       if(credit.receiptStatus!==404)return demoEarningReceipt(credit);
     }
     const tasks=demoSettledTasks(state,state.previewFactsAt??now);

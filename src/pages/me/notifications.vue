@@ -74,6 +74,7 @@ import { workloadLabel } from "@/lib/workload-label";
 import { useDataVisibility } from "@/store/data-visibility";
 import type { NotificationEarning } from "@/api/notification-api";
 import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
+import { ApiError } from "@/api/errors";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ServiceMessageList from "@/components/support/service-message-list.vue";
 import { useConversations } from "@/store/conversations";
@@ -83,10 +84,10 @@ import { notificationCategory, type NotificationCategory } from "@/lib/notificat
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
-import { useNotifications, type Notification } from "@/store/notifications";
+import { EARNING_NOTIFICATION_REMOVED, useNotifications, type Notification } from "@/store/notifications";
 import { navTo, navBack, takeNavigationQuery } from "@/lib/route";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
 import { useApp } from "@/store/app";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
@@ -122,7 +123,9 @@ function isCurrentIntent(intent: ReturnType<typeof captureIntent>) {
 // 写法与 risk-disclosure.vue:108 同源。
 const notifsErrorText = computed(() => notifs.readFailedWithoutData ? t.value.notifs.loadFailed : "");
 watch(() => notifs.commandError, error => {
-  if (error && pageVisible.value) toast.error(t.value.notifs.loadFailed);
+  if (!error || !pageVisible.value) return;
+  if (error === EARNING_NOTIFICATION_REMOVED) toast.info(earningCopy.value.removed);
+  else toast.error(t.value.notifs.loadFailed);
 }, { flush: "sync" });
 
 async function loadMoreNotifications() {
@@ -221,12 +224,17 @@ const categoryIcons: Record<NotificationCategory, string> = {
 function keepUnits(text: string) { return text.replace(/(\d) (USDT|UVT|VND)\b/g, "$1\u00a0$2"); }
 function kindIcon(n: Notification) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${categoryIcons[notificationCategory(n)]}</svg>`; }
 function countOf(id: Filter) { return id === "all" ? notifs.items.length : notifs.items.filter(n => notificationCategory(n) === id).length; }
-const filtered = computed(() => filter.value === "all" ? notifs.items : notifs.items.filter(n => notificationCategory(n) === filter.value));
+const filtered = computed(() => {
+  const rows = filter.value === "all" ? notifs.items : notifs.items.filter(n => notificationCategory(n) === filter.value);
+  if (!notifs.earningsReadConfirmed) return rows;
+  // The existing row uses readAt for its dot and emphasis. Project it for display only.
+  return rows.map(n => n.earning && n.readAt === null ? { ...n, readAt: n.ts } : n);
+});
 function filterLabel(id: Filter) { return id === "all" ? t.value.notifs.filterAll : t.value.notifs[categoryKeys[id]]; }
 const emptyTitle = computed(() => filter.value === "all" ? t.value.notifs.emptyAllTitle : fmt(t.value.notifs.emptyFilterTitle, { filter: filterLabel(filter.value) }));
 function directNotice(n: Notification) { return !!n.ctaHref && isDirectNotificationSummary(n.body); }
 function toggle(n: Notification) {
-  if (n.earning) { openEarningDetail(n, n.earning); return; }
+  if (n.earning) { void openEarningDetail(n, n.earning); return; }
   if (directNotice(n)) { void onTap(n); return; }
   void notifs.markRead(n.id);
   expandedId.value = expandedId.value === n.id ? null : n.id;
@@ -307,19 +315,93 @@ function earningRowLabel(earning: NotificationEarning) {
   const amounts = earningAmounts(earning).map(({ sign, value, unit }) => `${sign}${amountsHidden.value ? "••••" : value} ${unit}`).join(" · ");
   return `${amounts}, ${earningSummary(earning).map(part => part.text).join(" · ")}`;
 }
-// Earnings detail sheet, opened in place over the message center. The page opens it with the message's own amount in
-// the loading state. Placeholder for the logic batch (Codex): the action-receipt check (route receiptNo must match
-// earning.receiptNo; NOTIFICATION_NOT_FOUND → toast.info(earningCopy.removed) and refresh), the receipt read with
-// ready / failed (03 §3.5.2 automatic recovery) / unavailable, and marking the message read.
 type EarningDetailState = "loading" | "ready" | "failed" | "unavailable";
 const earningDetail = ref<{ notificationId: string; earning: NotificationEarning; state: EarningDetailState; receipt: CanonicalComputeReceipt | null } | null>(null);
-function openEarningDetail(n: Notification, earning: NotificationEarning) {
-  earningDetail.value = { notificationId: n.id, earning, state: "loading", receipt: null };
+let pendingEarningAction: ReturnType<typeof captureIntent> | null = null;
+let detailReadGeneration = 0;
+let earningReturnScroll: number | undefined;
+
+async function readEarningDetail() {
+  const detail = earningDetail.value;
+  const intent = captureIntent();
+  if (!detail || !isCurrentIntent(intent) || !foregroundReadAllowed()) return;
+  const generation = ++detailReadGeneration;
+  const isCurrent = () => generation === detailReadGeneration && earningDetail.value === detail
+    && isCurrentIntent(intent) && foregroundReadAllowed();
+  try {
+    const receipt = await taskAssignmentApi.receipt(detail.earning.receiptNo);
+    if (!isCurrent()) return;
+    detail.receipt = receipt;
+    detail.state = "ready";
+  } catch (cause) {
+    if (!isCurrent()) return;
+    const unavailable = cause instanceof ApiError && (cause.status === 404 || cause.status === 403
+      || (cause.kind === "business" && (cause.code === 404 || cause.code === 403 || cause.message === "TASK_RECEIPT_UNAVAILABLE")));
+    detail.state = unavailable ? "unavailable" : "failed";
+    if (!unavailable) throw cause;
+  }
 }
-// 查看全部收益: close the sheet first, then the compute receipts (their default kind). Return position: logic batch.
+
+useAutoRecovery({
+  active: () => pageVisible.value && earningDetail.value !== null,
+  failed: () => earningDetail.value?.state === "failed",
+  retry: readEarningDetail,
+  repeatMs: 30_000,
+});
+
+async function runEarningAction(n: Notification, earning: NotificationEarning, action: "cta" | "swipe_conversion") {
+  const intent = captureIntent();
+  if (!isCurrentIntent(intent) || pendingEarningAction || earningDetail.value || section.value !== "notifications") return;
+  const requestedFilter = filter.value;
+  pendingEarningAction = intent;
+  try {
+    const route = await (action === "cta" ? notifs.recordCta(n.id, earning.receiptNo)
+      : notifs.recordSwipeConversion(n.id, earning.receiptNo));
+    if (!route || !isCurrentIntent(intent) || requestedFilter !== filter.value || section.value !== "notifications") return;
+    if (action === "swipe_conversion") {
+      navTo(route);
+      return;
+    }
+    earningDetail.value = { notificationId: n.id, earning, state: "loading", receipt: null };
+    void readEarningDetail().catch(() => { /* The failed state starts read recovery. */ });
+  } finally {
+    if (pendingEarningAction === intent) pendingEarningAction = null;
+  }
+}
+
+function openEarningDetail(n: Notification, earning: NotificationEarning) {
+  if (suppressedClick?.id === n.id && Date.now() <= suppressedClick.until) {
+    suppressedClick = null;
+    return;
+  }
+  return runEarningAction(n, earning, "cta");
+}
+
+function earningMessageScroller() {
+  if (typeof document === "undefined") return;
+  return document.querySelector<HTMLElement>('.nx-chassis[data-page-visible="true"] .message-scroll .uni-scroll-view-scrollbar-hidden');
+}
+
 function viewAllEarnings() {
+  // H5 may scroll the retained list when shared focus handling selects a heading on return.
+  const scrollTop = earningMessageScroller()?.scrollTop;
+  earningReturnScroll = scrollTop;
   earningDetail.value = null;
-  navTo("/pages/me/receipts");
+  void navTo("/pages/me/receipts").then(navigated => {
+    if (!navigated && earningReturnScroll === scrollTop) earningReturnScroll = undefined;
+  });
+}
+
+function restoreEarningReturnScroll() {
+  const scrollTop = earningReturnScroll;
+  earningReturnScroll = undefined;
+  if (scrollTop === undefined) return;
+  const intent = captureIntent();
+  void nextTick(() => requestAnimationFrame(() => {
+    if (!isCurrentIntent(intent)) return;
+    const scroller = earningMessageScroller();
+    if (scroller) scroller.scrollTop = scrollTop;
+  }));
 }
 
 async function onTap(n: Notification) {
@@ -366,6 +448,10 @@ async function onTouchEnd(n: Notification, event: UniTouchEvent) {
   if (!remoteApiEnabled) return;
   if (!start || !end || !isCurrentIntent(start.intent) || !isLeftConversionSwipe(start.point, end)) return;
   suppressedClick = { id: n.id, until: Date.now() + 800 };
+  if (n.earning) {
+    await runEarningAction(n, n.earning, "swipe_conversion");
+    return;
+  }
   const canonicalRoute = await notifs.recordSwipeConversion(n.id);
   if (canonicalRoute && isCurrentIntent(start.intent)) navTo(canonicalRoute);
 }
@@ -375,22 +461,31 @@ function invalidatePendingIntents() {
   ui.clearConfirmsBy(confirmOwner);
   touchStarts.clear();
   suppressedClick = null;
+  pendingEarningAction = null;
 }
 function invalidatePage() {
   pageVisible.value = false;
   releaseActiveRefresh();
   invalidatePendingIntents();
 }
-watch(() => [app.accountKey, app.accountBindingEpoch], invalidatePendingIntents, { flush: "sync" });
+watch(() => [app.accountKey, app.accountBindingEpoch], () => {
+  earningDetail.value = null;
+  earningReturnScroll = undefined;
+  invalidatePendingIntents();
+}, { flush: "sync" });
 onShow(() => {
   if (disposed) return;
   pageVisible.value = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshHealthyNotifications, "pages/me/notifications");
   preserveSectionInH5();
+  restoreEarningReturnScroll();
 });
 watch([pageVisible, foregroundReadAllowed], ([visible, allowed], [wasVisible]) => {
   if (disposed || !visible || !allowed) return;
+  if (earningDetail.value?.state === "loading") {
+    void readEarningDetail().catch(() => { /* The failed state starts read recovery. */ });
+  }
   void refreshHealthyNotifications();
   if (!wasVisible || section.value === "service") void refreshHealthyService();
 });
