@@ -25,7 +25,7 @@
         <view class="min-w-0">
           <!-- The rows open nothing, so names wrap in full instead of being cut (03 §3.6.1). -->
           <text class="on-grid__name">{{ c.name ?? "—" }}</text>
-          <text class="on-grid__meta">{{ c.model ?? "—" }} <text style="color: var(--v5-ink-4)">·</text> {{ c.city ?? "—" }}</text>
+          <text class="on-grid__meta mt-0.5">{{ c.model ?? "—" }} <text style="color: var(--v5-ink-4)">·</text> {{ c.city ?? "—" }}</text>
         </view>
       </view>
       <view ref="footerRef" class="px-4 py-2 flex items-center justify-between on-grid__footer" :class="{ 'nx-loops-paused': !footerRunning }" style="border-top:1px solid var(--v5-border);min-height:44px">
@@ -93,7 +93,7 @@ function goGlobe() {
 .on-grid__title-note { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); letter-spacing: 0; }
 .on-grid__initial { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
 .on-grid__name { display: block; min-width: 0; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
-.on-grid__meta { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.on-grid__meta { display: block; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 /* Figures in JetBrains Mono, the label in the interface font (01 §1.2, 06 §6.3); aux figure role. */
 .on-grid__footer { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .on-grid__dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success); }

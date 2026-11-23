@@ -227,15 +227,15 @@ function goAll() {
 .nx-home-live-feed :deep(.nx-feed-sub--split) { display:flex;gap:var(--v5-space-1); }
 /* Activity and running rows open nothing, so the client or status is never cut (03 §3.6.1): the time or estimate drops
    to its own line, and a lead longer than the row wraps between words. */
-.nx-home-live-feed :deep(.nx-feed-sub--wrap) { flex-wrap:wrap;margin-left:-8px;clip-path:inset(0 0 0 8px); }
-.nx-home-live-feed :deep(.nx-feed-sub--wrap > .nx-feed-sub__lead) { margin-left:8px; }
+.nx-home-live-feed :deep(.nx-feed-sub--wrap) { flex-wrap:wrap;margin-left:calc(-1 * var(--v5-space-2));clip-path:inset(0 0 0 var(--v5-space-2)); }
+.nx-home-live-feed :deep(.nx-feed-sub--wrap > .nx-feed-sub__lead) { margin-left:var(--v5-space-2); }
 .nx-home-live-feed :deep(.nx-feed-sub__lead) { min-width:0;white-space:normal;overflow-wrap:break-word; }
 .nx-home-live-feed :deep(.nx-feed-sub__time) { flex:none; }
 /* The "·" is never left at the end of a line (03 §3.6.1): it travels with the time or estimate after it. When that text
    wraps onto its own line, the 4px separator plus its 4px gap fall into the 8px the wrapping row is shifted left by and
    clipped at, so the new line starts with the time, not with a stray "·". */
 .nx-home-live-feed :deep(.nx-feed-sub__tail) { display:inline-flex;flex:none;gap:var(--v5-space-1); }
-.nx-home-live-feed :deep(.nx-feed-sub__tail > :first-child) { flex:none;width:4px;text-align:center; }
+.nx-home-live-feed :deep(.nx-feed-sub__tail > :first-child) { flex:none;width:var(--v5-space-1);text-align:center; }
 .nx-home-live-feed :deep(.nx-feed-amount) { display:flex;align-items:baseline;gap:9px;font:500 14px/20px var(--font-metric);white-space:nowrap; }
 .nx-home-live-feed :deep(.nx-feed-amount--earned), .nx-home-live-feed :deep(.nx-feed-list .nx-feed-amount) { color:var(--v5-success-ink); }
 .nx-home-live-feed :deep(.nx-feed-unit) { font:500 12px/16px var(--font-metric);color:var(--v5-ink-3); }
