@@ -238,7 +238,7 @@ const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
 .topup-sticky__label { display: inline-flex; align-items: center; gap: 8px; }
 .topup-sticky__spin { width: 16px; height: 16px; flex: none; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: spin 1s linear infinite; }
 .topup-seg { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
-.topup-seg > svg { flex: none; }
+.topup-seg > svg, .topup-seg > .nx-native-svg { flex: none; }
 .topup-seg__label { font: var(--ui-type-segment-weight) var(--ui-type-segment)/var(--ui-type-segment-lh) var(--font-v5); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .topup-sticky__spin { animation-duration: 2s; } }
 </style>

@@ -704,7 +704,7 @@ export default chassisView;
   place-items: center;
   transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
-.nx-nav-glass > svg { position: relative; z-index: 1; }
+.nx-nav-glass > svg, .nx-nav-glass > .nx-native-svg { position: relative; z-index: 1; }
 .nx-nav-titlewrap {
   position: relative;
   z-index: 1;
@@ -939,7 +939,7 @@ export default chassisView;
 .nx-header { height:56px;padding-inline:16px; }
 .nx-header__r { gap:8px;padding:0; }
 .nx-icon-btn { isolation:isolate;border-radius:50%; }
-.nx-icon-btn > svg { position:relative;z-index:1; }
+.nx-icon-btn > svg, .nx-icon-btn > .nx-native-svg { position:relative;z-index:1; }
 .nx-header-scan-icon { position:relative;z-index:1;display:flex;align-items:center;justify-content:center; }
 @media (max-width:374px) {
   .nx-header__l { width:124px; height:43px; }

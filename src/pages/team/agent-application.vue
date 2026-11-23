@@ -656,9 +656,9 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-hero__meta { display: flex; align-items: center; justify-content: space-between; margin-top: var(--v5-space-4); padding-top: var(--ui-space-inline); border-top: 1px solid var(--v5-border); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-hero__id { font-family: var(--font-metric); color: var(--v5-ink-2); }
 .detail-hint { display: flex; gap: var(--v5-space-2); margin: var(--ui-space-inline) var(--v5-space-4) 0; font: var(--ui-type-note-weight, 400) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
-.detail-hint > svg { flex: none; margin-top: var(--v5-space-1); }
+.detail-hint > svg, .detail-hint > .nx-native-svg { flex: none; margin-top: var(--v5-space-1); }
 .detail-hint--support { flex-wrap: wrap; align-items: center; }
-.detail-hint--support > svg { margin-top: 0; }
+.detail-hint--support > svg, .detail-hint--support > .nx-native-svg { margin-top: 0; }
 .detail-link { display: inline-flex; align-items: center; gap: 2px; padding: calc((44px - 18px) / 2) 0; margin: calc((18px - 44px) / 2) 0; font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3); cursor: pointer; }
 .detail-section { margin-top: var(--ui-space-section-gap); }
 .detail-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); margin: 0 var(--v5-space-4) var(--ui-space-inline); }
@@ -669,7 +669,7 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-review--warn { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-warning-ink) 55%, transparent), var(--v5-glass-shadow); }
 .detail-review__label { font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-review__status { display: flex; align-items: center; gap: var(--v5-space-2); margin-top: var(--v5-space-2); font: var(--ui-type-list-title-weight, 500) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
-.detail-review__status > svg { flex: none; }
+.detail-review__status > svg, .detail-review__status > .nx-native-svg { flex: none; }
 .detail-review__status--ok { color: var(--v5-success-ink); }
 .detail-review__status--warn { color: var(--v5-warning-ink); }
 .detail-review__status--wait { color: var(--v5-ink-3); }

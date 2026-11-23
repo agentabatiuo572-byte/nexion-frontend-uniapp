@@ -991,7 +991,7 @@ const successRowValStyle: CSSProperties = {
 .rb-paste { position: relative; flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .rb-paste::after { content: ""; position: absolute; inset: -6px -2px; }
 .rb-lock { display: flex; align-items: center; gap: 8px; margin: 12px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
-.rb-lock > svg { flex: none; }
+.rb-lock > svg, .rb-lock > .nx-native-svg { flex: none; }
 .rb-bar-space { height: 110px; }
 .rb-bar { position: absolute; z-index: 36; display: flex; }
 .rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }

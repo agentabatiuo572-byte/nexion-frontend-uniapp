@@ -668,13 +668,13 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-trio .nx-dep-k { padding-top: 3px; }
 .nx-dep-trio__v { display: block; margin-top: 2px; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; }
 .nx-dep-warnbox { display: flex; align-items: flex-start; gap: 10px; margin: 12px -2px 0; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-warning) 16%, transparent); color: var(--v5-warning-ink); font: 400 13px/20px var(--font-v5); }
-.nx-dep-warnbox > svg { flex: none; margin-top: 3px; }
+.nx-dep-warnbox > svg, .nx-dep-warnbox > .nx-native-svg { flex: none; margin-top: 3px; }
 .nx-dep-amount-note { margin-top: 10px; padding: 0 2px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-dep-rows { margin: 16px -2px 0; overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-link { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; color: var(--v5-ink); cursor: pointer; }
 .nx-dep-link__t { flex: 1; min-width: 0; font: 400 15px/20px var(--font-v5); }
 .nx-dep-link + .nx-dep-link, .nx-dep-record-row + .nx-dep-record-row { border-top: 1px solid var(--v5-border); }
-.nx-dep-link > svg { flex: none; color: var(--v5-ink-4); }
+.nx-dep-link > svg, .nx-dep-link > .nx-native-svg { flex: none; color: var(--v5-ink-4); }
 .nx-dep-link:active { opacity: .7; }
 .nx-dep-sec { display: block; margin: 32px 2px 12px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
 .nx-dep-sec + view > .nx-dep-rows, .nx-dep-sec ~ .nx-dep-rows { margin-top: 0; }

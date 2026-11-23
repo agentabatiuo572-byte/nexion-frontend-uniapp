@@ -165,7 +165,7 @@ useAutoRecovery({ failed: () => state.value.error && !state.value.loading, retry
 .how-authority { display: block; margin: 16px 20px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .how-rank-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; margin: 16px 16px 0; padding: 0 16px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); cursor: pointer; }
 .how-rank-link > text { min-width: 0; overflow-wrap: break-word; }
-.how-rank-link > svg { flex: none; color: var(--v5-ink-4); }
+.how-rank-link > svg, .how-rank-link > .nx-native-svg { flex: none; color: var(--v5-ink-4); }
 .how-footer { margin: 24px 16px 0; }
 .how-footer :deep(.nx-button) { width: 100%; box-sizing: border-box; }
 .how-rank-link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }

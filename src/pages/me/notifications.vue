@@ -400,7 +400,7 @@ watch(filter, value => {
 .message-page { bottom:0!important; }
 .message-center .message-nav { position:relative; z-index:41; height:70px; margin:-7px -4px 0; }
 .message-center .message-nav .message-icon-button { color:var(--v5-ink); }
-.message-nav .message-icon-button > svg { position:relative; z-index:1; }
+.message-nav .message-icon-button > svg, .message-nav .message-icon-button > .nx-native-svg { position:relative; z-index:1; }
 .message-nav :deep(.nx-liquid-glass) { background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-ink) 7%,transparent); box-shadow:var(--ui-glass-edge-shadow); backdrop-filter:blur(12px) saturate(125%); }
 :global([data-theme="light"] .message-center .message-nav .nx-liquid-glass) { background-color:color-mix(in srgb,var(--v5-surface) 78%,transparent); box-shadow:var(--v5-glass-shadow),var(--ui-glass-edge-shadow); }
 .message-center .message-heading { padding:0 4px; }

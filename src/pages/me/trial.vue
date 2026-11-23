@@ -617,7 +617,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-link { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 2px;border-top:1px solid var(--v5-border);font:400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .trial-link:active { opacity:.7; }
 .trial-link:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
-.trial-link > svg { flex:none; }
+.trial-link > svg, .trial-link > .nx-native-svg { flex:none; }
 
 /* ── Claim / terminal states ── */
 .trial-slot { position:relative;flex:none;width:248px;height:248px; }

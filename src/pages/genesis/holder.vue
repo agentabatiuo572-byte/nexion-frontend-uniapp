@@ -815,7 +815,7 @@ const noteStyle: CSSProperties = {
 .gh-empty-card > view > view:nth-child(2) { margin-top:14px; }
 .gh-empty-card > view > view:nth-child(2) > text:first-child { font:600 16px/22px var(--font-v5)!important; }
 .gh-empty-card > view > view:nth-child(2) > text:nth-child(2) { margin-top:var(--v5-space-1)!important; font:400 13px/20px var(--font-v5)!important; }
-.gh-empty-card > view > svg { display:none; }
+.gh-empty-card > view > svg, .gh-empty-card > view > .nx-native-svg { display:none; }
 .gh-empty-card .gh-empty-link { display:block; margin-top:14px; color:var(--v5-genesis-gold); font:500 13px/18px var(--font-v5); }
 .gh-empty-facts { padding:var(--v5-space-4)!important; border:0!important; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
 .gh-empty-facts > text:first-child { font:500 15px/22px var(--font-v5)!important; color:var(--v5-ink)!important; letter-spacing:0!important; }

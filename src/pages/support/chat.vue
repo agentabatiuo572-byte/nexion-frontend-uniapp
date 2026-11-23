@@ -1400,7 +1400,7 @@ useAutoRecovery({
   pointer-events: none;
 }
 .cp-back { overflow: visible; }
-.cp-back > svg { position: relative; z-index: 1; }
+.cp-back > svg, .cp-back > .nx-native-svg { position: relative; z-index: 1; }
 .cp-history-error { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; padding:7px 16px; text-align:start; color:var(--v5-ink-3); font-size:12px; }
 .cp-history-error > text { min-width:0; overflow-wrap:break-word; }
 .cp-history-error > .cp-history-text-action { min-width:44px; padding-inline:0; white-space:nowrap; font:600 13px/20px var(--font-v5); }

@@ -96,7 +96,7 @@ function openRow(row: Row) {
 .service-row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -3px; }
 .service-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .service-avatar { position: relative; width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
-.service-avatar > svg { position: relative; }
+.service-avatar > svg, .service-avatar > .nx-native-svg { position: relative; }
 .service-content { flex: 1; min-width: 0; }
 .service-title { display: block; color: var(--v5-ink); font-size: var(--ui-type-message-title); line-height: var(--ui-type-message-title-lh); font-weight: 500; overflow-wrap: break-word; }
 .service-time { display: block; margin-top: 5px; font-size: var(--ui-type-message-meta); line-height: var(--ui-type-message-meta-lh); color: var(--v5-ink-3); white-space: normal; overflow-wrap: break-word; }

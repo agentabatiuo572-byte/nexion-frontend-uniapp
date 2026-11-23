@@ -1515,7 +1515,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   --v5-liquid-shadow: 0 0 0 transparent;
   transition: transform 80ms ease-out, color 120ms ease-out;
 }
-.nx-conv-send-face > svg { position: relative; z-index: 1; }
+.nx-conv-send-face > svg, .nx-conv-send-face > .nx-native-svg { position: relative; z-index: 1; }
 /* The send button sits on the already frosted input surface. Reuse that
    sample and keep its own tint/rim; a second backdrop here creates tile seams. */
 .nx-conv-compose-field .nx-conv-send-face > :deep(.nx-liquid-glass--frosted) {
