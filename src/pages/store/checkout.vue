@@ -294,7 +294,7 @@ import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app
 import { documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
 import { capacityPaymentKind, readCapacityPending } from '@/lib/capacity-command-recovery';
-import { checkoutQuoteBlock, validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
+import { checkoutCreateBlock, checkoutQuoteBlock, validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
 import { takeNavigationQuery } from '@/lib/route';
 import { promotionCheckoutHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
 import AppChassis from "@/components/app-chassis.vue";
@@ -341,7 +341,7 @@ import { navReplace, navReset, navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
-import { ApiError, asApiError, isApiRefusal } from "@/api/errors";
+import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
@@ -2814,11 +2814,20 @@ async function submitRemoteOrder(): Promise<void> {
   } catch (error) {
     if (!scopeIsCurrent()) return;
     if (error instanceof Error && error.message === 'PAYMENT_CANCELLED') return;
-    // A definitive refusal leaves the pending order unpaid; retire its payment key
-    // so a later attempt is a new command, and say why instead of "confirming".
+    const apiError = asApiError(error);
     const rejection = orderPaymentRejection(error, locale.code);
-    const walletShort = recoveryOrderNo && asApiError(error).message === "ORDER_WALLET_INSUFFICIENT";
-    if (rejection || walletShort) {
+    // Known purchase refusals settle the create. An ambiguous response keeps the original command.
+    const keepForReadback = !checkoutCreateBlock(error)
+      && !(rejection && isApiRefusal(error, 409, apiError.message))
+      && (isAmbiguousEnvelopeOutcome(error) || apiError.message === "IDEMPOTENCY_RESULT_UNKNOWN");
+    if (!remoteTradeinRecoveryRequired.value && !keepForReadback && !canonicalOrderCommitted) {
+      if (pendingCheckoutCreate.value) forgetCheckoutCreate(submissionScope.accountKey, pendingCheckoutCreate.value);
+      pendingCheckoutCreate.value = null;
+      retireRemoteOrderKey();
+    }
+    // An existing order stays unpaid after a definitive payment refusal.
+    const walletShort = recoveryOrderNo && apiError.message === "ORDER_WALLET_INSUFFICIENT";
+    if ((rejection && (canonicalOrderCommitted || !keepForReadback)) || walletShort) {
       if (recoveryOrderNo && paymentKey) clearOrderAction(submissionScope.accountKey, recoveryOrderNo, paymentKey, true);
       step.value = 'confirm';
       if (walletShort) await offerWalletTopup(quotedTotal, submissionScope);
@@ -2834,18 +2843,6 @@ async function submitRemoteOrder(): Promise<void> {
         step.value = "confirm";
       }
       return;
-    }
-    // Keep only outcome-unknown errors: transport, malformed response, 5xx and
-    // the server's explicit unknown-result fence. Structured API facts—not text
-    // matching—decide whether a business rejection can mint a new attempt.
-    const apiError = asApiError(error);
-    const keepForReadback = apiError.kind === "network" || apiError.kind === "protocol"
-      || (apiError.kind === "http" && (apiError.status ?? 0) >= 500)
-      || apiError.message === "IDEMPOTENCY_RESULT_UNKNOWN";
-    if (!remoteTradeinRecoveryRequired.value && !keepForReadback && !canonicalOrderCommitted) {
-      if (pendingCheckoutCreate.value) forgetCheckoutCreate(submissionScope.accountKey, pendingCheckoutCreate.value);
-      pendingCheckoutCreate.value = null;
-      retireRemoteOrderKey();
     }
     if (remoteTradeinRecoveryRequired.value) remoteTradeinRecoveryError.value = true;
     if (!remoteTradeinRecoveryRequired.value && !canonicalOrderCommitted
