@@ -97,7 +97,10 @@
             <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
           </NxIconTile>
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="rowLabelStyle">{{ sessionDeviceLabel(s) }}</text>
+            <view class="security-session-name" :style="rowLabelStyle">
+              <text class="security-session-name__lead">{{ deviceNameParts(s)[0] }}</text>
+              <view v-for="(part, k) in deviceNameParts(s).slice(1)" :key="k" class="security-session-name__tail"><text aria-hidden="true">·</text><text>{{ part }}</text></view>
+            </view>
             <text class="block security-session-meta" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
@@ -1033,6 +1036,11 @@ function sessionDeviceLabel(s: SessionListItem): string {
   return remoteApiEnabled ? s.deviceName : `${s.deviceName} · ${surfaceLabel(s)}`;
 }
 
+// Display only: a device name reads 「品牌 型号 · 系统」 or 「浏览器 · 系统」, and its parts wrap as units (03 §3.6.1).
+function deviceNameParts(s: SessionListItem): string[] {
+  return sessionDeviceLabel(s).split(" · ");
+}
+
 function sessionSecondaryLabel(s: SessionListItem): string {
   const location = remoteApiEnabled ? s.ip : t.value.security.sessionLocation;
   return `${location} · ${lastActiveLabel(s.lastActiveMs)}`;
@@ -1770,6 +1778,16 @@ const dangerLabelStyle: CSSProperties = {
 .security-phone { margin-top:0!important; border-radius:0 0 22px 22px!important; }
 .security-phone > view:first-child { margin-inline:-16px; padding-inline:16px!important; border-top:1px solid var(--v5-border); }
 .security-session-meta { font-family:var(--font-metric)!important; }
+/* A device row opens nothing, so its name is never cut (03 §3.6.1): the name's parts (model, system) wrap as units, a
+   part longer than the line wraps between words, and the "·" travels with the part after it. When that part starts a
+   new line, the 4px separator and its 4px gap fall into the 8px the name is shifted left by and clipped at, as on the
+   home feed. The revoke button keeps its 44px target beside the wrapped name. */
+.security-session-name { display:flex; flex-wrap:wrap; column-gap:4px; margin-left:-8px; clip-path:inset(-4px -4px -4px 8px); }
+.security-session-name > :first-child { margin-left:8px; }
+.security-session-name__lead { min-width:0; overflow-wrap:break-word; }
+.security-session-name__tail { display:inline-flex; gap:4px; min-width:0; }
+.security-session-name__tail > :first-child { flex:none; width:4px; text-align:center; }
+.security-session-name__tail > :last-child { min-width:0; overflow-wrap:break-word; }
 .security-providers :deep([data-provider="Google"] .auth-provider__icon) { width:22px; height:22px; flex-basis:22px; }
 .security-providers :deep([data-provider="Google"] svg) { width:22px; height:22px; flex-shrink:0; }
 .security-providers :deep([data-provider="Apple"] .auth-provider__icon) { color:var(--v5-ink); }
