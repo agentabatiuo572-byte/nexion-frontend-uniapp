@@ -79,7 +79,7 @@
           <!-- 费用/最低额/确认数 — 服务端或 deposits-core 常量单源 -->
           <view class="nx-dep-trio">
             <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">${{ formatAmount(minDeposit) }}</text></view>
-            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ formatAmount(feeUsdt) }} USDT</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ formatAmount(feeUsdt) + '\u00A0USDT' }}</text></view>
             <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
         </view>
@@ -91,6 +91,16 @@
         <text>{{ t.topupChrome.depositAddrNote }}</text>
       </view>
       <view v-if="activeNet" class="nx-dep-amount-note"><text>{{ t.topupChrome.amountAtSenderNote }}</text></view>
+
+      <!-- ── 没有开放的网络:说明暂未开放 + 一个出口(03 §3.4);最近入金照常显示 ── -->
+      <view v-if="channelClosed" class="nx-dep-closed" role="status">
+        <view class="grid place-items-center" :style="stateIconBoxStyle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m5.7 5.7 12.6 12.6" /></svg>
+        </view>
+        <text class="nx-dep-closed__t">{{ t.topupChrome.railsClosedTitle }}</text>
+        <NxButton v-if="bankAvailable" class="nx-dep-closed__cta" variant="secondary" size="medium" :label="t.topupChrome.useBankInstead" @click="emit('use-bank')" />
+        <NxButton v-else class="nx-dep-closed__cta" variant="secondary" size="medium" icon="arrow-right" :label="t.help.contactSupport" @click="goSupport" />
+      </view>
 
       <!-- ── 指引 / 工单入口 ── -->
       <view class="nx-dep-rows nx-dep-links">
@@ -139,7 +149,7 @@
           <view class="nx-dep-record-row__main">
             <text class="nx-dep-record-row__title">{{ rowTitle(r) }}</text>
             <view class="nx-dep-record-row__sub"><text class="nx-dep-record-row__net">{{ netShort(r.channel) }} · </text><NxCodeValue class="nx-dep-record-row__id" :value="r.depositId" :label="t.bills.detailRef" :copyable="!recordClickable(r)" /></view>
-            <view v-if="isInFlight(r) && r.requiredConfirmations != null" class="nx-dep-progress" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
+            <view v-if="isInFlight(r)" class="nx-dep-progress nx-progress" role="progressbar" :aria-label="t.topupChrome.confirmationsLabel" aria-valuemin="0" :aria-valuemax="r.requiredConfirmations ?? undefined" :aria-valuenow="confirmPct(r) === null ? undefined : r.confirmations"><view v-viz-inview class="nx-progress__fill nx-viz-grow" :style="{ width: `${confirmPct(r) ?? 0}%` }" /></view>
             <view v-if="noteText(r)"><text class="block" :style="noteStyle">{{ noteText(r) }}</text></view>
           </view>
           <view class="nx-dep-record-row__side">
@@ -168,6 +178,7 @@ import { useAuth } from "@/store/auth";
 import { useT } from "@/i18n/use-t";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
@@ -183,6 +194,9 @@ import {
 import type { ChainDepositChannel, DepositChannel, DepositRecord } from "@/store/types";
 
 const t = useT();
+// The page knows whether its bank channel is open; with no USDT network open, that is the way on.
+defineProps<{ bankAvailable?: boolean }>();
+const emit = defineEmits<{ (event: "use-bank"): void }>();
 const dep = useDeposits();
 const app = useApp();
 const auth = useAuth();
@@ -435,6 +449,8 @@ const activeNet = computed<ChainDepositChannel | null>(() => {
   const fallback = NETWORKS.find((n) => isEnabled(n.id));
   return fallback ? fallback.id : null;
 });
+// The policy was read and opens no network for new deposits.
+const channelClosed = computed(() => phase.value === "ready" && !addressRefreshFailed.value && visibleNets.value.length === 0);
 const activeLabel = computed(() => (activeNet.value ? CHANNEL_SHORT[activeNet.value] : ""));
 function pickNet(id: ChainDepositChannel) {
   if (id === net.value || !visibleNets.value.some((nw) => nw.id === id)) return;
@@ -542,7 +558,7 @@ function stateText(r: PaneDepositRecord): string {
   if (r.status === "credited") return tc.depositCredited;
   if (r.status === "returned") return tc.depositReturned;
   if (isInFlight(r)) {
-    return fmt(tc.confirmingProgress, { n: r.confirmations ?? 0, total: r.requiredConfirmations ?? "-" });
+    return fmt(tc.confirmingProgress, { n: r.confirmations ?? "—", total: r.requiredConfirmations ?? "—" });
   }
   return ""; // dust_hold:右侧留空,整句人工处理说明走 note 行
 }
@@ -610,23 +626,10 @@ function stateTextStyle(r: PaneDepositRecord): CSSProperties {
     color: isRiskHold(r) ? "var(--v5-warning)" : r.status === "credited" ? "var(--v5-success-ink)" : ["returned", "reorg_reversed"].includes(r.status) ? "var(--v5-ink-4)" : "var(--v5-ink-3)",
   };
 }
-const progTrackStyle: CSSProperties = {
-  height: "4px",
-  marginTop: "8px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-3)",
-  overflow: "hidden",
-};
-function progFillStyle(r: PaneDepositRecord): CSSProperties {
-  const total = Math.max(1, r.requiredConfirmations ?? 1);
-  const pct = Math.max(4, Math.round(((r.confirmations ?? 0) / total) * 100));
-  return {
-    height: "100%",
-    width: `${Math.min(100, pct)}%`,
-    borderRadius: "999px",
-    background: "var(--v5-brand)",
-    transition: "width 0.4s ease",
-  };
+// Confirmations as reported by the API: 0 leaves the empty track, unknown draws no fill (03 §3.6).
+function confirmPct(r: PaneDepositRecord): number | null {
+  if (r.confirmations == null || !r.requiredConfirmations) return null;
+  return Math.min(100, Math.round((r.confirmations / r.requiredConfirmations) * 100));
 }
 const historyUnknownStyle: CSSProperties = { marginTop: "8px", padding: "18px 0", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
 const noteStyle: CSSProperties = {
@@ -659,7 +662,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
 .nx-dep-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
-.nx-dep-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.nx-dep-net__name { color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .nx-dep-net--on .nx-dep-net__name { color: var(--v5-brand); }
 .nx-dep-net__sub { min-width: 0; overflow: hidden; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); text-overflow: ellipsis; white-space: nowrap; }
 .nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
@@ -695,6 +698,11 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-link + .nx-dep-link, .nx-dep-record-row + .nx-dep-record-row { border-top: 1px solid var(--v5-border); }
 .nx-dep-link > svg { flex: none; color: var(--v5-ink-4); }
 .nx-dep-link:active { opacity: .7; }
+.nx-dep-closed { display: flex; flex-direction: column; align-items: center; padding: 32px 0 8px; text-align: center; }
+.nx-dep-closed__t { margin-top: 12px; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
+.nx-dep-closed__cta { margin-top: 12px; }
+.nx-dep-progress { margin-top: 8px; }
+.nx-dep-progress .nx-progress__fill { transition: width 400ms ease; }
 .nx-dep-sec { display: block; margin: 32px 2px 12px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
 .nx-dep-sec + view > .nx-dep-rows, .nx-dep-sec ~ .nx-dep-rows { margin-top: 0; }
 .nx-dep-record-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; }
@@ -713,7 +721,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-record-row__side { flex: none; max-width: 50%; text-align: right; }
 .nx-dep-record-row__amt { display: block; font: 500 16px/20px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-dep-record-row__state { display: block; margin-top: 2px; font: 400 12px/16px var(--font-v5); }
-@media (prefers-reduced-motion: reduce) { .nx-dep-net, .nx-dep-copy-address-cta { transition: none; } .nx-dep-net:active, .nx-dep-copy-address-cta:active { transform: none; } .nx-dep-qr-box { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .nx-dep-net, .nx-dep-copy-address-cta, .nx-dep-progress .nx-progress__fill { transition: none; } .nx-dep-net:active, .nx-dep-copy-address-cta:active { transform: none; } .nx-dep-qr-box { animation: none; } }
 /* 骨架 shimmer(匹配形状占位;通用 spinner 禁用) */
 .nx-dep-sk {
   border-radius: 16px;

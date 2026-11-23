@@ -5582,6 +5582,7 @@ export const ru: Messages = {
     sendVia: "Отправка через {network}",
     segUsdt: "USDT в сети",
     railsClosedTitle: "Этот способ пополнения пока закрыт",
+    useBankInstead: "Оплатить картой",
     flowRetired: "Этот раздел изменился. Вернитесь и откройте его снова.",
     segCard: "Карта",
     netRecommended: "Рекомендуем · мин. комиссия",

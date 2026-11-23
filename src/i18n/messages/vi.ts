@@ -5269,6 +5269,7 @@ openSeaErrorPool: {
     sendVia: "Chuyển qua {network}",
     segUsdt: "USDT on-chain",
     railsClosedTitle: "Phương thức nạp này chưa mở",
+    useBankInstead: "Dùng thẻ ngân hàng",
     flowRetired: "Lối vào này đã thay đổi. Vui lòng quay lại và mở lại.",
     segCard: "Thẻ ngân hàng",
     netRecommended: "Khuyên dùng · phí thấp nhất",

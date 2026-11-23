@@ -5582,6 +5582,7 @@ export const kk: Messages = {
     sendVia: "{network} арқылы жіберу",
     segUsdt: "USDT",
     railsClosedTitle: "Бұл толтыру әдісі әлі ашылмаған",
+    useBankInstead: "Банк картасымен төлеу",
     flowRetired: "Бұл бет жаңартылды. Артқа оралып, қайта ашыңыз.",
     segCard: "Банк картасы",
     netRecommended: "Ұсынылады · ең аз комиссия",

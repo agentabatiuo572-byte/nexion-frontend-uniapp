@@ -5366,6 +5366,7 @@ openSeaErrorPool: {
     sendVia: "Send via {network}",
     segUsdt: "USDT on-chain",
     railsClosedTitle: "This top-up method isn't open yet",
+    useBankInstead: "Use bank card",
     flowRetired: "This entry has changed. Return and open it again.",
     segCard: "Bank card",
     netRecommended: "Recommended · lowest fee",

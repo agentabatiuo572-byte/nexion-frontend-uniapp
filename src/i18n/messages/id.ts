@@ -5582,6 +5582,7 @@ export const id: Messages = {
     sendVia: "Kirim lewat {network}",
     segUsdt: "USDT on-chain",
     railsClosedTitle: "Metode top up ini belum dibuka",
+    useBankInstead: "Pakai kartu bank",
     flowRetired: "Menu ini telah berubah. Kembali, lalu buka lagi.",
     segCard: "Kartu bank",
     netRecommended: "Disarankan · biaya terendah",

@@ -5275,6 +5275,7 @@ openSeaErrorPool: {
     sendVia: "通过 {network} 转入",
     segUsdt: "USDT 链上",
     railsClosedTitle: "该充值方式暂未开放",
+    useBankInstead: "改用银行卡支付",
     flowRetired: "该入口已更新,请返回后重新进入。",
     segCard: "银行卡",
     netRecommended: "推荐 · 手续费最低",

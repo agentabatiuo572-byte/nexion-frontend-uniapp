@@ -5582,6 +5582,7 @@ export const ms: Messages = {
     sendVia: "Hantar melalui {network}",
     segUsdt: "USDT rantaian",
     railsClosedTitle: "Kaedah tambah nilai ini belum dibuka",
+    useBankInstead: "Guna kad bank",
     flowRetired: "Pintu masuk ini telah berubah. Kembali dan buka semula.",
     segCard: "Kad bank",
     netRecommended: "Disyorkan · caj terendah",
