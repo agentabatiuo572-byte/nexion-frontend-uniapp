@@ -2,10 +2,19 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import { parseServerTimestamp } from "./server-time";
 import type { NotificationCategory } from "@/lib/notification-category";
+import type { CanonicalTaskAssignment } from "./task-assignment-api";
 
 export type NotificationFilter = "all" | NotificationCategory;
 
 export type CanonicalNotificationPriority = "critical" | "high" | "normal" | "low";
+
+export interface NotificationEarning {
+  receiptNo: string;
+  usdt: string | null;
+  uvt: string | null;
+  deviceName: string | null;
+  taskClass: CanonicalTaskAssignment["taskClass"] | null;
+}
 
 export interface CanonicalNotification {
   id: number;
@@ -17,6 +26,7 @@ export interface CanonicalNotification {
   ctaHref: string;
   createdAt: number;
   readAt: number | null;
+  earning?: NotificationEarning;
 }
 
 export interface CanonicalNotificationPage {
@@ -76,6 +86,27 @@ function timestamp(value: unknown, nullable = false): number | null {
   return parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function earningAmount(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || !/^\d+(?:\.\d+)?$/.test(value)) return invalid();
+  return value;
+}
+
+function parseEarning(value: unknown): NotificationEarning {
+  const row = record(value);
+  const receiptNo = text(row?.receiptNo);
+  if (!row || !receiptNo) return invalid();
+  const { deviceName, taskClass } = row;
+  if ((deviceName !== null && typeof deviceName !== "string")
+      || (taskClass !== null && (typeof taskClass !== "string" || !/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass)))) {
+    return invalid();
+  }
+  const usdt = earningAmount(row.usdt);
+  const uvt = earningAmount(row.uvt);
+  if (!/[1-9]/.test(usdt ?? "") && !/[1-9]/.test(uvt ?? "")) return invalid();
+  return { receiptNo, usdt, uvt, deviceName, taskClass: taskClass as NotificationEarning["taskClass"] };
+}
+
 function parseNotification(value: unknown): CanonicalNotification {
   const row = record(value);
   const id = integer(row?.id, 1);
@@ -92,7 +123,9 @@ function parseNotification(value: unknown): CanonicalNotification {
       || createdAt === null || (row.readAt != null && readAt === null)) {
     return invalid();
   }
-  return { id, kind: kind.toLowerCase(), priority, title, body, ctaLabel, ctaHref, createdAt, readAt };
+  const rawKind = kind.toLowerCase();
+  const item = { id, kind: rawKind, priority, title, body, ctaLabel, ctaHref, createdAt, readAt };
+  return rawKind === "earning_credited" ? { ...item, earning: parseEarning(row.earning) } : item;
 }
 
 function parsePage(value: unknown): CanonicalNotificationPage {

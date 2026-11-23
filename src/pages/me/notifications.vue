@@ -118,11 +118,14 @@ async function loadMoreNotifications() {
 
 const center = useMessageDrawer();
 const conversations = useConversations();
+type Filter = "all" | NotificationCategory;
+const filter = ref<Filter>("all");
 let sectionLoaded = false;
 let sectionAccountWasBound = app.accountKey !== "default";
 const initialSectionAccountEpoch = app.accountBindingEpoch;
 let sectionEntryAllowed = true;
 let initialSection: MessageSection | null = sectionAccountWasBound ? null : center.section;
+let initialFilter: Filter = "all";
 const section = computed({ get: () => center.section, set: (value: MessageSection) => {
   center.section = value;
   if (!sectionAccountWasBound && sectionEntryAllowed) initialSection = value;
@@ -163,10 +166,16 @@ function preserveSectionInH5() {
   } catch { /* Unsupported history leaves the existing in-memory selection intact. */ }
 }
 onLoad(query => {
-  const pending = takeNavigationQuery("/pages/me/notifications");
-  const initial = query?.section ?? new URLSearchParams(pending).get("section");
+  const pending = new URLSearchParams(takeNavigationQuery("/pages/me/notifications"));
+  const initial = query?.section ?? pending.get("section");
   sectionLoaded = true;
-  if (sectionEntryAllowed && (initial === "notifications" || initial === "service")) section.value = initial;
+  if (sectionEntryAllowed && (initial === "notifications" || initial === "service")) {
+    section.value = initial;
+    if (initial === "notifications" && (query?.filter ?? pending.get("filter")) === "finance") {
+      initialFilter = "finance";
+      filter.value = initialFilter;
+    }
+  }
   else preserveSectionInH5();
 });
 const sectionOptions = computed(() => [
@@ -181,8 +190,6 @@ const unreadLabel = computed(() => {
   const unreadLoading = conversations.loading || (notifs.loading && !notifs.hasRemoteSnapshot);
   return unreadLoading ? t.value.notifs.unreadUnavailable : t.value.notifs.allCaughtUp;
 });
-type Filter = "all" | NotificationCategory;
-const filter = ref<Filter>("all");
 const filterIds: Filter[] = ["all", "finance", "device", "team", "rewards", "system"];
 const visibleFilterIds = computed(() => filterIds);
 const expandedId = ref<string | null>(null);
@@ -234,10 +241,12 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextE
   else if (!firstBinding) {
     sectionEntryAllowed = false;
     initialSection = null;
+    initialFilter = "all";
     section.value = "notifications";
   }
   preserveSectionInH5();
-  expandedId.value = null; filter.value = "all"; resetHeader();
+  expandedId.value = null; filter.value = initialFilter; resetHeader();
+  if (notifs.category !== filter.value) void notifs.selectCategory(filter.value);
   if (!disposed && pageVisible.value && foregroundReadAllowed()) {
     void refreshHealthyNotifications();
     void refreshHealthyService();

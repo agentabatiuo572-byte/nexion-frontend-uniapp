@@ -2,7 +2,8 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 
 export type NotificationPreferenceKey = "commission" | "team" | "staking" | "market" | "genesis" | "system";
-export type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
+export type EarningPush = "DAILY" | "HALF_HOURLY" | "OFF";
+export type NotificationPreferences = Record<NotificationPreferenceKey, boolean> & { earningPush?: EarningPush };
 export type NotificationPreferencesPatch = Partial<NotificationPreferences>;
 
 export interface NotificationPreferencesApi {
@@ -12,15 +13,22 @@ export interface NotificationPreferencesApi {
 
 const KEYS: NotificationPreferenceKey[] = ["commission", "team", "staking", "market", "genesis", "system"];
 
+function isEarningPush(value: unknown): value is EarningPush {
+  return value === "DAILY" || value === "HALF_HOURLY" || value === "OFF";
+}
+
 function parse(value: unknown): NotificationPreferences {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ApiError({ kind: "protocol", message: "NOTIFICATION_PREFERENCES_RESPONSE_INVALID" });
   }
   const row = value as Record<string, unknown>;
-  if (KEYS.some((key) => typeof row[key] !== "boolean")) {
+  if (KEYS.some((key) => typeof row[key] !== "boolean")
+      || ("earningPush" in row && !isEarningPush(row.earningPush))) {
     throw new ApiError({ kind: "protocol", message: "NOTIFICATION_PREFERENCES_RESPONSE_INVALID" });
   }
-  return Object.fromEntries(KEYS.map((key) => [key, row[key]])) as NotificationPreferences;
+  const preferences = Object.fromEntries(KEYS.map((key) => [key, row[key]])) as NotificationPreferences;
+  if (isEarningPush(row.earningPush)) preferences.earningPush = row.earningPush;
+  return preferences;
 }
 
 function patchBody(value: NotificationPreferencesPatch): NotificationPreferencesPatch {
@@ -31,19 +39,12 @@ function patchBody(value: NotificationPreferencesPatch): NotificationPreferences
   if (keys.length === 0) {
     throw new ApiError({ kind: "protocol", message: "NOTIFICATION_PREFERENCES_PATCH_EMPTY" });
   }
-  if (keys.some((key) => !KEYS.includes(key as NotificationPreferenceKey))) {
+  if (keys.some((key) => key === "earningPush"
+    ? !isEarningPush(value.earningPush)
+    : !KEYS.includes(key as NotificationPreferenceKey) || typeof value[key as NotificationPreferenceKey] !== "boolean")) {
     throw new ApiError({ kind: "protocol", message: "NOTIFICATION_PREFERENCES_PATCH_INVALID" });
   }
-  const body: NotificationPreferencesPatch = {};
-  for (const key of KEYS) {
-    if (key in value) {
-      if (typeof value[key] !== "boolean") {
-        throw new ApiError({ kind: "protocol", message: "NOTIFICATION_PREFERENCES_PATCH_INVALID" });
-      }
-      body[key] = value[key];
-    }
-  }
-  return body;
+  return { ...value };
 }
 
 export function createNotificationPreferencesApi(client: ApiClient): NotificationPreferencesApi {

@@ -184,6 +184,7 @@ import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
 import { useApp } from "@/store/app";
+import { takeNavigationQuery } from "@/lib/route";
 
 import { presentVietQrReceipt } from "@/lib/vietqr-receipt-presentation";
 import { createReceiptsPageRequestFence } from "./receipts-page-request-fence";
@@ -254,6 +255,8 @@ const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
 const open = ref<Receipt | CanonicalComputeReceipt | null>(null);
 let receiptRequestEpoch = 0;
+let linkedReceiptNo: string | null = null;
+const initialAccountEpoch = app.accountBindingEpoch;
 const visibleCount = ref(PAGE_SIZE);
 watch(tab, () => { visibleCount.value = PAGE_SIZE; });
 
@@ -411,20 +414,24 @@ function moveRemoteReceiptKind(index: number, delta: number): void {
   });
 }
 
-async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
+function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
+  return readRemoteComputeReceipt(task.receiptNo, true);
+}
+
+async function readRemoteComputeReceipt(receiptNo: string, notifyOnFailure: boolean): Promise<void> {
   if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
   const requestEpoch = ++receiptRequestEpoch;
   const requestScope = receiptsPageFence.capture("detail");
   const expectedAccountKey = app.accountKey;
   const expectedBindingEpoch = app.accountBindingEpoch;
   try {
-    const detail = await taskAssignmentApi.receipt(task.receiptNo);
+    const detail = await taskAssignmentApi.receipt(receiptNo);
     if (requestEpoch === receiptRequestEpoch
       && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) open.value = detail;
   } catch {
-    if (requestEpoch === receiptRequestEpoch
+    if (notifyOnFailure && requestEpoch === receiptRequestEpoch
       && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
@@ -433,15 +440,30 @@ async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): P
   }
 }
 
+function openLinkedReceipt(): void {
+  if (!linkedReceiptNo || !remoteReceiptsMode || !receiptsPageFence.isVisible()
+    || app.accountKey === "default" || !sessionVault.read()) return;
+  const receiptNo = linkedReceiptNo;
+  linkedReceiptNo = null;
+  void readRemoteComputeReceipt(receiptNo, false);
+}
+
 watch(
   () => [app.accountKey, app.accountBindingEpoch] as const,
-  () => {
+  ([accountKey, epoch], previous) => {
     if (!remoteReceiptsMode) return;
+    // A cold H5 entry can load before the first authenticated binding.
+    if (previous && !(previous[0] === "default" && accountKey !== "default" && epoch === initialAccountEpoch + 1)) {
+      linkedReceiptNo = null;
+    }
     invalidateRemoteReceiptsPage();
     remoteComputeReceiptItems.value = [];
     remoteComputeReceiptNextOffset.value = null;
     remoteComputeReceiptNextCursor.value = null;
-    if (receiptsPageFence.isVisible()) refreshRemoteReceiptsPage();
+    if (receiptsPageFence.isVisible()) {
+      refreshRemoteReceiptsPage();
+      openLinkedReceipt();
+    }
   },
   { immediate: true },
 );
@@ -465,23 +487,29 @@ function refreshRemoteReceiptsPage(): void {
 }
 
 onLoad((options) => {
-  remoteReceiptKind.value = options?.kind === "deposit" ? "deposit" : "compute";
+  const pending = new URLSearchParams(takeNavigationQuery("/pages/me/receipts"));
+  linkedReceiptNo = (options?.receiptNo ?? pending.get("receiptNo"))?.trim() || null;
+  remoteReceiptKind.value = !linkedReceiptNo && (options?.kind ?? pending.get("kind")) === "deposit" ? "deposit" : "compute";
+  openLinkedReceipt();
 });
 
 onShow(() => {
   if (!remoteReceiptsMode) return;
   receiptsPageFence.show();
   loadSelectedRemoteReceipts();
+  openLinkedReceipt();
 });
 
 onHide(() => {
   if (!remoteReceiptsMode) return;
+  linkedReceiptNo = null;
   receiptsPageFence.hide();
   invalidateRemoteReceiptsPage();
 });
 
 onUnmounted(() => {
   if (!remoteReceiptsMode) return;
+  linkedReceiptNo = null;
   receiptsPageFence.hide();
   invalidateRemoteReceiptsPage();
 });

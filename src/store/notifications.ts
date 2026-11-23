@@ -8,7 +8,7 @@ import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { nexGridBrandText } from "@/lib/brand-copy";
-import type { NotificationFilter } from "@/api/notification-api";
+import type { NotificationEarning, NotificationFilter } from "@/api/notification-api";
 
 export type NotifKind = "commission" | "team" | "staking" | "market" | "genesis" | "system";
 export type NotifPriority = "critical" | "high" | "normal" | "low";
@@ -24,6 +24,7 @@ export interface Notification {
   ctaHref?: string;
   ts: number;
   readAt: number | null;
+  earning?: NotificationEarning;
 }
 export interface PushInput { id?: string; kind: NotifKind; priority?: NotifPriority; title: string; body?: string; ctaLabel?: string; ctaHref?: string; }
 
@@ -101,6 +102,7 @@ export const useNotifications = defineStore("notifications", () => {
         id: String(item.id), kind: knownKind(item.kind), rawKind: item.kind, priority: item.priority, title: item.title,
         body: item.body || undefined, ctaLabel: item.ctaLabel || undefined, ctaHref: item.ctaHref || undefined,
         ts: item.createdAt, readAt: item.readAt,
+        ...(item.earning && { earning: item.earning }),
       };
     });
     const ids = new Set(next.map(item => item.id));
@@ -222,7 +224,7 @@ export const useNotifications = defineStore("notifications", () => {
       invalidateReads();
       category.value = value;
     }
-    if (remoteApiEnabled && !hasRemoteSnapshot.value && !loading.value) await refreshRemote();
+    if (remoteApiEnabled && boundKey !== "default" && !hasRemoteSnapshot.value && !loading.value) await refreshRemote();
   }
   function enqueueRemoteMutation<T>(request: RemoteAccountRequest, operation: () => Promise<T>): Promise<T | undefined> {
     const queue = mutations;
