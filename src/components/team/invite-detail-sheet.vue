@@ -84,7 +84,7 @@ useDialogA11y(computed(() => props.open), '.invite-detail', () => emit('close'))
 .invite-detail__sheet { position: absolute; bottom: 0; left: 0; right: 0; box-sizing: border-box; max-height: min(82vh, calc(100vh - var(--nx-overlay-top))); display: flex; flex-direction: column; border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); padding: 16px 20px 0; }
 .invite-detail__header { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); flex: 0 0 auto; font-family: var(--font-v5); font-size: var(--ui-type-hero-title); line-height: var(--ui-type-hero-title-lh); font-weight: var(--ui-type-hero-title-weight); }
 .invite-detail__close { position: relative; isolation: isolate; width: 44px; height: 44px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; font-size: 24px; }
-.invite-detail__close > svg { position: relative; z-index: 1; color: var(--v5-ink); }
+.invite-detail__close > svg, .invite-detail__close > .nx-native-svg { position: relative; z-index: 1; color: var(--v5-ink); }
 /* The bottom inset scrolls with the body, so long records run to the screen edge instead of stopping above an opaque band. */
 .invite-detail__body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-top: 16px; padding-bottom: var(--nx-overlay-bottom); font: 400 14px/1.6 var(--font-v5); }
 .invite-detail__grab { flex: none; width: 40px; height: 5px; margin: 0 auto 10px; border-radius: 999px; background: var(--v5-surface-3); }

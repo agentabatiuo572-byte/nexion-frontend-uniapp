@@ -674,7 +674,7 @@ const sortOptions = computed(() => [
 .marketplace-info { border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
 .marketplace-info-row { display:flex; align-items:center; gap:var(--v5-space-3); min-height:56px; padding:6px 16px; box-sizing:border-box; font-size:15px; line-height:20px; }
 .marketplace-info-learn { padding-right:8px; }
-.marketplace-info-learn > svg { margin-right:12px; }
+.marketplace-info-learn > svg, .marketplace-info-learn > .nx-native-svg { margin-right:12px; }
 .marketplace-info-row + .marketplace-info-row { border-top:1px solid var(--v5-border); }
 .marketplace-fee-label { flex:1; color:var(--v5-ink-3); font-size:12px; line-height:16px; }
 .marketplace-fee { font:500 14px/20px var(--font-metric); }

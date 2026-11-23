@@ -190,14 +190,14 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
 .spv-side:active .spv-glass { transform: scale(.92); }
-.spv-glass > svg, :slotted(svg) { position: relative; z-index: 1; }
+.spv-glass > svg, :slotted(svg), .spv-glass > .nx-native-svg, :slotted(.nx-native-svg) { position: relative; z-index: 1; }
 .spv-back { margin-left: 6px; }
 .spv-bell { justify-self: end; margin-right: 6px; }
 .spv--plain { border-radius: 0; }
 .spv--plain .spv-glass { width: 44px; height: 44px; }
 .spv--solid .spv-glass { background: var(--v5-surface-2); }
 .spv--solid .spv-glass > .nx-liquid-glass { display: none; }
-.spv--solid .spv-glass > svg { stroke: var(--v5-ink); }
+.spv--solid .spv-glass > svg, .spv--solid .spv-glass > .nx-native-svg > svg { stroke: var(--v5-ink); }
 :global([data-theme="light"] .spv--solid .spv-glass) { background: var(--v5-surface); box-shadow: 0 2px 6px rgba(23,31,45,.12); }
 .spv-action { position: relative; z-index: 1; min-height: 44px; min-width: 72px; max-width: 100%; box-sizing: border-box; margin-right: 6px; padding: 0 4px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); font-size: 14px; font-weight: 500; line-height: 18px; border-radius: 22px; text-align: center; }
 .spv-action-surface { position: absolute; inset: 4px 0; border-radius: 18px; pointer-events: none; }

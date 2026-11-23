@@ -37,7 +37,7 @@
       <view class="intro-orb-area">
         <view class="intro-orb anim-orb">
           <view class="orb-glow" />
-          <svg viewBox="0 0 240 240" class="orb-svg" aria-hidden="true">
+          <view class="orb-svg" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 240 240">
             <defs>
               <radialGradient id="orb-core" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.55" />
@@ -92,7 +92,7 @@
             <!-- Center radial glow -->
             <circle cx="120" cy="120" r="56" fill="url(#orb-core)" />
 
-          </svg>
+          </svg></view>
           <!-- 中心品牌标(走 BrandLockup,全站 logo 的唯一出口)。
                🔴 不能放进上面的 SVG:uni 编译器会把 <image> 劫持成 uni-image 组件,落在 SVG 命名空间里
                完全不渲染(实测 0×0)。改为容器内绝对定位叠加,60/240 = 25% 居中。 -->
@@ -437,6 +437,7 @@ function goPrivacy() {
   width: 100%;
   height: 100%;
 }
+.orb-svg :deep(svg) { display: block; }
 
 .intro-hero {
   text-align: center;

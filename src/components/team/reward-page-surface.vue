@@ -19,7 +19,7 @@
 .reward-page :deep(.reward-cta:not(.reward-cta--wide)::after) { content: ""; flex-shrink: 0; width: 1em; height: 1em; background: currentColor; -webkit-mask: var(--nx-glyph-arrow-right) center / contain no-repeat; mask: var(--nx-glyph-arrow-right) center / contain no-repeat; }
 .reward-page :deep(.reward-cta:focus-visible) { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .reward-page :deep(.reward-cta[aria-disabled="true"]) { opacity: .5; cursor: default; }
-.reward-page :deep(.reward-cta > svg) { display: none; }
+.reward-page :deep(.reward-cta > svg), .reward-page :deep(.reward-cta > .nx-native-svg) { display: none; }
 .reward-page :deep(.reward-cta > text) { color: inherit !important; }
 .reward-page :deep(.reward-cta--wide) { display: flex; width: 100%; min-height: 48px; padding: 10px 20px; }
 .reward-page :deep(.reward-amount) { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: clamp(26px, 8vw, 36px); font-weight: 500; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: -.025em; overflow-wrap: break-word; }

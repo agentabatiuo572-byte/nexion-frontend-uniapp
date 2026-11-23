@@ -9,7 +9,7 @@
   <NxSection v-if="calculator" :title="t.home.doMathTitle" data-home-section="do-the-math">
     <view ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': !seen || !pageVisible, 'dc-card--masked': visibility.hidden }">
       <view class="dc-stage">
-        <svg class="dc-arc" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path :d="arcPath" /></svg>
+        <view class="dc-arc" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none"><path :d="arcPath" /></svg></view>
         <text class="dc-stage__label">{{ t.home.doMathStage }}</text>
         <view class="dc-multiplier" :aria-label="visibility.hidden ? '••' : `${calculator.multiplier}×`"><text>{{ visibility.hidden ? '••' : calculator.multiplier }}</text><text v-if="!visibility.hidden" class="dc-multiplier__sign">×</text></view>
         <view class="dc-col dc-col--base">
@@ -127,7 +127,8 @@ function goStore() {
 /* The arc is drawn by a left-to-right reveal: dashes cannot follow pathLength under a non-scaling stroke
    (they are laid out in screen space), and the arc runs left to right from 36% to 60%. */
 .dc-arc { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; animation:dc-arc-draw 750ms 900ms cubic-bezier(.4,0,.2,1) both; }
-.dc-arc path { fill:none; stroke:var(--v5-brand); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.dc-arc :deep(svg) { display:block; }
+.dc-arc :deep(path) { fill:none; stroke:var(--v5-brand); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
 .dc-multiplier { position:absolute; left:50%; top:10px; padding:0 8px; border-radius:12px; background:var(--v5-surface-2); font:500 36px/40px var(--font-jet-mono); letter-spacing:-.04em; color:var(--v5-brand); font-variant-numeric:tabular-nums; white-space:nowrap; transform:translateX(-50%); animation:dc-multiplier-pop 560ms 1250ms cubic-bezier(.2,.9,.3,1.35) both; }
 .dc-multiplier__sign { font-size:22px; margin-left:1px; }
 .dc-legend { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:10px; text-align:center; animation:dc-fade-up 500ms 1000ms ease-out both; }

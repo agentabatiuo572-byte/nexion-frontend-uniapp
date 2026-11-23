@@ -256,7 +256,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-page { color:var(--v5-ink);padding-bottom:28px; }
 .rank-scope-link { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-top:8px;color:var(--v5-brand);font:500 13px/1.5 var(--font-v5);cursor:pointer; }
 .rank-scope-link > text { min-width:0;overflow-wrap:break-word; }
-.rank-scope-link > svg { flex:none; }
+.rank-scope-link > svg, .rank-scope-link > .nx-native-svg { flex:none; }
 .rank-scope-link:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 .rank-content { padding:12px 16px 0; }
 .rank-spotlight { position:relative;isolation:isolate;overflow:hidden;padding:20px 18px 18px;border:1px solid var(--v5-border);border-radius:22px;margin-bottom:22px; }

@@ -279,7 +279,7 @@ const genesisPoints = useGenesisPoints();
 const perkKeys = ["a", "c", "f"] as const;
 // Perk icons: line glyphs in the shared tile (03 §3.6.1: no emoji as icons). a = UVT allowance, c = founding member, f = transferable.
 const PERK_TILES = {
-  a: { tone: "purple", path: "m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" },
+  a: { tone: "purple", path: "m12 3 8 4.5v9L12 21l-8-4.5v-9zM9 8.5v4a3 3 0 0 0 6 0v-4" },
   c: { tone: "sky", path: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
   f: { tone: "coral", path: "M7 7h13l-3-3M17 17H4l3 3" },
 } as const;
@@ -815,7 +815,7 @@ const noteStyle: CSSProperties = {
 .gh-empty-card > view > view:nth-child(2) { margin-top:14px; }
 .gh-empty-card > view > view:nth-child(2) > text:first-child { font:600 16px/22px var(--font-v5)!important; }
 .gh-empty-card > view > view:nth-child(2) > text:nth-child(2) { margin-top:var(--v5-space-1)!important; font:400 13px/20px var(--font-v5)!important; }
-.gh-empty-card > view > svg { display:none; }
+.gh-empty-card > view > svg, .gh-empty-card > view > .nx-native-svg { display:none; }
 .gh-empty-card .gh-empty-link { display:block; margin-top:14px; color:var(--v5-genesis-gold); font:500 13px/18px var(--font-v5); }
 .gh-empty-facts { padding:var(--v5-space-4)!important; border:0!important; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
 .gh-empty-facts > text:first-child { font:500 15px/22px var(--font-v5)!important; color:var(--v5-ink)!important; letter-spacing:0!important; }

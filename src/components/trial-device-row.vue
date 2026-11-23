@@ -7,7 +7,7 @@
       </view>
       <view class="trial-device-row__summary">
         <view class="trial-device-row__time"><text>{{ presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining }}</text><text class="trial-device-row__remaining">{{ remainingText }}</text></view>
-        <view class="trial-device-row__chevron" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: variant !== 'home' && isExpanded ? 'rotate(180deg)' : undefined }"><path :d="variant === 'home' ? 'm9 6 6 6-6 6' : 'm6 9 6 6 6-6'" /></svg></view>
+        <view class="trial-device-row__chevron" aria-hidden="true" :style="{ transform: variant !== 'home' && isExpanded ? 'rotate(180deg)' : undefined }"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="variant === 'home' ? 'm9 6 6 6-6 6' : 'm6 9 6 6 6-6'" /></svg></view>
       </view>
     </view>
     <view v-if="variant !== 'home' && isExpanded" :id="`trial-device-details-${variant}`" class="trial-device-row__body">
@@ -95,7 +95,8 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__time > text { display:block; overflow-wrap:break-word; }
 .trial-device-row__remaining { margin-top:4px; color:var(--v5-ink); font:600 clamp(12px,3.6vw,14px)/1.35 var(--font-v5); font-variant-numeric:tabular-nums; }
 .trial-device-row__chevron { display:grid; place-items:center; flex:none; width:28px; height:28px; border-radius:var(--v5-radius-full); background:var(--v5-surface-2); color:var(--v5-ink-3); }
-.trial-device-row__chevron svg { transition:transform .25s ease; }
+/* The round chevron turns as a whole: on the App the svg is written through NxNativeSvg, where a style change rewrites it. */
+.trial-device-row__chevron { transition:transform .25s ease; }
 .trial-device-row__body { padding:0 20px 16px; }
 .trial-device-row__state { display:block; margin-top:3px; color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); overflow-wrap:break-word; }
 .trial-device-row__credit,.trial-device-row__estimate { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:5px 12px; margin-top:12px; font:400 12px/18px var(--font-v5); color:var(--v5-ink-3); }
@@ -196,5 +197,5 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
   .trial-device-row--inventory .trial-device-row__time { font-size:var(--ui-type-meta); line-height:var(--ui-type-meta-lh); }
   .trial-device-row--inventory .trial-device-row__remaining { font-size:12px; line-height:1.2; }
 }
-@media (prefers-reduced-motion:reduce) { .trial-device-row__chevron svg { transition:none; } .trial-device-row__progress > view { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .trial-device-row__chevron { transition:none; } .trial-device-row__progress > view { animation:none; } }
 </style>
