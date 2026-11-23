@@ -28,10 +28,10 @@
     <!-- Task History (merged single list) -->
     <view class="pb-2">
       <view class="flex items-center justify-between">
-        <text style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.taskHistory.tabHistory }}</text>
+        <text class="earn-history-label">{{ t.taskHistory.tabHistory }}</text>
         <view class="earn-history-all flex items-center active:opacity-60" style="gap: 2px; padding: 0 0 0 16px; min-height: 44px" role="button" tabindex="0" @click="goReceipts"  @keydown.enter.stop.prevent="goReceipts" @keydown.space.stop.prevent="goReceipts">
-          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAll }}</text>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+          <text class="earn-history-link">{{ t.taskHistory.viewAll }}</text>
+          <svg class="earn-history-link" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
       </view>
     </view>
@@ -40,10 +40,10 @@
       v-else-if="remoteApiEnabled && (app.remoteAssignmentStatus === 'idle' || (app.remoteAssignmentStatus === 'loading' && !app.remoteAssignmentHasSnapshot))"
       class="pb-4" role="status" aria-live="polite"
     >
-      <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
+      <text class="earn-history-note">{{ t.taskHistory.loading }}</text>
     </view>
     <view v-else-if="allRecent.length === 0" class="pb-4">
-      <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.home.ledgerEmpty }}</text>
+      <text class="earn-history-note">{{ t.home.ledgerEmpty }}</text>
     </view>
     <view v-else class="earn-history-list pb-3 space-y-1.5">
       <view v-if="historyRewardUnit" class="earn-history-row earn-history-head" aria-hidden="true"><text class="earn-history-unit">{{ historyRewardUnit }}</text></view>
@@ -51,7 +51,7 @@
         v-for="task in allRecent"
         :key="task.id"
         class="earn-history-row active:opacity-80"
-        :data-task-id="task.id" style="font-size: 12px; min-height: 44px"
+        :data-task-id="task.id" style="min-height: 44px"
         :role="canOpenTaskReceipt(task) ? 'button' : undefined"
         :tabindex="canOpenTaskReceipt(task) ? 0 : undefined"
         @click.stop="openTaskReceipt(task)"
@@ -59,10 +59,10 @@
         @keydown.enter.stop.prevent="openTaskReceipt(task)" @keydown.space.stop.prevent="openTaskReceipt(task)"
       >
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-        <text class="earn-history-description" :title="task.type" style="color: var(--v5-ink-2)">{{ task.type }}</text>
-        <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5)" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatTaskReward(task, true, !historyRewardUnit)) }}<text v-if="historyRewardUnit" class="nx-sr-only"> {{ historyRewardUnit }}</text></text>
+        <text class="earn-history-description" :class="{ 'earn-history-description--clamp': canOpenTaskReceipt(task) }">{{ task.type }}</text>
+        <text class="earn-history-amount tabular-nums" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatTaskReward(task, true, !historyRewardUnit)) }}<text v-if="historyRewardUnit" class="nx-sr-only"> {{ historyRewardUnit }}</text></text>
         <text v-if="task.settlementStatus" class="earn-history-status" :style="{ color: task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ computeCopy.statuses[task.settlementStatus] }}</text>
-        <text class="earn-history-time" style="font-size: 12px; color: var(--v5-ink-3)">{{ completedTime(task.completedAt) }}</text>
+        <text class="earn-history-time">{{ completedTime(task.completedAt) }}</text>
         <view v-if="canOpenTaskReceipt(task)" class="earn-history-document shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" :title="task.receiptNo ?? task.id" @click.stop="openTaskReceipt(task)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>
         </view>
@@ -235,7 +235,7 @@ function completedTime(ts: number): string {
 .earn-tc__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
 .earn-tc__pulse { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .earn-tc__count { font: 500 12px/16px var(--font-metric); color: var(--v5-tech-cyan-ink); font-variant-numeric: tabular-nums; }
-.earn-tc__card { padding: 2px 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); font-size: 12px; }
+.earn-tc__card { padding: 2px 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 [data-theme="light"] .earn-tc__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .earn-tc__row { display: flex; align-items: center; gap: 12px; min-height: 60px; box-sizing: content-box; cursor: pointer; }
 .earn-tc__card > .earn-tc__row ~ .earn-tc__row, .earn-tc__panel + .earn-tc__row { border-top: 1px solid var(--v5-border); }
@@ -250,12 +250,18 @@ function completedTime(ts: number): string {
 @media (prefers-reduced-motion: reduce) { .earn-tc__arrow { transition: none; } }
 .earn-history-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 22px; align-items: center; gap: calc(var(--v5-space-1) / 2) var(--v5-space-2); }
 .earn-history-row > svg { grid-row: 1 / span 2; }
-.earn-history-description { grid-column: 2; grid-row: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.earn-history-description :deep(*) { white-space: nowrap; }
-.earn-history-amount { grid-column: 3; grid-row: 1; text-align: right; white-space: nowrap; }
-.earn-history-status { grid-column: 3; grid-row: 2; font-size: 12px; line-height: 16px; text-align: right; white-space: nowrap; }
+/* History panel (10 §10.1): the label is an uppercase auxiliary caption (+.04em, 01 §1.2), 查看全部 a text link in the
+   auxiliary colour with a chevron (03 §3.9), notes the description role. A row's job name is the row title in main ink on the
+   list-subtitle role; it wraps in full, and rows that open a receipt (where the full name is shown) stop at two lines (03 §3.6.1). */
+.earn-history-label { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: .04em; text-transform: uppercase; }
+.earn-history-link { color: var(--v5-ink-3); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
+.earn-history-note { color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.earn-history-description { grid-column: 2; grid-row: 1; min-width: 0; color: var(--v5-ink); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
+.earn-history-description--clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.earn-history-amount { grid-column: 3; grid-row: 1; text-align: right; white-space: nowrap; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.earn-history-status { grid-column: 3; grid-row: 2; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: right; white-space: nowrap; }
 .earn-history-head { min-height: 16px; }
-.earn-history-unit { grid-column: 3; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; text-align: right; }
-.earn-history-time { grid-column: 2; grid-row: 2; min-width: 0; white-space: nowrap; line-height: 16px; }
+.earn-history-unit { grid-column: 3; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); letter-spacing: .04em; text-align: right; }
+.earn-history-time { grid-column: 2; grid-row: 2; min-width: 0; white-space: nowrap; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .earn-history-document { grid-column: 4; grid-row: 1 / span 2; }
 </style>
