@@ -440,6 +440,7 @@ function quote(value: unknown): CanonicalTradeinQuote {
     targetProductName: string(source.targetProductName),
     sourceActualPaidUsdt: number(source.sourceActualPaidUsdt),
     cumulativeOutputUsdt: number(source.cumulativeOutputUsdt),
+    // Lifetime output can exceed the original purchase price.
     outputRatioPct: number(source.outputRatioPct),
     creditRatePct: number(source.creditRatePct),
     discountUsdt: number(source.discountUsdt),
@@ -453,7 +454,6 @@ function quote(value: unknown): CanonicalTradeinQuote {
   };
   if (
     result.discountUsdt > result.targetPriceUsdt
-    || result.outputRatioPct > 100
     || result.creditRatePct > 100
     || Math.abs((result.targetPriceUsdt - result.discountUsdt) - result.payableUsdt) > 0.00001
     || Math.abs(result.walletShortfallUsdt - Math.max(0, result.payableUsdt - result.walletBalanceUsdt)) > 0.00001
