@@ -3,6 +3,7 @@ import { demoTaskAssignments } from './prototype-demo-auxiliary.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 import { demoHasEarningsHistory, demoSettledTasks, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 
+import { demoReceiptWire } from './prototype-demo-notifications.mjs';
 import { demoBatchPage, demoEarningReceiptRead, demoReceiptPage, demoSimulatedReceiptFields, demoSimulatedReceiptDetail } from './prototype-demo-secondary.mjs';
 
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
@@ -168,7 +169,7 @@ export function computeDemo(url, state, request, now, facts) {
     const receipt=receipts.find(row=>row.receiptNo===decodeURIComponent(path.split('/').pop()));
     if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     const posted=postedTasks.find(row=>row.receiptNo===receipt.receiptNo);
-    return posted.simulation?demoSimulatedReceiptDetail(state,posted,receipt):receipt;
+    return demoReceiptWire(posted.simulation?demoSimulatedReceiptDetail(state,posted,receipt):receipt,state);
   }
   if (path === '/api/tasks/simulated/stop' && request.method() === 'POST') {
     const { deviceId, expectedVersion } = request.postDataJSON();

@@ -1,53 +1,110 @@
 import { createHash } from 'node:crypto';
+import { previewCapacity } from './design-review-fixture.mjs';
 
+const s1 = 'STELLARBOX-S1', pro = 'STELLARBOX-PRO', rack = 'STELLARRACK-P1';
+const minute = 60_000, day = 24 * 60 * minute, storageOffset = 8 * 60 * minute;
 const earningSamples = [
-  { id: 1009, deviceId: 54, deviceName: 'UVELBox Pacific Research Compute Cluster International West 0054',
-    taskClass: 'VG', usdt: '1234.5678', uvt: '2500', minutesAgo: 1 },
-  { id: 1008, deviceId: 41, taskClass: 'IG', usdt: '0.15', minutesAgo: 3 },
-  { id: 1007, deviceId: 54, taskClass: 'VG', usdt: '1.05', uvt: '0.75', minutesAgo: 16, modelReceipt: true },
-  { id: 1006, deviceId: 42, taskClass: 'LL', uvt: '0.5', minutesAgo: 29 },
-  { id: 1005, deviceId: 41, taskClass: 'EM', usdt: '0.0025', minutesAgo: 48, read: true },
-  { id: 1004, deviceId: 42, taskClass: 'SP', usdt: '0.12', minutesAgo: 60, hideMetadata: true, read: true },
-  { id: 1003, deviceId: 54, taskClass: 'FT', usdt: '0.42', minutesAgo: 70, receiptFailures: 2 },
-  { id: 1002, deviceId: 41, taskClass: 'IG', usdt: '0.15', minutesAgo: 80, receiptStatus: 404 },
-  { id: 1001, deviceId: 42, taskClass: 'SP', usdt: '0.12', minutesAgo: 90, actionMissing: true, read: true },
+  { id: 1001, sku: s1, taskClass: 'SP', minutesAgo: 90, actionMissing: true, read: true },
+  { id: 1002, sku: s1, taskClass: 'IG', minutesAgo: 80, receiptStatus: 404 },
+  { id: 1003, sku: s1, taskClass: 'FT', minutesAgo: 70, receiptFailures: 2 },
+  { id: 1004, sku: s1, taskClass: 'SP', minutesAgo: 53, hideMetadata: true, read: true },
+  { id: 1005, sku: s1, taskClass: 'EM', minutesAgo: 48, modelRate: [0.0025, 0.002708], durationSec: 5, read: true },
+  { id: 1006, sku: pro, taskClass: 'LL', minutesAgo: 29 },
+  { id: 1007, sku: s1, taskClass: 'VG', minutesAgo: 16, modelRate: [1, 1.1], durationSec: 900 },
+  { id: 1008, sku: s1, taskClass: 'IG', minutesAgo: 3 },
+  { id: 1009, sku: rack, taskClass: 'VG', minutesAgo: 1 },
+  { id: 1010, sku: pro, taskClass: 'LL', minutesAgo: 0 },
 ];
-const earningReceiptSamples = [...earningSamples, { id: 1010, deviceId: 41, taskClass: 'IG', minutesAgo: 0 }];
-
 const taskNames = { IG: 'Image Generation', VG: 'Video Generation', LL: 'LLM Inference',
   EM: 'Embedding', SP: 'Speech Processing', FT: 'Fine-tuning' };
+const roundReward = amount => Number(amount.toFixed(6));
 
-function demoEarningSamples(state, samples) {
-  if (state.fleetState !== 'earning-credit' || state.dataState === 'empty') return [];
-  return samples.flatMap(sample => {
-    const device = state.fleetSeed?.find(row => row.id === sample.deviceId);
+// Monthly pacing uses purchase anniversaries in the storage zone, with days clamped at month end.
+function purchaseCycle(device, completedAt) {
+  const anchor = new Date(device.purchasedAt + storageOffset);
+  const completed = new Date(completedAt + storageOffset);
+  const month = index => {
+    const anniversary = new Date(anchor);
+    anniversary.setUTCDate(1);
+    anniversary.setUTCMonth(anchor.getUTCMonth() + index);
+    const days = new Date(Date.UTC(anniversary.getUTCFullYear(), anniversary.getUTCMonth() + 1, 0)).getUTCDate();
+    anniversary.setUTCDate(Math.min(anchor.getUTCDate(), days));
+    return anniversary.getTime() - storageOffset;
+  };
+  let index = (completed.getUTCFullYear() - anchor.getUTCFullYear()) * 12 + completed.getUTCMonth() - anchor.getUTCMonth();
+  if (month(index) > completedAt) index--;
+  return { start: month(index), seconds: (month(index + 1) - month(index)) / 1000 };
+}
+
+export function demoEarningReceipts(state) {
+  if (state.fleetState !== 'earning-credit' || state.dataState === 'empty' || state.accountDeletionState === 'clear') return [];
+  const midnightUtc = Math.floor(state.previewFactsAt / day) * day;
+  // Keep the fixture's sequence on one UTC date, even when the preview starts just after midnight.
+  const anchor = state.previewFactsAt - midnightUtc < 92 * minute ? midnightUtc - minute : state.previewFactsAt;
+  const dailyCredits = new Set();
+  return earningSamples.flatMap(({ sku, modelRate, minutesAgo, durationSec = 300, ...sample }) => {
+    const device = state.fleetSeed?.find(row => row.productCode === sku);
     if (!device) return [];
-    const finishedAt = state.previewFactsAt - sample.minutesAgo * 60_000;
-    return [{ ...sample, device, deviceName: sample.deviceName ?? device.name, receiptNo: `CTR-DEMO-EARN-${sample.id}`,
-      completedAt: finishedAt - 60_000, settledAt: sample.usdt || sample.uvt ? finishedAt : null }];
+    const { dailyUvt, monthlyUsdt, capacitySchedule } = device.earningPurchase;
+    const postedAt = anchor - minutesAgo * minute;
+    const completedAt = postedAt - (modelRate ? 0 : minute);
+    const startedAt = completedAt - durationSec * 1000;
+    const capacity = at => previewCapacity(device, capacitySchedule, at).capacityPct / 100;
+    const cycle = purchaseCycle(device, completedAt);
+    // Frozen preview pacing quote: equal pool base rate per second, effective pace 0.95
+    // (day weight × cycle factor × controller correction), with the nominal inside the allocation band.
+    const baseUsdt = modelRate
+      ? (modelRate[0] + modelRate[1]) / 2 * capacity(startedAt)
+      : monthlyUsdt * capacity(cycle.start) * durationSec * 0.95 / cycle.seconds;
+    const rewardUsdt = roundReward(baseUsdt);
+    const dailyKey = `CLOUD_SHARE_DAILY:${device.id}:${new Date(completedAt).toISOString().slice(0, 10)}`;
+    let rewardNex = 0;
+    if (!dailyCredits.has(dailyKey)) {
+      rewardNex = roundReward(dailyUvt * capacity(completedAt));
+      if (rewardNex > 0) dailyCredits.add(dailyKey);
+    }
+    return [{ ...sample, device, modelReceipt: Boolean(modelRate), receiptNo: `CTR-DEMO-EARN-${sample.id}`,
+      taskNo: `${modelRate ? 'CTA' : 'SIM'}-DEMO-EARN-${sample.id}`, dailyKey, startedAt, completedAt, durationSec,
+      rewardUsdt, rewardNex, settledAt: rewardUsdt > 0 || rewardNex > 0 ? postedAt : null }];
   });
 }
 
-export function demoEarningCredits(state) { return demoEarningSamples(state, earningSamples); }
-export function demoEarningReceipts(state) { return demoEarningSamples(state, earningReceiptSamples); }
+export function demoEarningCredits(state) {
+  return demoEarningReceipts(state).filter(sample => sample.settledAt !== null);
+}
+
+export function demoEarningBillRefs(state) {
+  return demoEarningCredits(state).flatMap(({ taskNo, dailyKey, rewardUsdt, rewardNex, settledAt }) => [
+    ...(rewardUsdt > 0 ? [[taskNo, 'USDT', 'IN', rewardUsdt, 'COMPUTE_TASK_REWARD', 'bonus', settledAt]] : []),
+    ...(rewardNex > 0 ? [[dailyKey, 'UVT', 'IN', rewardNex, 'COMPUTE_TASK_REWARD', 'bonus', settledAt]] : []),
+  ]);
+}
+
+// DTO serialization comes after sorting and hashing the preview's internal epoch values.
+export function demoReceiptWire(receipt, state) {
+  if (state.fleetState !== 'earning-credit') return receipt;
+  const date = at => at == null ? null : new Date(at + storageOffset).toISOString().slice(0, 19).replace('T', ' ');
+  return { ...receipt, rewardUsdt: Number(receipt.rewardUsdt), rewardNex: Number(receipt.rewardNex),
+    completedAt: date(receipt.completedAt), settledAt: date(receipt.settledAt),
+    ...('startedAt' in receipt && { startedAt: date(receipt.startedAt) }) };
+}
 
 export function demoEarningReceipt(sample, detail = false) {
-  const { device, id, taskClass, receiptNo, completedAt, settledAt, modelReceipt } = sample;
+  const { device, id, taskNo, taskClass, receiptNo, startedAt, completedAt, settledAt, modelReceipt,
+    rewardUsdt, rewardNex, durationSec } = sample;
   const hash = createHash('sha256').update(receiptNo).digest('hex');
   return {
     source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true,
     receiptNo, displayReceiptNo: `UVEL-RC-${id.toString(36).toUpperCase().padStart(6, '0')}`,
-    taskNo: modelReceipt ? `DEMO-EARN-TASK-${id}` : receiptNo.replace(/^CTR-/, 'SIM-'),
-    taskClass, taskId: `demo-earn-${id}`, taskName: taskNames[taskClass], model: modelReceipt ? 'Wan 2.1' : '', client: 'UVEL',
-    deviceId: device.id, deviceInstanceNo: device.instanceNo, deviceName: sample.deviceName,
+    taskNo, taskClass, taskId: `demo-earn-${id}`, taskName: taskNames[taskClass],
+    model: modelReceipt ? (taskClass === 'EM' ? 'BGE-M3' : 'Wan 2.1') : '', client: 'UVEL',
+    deviceId: device.id, deviceInstanceNo: device.instanceNo, deviceName: device.name,
     deviceType: device.deviceType ?? 'BOX', deviceGpu: device.gpuModel ?? '', vramTotalGb: device.vramTotalGb,
-    rewardUsdt: sample.usdt ?? '0', rewardNex: sample.uvt ?? '0',
-    earningStatus: modelReceipt ? 'SETTLED' : 'CREDITED', settledAt, postingTimeVerified: settledAt !== null,
-    completedAt, startedAt: completedAt - 300_000, durationSec: 300,
-    ...(modelReceipt ? { executionMode: 'MODEL', proofKind: 'MODEL_EXECUTION', modelExecuted: true, proofHash: hash } : {
-      executionMode: 'SIMULATED', proofKind: 'TASK_RECEIPT', modelExecuted: false,
-      proofHash: null, ...(detail && { receiptHash: hash }),
-    }),
+    rewardUsdt, rewardNex, earningStatus: 'CREDITED', settledAt, postingTimeVerified: settledAt !== null,
+    completedAt, startedAt, durationSec,
+    executionMode: modelReceipt ? 'MODEL' : 'SIMULATED', proofKind: modelReceipt ? 'MODEL_EXECUTION' : 'TASK_RECEIPT',
+    modelExecuted: modelReceipt, proofHash: modelReceipt ? hash : null,
+    ...(detail && { receiptHash: modelReceipt ? null : hash }),
   };
 }
 
@@ -92,8 +149,9 @@ export function demoNotifications(locale, state, now, device, order) {
       body: text('查看这笔收益的凭证。', 'View the receipt for these earnings.', 'Xem biên nhận thu nhập này.'),
       ctaHref: `/pages/me/receipts?receiptNo=${sample.receiptNo}`, createdAt: sample.settledAt,
       readAt: sample.read ? sample.settledAt + 60_000 : null,
-      earning: { receiptNo: sample.receiptNo, usdt: sample.usdt ?? null, uvt: sample.uvt ?? null,
-        deviceName: sample.hideMetadata ? null : sample.deviceName, taskClass: sample.hideMetadata ? null : sample.taskClass },
+      earning: { receiptNo: sample.receiptNo, usdt: sample.rewardUsdt > 0 ? String(sample.rewardUsdt) : null,
+        uvt: sample.rewardNex > 0 ? String(sample.rewardNex) : null,
+        deviceName: sample.hideMetadata ? null : sample.device.name, taskClass: sample.hideMetadata ? null : sample.taskClass },
     }));
     const summary = {
       id: 999, kind: 'NOVA_DAILYSUMMARY', priority: 'low',

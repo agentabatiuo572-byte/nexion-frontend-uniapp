@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoEarningReceipts, demoEarningReceipt } from './prototype-demo-notifications.mjs';
+import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire } from './prototype-demo-notifications.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
@@ -35,7 +35,7 @@ export function demoEarningReceiptRead(url, state) {
       throw Object.assign(new Error('TASK_RECEIPT_UNAVAILABLE'), { status: 503 });
     }
   }
-  return demoEarningReceipt(sample, true);
+  return demoReceiptWire(demoEarningReceipt(sample,true),state);
 }
 
 // Receipt cursors retain the issuance cutoff while ordering by completion.
@@ -67,7 +67,7 @@ export function demoReceiptPage(params, receipts, state) {
     if(!boundary||!highWater||issuance(boundary,highWater)<0)invalid('TASK_RECEIPT_CURSOR_INVALID');
     eligible=rows.filter(row=>issuance(row,highWater)>=0&&ordering(row,boundary)>0);
   }
-  const items=eligible.slice(0,limit),more=eligible.length>limit;
+  const items=eligible.slice(0,limit).map(receipt=>demoReceiptWire(receipt,state)),more=eligible.length>limit;
   return {...proof,items,nextOffset:more?offset+limit:null,
     nextCursor:more?Buffer.from(JSON.stringify([items.at(-1).receiptNo,highWater.receiptNo])).toString('base64url'):null};
 }
@@ -289,7 +289,7 @@ export function secondaryDemo(url,state,request,walletBills){
     const index=items.findIndex(r=>r.receiptNo===p.split('/').pop());
     if(index<0)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     const receipt=items[index],task=tasks[index];
-    return task.simulation?demoSimulatedReceiptDetail(state,task,receipt):receipt;
+    return demoReceiptWire(task.simulation?demoSimulatedReceiptDetail(state,task,receipt):receipt,state);
   }
   if(p==='/api/earnings/release-status'){
     const entries=walletBills().filter(row=>row.status==='SUCCESS'&&row.direction==='IN'

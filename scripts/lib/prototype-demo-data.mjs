@@ -17,7 +17,7 @@ import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxi
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
-import { demoEarningCredits, demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
+import { demoEarningBillRefs, demoEarningCredits, demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
 import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { contentOptions, demoHasLongBillRefs } from './prototype-demo-long-content.mjs';
@@ -490,12 +490,20 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   const phones=state.fleetState==='phone-history'?[clone(43,'PHONE','Demo PHONE',1,0,{deviceType:'PHONE'}),clone(52,'MOBILE','Demo MOBILE',1,0,{deviceType:'MOBILE'})]
     :state.scopeState==='mixed'?[{...template,id:43,instanceNo:'DEMO-PHONE',name:'Phone',deviceType:'PHONE',productCode:'PHONE',dailyUsdt:0.1,dailyNex:0,todayEarningsUsdt:0,todayEarningsNex:0,actualPaidUsdt:0}]:[];
   // Device 42 is the account's second device. Lite's compute modes (computeState other than app) review a Cloud Share
-  // reward cycle, so in those scenarios the account owns a Cloud Share there from the start (its kind, catalog price and
-  // trade-in facts agree); the App mode owns a UVELBox Pro.
-  const second=(state.computeState??'app')==='app'?{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}
+  // reward cycle, so in those scenarios the account owns a Cloud Share there from the start.
+  // The earnings-credit signing fixture uses the same UVELBox Pro purchase in both modes.
+  const second=(state.computeState??'app')==='app'||state.fleetState==='earning-credit'?{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}
     :clone(42,'CLOUD-SHARE','Cloud Share',0.6,19.9,{instanceNo:'DEMO-CLOUD',deviceType:'SHARE',todayEarningsUsdt:.2,todayEarningsNex:0});
   let devices=state.fleetState==='none'?[]:[template,...phones,second];
-  if(state.fleetState==='earning-credit')devices.push(clone(54,'STELLARRACK-P1','UVELRack P1',45,12999,{}));
+  if(state.fleetState==='earning-credit'){
+    devices.push(clone(54,'STELLARRACK-P1','UVELRack Pacific Research Compute Cluster International West 0043',45,12999,{}));
+    devices=devices.map(device=>{
+      const product=products.find(row=>row.id.toUpperCase()===device.productCode);
+      if(product?.productType!=='DEVICE')return device;
+      return {...device,earningPurchase:{dailyUvt:product.dailyEarnNEX,
+        monthlyUsdt:device.productCode==='STELLARBOX-PRO'?0:product.monthlyEstimateUsdt,capacitySchedule}};
+    });
+  }
   if(state.fleetState==='inventory')devices.push(clone(51,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='decayed'){
     const decayedPurchaseAt=Math.max(decayedS1PurchasedAt(),minimumPurchaseAt);
@@ -850,7 +858,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     ]:[];
     const learningBill=demoLongLearningBill(url,state);
     if(learningBill)longRefs.push(learningBill);
-    return demoWalletBills(state,now,state.previewFactsAt,settledTasks(),longRefs);
+    if(state.fleetState==='earning-credit'&&!state.fleetSeed)demoFleetFacts(url,locale,state);
+    return demoWalletBills(state,now,state.previewFactsAt,settledTasks(),[...longRefs,...demoEarningBillRefs(state)]);
   };
   const referralFacts=(limit=10)=>{
     const rewards=demoReferralLedger(walletBills(),limit);
