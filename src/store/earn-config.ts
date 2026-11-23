@@ -32,7 +32,15 @@ watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
   environmentInvalidated = true;
   clearEarnConfig();
 }, { flush: "sync" });
-sessionVault.subscribe?.((_previous, _next, continuation) => { if (!continuation) clearEarnConfig(); });
+// A session change clears the config (its answer may belong to the old session). If it had been asked for, read it
+// again, so a page already showing it (the store's phone tier) is not left empty; the startup cookie restore lands here
+// too, sometimes before and sometimes after the launch read has finished.
+sessionVault.subscribe?.((_previous, _next, continuation) => {
+  if (continuation) return;
+  const reissue = status.value !== "idle";
+  clearEarnConfig();
+  if (reissue) void refreshEarnConfig();
+});
 
 // The mutable compatibility table is consumed by legacy presentation code.
 // Clear its prototype rows immediately in server mode; only a validated
