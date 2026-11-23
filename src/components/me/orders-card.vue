@@ -46,8 +46,8 @@ import { latestOrder as selectLatestOrder } from "@/lib/latest-order";
 const t = useT();
 const orders = useOrders();
 
-const orderCount = computed(() => orders.orders.length);
-const latestOrder = computed(() => selectLatestOrder(orders.orders));
+const orderCount = computed(() => orders.visibleOrders.length);
+const latestOrder = computed(() => selectLatestOrder(orders.visibleOrders));
 
 function goStore() {
   navReset({ url: "/pages/store/store", fail: () => {} });

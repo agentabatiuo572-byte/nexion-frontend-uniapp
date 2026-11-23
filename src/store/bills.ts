@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { computed, ref } from "vue";
 import { mockServerId } from "./mock-id";
 import { mockServerNow } from "./server-time";
@@ -42,6 +43,7 @@ export interface Bill {
    *  memo 正迁 memoKey(语言码位),网络不能永远靠 memo 文案正则反解 —— 这个字段就是网络的码位;
    *  非链上条目(奖励/兑换/NEX 等)不填。 */
   network?: "TRC20" | "ERC20" | "BEP20";
+  hiddenNetwork?: boolean;
   balanceAfter?: number;
   balanceAfterExact?: string;
   reservedAfter?: number;
@@ -215,6 +217,10 @@ export const useBills = defineStore("bills", () => {
     return writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, boundKey, { bills: bills.value });
   }
 
+  function visibleServerBill(row: WalletBillRow): boolean {
+    return isVisibleUsdtNetwork(row.network) && isVisibleUsdtNetwork(row.paymentMethod);
+  }
+
   function productionBill(row: WalletBillRow): Bill {
     const amount = row.direction === "IN" ? row.amount : -row.amount;
     const legacy = legacyPresentation(row.bizType, row.bizNo);
@@ -248,6 +254,7 @@ export const useBills = defineStore("bills", () => {
       memoKey,
       ref: orderRefund ? validOrderNo(publicReference) : publicReference,
       ledgerBizNo: row.bizNo,
+      hiddenNetwork: !visibleServerBill(row),
       balanceAfter: row.balanceAfter,
       balanceAfterExact: row.balanceAfterExact,
     };
@@ -403,7 +410,7 @@ export const useBills = defineStore("bills", () => {
     summaryStatus.value = "loading"; summaryError.value = "";
     const request = walletBillsApi.summary().then(snapshot => {
       if (expectedAccount !== requestGeneration || expected !== summaryGeneration) throw new Error("WALLET_SUMMARY_REQUEST_SUPERSEDED");
-      summary.value = { ...snapshot, recentNexBills: snapshot.recentNexBills.map(productionBill) };
+      summary.value = { ...snapshot, recentNexBills: snapshot.recentNexBills.filter(visibleServerBill).map(productionBill) };
       summaryStatus.value = "ready";
     }).catch(cause => {
       if (expectedAccount === requestGeneration && expected === summaryGeneration) {

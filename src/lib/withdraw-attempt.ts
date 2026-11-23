@@ -1,4 +1,5 @@
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import type { Withdrawal } from "@/store/types";
 type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 
@@ -43,7 +44,7 @@ export function readWithdrawAttempt(accountKey: string, throwOnReadError = false
   const { key, amount, network, address, policyVersion, offset } = row;
   if (typeof key !== "string" || !key) return null;
   if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) return null;
-  if (typeof network !== "string" || !NETWORKS.includes(network as CryptoNetwork)) return null;
+  if (typeof network !== "string" || !NETWORKS.includes(network as CryptoNetwork) || !isVisibleUsdtNetwork(network)) return null;
   if (typeof address !== "string" || !address) return null;
   if (typeof policyVersion !== "string" || !policyVersion) return null;
   if (typeof offset !== "boolean") return null;
