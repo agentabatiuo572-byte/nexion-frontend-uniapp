@@ -20,12 +20,9 @@ import { id as idMessages } from "@/i18n/messages/id";
 import { ms } from "@/i18n/messages/ms";
 import { fil } from "@/i18n/messages/fil";
 import { uiLocale, type LocaleCode } from "@/i18n";
-import type { Product, ProductTaskLevel } from "@/mock/products";
+import type { Product, ProductBadgeKind, ProductTaskLevel } from "@/mock/products";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { fmt } from "@/i18n/format";
-
-/** Marketing badge types the App knows; `custom` is operator free text shown as written. */
-export type ProductBadgeKind = "recommended" | "bestSeller" | "trending" | "upgradePick" | "flagship" | "lowBarrier" | "custom";
 
 type KnownBadgeKind = Exclude<ProductBadgeKind, "custom">;
 
@@ -57,8 +54,7 @@ function badgeText(t: Messages, kind: KnownBadgeKind): string {
   return t.store.catalog["cloud-share"].badge;
 }
 
-// The server badge is operator free text (PC 营销角标). Known labels in any App language are matched by
-// meaning, ignoring case and spacing ("Best seller" = "Best Seller" = "热销"); anything else is shown as written.
+// Catalog responses that predate badgeKind still match known labels across UI languages.
 const badgeKey = (value: string) => value.normalize("NFKC").trim().replace(/\s+/gu, " ").toLocaleLowerCase();
 const KNOWN_BADGES = new Map<string, KnownBadgeKind>();
 for (const store of [en.store, zh.store, vi.store, ru.store, kk.store, uz.store, idMessages.store, ms.store, fil.store]) {
@@ -76,7 +72,11 @@ const LEGACY_BADGES: [string, KnownBadgeKind][] = [
 ];
 for (const [label, kind] of LEGACY_BADGES) if (!KNOWN_BADGES.has(badgeKey(label))) KNOWN_BADGES.set(badgeKey(label), kind);
 
-function serverBadge(t: Messages, badge: string | undefined): Pick<ProductCopy, "badge" | "badgeKind"> {
+function serverBadge(t: Messages, { badge, badgeKind }: Product): Pick<ProductCopy, "badge" | "badgeKind"> {
+  if (badgeKind === null) return { badge: "", badgeKind: "custom" };
+  if (badgeKind === "custom") return { badge: badge ?? "", badgeKind };
+  if (badgeKind !== undefined) return { badge: badgeText(t, badgeKind), badgeKind };
+
   const text = badge?.trim() ?? "";
   const kind = text ? KNOWN_BADGES.get(badgeKey(text)) : undefined;
   return kind ? { badge: badgeText(t, kind), badgeKind: kind } : { badge: text, badgeKind: "custom" };
@@ -117,7 +117,7 @@ export function productTaskLevelsText(t: Messages, levels: readonly ProductTaskL
 export function productCopy(t: Messages, p: Product, serverCatalog = false, locale?: LocaleCode): ProductCopy {
   if (serverCatalog) return {
     tagline: serverTagline(t, p, locale),
-    ...serverBadge(t, p.badge),
+    ...serverBadge(t, p),
     taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];

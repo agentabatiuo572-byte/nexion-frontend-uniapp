@@ -26,7 +26,7 @@
         </template>
         <text class="block" :style="introStyle">{{ w.s2Intro }}</text>
         <view style="display: flex; flex-direction: column; gap: 10px">
-          <IconRow icon="m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" tone="purple" :label="w.perk1Label" :body="w.perk1Body" />
+          <IconRow icon="m12 3 8 4.5v9L12 21l-8-4.5v-9zM9 8.5v4a3 3 0 0 0 6 0v-4" tone="purple" :label="w.perk1Label" :body="w.perk1Body" />
           <IconRow icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" tone="sky" :label="w.perk2Label" :body="w.perk2Body" />
           <IconRow icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5" tone="amber" :label="w.perk3Label" :body="w.perk3Body" />
           <IconRow icon="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" tone="teal" :label="w.perk4Label" :body="w.perk4Body" />

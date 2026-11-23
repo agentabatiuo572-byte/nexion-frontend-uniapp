@@ -79,7 +79,7 @@
       <view v-for="(_,index) in items" :key="index" class="entry-page-dot" :class="{selected:activeIndex===index}" aria-hidden="true" />
     </view>
     <NxButton v-if="hasMore&&mode==='events'" class="entry-cta" size="medium" :busy="status==='loading'" :label="t.promotion.more" :busy-label="t.promotion.loading" icon="arrow-right" @click="load(false)"><text>{{ t.promotion.more }}</text></NxButton>
-    <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="termsText" :rules="termsRules" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
+    <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" audience="inviter" :terms="termsText" :rules="termsRules" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>
 <script setup lang="ts">
@@ -184,7 +184,7 @@ function cycleOffer(delta:number){if(items.value.length)activeIndex.value=(activ
 let autoplayTimer:ReturnType<typeof setInterval>|null=null;
 function stopAutoplay(){if(autoplayTimer!==null){clearInterval(autoplayTimer);autoplayTimer=null;}}
 function startAutoplay(){stopAutoplay();if(props.mode==='home'&&props.active&&visible&&items.value.length>1&&!termsActivity.value)autoplayTimer=setInterval(()=>cycleOffer(1),5000);}
-const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,publicName):[]);
+const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,id=>landingProductName(termsActivity.value!,id,locale.code),locale.code):[]);
 const termsText=computed(()=>termsActivity.value?promotionTermsText(termsActivity.value,t.value.promotion,locale.code):'');
 // Purchase gift, first purchase and repurchase have a landing page; other offers keep the store filter.
 function offerHref(activity:EntryPromotion){if ('displayOnly' in activity) return activity.href;return activityPageKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
@@ -197,7 +197,7 @@ function landingCards(activity:EntryPromotion){
   if(!kind||!rule)return [];
   void app.accountKey;void app.accountBindingEpoch;
   const reward=rule.buyerReward,parts=rewardParts(activity,reward),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
-  return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:keepUnits(rewardPartsText(parts,t.value.promotion)),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
+  return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:keepUnits(rewardPartsText(parts,t.value.promotion)),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo,locale.code),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
 }
 async function openTerms(activity:EntryPromotion){
   if (!('displayOnly' in activity)) {termsActivity.value=activity;return;}
