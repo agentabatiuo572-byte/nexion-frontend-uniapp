@@ -2195,7 +2195,7 @@ export const uz: Messages = {
     taskRewardLine: "{client} · mukofot +${amount}",
     etaRemaining: "{eta} qoldi",
     waitCta: "Vazifa tugagach avtomatik oʻchirish",
-    forceCta: "Majburan oʻchirish (mukofot yoʻqoladi)",
+    forceCta: "Majburan oʻchirish (mukofotsiz)",
     backCta: "Orqaga",
     toastForced: "{name} majburan oʻchirildi · joriy vazifa mukofoti bekor qilindi",
     toastSubmitting: "Avtomatik oʻchirish yuborilmoqda…",
