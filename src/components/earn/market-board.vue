@@ -23,10 +23,10 @@
         <text v-if="!priceIndex.length && marketState === 'empty'" class="earn-market__status">{{ t.empty.listTitle }}</text>
         <view v-else-if="!priceIndex.length" class="earn-market__grid" aria-hidden="true" data-earn-market-placeholder="true">
           <view v-for="n in 3" :key="n" class="earn-market__tile earn-market__tile--placeholder"><view class="earn-market__face earn-market__face--on">
-            <view class="earn-market__bar" style="width: 70%; margin-block: 3px" />
-            <view class="earn-market__bar" style="width: 40%; margin-block: 3px" />
+            <view class="earn-market__bar" style="width: 70%; margin-block: 4px" />
+            <view class="earn-market__bar" style="width: 40%; margin-block: 4px" />
             <view class="earn-market__bar earn-market__bar--price" />
-            <view class="earn-market__bar" style="width: 36%; margin-block: 3px" />
+            <view class="earn-market__bar" style="width: 36%; margin-block: 4px" />
             <view class="earn-market__spark" />
           </view></view>
         </view>
@@ -225,15 +225,19 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 
 </script>
 <style scoped>
-.nx-earn-market-board { margin: 0 16px; color: var(--v5-ink); }
+/* The tile name uses the aux figure role, except at the 360 tier: there 「LLM Inference」 needs 81px at 12px and a tile
+   gives it 77px, so the name stays 11px (pending a 10.2 exception; the line height stays 16). */
+.nx-earn-market-board { --earn-market-name-size: var(--ui-type-meta); margin: 0 16px; color: var(--v5-ink); }
+@media (max-width: 374px) { .nx-earn-market-board { --earn-market-name-size: 11px; } }
 .earn-market__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 2px 8px; }
 .earn-market__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
 .earn-market__updated { display: inline-flex; align-items: center; gap: 6px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); }
-.earn-market__card { padding: 14px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+/* Card inset 16px (01 §1.3). */
+.earn-market__card { padding: 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .earn-market__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-/* The board's caption line box sits 4.5px lower than its 14px line height. */
-.earn-market__caption { display: block; padding-top: 4.5px; font: 500 11px/14px var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
+/* Captions, tile name, unit and change use the aux figure role 12/16 (10 §10.1): words 400, the change 500. */
+.earn-market__caption { display: block; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
 .earn-market__caption--plain { letter-spacing: 0; text-transform: none; }
 .earn-market__status { display: block; padding: 10px 0; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
@@ -244,13 +248,16 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__face { grid-area: 1 / 1; display: flex; flex-direction: column; min-width: 0; visibility: hidden; }
 .earn-market__face--on { visibility: visible; }
 [data-theme="light"] .earn-market__tile { background: var(--v5-bg); }
-.earn-market__name { font: 500 11px/14px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.earn-market__unit { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-market__name { font: var(--ui-type-meta-weight) var(--earn-market-name-size)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-market__unit { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Market list price: list-title size and line height, JetBrains Mono 500 (10.1, 01 §1.2). */
 .earn-market__price { margin-top: 8px; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.earn-market__delta { font: 500 11px/14px var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.earn-market__flagship { margin-top: 2px; font: 500 11px/14px var(--font-v5); color: var(--v5-warning-ink); overflow-wrap: break-word; }
-.earn-market__flagship-delta { font: 500 11px/14px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.earn-market__delta { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* A label, not a status: neutral aux ink (01 §1.1.1 rule 4); its change keeps the trend colour. */
+.earn-market__flagship { margin-top: 2px; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.earn-market__flagship-delta { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.earn-market__flagship-delta.nx-before-arrow-up { color: var(--v5-success-ink); }
+.earn-market__flagship-delta.nx-before-arrow-down { color: var(--v5-danger); }
 /* Sparklines sit on the tile floor so a taller tile (flagship line) keeps them aligned. The App draws the SVG
    through NxNativeSvg (v-html), so the SVG's own style reaches it through :deep() on this real wrapper. */
 .earn-market__spark { height: 22px; margin-top: auto; padding-top: 6px; box-sizing: content-box; line-height: 0; }
