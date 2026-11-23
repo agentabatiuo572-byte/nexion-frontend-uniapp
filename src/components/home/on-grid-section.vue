@@ -33,7 +33,7 @@
           <view v-if="activeDevices !== null && activeDevices > 0" class="on-grid__dot nx-online-dot" aria-hidden="true" />
           <text><text class="font-mono-tabular" style="color:var(--v5-ink);font-weight:500"><NxTickNumber :text="onlineBand" /></text> {{ t.home.onGridOnline }}</text>
         </view>
-        <text class="font-mono-tabular" style="color:var(--v5-success-ink);font-weight:500">{{ perSecText }}</text>
+        <text class="font-mono-tabular" style="color:var(--v5-ink);font-weight:500">{{ perSecText }}</text>
       </view>
     </view>
   </view>
