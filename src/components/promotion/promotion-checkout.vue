@@ -928,6 +928,7 @@ onMounted(async()=>{
         const receipt=await promotionApi.findOrder(props.orderNo);if(!current())return;
         if(!receipt)throw new Error('ORIGINAL_ORDER_NOT_FOUND');
         session.resume(receipt);
+        revision.value++;
       }
       if(session.record.pending||session.record.order)await recover();else await Promise.all([loadQuote(),refreshWallet(true)]);
     }
