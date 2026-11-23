@@ -58,9 +58,7 @@
           <text v-if="displayTwoFactorEnabled === null" :style="unavailableValueStyle">{{ unknownMark(remoteSecurityReadFailed) }}</text>
           <view v-else class="shrink-0 flex items-center justify-center transition-opacity" :class="sessionWriteDimmed ? 'opacity-50' : 'active:opacity-70'" style="width: 44px; height: 44px" role="switch"
             :tabindex="sessionWriteDisabled ? -1 : 0" :aria-label="withReadReason(t.security.twoFactorSwitchLabel, remoteSecurityReadFailed)" :aria-checked="displayTwoFactorEnabled" :aria-disabled="sessionWriteDisabled" @click="openTwoFactorSheet">
-            <view :style="toggleTrackStyle">
-              <view class="security-toggle-thumb" :style="toggleThumbStyle" />
-            </view>
+            <NxSwitch :checked="displayTwoFactorEnabled" />
           </view>
         </view>
 
@@ -247,6 +245,7 @@ import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import NxSwitch from "@/components/ui/nx-switch.vue";
 import AccountDeletionReason from "@/components/me/account-deletion-reason.vue";
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { formatAmount } from "@/lib/amount-display";
@@ -1729,27 +1728,6 @@ const pwdSaveLabelStyle: CSSProperties = {
   fontWeight: "var(--ui-type-button-weight)",
   color: "var(--v5-on-brand)",
 };
-const toggleTrackStyle = computed<CSSProperties>(() => ({
-  position: "relative",
-  width: "44px",
-  height: "26px",
-  borderRadius: "var(--v5-radius-full)",
-  background: displayTwoFactorEnabled.value ? "var(--v5-brand)" : "var(--v5-surface-3)",
-  boxShadow: displayTwoFactorEnabled.value ? "none" : "inset 0 0 0 1px var(--v5-border)",
-
-}));
-const toggleThumbStyle = computed<CSSProperties>(() => ({
-  position: "absolute",
-  top: "3px",
-  left: "3px",
-  width: "20px",
-  height: "20px",
-  borderRadius: "var(--v5-radius-full)",
-  background: "var(--ui-switch-thumb)",
-  boxShadow: "0 1px 3px var(--v5-bg-color-mask)",
-  transform: `translateX(${displayTwoFactorEnabled.value ? 18 : 0}px)`,
-  transition: "transform 200ms ease",
-}));
 const revokeBtnStyle: CSSProperties = {
   width: "44px",
   height: "44px",
