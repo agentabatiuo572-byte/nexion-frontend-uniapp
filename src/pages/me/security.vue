@@ -1040,8 +1040,9 @@ function sessionDeviceLabel(s: SessionListItem): string {
 }
 
 // Display only: a device name reads 「品牌 型号 · 系统」 or 「浏览器 · 系统」, and its parts wrap as units (03 §3.6.1).
+// A model code such as SM-A5760 never breaks at its hyphen (non-breaking hyphen U+2011, also in the confirm).
 function deviceNameParts(s: SessionListItem): string[] {
-  return sessionDeviceLabel(s).split(" · ");
+  return sessionDeviceLabel(s).replace(/-/g, "\u2011").split(" · ");
 }
 
 // Where and when, wrapped as units like the name.
@@ -1260,7 +1261,7 @@ async function handleRevoke(s: SessionListItem) {
   const ok = await uiConfirm({
     title: t.value.security.sessionRevokeConfirm,
     message: fmt(t.value.security.sessionRevokeConfirmBody, {
-      device: sessionDeviceLabel(s).replace(/ · /g, "\u00A0·\u00A0"),
+      device: sessionDeviceLabel(s).replace(/-/g, "\u2011").replace(/ · /g, "\u00A0·\u00A0"),
       time: formatDisplayDateTime(s.lastActiveMs, dateLocale()).replace(/ /g, "\u00A0"),
     }),
     danger: true,
