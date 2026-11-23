@@ -38,5 +38,5 @@ export function rewardStateKey(state: RewardState): 'rewardPending'|'rewardGrant
 }
 export function displayDeadline(value: string, language: string): string {
   const date = formatDisplayDateTime(value, language, false, 0);
-  return date === '—' ? date : `${date} · UTC`;
+  return date === '—' ? date : `${date} UTC`;
 }

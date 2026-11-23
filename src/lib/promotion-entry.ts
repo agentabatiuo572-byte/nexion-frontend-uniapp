@@ -1,4 +1,4 @@
-import type { PublicPromotion, PublicRewardSpec, RewardDisclosure } from '@/api/promotion-contracts';
+import type { PublicPromotion, PublicRewardSpec, RewardDisclosure, Role } from '@/api/promotion-contracts';
 
 export type EntryItem = { productNo: string; quantity: number };
 export type EntrySelectionDraft = { items: EntryItem[]; entryItems?: EntryItem[] };
@@ -20,8 +20,10 @@ export function productRewardSpecs(activity: PublicPromotion | null, productNo?:
     .flatMap(rule => rule.inviterReward ? [rule.buyerReward, rule.inviterReward] : [rule.buyerReward]);
 }
 
-export function promotionDisclosures(activity: PublicPromotion | null, productNo?: string): RewardDisclosure[] {
-  return productRewardSpecs(activity, productNo).map(reward => reward.disclosure);
+/** A reward's disclosure with who receives it, so the rules sheet can tell the buyer's reward from the inviter's. */
+export type PromotionDisclosure = RewardDisclosure & { role?: Role };
+export function promotionDisclosures(activity: PublicPromotion | null, productNo?: string): PromotionDisclosure[] {
+  return productRewardSpecs(activity, productNo).map(reward => ({ ...reward.disclosure, role: reward.beneficiaryRole }));
 }
 
 export function validEntryItems(items: EntryItem[], minimum = 1): boolean {
