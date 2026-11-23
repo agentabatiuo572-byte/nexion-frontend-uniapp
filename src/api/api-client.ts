@@ -186,6 +186,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   function businessWrite(request: HttpRequest): boolean {
     if (request.method === "GET") return false;
     const path = request.url.slice(baseUrl.length).split("?")[0];
+    // iOS recovery refreshes its affected device projections after accepting the response.
+    if (path === "/api/onboarding/phone-installation/recovery") return false;
     // These live POST reads/socket tickets do not change displayed business facts.
     if (request.method === "POST" && ["/api/app/trade-in/eligibility", "/api/app/trade-in/quote",
       "/api/app/trade-in/capacity-quote", "/api/orders/quote", "/api/withdrawals/eligibility",

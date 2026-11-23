@@ -118,10 +118,12 @@ export interface OnboardingCalibrationApi {
   activationEligibility(): Promise<PhoneActivationEligibility>;
   activationFailed(idempotencyKey: string): Promise<boolean>;
   phoneLogin(deviceId: string): Promise<string>;
+  recoverIosPhone(deviceId: string, recoveryKey: string): Promise<"BOUND" | "RESTORED" | "UNAVAILABLE">;
   bindingStatus(): Promise<boolean>;
   calibrate(deviceId: string, signals: CalibrationRequestSignals, expectedRevision: number, idempotencyKey: string): Promise<OnboardingCalibration>;
   result(deviceId: string): Promise<OnboardingCalibration>;
-  activate(deviceId: string, expectedRevision: number, idempotencyKey: string, versions: PhoneActivationVersions): Promise<OnboardingCalibration>;
+  activate(deviceId: string, expectedRevision: number, idempotencyKey: string, versions: PhoneActivationVersions,
+    recoveryKey?: string | null): Promise<OnboardingCalibration>;
   defer(deviceId: string, expectedRevision: number, idempotencyKey: string, initialOnly?: boolean): Promise<OnboardingCalibration>;
 }
 
@@ -323,6 +325,13 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
           || typeof response.hasBinding !== "boolean") return invalid();
       return response.hasBinding;
     },
+    async recoverIosPhone(deviceId, recoveryKey) {
+      const result = record(await client.request({
+        method: "POST", path: "/api/onboarding/phone-installation/recovery", body: { deviceId, recoveryKey },
+      }));
+      if (result.status !== "BOUND" && result.status !== "RESTORED" && result.status !== "UNAVAILABLE") return invalid();
+      return result.status;
+    },
     async phoneLogin(deviceId) {
       const response = record(await client.request({
         method: "POST", path: "/api/onboarding/phone-installation/login", body: { deviceId: text(deviceId) },
@@ -349,7 +358,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       });
       return parseOnboardingCalibration(response, environment);
     },
-    async activate(deviceId, expectedRevision, idempotencyKey, versions) {
+    async activate(deviceId, expectedRevision, idempotencyKey, versions, recoveryKey) {
       const normalizedDeviceId = text(deviceId);
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
@@ -361,6 +370,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       }
       const response = await client.request({
         method: "POST", path: "/api/onboarding/calibrate/activate", idempotencyKey: key(idempotencyKey),
+        ...(recoveryKey ? { headers: { "X-UVEL-IOS-Recovery-Key": recoveryKey } } : {}),
         body: { deviceId: normalizedDeviceId, expectedRevision,
           expectedBindingVersion: versions.expectedBindingVersion, expectedPolicyVersion: versions.expectedPolicyVersion,
           replacementConfirmed: versions.replacementConfirmed,

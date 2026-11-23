@@ -3,18 +3,22 @@ import Security
 
 public final class NativeSessionKeychain {
     private static let service = "ai.uvel.app.test.refresh-session.v1"
+    private static let recoveryPrefix = "phone-recovery:"
 
     public static func supported() -> Bool {
         Bundle.main.bundleIdentifier == "ai.uvel.app.test"
     }
 
     private static func query(_ scope: String) -> [String: Any]? {
-        guard supported(),
-              scope.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { return nil }
+        let recovery = scope.hasPrefix(recoveryPrefix)
+        let account = recovery ? String(scope.dropFirst(recoveryPrefix.count)) : scope
+        let bundle = Bundle.main.bundleIdentifier
+        let permitted = recovery ? (bundle == "ai.uvel.app" || bundle == "ai.uvel.app.test") : supported()
+        guard permitted, account.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { return nil }
         return [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: scope,
+            kSecAttrService as String: recovery ? "ai.uvel.phone-binding-recovery.v1" : service,
+            kSecAttrAccount as String: account,
             kSecAttrSynchronizable as String: false
         ]
     }
