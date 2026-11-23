@@ -1770,18 +1770,18 @@ const dangerLabelStyle: CSSProperties = {
 .security-phone { margin-top:0!important; border-radius:0 0 22px 22px!important; }
 .security-phone > view:first-child { margin-inline:-16px; padding-inline:16px!important; border-top:1px solid var(--v5-border); }
 .security-session-meta { font-family:var(--font-metric)!important; }
-/* 17–23px titles track -0.01em; Chinese takes none (01 §1.2). */
-.security-section-head { letter-spacing:-.01em; }
+/* 17–23px titles track -0.01em; the 16px tier below 375 and Chinese take none (01 §1.2). */
+@media (min-width: 375px) { .security-section-head { letter-spacing:-.01em; } }
 .security-section-head:lang(zh) { letter-spacing:0; }
 /* A device row opens nothing, so its name and its IP and time line are never cut (03 §3.6.1): their parts (model,
    system; IP, time) wrap as units, a part longer than the line wraps between words, and the "·" travels with the part
    after it. When that part starts a new line, the separator (--sep wide) and its 4px gap fall into the space the line
    is shifted left by and clipped at, as on the home feed. The revoke button keeps its 44px target beside the wrapped
    text. The monospaced IP and time line gives its "·" a monospaced cell. */
-.security-session-parts { --sep:4px; display:flex; flex-wrap:wrap; column-gap:4px; margin-left:calc(-4px - var(--sep)); clip-path:inset(-4px -4px -4px calc(4px + var(--sep))); }
+.security-session-parts { --sep:4px; display:flex; flex-wrap:wrap; column-gap:var(--v5-space-1); margin-left:calc(-4px - var(--sep)); clip-path:inset(-4px -4px -4px calc(4px + var(--sep))); }
 .security-session-parts > :first-child { margin-left:calc(4px + var(--sep)); }
 .security-session-parts__lead { min-width:0; overflow-wrap:break-word; }
-.security-session-parts__tail { display:inline-flex; gap:4px; min-width:0; }
+.security-session-parts__tail { display:inline-flex; gap:var(--v5-space-1); min-width:0; }
 .security-session-parts__tail > :first-child { flex:none; width:var(--sep); text-align:center; }
 .security-session-parts__tail > :last-child { min-width:0; overflow-wrap:break-word; }
 .security-session-parts.security-session-meta { --sep:.6em; }
