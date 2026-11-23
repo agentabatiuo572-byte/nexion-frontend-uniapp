@@ -409,7 +409,7 @@ watch(() => apiRuntimeConfig?.environment, () => { orderEnvironmentInvalidated.v
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, locale.code], () => { orderPresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, apiRuntimeConfig?.environment], () => {
   paymentResultOrder.value = null; paymentResultVisible.value = false;
-  paymentResultReceipt.value = null;
+  confirmedPaymentReceipt.value = null;
   paymentSheetOpen.value = false; paymentNotice.value = '';
   pendingPaymentChecking.value = false;
 }, { flush: 'sync' });
@@ -501,7 +501,11 @@ const cancelBlocked = ref(false);
 const paymentNoticeReason = ref('');
 const noticeCancelFailed = ref(false);
 const paymentResultOrder = ref<Order|null>(null);
-const paymentResultReceipt = ref<PaidOrderReceipt|null>(null);
+const confirmedPaymentReceipt = ref<PaidOrderReceipt|null>(null);
+const paymentResultReceipt = computed(() => {
+  const receipt = confirmedPaymentReceipt.value;
+  return receipt?.orderNo === id.value ? receipt : null;
+});
 const resultOrder = computed(() => order.value ?? paymentResultOrder.value);
 const showTrialResult = computed({
   get: () => trialResultRequested.value && !!order.value && commerceOrderIsPaid(order.value),
@@ -511,7 +515,7 @@ const paymentResultAmount = computed<{ value: Order['total']; currency: 'USD' | 
   const current = order.value;
   if (current && commerceOrderIsPaid(current)) return commercePaidOrderAmount(current);
   const receipt = paymentResultReceipt.value;
-  if (receipt?.orderNo === id.value) return {
+  if (receipt) return {
     value: receipt.paidTotalUsdt ?? receipt.amountUsdt,
     currency: receipt.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT',
   };
@@ -537,6 +541,7 @@ const paymentResultState = computed<'activated'|'inventory'|'processing'|'error'
   const status = resultOrder.value?.status;
   if (status === 'provisioning_failed') return 'failed';
   if (status === 'activated' || status === 'inventory') return status;
+  if (paymentResultReceipt.value) return paymentResultReceipt.value.canonicalStatus;
   if (remoteOrderError.value) return 'error';
   return walletPaymentConfirmed.value || status === 'paid' || status === 'provisioning' ? 'processing' : 'error';
 });
@@ -1107,7 +1112,7 @@ async function handleWalletPayment() {
     }
     paymentConfirmed = true;
     paymentResultOrder.value = originalOrder;
-    paymentResultReceipt.value = receipt;
+    confirmedPaymentReceipt.value = receipt;
     paymentResultVisible.value = true;
     markOrderActionPaid(scope.accountScope.accountKey,requestOrderNo);
     orderAction.value=readOrderAction(scope.accountScope.accountKey,requestOrderNo);
