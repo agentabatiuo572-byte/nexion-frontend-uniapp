@@ -24,7 +24,7 @@
             role="radio" :tabindex="network === nw.id ? 0 : -1"
             :aria-checked="network === nw.id"
             @click="switchNetwork(nw.id)"
-            @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
+            @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)" @keydown.up.prevent="moveNetwork(-1)" @keydown.down.prevent="moveNetwork(1)"
           >
             <view class="rb-net__nm"><text class="rb-net__name">{{ nw.label }}</text></view>
             <view class="rb-net__ck" aria-hidden="true" />
@@ -154,7 +154,7 @@
               <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ t.addrRebind.sourceMigrated }}</text>
             </view>
           </view>
-          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(current?.addedAt ?? 0) }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(current?.addedAt ?? 0) }}</text>
           <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期)。
                冻结期不叠挂:冻结横幅说「禁提」时再说「可能需复核」= 同屏两种结论
                (审计 P1;与 wallet-withdraw 的 !frozenNow 反冗余门同型)。 -->
@@ -980,7 +980,7 @@ const successRowValStyle: CSSProperties = {
 .rb-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .rb-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
 .rb-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
-.rb-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.rb-net__name { color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .rb-net--on .rb-net__name { color: var(--v5-brand); }
 .rb-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .rb-net--on .rb-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }

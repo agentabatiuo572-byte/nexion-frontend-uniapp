@@ -33,7 +33,7 @@
       </GlassSegments>
       <view v-if="!bankOrderOpen" style="height: 4px" />
 
-      <DepositUsdtPane v-if="seg === 'crypto'" />
+      <DepositUsdtPane v-if="seg === 'crypto'" :bank-available="visibleSegments.some((item) => item.id === 'bank')" @use-bank="useBankChannel" />
       <DepositBankPane v-else-if="seg === 'bank'" ref="bankPane" />
       <TopupCardForm v-else @change-channel="seg = 'crypto'" />
       <view v-if="orderFunded || bankAction" style="height: 120px" />
@@ -127,6 +127,13 @@ const orderFunded = computed(() => !!orderTopup.value?.orderNo && topupCovered.v
 function backToOrder() {
   const orderNo = orderTopup.value?.orderNo;
   if (orderNo && orderFunded.value) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&pay=1`);
+}
+// The USDT pane's way on when no network is open: switch to the bank channel and keep keyboard focus on its tab.
+function useBankChannel(): void {
+  seg.value = "bank";
+  void nextTick(() => {
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>(".nx-topup-seg-bank")?.focus();
+  });
 }
 function segLabel(id: Seg): string {
   const tc = t.value.topupChrome;

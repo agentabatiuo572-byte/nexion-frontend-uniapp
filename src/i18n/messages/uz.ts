@@ -5574,6 +5574,7 @@ export const uz: Messages = {
     sendVia: "{network} orqali yuborish",
     segUsdt: "USDT zanjirda",
     railsClosedTitle: "Bu toʻldirish usuli hali ochilmagan",
+    useBankInstead: "Bank kartasi bilan toʻlash",
     flowRetired: "Bu boʻlim oʻzgardi. Qaytib, qayta oching.",
     segCard: "Bank kartasi",
     netRecommended: "Tavsiya · eng kam haq",

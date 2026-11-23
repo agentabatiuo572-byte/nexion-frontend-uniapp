@@ -5574,6 +5574,7 @@ export const fil: Messages = {
     sendVia: "Ipadala sa {network}",
     segUsdt: "USDT on-chain",
     railsClosedTitle: "Hindi pa bukas ang paraang ito ng top-up",
+    useBankInstead: "Magbayad via card",
     flowRetired: "Nagbago ang entry na ito. Bumalik at buksan ulit.",
     segCard: "Card ng bangko",
     netRecommended: "Mungkahi · pinakamababang fee",
