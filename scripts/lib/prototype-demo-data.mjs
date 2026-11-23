@@ -17,7 +17,7 @@ import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxi
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
-import { demoEarningBillRefs, demoEarningCredits, demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
+import { demoEarningBillRefs, demoEarningCredits, demoNotificationPage, demoNotifications, demoReceiptTodayByDevice, demoWithEarningReceiptTasks } from './prototype-demo-notifications.mjs';
 import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { contentOptions, demoHasLongBillRefs } from './prototype-demo-long-content.mjs';
@@ -524,7 +524,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   return devices;
 }
 // The authoritative fleet from the retained state, independent of presentation knobs.
-export function demoFleetFacts(url,locale,state,eventOwner) {
+export function demoFleetFacts(url,locale,state,eventOwner,postedTasks) {
   // Initialize sample orders and the trial before projecting the fleet.
   const trialSlotCount=demoTrialSlots(url,locale,state);
   const now=Date.now(),products=demoProducts(state,url.origin);
@@ -568,6 +568,9 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
         ...(gift===state.promotionGift&&{sourceChannel:'PROMOTION_GIFT',sourceOrderNo:demoPromotionGift.orderNo})});
     }
   }
+  const todayByDevice=state.fleetState==='earning-credit'
+    ?demoReceiptTodayByDevice(demoWithEarningReceiptTasks(state,postedTasks??demoSettledTasks(state,state.previewFactsAt)),now)
+    :null;
   const devices=roster
     .map(device=>({...device,...state.deviceActivations?.[device.id]}))
     // Lite's stop action (compute scenarios) is a lifecycle event: a stopped device frees its slot.
@@ -577,7 +580,10 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
       const share=product?.productType==='SHARE'
         ? {deviceType:'SHARE',gpuModel:product.gpu,vramTotalGb:0,basePowerW:0} : {};
       const capacity=previewCapacity(device,seed.capacitySchedule,now);
-      const projected={...device,...share,...capacity,monthlyTargetActive:product?.monthlyEstimateUsdt!=null};
+      const today=todayByDevice?.get(device.id);
+      const realized=todayByDevice?{todayEarningsUsdt:Number((today?.todayEarningsUsdt??0).toFixed(6)),
+        todayEarningsNex:Number((today?.todayEarningsNex??0).toFixed(6))}:{};
+      const projected={...device,...share,...capacity,...realized,monthlyTargetActive:product?.monthlyEstimateUsdt!=null};
       // Hidden phones keep their own earnings and never receive a monthly target projection.
       if(!projected.monthlyTargetActive)return projected;
       return {...projected,dailyUsdt:Number((product.dailyEarn*capacity.capacityPct/100).toFixed(6))};
@@ -811,7 +817,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const settledTasks=()=>computeFacts?.postedTasks??demoSettledTasks(state,state.previewFactsAt);
   if(pathname==='/api/app/home/overview') {
     const overview=structuredClone(base());
-    const tasks=settledTasks();
+    if(state.fleetState==='earning-credit'&&!state.fleetSeed)demoFleetFacts(url,locale,state);
+    const tasks=demoWithEarningReceiptTasks(state,settledTasks());
     overview.earnings=demoTaskPeriods(tasks,now);
     overview.earningsLedger=tasks.slice().sort((a,b)=>b.completedAt-a.completedAt).slice(0,15)
       .map(task=>({id:task.taskNo,client:task.client,model:task.simulation?task.taskName:task.model,rewardUsdt:task.amount,
@@ -1644,11 +1651,12 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
   }
   if(pathname==='/api/devices/earnings') {
-    const facts=demoFleetFacts(url,locale,state,previewAccountId(state,request.headers?.()??{}));
+    const facts=demoFleetFacts(url,locale,state,previewAccountId(state,request.headers?.()??{}),computeFacts?.postedTasks);
     const active=facts.devices.filter(device=>device.activatedAt!==null);
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
     const data=base();data.walletUsdt=demoWalletUsdt(state);data.walletNex=demoWalletNex(state,now);data.userJoinedAt=demoH4Account(state).createdAt;
     data.dailyUsdt=active.reduce((sum,device)=>sum+device.dailyUsdt,0);data.dailyNex=active.reduce((sum,device)=>sum+device.dailyNex,0);
+    if(state.fleetState==='earning-credit')data.timezone='Asia/Shanghai';
     data.realizedTodayUsdt=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsUsdt??0),0).toFixed(6));
     data.realizedTodayNex=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsNex??0),0).toFixed(6));
     Object.assign(data,facts);

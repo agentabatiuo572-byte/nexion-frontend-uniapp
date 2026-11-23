@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire } from './prototype-demo-notifications.mjs';
+import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire, demoVisibleEarningReceipts } from './prototype-demo-notifications.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
@@ -41,7 +41,7 @@ export function demoEarningReceiptRead(url, state) {
 // Receipt cursors retain the issuance cutoff while ordering by completion.
 export function demoReceiptPage(params, receipts, state) {
   if (state?.fleetState === 'earning-credit') {
-    const samples = demoEarningReceipts(state).filter(sample => sample.receiptStatus !== 404);
+    const samples = demoVisibleEarningReceipts(state);
     receipts = [...receipts, ...samples.map(sample => demoEarningReceipt(sample))].map(demoReceiptSummary);
   }
   const offset=Number(params.get('offset')??0),limit=Number(params.get('limit')??20);
