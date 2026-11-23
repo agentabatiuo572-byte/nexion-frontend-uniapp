@@ -3,7 +3,7 @@
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
 import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
-import {demoAccountId,previewAccountId} from './prototype-demo-identity.mjs';
+import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
 
 export const previewPurchaseCashier = new URL('/__demo/purchase-cashier/', 'https://api.hdpayadmin.com');
@@ -30,7 +30,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const refused = (status, message) => ({status, message, data: null});
   const handles = path => path.startsWith(base);
   // The preview models one purchasing account, including its seeded payments.
-  const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoAccountId;
+  const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoPurchasingAccountId(state);
   function existingIntentRefusal(intent, payload) {
     if (intent.kind === 'TRIAL_CONVERT') {
       const productNo = String(payload.productNo ?? '');

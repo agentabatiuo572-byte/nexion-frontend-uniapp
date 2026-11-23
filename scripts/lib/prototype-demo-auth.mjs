@@ -1,6 +1,6 @@
 // Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
-import { clearPreviewAccessToken, demoPhoneAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
+import { clearPreviewAccessToken, demoReferralBuyer, demoPhoneAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
 import { demoAccountPasswordMatches } from './prototype-demo-account.mjs';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
@@ -76,7 +76,7 @@ export function createAuthDemo(state) {
       if (path === '/auth/users/refresh') {
         return state.sessionState === 'signed-out' || headers.authorization && !previewAccountId(state, headers)
           ? failure(401, 'AUTH_REQUIRED')
-          : issue(session(state.authUser ?? existing));
+          : issue(session(state.authUser ?? (state.promotionBuyer === 'sponsored-new' ? demoReferralBuyer.user : existing)));
       }
       const recovery = recoverPath.exec(path);
       const id = recovery?.[1] ?? headers['x-nexgrid-login-attempt-id'];
