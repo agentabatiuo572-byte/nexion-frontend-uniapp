@@ -317,12 +317,12 @@ const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().sa
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
 const walletEnough = computed(() => Number(s.amount) === 0 || balanceKnown.value && app.user.usdtBalance >= Number(s.amount));
 const shortfall = computed(() => balanceKnown.value && Number(s.amount) > 0 ? Math.max(0, Number(s.amount) - app.user.usdtBalance) : 0);
-const usdtAvailable = computed(() => payment.available('CREGIS_USDT_BSC') || payment.available('CREGIS_USDT_ERC20') || payment.available('CREGIS_USDT_TRC20'));
 const networks = computed(() => [
   { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
   { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
   { id: 'CREGIS_USDT_TRC20' as const, title: copy.value.trc20, chain: copy.value.trc20Chain },
 ].filter(tab => payment.available(tab.id)));
+const usdtAvailable = computed(() => networks.value.length > 0);
 // A concluded payment has nothing left to offer behind its notice.
 const sheetOpen = computed(() => active.value && s.open && !s.pending && !s.concluded);
 const pageOpen = computed(() => active.value && s.open && !!s.pending && !s.concluded);

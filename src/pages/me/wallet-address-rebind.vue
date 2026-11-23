@@ -158,7 +158,7 @@
           <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期)。
                冻结期不叠挂:冻结横幅说「禁提」时再说「可能需复核」= 同屏两种结论
                (审计 P1;与 wallet-withdraw 的 !frozenNow 反冗余门同型)。 -->
-          <text v-if="holdActive && !frozenNow" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ holdNoteText }}</text>
+          <text v-if="retainedAddress || (holdActive && !frozenNow)" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ retainedAddress ? t.bankWithdrawal.networkUnavailable : holdNoteText }}</text>
         </view>
 
         <!-- 更换入口 / 拦截态(在途单 > 频控,原因 + 下一步;规格 ② 异常2/3) -->
@@ -194,7 +194,7 @@
           </view>
         </view>
         <view
-          v-else
+          v-else-if="networkAvailable"
           class="nx-rebind-change-cta w-full grid place-items-center active:opacity-90"
           :style="primaryCtaStyle"
           role="button" tabindex="0"
@@ -268,6 +268,7 @@ import { otpSend, otpVerify } from "@/store/auth-otp";
 import { CHAIN_TO_WITHDRAW_NETWORK, formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
 import { advanceMonotonicHighWater, deadlineRemainingMs, projectServerNow, readTrustedMonotonicNowMs } from "@/lib/server-deadline-clock";
 import type { ChainDepositChannel } from "@/store/types";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 
 const t = useT();
@@ -286,14 +287,13 @@ const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
 ];
 const networkPolicy = ref<WithdrawalPolicy | null>(null);
 const networkPolicyStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
-const NETWORKS = computed(() => payoutAddressServerEnabled
-  ? ALL_NETWORKS.filter((nw) => networkPolicy.value?.withdrawalEnabled === true
-    && networkPolicy.value.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
-  : ALL_NETWORKS);
-const network = ref<ChainDepositChannel>("usdt-trc20");
+const NETWORKS = computed(() => ALL_NETWORKS.filter((nw) => canSelectNewUsdtNetwork(nw.id)
+  && (!payoutAddressServerEnabled || (networkPolicy.value?.withdrawalEnabled === true
+    && networkPolicy.value.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id)))));
+const network = ref<ChainDepositChannel>("usdt-bep20");
 const withdrawReturnUrl = computed(() => `/pages/me/wallet-withdraw?network=${CHAIN_TO_WITHDRAW_NETWORK[network.value]}`);
-const networkAvailable = computed(() => !payoutAddressServerEnabled
-  || (networkPolicyStatus.value === "ready" && NETWORKS.value.some((nw) => nw.id === network.value)));
+const networkAvailable = computed(() => (!payoutAddressServerEnabled || networkPolicyStatus.value === "ready")
+  && NETWORKS.value.some((nw) => nw.id === network.value));
 
 onLoad((options) => {
   const q = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-address-rebind")).get("network");
@@ -307,11 +307,14 @@ const explicitStep = ref<Step>("base");
 const mode = ref<"add" | "change">("add");
 const successIsChange = ref(false);
 const current = computed(() => payout.currentFor(network.value));
+const retainedAddress = computed(() => !canSelectNewUsdtNetwork(network.value) && !!current.value);
 const history = computed(() => payout.stateFor(network.value).history);
 const historyDesc = computed(() => [...history.value].reverse());
 const historyOpen = ref(false);
 const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
-  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance || !networkAvailable.value)) return "unknown";
+  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance)) return "unknown";
+  if (retainedAddress.value) return "view";
+  if (!networkAvailable.value) return "unknown";
   if (explicitStep.value === "otp") return "otp";
   if (explicitStep.value === "success") return "success";
   if (explicitStep.value === "form") return "form";
@@ -651,8 +654,10 @@ watch([() => step.value !== "unknown", () => payout.stateFor(network.value).next
 const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
 const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
 watch(() => [networkPolicyStatus.value, remoteReadStatus.value] as const, ([policyStatus, addressStatus]) => {
-  if (policyStatus !== "ready" || addressStatus !== "ready" || networkAvailable.value) return;
-  const fallback = NETWORKS.value.find((nw) => payout.currentFor(nw.id)) ?? NETWORKS.value[0];
+  if ((payoutAddressServerEnabled && (policyStatus !== "ready" || addressStatus !== "ready"))
+      || networkAvailable.value || retainedAddress.value) return;
+  const withAddress = canSelectNewUsdtNetwork(network.value) ? NETWORKS.value.find((nw) => payout.currentFor(nw.id)) : undefined;
+  const fallback = withAddress ?? NETWORKS.value[0];
   if (fallback) switchNetwork(fallback.id);
 });
 let tickTimer: ReturnType<typeof setInterval> | undefined;

@@ -34,6 +34,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 import { useApp } from "@/store/app";
 import { usePayoutAddress } from "@/store/payout-address";
@@ -55,7 +56,7 @@ const cards = computed(() => {
   if (!current?.withdrawalEnabled) return [];
   // The address is decoration: until the address book is read, the card shows no destination rather than "not set".
   const addressesKnown = payout.readStatusFor(app.accountKey) === "ready";
-  return NETWORK_ORDER.filter(id => current.enabledNetworks.includes(id)).map(id => {
+  return NETWORK_ORDER.filter(id => canSelectNewUsdtNetwork(id) && current.enabledNetworks.includes(id)).map(id => {
     const label = id.slice(5), address = payout.currentFor(fromWithdrawNetwork(id))?.address ?? "";
     const fee = current.networkConfirmFeeUsd[label.toLowerCase() as keyof WithdrawalPolicy["networkConfirmFeeUsd"]];
     const to = !addressesKnown ? null : address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;

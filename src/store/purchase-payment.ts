@@ -1,4 +1,5 @@
 import { reactive } from 'vue';
+import { canSelectNewUsdtNetwork } from '@/lib/usdt-network-options';
 import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import { createCregisDepositApi } from '@/api/cregis-deposit-api';
@@ -429,7 +430,7 @@ async function loadPolicy() {
   reconcileChannel();
 }
 function available(method: PurchaseMethod) {
-  if (method === 'CREGIS_USDT_TRC20') return state.policy?.[method] === true;
+  if (!canSelectNewUsdtNetwork(method)) return false;
   return method === 'WALLET' || !state.policy || state.policy[method] === true;
 }
 function channelUnavailable(error: unknown, method: PurchaseMethod) {
@@ -445,8 +446,10 @@ function hideChannel(method: ExternalPaymentMethod) {
 function reconcileChannel() {
   if (state.concluded || state.pending || state.originalRecovery || state.step === 'methods' || available(state.method)) return;
   state.notice = ''; reviewedQuote = confirmedQuote = null;
-  const other = state.method === 'HDPAY_BANK' ? null : (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC', 'CREGIS_USDT_TRC20'] as const)
-    .find(method => method !== state.method && available(method));
+  const networks = !canSelectNewUsdtNetwork(state.method)
+    ? (['CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'] as const)
+    : (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC'] as const);
+  const other = state.method === 'HDPAY_BANK' ? null : networks.find(method => method !== state.method && available(method));
   if (other && available(other)) void select(other);
   else choose('WALLET');
 }
@@ -527,8 +530,7 @@ function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (state.originalRecovery) return;
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
-  // Preserve ERC20/BEP20 priority; TRC20 is selectable only when explicitly open.
-  const network = (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC', 'CREGIS_USDT_TRC20'] as const)
+  const network = (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC'] as const)
     .find(available) ?? 'CREGIS_USDT_ERC20';
   void select(network, 'network');
 }
