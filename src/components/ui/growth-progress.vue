@@ -15,25 +15,28 @@
 </template>
 <script setup lang="ts">
 import { computed, getCurrentInstance, ref, watch } from 'vue';
-import { useScrollGrowProgress } from '@/composables/use-scroll-grow-progress';
+import { useScrollGrowProgress, VIZ_RING_TRANSITION } from '@/composables/use-scroll-grow-progress';
 const props = withDefaults(defineProps<{ value: number | null; label?: string; ring?: boolean; size?: number; radius?: number; stroke?: number }>(), {ring: false, size: 64, radius:44, stroke: 8});
 // Two clipped semicircles sweep using only transform; no dash-offset or conic animation.
 const uid = getCurrentInstance()!.uid;
 const rightClip = `growth-right-${uid}`, leftClip = `growth-left-${uid}`;
-const { elRef, inView } = useScrollGrowProgress();
+const { elRef, inView } = useScrollGrowProgress({ nativeSelector: '.growth-progress' });
 const entered = ref(false);
 watch(inView, value => { if (value) entered.value = true; }, {immediate: true});
 const pct = computed(() => Math.max(0, Math.min(100, props.value ?? 0)));
-// The App draws the ring through NxNativeSvg, which rewrites the svg whenever its markup changes; the sweep angles and
-// the entered switch therefore live on the real root as CSS variables, so the transform transitions still run.
+// Ring entrance (07 §7.1.1): the registered --nx-viz-ring sweeps 0 → value over 1400ms on the real root while the ring
+// is in view, and resets to 0 when it leaves so it plays again on re-entry. Both half-arcs read that one value, so the
+// sweep is a single curve. The svg markup never changes with it (the App writes it through NxNativeSvg).
+// The --ui-growth-* values are the final state for reduced motion.
 const ringStyle = computed(() => ({
   width: props.size + 'px',
   height: props.size + 'px',
+  '--nx-viz-ring': inView.value === false ? 0 : pct.value,
+  transition: inView.value === false ? 'none' : VIZ_RING_TRANSITION,
   '--ui-growth-angle-1': `${Math.min(180, pct.value * 3.6)}deg`,
   '--ui-growth-angle-2': `${Math.max(0, pct.value * 3.6 - 180)}deg`,
   '--ui-growth-on-1': pct.value > 0 ? 1 : 0,
   '--ui-growth-on-2': pct.value > 50 ? 1 : 0,
-  '--ui-growth-entered': entered.value ? 1 : 0,
 }));
 </script>
 <style scoped>
@@ -42,10 +45,12 @@ const ringStyle = computed(() => ({
 .growth-progress__fill { height: 100%; width: 100%; border-radius: inherit; background: var(--v5-brand); transform-origin: left; transition: transform 1400ms cubic-bezier(.16,1,.3,1); }
 .growth-progress :deep(.growth-progress__track), .growth-progress :deep(.growth-progress__arc) { fill: none; }
 .growth-progress :deep(.growth-progress__track) { stroke: var(--v5-surface-3); }
-.growth-progress :deep(.growth-progress__arc) { stroke: var(--v5-brand); stroke-linecap: round; transform-origin: 50px 50px; transition: transform 700ms cubic-bezier(.16,1,.3,1); }
-.growth-progress :deep(.growth-progress__arc--first) { opacity: var(--ui-growth-on-1); transform: rotate(calc(var(--ui-growth-angle-1) * var(--ui-growth-entered))); }
-.growth-progress :deep(.growth-progress__arc--second) { opacity: var(--ui-growth-on-2); transform: rotate(calc(var(--ui-growth-angle-2) * var(--ui-growth-entered))); transition-delay: 350ms; }
-.growth-progress :deep(.growth-progress__start) { fill:var(--v5-brand); opacity: var(--ui-growth-entered); transition:opacity 150ms ease; }
+/* --nx-viz-ring is registered with inherits:false; the ring's nodes take it from the root explicitly. */
+.growth-progress--ring :deep(*) { --nx-viz-ring: inherit; }
+.growth-progress :deep(.growth-progress__arc) { stroke: var(--v5-brand); stroke-linecap: round; transform-origin: 50px 50px; }
+.growth-progress :deep(.growth-progress__arc--first) { opacity: clamp(0, calc(var(--nx-viz-ring) * 1000), 1); transform: rotate(calc(min(var(--nx-viz-ring), 50) * 3.6deg)); }
+.growth-progress :deep(.growth-progress__arc--second) { opacity: clamp(0, calc((var(--nx-viz-ring) - 50) * 1000), 1); transform: rotate(calc(max(calc(var(--nx-viz-ring) - 50), 0) * 3.6deg)); }
+.growth-progress :deep(.growth-progress__start) { fill:var(--v5-brand); opacity: clamp(0, calc(var(--nx-viz-ring) * 1000), 1); }
 .growth-progress__center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: var(--font-metric); }
-@media (prefers-reduced-motion: reduce) { .growth-progress :deep(.growth-progress__start), .growth-progress__fill, .growth-progress :deep(.growth-progress__arc) { transition: none; transform: none !important; }.growth-progress :deep(.growth-progress__arc--first) { transform: rotate(var(--ui-growth-angle-1)) !important; }.growth-progress :deep(.growth-progress__arc--second) { transform: rotate(var(--ui-growth-angle-2)) !important; } }
+@media (prefers-reduced-motion: reduce) { .growth-progress--ring, .growth-progress__fill { transition: none !important; }.growth-progress__fill { transform: none !important; }.growth-progress :deep(.growth-progress__arc--first) { opacity: var(--ui-growth-on-1) !important; transform: rotate(var(--ui-growth-angle-1)) !important; }.growth-progress :deep(.growth-progress__arc--second) { opacity: var(--ui-growth-on-2) !important; transform: rotate(var(--ui-growth-angle-2)) !important; }.growth-progress :deep(.growth-progress__start) { opacity: var(--ui-growth-on-1) !important; } }
 </style>
