@@ -22,15 +22,17 @@ import type { PromotionDisclosure } from '@/lib/promotion-entry';
 import { landingCopy } from '@/i18n/promotion-landing';
 import DisclosureDetails from './disclosure-details.vue';
 import { uniquePromotionParagraphs } from '@/lib/promotion-paragraphs';
-const props=defineProps<{open:boolean;title?:string;terms?:string;disclosures?:PromotionDisclosure[];rules?:{id:string;text:string;prose?:boolean}[]}>();
+const props=defineProps<{open:boolean;title?:string;terms?:string;disclosures?:PromotionDisclosure[];audience?:'inviter'|'buyer';rules?:{id:string;text:string;prose?:boolean}[]}>();
 const emit=defineEmits<{(e:'close'):void}>();const t=useT();const locale=useLocaleStore();
 const uniqueDisclosures = computed(() => Array.from(new Map((props.disclosures ?? []).map(entry => [JSON.stringify(entry), entry])).values()));
-// Referral offers publish the buyer's and the inviter's reward under the same title, so the groups are named by who gets them.
+// Referral offers publish the buyer's and the inviter's reward under the same title, so the groups are named by who gets them,
+// from the reader's side: the inviter's pages say "friend's purchase reward / referral reward", purchase pages "purchase reward / inviter's reward".
 const hasInviter = computed(() => uniqueDisclosures.value.some(entry => entry.role === 'DIRECT_INVITER'));
 function sectionTitle(entry: PromotionDisclosure) {
   if (!hasInviter.value) return localized(entry.title,locale.code);
   const copy = landingCopy(locale.code);
-  return entry.role === 'DIRECT_INVITER' ? copy.termsInviterReward : copy.termsFriendReward;
+  if (props.audience === 'inviter') return entry.role === 'DIRECT_INVITER' ? copy.termsInviterReward : copy.termsFriendReward;
+  return entry.role === 'DIRECT_INVITER' ? copy.termsInviterRewardForBuyer : copy.termsBuyerReward;
 }
 // Terms and refund rules come from the offer, so every group usually repeats them; identical text is shown once.
 const shared = computed(() => {
