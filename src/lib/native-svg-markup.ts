@@ -3,6 +3,7 @@ import { Comment, Fragment, Text, type VNode } from "vue";
 const SVG_TAGS = new Set([
   "svg", "g", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse",
   "defs", "linearGradient", "radialGradient", "stop", "clipPath", "mask", "use", "text", "tspan",
+  "filter", "feGaussianBlur", "animate", "animateMotion", "animateTransform",
 ]);
 
 function escape(value: unknown): string {

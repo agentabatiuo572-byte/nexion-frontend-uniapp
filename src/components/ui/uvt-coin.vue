@@ -34,14 +34,14 @@ const ids = { rim: 'uvt-rim-' + n, face: 'uvt-face-' + n };
 </script>
 <style scoped>
 .uvt-coin { position: relative; display: block; width: 100%; height: 100%; filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--v5-nex) 30%, transparent)); }
-.uvt-coin__svg { display: block; }
-.uvt-coin__rim-hi { stop-color: color-mix(in srgb, var(--v5-nex) 35%, white); }
-.uvt-coin__rim-lo { stop-color: color-mix(in srgb, var(--v5-nex) 62%, black); }
-.uvt-coin__face-hi { stop-color: color-mix(in srgb, var(--v5-nex) 70%, white); }
-.uvt-coin__face-mid { stop-color: var(--v5-nex); }
-.uvt-coin__face-lo { stop-color: color-mix(in srgb, var(--v5-nex) 78%, black); }
-.uvt-coin__inner-line { stroke: color-mix(in srgb, white 28%, transparent); }
-.uvt-coin__gloss { fill: color-mix(in srgb, white 30%, transparent); }
-.uvt-coin__mark { stroke: white; }
+.uvt-coin :deep(.uvt-coin__svg) { display: block; }
+.uvt-coin :deep(.uvt-coin__rim-hi) { stop-color: color-mix(in srgb, var(--v5-nex) 35%, white); }
+.uvt-coin :deep(.uvt-coin__rim-lo) { stop-color: color-mix(in srgb, var(--v5-nex) 62%, black); }
+.uvt-coin :deep(.uvt-coin__face-hi) { stop-color: color-mix(in srgb, var(--v5-nex) 70%, white); }
+.uvt-coin :deep(.uvt-coin__face-mid) { stop-color: var(--v5-nex); }
+.uvt-coin :deep(.uvt-coin__face-lo) { stop-color: color-mix(in srgb, var(--v5-nex) 78%, black); }
+.uvt-coin :deep(.uvt-coin__inner-line) { stroke: color-mix(in srgb, white 28%, transparent); }
+.uvt-coin :deep(.uvt-coin__gloss) { fill: color-mix(in srgb, white 30%, transparent); }
+.uvt-coin :deep(.uvt-coin__mark) { stroke: white; }
 .uvt-coin--muted { filter: grayscale(1); opacity: .45; }
 </style>

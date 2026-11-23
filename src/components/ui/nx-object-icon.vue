@@ -55,37 +55,37 @@ const hue = computed(() => props.kind === 'gift' ? 'var(--v5-warning)' : props.t
 </script>
 <style scoped>
 .nx-object-icon { --obj-soft: color-mix(in srgb, var(--obj) 72%, #9AA0AB); --obj2-soft: color-mix(in srgb, var(--v5-brand-2) 72%, #9AA0AB); position: relative; display: block; width: 100%; height: 100%; }
-.nx-object-icon__svg { display: block; overflow: visible; }
-.o-floor { fill: rgba(0,0,0,.16); }
-.o-gloss { fill: rgba(255,255,255,.22); }
-.o-shade { fill: rgba(0,0,0,.10); }
-.o-inner { stroke: rgba(255,255,255,.28); stroke-width: 1; }
-.nx-object-icon--gift .o-hi { stop-color: color-mix(in srgb, var(--obj-soft) 80%, white); }
-.nx-object-icon--gift .o-mid { stop-color: var(--obj-soft); }
-.nx-object-icon--gift .o-lo { stop-color: color-mix(in srgb, var(--obj-soft) 84%, black); }
-.nx-object-icon--gift .o2-hi { stop-color: color-mix(in srgb, var(--obj2-soft) 85%, white); }
-.nx-object-icon--gift .o2-lo { stop-color: color-mix(in srgb, var(--obj2-soft) 84%, black); }
-.nx-object-icon--bank-card .o-hi { stop-color: #3A3E47; }
-.nx-object-icon--bank-card .o-mid { stop-color: #1E2026; }
-.nx-object-icon--bank-card .o-lo { stop-color: #0F1013; }
-.nx-object-icon--bank-card .o2-hi { stop-color: #F4D58A; }
-.nx-object-icon--bank-card .o2-lo { stop-color: #B98A2E; }
-.o-card-edge { stroke: rgba(255,255,255,.16); stroke-width: 1; }
-.o-card-line { fill: rgba(255,255,255,.34); }
-.o-card-dot1 { fill: rgba(255,255,255,.30); } .o-card-dot2 { fill: rgba(255,255,255,.18); }
-.nx-object-icon--medal .o-hi { stop-color: color-mix(in srgb, var(--obj-soft) 80%, white); }
-.nx-object-icon--medal .o-mid { stop-color: var(--obj-soft); }
-.nx-object-icon--medal .o-lo { stop-color: color-mix(in srgb, var(--obj-soft) 84%, black); }
-.nx-object-icon--medal .o2-hi { stop-color: color-mix(in srgb, var(--obj-soft) 55%, white); }
-.nx-object-icon--medal .o2-lo { stop-color: color-mix(in srgb, var(--obj-soft) 70%, black); }
+.nx-object-icon :deep(.nx-object-icon__svg) { display: block; overflow: visible; }
+.nx-object-icon :deep(.o-floor) { fill: rgba(0,0,0,.16); }
+.nx-object-icon :deep(.o-gloss) { fill: rgba(255,255,255,.22); }
+.nx-object-icon :deep(.o-shade) { fill: rgba(0,0,0,.10); }
+.nx-object-icon :deep(.o-inner) { stroke: rgba(255,255,255,.28); stroke-width: 1; }
+.nx-object-icon--gift :deep(.o-hi) { stop-color: color-mix(in srgb, var(--obj-soft) 80%, white); }
+.nx-object-icon--gift :deep(.o-mid) { stop-color: var(--obj-soft); }
+.nx-object-icon--gift :deep(.o-lo) { stop-color: color-mix(in srgb, var(--obj-soft) 84%, black); }
+.nx-object-icon--gift :deep(.o2-hi) { stop-color: color-mix(in srgb, var(--obj2-soft) 85%, white); }
+.nx-object-icon--gift :deep(.o2-lo) { stop-color: color-mix(in srgb, var(--obj2-soft) 84%, black); }
+.nx-object-icon--bank-card :deep(.o-hi) { stop-color: #3A3E47; }
+.nx-object-icon--bank-card :deep(.o-mid) { stop-color: #1E2026; }
+.nx-object-icon--bank-card :deep(.o-lo) { stop-color: #0F1013; }
+.nx-object-icon--bank-card :deep(.o2-hi) { stop-color: #F4D58A; }
+.nx-object-icon--bank-card :deep(.o2-lo) { stop-color: #B98A2E; }
+.nx-object-icon :deep(.o-card-edge) { stroke: rgba(255,255,255,.16); stroke-width: 1; }
+.nx-object-icon :deep(.o-card-line) { fill: rgba(255,255,255,.34); }
+.nx-object-icon :deep(.o-card-dot1) { fill: rgba(255,255,255,.30); } .nx-object-icon :deep(.o-card-dot2) { fill: rgba(255,255,255,.18); }
+.nx-object-icon--medal :deep(.o-hi) { stop-color: color-mix(in srgb, var(--obj-soft) 80%, white); }
+.nx-object-icon--medal :deep(.o-mid) { stop-color: var(--obj-soft); }
+.nx-object-icon--medal :deep(.o-lo) { stop-color: color-mix(in srgb, var(--obj-soft) 84%, black); }
+.nx-object-icon--medal :deep(.o2-hi) { stop-color: color-mix(in srgb, var(--obj-soft) 55%, white); }
+.nx-object-icon--medal :deep(.o2-lo) { stop-color: color-mix(in srgb, var(--obj-soft) 70%, black); }
 .nx-object-icon__glyph { position: absolute; left: 0; right: 0; top: 0; height: 90.6%; display: grid; place-items: center; color: #4E3104; }
 :root:not([data-theme="light"]) .nx-object-icon__glyph { color: #735603; }
 .nx-object-icon__glyph > :deep(*) { display: grid; place-items: center; }
 .nx-object-icon--muted { filter: grayscale(1); opacity: .5; }
-[data-theme="light"] .o-floor { fill: rgba(20,16,8,.10); }
+[data-theme="light"] .nx-object-icon :deep(.o-floor) { fill: rgba(20,16,8,.10); }
 /* On the dark page the near-black card face needs a brighter top light and edge to read as an object. */
-:root:not([data-theme="light"]) .nx-object-icon--bank-card .o-hi { stop-color: #5C626E; }
-:root:not([data-theme="light"]) .nx-object-icon--bank-card .o-mid { stop-color: #2B2E35; }
-:root:not([data-theme="light"]) .o-card-edge { stroke: rgba(255,255,255,.34); }
-:root:not([data-theme="light"]) .o-floor { fill: rgba(0,0,0,.32); }
+:root:not([data-theme="light"]) .nx-object-icon--bank-card :deep(.o-hi) { stop-color: #5C626E; }
+:root:not([data-theme="light"]) .nx-object-icon--bank-card :deep(.o-mid) { stop-color: #2B2E35; }
+:root:not([data-theme="light"]) .nx-object-icon :deep(.o-card-edge) { stroke: rgba(255,255,255,.34); }
+:root:not([data-theme="light"]) .nx-object-icon :deep(.o-floor) { fill: rgba(0,0,0,.32); }
 </style>

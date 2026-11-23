@@ -22,12 +22,16 @@
       <!-- Streak energy ring -->
       <view class="dly-hero" :class="{ 'dly-hero--glow': dailyFactsVisible }" :role="dailyFactsVisible ? undefined : 'status'" :aria-label="t.daily.activeStreak">
         <view ref="ringRef" class="dly-rw" :class="{ 'nx-loops-paused': !ringLoops.running.value }">
-          <svg v-if="!dailyFactsVisible" class="dly-ring" width="248" height="248" viewBox="0 0 248 248" aria-hidden="true"><circle class="dly-ring__ph" cx="124" cy="124" r="104" /></svg>
-          <svg v-else class="dly-ring" width="248" height="248" viewBox="0 0 248 248" role="img" :aria-label="ringLabel">
-            <circle v-for="s in ringSegments" :key="`t${s.i}`" class="dly-ring__tr" cx="124" cy="124" r="104" :stroke-dasharray="s.dash" :stroke-linecap="ringCap" :transform="`rotate(${s.rotate} 124 124)`" />
-            <circle v-for="s in ringSegments.slice(0, ring.done)" :key="`d${s.i}`" class="dly-ring__dn" :class="{ 'dly-ring__dn--new': successFx && s.i === ring.done - 1 }" cx="124" cy="124" r="104" :stroke-dasharray="s.dash" :stroke-linecap="ringCap" :transform="`rotate(${s.rotate} 124 124)`" :style="{ stroke: ringDoneStroke(s.i), '--i': s.i }" />
-            <circle v-if="ringTodayIndex !== null" class="dly-ring__td" :class="{ 'dly-ring__td--breathe': ringBreathing }" cx="124" cy="124" r="104" :stroke-dasharray="ringSegments[ringTodayIndex].dash" :stroke-linecap="ringCap" :transform="`rotate(${ringSegments[ringTodayIndex].rotate} 124 124)`" />
-          </svg>
+          <view v-if="!dailyFactsVisible" class="dly-ring" aria-hidden="true"><svg width="248" height="248" viewBox="0 0 248 248"><circle class="dly-ring__ph" cx="124" cy="124" r="104" /></svg></view>
+          <view v-else class="dly-ring" :class="{ 'dly-ring--settled': ringSettled }" role="img" :aria-label="ringLabel">
+            <svg width="248" height="248" viewBox="0 0 248 248" aria-hidden="true">
+              <circle v-for="s in ringSegments" :key="`t${s.i}`" class="dly-ring__tr" cx="124" cy="124" r="104" :stroke-dasharray="s.dash" :stroke-linecap="ringCap" :transform="`rotate(${s.rotate} 124 124)`" />
+              <circle v-for="s in ringSegments.slice(0, ring.done)" :key="`d${s.i}`" class="dly-ring__dn" :class="{ 'dly-ring__dn--new': successFx && s.i === ring.done - 1 }" cx="124" cy="124" r="104" :stroke-dasharray="s.dash" :stroke-linecap="ringCap" :transform="`rotate(${s.rotate} 124 124)`" :style="{ stroke: ringDoneStroke(s.i), '--i': s.i }" />
+            </svg>
+            <view v-if="ringTodayIndex !== null" class="dly-ring__today" :class="{ 'dly-ring__today--breathe': ringBreathing }" aria-hidden="true">
+              <svg width="248" height="248" viewBox="0 0 248 248"><circle class="dly-ring__td" cx="124" cy="124" r="104" :stroke-dasharray="ringSegments[ringTodayIndex].dash" :stroke-linecap="ringCap" :transform="`rotate(${ringSegments[ringTodayIndex].rotate} 124 124)`" /></svg>
+            </view>
+          </view>
           <template v-if="dailyFactsVisible">
             <view class="dly-spk" style="left: -18px; top: 70px; width: 6px; height: 6px; background: var(--v5-warning); opacity: .7" />
             <view class="dly-spk" style="left: -4px; top: 186px; width: 4px; height: 4px; background: var(--v5-brand-2); opacity: .6" />
@@ -770,6 +774,8 @@ function goWithdraw() {
 // ── presentation ──
 // Retained pages skip the entrance on return (uni re-shows the hidden page).
 const returned = ref(false);
+// Set by the first check-in on this page: from then on only the newly signed ring segment animates (see .dly-ring--settled).
+const ringSettled = ref(false);
 
 const RING_R = 104;
 const RING_C = 2 * Math.PI * RING_R;
@@ -864,6 +870,7 @@ function clearCheckInSuccess() {
 function playCheckInSuccess(from: number, gained: number, multiplier: number, summary: string) {
   clearCheckInSuccess();
   successFx.value = { key: Date.now(), amount: formatAmount(gained), multiplier, summary, atRing: ringLoops.running.value };
+  ringSettled.value = true;
   successTimer = setTimeout(clearCheckInSuccess, 1900);
   const to = streak.value;
   const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -908,17 +915,24 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-hero { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: 4px; text-align: center; animation: dly-rise 520ms cubic-bezier(.16, 1, .3, 1) both; }
 .dly-hero--glow::before { content: ""; position: absolute; left: 50%; top: -34px; width: 380px; height: 330px; margin-left: -190px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-warning) var(--dly-glow), transparent), color-mix(in srgb, var(--v5-brand-2) var(--dly-glow2), transparent) 62%, transparent); filter: blur(6px); pointer-events: none; }
 .dly-rw { position: relative; width: 248px; height: 248px; }
-.dly-ring { position: absolute; inset: 0; overflow: visible; }
-.dly-ring circle { fill: none; stroke-width: 14; }
-.dly-ring__ph { stroke: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
-.dly-ring__tr { stroke: color-mix(in srgb, var(--v5-ink) 9%, transparent); }
-.dly-ring__dn { animation: dly-lit 380ms ease-out both; animation-delay: calc(var(--i) * 80ms + 260ms); }
-.dly-ring__dn--new { animation-delay: 0ms; }
-.dly-ring__td { stroke: var(--v5-brand); }
-.dly-ring__td--breathe { opacity: .35; animation: dly-breathe 2.4s ease-in-out 900ms infinite; }
+/* The App draws the ring through NxNativeSvg (v-html): circles are reached with :deep(), and anything that toggles
+   while the page is open sits on real elements, since every markup change rewrites the svg and restarts its animations.
+   Today's breathing segment is its own layer; after a check-in the segments already lit stay lit and only the new one fills. */
+.dly-ring { position: absolute; inset: 0; }
+.dly-ring :deep(svg) { display: block; overflow: visible; }
+.dly-ring :deep(circle) { fill: none; stroke-width: 14; }
+.dly-ring :deep(.dly-ring__ph) { stroke: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.dly-ring :deep(.dly-ring__tr) { stroke: color-mix(in srgb, var(--v5-ink) 9%, transparent); }
+.dly-ring :deep(.dly-ring__dn) { animation: dly-lit 380ms ease-out both; animation-delay: calc(var(--i) * 80ms + 260ms); }
+.dly-ring :deep(.dly-ring__dn--new) { animation-delay: 0ms; }
+.dly-ring--settled :deep(.dly-ring__dn) { animation: none; }
+.dly-ring--settled :deep(.dly-ring__dn--new) { animation: dly-lit 380ms ease-out both; }
+.dly-ring :deep(.dly-ring__td) { stroke: var(--v5-brand); }
+.dly-ring__today { position: absolute; inset: 0; }
+.dly-ring__today--breathe { opacity: .35; animation: dly-breathe 2.4s ease-in-out 900ms infinite; }
 /* Light theme: blue thinned to .35 over the beige track reads as lavender, so the low point stays at .6. */
-[data-theme="light"] .dly-ring__td--breathe { opacity: .6; animation-name: dly-breathe-light; }
-.nx-loops-paused .dly-ring__td--breathe { animation-play-state: paused; }
+[data-theme="light"] .dly-ring__today--breathe { opacity: .6; animation-name: dly-breathe-light; }
+.nx-loops-paused .dly-ring__today--breathe { animation-play-state: paused; }
 .dly-spk { position: absolute; border-radius: 50%; pointer-events: none; }
 /* The gift object sits straight on the ring (no disc behind it); an unreached milestone is a little quieter. */
 .dly-gift__object { width: 40px; height: 40px; opacity: .85; }
@@ -1092,7 +1106,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 }
 
 /* Retained page shown again: no second entrance. */
-.dly--instant .dly-hero, .dly--instant .dly-ring__dn, .dly--instant .dly-rail__item > .dly-tk, .dly--instant .dly-tk__sheen > view { animation: none; }
+.dly--instant .dly-hero, .dly--instant .dly-ring :deep(.dly-ring__dn), .dly--instant .dly-rail__item > .dly-tk, .dly--instant .dly-tk__sheen > view { animation: none; }
 
 @keyframes dly-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes dly-slidein { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
@@ -1109,8 +1123,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 @keyframes dly-fly-fade { 0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .dly-hero, .dly-ring__dn, .dly-rail__item > .dly-tk, .dly-tk__sheen > view, .dly-cta__sheen, .dly-bar, .dly-burst { animation: none; }
-  .dly-ring__td--breathe, [data-theme="light"] .dly-ring__td--breathe { opacity: 1; animation: none; }
+  .dly-hero, .dly-ring :deep(.dly-ring__dn), .dly-rail__item > .dly-tk, .dly-tk__sheen > view, .dly-cta__sheen, .dly-bar, .dly-burst { animation: none; }
+  .dly-ring__today--breathe, [data-theme="light"] .dly-ring__today--breathe { opacity: 1; animation: none; }
   .dly-tk__sheen, .dly-cta__sheen { display: none; }
   /* The reward stays readable for the full 1900ms, fading in place (overrides the global reduce catch-all). */
   .dly .dly-fly, .dly-bar .dly-fly { animation: dly-fly-fade 1900ms linear both !important; animation-delay: 0s !important; }

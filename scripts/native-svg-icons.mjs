@@ -1,10 +1,16 @@
 import { parse } from "@vue/compiler-sfc";
 
-// App-vue does not reliably render template SVG elements. Keep charts and
-// illustrations untouched; convert icon-sized SVGs to a component that writes
-// SVG markup through the App view layer's supported v-html path. A larger SVG
-// opts in with a `data-native-svg` attribute (its styles must then reach inner
-// nodes through :deep() on a real scoped wrapper).
+// App-vue builds template SVG elements in the XHTML namespace, where they have no size
+// and never paint. Every template SVG therefore goes through NxNativeSvg, which writes
+// the markup through the App view layer's v-html path (SVG namespace). Rules for SVG
+// written this way:
+// - scoped styles reach the svg and its inner nodes only through :deep() on a real
+//   scoped wrapper (the inner nodes carry no data-v attribute);
+// - inner nodes keep attributes only: events and refs are dropped, so interaction
+//   lives on a real element around the svg;
+// - any change to the markup replaces the whole svg, so a value that changes over time
+//   (countdowns, progress, toggled classes) belongs in a CSS variable or class on the
+//   real wrapper, otherwise CSS animations restart and transitions never run.
 export function nativeSvgIcons() {
   return {
     name: "nexgrid-native-svg-icons",
@@ -18,12 +24,9 @@ export function nativeSvgIcons() {
       const edits = [];
       const visit = (node) => {
         if (node.type === 1 && node.tag === "svg" && !node.isSelfClosing) {
-          const size = (name) => Number(node.props.find((prop) => prop.type === 6 && prop.name === name)?.value?.content);
-          const optIn = node.props.some((prop) => prop.type === 6 && prop.name === "data-native-svg");
-          if (optIn || (size("width") > 0 && size("width") <= 80 && size("height") > 0 && size("height") <= 80)) {
-            edits.push([node.loc.start.offset + 1, 3, "NxNativeSvg"]);
-            edits.push([node.loc.end.offset - 4, 3, "NxNativeSvg"]);
-          }
+          edits.push([node.loc.start.offset + 1, 3, "NxNativeSvg"]);
+          edits.push([node.loc.end.offset - 4, 3, "NxNativeSvg"]);
+          return; // the markup writer serialises nested nodes itself
         }
         for (const child of node.children ?? []) visit(child);
       };
