@@ -22,7 +22,7 @@
           <DeviceArt v-if="item.device" class="fleet-stage__chip-art" :device="item.device" />
           <DeviceArt v-else class="fleet-stage__chip-art" :src="trialArt" />
           <text class="fleet-stage__chip-name">{{ item.name }}</text>
-          <text v-if="!item.device" class="fleet-stage__chip-tag">{{ trialCopy.imageBadge }}</text>
+          <NxTag v-if="!item.device" tone="brand" :label="trialCopy.imageBadge" />
           <view class="fleet-stage__chip-dot" :class="{ 'fleet-stage__chip-dot--on': item.online }" />
         </view>
         <view v-if="fleet.countReady.value && fleet.freeSlots.value > 0" class="fleet-stage__chip fleet-stage__chip--add" role="button" tabindex="0" :aria-label="`${t.earn.addDevice}, ${freeSlotsText}`" @click="addDevice"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></view>
@@ -52,6 +52,7 @@ import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useFleetSlots } from "@/composables/use-fleet-slots";
 import type { Device } from "@/store/types";
 import DeviceArt from "@/components/device-art.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import DeviceCardPC from "./device-card-pc.vue";
 import TrialStage from "./trial-stage.vue";
 import JobGauge from "./job-gauge.vue";
@@ -129,7 +130,6 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 .fleet-stage__chip:active { opacity: .85; }
 .fleet-stage__chip-art { width: 34px; height: 30px; flex: none; }
 .fleet-stage__chip--off .fleet-stage__chip-art { filter: grayscale(.75); opacity: .55; }
-.fleet-stage__chip-tag { padding: 0 4px; border-radius: 5px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 10px/14px var(--font-v5); }
 .fleet-stage__chip-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .fleet-stage__chip-dot--on { background: var(--v5-success); }
 .fleet-stage__chip--add { width: 44px; padding: 0; justify-content: center; background: transparent; color: var(--v5-ink-3); }
