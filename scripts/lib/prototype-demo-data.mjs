@@ -166,7 +166,10 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
       purchaseGate:state.catalogState==='restricted'&&id==='stellarbox-s1'?{mode:'all',enforce:true,rankMin:8}:null,
       purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
-      dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
+      // Every SKU gets the backend's band ranges so previews show the coming contract: B75 (device USDT daily range) and
+      // B75-BE-02 (UVT daily range; field names provisional until the backend ships).
+      dailyEstimateLowUsdt:monthlyEstimateUsdt*(1-b)/30,dailyEstimateHighUsdt:monthlyEstimateUsdt*(1+b)/30,
+      dailyEstimateLowNex:dailyEarnNEX*(1-b),dailyEstimateHighNex:dailyEarnNEX*(1+b),
       shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
     };
   }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
