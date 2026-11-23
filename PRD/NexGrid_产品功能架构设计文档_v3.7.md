@@ -1695,6 +1695,8 @@ credit = paidPriceUsdt × creditPct(band(ratio)) × promoMult,  clamp 到 [0, �
 | 4 | 75% – <100% | 30% |
 | 5 | ≥100% | 15% |
 
+报价保留后端计算的实际产出比。超过 100% 的值有效，继续使用最后一档的抵扣比例。
+
 - **实付基数**:`paidPriceUsdt` = 实付净额(订单 total,已扣券与置换抵扣;trial 转正 = 促销价 − 收益抵扣),非目录价 — 防券/试用低价买入套利。
 - **paidPrice = 0(赠送)⇒ 不可置换**(资格排除,非"∞ 产出比落档 5")。
 - **规则参数**(后台「升级置换阶梯」面板可配,详见后台 PRD E 域):阶梯 5 档界点与比例(区间连续、比例严格递减,结构由机器哨兵锁)/ `requireHigherPrice`(默认 true)/ `maxDevicesPerOrder`(默认 1)/ `promoMult`(默认 1.0;>≈1.47 时 clamp 可能绑定)/ `applyTo` SKU 白名单 / `enabled` 总开关(关闭 = 全部置换入口隐藏)。
