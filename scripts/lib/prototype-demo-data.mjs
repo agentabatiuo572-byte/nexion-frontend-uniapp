@@ -16,7 +16,7 @@ import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxi
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
-import { demoEarningBillRefs, demoEarningCredits, demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
+import { demoEarningBillRefs, demoEarningCredits, demoNotificationPage, demoNotifications, demoReceiptTodayByDevice, demoWithEarningReceiptTasks } from './prototype-demo-notifications.mjs';
 import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs';
 import { savedAttemptOptions } from './prototype-demo-auth.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
@@ -549,13 +549,19 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
         ...(gift===state.promotionGift&&{sourceChannel:'PROMOTION_GIFT',sourceOrderNo:demoPromotionGift.orderNo})});
     }
   }
+  const todayByDevice=state.fleetState==='earning-credit'
+    ?demoReceiptTodayByDevice(demoWithEarningReceiptTasks(state,demoSettledTasks(state,state.previewFactsAt)),now)
+    :null;
   const devices=roster.map(seedDevice=>{
     const product=products.find(product=>product.id.toUpperCase()===seedDevice.productCode);
     const share=product.productType==='SHARE'
       ? {deviceType:'SHARE',gpuModel:product.gpu,vramTotalGb:0,basePowerW:0} : {};
     const device={...seedDevice,...state.deviceActivations?.[seedDevice.id],...share};
     const capacity=previewCapacity(device,seed.capacitySchedule,now);
-    return {...device,...capacity,monthlyTargetActive:product.monthlyEstimateUsdt!=null,
+    const today=todayByDevice?.get(device.id);
+    const realized=todayByDevice?{todayEarningsUsdt:Number((today?.todayEarningsUsdt??0).toFixed(6)),
+      todayEarningsNex:Number((today?.todayEarningsNex??0).toFixed(6))}:{};
+    return {...device,...capacity,...realized,monthlyTargetActive:product.monthlyEstimateUsdt!=null,
       dailyUsdt:Number((product.dailyEarn*capacity.capacityPct/100).toFixed(6))};
   });
   // serverNow is this read's time: the shared review fixture's clock stops at server start.
@@ -777,7 +783,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const settledTasks=()=>demoSettledTasks(state,state.previewFactsAt);
   if(pathname==='/api/app/home/overview') {
     const overview=structuredClone(base());
-    const tasks=settledTasks();
+    if(state.fleetState==='earning-credit'&&!state.fleetSeed)demoFleetFacts(url,locale,state);
+    const tasks=demoWithEarningReceiptTasks(state,settledTasks());
     overview.earnings=demoTaskPeriods(tasks,now);
     overview.earningsLedger=tasks.slice().sort((a,b)=>b.completedAt-a.completedAt).slice(0,15)
       .map(task=>({id:task.taskNo,client:task.client,model:task.simulation?task.taskName:task.model,rewardUsdt:task.amount,
@@ -1552,6 +1559,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
     const data=base();data.walletUsdt=demoWalletUsdt(state);data.walletNex=demoWalletNex(state,now);data.userJoinedAt=demoH4Account(state).createdAt;
     data.dailyUsdt=active.reduce((sum,device)=>sum+device.dailyUsdt,0);data.dailyNex=active.reduce((sum,device)=>sum+device.dailyNex,0);
+    if(state.fleetState==='earning-credit')data.timezone='Asia/Shanghai';
     data.realizedTodayUsdt=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsUsdt??0),0).toFixed(6));
     data.realizedTodayNex=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsNex??0),0).toFixed(6));
     Object.assign(data,facts);

@@ -17,6 +17,7 @@ const earningSamples = [
 ];
 const taskNames = { IG: 'Image Generation', VG: 'Video Generation', LL: 'LLM Inference',
   EM: 'Embedding', SP: 'Speech Processing', FT: 'Fine-tuning' };
+const earningModel = taskClass => taskClass === 'EM' ? 'BGE-M3' : 'Wan 2.1';
 const roundReward = amount => Number(amount.toFixed(6));
 
 // Monthly pacing uses purchase anniversaries in the storage zone, with days clamped at month end.
@@ -69,6 +70,34 @@ export function demoEarningReceipts(state) {
   });
 }
 
+export function demoVisibleEarningReceipts(state) {
+  return demoEarningReceipts(state).filter(sample => sample.receiptStatus !== 404);
+}
+
+export function demoWithEarningReceiptTasks(state, tasks) {
+  if (state.fleetState !== 'earning-credit') return tasks;
+  const samples = demoVisibleEarningReceipts(state);
+  // These samples are canonical CREDITED receipts. A zero-reward receipt still counts as a completed job.
+  return [...tasks, ...samples.map(sample => ({
+    taskNo: sample.taskNo, deviceId: sample.device.id, client: 'UVEL',
+    model: sample.modelReceipt ? earningModel(sample.taskClass) : taskNames[sample.taskClass],
+    amount: sample.rewardUsdt, nex: sample.rewardNex, completedAt: sample.completedAt,
+  }))];
+}
+
+export function demoReceiptTodayByDevice(tasks, now) {
+  const start = Math.floor((now + storageOffset) / day) * day - storageOffset;
+  const totals = new Map();
+  for (const task of tasks) {
+    if (task.completedAt < start || task.completedAt >= start + day) continue;
+    const total = totals.get(task.deviceId) ?? { todayEarningsUsdt: 0, todayEarningsNex: 0 };
+    total.todayEarningsUsdt += task.amount;
+    total.todayEarningsNex += task.nex ?? 0;
+    totals.set(task.deviceId, total);
+  }
+  return totals;
+}
+
 export function demoEarningCredits(state) {
   return demoEarningReceipts(state).filter(sample => sample.settledAt !== null);
 }
@@ -97,7 +126,7 @@ export function demoEarningReceipt(sample, detail = false) {
     source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true,
     receiptNo, displayReceiptNo: `UVEL-RC-${id.toString(36).toUpperCase().padStart(6, '0')}`,
     taskNo, taskClass, taskId: `demo-earn-${id}`, taskName: taskNames[taskClass],
-    model: modelReceipt ? (taskClass === 'EM' ? 'BGE-M3' : 'Wan 2.1') : '', client: 'UVEL',
+    model: modelReceipt ? earningModel(taskClass) : '', client: 'UVEL',
     deviceId: device.id, deviceInstanceNo: device.instanceNo, deviceName: device.name,
     deviceType: device.deviceType ?? 'BOX', deviceGpu: device.gpuModel ?? '', vramTotalGb: device.vramTotalGb,
     rewardUsdt, rewardNex, earningStatus: 'CREDITED', settledAt, postingTimeVerified: settledAt !== null,

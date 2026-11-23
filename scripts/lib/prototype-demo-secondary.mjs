@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire } from './prototype-demo-notifications.mjs';
+import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire, demoVisibleEarningReceipts } from './prototype-demo-notifications.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
@@ -264,7 +264,7 @@ export function secondaryDemo(url,state,request,walletBills){
         postingTimeVerified:task.postedAt!=null}),
       proofHash:task.simulation?null:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts'){
-      const receipts=[...items,...earningReceipts.filter(sample=>sample.receiptStatus!==404).map(sample=>demoEarningReceipt(sample))];
+      const receipts=[...items,...demoVisibleEarningReceipts(state).map(sample=>demoEarningReceipt(sample))];
       return demoReceiptPage(url.searchParams,state.fleetState==='earning-credit'?receipts.map(demoReceiptSummary):receipts,state);
     }
     const index=items.findIndex(r=>r.receiptNo===p.split('/').pop());
