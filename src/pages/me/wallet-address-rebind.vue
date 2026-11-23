@@ -43,18 +43,13 @@
           <view class="grid place-items-center" :style="successIconBoxStyle">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
           </view>
-          <view><text class="block text-center" :style="stateTitleStyle">{{ successIsChange ? t.addrRebind.successTitle : t.addrRebind.addSuccessTitle }}</text></view>
-          <view><text class="block text-center" :style="stateBodyStyle">{{ successIsChange ? t.addrRebind.successBody : t.addrRebind.addSuccessBody }}</text></view>
+          <view><text class="block text-center nx-rebind-success-title" tabindex="-1" :style="stateTitleStyle">{{ successTitleText }}</text></view>
+          <view v-if="successBodyText"><text class="block text-center" :style="stateBodyStyle">{{ successBodyText }}</text></view>
           <view style="margin-top: 14px" class="w-full">
             <view class="flex items-center justify-between" :style="successRowStyle">
               <text :style="successRowLabelStyle">{{ t.addrRebind.successNewAddr }}</text>
               <text class="font-mono tabular-nums" :style="successRowValStyle">{{ maskAddressMid(current?.address ?? '') }}</text>
             </view>
-          </view>
-          <!-- 首次添加也进入新地址安全冻结(时长取后台配置,不写死) -->
-          <view v-if="!successIsChange" class="w-full flex" :style="warnlineStyle">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-            <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
           </view>
         </view>
         <view class="nx-rebind-done-cta w-full grid place-items-center active:opacity-90" :style="primaryCtaStyle" role="button" tabindex="0" @click="finish">
@@ -154,7 +149,7 @@
               <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ t.addrRebind.sourceMigrated }}</text>
             </view>
           </view>
-          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(currentEffectiveAt ?? 0) }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ effectiveLabel }} · {{ fmtStamp(currentEffectiveAt ?? 0) }}</text>
           <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期)。
                冻结期不叠挂:冻结横幅说「禁提」时再说「可能需复核」= 同屏两种结论
                (审计 P1;与 wallet-withdraw 的 !frozenNow 反冗余门同型)。 -->
@@ -637,9 +632,8 @@ function focusSoon(selectors: string[]) {
 }
 function returnToView() {
   backToBase();
-  focusSoon([".nx-rebind-change-cta", '.nx-rebind-network-radio[tabindex="0"]']);
-}
-function backToBase() {
+  focusSoon([".nx-rebind-change-cta", ".rb-form .rb-title", '.nx-rebind-network-radio[tabindex="0"]']);
+}function backToBase() {
   invalidatePageCommand();
   explicitStep.value = "base";
   mode.value = "add";
@@ -830,6 +824,14 @@ const cooldownDays = computed(() => payout.changeCooldownDays ?? cfg.config.with
 function fmtStamp(ts: number): string {
   return formatDisplayDateTime(ts, dateLocale());
 }
+// Effective-time wording follows the snapshot: pending, in effect, or unknown while the server clock is unavailable.
+const effectiveLabel = computed(() => addressEffective.value === true ? t.value.addrRebind.addedAtLabel
+  : addressEffective.value === false ? t.value.addrRebind.effectivePendingLabel : t.value.addrRebind.effectiveUnknownLabel);
+const successTitleText = computed(() => addressEffective.value === true
+  ? fmt(t.value.addrRebind.successEffectiveTitle, { network: ALL_NETWORKS.find((nw) => nw.id === network.value)?.label ?? "" })
+  : successIsChange.value ? t.value.addrRebind.successTitle : t.value.addrRebind.addSuccessTitle);
+const successBodyText = computed(() => addressEffective.value === null || currentEffectiveAt.value === null ? ""
+  : fmt(addressEffective.value ? t.value.addrRebind.successEffectiveBody : t.value.addrRebind.successPendingBody, { time: fmtStamp(currentEffectiveAt.value) }));
 // 频控拦截给绝对时刻(平台口径,不说「明天」;规格 ② 异常3)
 const cooldownUntilText = computed(() => {
   const at = payout.stateFor(network.value).nextChangeAt;
@@ -856,6 +858,13 @@ function finish() {
   invalidatePageCommand();
   navBack(withdrawReturnUrl.value); // 无页面栈时保留当前网络,地址由响应式 store 即时回填
 }
+// Registered after every value `step` reads, so its first evaluation sees them initialised.
+// The code step and the result replace the control that opened them: focus the code input, then the result title.
+watch(() => step.value, (next, previous) => {
+  if (next === previous) return;
+  if (next === "otp") focusSoon([".nx-rebind-otp-input input", ".nx-rebind-otp-input"]);
+  else if (next === "success") focusSoon([".nx-rebind-success-title"]);
+});
 
 // ── styles ──
 // 输入框零描边,贴页面底(容器无底色 → surface L1,与既有子页同型)。
@@ -875,13 +884,6 @@ const errorTextStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-danger)",
   lineHeight: 1.4,
-};
-const warnlineStyle: CSSProperties = {
-  marginTop: "16px",
-  padding: "12px",
-  borderRadius: "12px",
-  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-  gap: "8px",
 };
 const warnTextStyle: CSSProperties = {
   fontSize: "12px",
@@ -967,6 +969,8 @@ const stateBodyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.55,
   maxWidth: "300px",
+  // Short centred results wrap into even lines, never one character alone on the last line.
+  textWrap: "balance",
 };
 const successRowStyle: CSSProperties = {
   padding: "12px",
@@ -1002,7 +1006,7 @@ const successRowValStyle: CSSProperties = {
 .rb-net--on .rb-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
 .rb-net--on .rb-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
 .rb-form { margin-top: 24px; }
-.rb-title:focus { outline: none; }
+.rb-title:focus, .nx-rebind-success-title:focus { outline: none; }
 .rb-title { display: block; padding: 0 4px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .rb-desc { display: block; margin-top: 4px; padding: 0 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .rb-field { display: flex; align-items: center; gap: 10px; min-height: 56px; margin-top: 8px; padding: 8px 8px 8px 14px; box-sizing: border-box; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
