@@ -331,7 +331,7 @@ export function requireDemoPurchase(state,products,items,now,settlement=false,qu
 const orderDiscounts={1:10,4:5};
 const orderDiscountDisclosure=amount=>({deviceName:null,deviceRights:null,title:{zh:'订单立减',en:'Order discount',vi:'Giảm giá đơn hàng'},
   benefitDescription:{zh:'下单立减，不另发钱包奖励；退款按实际支付金额。',en:'Deducted at checkout, with no wallet reward. Refunds use the amount paid.',vi:'Giảm trực tiếp khi đặt hàng, không thưởng thêm vào ví. Hoàn tiền theo số tiền thực trả.'},
-  terms:{zh:'下单时直接减 '+amount+' USDT。',en:amount+' USDT comes off when you order.',vi:'Giảm trực tiếp '+amount+' USDT khi đặt hàng.'},
+  terms:{zh:'下单时直接减 '+amount+' USDT。',en:amount+' USDT comes off when you order.',vi:'Giảm trực tiếp '+amount+' USDT khi đặt hàng.'},
   refundTerms:{zh:'退款按实际支付金额处理。',en:'Refunds use the amount paid.',vi:'Hoàn tiền theo số tiền thực trả.'}});
 const orderStates={placed:['PENDING','PENDING_PAYMENT','WAITING_PAYMENT'],paid:['PAID','PAID','WAITING_PROVISIONING'],provisioning:['PAID','PROCESSING','PROVISIONING'],activated:['PAID','COMPLETED','ACTIVATED'],payment_failed:['FAILED','PAYMENT_FAILED','WAITING_PAYMENT'],expired:['EXPIRED','EXPIRED','WAITING_PAYMENT'],provisioning_failed:['PAID','PROVISIONING_FAILED','PROVISIONING_FAILED'],refunded:['REFUNDED','REFUNDED','REFUNDED'],chargeback:['CHARGEBACK','CHARGEBACK','DEACTIVATED'],cancelled:['CANCELLED','CANCELLED','WAITING_PAYMENT']};
 // Sample times are facts of the scenario: fixed when it is seeded, not regenerated per read. Like the backend's
@@ -1201,7 +1201,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
     const sample=base('/api/promotions').items[0];
     const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
-    const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share'],['DIRECT_REFERRAL','邀请好友购机礼（按台）','Referral purchase reward (per unit)','Quà giới thiệu (theo thiết bị)','stellarrack-p2']];
+    const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share'],['DIRECT_REFERRAL','首台设备邀请礼','First device referral gift','Quà giới thiệu thiết bị đầu tiên','stellarrack-p2']];
     const authenticated=Boolean(previewAccountId(state,request?.headers?.()??{}));
     const exact=state.repurchaseState==='boundary'||state.repurchaseState==='outside';
     const repurchaseWindow=exact?{minDays:30,maxDays:30}:{minDays:state.repurchaseState==='inside'?7:0,maxDays:90};
@@ -1229,12 +1229,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         item.rewardRules[0].buyerReward=reward;
         if(state.promotionRewardType==='gift-discount')item.rewardRules[0].buyerReward={rewardRuleId:reward.rewardRuleId,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:'100',disclosure:orderDiscountDisclosure(100)};
       }
-      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
+      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',calculation:'FIXED',amount:String(i*50),disclosure:d};}
       // The referral offer also publishes what the inviter gets for each friend's first purchase.
       if(template==='DIRECT_REFERRAL'){
+        if(!authenticated&&item.eligibility!=='INELIGIBLE')item.eligibility='SIGN_IN_REQUIRED';
         const byOrder=i===2;
         item.firstPurchaseCondition={mode:byOrder?'FIRST_ELIGIBLE_ORDER':'FIRST_ELIGIBLE_UNIT',restoreAfterRefund:byOrder};
-        item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:{...structuredClone(item.rewardRules[0].buyerReward.disclosure),benefitDescription:{zh:'领取 50 UVT',en:'Receive 50 UVT',vi:'Nhận 50 UVT'}}};
+        item.rewardRules[0].inviterReward={rewardRuleId:'demo-inviter-'+i,beneficiaryRole:'DIRECT_INVITER',type:'UVT',calculation:'FIXED',amount:'50',disclosure:{...structuredClone(item.rewardRules[0].buyerReward.disclosure),benefitDescription:{zh:'领取 50 UVT',en:'Receive 50 UVT',vi:'Nhận 50 UVT'}}};
       }
       if(i>0){
         if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
