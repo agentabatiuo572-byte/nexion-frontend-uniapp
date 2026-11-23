@@ -2,21 +2,37 @@
 import { randomUUID } from 'node:crypto';
 import { previewInterfaceLanguages } from './design-review-fixture.mjs';
 import { demoH4Account, demoTeamBusinessDate } from './prototype-demo-events.mjs';
+import { demoAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 
 const pendingWithdrawalAmount = 100;
 
-const browserNames = ['Chrome · Android', 'Safari · iOS', 'Safari · macOS', 'Chrome · Windows'];
+export const demoTwoFactorAccountId = 900004;
 
-function activeOtherSecuritySessions(state, security) {
-  if (state.securitySessionState !== 'paginated' || security.otherSessionsRevoked) return [];
+export function demoSecurityAccount(state, accountId) {
+  const accounts = state.securityDemoByAccount ??= {};
+  return accounts[accountId] ??= {
+    twoFactorEnabled: Number(accountId) === demoTwoFactorAccountId,
+    passwordChangedAt: String(accountId) === demoAccountId ? new Date(state.previewFactsAt).toISOString() : null,
+  };
+}
+
+export function demoAccountPasswordMatches(_state, password) {
+  return password === 'Local404Pass!';
+}
+
+const browserNames = ['Safari · iOS', 'Safari · macOS', 'Chrome · Windows'];
+const currentSessionId = accountId => accountId === demoAccountId ? 'demo-session' : 'demo-session-' + accountId;
+
+function activeOtherSecuritySessions(state, accountId, security) {
+  if (accountId !== demoAccountId || state.securitySessionState !== 'paginated' || security.otherSessionsRevoked) return [];
   // Each row is a distinct installation's representative. The first two share a model.
   return Array.from({ length: 23 }, (_, index) => {
     const rowId = 3023 - index;
     return {
       rowId,
       session: {
-        id: 'demo-h5-session-' + rowId,
-        deviceName: index < 2 ? 'Samsung SM-A5760 · Android 16' : browserNames[index % browserNames.length],
+        id: (index === 2 ? 'demo-app-session-' : 'demo-h5-session-') + rowId,
+        deviceName: index < 2 ? 'Chrome · Android' : index === 2 ? 'Samsung SM-A5760 · Android 16' : browserNames[index % browserNames.length],
         ipMasked: index < 2 ? '198.51.100.*' : '203.0.113.*',
         lastActiveAt: new Date(state.previewFactsAt - (index + 1) * 60000).toISOString(),
         current: false,
@@ -80,25 +96,29 @@ export function accountDemo(url, locale, state, request) {
       reject('SECURITY_CURSOR_INVALID', 422);
     }
     if (state.securityReadFailure === (cursor === null ? 'overview' : 'next-page')) reject('DEMO_SECURITY_READ_UNAVAILABLE', 503);
-    const security = state.securityDemo ??= { passwordChangedAt: new Date(state.previewFactsAt).toISOString() };
-    const rows = activeOtherSecuritySessions(state, security).filter(row => cursor === null || row.rowId < Number(cursor));
+    const accountId = previewAccountId(state, request.headers());
+    if (!accountId) reject('AUTH_REQUIRED', 401);
+    const security = demoSecurityAccount(state, accountId);
+    const rows = activeOtherSecuritySessions(state, accountId, security).filter(row => cursor === null || row.rowId < Number(cursor));
     if (cursor === null) rows.unshift({ rowId: 3024, session: {
-      id: 'demo-session', deviceName: state.loginDeviceName ?? 'Safari · iOS', ipMasked: '192.0.2.*',
+      id: currentSessionId(accountId), deviceName: security.deviceName ?? 'Safari · iOS', ipMasked: '192.0.2.*',
       lastActiveAt: new Date().toISOString(), current: true,
     } });
-    return { twoFactorEnabled: state.twoFactorEnabled ?? true, passwordChangedAt: security.passwordChangedAt,
+    return { twoFactorEnabled: security.twoFactorEnabled, passwordChangedAt: security.passwordChangedAt,
       sessions: rows.slice(0, 20).map(row => row.session), nextCursor: rows.length > 20 ? String(rows[19].rowId) : null };
   }
   const sessionRevoke = method === 'POST' && path.match(/^\/api\/app\/security\/sessions\/([^/]+)\/revoke$/);
   if (sessionRevoke || (method === 'POST' && path === '/api/app/security/sessions/revoke-others')) {
-    const security = state.securityDemo ??= { passwordChangedAt: new Date(state.previewFactsAt).toISOString() };
-    const others = activeOtherSecuritySessions(state, security);
+    const accountId = previewAccountId(state, request.headers());
+    if (!accountId) reject('AUTH_REQUIRED', 401);
+    const security = demoSecurityAccount(state, accountId);
+    const others = activeOtherSecuritySessions(state, accountId, security);
     if (!sessionRevoke) {
       security.otherSessionsRevoked = true;
       return { revokedSessionCount: others.length };
     }
     const id = sessionRevoke[1];
-    if (id === 'demo-session') reject('CURRENT_SESSION_REVOKE_FORBIDDEN');
+    if (id === currentSessionId(accountId)) reject('CURRENT_SESSION_REVOKE_FORBIDDEN');
     if (!others.some(({ session }) => session.id === id)) reject('SESSION_NOT_ACTIVE_OR_NOT_OWNED', 404);
     (security.revokedSessionIds ??= []).push(id);
     return { revokedSessionCount: 1 };
