@@ -3090,7 +3090,7 @@ export const fil: Messages = {
     typeWalletPairing: "Wallet verification (luma)",
     sigCopied: "Nakopya ang signature",
     clearedToast: "{n} resibo ang inalis",
-    stampVerified: "BERIPIKADO",
+    stampVerified: "Beripikado",
     statusRecorded: "Naitala",
     statusSettled: "Naibigay",
     vietQrStatus: {

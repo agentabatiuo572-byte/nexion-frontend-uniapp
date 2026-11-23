@@ -2647,7 +2647,7 @@ rankBenefits: "Xem quyền lợi cấp bậc",
     typeWalletPairing: "Xác minh ví (cũ)",
     sigCopied: "Đã sao chép chữ ký",
     clearedToast: "Đã xóa {n} biên lai",
-    stampVerified: "ĐÃ XÁC MINH",
+    stampVerified: "Đã xác minh",
     statusRecorded: "Đã ghi nhận",
     statusSettled: "Đã thanh toán",
     vietQrStatus: {

@@ -3090,7 +3090,7 @@ export const uz: Messages = {
     typeWalletPairing: "Hamyon tekshiruvi (eski)",
     sigCopied: "Imzo nusxalandi",
     clearedToast: "{n} ta chek oʻchirildi",
-    stampVerified: "TEKSHIRILGAN",
+    stampVerified: "Tekshirilgan",
     statusRecorded: "Qayd etildi",
     statusSettled: "Toʻlandi",
     vietQrStatus: {

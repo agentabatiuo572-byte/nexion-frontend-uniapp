@@ -3090,7 +3090,7 @@ export const ms: Messages = {
     typeWalletPairing: "Pengesahan dompet (lama)",
     sigCopied: "Tandatangan disalin",
     clearedToast: "{n} resit dibuang",
-    stampVerified: "DISAHKAN",
+    stampVerified: "Disahkan",
     statusRecorded: "Direkodkan",
     statusSettled: "Dibayar",
     vietQrStatus: {

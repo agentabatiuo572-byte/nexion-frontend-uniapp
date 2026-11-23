@@ -2706,7 +2706,7 @@ rankBenefits: "View rank benefits",
     typeWalletPairing: "Wallet verification (legacy)",
     sigCopied: "Signature copied",
     clearedToast: "{n} receipts removed",
-    stampVerified: "VERIFIED",
+    stampVerified: "Verified",
     statusRecorded: "Recorded",
     statusSettled: "Settled",
     vietQrStatus: {

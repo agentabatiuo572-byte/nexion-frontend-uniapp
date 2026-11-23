@@ -3090,7 +3090,7 @@ export const ru: Messages = {
     typeWalletPairing: "Проверка кошелька (архив)",
     sigCopied: "Подпись скопирована",
     clearedToast: "Удалено квитанций: {n}",
-    stampVerified: "ПРОВЕРЕНО",
+    stampVerified: "Проверено",
     statusRecorded: "Записано",
     statusSettled: "Выплачено",
     vietQrStatus: {

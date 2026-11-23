@@ -3090,7 +3090,7 @@ export const kk: Messages = {
     typeWalletPairing: "Әмиянды тексеру (ескі)",
     sigCopied: "Қолтаңба көшірілді",
     clearedToast: "Жойылған түбіртек: {n}",
-    stampVerified: "ТЕКСЕРІЛДІ",
+    stampVerified: "Тексерілді",
     statusRecorded: "Жазылды",
     statusSettled: "Төленді",
     vietQrStatus: {
