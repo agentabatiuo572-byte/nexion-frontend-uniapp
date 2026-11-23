@@ -7,6 +7,7 @@ export interface LoginAttempt {
   recoveryProof: string;
   installationId: string;
   executionSupported: boolean;
+  deviceName?: string;
   authMethod: string;
   authReference: string;
   pending: boolean;
@@ -14,7 +15,7 @@ export interface LoginAttempt {
 }
 
 /** Credentials and OTP never enter this record; the runtime chooses per-surface storage. */
-export function createLoginAttempt(deps: { clientSurface?: "APP" | "H5"; storage?: KeyValueStorage; installationId: () => string; executionSupported: () => boolean }) {
+export function createLoginAttempt(deps: { clientSurface?: "APP" | "H5"; storage?: KeyValueStorage; installationId: () => string; executionSupported: () => boolean; deviceName?: () => string | undefined }) {
   let current: LoginAttempt | null = null;
   function read() {
     // H5 recovery uses the installation frozen in the saved attempt, even an old
@@ -50,6 +51,7 @@ export function createLoginAttempt(deps: { clientSurface?: "APP" | "H5"; storage
       const attempt = { ...(continuation ? old : {
         loginAttemptId: requireCryptoUuid(), recoveryProof: (requireCryptoUuid() + requireCryptoUuid()).replace(/-/g, ""),
         installationId: deps.installationId(), executionSupported: deps.executionSupported(),
+        deviceName: deps.deviceName?.(),
       }), authMethod, authReference, context, pending: true } as LoginAttempt;
       save(attempt);
       return attempt;

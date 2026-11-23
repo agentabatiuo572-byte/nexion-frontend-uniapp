@@ -142,6 +142,9 @@ const demoCatalogBadges = [
   {badge:'Low barrier',badgeKind:'lowBarrier'},
 ];
 const demoPromotionGift={orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',obligationId:'demo-reward-3',productNo:'stellarbox-s1',quantity:1};
+const catalogTaglineTranslations = {
+  'stellarbox-pro': { zh:'全托管设备', vi:'Thiết bị vận hành trọn gói' },
+};
 // The paid order keeps the gift terms of its published version even after the live offer changes.
 function promotionDeviceReward(giftName) {
   return {rewardRuleId:'review-gift',beneficiaryRole:'BUYER',type:'DEVICE',giftProductNo:demoPromotionGift.productNo,
@@ -906,7 +909,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
   if(pathname==='/auth/users/oauth/provider/linked')return [...new Set(['GOOGLE',...(state.linkedProviders??[])])];
-  if(pathname==='/api/store/catalog') return {...authority,source:'nx_product',revision:null,products:empty?[]:products};
+  if(pathname==='/api/store/catalog') {
+    const requested=(url.searchParams.get('locale')?.trim()||state.profile?.language||locale).toLowerCase().split(/[-_]/)[0];
+    const language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(requested)?requested:'en';
+    return {...authority,source:'nx_product',revision:null,products:empty?[]:products.map(product=>({
+      ...product,tagline:catalogTaglineTranslations[product.id]?.[language]??product.tagline,
+    }))};
+  }
   if(pathname==='/api/product/phase') return {phase:'P2',source:'H1_GROWTH_RHYTHM',devOverrideAllowed:false};
   if(pathname==='/api/store/purchase-eligibility'||pathname==='/api/app/team/quota'){
     const members=demoTeamNetworkMembers(state,now);
@@ -1612,7 +1621,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       direction:'IN',amount:rewardNex,at:now,category:'achievement'});
     return remember('earningMilestone',id,{...authority,fired:[{milestoneId:id,thresholdUsd,rewardNex,lifetimeEarningsUsd}],count:1},null);
   }
-  if(pathname==='/api/app/security') return {twoFactorEnabled:state.twoFactorEnabled??true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};
   if(pathname==='/api/app/referral-rewards'){
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
     const limit=Math.max(1,Math.min(20,Math.trunc(Number(url.searchParams.get('limit')??10))||10));

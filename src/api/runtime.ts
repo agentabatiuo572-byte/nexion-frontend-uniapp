@@ -70,7 +70,7 @@ import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
 import type { RefreshCredentialMode } from "./session-vault";
 import { createNativeSessionStorage, type NativeSessionStorage } from "./native-session-storage";
-import { getDeviceId } from "@/lib/device-id";
+import { getDeviceId, getLoginDeviceName } from "@/lib/device-id";
 
 export const apiRuntimeConfig = reactive(readApiRuntimeConfig());
 /** Immutable identity of the client constructed below; mutable UI config cannot rebind it. */
@@ -136,6 +136,7 @@ export const apiClient = createRuntimeApiClient({
 export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface,
   installationId: getDeviceId,
   executionSupported: () => false,
+  deviceName: () => getLoginDeviceName(clientSurface === "APP"),
   attemptStorage: nativeAttemptStorage ?? (typeof sessionStorage !== "undefined" ? {
     get: () => { const value = sessionStorage.getItem("uvel-login-attempt"); return value ? JSON.parse(value) : null; },
     set: value => sessionStorage.setItem("uvel-login-attempt", JSON.stringify(value)),

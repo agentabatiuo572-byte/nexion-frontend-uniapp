@@ -98,7 +98,10 @@ export function localizedDatacenterValue(value: string | null | undefined, local
   return VIRGINIA_DATACENTER_LABEL[uiLocale(locale)];
 }
 
-function serverTagline(t: Messages, p: Product, locale?: LocaleCode): string {
+export function serverTagline(t: Messages, p: Product, locale?: LocaleCode): string {
+  // A Chinese catalog can carry these exact strings as published translations.
+  // Keep that snapshot intact while the next language is loading.
+  if (p.catalogRequestLocale === "zh") return p.tagline;
   if (p.id === "cloud-share" && normalizedPublishedTagline(p.tagline) === zh.store.cloudShareLowBarrierTagline) {
     return t.store.cloudShareLowBarrierTagline;
   }

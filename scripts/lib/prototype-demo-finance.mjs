@@ -14,17 +14,30 @@ const minWithdrawal = 20; // AppWithdrawalService.MIN_WITHDRAWAL, shared by poli
 const bankConfig={enabled:true,paymentMode:'hosted',dailyCapacityKnown:false,minDepositUsdt:50,maxDepositUsdt:5000,todayRemainingDepositUsdt:0,todayRemainingVnd:0,toleranceVnd:1000,graceMinutes:10,version:1,feeVnd:0,feeUsdt:0};
 const bankFx={baseRateVndPerUsdt:25000,buySpreadPct:0,quoteRateVndPerUsdt:25000,lockWindowMinutes:15,version:1};
 const refuse=(status,message)=>{throw Object.assign(new Error(message),{status});};
-export const demoWithdrawalNetworks = state => ({ "bep20-erc20": ["USDT-BEP20", "USDT-ERC20"], bep20: ["USDT-BEP20"], erc20: ["USDT-ERC20"], closed: [] }[state.withdrawNetworksState] ?? ["USDT-BEP20", "USDT-ERC20"]);
+export const demoUsdtWithdrawalNetworks = ["USDT-BEP20", "USDT-ERC20"];
+export const demoWithdrawalNetworks = state => ({ "bep20-erc20": demoUsdtWithdrawalNetworks, bep20: ["USDT-BEP20"], erc20: ["USDT-ERC20"], closed: [] }[state.withdrawNetworksState] ?? demoUsdtWithdrawalNetworks);
+export const demoPayoutAddressDelayHours = 24;
+export const demoPayoutAddressCooldownDays = 7;
 // The list, eligibility and address writes must read the same per-network address book.
 export function demoPayoutAddresses(state, now = Date.now()) {
-  const defaults = state.dataState === 'empty' ? {} : { 'USDT-BEP20': { source: 'server', serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '', network: 'USDT-BEP20', address: `0x${'1'.repeat(40)}`, status: 'ACTIVE', effectiveAt: new Date(now - day).toISOString(), createdAt: new Date(now - 8 * day).toISOString(), nextChangeAllowedAt: new Date(now).toISOString() } };
+  const createdAt = (state.previewFactsAt ?? now) - 8 * day;
+  const defaults = state.dataState === 'empty' ? {} : {
+    'USDT-BEP20': {
+      source: 'server', serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '',
+      network: 'USDT-BEP20', address: '0x' + '1'.repeat(40), status: 'ACTIVE',
+      createdAt: new Date(createdAt).toISOString(),
+      effectiveAt: new Date(createdAt + demoPayoutAddressDelayHours * 3600000).toISOString(),
+      nextChangeAllowedAt: new Date(createdAt + demoPayoutAddressCooldownDays * day).toISOString(),
+    },
+  };
   return Object.values({ ...defaults, ...state.bankDemo?.addresses }).map(row => ({ ...row, changePending: Date.parse(row.effectiveAt) > now }));
 }
 export function demoWithdrawalPolicy(state, facts) {
   const policy = {
     minAmount: minWithdrawal, dailyLimitCount: facts.dailyLimitCount, balanceMaxRatio: facts.balanceMaxRatio,
     smallAmountThresholdUsd: 100, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
-    networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1,
+    // The withdrawal policy contract requires a fee field for the inactive network.
+    networkConfirmFeeUsd: { trc20: 0, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1,
     cooldownDays: 7, complianceHoldEnabled: false,
     complianceReviewThresholdUsdt: 1000, withdrawalEnabled: true, enabledNetworks: demoWithdrawalNetworks(state),
     currentPhase: 'P1', currentMonth: 1, gateSource: 'J1', source: 'D5+H1',
@@ -35,8 +48,8 @@ export function demoWithdrawalPolicy(state, facts) {
 
 // The fixture models passing K3 and low K4. Non-fast orders go to manual review.
 function demoWithdrawalRisk(policy, chain, amount) {
-  const complianceReviewRequired = policy.complianceHoldEnabled && ['USDT-BEP20', 'USDT-ERC20'].includes(chain);
-  const complianceHoldApplies = complianceReviewRequired && amount > policy.complianceReviewThresholdUsdt;
+  const complianceReviewRequired = policy.complianceHoldEnabled && demoUsdtWithdrawalNetworks.includes(chain);
+  const complianceHoldApplies = complianceReviewRequired && policy.cooldownDays > 0 && amount > policy.complianceReviewThresholdUsdt;
   const complianceHoldDays = complianceHoldApplies ? policy.cooldownDays : 0;
   const strongReview = amount >= policy.strongReviewThresholdUsdt;
   const smallAmountEligible = amount <= policy.smallAmountThresholdUsd;
@@ -89,11 +102,10 @@ function createWithdrawalReceipt(frozen, policy, createdAt, nexAvailable, withdr
   const feeWaived = Math.floor(nexBurned * policy.nexFeeOffsetRate * 1e6) / 1e6;
   const actualFee = money(networkFee - feeWaived);
   const { fastLaneApplied, strongReview, ...risk } = demoWithdrawalRisk(policy, chain, amount);
-  const holdDays = chain === 'USDT-TRC20' ? policy.cooldownDays : risk.complianceHoldDays;
-  const holdAt = createdAt + holdDays * day;
+  const holdAt = createdAt + risk.complianceHoldDays * day;
   return {
     withdrawalNo, amount, chain,
-    status: fastLaneApplied || risk.complianceHoldApplies ? 'EXTENDED_HOLD' : 'REVIEW_PENDING',
+    status: fastLaneApplied ? 'PENDING_CHAIN' : risk.complianceHoldApplies ? 'EXTENDED_HOLD' : 'REVIEW_PENDING',
     holdUntil: new Date(holdAt).toISOString(),
     payoutDueAt: new Date(holdAt + policy.payoutSlaHours * 3600000).toISOString(),
     networkConfirmUsd: networkFee, networkFee, penaltyFeeRate: 0, penaltyFee: 0, grossFee: networkFee,
@@ -157,7 +169,24 @@ export function submitDemoWithdrawal(state, user, frozen) {
   return { status: 200, receipt };
 }
 
-export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now,demoWithdrawalUser(state,request.headers?.())),walletAmount=facts.walletUsdt; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
+// Model the provider's payout steps only for automatic approvals created in this preview.
+function advanceDemoFastWithdrawals(state, user, now) {
+  const orders = state.withdrawalOrders?.[user] ?? {};
+  for (const order of Object.values(orders)) {
+    if (order.riskRoute !== 'fast-pass' || !['PENDING_CHAIN', 'PROCESSING', 'CHAIN_SUBMITTED'].includes(order.status)) continue;
+    const createdAt = Date.parse(order.createdAt);
+    const age = now - createdAt;
+    if (age >= 20_000) {
+      order.status = 'CONFIRMED';
+      order.confirmedAt = new Date(createdAt + 20_000).toISOString();
+    } else if (age >= 12_000) order.status = 'CHAIN_SUBMITTED';
+    else if (age >= 6_000) order.status = 'PROCESSING';
+  }
+}
+
+export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',user=demoWithdrawalUser(state,request.headers?.());
+if(p==='/api/withdrawals'||p.startsWith('/api/withdrawals/'))advanceDemoFastWithdrawals(state,user,now);
+const facts=demoWithdrawalFacts(state,now,user),walletAmount=facts.walletUsdt; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
 const caps = { ...proof, source: "G2/G3 server configuration", asset: "UVT", currency: "USDT", currentPrice: .125, userDailyCapUsdt: 5000, platformDailyCapUsdt: 100000, feePct: .1, feeMinUsdt: .1, minUsdt: .1, minNex: 1, queueMode: "QUEUE", swapEnabled: true };
 const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_item + nx_emergency_control_setting" };
   if (p === "/api/config/exchange/caps") return caps;
@@ -195,7 +224,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     const input = method === 'GET' ? Object.fromEntries(url.searchParams) : request.postDataJSON();
     return demoWithdrawalEligibility(state, input, now, facts, demoWithdrawalPolicy(state, facts)).view;
   }
-  if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: 7, effectiveDelayHours: 24, inFlightWithdrawalBlocked: true };
+  if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: demoPayoutAddressCooldownDays, effectiveDelayHours: demoPayoutAddressDelayHours, inFlightWithdrawalBlocked: true };
   if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { ...bankConfig, enabled: state.topupChannels !== "bank-off" } };
   if (p === "/api/app/payments/fx-quote") {
     if(url.searchParams.get('fiat')?.toUpperCase()!=='VND'||url.searchParams.get('asset')?.toUpperCase()!=='USDT')refuse(422,'FX_PAIR_NOT_SUPPORTED');

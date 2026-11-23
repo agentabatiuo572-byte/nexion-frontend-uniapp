@@ -17,9 +17,9 @@ export interface PayoutAddressRow extends PayoutAddressProvenance {
   network: PayoutAddressNetwork;
   address: string;
   status: "ACTIVE";
-  effectiveAt: string;
-  createdAt: string;
-  nextChangeAllowedAt: string;
+  effectiveAtEpochMs: number;
+  createdAtEpochMs: number;
+  nextChangeAllowedAtEpochMs: number;
   changePending: boolean;
 }
 
@@ -56,16 +56,12 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 /** Backend serializes LocalDateTime in its fixed Asia/Shanghai business zone. */
-export function payoutAddressEpochMs(value: unknown): number | null {
+function payoutAddressEpochMs(value: unknown): number | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const normalized = value.trim().replace(" ", "T");
   const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
   const epochMs = Date.parse(hasOffset ? normalized : `${normalized}${BUSINESS_TIME_ZONE_OFFSET}`);
   return Number.isFinite(epochMs) ? epochMs : null;
-}
-
-function timestamp(value: unknown): value is string {
-  return payoutAddressEpochMs(value) !== null;
 }
 
 function epochMilliseconds(value: unknown): number | null {
@@ -92,28 +88,37 @@ function provenance(value: unknown, mode: ApiEnvironment): PayoutAddressProvenan
 
 function parseRow(value: unknown, mode: ApiEnvironment, expected?: PayoutAddressProvenance): PayoutAddressRow {
   const row = record(value);
+  const effectiveAtEpochMs = payoutAddressEpochMs(row?.effectiveAt);
+  const createdAtEpochMs = payoutAddressEpochMs(row?.createdAt);
+  const nextChangeAllowedAtEpochMs = payoutAddressEpochMs(row?.nextChangeAllowedAt);
   if (
     !row
     || !NETWORKS.has(row.network as PayoutAddressNetwork)
     || typeof row.address !== "string"
     || !row.address.trim()
     || row.status !== "ACTIVE"
-    || !timestamp(row.effectiveAt)
-    || !timestamp(row.createdAt)
-    || !timestamp(row.nextChangeAllowedAt)
+    || effectiveAtEpochMs === null
+    || createdAtEpochMs === null
+    || nextChangeAllowedAtEpochMs === null
     || typeof row.changePending !== "boolean"
   ) {
     throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_RESPONSE_INVALID" });
   }
-  if (row.serverCanonical !== true) {
-    throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_PROVENANCE_INVALID" });
-  }
   const actual = provenance(row, mode);
-  if (!expected || actual.source !== expected.source
-    || actual.sourceEnvironment !== expected.sourceEnvironment || actual.runId !== expected.runId) {
+  if (expected && (actual.source !== expected.source
+    || actual.sourceEnvironment !== expected.sourceEnvironment || actual.runId !== expected.runId)) {
     throw new ApiError({ kind: "protocol", message: "PAYOUT_ADDRESS_PROVENANCE_INVALID" });
   }
-  return row as unknown as PayoutAddressRow;
+  return {
+    ...actual,
+    network: row.network as PayoutAddressNetwork,
+    address: row.address,
+    status: row.status,
+    effectiveAtEpochMs,
+    createdAtEpochMs,
+    nextChangeAllowedAtEpochMs,
+    changePending: row.changePending,
+  };
 }
 
 function parseSnapshot(value: unknown, mode: ApiEnvironment): PayoutAddressSnapshot {
@@ -182,10 +187,7 @@ export function createPayoutAddressApi(client: ApiClient, mode: ApiEnvironment =
         idempotencyKey: input.idempotencyKey,
         timeoutMs: 30_000,
       });
-      const row = record(raw);
-      const proof = provenance(raw, mode);
-      parseRow(raw, mode, proof);
-      return { ...(row as unknown as PayoutAddressRow), ...proof };
+      return parseRow(raw, mode);
     },
   };
 }

@@ -17,7 +17,7 @@ export const promotionZH = {
 "rewardCategory":"活动奖励",
 "rewardCategoryDesc":"设备赠礼、USDT 与 UVT 奖励",
 "orderUnknownTitle":"订单处理结果尚未确认",
-"buyAgain":"再买一单",
+"buyAgain":"再买一台",
 "retryOriginalCancel":"重试原取消",
 "openedOriginal":"已先打开上一笔结果待确认的订单。请先处理此单，再返回打开所选订单。",
 "orderGroupLimit":"每单奖励次数上限",

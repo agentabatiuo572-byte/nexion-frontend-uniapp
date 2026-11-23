@@ -49,7 +49,7 @@ const visibility = useDataVisibility();
 const billsStore = useBills();
 const pager = billsStore.getLedger({ direction: "IN" });
 useAutoRecovery({ failed: () => fundsServerEnabled && props.active && pager.status === "error", retry: () => runPassiveTabRead("bills-income", () => pager.refresh(), undefined, () => pager.status === "ready") });
-const rows = computed(() => (fundsServerEnabled ? pager.rows : billsStore.bills.filter(bill => bill.amount > 0)).slice(0, ROWS));
+const rows = computed(() => (fundsServerEnabled ? pager.rows.filter(bill => !bill.hiddenNetwork) : billsStore.bills.filter(bill => bill.amount > 0)).slice(0, ROWS));
 const stateText = computed(() => fundsServerEnabled && (pager.status === "idle" || pager.status === "loading") ? t.value.home.networkStatUpdating
   : fundsServerEnabled && pager.status === "error" ? t.value.uiChrome.unavailable : t.value.home.incomeEmpty);
 function typeLabel(type: BillType): string {

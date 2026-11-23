@@ -315,6 +315,7 @@ import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
+import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
@@ -532,10 +533,8 @@ async function abandonPendingAttempt() {
     abandoningAttempt.value = false;
   }
 }
-// Server policy owns the network allow-list; local mock keeps its fixture.
-const NETWORKS = computed<{ id: CryptoNetwork; label: string }[]>(() => fundsServerEnabled
-    ? ALL_NETWORKS.filter((item) => withdrawalPolicy.value?.enabledNetworks.includes(item.id))
-    : ALL_NETWORKS);
+const NETWORKS = computed(() => ALL_NETWORKS.filter((item) => canSelectNewUsdtNetwork(item.id)
+  && (!fundsServerEnabled || withdrawalPolicy.value?.enabledNetworks.includes(item.id))));
 
 function isCurrentWithdrawalFactsScope(
   accountKey: string,
@@ -801,7 +800,8 @@ onLoad((options) => {
   devMode.value = import.meta.env.DEV && options?.dev === "1";
   // 网络由「选择提现网络」页带入(只读);无有效参数(深链 / 刷新 / 无栈返回)才用默认,见 settleDefaultNetwork。
   const requested = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-withdraw")).get("network");
-  const chosen = ALL_NETWORKS.find((n) => n.id === requested);
+  replacingHiddenNetwork = typeof requested === "string" && !canSelectNewUsdtNetwork(requested);
+  const chosen = ALL_NETWORKS.find((n) => n.id === requested && canSelectNewUsdtNetwork(n.id));
   if (chosen) {
     selectedNetwork.value = chosen.id;
     networkChosen = true;
@@ -815,7 +815,7 @@ const amount = ref(pendingAttempt.value?.amount.toFixed(2) ?? "");
 // selection separately so resolving that command restores the ordinary network rules.
 const selectedNetwork = ref<CryptoNetwork>("USDT-BEP20");
 const network = computed(() => pendingAttempt.value?.network ?? selectedNetwork.value);
-let networkChosen = false, defaultNetworkSettled = false;
+let networkChosen = false, defaultNetworkSettled = false, replacingHiddenNetwork = false;
 // A closed network blocks new submissions; an unresolved command still has its exact replay path.
 const networkClosed = computed(() => withdrawalPolicyCurrent.value && !NETWORKS.value.some((item) => item.id === network.value));
 function chooseNetworkAgain() {
@@ -830,7 +830,8 @@ function settleDefaultNetwork() {
   const open = NETWORKS.value;
   if (networkChosen || inputsLocked.value || open.length === 0) return;
   if (!defaultNetworkSettled && payout.readStatusFor(app.accountKey) === "ready") {
-    selectedNetwork.value = (open.find((n) => payout.currentFor(fromWithdrawNetwork(n.id))) ?? open[0]).id;
+    const withAddress = replacingHiddenNetwork ? undefined : open.find((n) => payout.currentFor(fromWithdrawNetwork(n.id)));
+    selectedNetwork.value = (withAddress ?? open[0]).id;
     defaultNetworkSettled = true;
   } else if (!open.some((item) => item.id === network.value)) {
     selectedNetwork.value = open[0].id;
@@ -1236,7 +1237,8 @@ const quoteDisplayBlocked = computed(() =>
   && submitDisabledReason.value !== "",
 );
 // The fee detail rows (confirm fee + receive) show only for an amount that can actually be quoted.
-const feeDetailReady = computed(() => !feeConfigLoading.value && NETWORKS.value.length > 0 && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value);
+const feeDetailReady = computed(() => !feeConfigLoading.value && (pendingAttempt.value || NETWORKS.value.length > 0)
+  && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value);
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );

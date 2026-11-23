@@ -14,7 +14,7 @@ export interface WithdrawalTrackingReadScope {
 }
 
 interface WithdrawalTrackingReadOptions<T extends { withdrawalNo: string }> {
-  read(withdrawalNo: string): Promise<T>;
+  read(withdrawalNo: string): Promise<T | null>;
   currentScope(): WithdrawalTrackingReadScope | null;
   apply(result: T): void;
   setStatus(status: WithdrawalTrackingReadStatus): void;
@@ -106,6 +106,7 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
           retryForChangedScope = !quiet && request === requestEpoch && options.currentScope() !== null;
           return;
         }
+        if (!result) { options.setStatus("not-found"); return; }
         if (result.withdrawalNo !== scope.withdrawalNo) {
           throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
         }
