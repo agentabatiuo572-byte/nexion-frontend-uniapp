@@ -52,6 +52,8 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
+import { formatEstimate, formatEstimateRange } from "@/lib/estimate-display";
+import { productDailyUvtRange } from "@/lib/product-estimates";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
@@ -268,7 +270,7 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
     unlockKind: g.mode,
     conditions,
     perks: [
-      fmt(auditCopy.value.estimatedDaily, { n: formatAmount(p.dailyEarnNEX) }),
+      fmt(auditCopy.value.estimatedDaily, { n: uvtEstimateText(p) }),
       // A Cloud Share shows no video memory.
       p.productType === "SHARE" ? specText(t.value, p.gpu, "—") : `${specText(t.value, p.gpu, "—")} · ${specText(t.value, p.vram, "—", "vram")}`,
     ],
@@ -296,7 +298,7 @@ function catalogProductPerks(productId: string, fallback: readonly string[]): st
   if (!p) return fallback.filter((perk) => !isAnnualizedQuotaPerk(perk)).map(quotaPerkText);
   // Annualized output is rendered only with its complete calculation basis.
   return [
-    fmt(auditCopy.value.estimatedDaily, { n: formatAmount(p.dailyEarnNEX) }),
+    fmt(auditCopy.value.estimatedDaily, { n: uvtEstimateText(p) }),
     p.productType === "SHARE" ? specText(t.value, p.gpu, "—") : `${specText(t.value, p.gpu, "—")} · ${specText(t.value, p.vram, "—", "vram")}`,
   ];
 }
@@ -310,17 +312,23 @@ function catalogProductRoiBasis(productId: string): QuotaTier["roiBasis"] {
   return { dailyEarn: p.dailyEarn, price: p.price, roi: mockAnnualRoiPct(p), revision: productCatalogPresentation.value?.revision };
 }
 
+// UVT output is an estimate: the catalog range when sent, otherwise one figure (src/lib/estimate-display.ts).
+function uvtEstimateText(p: Pick<Product, "dailyEarnNEX" | "dailyEstimateLowNex" | "dailyEstimateHighNex">): string {
+  const uvt = productDailyUvtRange(p);
+  return formatEstimateRange(uvt.low, uvt.high);
+}
+
 // The server row's perk strings are unlocalized and carry the raw column scale
 // ("80.000000 NEX/day"). Until the catalog read lands they are the only facts
-// available, so render them through the same localized, two-decimal
-// line the catalog path uses (BUG 33) instead of printing the raw column.
+// available, so render them through the same localized estimate line the
+// catalog path uses (BUG 33) instead of printing the raw column.
 const QUOTA_PERK_GEN = /^(\d+(?:\.\d+)?)\s*(?:NEX|UVT)\s*\/\s*day$/i;
 function quotaPerkText(perk: string): string {
   const match = QUOTA_PERK_GEN.exec(perk.trim());
   if (!match) return perk;
   const amount = Number(match[1]);
   if (!Number.isFinite(amount)) return perk;
-  return fmt(auditCopy.value.estimatedDaily, { n: formatAmount(match[1]) });
+  return fmt(auditCopy.value.estimatedDaily, { n: formatEstimate(amount) });
 }
 
 /** 请求聚焦的商品是否确实在配额档位里(空 id = 未指定,不提示)。 */

@@ -11,7 +11,7 @@
           <image class="store-voucher-ticket__art" src="/static/img/home-glass-20260928/coupon.webp" mode="aspectFit" aria-hidden="true" />
         </LoopScope>
         <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" tinted />
-        <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :target="upgrade.target" />
+        <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :base-daily-range="upgradeBaseDailyRange" :target="upgrade.target" />
         <template v-if="!voucherContext.voucherId">
           <StoreHero :multiplier="upgrade?.multiplier ?? null" />
           <ClusterLadder :authority="yieldAuthority" :owned="ownedHardware" />
@@ -115,6 +115,7 @@ import StoreHero from "@/components/store/store-hero.vue";
 import ClusterLadder from "@/components/store/cluster-ladder.vue";
 import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
+import { productPublishedDailyUsdtRange } from "@/lib/product-estimates";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
 import { useApp } from "@/store/app";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -161,7 +162,7 @@ async function refreshVisibleStore() {
   await Promise.allSettled([
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     refreshServerProductPhase(true),
-    revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(),
+    revalidateProductCatalog(), phoneTierReadFailed() ? undefined : earnConfig.ensure(), app.ensureRemoteFleet(),
   ]);
 }
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -282,7 +283,7 @@ const liveYield = computed(() => buildStoreYieldAuthority(
 const yieldAuthority = computed(() => {
   if (!remoteApiEnabled) return liveYield.value;
   const catalog = productCatalogDisplayProof.value ? liveYield.value : readTabSnapshot("catalogYield");
-  const phone = earnConfig.status.value === "ready" ? liveYield.value.phone : readTabSnapshot("phoneYield");
+  const phone = earnConfig.phoneTiers.value ? liveYield.value.phone : readTabSnapshot("phoneYield");
   const entry = catalog?.entry ?? null, pro = catalog?.pro ?? null, rack = catalog?.rack ?? null;
   const rows = liveYield.value.ladder.map(row => ({ ...row, amount: row.id === "phone" ? phone : catalog?.ladder.find(item => item.id === row.id)?.amount ?? null }));
   const maximum = Math.max(0, ...rows.map(row => row.amount?.usd ?? 0));
@@ -307,6 +308,13 @@ const upgrade = computed(() => storeUpgrade(unlockedProducts.value, ownedDevices
 const upgradeBaseImageUrl = computed(() => {
   const base = upgrade.value?.base;
   return base ? displayProducts.value.find(p => p.id === base.kind)?.imageUrl : undefined;
+});
+const upgradeBaseDailyRange = computed(() => {
+  const base = upgrade.value?.base;
+  if (!base) return null;
+  const sku = base.productCode?.toLowerCase() ?? base.kind;
+  const product = displayProducts.value.find(p => p.id.toLowerCase() === sku);
+  return product ? productPublishedDailyUsdtRange(product) : null;
 });
 const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentationClaimable : voucher.claimableVouchers).filter(offer => voucherSupportsSurface(offer, 'store')));
 const voucherOffers = computed(() => remoteApiEnabled
@@ -369,6 +377,8 @@ const catalogProducts = computed(() => focusFeatured.value
 function retryCatalog() {
   void refreshProductCatalog(true);
 }
+const phoneTierReadFailed = () => earnConfig.status.value === "error";
+useAutoRecovery({ active: () => !publicOnly.value, failed: phoneTierReadFailed, retry: earnConfig.refresh });
 useAutoRecovery({ failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
 
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:

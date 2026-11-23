@@ -156,6 +156,13 @@ function promotionDeviceReward(giftName) {
       deviceRights:{activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:null,taskEnabled:true,countsAsDeviceHolding:true,
         countsForRank:false,transferable:false,exchangeable:false,revocationMode:'MANUAL_IF_USED'}}};
 }
+const demoBandPct = 10;
+// Monthly USDT is configured in cents and this fixture uses whole percentages.
+function demoDailyUsdt(monthlyTarget, percent = 100) {
+  const cents = Math.round(monthlyTarget * 100);
+  return Math.round(cents * percent * 100 / 30) / 1e6;
+}
+
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
   const inventory=(id,index,share)=>{
     const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
@@ -169,7 +176,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     const price=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
-    const dailyEarn=monthlyEstimateUsdt/30,b=.1;
+    const dailyEarn=demoDailyUsdt(monthlyEstimateUsdt),b=demoBandPct/100;
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
     return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
@@ -180,7 +187,10 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
       releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
       purchaseGate:state.catalogState==='restricted'&&id==='stellarbox-s1'?{mode:'all',enforce:true,rankMin:8}:null,
-      dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
+      // B75 USDT follows the backend's six-decimal HALF_UP projection. UVT remains simulated (B75-BE-02).
+      dailyEstimateLowUsdt:demoDailyUsdt(monthlyEstimateUsdt,100-demoBandPct),dailyEstimateHighUsdt:demoDailyUsdt(monthlyEstimateUsdt,100+demoBandPct),
+      dailyEstimateLowNex:Math.round(dailyEarnNEX*(100-demoBandPct)*10_000)/1e6,
+      dailyEstimateHighNex:Math.round(dailyEarnNEX*(100+demoBandPct)*10_000)/1e6,
       shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
     };
   }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
@@ -805,9 +815,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         {code:'EM',name:'BGE-M3',unit:null,price:.0008,deltaPct:2.1,sparkline:[.4,.45,.4,.5,.52,.55,.57],flagshipDeltaPct:null},
         {code:'SP',name:'Whisper v3',unit:null,price:.0003,deltaPct:-.6,sparkline:[.56,.55,.57,.53,.52,.53,.5],flagshipDeltaPct:null},
       ],deviceRankings:[
-        {rank:1,kind:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,bestFor:null},
-        {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null},
-        {rank:3,kind:'phone',name:null,dailyUsdt:.06,bestFor:null},
+        ...['stellarbox-pro','stellarbox-s1'].map((kind,index)=>{
+          const {name,dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt}=products.find(product=>product.id===kind);
+          return {rank:index+1,kind,name,dailyUsdt:dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt,bestFor:null};
+        }),
+        {rank:3,kind:'phone',name:null,dailyUsdt:.06,dailyEstimateLowUsdt:null,dailyEstimateHighUsdt:null,bestFor:null},
       ]};
       const devices=demoFleetFacts(url,locale,state).devices;
       const points=demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);

@@ -68,11 +68,13 @@ export function previewDoTheMath(devices, products, canPurchase) {
     .find(({ product }) => canPurchase(product));
   if (!next) return null;
 
-  const ownedSku = products.find(product => product.id.toUpperCase() === current.productCode)?.id ?? current.productCode;
+  const ownedProduct = products.find(product => product.id.toUpperCase() === current.productCode);
   return {
     basis: 'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',
-    base: { kind: baseKind, productNo: ownedSku, name: current.name, dailyUsdt: current.dailyUsdt },
-    target: { kind: next.kind, productNo: next.product.id, name: next.product.name, dailyUsdt: next.product.dailyEarn, priceUsdt: next.product.price },
+    base: { kind: baseKind, productNo: ownedProduct?.id ?? current.productCode, name: current.name, dailyUsdt: current.dailyUsdt,
+      dailyEstimateLowUsdt: ownedProduct?.dailyEstimateLowUsdt ?? null, dailyEstimateHighUsdt: ownedProduct?.dailyEstimateHighUsdt ?? null },
+    target: { kind: next.kind, productNo: next.product.id, name: next.product.name, dailyUsdt: next.product.dailyEarn, priceUsdt: next.product.price,
+      dailyEstimateLowUsdt: next.product.dailyEstimateLowUsdt ?? null, dailyEstimateHighUsdt: next.product.dailyEstimateHighUsdt ?? null },
     multiplier: Math.round(next.product.dailyEarn / current.dailyUsdt),
     paybackDays: Math.round(next.product.price / next.product.dailyEarn),
   };
