@@ -148,7 +148,8 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
 ];
 
 // Which of the three non-content states the board is in when a section has no rows (03 §3.4).
-const marketState = computed(() => !remoteApiEnabled || app.homeTruthStatus === "ready" ? "empty" : app.homeTruthStatus === "error" ? "failed" : "loading");
+// A succeeded read stays the answer while a refresh runs or fails (03 §3.4), so an empty board does not turn back into placeholders.
+const marketState = computed(() => !remoteApiEnabled || app.homeTruth ? "empty" : app.homeTruthStatus === "error" ? "failed" : "loading");
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
@@ -184,7 +185,8 @@ function spokenWorkload(w: WorkloadPrice): string {
   const signed = (delta: number) => `${shownDelta(delta) > 0 ? "+" : shownDelta(delta) < 0 ? "−" : ""}${Math.abs(shownDelta(delta)).toFixed(1)}%`;
   const delta = w.delta === null ? "—" : signed(w.delta);
   const flagship = w.flagshipDelta === null ? "" : `, ${en.market.flagshipRow} ${signed(w.flagshipDelta)}`;
-  return `${copy.name} ${copy.unit}: ${w.price === null ? "—" : formatUsd(w.price, "detail")}, ${delta}${flagship}`;
+  // Each value is read with its column name, so an unknown "—" is still tied to price or change.
+  return `${copy.name} ${copy.unit}: ${en.home.mbColPrice} ${w.price === null ? "—" : formatUsd(w.price, "detail")}, ${en.home.mbCol24h} ${delta}${flagship}`;
 }
 // The direction follows the shown one-decimal value: a change that rounds to 0.0 is flat, anything else keeps its sign
 // (−0.04 → 0.0%, ±0.05 → ±0.1%), as on the home market table.
