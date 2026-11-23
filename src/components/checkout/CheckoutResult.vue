@@ -20,10 +20,14 @@
         <view v-if="showPaidAmount" class="checkout-result__amount"><text>{{ copy.paidAmount }}</text><CheckoutAmount :value="amount" :currency="currency ?? 'USDT'" /></view>
       </view>
       <!-- done: the page's own exits wait for the result presentation to finish (PRD purchase payment, line 49). -->
-      <slot :done="phase === 'complete'" />
+      <slot v-if="state !== 'inventory'" :done="phase === 'complete'" />
     </view>
     <view class="checkout-result__actions">
-      <NxButton v-if="(state === 'inventory' || state === 'activated') && phase === 'complete'" :label="copy.devices" variant="primary" @click="emit('devices')" />
+      <template v-if="state === 'inventory' && phase === 'complete'">
+        <NxButton :label="copy.replaceOnlineDevice" variant="primary" @click="startReplacement" />
+        <NxButton :label="copy.replaceLater" variant="secondary" @click="finishPurchase" />
+      </template>
+      <NxButton v-else-if="state === 'activated' && phase === 'complete'" :label="copy.devices" variant="primary" @click="emit('devices')" />
       <NxButton v-else-if="state === 'failed'" :label="t.orders.copyAndSupport" variant="primary" @click="emit('support')" />
       <template v-else-if="(state === 'error' || state === 'processing') && phase === 'complete'">
         <NxButton :label="copy.deviceInventory" variant="text" @click="emit('devices')" />
@@ -40,15 +44,32 @@ import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxResultHead from '@/components/ui/nx-result-head.vue';
 import { useT } from '@/i18n/use-t';
+import { fmt } from '@/i18n/format';
+import { navReset } from '@/lib/route';
+import type { OrderDeviceDelivery } from '@/api/order-api';
 import { purchasePaymentCopy } from '@/lib/purchase-payment-copy';
 import CheckoutAmount from './CheckoutAmount.vue';
 // 'failed' is a server-confirmed provisioning failure (order PAID + PROVISIONING_FAILED); 'error' is only a read-back that has not succeeded yet.
-const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number | null; currency?: 'USD' | 'USDT'; error?: string }>();
+const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number | null; delivery?: OrderDeviceDelivery; currency?: 'USD' | 'USDT'; error?: string }>();
 const emit = defineEmits<{ (event: 'devices'): void; (event: 'support'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));
 const t = useT();
 const showPaidAmount = computed(() => props.paymentConfirmed && props.amount !== undefined);
+const inventoryDescription = computed(() => {
+  const delivery = props.delivery;
+  if (!delivery) return copy.value.inventoryHint;
+  if (delivery.activatedQuantity > 0 && delivery.inventoryQuantity > 0) return fmt(copy.value.inventoryPartialHint, {
+    activated: delivery.activatedQuantity, inventory: delivery.inventoryQuantity,
+  });
+  return delivery.inventoryQuantity > 1 ? fmt(copy.value.inventoryCountHint, { inventory: delivery.inventoryQuantity })
+    : copy.value.inventoryHint;
+});
+function startReplacement() {
+  const device = props.delivery?.inventoryDeviceIds[0];
+  void navReset(device === undefined ? '/pages/me/devices' : '/pages/me/devices?replaceDeviceId=' + device);
+}
+function finishPurchase() { void navReset('/pages/store/orders'); }
 const phase = ref<'confirmed' | 'activating' | 'complete'>('complete');
 // Confetti for the purchase itself; a check pop and halo when activation completes.
 const celebrating = ref(false);
@@ -69,7 +90,7 @@ const title = computed(() => phase.value === 'confirmed' ? copy.value.paid
   : props.state === 'failed' ? t.value.orders.statusProvisioningFailed : copy.value.resultError);
 const description = computed(() => phase.value === 'confirmed' ? props.state === 'activated' ? copy.value.paidHint : copy.value.paidInventoryHint
   : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activatingHint : copy.value.activatedHint
-  : props.state === 'inventory' ? copy.value.inventoryHint : props.state === 'processing' ? copy.value.processingHint
+  : props.state === 'inventory' ? inventoryDescription.value : props.state === 'processing' ? copy.value.processingHint
   : props.state === 'failed' ? purchasePaymentCopy(locale.code).delivery : props.error || copy.value.resultErrorHint);
 // Head tone follows the status map (03 §3.8): paid and done are success; activating, processing and a paid order whose
 // read-back has not succeeded yet are in progress (03 §3.5.2: no failure before the server confirms one); only the

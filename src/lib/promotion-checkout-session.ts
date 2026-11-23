@@ -1,4 +1,4 @@
-import type { Quote } from '../api/promotion-contracts';
+import type { Quote } from '../api/promotion-api';
 import type { OrderReceipt, PromotionApi, PromotionOperation } from '../api/promotion-api';
 import { checkoutCreateBlock, parsePromotedOrder, type CheckoutCreateBlock } from '../api/promotion-api';
 

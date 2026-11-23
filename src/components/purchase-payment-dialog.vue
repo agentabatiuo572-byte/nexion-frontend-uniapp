@@ -417,6 +417,7 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'rejectQuotaMonthFull':
     case 'rejectQuotaSoldOut':
     case 'rejectCapacitySourceChanged':
+    case 'rejectCapacityPurchaseRetired':
     case 'trialConversionClosed':
     case 'trialNotConvertible': {
       const flow = checkoutFlowCopy(locale.code);
@@ -450,7 +451,7 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
 }
 const notice = computed(() => noticeFor(s.notice));
 const TOAST_NOTICES: PurchaseNotice[] = ['timeout', 'gone', 'changed', 'orderMissing', 'networkPaused', 'quoteChanged', 'rejectTradeinBusy', 'rejectTradeinWalletOnly', 'rejectTradeinOwner',
-  'rejectQuotaPaused', 'rejectQuotaMonthFull', 'rejectQuotaSoldOut', 'rejectCapacitySourceChanged', 'trialConversionClosed', 'trialNotConvertible'];
+  'rejectQuotaPaused', 'rejectQuotaMonthFull', 'rejectQuotaSoldOut', 'rejectCapacitySourceChanged', 'rejectCapacityPurchaseRetired', 'trialConversionClosed', 'trialNotConvertible'];
 const acknowledgementOnly = computed(() => !!notice.value && !notice.value.secondary && TOAST_NOTICES.includes(s.notice));
 // The notice's only exit runs at once (close, or stay on the sheet for a new quote), and a toast says what happened.
 watch(() => active.value && s.open && acknowledgementOnly.value, show => {

@@ -1,3 +1,4 @@
+import type { PendingDeviceReplacement } from "@/api/device-e3-api";
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
 import type { EntrySurface } from "@/lib/entry-surface";
 import type { TaskExecutionMetadata } from "@/api/task-assignment-api";
@@ -71,6 +72,7 @@ export interface CompletedTask extends CurrentTask {
 
 export interface Device {
   id: string;
+  instanceNo?: string;
   /** Exact owned SKU from the canonical fleet; retained separately from its display family. */
   productCode?: string;
   /** Explicit device target fact; absent on legacy rows. */
@@ -137,6 +139,7 @@ export interface Device {
   // until tick() sees currentTask transition complete → triggers deactivation.
   // Cleared by activateDevice() and by tick() after auto-deactivation fires.
   pendingDeactivate?: boolean;
+  replacement?: PendingDeviceReplacement;
   status: DeviceStatus;
   // Live simulation state
   gpuUsage: number; // 0-100

@@ -34,8 +34,8 @@
       </view>
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
-      <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices" @support="contactOrderSupport" v-slot="{ done }">
+      <view v-else-if="resultOrder && resultShown" class="order-payment-result" data-testid="trial-purchase-result">
+        <CheckoutResult :state="paymentResultState" :delivery="resultOrder.deviceDelivery ?? paymentResultReceipt?.deviceDelivery" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" @devices="goDevices" @support="contactOrderSupport" v-slot="{ done }">
         <!-- "Running" is the end of the replay: it waits, in place, for the head to reach 设备已激活 so both tell one progress. -->
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit nx-tint" role="group" :aria-label="purchaseCopy.resultCredited">
@@ -49,7 +49,7 @@
         <!-- The exit keeps its place but stays hidden and untouchable until the result animation has finished. -->
         <view class="trial-result-actions" :style="{ visibility: done ? 'visible' : 'hidden' }" :aria-hidden="!done">
           <!-- The second exit is the shared neutral glass L (03 §3.1), not a page-private outlined pill. -->
-          <NxButton variant="secondary" :label="purchaseCopy.resultOrder" @click="showTrialResult = false; paymentResultVisible = false" />
+          <NxButton variant="secondary" :label="purchaseCopy.resultOrder" @click="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false" />
         </view>
         </CheckoutResult>
       </view>
@@ -247,6 +247,7 @@ let automaticPaymentDiscovery = true;
 let pendingPaymentIntentAccount = '';
 // FEAT-TRIAL05: `?result=trial` (set by checkout) opens the purchase result once; the order view is one tap away.
 const showTrialResult = ref(false);
+const showInventoryResult = ref(false);
 const paymentResultVisible = ref(false);
 const orderOrigin = ref("");
 const ordersBackHref = ref("/store/orders");
@@ -285,7 +286,9 @@ onLoad((options) => {
   id.value = o.id || (queryIds.length === 1 ? queryIds[0] : "");
   const queryMatchesOrder = Boolean(id.value) && queryIds.length === 1 && queryIds[0] === id.value;
   const from = o.from ?? (queryMatchesOrder && query.getAll("from").length === 1 ? query.get("from") : "");
-  showTrialResult.value = (o.result ?? (queryMatchesOrder && query.getAll("result").length === 1 ? query.get("result") : "")) === "trial";
+  const result = o.result ?? (queryMatchesOrder && query.getAll("result").length === 1 ? query.get("result") : "");
+  showTrialResult.value = result === "trial";
+  showInventoryResult.value = result === "delivery";
   autoPayRequested.value = (o.pay ?? (queryMatchesOrder && query.getAll('pay').length === 1 ? query.get('pay') : '')) === '1';
   automaticPaymentDiscovery = (o.readback ?? (queryMatchesOrder ? query.get('readback') : null)) !== '1';
   orderOrigin.value = from === "me" || from === "store" ? from : "";
@@ -508,7 +511,8 @@ const paymentResultAmount = computed<{ value: Order['total']; currency: 'USD' | 
   if (current && commerceOrderHasPayment(current)) return commerceOrderAmount(current);
 });
 // Same branch as the template's result view: the header drops back and retitles only while that view is on screen.
-const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value && (showTrialResult.value || paymentResultVisible.value));
+const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value
+  && (showTrialResult.value || paymentResultVisible.value || (showInventoryResult.value && resultOrder.value.status === "inventory")));
 
 // Sticky chassis nav header — back + "Order details" title. The order number
 // stays in the summary card; a long id is not a page title. Getter form: falls

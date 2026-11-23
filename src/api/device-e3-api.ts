@@ -5,6 +5,26 @@ import { matchesRuntimeProvenance } from "./runtime-provenance";
 
 const E3_FLEET_SOURCE = "nx_user_device + nx_compute_receipt + nx_compute_e3_config";
 
+export interface PendingDeviceReplacement {
+  oldDeviceId: number;
+  newDeviceId: number;
+  oldDeviceName: string;
+  newDeviceName: string;
+}
+
+export interface DeviceReplacementRequest {
+  newDeviceId: number;
+  oldDeviceId: number;
+  newExpectedVersion: number;
+  oldExpectedVersion: number;
+}
+
+export interface DeviceReplacementResult {
+  status: "PENDING" | "COMPLETED" | "CANCELLED";
+  oldDeviceId: number;
+  newDeviceId: number;
+}
+
 export interface CanonicalE3Device {
   id: number;
   rowVersion: number;
@@ -16,6 +36,7 @@ export interface CanonicalE3Device {
   status: string;
   runtimeStatus?: "ONLINE" | "OFFLINE" | "UNKNOWN";
   pendingDeactivate: boolean;
+  replacement?: PendingDeviceReplacement;
   activatedAt: number | null;
   /** Absent in older backend responses; the parser normalizes it to null. */
   deactivatedAt: number | null;
@@ -141,7 +162,7 @@ export interface CanonicalCapacityKeepResult {
   operationNo: string;
   orderNo: string;
   targetDeviceId: number;
-  deviceStatus: "ACTIVE";
+  deviceStatus: "ACTIVE" | "INACTIVE";
   orderStatus: "COMPLETED";
   walletDebitUsdt: number;
   walletBalanceAfterUsdt: number;
@@ -155,12 +176,13 @@ export interface CanonicalDeviceCommandResult {
   alreadyApplied: boolean;
 }
 
-export type CapacityReplaceDecision = "CAPACITY_AVAILABLE" | "NO_ACTIVE_DEVICE" | "REPLACE_REQUIRED";
+export type CapacityReplaceDecision = "CAPACITY_AVAILABLE" | "INVENTORY_ONLY" | "NO_ACTIVE_DEVICE" | "REPLACE_REQUIRED";
 
 export interface CanonicalCapacityReplaceQuote {
   decision: CapacityReplaceDecision;
   activeDevices: number;
   maxActiveDevices: number;
+  assignableSlots?: number;
   sourceDeviceId: number | null;
   sourceDeviceName: string | null;
   targetProductId: number;
@@ -208,6 +230,8 @@ export interface DeviceE3Api {
   activate(deviceId: number, expectedVersion: number, clientMaxDevices: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
   deactivate(deviceId: number, expectedVersion: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
   deactivateAfterTask(deviceId: number, expectedVersion: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
+  replaceDevice(request: DeviceReplacementRequest, idempotencyKey: string): Promise<DeviceReplacementResult>;
+  cancelDeviceReplacement(request: DeviceReplacementRequest, idempotencyKey: string): Promise<DeviceReplacementResult>;
 }
 
 function invalid(message = "E3_CANONICAL_RESPONSE_INVALID"): never {
@@ -275,8 +299,20 @@ function device(value: unknown): CanonicalE3Device {
   if (capacityPct > 100) return invalid();
   const capabilityTier = source.capabilityTier == null ? null : integer(source.capabilityTier, 1);
   if (capabilityTier !== null && capabilityTier > 5) return invalid();
+  const id = integer(source.id, 1);
+  let replacement: PendingDeviceReplacement | undefined;
+  if (source.replacement != null) {
+    const pending = record(source.replacement);
+    const oldDeviceId = integer(pending.oldDeviceId, 1);
+    const newDeviceId = integer(pending.newDeviceId, 1);
+    if (oldDeviceId === newDeviceId || (id !== oldDeviceId && id !== newDeviceId)
+        || !Number.isSafeInteger(oldDeviceId) || !Number.isSafeInteger(newDeviceId)) return invalid();
+    replacement = { oldDeviceId, newDeviceId, oldDeviceName: string(pending.oldDeviceName),
+      newDeviceName: string(pending.newDeviceName) };
+  }
   return {
-    id: integer(source.id, 1),
+    id,
+    ...(replacement && { replacement }),
     rowVersion: integer(source.rowVersion),
     instanceNo: string(source.instanceNo),
     name: string(source.name),
@@ -472,13 +508,13 @@ export function parseCanonicalCapacityKeepResult(value: unknown): CanonicalCapac
   const source = purchaseReceiptRecord(value);
   const deviceStatus = string(source.deviceStatus).toUpperCase();
   const orderStatus = string(source.orderStatus).toUpperCase();
-  if (deviceStatus !== "ACTIVE" || orderStatus !== "COMPLETED") return invalid();
+  if ((deviceStatus !== "ACTIVE" && deviceStatus !== "INACTIVE") || orderStatus !== "COMPLETED") return invalid();
   return {
     ...externalPurchaseFields(source),
     operationNo: string(source.operationNo),
     orderNo: string(source.orderNo),
     targetDeviceId: integer(source.targetDeviceId, 1),
-    deviceStatus: "ACTIVE",
+    deviceStatus,
     orderStatus: "COMPLETED",
     walletDebitUsdt: number(source.walletDebitUsdt),
     walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt, -Infinity),
@@ -597,11 +633,12 @@ function nullableNumber(value: unknown): number | null {
 function capacityQuote(value: unknown): CanonicalCapacityReplaceQuote {
   const source = record(value);
   const decision = string(source.decision).toUpperCase() as CapacityReplaceDecision;
-  if (!["CAPACITY_AVAILABLE", "NO_ACTIVE_DEVICE", "REPLACE_REQUIRED"].includes(decision)) return invalid();
+  if (!["CAPACITY_AVAILABLE", "INVENTORY_ONLY", "NO_ACTIVE_DEVICE", "REPLACE_REQUIRED"].includes(decision)) return invalid();
   const parsed: CanonicalCapacityReplaceQuote = {
     decision,
     activeDevices: integer(source.activeDevices),
     maxActiveDevices: integer(source.maxActiveDevices, 1),
+    ...(source.assignableSlots !== undefined && { assignableSlots: integer(source.assignableSlots) }),
     sourceDeviceId: nullableInteger(source.sourceDeviceId),
     sourceDeviceName: nullableString(source.sourceDeviceName),
     targetProductId: integer(source.targetProductId, 1),
@@ -617,8 +654,12 @@ function capacityQuote(value: unknown): CanonicalCapacityReplaceQuote {
       || parsed.sufficientFunds !== (parsed.walletBalanceUsdt >= parsed.payableUsdt)
       || (parsed.sourceDeviceId === null) !== (parsed.sourceDeviceName === null)) return invalid();
   // Trial and unfulfilled-order reservations can fill slots below the active-device cap.
+  if (parsed.assignableSlots !== undefined
+      && parsed.assignableSlots > Math.max(0, parsed.maxActiveDevices - parsed.activeDevices)) return invalid();
   if (decision === "CAPACITY_AVAILABLE") {
-    if (parsed.activeDevices >= parsed.maxActiveDevices || parsed.sourceDeviceId !== null) return invalid();
+    if (parsed.activeDevices >= parsed.maxActiveDevices || parsed.sourceDeviceId !== null || parsed.assignableSlots === 0) return invalid();
+  } else if (decision === "INVENTORY_ONLY") {
+    if (parsed.sourceDeviceId !== null || parsed.assignableSlots !== 0) return invalid();
   } else if (decision === "REPLACE_REQUIRED") {
     if (parsed.sourceDeviceId === null || parsed.sourceDeviceName === null) return invalid();
   } else if (decision === "NO_ACTIVE_DEVICE") {
@@ -652,6 +693,23 @@ async function sendCapacityKeep(client: ApiClient, targetProductNo: string, idem
   }));
   if (!sameMoney(parsed.walletDebitUsdt, payable)) return invalid("E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH");
   return parsed;
+}
+
+async function sendDeviceReplacement(client: ApiClient, path: string, request: DeviceReplacementRequest,
+  idempotencyKey: string): Promise<DeviceReplacementResult> {
+  const key = idempotencyKey.trim();
+  if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
+  const body = {
+    oldDeviceId: integer(request.oldDeviceId, 1),
+    newDeviceId: integer(request.newDeviceId, 1),
+    oldExpectedVersion: integer(request.oldExpectedVersion),
+    newExpectedVersion: integer(request.newExpectedVersion),
+  };
+  const result = record(await client.request<unknown>({ method: "POST", path, body, idempotencyKey: key }));
+  const status = result.status;
+  if ((status !== "PENDING" && status !== "COMPLETED" && status !== "CANCELLED")
+      || result.oldDeviceId !== body.oldDeviceId || result.newDeviceId !== body.newDeviceId) return invalid();
+  return { status, oldDeviceId: body.oldDeviceId, newDeviceId: body.newDeviceId };
 }
 
 export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "prod"): DeviceE3Api {
@@ -745,6 +803,12 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
         },
         idempotencyKey: key,
       })), expectedQuote);
+    },
+    replaceDevice(request, idempotencyKey) {
+      return sendDeviceReplacement(client, "/api/devices/slot-replacement", request, idempotencyKey);
+    },
+    cancelDeviceReplacement(request, idempotencyKey) {
+      return sendDeviceReplacement(client, "/api/devices/slot-replacement/cancel", request, idempotencyKey);
     },
     async activate(deviceId, expectedVersion, clientMaxDevices, idempotencyKey) {
       const key = idempotencyKey.trim();

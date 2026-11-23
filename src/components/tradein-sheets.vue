@@ -7,16 +7,15 @@
   taps). Branch is gated by `state.kind`, not local props:
 
     1.   choice  — entry fork at checkout when the user owns ≥1 retirable
-         device toward the target SKU. Trade in (→ tradein) or pay full price
-         (→ replace if slot-full, else dismiss + caller proceeds).
+         device toward the target SKU. Trade in (→ tradein) or close the sheet
+         to continue with the current checkout price.
     1.5  retire  — FEAT-DEV02 devices-page entry: pick a higher-priced upgrade
          target for the chosen device (select list, no free input) → tradein.
     2.   tradein — confirm card (lifetime output / ladder band / credit / est.
          payable). Confirm writes the checkout credit context
          (sheet.applyTradein) and routes to checkout — money + device mutation
          happen atomically in checkout's persist block, not here.
-    3.   replace — Path B slot-full prompt. Demote the lowest-yield active
-         device (or keep all slots + store new device in inventory).
+    3.   replace — entry for retrying a previously saved capacity purchase.
     4.   block   — mid-task gate, split by origin: replace → wait / force
          (forfeits reward); retire → view task / dismiss (no force teardown).
 
@@ -58,7 +57,7 @@
       <!-- ─────────── 1. choice — trade-in or full price ─────────── -->
       <template v-if="state.kind === 'choice'">
         <view class="tis-head">
-          <text :id="titleId" class="tis-title">{{ t.tradein.choiceTitle }}</text>
+          <text :id="titleId" class="tis-title">{{ remoteApiEnabled ? t.tradein.checkoutReAdd : t.tradein.choiceTitle }}</text>
         </view>
         <view class="tis-opt-list">
           <view
@@ -301,7 +300,7 @@ import type { CanonicalCapacityReplaceQuote, CanonicalTradeinConfig, CanonicalTr
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { isProductAvailable } from "@/store/product-availability";
 import { useOrders } from "@/store/orders";
-import { completeVerifiedMutation, handleNoActiveDeviceDecision } from "@/domain/e20-capacity-coordinator";
+import { completeVerifiedMutation } from "@/domain/e20-capacity-coordinator";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { onPurchaseRecordReleased, readCheckoutCapacityPayment, refusedPurchasePayment, resumeCheckoutCapacityPayment, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
@@ -309,13 +308,14 @@ import { readPaymentCommand } from "@/api/payment-command-api";
 import { parseCanonicalTradeinResult,parseCanonicalCapacityKeepResult,type CanonicalTradeinResult,type CanonicalCapacityKeepResult } from "@/api/device-e3-api";
 import { purchaseRecoveryCopy } from "@/lib/purchase-recovery-copy";
 import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
-import { tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from "@/lib/order-payment-rejection";
+import { CAPACITY_REPLACEMENT_PURCHASE_RETIRED, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from "@/lib/order-payment-rejection";
 import { asApiError, isApiRefusal } from "@/api/errors";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { acquireAccountCommandKey, releaseAccountCommandKey,readAccountRow,writeAccountRow } from "@/store/account-scoped-storage";
+import { releaseAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { readCheckoutTradein } from "@/lib/checkout-order-recovery";
 import { CAPACITY_RECOVERY_TABLE, capacityIntent, capacityPaymentKind, readCapacityPending, type CapacityPending } from '@/lib/capacity-command-recovery';
+import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { CAPACITY_COMMAND_TABLE, type PendingKeepCommand } from "@/lib/keep-command-recovery";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 
@@ -352,7 +352,6 @@ const remoteRetirePayables = ref<Map<string, number>>(new Map());
 const remoteRetirePending = ref(false);
 const remoteRetireLoadError = ref(false);
 const remoteRetireOrigin = ref<{ environment: string; baseUrl: string } | null>(null);
-const capacityCommandKey = ref<string | null>(null);
 const savedCapacity = ref<CapacityPending|null>(null);
 const capacityRefusal = computed(() => savedCapacity.value && refusedPurchasePayment(app.accountKey, savedCapacity.value.key));
 const capacityRecovery = computed(() => capacityRefusal.value ? null : savedCapacity.value);
@@ -630,7 +629,6 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   remoteRetireEligibleTargets.value = new Set();
   remoteRetirePayables.value = new Map();
   remoteRetireRequest += 1;
-  capacityCommandKey.value = null;
   quoteLoading.value = false;
   retireTargetRead.value = null;
   // app.bindAccount is followed by the global account rebind in the same stack.
@@ -721,7 +719,7 @@ const choiceSources = computed(() => {
   return s.tradeInSources
     .map((id) => app.devices.find((d) => d.id === id))
     // Lite never lists phones, even when the server offers one as a source.
-    .filter((d): d is Device => !!d && d.kind !== "phone")
+    .filter((d): d is Device => !!d && d.kind !== "phone" && (!remoteApiEnabled || d.paidPriceUsdt > 0))
     .map((d) => ({
       id: d.id,
       label: remoteApiEnabled
@@ -789,9 +787,9 @@ async function openTradeinQuote(oldDevice: Device, targetKind: DeviceKind, newPr
 
 function onChooseTradein(deviceId: string) {
   const s = state.value;
-  if (s.kind !== "choice" || quoteLoading.value) return;
+  if (s.kind !== "choice" || quoteLoading.value || !s.tradeInSources.includes(deviceId)) return;
   const oldDevice = app.devices.find((d) => d.id === deviceId) ?? null;
-  if (!oldDevice || oldDevice.kind === "phone") {
+  if (!oldDevice || oldDevice.kind === "phone" || (remoteApiEnabled && oldDevice.paidPriceUsdt <= 0)) {
     // Race: device disappeared between hint computation and click. Bail out
     // gracefully — user can retry from the product page.
     hide();
@@ -801,20 +799,10 @@ function onChooseTradein(deviceId: string) {
   void openTradeinQuote(oldDevice, s.targetKind, s.newPrice);
 }
 
-async function onChooseFullPrice() {
+function onChooseFullPrice() {
   const s = state.value;
   if (s.kind !== "choice" || quoteLoading.value) return;
-  if (remoteApiEnabled) {
-    await refreshCapacityReplacement(s.targetKind, true);
-    return;
-  }
-  // If slot full, hand off to the replace sheet; else just dismiss (caller's
-  // checkout flow proceeds normally to payment).
-  if ((app.remoteSlotsUsed ?? (app.activeSlotCount + reservedSlots.value)) >= app.slotCap) {
-    sheet.showReplace(s.targetKind, s.newPrice);
-  } else {
-    hide();
-  }
+  if (!handleOriginalCapacityPurchase(s.targetKind, true)) hide();
 }
 
 function warnTradeinQuoteRefusal(error: unknown) {
@@ -835,7 +823,7 @@ function handleOriginalCapacityPurchase(target: DeviceKind, retryRefused = false
     checkoutTarget = original.quote ? original.quote.targetProductNo : original.targetProductNo;
     if (refusedPurchasePayment(app.accountKey, original.key)) {
       if (!retryRefused || checkoutTarget !== target) return false;
-      void runCanonicalCapacityPurchase(original.operation, original.quote, target, true);
+      void runCanonicalCapacityPurchase(original.operation, original.quote, true);
       return true;
     }
   } catch {
@@ -845,39 +833,6 @@ function handleOriginalCapacityPurchase(target: DeviceKind, retryRefused = false
   hide();
   void navTo(capacityCheckoutHref(checkoutTarget));
   return true;
-}
-
-async function refreshCapacityReplacement(targetKind: DeviceKind, retryRefused = false) {
-  const requestGeneration = ++quoteRequestGeneration.value;
-  const requestScope = captureAccountScope();
-  const requestIsCurrent = () => requestGeneration === quoteRequestGeneration.value
-    && props.active && isCurrentAccountScope(requestScope);
-  quoteLoading.value = true;
-  try {
-    const quote = await deviceE3Api.capacityQuote(targetKind);
-    if (!requestIsCurrent()) return;
-    if (quote.decision === "REPLACE_REQUIRED") {
-      if (handleOriginalCapacityPurchase(targetKind, retryRefused)) return;
-      sheet.showCanonicalReplace(targetKind, quote.payableUsdt, quote);
-      return;
-    }
-    if (quote.decision === "NO_ACTIVE_DEVICE") {
-      await handleNoActiveDeviceDecision({
-        notify: () => {
-          if (requestIsCurrent()) toast.warn(t.value.tradein.errNoActiveDevice);
-        },
-        refreshFleet: async () => {
-          if (!requestIsCurrent()) return;
-          await app.refreshRemoteFleet();
-        }, // best-effort:失败自吞
-      });
-    }
-    if (requestIsCurrent()) hide();
-  } catch (error) {
-    if (requestIsCurrent()) warnTradeinQuoteRefusal(error);
-  } finally {
-    if (requestIsCurrent()) quoteLoading.value = false;
-  }
 }
 
 // ───────────────────── 1.5 retire — 主动下架:选升级目标 ─────────────────────
@@ -1177,21 +1132,6 @@ const replaceView = computed(() => {
   };
 });
 
-function canonicalCapacityKey(
-  operation: "replace" | "keep",
-  quote: CanonicalCapacityReplaceQuote,
-  accountKey: string,
-): string {
-  const key = acquireAccountCommandKey(
-    CAPACITY_COMMAND_TABLE,
-    accountKey,
-    capacityIntent(operation, quote),
-    operation === "replace" ? "e3-capacity" : "e3-capacity-keep",
-  );
-  capacityCommandKey.value = key;
-  return key;
-}
-
 function writeCapacityPending(accountKey:string,pending:CapacityPending|null):void {
   if (!writeAccountRow(CAPACITY_RECOVERY_TABLE,accountKey,{pending})
       || readCapacityPending(accountKey)?.key!==(pending?.key)) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
@@ -1202,12 +1142,15 @@ function writeCapacityPending(accountKey:string,pending:CapacityPending|null):vo
 
 function clearCapacityPurchase(accountKey: string, original: CapacityPending) {
   if (!releaseAccountCommandKey(CAPACITY_COMMAND_TABLE, accountKey, original.intent, original.key)) throw new Error('CAPACITY_COMMAND_RELEASE_FAILED');
-  writeCapacityPending(accountKey, null);
-  capacityCommandKey.value = null;
+  if (readCapacityPending(accountKey)?.key === original.key) writeCapacityPending(accountKey, null);
 }
 
 function rejectCapacityPurchase(accountKey: string, original: CapacityPending, message?: string) {
-  clearCapacityPurchase(accountKey, original);
+  if (original.operation === 'replace' && message === CAPACITY_REPLACEMENT_PURCHASE_RETIRED) {
+    releasePurchaseCallerRecord(accountKey, 'CAPACITY_REPLACE', original.key);
+  } else {
+    clearCapacityPurchase(accountKey, original);
+  }
   if (original.operation === 'replace' && message === TRADEIN_RUNTIME_RECOVERING) {
     toast.warn(t.value.tradein.errPleaseRetry);
     return;
@@ -1217,14 +1160,11 @@ function rejectCapacityPurchase(accountKey: string, original: CapacityPending, m
   if (reason) {
     const flow = checkoutFlowCopy(locale.code);
     toast.warn(flow.cannotPay, flow[reason]);
-    if (reason === 'rejectCapacitySourceChanged' && original.operation === 'replace') {
-      void refreshCapacityReplacement(original.quote.targetProductNo as DeviceKind);
-    }
   } else toast.warn(recoveryCopy.value.rejected);
 }
 
 async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requestedQuote:CanonicalCapacityReplaceQuote|null,
-    newKind:DeviceKind,allowOriginalResume=false,readOnlyCurrent?:()=>boolean,resumeCurrent?:()=>boolean):Promise<"cleared" | void> {
+    allowOriginalResume=false,readOnlyCurrent?:()=>boolean,resumeCurrent?:()=>boolean):Promise<"cleared" | void> {
   if (capacityRecoveryBusy.value || capacityReadBusy.value) return;
   const scope=captureAccountScope(),requestedIntent=requestedQuote?capacityIntent(operation,requestedQuote):null;
   const current=()=>isCurrentAccountScope(scope)&&(!readOnlyCurrent||readOnlyCurrent());
@@ -1243,10 +1183,12 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         writeCapacityPending(scope.accountKey,original);
       }
     }
+    if (!original) throw new Error("CAPACITY_ORIGINAL_UNRESOLVED");
+    const command = original;
     let receipt:CanonicalTradeinResult|CanonicalCapacityKeepResult|null=null;
-    const refused = original && refusedPurchasePayment(scope.accountKey, original.key);
+    const refused = refusedPurchasePayment(scope.accountKey, command.key);
     if (refused && readOnlyCurrent) return;
-    if (original && !refused) {
+    if (!refused) {
       savedCapacity.value=original;
       let result = readOnlyCurrent && props.checkoutCapacityTarget
         ? await readCheckoutCapacityPayment(scope.accountKey, capacityPaymentKind(original.operation), original.key, current)
@@ -1269,56 +1211,49 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         return "cleared";
       } else if (!capacityResumeAllowed.value || !allowOriginalResume) return;
     }
-    if (!original&&(!requestedQuote||requestedQuote.decision!==(operation==='keep'?'CAPACITY_AVAILABLE':'REPLACE_REQUIRED')
-        ||requestedQuote.targetProductNo!==newKind||requestedQuote.decisionSource!=='server')) throw new Error('CAPACITY_PURCHASE_QUOTE_INVALID');
-    const frozen=original?original.quote:{...requestedQuote!};
-    const effectiveOperation=original?.operation??operation;
-    const intent=original?.intent??capacityIntent(effectiveOperation,frozen!);
-    const target=frozen?frozen.targetProductNo:(original as PendingKeepCommand).targetProductNo;
-    const payable=frozen?frozen.payableUsdt:(original as PendingKeepCommand).payableUsdt;
-    const summary=frozen?frozen.targetProductName:kindLabel(target as DeviceKind);
+    const frozen = command.quote;
+    const effectiveOperation = command.operation;
+    const target = frozen ? frozen.targetProductNo : (command as PendingKeepCommand).targetProductNo;
+    const payable = frozen ? frozen.payableUsdt : (command as PendingKeepCommand).payableUsdt;
+    const summary = frozen ? frozen.targetProductName : kindLabel(target as DeviceKind);
     if (!receipt) {
       if (readOnlyCurrent) return;
-      const purchaseIsCurrent=()=>current()&&props.active&&(state.value.kind==='replace'||state.value.kind==='choice'||allowOriginalResume&&state.value.kind==='keep-recovery')
-        &&(allowOriginalResume||refused?readCapacityPending(scope.accountKey)?.intent===intent
-          :state.value.kind==='replace'&&state.value.newKind===newKind&&!!state.value.canonicalCapacityQuote&&capacityIntent(operation,state.value.canonicalCapacityQuote)===requestedIntent);
-      receipt=await executeSelectedPurchase({amount:payable,currency:'USDT',summary},async authorization=>{
-        const saved=readCapacityPending(scope.accountKey);
-        if (saved&&saved.intent!==intent) throw new Error('CAPACITY_ORIGINAL_UNRESOLVED');
-        const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);
-        original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};
-        writeCapacityPending(scope.accountKey,original);
-        if (effectiveOperation !== 'replace') return allowOriginalResume
-          ? deviceE3Api.replayCapacityKeep(target,key,payable,authorization)
-          : deviceE3Api.capacityKeep(target,key,frozen!,authorization);
+      const purchaseIsCurrent = () => current() && props.active
+        && (state.value.kind === "replace" || state.value.kind === "choice" || allowOriginalResume && state.value.kind === "keep-recovery")
+        && readCapacityPending(scope.accountKey)?.key === command.key;
+      receipt = await executeSelectedPurchase({ amount: payable, currency: "USDT", summary }, async authorization => {
+        if (!purchaseIsCurrent()) return null;
+        const key = command.key;
+        if (effectiveOperation === "keep") return deviceE3Api.replayCapacityKeep(target, key, payable, authorization);
         try {
           return await deviceE3Api.capacityReplace(frozen!.sourceDeviceId!,target,key,frozen!,authorization);
         } catch (error) {
           if (!current() || !(tradeinPaymentRejection(error) || isApiRefusal(error, 503, TRADEIN_RUNTIME_RECOVERING))) throw error;
-          rejectCapacityPurchase(scope.accountKey, original, asApiError(error).message);
+          rejectCapacityPurchase(scope.accountKey, command, asApiError(error).message);
           return null;
         }
       },purchaseIsCurrent,{kind:effectiveOperation==='replace'?'CAPACITY_REPLACE':'CAPACITY_KEEP',
         payload:{targetProductNo:target,expectedPayableUsdt:payable,...(effectiveOperation==='replace'?{sourceDeviceId:frozen!.sourceDeviceId}: {})},
-        tradeinKey: original?.key,
+        tradeinKey: command.key,
         refusedPaymentKey: refused?.commandKey,
-        commandKey:()=>{const saved=readCapacityPending(scope.accountKey);const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};writeCapacityPending(scope.accountKey,original);return key;},
+        commandKey: () => {
+          if (!purchaseIsCurrent()) throw new Error("CAPACITY_ORIGINAL_UNRESOLVED");
+          return command.key;
+        },
         onReplacementRefused: reason => {
           if (!current() || !props.active) return;
           if (effectiveOperation === 'replace') sheet.replacementPaymentRefusal = { targetProductNo: target, reason };
-          capacityCommandKey.value = null;
           savedCapacity.value = null;
           capacityResumeKey.value = null;
           capacityIntentResume.value = null;
           hide();
-          if (reason === 'rejectCapacitySourceChanged') void refreshCapacityReplacement(target as DeviceKind);
         },
         parseReceipt:raw=>effectiveOperation==='replace'?parseCanonicalTradeinResult(raw):parseCanonicalCapacityKeepResult(raw)});
       // The record may have been released with a payment the server no longer holds.
       if (!receipt) { savedCapacity.value=readCapacityPending(scope.accountKey); return; }
     }
-    if (!current()||!original) return;
-    await completeCapacityPurchase(original, receipt, readOnlyCurrent);
+    if (!current()) return;
+    await completeCapacityPurchase(command, receipt, readOnlyCurrent);
   } catch {
     if (current() && readOnlyCurrent) {
       capacityResumeKey.value = null;
@@ -1346,7 +1281,7 @@ async function completeCapacityPurchase(original: CapacityPending, receipt: Cano
       { key: original.key, receipt: receipt as CanonicalTradeinResult }, current);
   } else {
     const target = original.quote ? original.quote.targetProductNo : original.targetProductNo;
-    await submitCanonicalKeepBuy(target as DeviceKind, original.quote,
+    await submitCanonicalKeepBuy(target as DeviceKind,
       { key: original.key, intent: original.intent, receipt: receipt as CanonicalCapacityKeepResult }, current);
   }
 }
@@ -1434,8 +1369,7 @@ async function recoverCapacityPurchase(resume=false):Promise<void> {
       return;
     }
     const resumeCurrent = resume ? () => current() && state.value === openingSheet : undefined;
-    const result = await runCanonicalCapacityPurchase(pending.operation, pending.quote, target as DeviceKind,
-      resume, resume ? undefined : current, resumeCurrent);
+    const result = await runCanonicalCapacityPurchase(pending.operation, pending.quote, resume, resume ? undefined : current, resumeCurrent);
     if (result === "cleared" && current()) emit("checkout-capacity-cleared", target);
   } catch {
     if (!current()) return;
@@ -1450,10 +1384,9 @@ async function recoverCapacityPurchase(resume=false):Promise<void> {
 async function submitCanonicalCapacityReplacement(
   quote: CanonicalCapacityReplaceQuote,
   newKind: DeviceKind,
-  recovered?:{key:string;receipt:CanonicalTradeinResult},
+  recovered:{key:string;receipt:CanonicalTradeinResult},
   readOnlyCurrent?:()=>boolean,
 ): Promise<void> {
-  if (!recovered) { await runCanonicalCapacityPurchase('replace',quote,newKind); return; }
   const requestScope = captureAccountScope();
   const intent = capacityIntent("replace", quote);
   let commandKey = "";
@@ -1518,7 +1451,6 @@ async function submitCanonicalCapacityReplacement(
         if (!releaseAccountCommandKey(CAPACITY_COMMAND_TABLE, requestScope.accountKey, intent, commandKey)) {
           throw new Error("CAPACITY_COMMAND_RELEASE_FAILED");
         }
-        capacityCommandKey.value = null;
         writeCapacityPending(requestScope.accountKey,null);
         toast.success(fmt(t.value.tradein.replaceSuccessToast, {
           newKind: kindLabel(newKind),
@@ -1540,16 +1472,8 @@ function onReplace() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
   if (handleOriginalCapacityPurchase(s.newKind, true)) return;
+  if (remoteApiEnabled) { hide(); return; }
   if (!canReplaceSource.value || replaceView.value?.insufficient) return;
-  if (remoteApiEnabled) {
-    if (!s.canonicalCapacityQuote) {
-      toast.warn(t.value.tradein.errPleaseRetry);
-      return;
-    }
-    confirming.value = true;
-    void submitCanonicalCapacityReplacement(s.canonicalCapacityQuote, s.newKind);
-    return;
-  }
   const lowest = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!lowest) return;
   confirming.value = true;
@@ -1629,11 +1553,9 @@ function onReplace() {
 
 async function submitCanonicalKeepBuy(
   newKind: DeviceKind,
-  quote: CanonicalCapacityReplaceQuote | null,
-  recovered?:{key:string;intent:string;receipt:CanonicalCapacityKeepResult},
+  recovered:{key:string;intent:string;receipt:CanonicalCapacityKeepResult},
   readOnlyCurrent?:()=>boolean,
 ): Promise<void> {
-  if (!recovered) { await runCanonicalCapacityPurchase('keep',quote,newKind); return; }
   const requestScope = captureAccountScope();
   let intent = "";
   let key = "";
@@ -1644,6 +1566,7 @@ async function submitCanonicalKeepBuy(
     intent = recovered.intent;
     key = recovered.key;
     const receipt = recovered.receipt;
+    const activeAtPurchase = receipt.deviceStatus === "ACTIVE";
     await completeVerifiedMutation({
       submit: async () => {
         requireCurrentAccount();
@@ -1660,10 +1583,10 @@ async function submitCanonicalKeepBuy(
         requireCurrentAccount();
         if (!persisted || persisted.productNo !== newKind
             || persisted.orderType.toUpperCase() !== "CAPACITY_KEEP"
-            || persisted.canonicalStatus !== "activated"
+            || persisted.canonicalStatus !== (activeAtPurchase ? "activated" : "inventory")
             || persisted.paymentStatus.toUpperCase() !== "PAID"
             || persisted.orderStatus.toUpperCase() !== "COMPLETED"
-            || persisted.activationStatus.toUpperCase() !== "ACTIVATED"
+            || persisted.activationStatus.toUpperCase() !== (activeAtPurchase ? "ACTIVATED" : "INVENTORY")
             || persisted.targetDeviceId !== submitted.targetDeviceId
             || !persisted.targetDeviceInstanceNo
             || typeof persisted.amountUsdt !== "number"
@@ -1685,7 +1608,7 @@ async function submitCanonicalKeepBuy(
       verifyFleet(submitted) {
         requireCurrentAccount();
         const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
-        if (!target || target.activatedAt == null || target.activationUnconfirmed) {
+        if (!target || target.activationUnconfirmed || (activeAtPurchase && target.activatedAt == null)) {
           throw new Error("CAPACITY_KEEP_FLEET_READBACK_MISMATCH");
         }
       },
@@ -1694,9 +1617,8 @@ async function submitCanonicalKeepBuy(
         if (!releaseAccountCommandKey(CAPACITY_COMMAND_TABLE, requestScope.accountKey, intent, key)) {
           throw new Error("CAPACITY_COMMAND_RELEASE_FAILED");
         }
-        capacityCommandKey.value = null;
         writeCapacityPending(requestScope.accountKey,null);
-        toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(newKind) }));
+        toast.success(activeAtPurchase ? fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(newKind) }) : t.value.orders.inventoryToast);
         hide();
         goDevices();
       },
@@ -1713,20 +1635,7 @@ function onKeepBuy() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
   if (handleOriginalCapacityPurchase(s.newKind, true)) return;
-  if (remoteApiEnabled) {
-    if (!canReplaceSource.value || replaceView.value?.insufficient) return;
-    if (!s.canonicalCapacityQuote) {
-      toast.warn(t.value.tradein.errPleaseRetry);
-      return;
-    }
-    if (s.canonicalCapacityQuote.decision !== "CAPACITY_AVAILABLE") {
-      toast.warn(t.value.tradein.errReplaceSlotConflict);
-      return;
-    }
-    confirming.value = true;
-    void submitCanonicalKeepBuy(s.newKind, s.canonicalCapacityQuote);
-    return;
-  }
+  if (remoteApiEnabled) { hide(); return; }
   if (!canReplaceSource.value || replaceView.value?.insufficient) return;
   confirming.value = true;
   // ⚠️ MOCK-ONLY CROSS-STORE COMPOSER — Path B "Keep & buy" branch.
