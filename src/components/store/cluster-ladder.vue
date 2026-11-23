@@ -97,7 +97,7 @@ function yieldColor(tier: Tier): string {
 
 <style scoped>
 .ladder-card { display: flex; flex-direction: column-reverse; gap: var(--v5-space-1); padding: var(--ui-space-inline) var(--ui-space-inset); border-radius: var(--nx-glass-radius); background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); }
-.ladder-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 92px; align-items: center; column-gap: var(--ui-space-inline); min-height: 32px; }
+.ladder-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 112px; align-items: center; column-gap: var(--ui-space-inline); min-height: 32px; }
 .ladder-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--v5-space-1); min-width: 0; }
 .ladder-name { white-space: nowrap; }
 .ladder-you { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand-2-ink); }
@@ -107,4 +107,6 @@ function yieldColor(tier: Tier): string {
 /* Side-by-side yield estimates use the inline-figure role (10 §10.1 行内数值, JetBrains Mono). */
 .ladder-yield { overflow: hidden; text-align: right; white-space: nowrap; font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .ladder-unit { font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* uni <text> wraps on its own (pre-line); a range such as $5.5–6.9 stays on one line in the 112px column. */
+.ladder-yield text { white-space: nowrap; }
 </style>

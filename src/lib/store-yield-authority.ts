@@ -94,6 +94,15 @@ export function storefrontNex(amount: YieldAmount | null): string {
   return amount.nexRange ? formatEstimateRange(amount.nexRange.low, amount.nexRange.high) : formatEstimate(amount.nex);
 }
 
+// The store's phone-vs-S1 card quotes a multiple, so it shows single estimates (same format, no range).
+export function storefrontUsdPoint(amount: YieldAmount | null): string {
+  return amount ? `$${formatEstimate(amount.usd)}` : "—";
+}
+
+export function storefrontNexPoint(amount: YieldAmount | null): string {
+  return amount ? formatEstimate(amount.nex) : "—";
+}
+
 export function storefrontNexFull(amount: YieldAmount | null): string {
-  return amount ? `${storefrontNex(amount)}\u00A0UVT` : "— UVT";
+  return amount ? `${storefrontNexPoint(amount)}\u00A0UVT` : "— UVT";
 }
