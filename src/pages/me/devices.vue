@@ -210,10 +210,13 @@
 </template>
 
 <script setup lang="ts">
+import { useMeEntryRead } from "@/composables/use-me-entry-read";
+import { isShownInventoryDevice } from "@/lib/me-entry-facts";
+import { useMeEntrySeen } from "@/store/me-entry-seen";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch, onUnmounted } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -267,15 +270,33 @@ const session = useSession();
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 const trial = useFreeTrial();
+const inventoryPageVisible = ref(false);
+const inventoryRead = useMeEntryRead(() => inventoryPageVisible.value);
+const entrySeen = useMeEntrySeen();
+
+async function readShownInventory(load: () => Promise<boolean>) {
+  const read = inventoryRead.capture("inventory");
+  if (!await load()) return;
+  await nextTick();
+  if (!read.current() || !app.remoteFleetHasSnapshot) return;
+  const ids = app.visibleDevices.filter(isShownInventoryDevice).map(device => device.id);
+  entrySeen.record("inventory", ids, read.scope, true);
+}
+
+watch([inventoryRead.visible, inventoryRead.ready, () => app.accountBindingEpoch], ([visible, ready]) => {
+  if (remoteApiEnabled && visible && ready) void readShownInventory(() => app.ensureRemoteFleet());
+});
 onShow(() => {
+  inventoryPageVisible.value = true;
   app.setTaskReadPageVisible("device-inventory", true);
   void trial.refreshVisible(false, true);
-  if (remoteApiEnabled) void app.ensureRemoteFleet();
 });
 onHide(() => {
+  inventoryPageVisible.value = false;
   app.setTaskReadPageVisible("device-inventory", false);
   closeReplacementDialogs();
 });
+onUnmounted(() => { inventoryPageVisible.value = false; });
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
@@ -289,7 +310,7 @@ const inventoryError = computed(() => !inventoryReady.value && (app.remoteFleetS
   || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")));
 const inventoryLoading = computed(() => !inventoryReady.value && !inventoryError.value);
 async function retryInventory(retryTransientAssignments = false) {
-  await Promise.all([refreshRemoteFleetAfterCatalog(app.accountKey, retryTransientAssignments), trial.poll(Date.now())]);
+  await Promise.all([readShownInventory(() => refreshRemoteFleetAfterCatalog(app.accountKey, retryTransientAssignments)), trial.poll(Date.now())]);
 }
 useAutoRecovery({
   failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && trial.authorityStatus !== "loading"

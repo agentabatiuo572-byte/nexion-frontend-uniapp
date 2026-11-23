@@ -20,11 +20,13 @@ import { demoPaymentIntentMissing, demoPaymentScenario, selectDemoPaymentState }
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.mjs';
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
+import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
 const authDemo=createAuthDemo(state);
+const meEntryDots=createMeEntryDotsFixture();
 // An optional local handoff preserves demo conversations across a preview rebuild.
 if(process.env.DEMO_STATE_FILE){
   const saved=JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state;
@@ -185,6 +187,12 @@ const server=http.createServer(async(req,res)=>{
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }
+    if(req.method==='POST'&&url.pathname==='/__demo/me-entry-dots'){
+      let raw='';for await(const chunk of req)raw+=chunk;
+      const update=JSON.parse(raw||'{}'),accountId=String(update.accountId??previewSelectedAccountId(state)??'');
+      if(!/^\d+$/.test(accountId))return sendJson(res,{code:422,message:'ME_DOTS_ACCOUNT_REQUIRED',data:null},422);
+      return sendJson(res,{accountId,...meEntryDots.configure(accountId,update)});
+    }
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
       let withdrawalRecoverySeed, longContentUnavailable;
@@ -322,6 +330,11 @@ const server=http.createServer(async(req,res)=>{
     if(/^\/(api|auth)\//.test(url.pathname)) {
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
+      if(req.method==='GET'){
+        const data=await meEntryDots.read(url,previewAccountId(state,req.headers),path=>
+          fixtureFor(new URL(path,url.origin),{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>({})}));
+        if(data!==undefined)return sendJson(res,{code:0,message:'OK',data});
+      }
       if(checkoutFlow?.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
         if(staleWrite())return refuseStale();

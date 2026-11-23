@@ -194,6 +194,11 @@ import { useApp } from "@/store/app";
 import { takeNavigationQuery } from "@/lib/route";
 
 import { presentVietQrReceipt } from "@/lib/vietqr-receipt-presentation";
+import { appReadForeground, documentReadVisible } from "@/lib/foreground-read";
+import { useMeEntryRead } from "@/composables/use-me-entry-read";
+import { latestMeReceipt } from "@/lib/me-entry-facts";
+import { rememberMeReceiptSummary } from "@/lib/me-receipt-summary";
+import { useMeEntrySeen } from "@/store/me-entry-seen";
 import { createReceiptsPageRequestFence } from "./receipts-page-request-fence";
 import { canLoadRemoteComputeMore } from "./receipts-page-pagination";
 
@@ -294,14 +299,34 @@ function remoteReceiptAmountStyle(receipt: ServerReceiptListItem): CSSProperties
   };
 }
 
+const receiptPageVisible = ref(false);
+const receiptEntryRead = useMeEntryRead(() => receiptPageVisible.value);
+const entrySeen = useMeEntrySeen();
+let pendingReceiptSeen: (() => void) | null = null;
 let receiptPageRequestEpoch = 0;
+
+function confirmVisibleReceiptList(): void {
+  if (open.value || linkedReceiptDetail.value || linkedReceiptNo || remoteComputeInitialLoading.value
+    || remoteReceiptKind.value !== "compute") return;
+  const confirm = pendingReceiptSeen;
+  pendingReceiptSeen = null;
+  confirm?.();
+}
+
+watch([open, linkedReceiptDetail], confirmVisibleReceiptList, { flush: "post" });
+watch([appReadForeground, documentReadVisible], ([foreground, visible]) => {
+  if (!foreground || !visible) pendingReceiptSeen = null;
+});
+
 async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor: string | null = null): Promise<void> {
   if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
   const requestEpoch = ++receiptPageRequestEpoch;
   const requestScope = receiptsPageFence.capture("compute");
   const expectedAccountKey = app.accountKey;
   const expectedBindingEpoch = app.accountBindingEpoch;
+  const seenRead = !append ? receiptEntryRead.capture("receipts") : null;
   if (!append) {
+    pendingReceiptSeen = null;
     remoteComputeInitialLoading.value = true;
     remoteComputeReceiptNextOffset.value = null;
     remoteComputeReceiptNextCursor.value = null;
@@ -324,6 +349,15 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor
     remoteComputeReceiptNextOffset.value = page.nextOffset;
     remoteComputeReceiptNextCursor.value = page.nextCursor;
     remoteComputeReceiptStatus.value = "ready";
+    if (seenRead?.current()) {
+      const latestAt = latestMeReceipt(page.items);
+      rememberMeReceiptSummary(latestAt);
+      pendingReceiptSeen = () => {
+        if (seenRead.current() && receiptsPageFence.isCurrent(requestScope)) {
+          entrySeen.record("receipts", latestAt, seenRead.scope, true);
+        }
+      };
+    }
   } catch {
     if (requestEpoch === receiptPageRequestEpoch
       && receiptsPageFence.isCurrent(requestScope)
@@ -339,7 +373,11 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
         remoteComputeReceiptLoading.value = false;
-        if (!append) remoteComputeInitialLoading.value = false;
+        if (!append) {
+        remoteComputeInitialLoading.value = false;
+        await nextTick();
+        confirmVisibleReceiptList();
+      }
       }
   }
 }
@@ -498,6 +536,7 @@ watch(
 );
 
 function invalidateRemoteReceiptsPage(): void {
+  pendingReceiptSeen = null;
   closeReceiptDetail();
   receiptPageRequestEpoch += 1;
   receiptsPageFence.invalidate();
@@ -524,12 +563,14 @@ onLoad((options) => {
 onShow(() => {
   if (!remoteReceiptsMode) return;
   receiptsPageFence.show();
+  receiptPageVisible.value = true;
   loadSelectedRemoteReceipts();
   openLinkedReceipt();
 });
 
 onHide(() => {
   if (!remoteReceiptsMode) return;
+  receiptPageVisible.value = false;
   linkedReceiptNo = null;
   receiptsPageFence.hide();
   invalidateRemoteReceiptsPage();
@@ -537,6 +578,7 @@ onHide(() => {
 
 onUnmounted(() => {
   if (!remoteReceiptsMode) return;
+  receiptPageVisible.value = false;
   linkedReceiptNo = null;
   receiptsPageFence.hide();
   invalidateRemoteReceiptsPage();

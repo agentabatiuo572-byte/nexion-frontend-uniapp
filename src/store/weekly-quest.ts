@@ -1,5 +1,6 @@
 import { computed, ref, watch } from "vue";
 import { defineStore } from "pinia";
+import { invalidateQuestState, readQuestState } from "@/lib/quest-state-read";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
 import { isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import type { CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
@@ -108,7 +109,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     if (!claimErrorQuestCode.value) error.value = null;
     claimNotice.value = null;
     try {
-      const next = await questApi.state(locale.code);
+      const next = await readQuestState(locale.code, fromSettledClaim);
       if (!isCurrentRequest() || predatesClaim()) return false;
       snapshot.value = next;
       scheduleRollover(next);
@@ -146,6 +147,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     try {
       const key = acquireWeeklyQuestCommandKey(accountKeyValue, quest.questCode, quest.instanceKey);
       const claimResult = await questApi.claim(quest.questCode, key, quest.instanceKey);
+      invalidateQuestState();
       if (!isCurrentRequest()) return false;
       if (claimResult.questId !== quest.questCode || claimResult.instanceKey !== quest.instanceKey) {
         throw new Error("WEEKLY_QUEST_CLAIM_MISMATCH");

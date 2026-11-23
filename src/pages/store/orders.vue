@@ -104,7 +104,7 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { commerceOrderAmount, commerceOrderTitle } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { commerceAmount as formatAmount } from "@/lib/commerce-review";
-import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { computed, nextTick, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -115,6 +115,9 @@ import NxTag from "@/components/ui/nx-tag.vue";
 import { GENESIS_MEDIA } from "@/lib/product-media";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";
+import { useMeEntryRead } from "@/composables/use-me-entry-read";
+import { latestMeOrders } from "@/lib/me-entry-facts";
+import { useMeEntrySeen } from "@/store/me-entry-seen";
 import { useOrders, type Order, type OrderStatus } from "@/store/orders";
 import { useGenesis } from "@/store/genesis";
 import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-order-list";
@@ -208,13 +211,15 @@ const orderPanels = computed(() => orderListPanels({
 }));
 const ordersReadFailed = ref(false);
 let refreshEpoch = 0;
-let ordersPageActive = true;
+const ordersPageActive = ref(true);
+const ordersEntryRead = useMeEntryRead(() => ordersPageActive.value);
+const entrySeen = useMeEntrySeen();
 async function refreshOrders() {
   if (!remoteApiEnabled || !remoteSessionReady.value) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
   const runtime = captureRuntimeRevision();
   const currentRefresh = ++refreshEpoch;
-  const current = () => ordersPageActive && currentRefresh === refreshEpoch && isCurrentRuntimeRevision(runtime) && remoteCommerceRequestCurrent(request, {
+  const current = () => ordersPageActive.value && currentRefresh === refreshEpoch && isCurrentRuntimeRevision(runtime) && remoteCommerceRequestCurrent(request, {
     accountKey: app.accountKey,
     epoch: app.accountBindingEpoch,
   });
@@ -227,8 +232,10 @@ async function refreshOrders() {
     commerceOrdersUnavailable.value = false;
     genesisOrdersUnavailable.value = false;
   }
+  const seenRead = ordersEntryRead.capture("orders");
+  const firstPage = orders.refreshRemote();
   const outcome = await createRemoteOrdersRefresh({
-    commerce: () => orders.refreshRemote(),
+    commerce: () => firstPage,
     genesis: () => genesis.syncRemote(),
     // BUG 174: Genesis 订单行来自**账号投影** (GET /api/genesis/account),
     // 不是资格判定。资格不可用(Genesis 未开放)时账号投影照常可读,
@@ -244,16 +251,21 @@ async function refreshOrders() {
   remoteOrderAvailability.value = outcome.availability;
   remoteOrdersResolved.value = true;
   remoteOrdersRefreshing.value = false;
+  await nextTick();
+  const shownPage = outcome.commerceUnavailable ? null : await firstPage;
+  if (current() && seenRead.current() && shownPage?.isCurrent()) {
+    entrySeen.record("orders", latestMeOrders(shownPage.visible), seenRead.scope, true);
+  }
 }
 useAutoRecovery({
   failed: () => remoteApiEnabled && !remoteOrdersRefreshing.value && (ordersReadFailed.value || orders.failedOrderReadbacks.size > 0),
-  retry: () => ordersReadFailed.value ? refreshOrders() : orders.retryOrderReadbacks(() => ordersPageActive && foregroundReadAllowed()),
+  retry: () => ordersReadFailed.value ? refreshOrders() : orders.retryOrderReadbacks(() => ordersPageActive.value && foregroundReadAllowed()),
 });
 async function loadMoreOrders() {
   if (orders.loadingMore || !orders.nextCursor) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
   const requestedRefresh = refreshEpoch;
-  const current = () => ordersPageActive && requestedRefresh === refreshEpoch && remoteCommerceRequestCurrent(request, {
+  const current = () => ordersPageActive.value && requestedRefresh === refreshEpoch && remoteCommerceRequestCurrent(request, {
     accountKey: app.accountKey,
     epoch: app.accountBindingEpoch,
   });
@@ -271,34 +283,34 @@ async function loadMoreOrders() {
 }
 const scrollAnchor = ref<unknown>(null);
 const scrollPager = useManualScrollLoadMore(scrollAnchor, {
-  enabled: () => remoteApiEnabled && remoteSessionReady.value && ordersPageActive && !commerceOrdersUnavailable.value,
+  enabled: () => remoteApiEnabled && remoteSessionReady.value && ordersPageActive.value && !commerceOrdersUnavailable.value,
   hasMore: () => Boolean(orders.nextCursor),
   loading: () => remoteOrdersRefreshing.value || orders.loadingMore,
   loadMore: loadMoreOrders,
 });
 onShow(() => {
-  ordersPageActive = true;
+  ordersPageActive.value = true;
   preserveOrdersOriginInH5();
   void refreshOrders();
 });
 onHide(() => {
-  ordersPageActive = false;
+  ordersPageActive.value = false;
   refreshEpoch += 1;
   remoteOrdersRefreshing.value = false;
 });
 onUnmounted(() => {
-  ordersPageActive = false;
+  ordersPageActive.value = false;
   refreshEpoch += 1;
   unsubscribeRuntimeRevision();
 });
 watch(() => app.accountBindingEpoch, () => {
   remoteOrdersResolved.value = false;
-  if (ordersPageActive) void refreshOrders();
+  if (ordersPageActive.value) void refreshOrders();
 });
 // onShow can land before the cookie restore binds the account. The deferred
 // read starts here instead, so the page never settles on an account-state error.
 watch(remoteSessionReady, (ready, wasReady) => {
-  if (ready && !wasReady && ordersPageActive) void refreshOrders();
+  if (ready && !wasReady && ordersPageActive.value) void refreshOrders();
 });
 
 // A later catalog response clears the shared orders without rebinding the account.
@@ -308,12 +320,12 @@ const unsubscribeRuntimeRevision = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled) return;
   refreshEpoch += 1;
   remoteOrdersResolved.value = false;
-  remoteOrdersRefreshing.value = ordersPageActive;
-  if (!ordersPageActive || runtimeRefreshQueued) return;
+  remoteOrdersRefreshing.value = ordersPageActive.value;
+  if (!ordersPageActive.value || runtimeRefreshQueued) return;
   runtimeRefreshQueued = true;
   void Promise.resolve().then(() => {
     runtimeRefreshQueued = false;
-    if (ordersPageActive) void refreshOrders();
+    if (ordersPageActive.value) void refreshOrders();
   });
 });
 

@@ -56,6 +56,8 @@
 </template>
 
 <script setup lang="ts">
+import { useMeEntryRead } from "@/composables/use-me-entry-read";
+import { useNow } from "@/composables/use-now";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { useDataVisibility } from "@/store/data-visibility";
@@ -87,6 +89,12 @@ import { useSession } from "@/store/session";
 import { useProfile } from "@/store/profile";
 import { useDeposits } from "@/store/deposits";
 import { useOrders } from "@/store/orders";
+import { useQuest } from "@/store/quest";
+import { meEntryLocalDay, useMeEntrySeen, type SeenOrders } from "@/store/me-entry-seen";
+import { hasNewMeOrders, isShownInventoryDevice, latestMeOrders, meMissionFacts } from "@/lib/me-entry-facts";
+import { readMeReceiptSummary } from "@/lib/me-receipt-summary";
+import { isReadAuthorizationDenial } from "@/lib/remote-read-failure";
+import type { QuestSnapshot } from "@/api/quest-api";
 import { useLocaleStore } from "@/store/locale";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useSecurity } from "@/store/security";
@@ -168,6 +176,42 @@ let remoteSecurityRequest = 0;
 let remoteOrdersRequest = 0;
 const remoteMeActive = ref(false);
 let meEntryReadPending = true;
+const entryRead = useMeEntryRead(() => remoteMeActive.value);
+const entrySeen = useMeEntrySeen();
+const quest = useQuest();
+const config = useConfig();
+const meClock = useNow(() => entryRead.visible.value);
+const meLocalDay = computed(() => meEntryLocalDay(meClock.value * 1000));
+const latestOrders = ref<SeenOrders | null>(null);
+const placedOrder = ref(false);
+const missionSnapshot = ref<QuestSnapshot | null>(null);
+const latestReceipt = ref<number | null>(null);
+const fleetDeviceIds = ref<string[]>([]);
+const missionReadFailed = ref(false);
+const receiptSummaryFailed = ref(false);
+
+const entryDots = computed(() => {
+  const seen = entrySeen.entries;
+  const today = meLocalDay.value;
+  const orders = seen.orders;
+  const missions = seen.missions;
+  const receipts = seen.receipts;
+  const inventory = seen.inventory;
+  const taskFacts = missionSnapshot.value
+    ? meMissionFacts(missionSnapshot.value, meClock.value * 1000, config.isEnabled("stakingVisible"))
+    : null;
+  return {
+    orders: entryRead.ready.value && (placedOrder.value || Boolean(orders && latestOrders.value
+      && orders.localDay !== today && hasNewMeOrders(latestOrders.value, orders.facts))),
+    missions: Boolean(entryRead.ready.value && missions && taskFacts && missions.localDay !== today
+      && (taskFacts.participating.some(id => !missions.facts.participating.includes(id))
+        || taskFacts.claimable.some(id => !missions.facts.claimable.includes(id)))),
+    receipts: Boolean(entryRead.ready.value && receipts && receipts.localDay !== today && latestReceipt.value !== null
+      && (receipts.facts === null || latestReceipt.value > receipts.facts)),
+    inventory: Boolean(entryRead.ready.value && inventory && inventory.localDay !== today
+      && fleetDeviceIds.value.some(id => !inventory.facts.includes(id))),
+  };
+});
 
 const iconPaths = {
   network: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 7a4 4 0 1 0 0 .01", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"],
@@ -256,7 +300,6 @@ const themeModeLabel = computed(() =>
 // Genesis row surfaces once the user actually owns a Genesis node →
 // links to the holder (holdings/dividends) page.
 const genesis = useGenesis();
-const config = useConfig();
 const ownsGenesis = computed(() => genesis.myOwned > 0);
 const myGenesisValue = computed(() => fmt(t.value.me.myGenesisNodeValue, { n: String(genesis.myOwned) }));
 
@@ -287,7 +330,7 @@ const quickSections = computed<QuickSection[]>(() => [
     title: t.value.myDevices.sectionTitle,
     count: deviceSectionCount.value,
     items: [
-      { key: "inventory", label: t.value.myDevices.inventoryTitle, href: "/me/devices", icon: "device", meta: activatedLabel.value, tone: "success" },
+      { key: "inventory", dot: entryDots.value.inventory, label: t.value.myDevices.inventoryTitle, href: "/me/devices", icon: "device", meta: activatedLabel.value, tone: "success" },
       { key: "add", label: t.value.me.deviceAddLabel, href: "/store", icon: "plus", meta: t.value.me.deviceAddMeta, tone: "brand" },
       { key: "slots", label: t.value.myDevices.inventorySlotsLabel, href: "/me/devices", icon: "slots", meta: emptySlotsLabel.value, tone: "purple" },
       { key: "goals", label: t.value.me.goalsRow, href: "/me/goals", icon: "target", meta: t.value.me.setTarget, tone: "orange" },
@@ -297,10 +340,10 @@ const quickSections = computed<QuickSection[]>(() => [
     key: "account",
     title: t.value.me.secAccount,
     items: [
-      { key: "missions", label: t.value.me.missionsRow, href: "/pages/missions/missions", icon: "target", tone: "brand" },
+      { key: "missions", dot: entryDots.value.missions, label: t.value.me.missionsRow, href: "/pages/missions/missions", icon: "target", tone: "brand" },
       { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "gift", dot: rewardsDot.value, tone: "brand" },
-      { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", tone: "brand" },
-      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders?from=me", icon: "package", meta: remoteApiEnabled && !remoteOrdersHasRead.value ? "—" : orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
+      { key: "receipts", dot: entryDots.value.receipts, label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", tone: "brand" },
+      { key: "orders", dot: entryDots.value.orders, label: t.value.store.ordersChip, href: "/store/orders?from=me", icon: "package", meta: remoteApiEnabled && !remoteOrdersHasRead.value ? "—" : orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
       { key: "genesis", label: t.value.me.genesisNode, href: ownsGenesis.value ? "/genesis/holder" : "/genesis", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
       { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
@@ -349,8 +392,27 @@ async function refreshRemoteOrders(passive: unknown = false) {
   const request = ++remoteOrdersRequest;
   const accountKey = app.accountKey;
   const readScope = passiveTabReadScope();
+  const dotRead = entryRead.capture("orders");
   await runRemoteOrdersRefresh(
-    () => passive === true ? runPassiveTabRead('orders', () => orders.refreshRemote().then(() => true)).then(() => undefined) : (invalidatePassiveTabRead('orders'), orders.refreshRemote()),
+    async () => {
+      try {
+        const batch = passive === true
+          ? await runPassiveTabRead("orders", () => orders.refreshRemote())
+          : await orders.refreshRemote();
+        if (!dotRead.current() || !batch?.isCurrent()) return;
+        placedOrder.value = batch.visible.some(order => order.status === "placed");
+        if (batch.filteredEmpty) return;
+        const facts = latestMeOrders(batch.visible);
+        entrySeen.record("orders", facts, dotRead.scope, false);
+        latestOrders.value = facts;
+      } catch (cause) {
+        if (dotRead.current() && isReadAuthorizationDenial(cause)) {
+          latestOrders.value = null;
+          placedOrder.value = false;
+        }
+        throw cause;
+      }
+    },
     (state) => {
       if (request !== remoteOrdersRequest || accountKey !== app.accountKey || readScope !== passiveTabReadScope()) return;
       remoteOrdersLoading.value = state.loading && passive === true && remoteOrdersFailed.value ? false : state.loading;
@@ -359,6 +421,68 @@ async function refreshRemoteOrders(passive: unknown = false) {
     },
   );
 }
+
+async function refreshMissionDots(force = false) {
+  const read = entryRead.capture("missions");
+  if (!read.current()) return;
+  const success = await (force ? quest.refreshRemote() : quest.ensureRemote());
+  if (!read.current()) return;
+  const snapshot = quest.remoteSnapshot;
+  missionReadFailed.value = !success;
+  if (!success || !snapshot) {
+    if (!snapshot) missionSnapshot.value = null;
+    return;
+  }
+  entrySeen.record("missions", meMissionFacts(snapshot, Date.now(), config.isEnabled("stakingVisible")), read.scope, false);
+  missionSnapshot.value = snapshot;
+}
+
+async function refreshReceiptDots(force = false) {
+  const read = entryRead.capture("receipts");
+  if (!read.current()) return;
+  try {
+    const summary = await readMeReceiptSummary(force);
+    if (!read.current()) return;
+    receiptSummaryFailed.value = false;
+    entrySeen.record("receipts", summary.latestAt, read.scope, false);
+    latestReceipt.value = summary.latestAt;
+  } catch (cause) {
+    if (read.current()) {
+      receiptSummaryFailed.value = true;
+      if (isReadAuthorizationDenial(cause)) latestReceipt.value = null;
+    }
+    throw cause;
+  }
+}
+
+async function refreshFleetDots(recover = false) {
+  const read = entryRead.capture("inventory");
+  const success = await (recover ? app.refreshRemoteFleet(undefined, { coalesce: true }) : app.ensureRemoteFleet());
+  if (!read.current()) return;
+  if (!success || !app.remoteFleetHasSnapshot) {
+    if (!app.remoteFleetHasSnapshot) fleetDeviceIds.value = [];
+    return;
+  }
+  const devices = app.visibleDevices.filter(isShownInventoryDevice);
+  entrySeen.record("inventory", devices.map(device => device.id), read.scope, false);
+  fleetDeviceIds.value = devices.filter(device => device.serverPurchasedAt != null).map(device => device.id);
+}
+
+useAutoRecovery({
+  active: () => entryRead.ready.value,
+  failed: () => missionReadFailed.value,
+  retry: () => refreshMissionDots(true),
+});
+useAutoRecovery({
+  active: () => entryRead.ready.value,
+  failed: () => receiptSummaryFailed.value,
+  retry: () => refreshReceiptDots(true),
+});
+useAutoRecovery({
+  active: () => entryRead.ready.value,
+  failed: () => app.remoteFleetStatus === "error",
+  retry: () => refreshFleetDots(true),
+});
 
 useAutoRecovery({
   failed: () => remoteApiEnabled && remoteOrdersFailed.value && !remoteOrdersLoading.value,
@@ -397,13 +521,15 @@ async function refreshRemoteMe(explicit = false) {
     ["fleet", async () => {
       await revalidateProductCatalog();
       await Promise.all([
-        app.remoteFleetStatus !== "error" ? app.ensureRemoteFleet() : undefined,
+        app.remoteFleetStatus !== "error" ? refreshFleetDots() : undefined,
         earningsReleaseStatus.value === "error" ? undefined
           : explicit ? refreshEarningsReleaseStatus() : ensureEarningsReleaseStatus(),
       ]);
     }],
     ["funds", refreshRemoteFunds],
     ["orders", () => remoteOrdersFailed.value ? undefined : refreshRemoteOrders(true)],
+    ["missions", () => missionReadFailed.value ? undefined : refreshMissionDots(explicit)],
+    ["receipt-summary", () => receiptSummaryFailed.value ? undefined : refreshReceiptDots()],
     ["security", refreshRemoteSecurity],
     ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.readError)],
     ["conversations", () => runPassiveTabRead('conversations', () => conversations.refresh(), { owner: conversations.scopeInvalidated }, () => !conversations.loading && !conversations.error)],
@@ -421,7 +547,15 @@ watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId
   remoteSecurityRequest += 1;
   remoteSecurity.value = null;
   remoteOrdersHasRead.value = false;
+  remoteOrdersFailed.value = false;
   remoteOrdersRequest += 1;
+  latestOrders.value = null;
+  placedOrder.value = false;
+  missionSnapshot.value = null;
+  latestReceipt.value = null;
+  fleetDeviceIds.value = [];
+  missionReadFailed.value = false;
+  receiptSummaryFailed.value = false;
 }, { flush: "sync" });
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (remoteApiEnabled && remoteMeActive.value && foregroundReadAllowed()) void refreshVisibleMe();
@@ -443,7 +577,13 @@ watch([remoteMeActive, foregroundReadAllowed], ([active, allowed]) => {
     meEntryReadPending = false;
     void refreshVisibleMe();
   }
-  else if (remoteApiEnabled) void app.refreshRemoteWithdrawalList();
+  else if (remoteApiEnabled) {
+    void app.refreshRemoteWithdrawalList();
+    if (!remoteOrdersFailed.value) void refreshRemoteOrders(true);
+    if (!missionReadFailed.value) void refreshMissionDots();
+    if (!receiptSummaryFailed.value) void refreshReceiptDots().catch(() => {});
+    if (app.remoteFleetStatus !== "error") void refreshFleetDots();
+  }
 });
 onHide(() => {
   releaseActiveRefresh();

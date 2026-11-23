@@ -58,8 +58,8 @@ async function refresh() {
   if (!remoteApiEnabled || app.accountKey === 'default') { initialPending.value = false; return; }
   const current = () => visible && request === generation && scope === passiveTabReadScope(false);
   await Promise.allSettled([
-    runPassiveTabRead('quest', () => quest.refreshRemote(), undefined, () => quest.remoteStatus === 'ready'), runPassiveTabRead('trial-state', () => trial.refreshRemote()), voucher.revalidateRemote(),
-    runPassiveTabRead('orders', () => orders.refreshRemote().then(() => true)).then(() => { if(current()) ordersReady.value = true; }).catch(() => { if(current()) ordersReady.value = false; }),
+    quest.ensureRemote(), runPassiveTabRead('trial-state', () => trial.refreshRemote()), voucher.revalidateRemote(),
+    runPassiveTabRead('orders', () => orders.refreshRemote()).then(() => { if(current()) ordersReady.value = true; }).catch(() => { if(current()) ordersReady.value = false; }),
     runPassiveTabRead('security-overview', () => accountApi.securityOverview()).then(security => { if(current()) securityNeedsAction.value = !security.twoFactorEnabled; }).catch(() => { if(current()) securityNeedsAction.value = false; }),
   ]);
   if (current()) initialPending.value = false;

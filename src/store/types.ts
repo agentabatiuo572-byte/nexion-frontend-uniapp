@@ -114,6 +114,8 @@ export interface Device {
   // degradation curve in lib/store/device-lifecycle.ts. Cloud Share / phone are
   // exempt from degradation (compute is rented or co-located).
   purchasedAt: number; // epoch ms
+  /** Original fleet purchase time, before the display fallback. */
+  serverPurchasedAt?: number | null;
   // Activation lifecycle (Sprint #146-1): null = purchased but inactive (not consuming a slot,
   // not contributing earnings/quest progress/promo variables);
   // number = epoch ms when user activated this device into one of the 6 slots.
