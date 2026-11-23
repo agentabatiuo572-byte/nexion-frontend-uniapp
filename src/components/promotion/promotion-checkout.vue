@@ -56,7 +56,7 @@
             <view v-if="compactGift" class="checkout-discount-row checkout-gift-summary" data-testid="checkout-gift-summary" role="button" tabindex="0" :aria-label="p.checkoutGiftTitle+' · '+compactGiftSummary+' · '+p.rulesLink" @click="termsOpen=true" @keydown.enter.prevent="termsOpen=true" @keydown.space.prevent="termsOpen=true">
               <view class="checkout-discount-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z" /></svg></view>
               <view class="promotion-grow"><text class="checkout-discount-title">{{ p.checkoutGiftTitle }}</text><text class="checkout-discount-description">{{ compactGiftSummary }} · {{ p.checkoutGiftSettlement }}</text></view>
-              <text class="checkout-gift-badge">{{ p.checkoutGiftBadge }}</text>
+              <NxTag class="checkout-gift-badge" tone="brand" :label="p.checkoutGiftBadge" />
             </view>
             <view v-else class="checkout-discount-row checkout-rewards-heading">
               <view class="checkout-discount-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z" /></svg></view>
@@ -126,6 +126,7 @@
 </template>
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
@@ -965,7 +966,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-rewards-heading { border-bottom:0; }
 .checkout-gift-summary { cursor:pointer; }
 .checkout-gift-summary:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
-.checkout-gift-badge { flex-shrink:0; padding:2px 7px; border-radius:6px; font:500 12px/18px var(--font-v5); color:var(--v5-brand); background:color-mix(in srgb,var(--v5-brand) 12%,transparent); }
+.checkout-gift-badge { flex-shrink:0; }
 .checkout-rewards :deep(.promotion-row) { align-items:center; min-height:64px; box-sizing:border-box; padding:10px 16px; }
 .checkout-rewards :deep(.promotion-symbol) { display:grid; place-items:center; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); color:var(--v5-ink-2); }
 .checkout-rewards :deep(.promotion-symbol svg) { width:18px; height:18px; }

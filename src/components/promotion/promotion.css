@@ -29,7 +29,6 @@
 .nx-card-link.promotion-link--end { display:flex; width:fit-content; margin-top:13px; }
 .promotion-actions { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
 .promotion-notice { border-left:2px solid var(--v5-brand); padding:4px 0 4px 12px; font-size:var(--ui-type-list-subtitle); line-height:1.7; }
-.promotion-badge { display:inline-flex; margin-top:8px; padding:4px 8px; border-radius:8px; color:var(--v5-brand); background:color-mix(in srgb,var(--v5-brand) 10%,var(--v5-surface)); font-size:12px; }
 .promotion-summary { display:flex; justify-content:space-between; gap:18px; padding:10px 0; font-size:var(--ui-type-list-subtitle); }
 .promotion-summary > * { min-width:0; overflow-wrap:break-word; }
 .promotion-summary > :last-child { text-align:right; }
@@ -48,11 +47,12 @@
 .promotion-modal { position:relative; isolation:isolate; }
 .promotion-modal-content { position:relative; z-index:1; }
 
-/* Reward state styling is confined to RewardRows; other business badges keep their own role. */
-.promotion-reward-rows .promotion-reward-state--success { color:var(--v5-success-ink); background:var(--v5-success-soft); }
-.promotion-reward-rows .promotion-reward-state--pending { color:var(--v5-ink-2); background:var(--v5-surface-2); }
-.promotion-reward-rows .promotion-reward-state--attention { color:var(--v5-warning-ink); background:var(--v5-warning-soft); }
-.promotion-reward-rows .promotion-reward-state--closed { color:var(--v5-ink-3); background:var(--v5-surface-2); }
+/* RewardRows: the reward is a content-row title (list-title role, 500); its state is the shared NxTag (03 §3.8); the
+   detail entry is the shared muted text link with a chevron (03 §3.9), its 44px target kept. */
+.promotion-reward-rows .promotion-reward-title { display:block; font:var(--ui-type-list-title-weight,500) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
+.promotion-reward-rows .promotion-reward-state { margin-top:8px; }
+.promotion-reward-rows .promotion-reward-link { display:flex; width:fit-content; min-height:44px; }
+.promotion-reward-rows .promotion-reward-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:3px; }
 .promotion-reward-detail > .promotion-rule-section { min-width:0; padding:4px 0 16px; border-bottom:1px solid var(--v5-border); }
 /* Open-layout sections on the reward page: section-title role (10.1), not the card title above. */
 .promotion-reward-detail > .promotion-rule-section > .promotion-title { font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); margin-bottom:8px; }
