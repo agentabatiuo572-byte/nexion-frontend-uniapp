@@ -162,7 +162,7 @@ const remoteSessionReady = computed(() => binarySessionReady({
 type CommerceOrderListItem = Order & { kind: "commerce"; meta?: string };
 type OrderListItem = CommerceOrderListItem | GenesisOrderListItem;
 const orderList = computed<OrderListItem[]>(() => [
-  ...orders.orders.map((order): CommerceOrderListItem => ({ ...order, kind: "commerce" })),
+  ...orders.visibleOrders.map((order): CommerceOrderListItem => ({ ...order, kind: "commerce" })),
   ...genesisOrderListItems(genesis.remoteOrders, t.value.me.genesisNode, t.value.orders.quantity),
 ].sort((a, b) => b.placedAt - a.placedAt));
 // Status categories. "To pay" matches the home to-do count (placed or payment failed).

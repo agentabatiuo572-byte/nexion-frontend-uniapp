@@ -16,6 +16,7 @@ const ARRIVE_AFTER = 15000, DELIVER_AFTER = 25000;
 // Like PurchasePaymentService: a quote lives 15 minutes, never past the deadline; a purchase that has no order gets 30
 // minutes from its quote; funds may be confirmed for 3 (BSC) or 5 minutes after the deadline.
 const QUOTE_TTL = 15 * 60000;
+const paymentMethods = ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'];
 const graceEnd = (method, deadline) => deadline + (method === 'CREGIS_USDT_BSC' ? 3 : 5) * 60000;
 
 export function createPurchasePaymentPreviewFixture(state, locale) {
@@ -332,7 +333,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const intent = openIntent({kind: 'ORDER_PAY', orderNo});
       return {status: 200, message: 'OK', data: {orderNo, state: intent ? 'IN_PROGRESS' : 'NONE', intentNo: intent?.intentNo ?? null}};
     }
-    if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
+    if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: paymentMethods.map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
     if (path === `${base}-quotes` && method === 'POST') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const body = request.postDataJSON(), {kind, payload} = body;
@@ -340,6 +341,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const products = demoProducts(state, url.origin), subject = purchaseSubject(kind, payload, products);
       const existing = openIntent(subject);
       if (existing) return existingIntentRefusal(existing, payload);
+      if (!paymentMethods.includes(body.paymentMethod)) return refused(503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
       if (!networkOpen(body.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       const order = kind === 'ORDER_PAY' ? ordersOf(url.origin).find(row => row.orderNo === subject.orderNo) : null;
       if (kind === 'ORDER_PAY' && !order) return refused(404, 'ORDER_NOT_FOUND');
