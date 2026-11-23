@@ -63,7 +63,8 @@
               @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate font-mono-code" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
+                <!-- The shown number, middle-ellipsized with its last 6 kept (03 §3.6.1); the row's label carries it whole. -->
+                <NxCodeValue :value="r.displayReceiptNo || r.receiptNo" label="" :copyable="false" :style="rowTitleStyle" />
                 <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(computeTaskLine(r)) }}</text>
               </view>
               <!-- Each credited asset on its own line, same figure role as the message row (04.5, 10.1). -->
@@ -170,6 +171,7 @@ import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSPrope
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ReceiptCatIcon from "@/components/me/receipt-cat-icon.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
@@ -178,7 +180,6 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { workloadLabel } from "@/lib/workload-label";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
-import { shortenHex } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { ApiError } from "@/api/errors";
@@ -637,7 +638,7 @@ function computeTaskLine(r: CanonicalComputeReceiptSummary): string {
 // The row shows a shortened receipt number and clamps the job line to two lines (the detail shows both in full);
 // screen readers get the full text (03 §3.6.1).
 function computeRowLabel(r: CanonicalComputeReceiptSummary): string {
-  return [r.receiptNo, computeTaskLine(r), ...creditedAmounts(r.rewardUsdt, r.rewardNex).map(a => `${a.sign}${a.value} ${a.unit}`), shortDate(r.completedAt)].join(", ");
+  return [r.displayReceiptNo || r.receiptNo, computeTaskLine(r), ...creditedAmounts(r.rewardUsdt, r.rewardNex).map(a => `${a.sign}${a.value}\u00a0${a.unit}`), shortDate(r.completedAt)].join(", ");
 }
 function shortDate(ts: number | string): string {
   const timestamp = displayTimestamp(ts);

@@ -27,7 +27,7 @@
       <view v-if="state !== 'unavailable' && summaryLines.length" :style="summaryStyle">
         <text class="block" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-3)">{{ copy.result }}</text>
         <view class="nx-receipt-amounts">
-          <text v-for="line in summaryLines" :key="line.unit" class="nx-receipt-amount">{{ line.sign }}{{ line.whole }}<text class="nx-receipt-amount__fraction">{{ line.fraction }}</text><text class="nx-receipt-amount__unit">{{ line.unit }}</text></text>
+          <text v-for="line in summaryLines" :key="line.unit" class="nx-receipt-amount">{{ line.sign }}{{ line.whole }}<text class="nx-receipt-amount__fraction">{{ line.fraction }}</text><text class="nx-receipt-amount__unit">{{ "\u00a0" + line.unit }}</text></text>
         </view>
       </view>
       <view v-if="state === 'loading'" aria-hidden="true">
@@ -60,24 +60,13 @@
         >
           <text class="nx-receipt-line" :title="fieldLabel(row.k)" style="color:var(--v5-ink-3)">{{ fieldLabel(row.k) }}</text>
           <view v-if="row.divider" :style="dividerStyle" />
-          <view
-            v-else-if="row.copyValue"
-            class="flex items-center active:opacity-60"
-            :style="copyRowStyle"
-            role="button"
-            tabindex="0"
-            :aria-label="copy.copy + ' ' + fieldLabel(row.k)"
-            @click="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
-            @keydown.enter.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
-            @keydown.space.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
-          >
-            <text class="nx-receipt-line" style="font-family:var(--font-jet-mono),ui-monospace,monospace;color:var(--v5-ink)">{{ receiptLine(row.v) }}</text>
-            <text v-if="row.hint" class="nx-receipt-line" style="color:var(--v5-ink-3);font-size:12px">({{ row.hint }})</text>
-            <!-- Check when just-copied, else Copy affordance (mirrors prototype RowCopy) -->
-            <svg v-if="copiedField === (row.copyKey ?? row.k)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
-            <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+          <!-- Long codes (03 §3.6.1): one line, middle ellipsis keeping the last 6; screen readers and the copy button get the
+               same whole value that is shown. -->
+          <view v-else-if="row.copyValue" :style="copyRowStyle">
+            <NxCodeValue :value="row.copyValue" :label="fieldLabel(row.k)" fill />
+            <text v-if="row.hint" class="nx-receipt-line" style="flex-shrink:0;color:var(--v5-ink-3);font-size:12px">({{ row.hint }})</text>
           </view>
-          <text v-else class="nx-receipt-line text-right" :style="valueStyle(row)" :title="row.v" @longpress="row.v && copyRow(row.k, row.v)">{{ receiptLine(row.v) }}</text>
+          <text v-else class="nx-receipt-line text-right" :style="valueStyle(row)" :title="row.v" @longpress="row.v && copyRow(row.v)">{{ receiptLine(row.v) }}</text>
         </view>
         <!-- 历史验证回执的核验清单(渲染兜底,仅存量数据) -->
         <view v-if="sec.checks" style="margin-top: 4px">
@@ -98,14 +87,14 @@
 
 <script setup lang="ts">
 import { formatDisplayDateTime } from "@/lib/display-date";
-import { creditedAmounts, formatAmount } from "@/lib/amount-display";
+import { creditedAmounts, formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { receiptLine } from "@/lib/receipt-line";
-import { computed, ref, onUnmounted, type CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { earningCreditCopy } from "@/i18n/earning-credit";
 import type { Receipt, ReceiptDetails } from "@/mock/receipt";
-import { shortenHex } from "@/mock/receipt";
 import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -213,10 +202,7 @@ const summaryLines = computed(() => {
   });
 });
 
-// ── tap-to-copy (matches prototype RowCopy: copy on tap, transient ✓ icon) ──
-// Backend-replaceable: copies the full underlying value; no real backend call.
-const copiedField = ref<string | null>(null);
-let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
+// ── long-press copy on plain value rows (codes use NxCodeValue and its own copy button) ──
 
 async function writeClipboard(text: string): Promise<boolean> {
   try {
@@ -241,21 +227,9 @@ async function writeClipboard(text: string): Promise<boolean> {
   });
 }
 
-async function copyRow(field: string, value: string): Promise<void> {
-  const ok = await writeClipboard(value);
-  if (!ok) return;
-  copiedField.value = field;
-  toast.success(t.value.receipt.copied);
-  if (copyResetTimer) clearTimeout(copyResetTimer);
-  copyResetTimer = setTimeout(() => {
-    copiedField.value = null;
-    copyResetTimer = null;
-  }, 1400);
+async function copyRow(value: string): Promise<void> {
+  if (await writeClipboard(value)) toast.success(t.value.receipt.copied);
 }
-
-onUnmounted(() => {
-  if (copyResetTimer) clearTimeout(copyResetTimer);
-});
 
 interface DescRow {
   k: string;
@@ -335,8 +309,8 @@ const sections = computed<DescSection[]>(() => {
     return [
       {
         rows: [
-          { k: "receipt_no", v: r.displayReceiptNo || shortenHex(r.receiptNo, 7, 6), copyValue: r.receiptNo },
-          { k: "task_no", v: shortenHex(r.taskNo, 7, 6), copyValue: r.taskNo },
+          { k: "receipt_no", v: r.displayReceiptNo || r.receiptNo, copyValue: r.displayReceiptNo || r.receiptNo },
+          { k: "task_no", v: r.taskNo, copyValue: r.taskNo },
           { k: "task_type", v: workloadLabel(t.value, r.taskClass) },
           { k: "task_name", v: r.taskName },
           ...(!isSimulatedReceipt.value ? [{ k: "model", v: r.model || "—" }] : []),
@@ -351,10 +325,10 @@ const sections = computed<DescSection[]>(() => {
       {
         rows: [
           { k: "device", v: r.deviceName },
-          { k: "device_instance", v: shortenHex(r.deviceInstanceNo, 8, 6), copyValue: r.deviceInstanceNo },
+          { k: "device_instance", v: r.deviceInstanceNo, copyValue: r.deviceInstanceNo },
           { k: "device_type", v: r.deviceType },
           ...(r.deviceGpu ? [{ k: "gpu", v: r.deviceGpu }] : []),
-          ...(r.vramTotalGb !== null && !shareReceipt.value ? [{ k: "vram", v: `${r.vramTotalGb} GB` }] : []),
+          ...(r.vramTotalGb !== null && !shareReceipt.value ? [{ k: "vram", v: `${r.vramTotalGb}\u00a0GB` }] : []),
         ],
       },
       {
@@ -366,14 +340,14 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
-          ...(!isSimulatedNexReceipt.value ? [{ k: "reward_usdt", v: `+${formatAmount(r.rewardUsdt, "full")} USDT`, accent: true, strong: true }] : []),
-          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex, "full")} UVT`, accent: true, strong: true }] : []),
+          ...(!isSimulatedNexReceipt.value ? [{ k: "reward_usdt", v: `+${formatGroupedAmount(r.rewardUsdt, "full")}\u00a0USDT`, accent: true, strong: true }] : []),
+          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatGroupedAmount(r.rewardNex, "full")}\u00a0UVT`, accent: true, strong: true }] : []),
         ],
       },
       {
         rows: [
-          ...(r.receiptHash ? [{ k: "receipt_hash", copyValue: r.receiptHash, v: shortenHex(r.receiptHash, 8, 6) }] : []),
-          ...(r.proofHash ? [{ k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: shortenHex(r.proofHash, 8, 6) }] : []),
+          ...(r.receiptHash ? [{ k: "receipt_hash", copyValue: r.receiptHash, v: r.receiptHash }] : []),
+          ...(r.proofHash ? [{ k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: r.proofHash }] : []),
         ],
       },
     ];
@@ -390,9 +364,9 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
-          { k: "paired_wallet", copyKey: "paired_wallet", copyValue: r.verificationWalletAddress ?? "0x", v: shortenHex(r.verificationWalletAddress ?? "0x", 6, 4) },
+          { k: "paired_wallet", copyKey: "paired_wallet", copyValue: r.verificationWalletAddress ?? "0x", v: r.verificationWalletAddress ?? "0x" },
           { k: "network", v: r.verificationNetwork ?? "—" },
-          { k: "signature", copyKey: "verification_signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
+          { k: "signature", copyKey: "verification_signature", copyValue: r.signature, v: r.signature, hint: "rsa-sha256" },
         ],
       },
       {
@@ -402,14 +376,14 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
-          { k: "deposit", v: `${formatAmount(r.gross)} USDT` },
+          { k: "deposit", v: `${formatGroupedAmount(r.gross)}\u00a0USDT` },
           { k: "purpose", v: copy.value.purpose, muted: true },
-          { k: "credited", v: `+$${formatAmount(r.netPaid)}`, accent: true, strong: true },
+          { k: "credited", v: `+$${formatGroupedAmount(r.netPaid)}`, accent: true, strong: true },
         ],
       },
       {
         rows: [
-          { k: "tx_hash", copyKey: "tx_hash", copyValue: r.txHash, v: shortenHex(r.txHash, 8, 6) },
+          { k: "tx_hash", copyKey: "tx_hash", copyValue: r.txHash, v: r.txHash },
           { k: "block", v: `#${r.blockNumber.toLocaleString()}` },
           { k: "verified_at", v: fmtDate(r.settledAt) },
         ],
@@ -429,8 +403,8 @@ const sections = computed<DescSection[]>(() => {
     {
       rows: [
         { k: "client", v: r.client },
-        { k: "client_addr", copyKey: "client_addr", copyValue: r.clientAddress, v: shortenHex(r.clientAddress, 6, 4) },
-        { k: "signature", copyKey: "signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
+        { k: "client_addr", copyKey: "client_addr", copyValue: r.clientAddress, v: r.clientAddress },
+        { k: "signature", copyKey: "signature", copyValue: r.signature, v: r.signature, hint: "rsa-sha256" },
       ],
     },
     {
@@ -443,22 +417,22 @@ const sections = computed<DescSection[]>(() => {
     {
       rows: [
         { k: "duration", v: fmtDuration(r.durationSec) },
-        ...(r.vramTotalGb > 0 ? [{ k: "vram_peak", v: `${r.vramPeakGb.toFixed(1)} / ${r.vramTotalGb} GB` }] : []),
-        { k: "energy", v: `${r.energyKwh.toFixed(3)} kWh` },
+        ...(r.vramTotalGb > 0 ? [{ k: "vram_peak", v: `${r.vramPeakGb.toFixed(1)} / ${r.vramTotalGb}\u00a0GB` }] : []),
+        { k: "energy", v: `${r.energyKwh.toFixed(3)}\u00a0kWh` },
       ],
     },
     {
       rows: [
-        { k: "unit_price", v: r.unitPriceLabel.replace(/^\$([0-9]+(?:\.[0-9]+)?)/, (_match, amount: string) => `$${formatAmount(amount)}`) },
+        { k: "unit_price", v: r.unitPriceLabel.replace(/^\$([0-9]+(?:\.[0-9]+)?)/, (_match, amount: string) => `$${formatGroupedAmount(amount)}`) },
         { k: "units", v: r.unitsLabel },
-        { k: "gross", v: `$${formatAmount(r.gross)}` },
-        { k: "network_fee", v: `-$${formatAmount(r.fee)}`, muted: true },
-        { k: "net_paid", v: `+${formatAmount(r.netPaid)} USDT`, accent: true, strong: true },
+        { k: "gross", v: `$${formatGroupedAmount(r.gross)}` },
+        { k: "network_fee", v: `\u2212$${formatGroupedAmount(r.fee)}`, muted: true },
+        { k: "net_paid", v: `+${formatGroupedAmount(r.netPaid)}\u00a0USDT`, accent: true, strong: true },
       ],
     },
     {
       rows: [
-        { k: "tx_hash", copyKey: "tx_hash", copyValue: r.txHash, v: shortenHex(r.txHash, 8, 6) },
+        { k: "tx_hash", copyKey: "tx_hash", copyValue: r.txHash, v: r.txHash },
         { k: "block", v: `#${r.blockNumber.toLocaleString()}` },
       ],
     },
@@ -526,8 +500,8 @@ function valueStyle(row: DescRow): CSSProperties {
     fontWeight: row.strong ? 600 : 400,
   };
 }
-// Prototype RowCopy: `flex items-center gap-1` (4px) — value + hint + copy icon.
-const copyRowStyle: CSSProperties = { gap: "6px", minHeight: "44px", minWidth: 0, justifyContent: "flex-end", flexWrap: "nowrap" };
+// A code row: NxCodeValue (value + its copy button) and an optional hint, right-aligned in the value column.
+const copyRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", minWidth: 0, justifyContent: "flex-end", flexWrap: "nowrap" };
 </script>
 
 <style scoped>
@@ -541,7 +515,8 @@ const copyRowStyle: CSSProperties = { gap: "6px", minHeight: "44px", minWidth: 0
 /* Main amount (01.2): Montserrat digits, whole part ink; fraction and unit auxiliary; a unit under 30px uses the auxiliary-figure role. */
 .nx-receipt-amount { display: block; white-space: nowrap; color: var(--v5-ink); font: 500 26px/1.3 var(--font-amount); font-variant-numeric: tabular-nums; }
 .nx-receipt-amount__fraction { color: var(--v5-ink-3); }
-.nx-receipt-amount__unit { margin-left: 4px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+/* The unit text starts with a real no-break space (03 §3.6.1), so copy and screen readers get "+1.05 USDT". */
+.nx-receipt-amount__unit { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-receipt-skeleton { border-radius: 6px; background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
 .nx-receipt-state { display: flex; flex-direction: column; align-items: center; padding: 40px 24px 24px; text-align: center; }
 .nx-receipt-state__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; color: var(--v5-ink-3); background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
