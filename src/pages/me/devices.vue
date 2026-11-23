@@ -45,10 +45,10 @@
             <view class="device-hero__tags">
               <view v-if="inventoryLoading" class="device-hero__loading" role="status"><view class="device-hero__spin" aria-hidden="true" /><text>{{ t.earn.deviceLoading }}</text></view>
               <template v-else>
-                <view v-if="onlineCount > 0" class="device-hero__tag"><view class="device-hero__dot" aria-hidden="true" /><text>{{ fmt(t.myDevices.activatedLabel, { n: onlineCount }) }}</text></view>
-                <view v-if="slotsUsed !== null && slotsFull" class="device-hero__tag device-hero__tag--warn"><text>{{ t.myDevices.inventoryRowSlotsFull }}</text></view>
-                <view v-else-if="slotsUsed !== null" class="device-hero__tag"><text>{{ fmt(t.myDevices.emptySlots, { n: app.slotCap - slotsUsed }) }}</text></view>
-                <view v-else class="device-hero__tag"><text>{{ slotUnavailableText }}</text></view>
+                <NxTag v-if="onlineCount > 0"><view class="device-hero__dot" aria-hidden="true" /><text>{{ fmt(t.myDevices.activatedLabel, { n: onlineCount }) }}</text></NxTag>
+                <NxTag v-if="slotsUsed !== null && slotsFull" tone="warning" :label="t.myDevices.inventoryRowSlotsFull" />
+                <NxTag v-else-if="slotsUsed !== null" :label="fmt(t.myDevices.emptySlots, { n: app.slotCap - slotsUsed })" />
+                <NxTag v-else :label="slotUnavailableText" />
               </template>
             </view>
           </view>
@@ -194,6 +194,7 @@ import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
 import { computed, ref } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import DeviceBay from "@/components/me/device-bay.vue";
@@ -442,9 +443,8 @@ function goStore() {
 .device-hero__used { font-size: 44px; font-weight: 500; line-height: 48px; letter-spacing: -.02em; }
 .device-hero__max { color: var(--v5-ink-3); font-size: 20px; font-weight: 500; line-height: 24px; }
 .device-hero__tags { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 2px; }
-.device-hero__tag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); white-space: nowrap; }
-.device-hero__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); flex: none; }
-.device-hero__tag--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
+/* The slot counts are status tags: the shared NxTag (03 §3.8), neutral or warning. */
+.device-hero__dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; vertical-align: 1px; border-radius: 50%; background: var(--v5-success); flex: none; }
 .device-hero__loading { display: inline-flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
 .device-hero__spin { width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); border-top-color: var(--v5-brand); animation: spin 1s linear infinite; }
 .device-hero__spin--lg { width: 22px; height: 22px; }
