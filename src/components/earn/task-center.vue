@@ -231,8 +231,9 @@ function completedTime(ts: number): string {
 <style scoped>
 .nx-earn-task-center { margin: 0 16px; color: var(--v5-ink); }
 .earn-tc__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; min-height: 44px; margin: 0 2px 8px; }
-.earn-tc__title { font: 600 17px/24px var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
-.earn-tc__pulse { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+/* Section title role (10 §10.1); the row below is a content row (list title + list subtitle). */
+.earn-tc__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
+.earn-tc__pulse { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .earn-tc__count { font: 500 12px/16px var(--font-metric); color: var(--v5-tech-cyan-ink); font-variant-numeric: tabular-nums; }
 .earn-tc__card { padding: 2px 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); font-size: 12px; }
 [data-theme="light"] .earn-tc__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
@@ -241,8 +242,8 @@ function completedTime(ts: number): string {
 .earn-tc__row:active { opacity: .8; }
 .earn-tc__row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
 .earn-tc__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.earn-tc__row-title { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); }
-.earn-tc__row-sub { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-tc__row-title { font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
+.earn-tc__row-sub { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .earn-tc__arrow { display: grid; place-items: center; flex: none; color: var(--v5-ink-4); transition: transform .2s ease; }
 .earn-tc__arrow--open { transform: rotate(90deg); }
 .earn-tc__panel { padding-bottom: 4px; }

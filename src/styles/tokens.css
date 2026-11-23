@@ -1346,6 +1346,10 @@ uni-input .uni-input-placeholder {
   --ui-type-description: 13px; --ui-type-description-lh: 20px;
   --ui-type-note: 12px; --ui-type-note-lh: 18px;
   --ui-type-metric-value: 18px; --ui-type-metric-value-lh: 24px;
+  /* Card figure: a card's own main number under 30px (compact product price, 「估算 N×」); inline figure: side-by-side
+     non-amount metrics in a row (cluster ladder). Montserrat for amounts, JetBrains Mono for metrics (01 §1.2). */
+  --ui-type-card-figure: 16px; --ui-type-card-figure-lh: 21px;
+  --ui-type-inline-figure: 13px; --ui-type-inline-figure-lh: 18px;
   --ui-type-compact-button: 13px; --ui-type-compact-button-lh: 18px;
   --ui-type-chip: 12px; --ui-type-chip-lh: 16px;
   --ui-type-text-link: 13px; --ui-type-text-link-lh: 18px;
@@ -1360,6 +1364,7 @@ uni-input .uni-input-placeholder {
   --ui-type-description-weight: 400; --ui-type-note-weight: 400; --ui-type-list-subtitle-weight: 400;
   --ui-type-meta-weight: 400; --ui-type-message-preview-weight: 400; --ui-type-message-meta-weight: 400;
   --ui-type-input-weight: 400; --ui-type-wallet-amount-weight: 550; --ui-type-segment-weight: 500;
+  --ui-type-card-figure-weight: 500; --ui-type-inline-figure-weight: 500;
   --ui-text-body: var(--ui-type-body);
 }
 @media (max-width: 339px) {
@@ -1384,6 +1389,8 @@ uni-input .uni-input-placeholder {
     --ui-type-guide-body: 13px; --ui-type-guide-body-lh: 21px;
     --ui-type-description: 12px; --ui-type-description-lh: 18px;
     --ui-type-metric-value: 16px; --ui-type-metric-value-lh: 22px;
+    --ui-type-card-figure: 15px; --ui-type-card-figure-lh: 20px;
+    --ui-type-inline-figure: 12px; --ui-type-inline-figure-lh: 16px;
     --ui-type-segment: 13px; --ui-type-segment-lh: 18px;
     --ui-type-nav-title-weight: 500; --ui-type-wallet-amount-weight: 500;
   }
