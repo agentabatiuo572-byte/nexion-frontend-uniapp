@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoEarningReceipts, demoEarningReceipt } from './prototype-demo-notifications.mjs';
+import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire } from './prototype-demo-notifications.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
@@ -22,7 +22,7 @@ function demoReceiptSummary({
 }
 
 // Receipt cursors retain the issuance cutoff while ordering by completion.
-export function demoReceiptPage(params, receipts) {
+export function demoReceiptPage(params, receipts, state) {
   const offset=Number(params.get('offset')??0),limit=Number(params.get('limit')??20);
   const cursor=params.get('cursor')?.trim();
   const invalid=(message)=>{throw Object.assign(new Error(message),{status:422});};
@@ -46,7 +46,7 @@ export function demoReceiptPage(params, receipts) {
     if(!boundary||!highWater||issuance(boundary,highWater)<0)invalid('TASK_RECEIPT_CURSOR_INVALID');
     eligible=rows.filter(row=>issuance(row,highWater)>=0&&ordering(row,boundary)>0);
   }
-  const items=eligible.slice(0,limit),more=eligible.length>limit;
+  const items=eligible.slice(0,limit).map(receipt=>demoReceiptWire(receipt,state)),more=eligible.length>limit;
   return {...proof,items,nextOffset:more?offset+limit:null,
     nextCursor:more?Buffer.from(JSON.stringify([items.at(-1).receiptNo,highWater.receiptNo])).toString('base64url'):null};
 }
@@ -251,7 +251,7 @@ export function secondaryDemo(url,state,request,walletBills){
         if(counts[credit.receiptNo]<=credit.receiptFailures)
           throw Object.assign(new Error('TASK_RECEIPT_UNAVAILABLE'),{status:503});
       }
-      if(credit.receiptStatus!==404)return demoEarningReceipt(credit,true);
+      if(credit.receiptStatus!==404)return demoReceiptWire(demoEarningReceipt(credit,true),state);
     }
     const tasks=demoSettledTasks(state,state.previewFactsAt??now);
     const items=tasks.map((task,i)=>({...proof,
@@ -265,17 +265,17 @@ export function secondaryDemo(url,state,request,walletBills){
       proofHash:task.simulation?null:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts'){
       const receipts=[...items,...earningReceipts.filter(sample=>sample.receiptStatus!==404).map(sample=>demoEarningReceipt(sample))];
-      return demoReceiptPage(url.searchParams,state.fleetState==='earning-credit'?receipts.map(demoReceiptSummary):receipts);
+      return demoReceiptPage(url.searchParams,state.fleetState==='earning-credit'?receipts.map(demoReceiptSummary):receipts,state);
     }
     const index=items.findIndex(r=>r.receiptNo===p.split('/').pop());
     if(index<0)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     const receipt=items[index],task=tasks[index];
-    if(!task.simulation)return receipt;
+    if(!task.simulation)return demoReceiptWire(receipt,state);
     const receiptHash=createHash('sha256').update(['UVEL:TASK_RECEIPT:1',receipt.receiptNo,receipt.taskNo,
       state.authUser?.userId??900001,receipt.deviceId,receipt.taskId,task.configVersion,
       new Date(receipt.startedAt).toISOString(),new Date(receipt.completedAt).toISOString(),
       receipt.rewardUsdt,receipt.rewardNex].join('|')).digest('hex');
-    return {...receipt,receiptHash};
+    return demoReceiptWire({...receipt,receiptHash},state);
   }
   if(p==='/api/earnings/release-status'){
     const entries=walletBills().filter(row=>row.status==='SUCCESS'&&row.direction==='IN'

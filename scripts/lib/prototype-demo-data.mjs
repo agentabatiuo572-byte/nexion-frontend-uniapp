@@ -16,7 +16,7 @@ import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxi
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
-import { demoEarningCredits, demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
+import { demoEarningBillRefs, demoEarningCredits, demoNotificationPage, demoNotifications } from './prototype-demo-notifications.mjs';
 import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs';
 import { savedAttemptOptions } from './prototype-demo-auth.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
@@ -479,7 +479,15 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   if(state.dataState==='empty'||state.promotionBuyer==='sponsored-new')return [];
   let devices=state.fleetState==='none'?[]:[template,{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}];
   if(state.fleetState==='inventory')devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
-  if(state.fleetState==='earning-credit')devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{}));
+  if(state.fleetState==='earning-credit'){
+    devices.push(clone(43,'STELLARRACK-P1','UVELRack Pacific Research Compute Cluster International West 0043',45,12999,{}));
+    devices=devices.map(device=>{
+      const product=products.find(row=>row.id.toUpperCase()===device.productCode);
+      if(product?.productType!=='DEVICE')return device;
+      return {...device,earningPurchase:{dailyUvt:product.dailyEarnNEX,
+        monthlyUsdt:device.productCode==='STELLARBOX-PRO'?0:product.monthlyEstimateUsdt,capacitySchedule}};
+    });
+  }
   if(state.fleetState==='decayed'){
     const decayedPurchaseAt=Math.max(decayedS1PurchasedAt(),minimumPurchaseAt);
     const older={purchasedAt:decayedPurchaseAt,activatedAt:decayedPurchaseAt};
@@ -816,7 +824,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     ]:[];
     const learningBill=demoLongLearningBill(url,state);
     if(learningBill)longRefs.push(learningBill);
-    return demoWalletBills(state,now,state.previewFactsAt,settledTasks(),longRefs);
+    if(state.fleetState==='earning-credit'&&!state.fleetSeed)demoFleetFacts(url,locale,state);
+    return demoWalletBills(state,now,state.previewFactsAt,settledTasks(),[...longRefs,...demoEarningBillRefs(state)]);
   };
   const referralFacts=(limit=10)=>{
     const rewards=demoReferralLedger(walletBills(),limit);
