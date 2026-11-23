@@ -1,6 +1,6 @@
-import { computed, ref, watch } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import { defineStore } from "pinia";
-import { invalidateQuestState, readQuestState } from "@/lib/quest-state-read";
+import { invalidateQuestState } from "@/lib/quest-state-read";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
 import { isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import type { CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
@@ -8,7 +8,6 @@ import {
   acquireWeeklyQuestCommandKey,
   finishWeeklyQuestCommand,
 } from "@/lib/weekly-quest-command-key";
-import { useLocaleStore } from "@/store/locale";
 import { isCurrentQuest } from "@/lib/actionable-quest";
 import { questClaimNoticeFor, type QuestClaimNotice } from "@/lib/quest-claim-notice";
 
@@ -19,11 +18,18 @@ const UNKNOWN_IDEMPOTENCY_RESULTS = new Set([
 
 type ClaimRecovery = "claimed" | "not_claimed" | "unavailable";
 
+interface SharedQuestRead {
+  readonly remoteSnapshot: QuestSnapshot | null;
+  readonly remoteLoading: boolean;
+  ensureRemote(): Promise<boolean>;
+  readRemoteSnapshot(): Promise<QuestSnapshot | null>;
+}
+
 /** Weekly quests are a read-through projection of the server mission and reward ledger. */
 export const useWeeklyQuest = defineStore("weeklyQuest", () => {
-  const locale = useLocaleStore();
-  const snapshot = ref<QuestSnapshot | null>(null);
-  const loading = ref(false);
+  const questRead = shallowRef<SharedQuestRead | null>(null);
+  const snapshot = computed(() => questRead.value?.remoteSnapshot ?? null);
+  const loading = computed(() => questRead.value?.remoteLoading ?? false);
   const error = ref<string | null>(null);
   const claimErrorQuestCode = ref<string | null>(null);
   const claimNotice = ref<QuestClaimNotice | null>(null);
@@ -32,7 +38,6 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   let accountEpoch = 0;
   let refreshSequence = 0;
   let claimSequence = 0;
-  let rolloverTimer: ReturnType<typeof setTimeout> | null = null;
 
   const tier1Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T1" && isCurrentQuest(q)) ?? []);
   const tier2Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T2" && isCurrentQuest(q)) ?? []);
@@ -56,13 +61,11 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     isCurrentRequest: () => boolean,
   ): Promise<ClaimRecovery> {
     try {
-      const readBack = await questApi.state(locale.code);
-      if (!isCurrentRequest()) return "unavailable";
+      const readBack = await questRead.value?.readRemoteSnapshot();
+      if (!readBack || !isCurrentRequest()) return "unavailable";
       const authoritative = readBack.quests.find((row) =>
         row.questCode === quest.questCode && row.instanceKey === quest.instanceKey);
       if (!authoritative) return "unavailable";
-      snapshot.value = readBack;
-      scheduleRollover(readBack);
       if (authoritative.status === "CLAIMED") {
         finishWeeklyQuestCommand(accountKeyValue, quest.questCode, quest.instanceKey);
         return "claimed";
@@ -75,59 +78,37 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     }
   }
 
-  function scheduleRollover(next: QuestSnapshot | null) {
-    if (rolloverTimer) clearTimeout(rolloverTimer);
-    rolloverTimer = null;
-    const boundary = (next?.quests ?? [])
-      .filter((quest) => quest.layer !== "DAY_ONE" && quest.eligible)
-      .map((quest) => Date.parse(quest.eligibleUntil))
-      .filter(Number.isFinite)
-      .reduce((earliest, value) => Math.min(earliest, value), Number.POSITIVE_INFINITY);
-    if (!Number.isFinite(boundary)) return;
-    const delay = Math.min(Math.max(boundary - Date.now() + 250, 250), 2_147_000_000);
-    rolloverTimer = setTimeout(() => void refresh(), delay);
-  }
-
   async function refresh(fromSettledClaim = false): Promise<boolean> {
+    if (!remoteApiEnabled) {
+      error.value = "WEEKLY_QUEST_SERVER_REQUIRED";
+      claimErrorQuestCode.value = null;
+      return false;
+    }
     const epoch = accountEpoch;
     const requestSequence = ++refreshSequence;
     const startedClaimSequence = claimSequence;
-    const startedDuringClaim = claiming.value !== null;
-    const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
-    const predatesClaim = () => (startedDuringClaim && !fromSettledClaim) || claimSequence !== startedClaimSequence;
-    if (!remoteApiEnabled) {
-      if (isCurrentRequest()) {
-        snapshot.value = null;
-        scheduleRollover(null);
-        error.value = "WEEKLY_QUEST_SERVER_REQUIRED";
-        claimErrorQuestCode.value = null;
-        loading.value = false;
-      }
-      return false;
-    }
-    loading.value = true;
+    if (claiming.value && !fromSettledClaim) return false;
     if (!claimErrorQuestCode.value) error.value = null;
     claimNotice.value = null;
     try {
-      const next = await readQuestState(locale.code, fromSettledClaim);
-      if (!isCurrentRequest() || predatesClaim()) return false;
-      snapshot.value = next;
-      scheduleRollover(next);
-      error.value = null;
-      claimErrorQuestCode.value = null;
-      try {
-        retireClaimedCommands(next);
-      } catch (cause) {
-        error.value = cause instanceof Error ? cause.message : "WEEKLY_QUEST_COMMAND_STORAGE_UNAVAILABLE";
+      const source = questRead.value;
+      const success = fromSettledClaim
+        ? Boolean(await source?.readRemoteSnapshot())
+        : await source?.ensureRemote();
+      if (epoch !== accountEpoch || requestSequence !== refreshSequence || startedClaimSequence !== claimSequence) return false;
+      if (!success) {
+        if (!claimErrorQuestCode.value) error.value = "WEEKLY_QUEST_LOAD_FAILED";
+        return false;
       }
+      if (error.value !== "WEEKLY_QUEST_COMMAND_STORAGE_UNAVAILABLE") error.value = null;
+      claimErrorQuestCode.value = null;
       return true;
     } catch (cause) {
-      if (isCurrentRequest() && !predatesClaim() && !claimErrorQuestCode.value) {
+      if (epoch === accountEpoch && requestSequence === refreshSequence
+        && startedClaimSequence === claimSequence && !claimErrorQuestCode.value) {
         error.value = cause instanceof Error ? cause.message : "WEEKLY_QUEST_LOAD_FAILED";
       }
       return false;
-    } finally {
-      if (isCurrentRequest()) loading.value = false;
     }
   }
 
@@ -152,15 +133,13 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
       if (claimResult.questId !== quest.questCode || claimResult.instanceKey !== quest.instanceKey) {
         throw new Error("WEEKLY_QUEST_CLAIM_MISMATCH");
       }
-      const readBack = await questApi.state(locale.code);
+      const readBack = await questRead.value?.readRemoteSnapshot();
       if (!isCurrentRequest()) return false;
-      const authoritative = readBack.quests.find((row) =>
+      const authoritative = readBack?.quests.find((row) =>
         row.questCode === quest.questCode && row.instanceKey === quest.instanceKey);
       if (!authoritative || authoritative.status !== "CLAIMED") {
         throw new Error("WEEKLY_QUEST_CLAIM_NOT_CONFIRMED");
       }
-      snapshot.value = readBack;
-      scheduleRollover(readBack);
       finishWeeklyQuestCommand(accountKeyValue, quest.questCode, quest.instanceKey);
       return true;
     } catch (cause) {
@@ -212,23 +191,25 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     }
   }
 
-  function bindAccount(accountKey: string) {
+  function bindAccount(accountKey: string, source: SharedQuestRead) {
     accountEpoch += 1;
     refreshSequence += 1;
     claimSequence += 1;
-    snapshot.value = null;
-    scheduleRollover(null);
-    loading.value = false;
     error.value = null;
     claimErrorQuestCode.value = null;
     claimNotice.value = null;
     claiming.value = null;
     accountKeyValue = accountKey.trim().toLowerCase() || "default";
-    void refresh();
+    questRead.value = source;
   }
 
-  watch(() => locale.code, () => {
-    if (remoteApiEnabled) void refresh();
+  watch(snapshot, (next) => {
+    if (!next || claiming.value) return;
+    try {
+      retireClaimedCommands(next);
+    } catch {
+      error.value = "WEEKLY_QUEST_COMMAND_STORAGE_UNAVAILABLE";
+    }
   });
 
   return { snapshot, loading, error, claimErrorQuestCode, claimNotice, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };

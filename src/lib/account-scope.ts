@@ -118,8 +118,9 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useCards().bindAccount(accountKey);
   useNexFaucet().bindAccount(accountKey);
   usePayoutAddress().bindAccount(accountKey);
-  useQuest().bindAccount(accountKey);
-  useWeeklyQuest().bindAccount(accountKey);
+  const quest = useQuest();
+  quest.bindAccount(accountKey);
+  useWeeklyQuest().bindAccount(accountKey, quest);
   useReferralReward().bindAccount(accountKey);
   useNetwork().bindAccount(accountKey);
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次

@@ -95,6 +95,7 @@ export const useQuest = defineStore("quest", () => {
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
   const remoteSnapshot = shallowRef<QuestSnapshot | null>(null);
+  const remoteLoading = ref(false);
 
   function clearRemoteFacts() {
     if (eligibilityTimer) clearTimeout(eligibilityTimer);
@@ -131,19 +132,29 @@ export const useQuest = defineStore("quest", () => {
   }
 
   async function refreshRemote(force = true): Promise<boolean> {
-    invalidateBeforePassiveTabRead("quest");
     if (!remoteApiEnabled) return true;
+    try {
+      return (await readRemoteSnapshot(force)) !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  async function readRemoteSnapshot(force = true): Promise<QuestSnapshot | null> {
+    invalidateBeforePassiveTabRead("quest");
+    if (!remoteApiEnabled) return null;
     const epoch = accountEpoch;
     const requestSequence = ++refreshSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
     claimNotice.value = null;
+    remoteLoading.value = true;
     // Background refreshes use stale-while-revalidate semantics: a route or
     // module switch must not erase the last server-confirmed task catalogue.
     // Account changes explicitly discard it in bindAccount() below.
     if (!hasRemoteSnapshot) remoteStatus.value = "loading";
     try {
       const snapshot = await readQuestState(useLocaleStore().code, force);
-      if (!isCurrentRequest()) return false;
+      if (!isCurrentRequest()) return null;
       const nextQuests = snapshot.quests.map((quest) => ({ ...quest }));
       const nextRewards: Record<string, number> = {};
       const nextCompleted: Record<string, boolean> = {};
@@ -165,18 +176,19 @@ export const useQuest = defineStore("quest", () => {
       remoteStatus.value = "ready";
       remoteSnapshot.value = snapshot;
       scheduleEligibilityRefresh(nextQuests);
-      return true;
+      return snapshot;
     } catch (cause) {
-      if (isCurrentRequest()) {
-        if (isReadAuthorizationDenial(cause)) remoteSnapshot.value = null;
-        if (hasRemoteSnapshot) {
-          remoteStatus.value = "ready";
-        } else {
-          discardRemoteSnapshot();
-          remoteStatus.value = "error";
-        }
+      if (!isCurrentRequest()) return null;
+      if (isReadAuthorizationDenial(cause)) remoteSnapshot.value = null;
+      if (hasRemoteSnapshot) {
+        remoteStatus.value = "ready";
+      } else {
+        discardRemoteSnapshot();
+        remoteStatus.value = "error";
       }
-      return false;
+      throw cause;
+    } finally {
+      if (isCurrentRequest()) remoteLoading.value = false;
     }
   }
 
@@ -184,9 +196,8 @@ export const useQuest = defineStore("quest", () => {
     () => useLocaleStore().code,
     () => {
       // The home carousel consumes this store directly. Refresh an already
-      // confirmed server catalogue so a deliberate language switch never
-      // leaves it showing a previous locale's authored task name.
-      if (remoteApiEnabled && hasRemoteSnapshot) void refreshRemote();
+      // bound server catalogue so the current locale can supply authored task names.
+      if (remoteApiEnabled && boundKey !== "default") void refreshRemote();
     },
   );
 
@@ -263,6 +274,7 @@ export const useQuest = defineStore("quest", () => {
   function bindAccount(rawAccountKey: string) {
     accountEpoch += 1;
     refreshSequence += 1;
+    remoteLoading.value = false;
     claimSequence += 1;
     boundKey = normalizeAccountKey(rawAccountKey);
     dayOneClaiming.value = false;
@@ -325,5 +337,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, remoteQuests, dayOneRewardNex, dayOneRequiredTaskCount, dayOneSnapshotStatus, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, ensureRemote, refreshRemote, remoteSnapshot, claimRemote, remoteStatus, claimNotice, claimDayOne, dayOneClaiming, dayOneClaimError };
+  return { completedMap, remoteQuests, dayOneRewardNex, dayOneRequiredTaskCount, dayOneSnapshotStatus, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, ensureRemote, refreshRemote, readRemoteSnapshot, remoteSnapshot, remoteLoading, claimRemote, remoteStatus, claimNotice, claimDayOne, dayOneClaiming, dayOneClaimError };
 });

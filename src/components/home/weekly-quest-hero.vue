@@ -55,8 +55,9 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
-import { computed, onMounted, watch, type CSSProperties } from "vue";
+import { computed, inject, onMounted, watch, type CSSProperties } from "vue";
 import type { CanonicalQuest } from "@/api/quest-api";
+import { WEEKLY_QUEST_PAGE_READ_SETTLED } from "@/lib/weekly-quest-page-read";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useConfig } from "@/store/config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
@@ -79,6 +80,7 @@ const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
+const pageReadSettled = inject(WEEKLY_QUEST_PAGE_READ_SETTLED, null);
 const nowTick = useNow();
 
 // 🔴 观测闸,**不是过滤器**——为什么客户端不过滤,见 lib/quest-genesis-tripwire.ts 顶部。
@@ -111,7 +113,7 @@ watch(
 );
 
 onMounted(() => {
-  void wq.refresh();
+  if (!pageReadSettled) void wq.refresh();
 });
 
 const quest = computed<CanonicalQuest | null>(() => wq.tier1Quests.find((q) =>

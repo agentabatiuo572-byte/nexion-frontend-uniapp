@@ -27,7 +27,7 @@
 </template>
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -53,6 +53,7 @@ import { useMeEntryRead } from "@/composables/use-me-entry-read";
 import { meMissionFacts } from "@/lib/me-entry-facts";
 import { useConfig } from "@/store/config";
 import { useMeEntrySeen } from "@/store/me-entry-seen";
+import { WEEKLY_QUEST_PAGE_READ_SETTLED } from "@/lib/weekly-quest-page-read";
 import { useQuest } from "@/store/quest";
 import { useLocaleStore } from "@/store/locale";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
@@ -80,6 +81,8 @@ const mounted = ref(false);
 const remoteRequestFence = createRemotePageRequestFence(remoteAccountEpoch, () => mounted.value);
 const missionRead = useMeEntryRead(() => mounted.value);
 const missionReadFailed = ref(false);
+const missionReadSettled = ref(!remoteApiEnabled);
+provide(WEEKLY_QUEST_PAGE_READ_SETTLED, missionReadSettled);
 const entrySeen = useMeEntrySeen();
 const config = useConfig();
 async function refreshMissionTasks(force = false) {
@@ -89,13 +92,18 @@ async function refreshMissionTasks(force = false) {
   const snapshot = quest.remoteSnapshot;
   await nextTick();
   if (!read.current()) return;
+  missionReadSettled.value = true;
   missionReadFailed.value = !success;
   if (success && snapshot && quest.remoteSnapshot === snapshot) {
     const facts = meMissionFacts(snapshot, Date.now(), config.isEnabled("stakingVisible"));
     entrySeen.record("missions", facts, read.scope, true);
   }
 }
-watch([missionRead.visible, missionRead.ready, () => app.accountBindingEpoch], ([visible, ready]) => {
+watch([missionRead.visible, missionRead.ready, () => app.accountBindingEpoch], ([visible, ready, epoch], previous) => {
+  if (epoch !== previous[2]) {
+    missionReadSettled.value = false;
+    missionReadFailed.value = false;
+  }
   if (remoteApiEnabled && visible && ready) void refreshMissionTasks();
 });
 useAutoRecovery({

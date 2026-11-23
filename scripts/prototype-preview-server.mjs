@@ -26,7 +26,7 @@ const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirna
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
 const authDemo=createAuthDemo(state);
-const meEntryDots=createMeEntryDotsFixture();
+const meEntryDots=createMeEntryDotsFixture(state);
 // An optional local handoff preserves demo conversations across a preview rebuild.
 if(process.env.DEMO_STATE_FILE){
   const saved=JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state;

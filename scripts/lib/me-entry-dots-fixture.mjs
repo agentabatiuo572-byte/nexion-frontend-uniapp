@@ -1,5 +1,5 @@
-import { demoEarningReceipt } from './prototype-demo-notifications.mjs';
-import { demoReceiptPage } from './prototype-demo-secondary.mjs';
+import { demoEarningReceipt, demoReceiptWire } from './prototype-demo-notifications.mjs';
+import { demoReceiptPage, demoReceiptSummary } from './prototype-demo-secondary.mjs';
 import { demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
 
 const sources = {
@@ -9,7 +9,28 @@ const sources = {
   '/api/devices/earnings': 'inventory',
 };
 const day = 86_400_000;
-const receiptPrefix = 'CTR-DEMO-ME-DOT-';
+const weekLength = 7 * day;
+const chinaOffset = 8 * 60 * 60 * 1000;
+const modelTaskSuffixPrefix = '0000000000004000800000000000';
+const receiptPrefix = 'CTR-' + modelTaskSuffixPrefix;
+
+function weekStart(now) {
+  const localMidnight = Math.floor((now + chinaOffset) / day) * day;
+  const weekday = (new Date(localMidnight).getUTCDay() + 6) % 7;
+  return localMidnight - weekday * day - chinaOffset;
+}
+
+function specimenReceipt(completedAt, index, device) {
+  const id = 7110 + index;
+  const taskNo = 'CTA-' + modelTaskSuffixPrefix + id.toString(16).toUpperCase().padStart(4, '0');
+  const durationSec = 300;
+  return {
+    id, taskNo, receiptNo: 'CTR-' + taskNo.slice(-32), taskClass: 'IG',
+    rewardUsdt: 0.15, rewardNex: 0, modelReceipt: true,
+    device, deviceName: device.name, startedAt: completedAt - durationSec * 1000,
+    durationSec, completedAt, settledAt: completedAt,
+  };
+}
 const inventoryInstance = index => 'ME-DOT-DEVICE-' + (index + 1);
 
 function specimenDevices(template, fixture) {
@@ -32,7 +53,8 @@ function specimenOrders(payload, fixture) {
   if (fixture.payment !== 'none') {
     const placedAt = fixture.paymentPlacedAt;
     const pending = {
-      ...template, orderNo: 'DEMO-ME-DOT-PAY', placedAt, expiresAt: placedAt + paymentWindow,
+      ...template, orderNo: 'DEMO-ME-DOT-PAY', placedAt,
+      expiresAt: fixture.payment === 'placed' ? placedAt + paymentWindow : null,
       paymentStatus: 'PENDING', orderStatus: 'PENDING_PAYMENT', activationStatus: 'WAITING_PAYMENT',
       canonicalStatus: 'placed', closeReasonCode: null,
     };
@@ -56,9 +78,16 @@ function specimenOrders(payload, fixture) {
 
 function specimenQuests(payload, fixture) {
   const template = payload.quests.find(row => row.layer === 'WEEKLY_T2' && row.status === 'PENDING');
-  const quests = fixture.waves.map((at, index) => ({
-    ...template, questCode: 'demo-me-dot-week-' + index, instanceKey: 'WEEK:me-dots',
-    eligibleFrom: new Date(at - day).toISOString(), eligibleUntil: new Date(at + 5 * day).toISOString(),
+  const start = fixture.weekStart + (fixture.weekState === 'next' ? weekLength : 0);
+  // Every issued task comes from the same frozen week header. A closed
+  // period contributes no weekly rows; the next header reuses the codes.
+  const week = {
+    instanceKey: 'WEEK:' + start.toString(16).padStart(32, '0'),
+    eligibleFrom: new Date(start).toISOString(),
+    eligibleUntil: new Date(start + weekLength).toISOString(),
+  };
+  const quests = fixture.weekState === 'closed' ? [] : fixture.waves.map((_at, index) => ({
+    ...template, ...week, questCode: 'demo-me-dot-week-' + index, eligible: true,
     status: index === 0 ? fixture.weeklyStatus : 'PENDING',
   }));
   const dayOne = fixture.dayOne ? payload.quests.filter(row => row.layer === 'DAY_ONE').map(row => ({
@@ -71,13 +100,14 @@ function specimenQuests(payload, fixture) {
   };
 }
 
-export function createMeEntryDotsFixture() {
+export function createMeEntryDotsFixture(previewState) {
   const accounts = new Map();
 
   function configure(accountId, update) {
     if (update.reset) accounts.delete(accountId);
     const fixture = accounts.get(accountId) ?? {
       waves: [], payment: 'none', newerOrders: 0, weeklyStatus: 'PENDING', dayOne: null,
+      weekStart: weekStart(Date.now()), weekState: 'current',
       fail: null, delay: null, paymentPlacedAt: Date.now() - paymentWindow - 5000,
     };
     if (update.wave !== undefined) {
@@ -89,7 +119,11 @@ export function createMeEntryDotsFixture() {
     }
     if (['none', 'placed', 'paid', 'expired', 'failed'].includes(update.payment)) fixture.payment = update.payment;
     if ([0, 20].includes(update.newerOrders)) fixture.newerOrders = update.newerOrders;
-    if (['PENDING', 'COMPLETED', 'CLAIMABLE', 'CLAIMED', 'EXPIRED'].includes(update.weeklyStatus)) {
+    if (['current', 'closed', 'next'].includes(update.weekState) && update.weekState !== fixture.weekState) {
+      fixture.weekState = update.weekState;
+      fixture.weeklyStatus = 'PENDING';
+    }
+    if (['PENDING', 'COMPLETED', 'CLAIMABLE', 'CLAIMED'].includes(update.weeklyStatus)) {
       fixture.weeklyStatus = update.weeklyStatus;
     }
     if ([null, 'PENDING', 'COMPLETED', 'CLAIMABLE'].includes(update.dayOne)) fixture.dayOne = update.dayOne;
@@ -134,15 +168,14 @@ export function createMeEntryDotsFixture() {
             dailyNex: devices.reduce((sum, row) => sum + row.dailyNex, 0),
             realizedTodayUsdt: devices.length * 0.15, realizedTodayNex: 0 };
         } else {
-          const samples = fixture.waves.map((completedAt, index) => ({
-            id: 7110 + index, receiptNo: receiptPrefix + (index + 1), taskClass: 'IG', usdt: '0.15',
-            modelReceipt: true, device: devices[index], deviceName: devices[index].name, completedAt, settledAt: completedAt,
-          }));
-          if (source === 'receipts') data = demoReceiptPage(url.searchParams, samples.map(sample => demoEarningReceipt(sample)));
-          else {
+          const samples = fixture.waves.map((completedAt, index) => specimenReceipt(completedAt, index, devices[index]));
+          if (source === 'receipts') {
+            const summaries = samples.map(sample => demoReceiptSummary(demoEarningReceipt(sample)));
+            data = demoReceiptPage(url.searchParams, summaries, previewState);
+          } else {
             const sample = samples.find(row => row.receiptNo === path.split('/').at(-1));
             if (!sample) throw Object.assign(new Error('ME_DOTS_RECEIPT_NOT_FOUND'), { status: 404 });
-            data = demoEarningReceipt(sample, true);
+            data = demoReceiptWire(demoEarningReceipt(sample, true), previewState);
           }
         }
       }

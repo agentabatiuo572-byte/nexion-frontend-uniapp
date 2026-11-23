@@ -7,9 +7,9 @@ curl -sS http://127.0.0.1:5788/__demo/me-entry-dots \
   -H 'Content-Type: application/json' -d '{"wave":0}'
 ```
 
-- `wave` 取 0–3。0 为空，每增加一档新增一笔已交付订单、一项任务、一张收益凭证和一台设备。凭证详情号为 `CTR-DEMO-ME-DOT-1` 等。
+- `wave` 取 0–3。0 为空，每增加一档新增一笔已交付订单、一项任务、一张收益凭证和一台设备。第一笔凭证可从 `/#/pages/me/receipts?receiptNo=CTR-00000000000040008000000000001BC6` 打开。
 - `payment` 取 `placed`、`paid`、`expired`、`failed`、`none`。放置样本已超付款截止点，只有服务端状态变更才解除常亮。`newerOrders:20` 将样本移出首批。
-- `weeklyStatus` 可把第一项任务切换为 `COMPLETED` 或 `CLAIMABLE`。可用 `dayOne` 的 `PENDING`、`COMPLETED`、`CLAIMABLE` 或 `null` 切换新手组。
+- `weeklyStatus` 可把第一项任务切换为 `COMPLETED` 或 `CLAIMABLE`。用 `weekState: "closed"` 关闭周，`weekState: "next"` 在下一周用相同任务码和新实例发放。验证下一周点亮时，把预览页面的时钟推进到新周期起点之后。可用 `dayOne` 的 `PENDING`、`COMPLETED`、`CLAIMABLE` 或 `null` 切换新手组。
 - `fail` 可指定 `orders`、`missions`、`receipts` 或 `inventory` 返回 503，设为 `null` 恢复。用 `failStatus:403` 模拟身份失效。
 - `delay` 可指定上述来源或 `receipt-detail`，用 `delayMs` 设置延迟，设为 `null` 恢复。响应内容在开始延时前固定。
 - 默认使用当前预览账号，可用 `accountId` 设置另一预览账号的数据。用 `reset:true` 重置对应账号的服务端夹具。
