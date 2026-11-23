@@ -6,9 +6,9 @@ import { productDailyEstimateRange, productDailyUvtRange } from "./product-estim
 export interface YieldAmount {
   usd: number;
   nex: number;
-  /** Catalog daily ranges; absent for the phone tier, which has one figure. */
-  usdRange?: { low: number; high: number };
-  nexRange?: { low: number; high: number };
+  /** Catalog daily ranges (null when the catalog sends none); the phone tier carries one figure and no range keys. */
+  usdRange?: { low: number; high: number } | null;
+  nexRange?: { low: number; high: number } | null;
 }
 
 export interface StoreYieldLadderRow {
@@ -49,7 +49,7 @@ function productAmount(products: readonly Product[], productId: string): YieldAm
   if (candidates.length !== 1) return null;
   const [product] = candidates;
   return { usd: product.dailyEarn, nex: product.dailyEarnNEX,
-    usdRange: productDailyEstimateRange(product) ?? undefined, nexRange: productDailyUvtRange(product) };
+    usdRange: productDailyEstimateRange(product), nexRange: productDailyUvtRange(product) };
 }
 
 export function buildStoreYieldAuthority(

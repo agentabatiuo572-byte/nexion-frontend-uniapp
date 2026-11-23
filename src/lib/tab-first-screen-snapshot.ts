@@ -54,7 +54,9 @@ const n: Schema = "number", c: Schema = "count", pct: Schema = "percent", s: Sch
 const nullable = (value: Schema): Schema => ({ nullable: value });
 const fields = (value: Record<string, Schema>): Schema => ({ fields: value });
 const list = (value: Schema): Schema => ({ list: value });
-const amount = nullable(fields({ usd: n, nex: n }));
+const range = nullable(fields({ low: n, high: n }));
+// Catalog amounts carry the catalog's daily ranges; the phone tier and snapshots written before ranges have none.
+const amount = nullable({ anyOf: [fields({ usd: n, nex: n }), fields({ usd: n, nex: n, usdRange: range, nexRange: range })] });
 const period = fields({ usdt: nullable(n), nex: nullable(n), jobCount: nullable(c) });
 const localized = fields({ zh: s, en: s, vi: s });
 const schemas: Record<TabSnapshotKey, Schema> = {
