@@ -9,12 +9,11 @@ import { svgMarkup } from "@/lib/native-svg-markup";
 defineOptions({ inheritAttrs: false });
 const attrs = useAttrs();
 const slots = useSlots();
-const instance = getCurrentInstance();
+const instance = getCurrentInstance()!;
 // The scope ids Vue would give the <svg> as a template root: the template that wrote it, plus each parent component's
 // while this box is that component's root (as for NxIcon), so a parent's scoped class rule reaches the svg too.
 function rootScopeIds(): string[] {
   const ids: string[] = [];
-  if (!instance) return ids;
   if (instance.vnode.scopeId) ids.push(instance.vnode.scopeId);
   let child = instance;
   let parent = instance.parent;
