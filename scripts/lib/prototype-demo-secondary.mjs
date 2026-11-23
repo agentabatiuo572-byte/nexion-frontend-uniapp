@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoEarningCredits, demoEarningReceipt } from './prototype-demo-notifications.mjs';
+import { demoEarningReceipts, demoEarningReceipt } from './prototype-demo-notifications.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
@@ -227,8 +227,8 @@ export function secondaryDemo(url,state,request,walletBills){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
-    const credits=demoEarningCredits(state);
-    const credit=credits.find(sample=>sample.receiptNo===p.split('/').pop());
+    const earningReceipts=demoEarningReceipts(state);
+    const credit=earningReceipts.find(sample=>sample.receiptNo===p.split('/').pop());
     if(credit){
       if(credit.receiptFailures){
         if(!state.earningReceiptAttempts||state.earningReceiptAttempts.epoch!==state.scenarioEpoch)
@@ -238,7 +238,7 @@ export function secondaryDemo(url,state,request,walletBills){
         if(counts[credit.receiptNo]<=credit.receiptFailures)
           throw Object.assign(new Error('TASK_RECEIPT_UNAVAILABLE'),{status:503});
       }
-      if(credit.receiptStatus!==404)return demoEarningReceipt(credit);
+      if(credit.receiptStatus!==404)return demoEarningReceipt(credit,true);
     }
     const tasks=demoSettledTasks(state,state.previewFactsAt??now);
     const items=tasks.map((task,i)=>({...proof,
@@ -251,7 +251,7 @@ export function secondaryDemo(url,state,request,walletBills){
         postingTimeVerified:task.postedAt!=null}),
       proofHash:task.simulation?null:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts')return demoReceiptPage(url.searchParams,[
-      ...items,...credits.filter(sample=>sample.receiptStatus!==404).map(demoEarningReceipt),
+      ...items,...earningReceipts.filter(sample=>sample.receiptStatus!==404).map(sample=>demoEarningReceipt(sample)),
     ]);
     const index=items.findIndex(r=>r.receiptNo===p.split('/').pop());
     if(index<0)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});

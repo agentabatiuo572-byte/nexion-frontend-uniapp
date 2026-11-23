@@ -1575,7 +1575,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       const order=orders.find(item=>item.orderNo==='DEMO-ORDER-002')??orders.find(item=>item.paymentStatus==='PAID');
       return demoNotifications(locale,state,now,device,order);
     };
-    if(pathname==='/api/notifications')return demoNotificationPage(notificationRows(),url.searchParams);
+    if(pathname==='/api/notifications')return demoNotificationPage(notificationRows(),url.searchParams,{
+      includeActionableUnread:state.fleetState!=='earning-credit',
+    });
     if(/^\/api\/notifications\/\d+\/read$/.test(pathname)){state.readIds||=[];state.readIds.push(Number(pathname.split('/')[3]));return null;}
     if(pathname==='/api/notifications/read-all'){
       const count=notificationRows().filter(item=>item.readAt===null).length;

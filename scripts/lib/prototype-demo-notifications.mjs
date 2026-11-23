@@ -12,35 +12,41 @@ const earningSamples = [
   { id: 1002, deviceId: 41, taskClass: 'IG', usdt: '0.15', minutesAgo: 80, receiptStatus: 404 },
   { id: 1001, deviceId: 42, taskClass: 'SP', usdt: '0.12', minutesAgo: 90, actionMissing: true, read: true },
 ];
+const earningReceiptSamples = [...earningSamples, { id: 1010, deviceId: 41, taskClass: 'IG', minutesAgo: 0 }];
 
 const taskNames = { IG: 'Image Generation', VG: 'Video Generation', LL: 'LLM Inference',
   EM: 'Embedding', SP: 'Speech Processing', FT: 'Fine-tuning' };
 
-export function demoEarningCredits(state) {
+function demoEarningSamples(state, samples) {
   if (state.fleetState !== 'earning-credit' || state.dataState === 'empty') return [];
-  return earningSamples.flatMap(sample => {
+  return samples.flatMap(sample => {
     const device = state.fleetSeed?.find(row => row.id === sample.deviceId);
     if (!device) return [];
+    const finishedAt = state.previewFactsAt - sample.minutesAgo * 60_000;
     return [{ ...sample, device, deviceName: sample.deviceName ?? device.name, receiptNo: `CTR-DEMO-EARN-${sample.id}`,
-      settledAt: state.previewFactsAt - sample.minutesAgo * 60_000 }];
+      completedAt: finishedAt - 60_000, settledAt: sample.usdt || sample.uvt ? finishedAt : null }];
   });
 }
 
-export function demoEarningReceipt(sample) {
-  const { device, id, taskClass, receiptNo, settledAt } = sample;
-  const completedAt = settledAt - 60_000;
+export function demoEarningCredits(state) { return demoEarningSamples(state, earningSamples); }
+export function demoEarningReceipts(state) { return demoEarningSamples(state, earningReceiptSamples); }
+
+export function demoEarningReceipt(sample, detail = false) {
+  const { device, id, taskClass, receiptNo, completedAt, settledAt, modelReceipt } = sample;
   const hash = createHash('sha256').update(receiptNo).digest('hex');
   return {
     source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true,
-    receiptNo, taskNo: `DEMO-EARN-TASK-${id}`, taskClass, taskId: `demo-earn-${id}`,
-    taskName: taskNames[taskClass], model: taskNames[taskClass], client: 'UVEL',
+    receiptNo, displayReceiptNo: `UVEL-RC-${id.toString(36).toUpperCase().padStart(6, '0')}`,
+    taskNo: modelReceipt ? `DEMO-EARN-TASK-${id}` : receiptNo.replace(/^CTR-/, 'SIM-'),
+    taskClass, taskId: `demo-earn-${id}`, taskName: taskNames[taskClass], model: modelReceipt ? 'Wan 2.1' : '', client: 'UVEL',
     deviceId: device.id, deviceInstanceNo: device.instanceNo, deviceName: sample.deviceName,
     deviceType: device.deviceType ?? 'BOX', deviceGpu: device.gpuModel ?? '', vramTotalGb: device.vramTotalGb,
     rewardUsdt: sample.usdt ?? '0', rewardNex: sample.uvt ?? '0',
-    earningStatus: 'SETTLED', settledAt, completedAt, startedAt: completedAt - 300_000, durationSec: 300,
-    ...(sample.modelReceipt ? { proofHash: hash } : {
+    earningStatus: modelReceipt ? 'SETTLED' : 'CREDITED', settledAt, postingTimeVerified: settledAt !== null,
+    completedAt, startedAt: completedAt - 300_000, durationSec: 300,
+    ...(modelReceipt ? { executionMode: 'MODEL', proofKind: 'MODEL_EXECUTION', modelExecuted: true, proofHash: hash } : {
       executionMode: 'SIMULATED', proofKind: 'TASK_RECEIPT', modelExecuted: false,
-      proofHash: null, receiptHash: hash, postingTimeVerified: true,
+      proofHash: null, ...(detail && { receiptHash: hash }),
     }),
   };
 }
@@ -119,7 +125,7 @@ export function demoNotifications(locale, state, now, device, order) {
 }
 
 
-export function demoNotificationPage(rows, params) {
+export function demoNotificationPage(rows, params, { includeActionableUnread }) {
   const rawCursor = params.get('cursor')?.trim();
   const cursor = rawCursor ? Number(rawCursor) : null;
   if (cursor !== null && (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(cursor) || cursor <= 0)) {
@@ -142,6 +148,8 @@ export function demoNotificationPage(rows, params) {
     items,
     nextCursor: remaining.length > limit ? String(items.at(-1).id) : null,
     unread: unread.length,
-    actionableUnread: unread.filter(row => row.kind !== 'marketing' && row.kind !== 'earning_credited').length,
+    ...(includeActionableUnread && {
+      actionableUnread: unread.filter(row => row.kind !== 'marketing' && row.kind !== 'earning_credited').length,
+    }),
   };
 }
