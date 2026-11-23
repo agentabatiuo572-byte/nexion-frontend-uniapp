@@ -355,11 +355,13 @@ const ctaStyle: CSSProperties = {
 const signinStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const signinLinkStyle: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "44px", minHeight: "44px", fontSize: "12px", color: "var(--v5-brand)" };
 const proofCardStyle: CSSProperties = { marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--v5-border)" };
+// Field-label heading over the figures: the meta role (10.1 12/16, 400, muted), no added tracking (01.2).
 const proofHeadStyle: CSSProperties = {
   marginBottom: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  letterSpacing: "0.02em",
+  fontSize: "var(--ui-type-meta)",
+  lineHeight: "var(--ui-type-meta-lh)",
+  fontWeight: 400,
   color: "var(--v5-ink-3)",
 };
 const partnerCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
