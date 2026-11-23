@@ -146,7 +146,7 @@ import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { PromotionItem } from '@/api/promotion-api';
 import { checkoutQuoteBlock, validatePromotionItems, type CheckoutQuoteBlock, type OrderReceipt } from '@/api/promotion-api';
-import type { RewardDisclosure,Quote } from '@/api/promotion-contracts';
+import type { Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { isLiteProduct } from '@/lib/lite-scope';
@@ -164,7 +164,7 @@ import { acquireAccountCommandKey,readAccountRow,writeAccountRow } from '@/store
 import { registerCheckoutLeaveGuard } from '@/lib/promotion-leave-guard';
 import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadline-clock';
 import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
-import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
+import { promotionCheckoutHref, promotionStoreHref, type PromotionDisclosure } from '@/lib/promotion-entry';
 import { litePromotion } from '@/lib/promotion-landing';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
 import { onPurchaseRecordReleased, pendingOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
@@ -353,8 +353,14 @@ async function changeQuantity(productNo:string,delta:-1|1,event?:KeyboardEvent):
   selection.value=next;
   await loadQuote();
 }
-function disclosure(r:ExpectedReward):RewardDisclosure|null {const d=r.disclosure;return d&&[d.title,d.terms,d.refundTerms,d.benefitDescription].every(x=>x&&(['zh','en','vi'] as const).every(l=>typeof x[l]==='string'&&x[l].trim()))?d:null;}
-const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is RewardDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
+function disclosure(reward: ExpectedReward): PromotionDisclosure | null {
+  const d = reward.disclosure;
+  const complete = d && [d.title,d.terms,d.refundTerms,d.benefitDescription].every(
+    text => text && (['zh','en','vi'] as const).every(lang => typeof text[lang] === 'string' && text[lang].trim()),
+  );
+  return complete ? { ...d, role: reward.beneficiaryRole } : null;
+}
+const disclosures=computed(()=>rewards.value.map(disclosure).filter((d):d is PromotionDisclosure=>!!d));const completeTerms=computed(()=>disclosures.value.length===rewards.value.length);
 const hasRewardTerms=computed(()=>auth.isAuthenticated&&!loading.value&&disclosures.value.length>0);
 // The compact gift row is only for a simple, eligible buyer gift before order
 // creation. Multiple rewards, inviter benefits and receipt states keep their

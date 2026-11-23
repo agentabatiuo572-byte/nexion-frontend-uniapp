@@ -3,7 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { accountDemo } from './prototype-demo-account.mjs';
-import { clearPreviewAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
+import { clearPreviewAccessToken, demoReferralBuyer, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
 
 export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',registrationState:'normal',phoneBindingState:'normal',savedAttemptState:'none'};
 export const authDemoOptions = {
@@ -66,7 +66,7 @@ export function createAuthDemo(state) {
       }
       if(path==='/auth/users/refresh')
         return state.authState==='signed-in'&&(!headers.authorization||previewAccountId(state,headers))
-          ? session(state.authUser??existing) : fail(401,'USER_REFRESH_TOKEN_REQUIRED');
+          ? session(state.authUser ?? (state.promotionBuyer === 'sponsored-new' ? demoReferralBuyer.user : existing)) : fail(401,'USER_REFRESH_TOKEN_REQUIRED');
       if(['/auth/users/logout','/auth/users/session/discard'].includes(path)){
         if(headers.authorization&&!previewAccountId(state,headers))return fail(401,'AUTH_REQUIRED');
         state.authState='signed-out';delete state.authUser;clearPreviewAccessToken(state);return ok(null);
