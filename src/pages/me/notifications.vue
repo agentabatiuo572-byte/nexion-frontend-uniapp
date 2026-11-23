@@ -495,9 +495,8 @@ watch(filter, value => {
 .message-center .notification-detail { padding:0 16px 14px 68px; background:var(--v5-surface); }
 /* Earnings credited row (04.5, 10.1): each amount is the card figure in Montserrat and the success colour, its unit the
    auxiliary figure; an amount and its unit never split, a second amount wraps whole. */
-.message-center .notification-amounts { display:flex; flex-wrap:wrap; align-items:baseline; min-width:0; }
+.message-center .notification-amounts { display:flex; flex-wrap:wrap; align-items:baseline; column-gap:6px; min-width:0; }
 .message-center .notification-amount { white-space:nowrap; color:var(--v5-success-ink); font:var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric:tabular-nums; }
-.message-center .notification-amount + .notification-amount { margin-left:6px; }
 .message-center .notification-amount__unit { color:var(--v5-ink-3); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
 .message-center .notification-amount__sep { color:var(--v5-ink-4); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
 .message-center .notification-earning-summary { margin-top:2px; }
