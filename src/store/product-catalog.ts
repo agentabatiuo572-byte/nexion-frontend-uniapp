@@ -7,6 +7,8 @@ import { productCatalogApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/run
 import { advanceRuntimeRevision, captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { clearProductCatalog, replaceProductCatalog } from "@/mock/products";
 import { ApiError } from "@/api/errors";
+import { serverLanguage, type ServerLanguage } from "@/i18n";
+import { useLocaleStore } from "@/store/locale";
 
 // "mock" 变体已删:它曾是 mock 模式的初值,而全仓消费方只认 "ready" —— 留着这个变体
 // 等于给「下次有人再把 mock 设成它」留了门。删掉后 tsc 会证明没有第二处在用。
@@ -38,11 +40,15 @@ export const productCatalogState = reactive<{
   revision: null,
 });
 
-let refreshInFlight: Promise<boolean> | null = null;
+let refreshInFlight: { locale: ServerLanguage; promise: Promise<boolean>; keepReady: boolean } | null = null;
 let catalogEpoch = 0;
 
 let retryAt = 0;
 let publishedCatalogSignature: string | null = null;
+let publishedCatalogLocale: ServerLanguage | null = null;
+const languageReadFailed = shallowRef(false);
+export const productCatalogLanguageReadFailed = shallowReadonly(languageReadFailed);
+export const productCatalogRetryAt = () => retryAt;
 // Display only. Purchase authority remains productCatalogState + a fresh
 // eligibility response; a failed read still clears the compatibility catalog.
 const presentation = shallowRef<ProductCatalogSnapshot | null>(null);
@@ -71,6 +77,8 @@ subscribeRuntimeRevision((scope: RuntimeRevisionScope) => {
   if (publishing === scope && isCurrentRuntimeRevision(scope)) return;
   invalidatePassiveTabRead("product-catalog");
   publishedCatalogSignature = null;
+  publishedCatalogLocale = null;
+  languageReadFailed.value = false;
   invalidateTabSnapshots(["catalogYield", "commission", "network", "rank", "referral"]);
   displayProof.value = null;
 
@@ -108,6 +116,8 @@ export function prepareProductCatalog(): void {
   // account can immediately start its own request.
   catalogEpoch += 1;
   publishedCatalogSignature = null;
+  publishedCatalogLocale = null;
+  languageReadFailed.value = false;
 
   retryAt = 0;
   refreshInFlight = null;
@@ -129,47 +139,70 @@ export function prepareProductCatalog(): void {
 export function revalidateProductCatalog(): Promise<boolean> {
   if (Date.now() < retryAt) return Promise.resolve(false);
   if (!remoteApiEnabled) return Promise.resolve(true);
-  return runPassiveTabRead("product-catalog", () => refreshInFlight ?? refreshProductCatalog(true), [catalogBindingEpoch]);
+  const locale = serverLanguage(useLocaleStore().code);
+  return runPassiveTabRead("product-catalog", () => refreshInFlight?.locale === locale
+    ? refreshInFlight.promise : refreshProductCatalog(true), [catalogBindingEpoch, locale]);
 }
 
 /** Follow a replacement read; a superseded response is never a catalog failure. */
-export async function settleProductCatalogRefresh(read: Promise<boolean>): Promise<boolean> {
+export async function settleProductCatalogRefresh(read: Promise<boolean>, { requireFresh = false } = {}): Promise<boolean> {
   const binding = catalogBindingEpoch;
   for (;;) {
     await read;
     if (binding !== catalogBindingEpoch) return false;
-    if (refreshInFlight && refreshInFlight !== read) { read = refreshInFlight; continue; }
-    if (productCatalogState.status !== "loading") return productCatalogState.status === "ready";
+    const latest = refreshInFlight?.promise;
+    if (latest && latest !== read) { read = latest; continue; }
+    if (productCatalogState.status !== "loading") {
+      return productCatalogState.status === "ready" && (!requireFresh || !languageReadFailed.value);
+    }
     read = refreshProductCatalog(true);
   }
 }
 
 export function refreshProductCatalog(force = false): Promise<boolean> {
-  if (force) invalidateBeforePassiveTabRead("product-catalog");
+  return readProductCatalog(force, false);
+}
+
+export function refreshProductCatalogLanguage(): Promise<boolean> {
+  return readProductCatalog(true, true);
+}
+
+function readProductCatalog(force: boolean, languageOnly: boolean): Promise<boolean> {
   if (!remoteApiEnabled) return Promise.resolve(true);
+  const localeStore = useLocaleStore();
+  const locale = serverLanguage(localeStore.code);
+  const pending = refreshInFlight?.locale === locale ? refreshInFlight : null;
+  if (pending && (!force || languageOnly)) return pending.promise;
   // A fresh read is unavailable until the server's retry deadline, even for commands.
-  if (Date.now() < retryAt) return Promise.resolve(false);
-  if (!force && productCatalogState.status === "ready") return Promise.resolve(true);
+  if (Date.now() < retryAt) {
+    if (languageOnly && productCatalogState.status === "ready") languageReadFailed.value = true;
+    return Promise.resolve(false);
+  }
+  const alreadyReady = productCatalogState.status === "ready";
+  if (!force && alreadyReady && publishedCatalogLocale === locale && !languageReadFailed.value) return Promise.resolve(true);
+  const keepReady = alreadyReady && (languageOnly || pending?.keepReady === true
+    || publishedCatalogLocale !== locale || languageReadFailed.value);
 
   // A visible-page refresh is a newer observation, not merely another caller
   // waiting for an older request. Advance the epoch so its late success/failure
   // cannot overwrite the newer catalog snapshot.
-  if (force) {
+  if (force) invalidateBeforePassiveTabRead("product-catalog");
+  if (force || refreshInFlight) {
     catalogEpoch += 1;
     refreshInFlight = null;
   }
-  if (refreshInFlight) return refreshInFlight;
 
   const snapshotWrite = captureTabSnapshotWrite();
   const requestEpoch = catalogEpoch;
   const requestRuntime = captureRuntimeRevision();
   const requestBinding = catalogBindingEpoch;
-  const current = () => requestEpoch === catalogEpoch && requestBinding === catalogBindingEpoch && isCurrentRuntimeRevision(requestRuntime);
-  productCatalogState.status = "loading";
+  const current = () => requestEpoch === catalogEpoch && requestBinding === catalogBindingEpoch
+    && serverLanguage(localeStore.code) === locale && isCurrentRuntimeRevision(requestRuntime);
+  if (!keepReady) productCatalogState.status = "loading";
   if (!current()) return Promise.resolve(false);
   productCatalogState.error = "";
   if (!current()) return Promise.resolve(false);
-  const request = productCatalogApi.catalog()
+  const request = productCatalogApi.catalog(locale)
     .then((snapshot) => {
       if (!current()) return false;
       replaceProductCatalog(snapshot.products);
@@ -193,12 +226,17 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       if (!current()) return false;
       productCatalogState.revision = snapshot.revision;
       if (!current()) return false;
+      publishedCatalogLocale = locale;
+      languageReadFailed.value = false;
       productCatalogState.status = "ready";
       if (!current()) return false;
 
       retryAt = 0;
-      const signature = JSON.stringify(snapshot);
-      // An identical directory read is an observation, not a business revision.
+      const signature = JSON.stringify({
+        ...snapshot,
+        products: snapshot.products.map(({ tagline, catalogRequestLocale, ...product }) => product),
+      });
+      // A subtitle-only change does not invalidate purchase or quote context.
       const published = signature === publishedCatalogSignature || publishCatalogRuntime();
       if (published) {
         publishedCatalogSignature = signature;
@@ -209,8 +247,14 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
     })
     .catch((error: unknown) => {
       if (!current()) return false;
-      if (transientCatalogRead(error) && error instanceof ApiError && error.kind === "http" && error.status === 429) retryAt = Date.now() + (error.retryAfterMs ?? 30_000);
-      if (!transientCatalogRead(error)) { displayProof.value = null; invalidateTabSnapshots(["catalogYield", "commission", "network", "rank", "referral"], snapshotWrite); }
+      const transient = transientCatalogRead(error);
+      if (transient && error instanceof ApiError && error.kind === "http" && error.status === 429) retryAt = Date.now() + (error.retryAfterMs ?? 30_000);
+      if (keepReady && transient) {
+        languageReadFailed.value = true;
+        return false;
+      }
+      languageReadFailed.value = false;
+      if (!transient) { displayProof.value = null; invalidateTabSnapshots(["catalogYield", "commission", "network", "rank", "referral"], snapshotWrite); }
       if (!current()) return false;
       if (error instanceof ApiError && (error.kind === "auth" || error.status === 401 || error.status === 403 || error.code === 401 || error.code === 403)) presentation.value = null;
       if (!current()) return false;
@@ -231,13 +275,14 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       productCatalogState.revision = null;
       if (!current()) return false;
       publishedCatalogSignature = null;
+      publishedCatalogLocale = null;
       publishCatalogRuntime();
       return false;
     })
     .finally(() => {
-      if (refreshInFlight === request) refreshInFlight = null;
+      if (refreshInFlight?.promise === request) refreshInFlight = null;
     });
-  rememberPassiveTabRead("product-catalog", request, [requestBinding]);
-  refreshInFlight = request;
+  rememberPassiveTabRead("product-catalog", request, [requestBinding, locale]);
+  refreshInFlight = { locale, promise: request, keepReady };
   return request;
 }

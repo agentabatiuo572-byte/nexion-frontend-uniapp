@@ -58,7 +58,7 @@
 
         <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
-          <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="product.tagline" class="checkout-product-meta">{{ product.tagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="checkoutTagline" class="checkout-product-meta">{{ checkoutTagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
           <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><view class="checkout-quantity-controls">
             <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" :size="20" /></button>
             <text class="checkout-quantity-value" aria-live="polite">1</text>
@@ -363,7 +363,8 @@ import { monthlyQuotaExhausted, resolvePurchaseEligibilityMessage } from "@/lib/
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
+import { productCatalogLanguageReadFailed, productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
+import { serverTagline } from "@/lib/product-copy";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -646,6 +647,15 @@ function isCurrentCheckoutRoute(scope: CheckoutRouteScope): boolean {
     && checkoutRouteFence.isCurrent(scope, checkoutRouteIdentity());
 }
 
+const checkoutCatalogCheckFailed = ref(false);
+async function settleCheckoutCatalogRefresh(scope: CheckoutRouteScope, read: Promise<boolean>): Promise<boolean> {
+  const ready = await settleProductCatalogRefresh(read, { requireFresh: true });
+  if (isCurrentCheckoutRoute(scope)) {
+    checkoutCatalogCheckFailed.value = !ready && productCatalogLanguageReadFailed.value;
+  }
+  return ready;
+}
+
 function clearRemotePurchaseEligibility(): void {
   purchaseEligibilityRequestSequence += 1;
   eligibilityCatalogUnconfirmed.value = false;
@@ -686,7 +696,7 @@ async function refreshPurchaseEligibility(scope = captureCheckoutRoute(), refres
     remotePurchaseEligibility.value = null;
     remotePurchaseEligibilityStatus.value = "error";
     if (refreshCatalogOnMissing && isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
-      const ready = await settleProductCatalogRefresh(refreshProductCatalog(true));
+      const ready = await settleProductCatalogRefresh(refreshProductCatalog(true), { requireFresh: true });
       if (!current()) return "stale";
       if (ready) {
         const listing = productCatalogPresentation.value?.products.find(entry => entry.id === scope.productNo);
@@ -830,7 +840,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
     ]);
     if (!isCurrentCheckoutRoute(routeScope)) return;
     // A retry may have replaced the failed read while phase and trial were still loading.
-    catalogReady = await settleProductCatalogRefresh(read);
+    catalogReady = await settleCheckoutCatalogRefresh(routeScope, read);
     // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
     if (!isCurrentCheckoutRoute(routeScope) || !catalogReady) return;
     // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
@@ -910,11 +920,17 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
   }
 }
 
-const catalogStatus = computed(() => productCatalogState.status);
+const catalogStatus = computed(() => checkoutCatalogCheckFailed.value && productCatalogState.status === "ready"
+  ? "error" : productCatalogState.status);
 const product = computed<Product | undefined>(() => !productId.value || (remoteApiEnabled && catalogStatus.value !== "ready") ? undefined
   : remoteApiEnabled
     ? productCatalogPresentation.value?.products.find((entry) => entry.id === productId.value)
     : getProduct(productId.value));
+const checkoutTagline = computed(() => {
+  const listing = product.value;
+  if (!listing) return "";
+  return remoteApiEnabled ? serverTagline(t.value, listing, locale.code) : listing.tagline;
+});
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
 function productOutOfStock(product: Product | undefined): boolean {
   return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
@@ -2974,7 +2990,10 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
   // An original payment can finish before the ordinary checkout reaches eligibility.
   if (!quantityReady.value || (!ordinaryCheckoutInitialized.value && !activeSession.value)) {
     void initializeCheckout(beginCheckoutRoute(), mode);
-  } else void resumeReadyCheckout(captureCheckoutRoute(), settleProductCatalogRefresh(refreshProductCatalog(true)), mode);
+  } else {
+    const scope = captureCheckoutRoute();
+    void resumeReadyCheckout(scope, settleCheckoutCatalogRefresh(scope, refreshProductCatalog(true)), mode);
+  }
 }
 
 function showCheckout() {
