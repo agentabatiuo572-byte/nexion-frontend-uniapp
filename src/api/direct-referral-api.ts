@@ -10,6 +10,7 @@ export type TeamSettlementMode = "LEGACY_7" | "DIRECT_ONLY_V1" | "SEVEN_V2";
 export type DirectReferralFilter = "all" | "purchase" | "device_earning";
 export interface DirectReferralEvent extends CommissionEvent {
   kind: DirectReferralKind;
+  layer?: 1 | 2;
   sourceRef: string;
   sourceDeviceId: string | null;
   policyVersion: number;
@@ -75,12 +76,15 @@ export function parseDirectReferralEvent(value: unknown): DirectReferralEvent {
   if (rejected && [source.amountUSDT, source.amountNEX, source.recoveryPendingUSDT, source.recoveryPendingNEX].some(value => value !== 0)) return invalid();
   const sourceDeviceId = source.sourceDeviceId === null ? null : text(source.sourceDeviceId);
   if (!rejected && source.kind === "direct_device_earning" && sourceDeviceId === null) return invalid();
+  const layer = source.kind === "direct_device_earning" ? source.layer : undefined;
+  if (layer !== undefined && layer !== 1 && layer !== 2) return invalid();
   return { id: text(source.id), kind: source.kind as DirectReferralKind, sourceUserName: text(source.sourceUserName),
     sourceRef: text(source.sourceRef), sourceDeviceId, policyVersion: integer(source.policyVersion, rejected ? 0 : 1),
     basisUsdt: number(source.basisUsdt, rejected || waiting ? 0 : Number.MIN_VALUE), nexUsdtPrice: (rejected || waiting) && source.nexUsdtPrice === null ? null : number(source.nexUsdtPrice, Number.MIN_VALUE),
     amountUSDT: number(source.amountUSDT), amountNEX: number(source.amountNEX),
     status: source.status as DirectReferralEvent["status"], ts, unlockAt,
     recoveryPendingUSDT: number(source.recoveryPendingUSDT), recoveryPendingNEX: number(source.recoveryPendingNEX),
+    ...(layer === undefined ? {} : { layer }),
   };
 }
 function split(value: unknown): DirectReferralSplit {
@@ -154,8 +158,7 @@ export function createDirectReferralApi(client: ApiClient, mode: ApiEnvironment 
         purchaseSplit = { enabled: rawSplit.enabled, usdtSharePct };
         sevenLayerReference = { revision: integer(reference.revision), baseRatePct: reference.baseRatePct === null ? null : number(reference.baseRatePct, 0, 100),
           coolingDays: reference.coolingDays === null ? null : integer(reference.coolingDays), legacyNexPerUsd: reference.legacyNexPerUsd === null ? null : number(reference.legacyNexPerUsd) };
-        if ((sevenLayerReference.baseRatePct !== null && sevenLayerReference.baseRatePct !== 10)
-          || (sevenLayerReference.coolingDays !== null && sevenLayerReference.coolingDays > 365)) return invalid();
+        if (sevenLayerReference.coolingDays !== null && sevenLayerReference.coolingDays > 365) return invalid();
         const ready = purchaseSplitConfigured !== false && sevenLayerReference.baseRatePct !== null && sevenLayerReference.coolingDays !== null;
         purchase ??= { ...purchaseSplit, enabled: purchaseSplit.enabled && ready, totalRatePct: sevenLayerReference.baseRatePct ?? 0, coolingDays: sevenLayerReference.coolingDays ?? 0 };
       }
