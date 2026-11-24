@@ -86,7 +86,7 @@
 
         <!-- Review uses the existing quote, redemption and explicit confirmation flow. -->
         <template v-else-if="step === 'select-payment' || step === 'confirm'">
-          <view v-if="!multiTrialCheckout" class="checkout-section">
+          <view v-if="!trialCheckoutShown" class="checkout-section">
             <view class="checkout-section-heading"><text>{{ t.promotion.discount }}</text></view>
             <view class="checkout-group">
               <view class="checkout-option checkout-voucher" role="button" :tabindex="multiTrialCheckout ? -1 : 0" :aria-disabled="multiTrialCheckout" :aria-expanded="voucherDetailsOpen" @click="toggleVoucherDetails" @keydown.enter.prevent="toggleVoucherDetails" @keydown.space.prevent="toggleVoucherDetails">
@@ -146,9 +146,9 @@
               </template>
               <template v-else>
               <CheckoutRow :label="t.store.coRowSubtotal" :value="reviewMoney(shownPurchaseSubtotal, false, true)" class="checkout-fee" />
-              <CheckoutRow v-if="shownTrialDiscounts.promo > 0" :label="multiTrialCheckout ? trialPromoRowLabel : promoRowLabel" :value="reviewMoney(shownTrialDiscounts.promo, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="shownTrialDiscounts.promo > 0" :label="trialCheckoutShown ? trialPromoRowLabel : promoRowLabel" :value="reviewMoney(shownTrialDiscounts.promo, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="shownTrialDiscounts.offset > 0" :label="t.store.coRowTrialOffset" :value="reviewMoney(shownTrialDiscounts.offset, true)" class="checkout-fee checkout-fee--discount" />
-              <CheckoutRow v-if="shownTrialDiscounts.early > 0" :label="multiTrialCheckout ? trialDetailCopy.earlyRow : trialCopy.earlyDiscountLabel" :value="reviewMoney(shownTrialDiscounts.early, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="shownTrialDiscounts.early > 0" :label="trialCheckoutShown ? trialDetailCopy.earlyRow : trialCopy.earlyDiscountLabel" :value="reviewMoney(shownTrialDiscounts.early, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="reviewMoney(voucherDiscount, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="reviewMoney(tradeinCredit, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="reviewMoney(cardFee)" class="checkout-fee" />
@@ -158,7 +158,7 @@
               <!-- While the original order's external payment is under way, this is the order's amount, not what that payment
                    charges (its total, fees included, lives on the payment itself). -->
               <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--total" aria-hidden="true" /><CheckoutAmount v-else :value="shownConfirmationTotal" currency="USD" /></view>
-              <text v-if="multiTrialCheckout" class="checkout-fees-note">{{ trialCopy.voucherUnavailable }}</text>
+              <text v-if="trialCheckoutShown" class="checkout-fees-note">{{ trialCopy.voucherUnavailable }}</text>
             </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
               <text>{{ trialCopy.afterPurchaseLabel }}</text>
@@ -299,7 +299,7 @@
           <view v-if="trialTrayWarning" class="nx-tray-note w-full checkout-tray-warning" role="status"><svg class="checkout-tray-warning__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg><text>{{ trialTrayWarning }}</text></view>
           <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
         </template>
-        <text v-else-if="trayNotice" class="nx-tray-note w-full" role="status">{{ trayNotice }}</text>
+        <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
         <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
         <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
       </view>
@@ -1939,6 +1939,9 @@ function totalStillConfirmed(confirmed: number) {
 // ── Trial checkout presentation (display only) ────────────────────────────────
 // Reads the states the trial wiring exposes; never feeds a submit, quote or recovery decision.
 const trialDetailCopy = useTrialDetailCopy();
+// Every trial checkout (the multi-device list, the legacy trial-device path, the local mock) drops the 优惠 group and
+// lists the trial discounts once in 核对订单 under the ticket's names.
+const trialCheckoutShown = computed(() => multiTrialCheckout.value || trialConversionMode.value);
 const trialQuotePending = computed(() => multiTrialCheckout.value && !trialOriginalLocked.value && !trialReviewQuote.value
   && (trialReviewStatus.value === "loading" || trialReviewStatus.value === "failed"));
 const trialQuoteLoading = computed(() => trialQuotePending.value && trialReviewStatus.value === "loading");
