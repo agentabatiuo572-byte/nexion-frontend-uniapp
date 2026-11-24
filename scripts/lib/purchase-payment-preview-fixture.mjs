@@ -5,6 +5,7 @@
 import {demoAccountOrders,demoAssignablePurchaseSlots,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderDelivery,demoOrderPaymentDeadline,demoPaidOrderDelivery,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
+import {trialPurchaseDevice,trialPurchaseOptionsEnabled} from './prototype-demo-trial.mjs';
 
 export const previewPurchaseCashier = new URL('/__demo/purchase-cashier/', 'https://api.hdpayadmin.com');
 
@@ -37,6 +38,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoPurchasingAccountId(state);
   function existingIntentRefusal(intent, payload) {
     if (intent.kind === 'TRIAL_CONVERT') {
+      if (trialPurchaseOptionsEnabled(state)) {
+        return {...refused(409,'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'),
+          data:{intentNo:intent.intentNo,originalPurchase:trialPurchaseSnapshot(intent)}};
+      }
       const productNo = String(payload.productNo ?? '');
       if (!/^[A-Za-z0-9._-]{2,64}$/.test(productNo)) return refused(422, 'TRIAL_PRODUCT_REQUIRED');
       const canonicalProductNo = value => value === 'device-trial-standard' ? 'stellarbox-s1' : value;
@@ -110,8 +115,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (state.trialConversionEnabled === false) reject('TRIAL_KILL_SWITCH_DISABLED');
     const trial = demoFixture(new URL('/api/trial/state', url.origin), locale(), state, {...request, method: () => 'GET', pricingAt});
     if (!['ACTIVE', 'GRACE', 'EXTENDED'].includes(trial.state) || !trial.quote) reject('TRIAL_NOT_CONVERTIBLE');
-    if (payload.productNo !== trial.config.trialProductId) reject('TRIAL_PRODUCT_NOT_ELIGIBLE');
+    if (payload.productNo !== trial.config.trialProductId)
+      reject(trialPurchaseOptionsEnabled(state)?'TRIAL_BALANCE_ONLY':'TRIAL_PRODUCT_NOT_ELIGIBLE');
     if (payload.quoteVersion !== trial.quote.quoteVersion) reject('TRIAL_QUOTE_CHANGED');
+    if (trialPurchaseOptionsEnabled(state)) {
+      const product=demoProducts(state,url.origin).find(row=>row.id===payload.productNo);
+      if (!product?.available || product.status!=='active') reject('TRIAL_PRODUCT_REMOVED');
+    }
     return trial;
   }
   const quotaItems = (subject, payload, order) => subject.kind === 'ORDER_PAY'
@@ -181,7 +191,22 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Recover the latest open intent for the same purchase after a replacement attempt.
   const openIntent = (subject, excluding) => [...intents.values()].findLast(row => row !== excluding && sameSubject(row, subject)
-    && !row.receipt && !['DELIVERED', 'EXPIRED'].includes(row.status));
+    && !row.receipt && !['DELIVERED', 'EXPIRED'].includes(row.status)
+    && !(row.kind==='TRIAL_CONVERT'&&row.reason==='PAYMENT_LATE_REVIEW'&&Date.now()>=graceEnd(row.paymentMethod,row.deadline)));
+  function trialPurchaseSnapshot(intent) {
+    return {
+      claimNo:'DEMO-TRIAL',kind:'EXTERNAL',paymentNo:intent.intentNo,device:intent.trialDeviceSnapshot,
+      paymentMethod:intent.paymentMethod,confirmedAmountUsdt:intent.businessAmountUsdt,
+      expiresAt:intent.expiresAt,status:intent.status,
+    };
+  }
+  function originalTrialPurchase() {
+    sync();
+    const intent=openIntent({kind:'TRIAL_CONVERT',identity:state.trialRow?.startedAt});
+    return intent?trialPurchaseSnapshot(intent):undefined;
+  }
+  const balanceConflict=()=>({...refused(409,'TRIAL_EXISTING_PURCHASE'),
+    data:{reasonCode:'TRIAL_EXISTING_PURCHASE',originalPurchase:state.trialBalancePurchase}});
   // An old failed attempt cannot cancel a successor or change an already settled order.
   function closeUnpaidOrder(intent) {
     if (!intent.orderNo || openIntent(intent, intent)) return null;
@@ -230,7 +255,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent, now) {
     // Ordinary provider outcomes do not advance the independently seeded B84 stories.
-    const age = now - intent.createdAt, scenario = intent.topupSample ? 'waiting' : paymentMode();
+    const age = now - intent.createdAt, scenario = intent.topupSample||intent.trialSample ? 'waiting' : paymentMode();
     const bank = intent.paymentMethod === 'HDPAY_BANK';
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED') {
@@ -298,7 +323,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, ...row} = intent, open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialSample, ...row} = intent, open = Date.now() < deadline;
     const networkEnabled = networkOpen(row.paymentMethod);
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
@@ -352,6 +377,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const body = request.postDataJSON(), {kind, payload} = body;
       if (kind === 'CAPACITY_REPLACE') return refused(409, 'CAPACITY_REPLACEMENT_PURCHASE_RETIRED');
       if (!Object.hasOwn(commandKinds, kind) || !payload) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
+      if (kind==='TRIAL_CONVERT'&&state.trialBalancePurchase) return balanceConflict();
       const products = demoProducts(state, url.origin), subject = purchaseSubject(kind, payload, products);
       const existing = openIntent(subject);
       if (existing) return existingIntentRefusal(existing, payload);
@@ -394,7 +420,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion: 3, pricingAsOf: new Date(now).toISOString(), expiresAt: new Date(Math.min(now + QUOTE_TTL, deadline)).toISOString(),
         deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(body.paymentMethod, deadline)).toISOString(),
         fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null};
-      quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote});
+      const trialDeviceSnapshot=trial?trialPurchaseDevice(quoteProducts[0],trial.config.trialProductName):undefined;
+      quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote, trialDeviceSnapshot});
       return {status: 200, message: 'OK', data: quote};
     }
     if (path === `${base}-intents` && method === 'POST') {
@@ -409,6 +436,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       const existing = openIntent(subject);
       if (existing) return existingIntentRefusal(existing, source.payload);
+      if (subject.kind==='TRIAL_CONVERT'&&state.trialBalancePurchase) return balanceConflict();
       if (!historicalSeed && orderTopupEnabled() && orderUsdt(subject.kind, source.quote.paymentMethod)) return refused(409, 'ORDER_USDT_USE_TOPUP');
       if (!networkOpen(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
@@ -435,7 +463,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const intent = suspended ?? {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: source.quote.deadlineAt,
         paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? new URL(intentNo, previewPurchaseCashier).href : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
-        createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin};
+        createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin,
+        trialDeviceSnapshot:source.trialDeviceSnapshot};
       if (suspended) {
         suspendedIntents.delete(intentNo);
         addDemoPaymentQuotaHold(state, suspended.quotaHold);
@@ -466,6 +495,29 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       return readIntent(intents.get(decodeURIComponent(one[1])));
     }
     return {status: 404, message: 'PURCHASE_PAYMENT_NOT_MODELED', data: null};
+  }
+  function setTrialExternalSample(origin, enabled) {
+    sync();
+    const current=originalTrialPurchase();
+    if (!enabled) {
+      const intent=intents.get(current?.paymentNo);
+      if (intent?.trialSample) expire(intent,'PAYMENT_TIMEOUT');
+      return {status:200};
+    }
+    if (current) return {status:200};
+    const trial=demoFixture(new URL('/api/trial/state',origin),locale(),state,{method:()=>'GET'});
+    if (!trial.quote) return refused(409,'TRIAL_NOT_CONVERTIBLE');
+    const quote=handlePayment(new URL(base+'-quotes',origin),{
+      method:()=>'POST',postDataJSON:()=>({kind:'TRIAL_CONVERT',paymentMethod:'CREGIS_USDT_BSC',
+        payload:{productNo:trial.config.trialProductId,expectedAmountUsdt:cents(trial.quote.amountUsdt)/100,quoteVersion:trial.quote.quoteVersion}}),
+    },true);
+    if (quote.status!==200) return quote;
+    const result=handlePayment(new URL(base+'-intents',origin),{
+      method:()=>'POST',headers:()=>({'idempotency-key':`trial-external-preview-${sequence}`}),
+      postDataJSON:()=>({paymentQuoteId:quote.data.paymentQuoteId}),
+    },true);
+    if (result.status===200) intents.get(result.data.intentNo).trialSample=true;
+    return result;
   }
   function seedHistoricalOrderPayment(origin, orderNo, paymentMethod) {
     if (openOrderPayment(orderNo)) return {status: 200};
@@ -552,5 +604,6 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     ];
   }
   return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, topupIntent, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments,
+    originalTrialPurchase,setTrialExternalSample,
     seedOrderTopupOriginal, deliveredOrderPayment, orderPaymentRecords, expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
 }

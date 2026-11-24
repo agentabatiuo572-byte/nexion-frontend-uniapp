@@ -4,6 +4,7 @@ import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoAccountOrders,demoFixture,demoOrderPaymentDeadline,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
+import {trialPurchaseOptionsEnabled} from './prototype-demo-trial.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeOrders) {
   const pin = createPaymentPinFlowFixture();
@@ -26,7 +27,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     ['/api/app/trade-in/capacity-replace', 'capacity-replace'],
   ]);
   const hidePath = /^\/api\/(?:app\/)?orders\/([^/]+)\/hide$/;
-  const handles = path => hidePath.test(path) || /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || tradeinCommands.has(path) || external.handles(path);
+  const handles = path => hidePath.test(path) || /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path)
+    || path==='/api/trial/convert' || tradeinCommands.has(path) || external.handles(path);
   // A reset or scenario change starts a fresh account: replayed receipts and payment command receipts belong to the
   // old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
@@ -128,9 +130,88 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     }
     return {status:error.status,message:error.message,data:null};
   }
+  const originalTrialPurchase = () => external.originalTrialPurchase() ?? state.trialBalancePurchase;
+  const trialCommand = (key, status, receipt, message) => ({
+    kind:'trial-convert',commandKey:key,status,canResumeSameKey:status==='NOT_SEEN',receipt,message,
+  });
+  const sameTrialSubmission = (body, purchase) => body.productNo===purchase.device.productNo
+    && body.expectedAmountUsdt===Number(purchase.confirmedAmountUsdt) && body.quoteVersion===purchase.quoteVersion;
+  function convertTrial(url, request, key) {
+    const fail = (status,message,data=null) => ({status,message,data});
+    if (request.method()!=='POST') return fail(405,'METHOD_NOT_ALLOWED');
+    if (!external.ownsPreviewPayments(request)) return fail(403,'PREVIEW_PURCHASE_ACCOUNT_REQUIRED');
+    if (!key) return fail(422,'IDEMPOTENCY_KEY_REQUIRED');
+    const command='trial-convert:'+key;
+    const body=request.postDataJSON();
+    const intent=JSON.stringify([body.productNo,body.expectedAmountUsdt,body.quoteVersion,body.paymentMethod]);
+    const recorded=pin.commands.get(command);
+    if (recorded) {
+      if (recorded.intent!==undefined&&recorded.intent!==intent) return fail(409,'IDEMPOTENCY_KEY_CONFLICT');
+      return recorded.status==='SUCCEEDED'?ok(recorded.receipt):fail(recorded.code,recorded.message,recorded.receipt);
+    }
+    const purchase=originalTrialPurchase();
+    const samePurchase=purchase?.kind==='BALANCE'&&purchase.submissionNo===key&&sameTrialSubmission(body,purchase);
+    if (samePurchase&&purchase.status==='PROCESSING')
+      return fail(202,'TRIAL_PURCHASE_PROCESSING',{originalPurchase:purchase});
+    if (purchase&&!samePurchase)
+      return fail(409,'TRIAL_EXISTING_PURCHASE',{reasonCode:'TRIAL_EXISTING_PURCHASE',originalPurchase:purchase});
+    const authorization=pin.authorize(body);
+    if (authorization.status!==200) return authorization;
+    try {
+      const receipt=demoFixture(url,locale(),state,{...request,originalTrialPurchase,walletAuthorized:true});
+      pin.state.payWrites++;
+      pin.commands.set(command,{...trialCommand(key,'SUCCEEDED',receipt),intent});
+      return ok(receipt);
+    } catch(error) {
+      if (!error.status) throw error;
+      if (samePurchase) {
+        delete state.trialBalancePurchase;
+        state.trialOriginalPurchaseState='none';
+      }
+      const data=error.data??null;
+      pin.commands.set(command,{...trialCommand(key,'REJECTED',data,error.message),code:error.status,intent});
+      return fail(error.status,error.message,data);
+    }
+  }
+  let trialSampleSequence=0;
+  function setTrialPurchaseSample(origin, mode) {
+    syncScenario();
+    if (mode===state.trialOriginalPurchaseState&&originalTrialPurchase()) return {status:200};
+    if (mode==='none') {
+      external.setTrialExternalSample(origin,false);
+      const original=state.trialBalancePurchase;
+      if (original?.status==='PROCESSING') {
+        const code='TRIAL_PURCHASE_UNAVAILABLE', key=original.submissionNo;
+        pin.commands.set('trial-convert:'+key,{...trialCommand(key,'REJECTED',{reasonCode:code},code),code:409});
+      }
+      delete state.trialBalancePurchase;
+      state.trialOriginalPurchaseState=mode;
+      return {status:200};
+    }
+    if (originalTrialPurchase()) return {status:409,message:'TRIAL_EXISTING_PURCHASE'};
+    if (mode==='external') {
+      const result=external.setTrialExternalSample(origin,true);
+      if (result.status===200) state.trialOriginalPurchaseState=mode;
+      return result;
+    }
+    const read=demoFixture(new URL('/api/trial/purchase-options',origin),locale(),state,{method:()=>'GET',trialPurchaseSample:true});
+    const option=read.options.find(row=>row.productNo==='stellarrack-p1'&&!row.isTrialProduct&&row.canBuy);
+    if (!option) return {status:409,message:'TRIAL_PREVIEW_RACK_REQUIRED'};
+    const {productNo,productName,imageUrl,productType}=option;
+    const confirmedCents=(BigInt(option.quote.amountUsdt.replace('.',''))+5000n)/10000n;
+    state.trialBalancePurchase={
+      kind:'BALANCE',claimNo:read.claimNo,device:{productNo,productName,imageUrl,productType},
+      paymentMethod:'UVEL_USDT_WALLET',submissionNo:'trial-balance-preview-'+(++trialSampleSequence),
+      confirmedAmountUsdt:(Number(confirmedCents)/100).toFixed(6),quoteVersion:option.quote.quoteVersion,
+      status:mode==='balance-processing'?'PROCESSING':'RESUMABLE',
+    };
+    state.trialOriginalPurchaseState=mode;
+    return {status:200};
+  }
   async function handle(url, request) {
     syncScenario();
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
+    if (path==='/api/trial/convert') return convertTrial(url,request,key);
     const handlesOrder = path === '/api/orders' || path.startsWith('/api/orders/') || path.startsWith('/api/promotion-commands/');
     const headers = request.headers();
     const hide = path.match(hidePath);
@@ -214,6 +295,10 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       if (!external.ownsPreviewPayments(request)) return {status:404,message:'PURCHASE_PAYMENT_INTENT_NOT_FOUND',data:null};
       const [,kind,encodedKey] = paymentCommand, commandKey = decodeURIComponent(encodedKey);
       if (state.paymentState === 'read-error' && pin.commands.has(kind+':'+commandKey)) return pin.handle(url, request);
+      const original=state.trialBalancePurchase;
+      if (kind==='trial-convert'&&original?.submissionNo===commandKey) {
+        return ok(trialCommand(commandKey, original.status==='PROCESSING'?'PROCESSING':'NOT_SEEN',{originalPurchase:original}));
+      }
       const result = external.paymentCommand(kind, commandKey);
       if (result) return ok(result);
     }
@@ -323,6 +408,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     if (order.promotionQuoteId) order.payBy = new Date(deadline).toISOString();
   }
   return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
+    originalTrialPurchase,setTrialPurchaseSample,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
     confirmLateOrderPayment:external.confirmLateOrderPayment, topupIntent:external.topupIntent,
     seedOrderTopupOriginal:external.seedOrderTopupOriginal, deliveredOrderPayment:external.deliveredOrderPayment,

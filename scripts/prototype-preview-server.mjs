@@ -62,7 +62,9 @@ let scenarioEpoch=state.scenarioEpoch??0;
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale,meEntryDots.orderProjection):null;
 const fixtureFor=(url,request)=>{
   if(['/api/app/team/quota','/api/store/purchase-eligibility'].includes(url.pathname))checkoutFlow?.observePayments();
-  return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,request),state);
+  return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,{
+    ...request,originalTrialPurchase:checkoutFlow?.originalTrialPurchase,
+  }),state);
 };
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
@@ -76,7 +78,7 @@ const seed=()=>'<script>'+init.map(script=>script()).join('\n')+"for(const [key,
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, event commands awaiting confirmation, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
-const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-convert-accounts-v1','uvel-event-pending-accounts-v1'];
+const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-purchase-preselection-accounts-v1','nexgrid-trial-convert-accounts-v1','uvel-event-pending-accounts-v1'];
 const serverRun=Date.now().toString(36);
 // The scenario a page or a reply belongs to: this server run and its scenario epoch.
 const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
@@ -249,7 +251,7 @@ const server=http.createServer(async(req,res)=>{
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
         if(['normal','device-limit'].includes(update.registrationState))state.registrationState=update.registrationState;
         if(['none','overview','deletion','phone-policy','next-page'].includes(update.securityReadFailure))state.securityReadFailure=update.securityReadFailure;
-        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState','trialOriginalPurchaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         const promotionBuyerChanged=state.promotionBuyer!==wasPromotionBuyer;
         if(update.reset||update.savedAttemptState||promotionBuyerChanged)authDemo.reset();
         if(update.savedAttemptState&&state.savedAttemptState!=='none')state.sessionState='signed-out';
@@ -265,6 +267,10 @@ const server=http.createServer(async(req,res)=>{
         const tradeinRecoverySelection=tradeinRecoveryStates.includes(update.tradeinRecoveryState)?update.tradeinRecoveryState:null;
         const scenarioChange=Boolean(tradeinRecoverySelection)||promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
+        if(scenarioChange){
+          delete state.trialBalancePurchase;
+          state.trialOriginalPurchaseState='none';
+        }
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -343,6 +349,16 @@ const server=http.createServer(async(req,res)=>{
           if(command)checkoutFlow.pin.commands.set(command.kind+':'+command.commandKey,command);
           tradeinRecoverySeed={accountId,entries};
           state.tradeinRecoveryState=tradeinRecoverySelection;
+        }
+        const trialSample=demoOptions.trialOriginalPurchaseState.find(([value])=>value===update.trialOriginalPurchaseState);
+        if(trialSample&&checkoutFlow){
+          let result;
+          try { result=checkoutFlow.setTrialPurchaseSample(url.origin,trialSample[0]); }
+          catch(error){
+            if(!error.status)throw error;
+            result={status:error.status,message:error.message};
+          }
+          if(result.status!==200)return sendJson(res,{state,options:demoOptions,simulation:true,message:result.message},result.status);
         }
         if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
@@ -496,7 +512,7 @@ const server=http.createServer(async(req,res)=>{
     const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
     const clearAuth=state.sessionState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'';
     res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed(url)+seed()+attemptSeed+clearAuth):bytes);
-  }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
+  }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:error.data??null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
 // QA can pause the provider clock and use POST /__checkout/state to observe on demand.
