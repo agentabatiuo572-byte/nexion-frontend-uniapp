@@ -1,0 +1,169 @@
+// 我的等级 · 月薪卡与领取的界面状态（team-rank DESIGN 2.1、2.6、第 6 节，画板 C、D 组）。
+// 只做显示映射：服务端 salary（6.1）＋领取过程的阶段 → 卡片、底部和确认框要显示什么。
+// 领取请求、幂等键、回执查询由逻辑项接（rank.vue 的 salaryPending），这里不发请求。
+import { fmt } from "@/i18n/format";
+import { uiLocale } from "@/i18n";
+import { formatHowNumber } from "@/lib/rank-how-content";
+
+export type RankSalaryMonth = {
+  month: string; // "2026-11"
+  rankCode: string; // "V3"
+  amountUsdt: string; // 十进制字符串
+  status: "PENDING" | "CLAIMABLE" | "CLAIMED";
+  claimableFrom: string; // "2026-11-25"
+  expiresAt: string; // 窗口结束（不含）
+  claimNo?: string;
+  claimedAt?: string;
+};
+export type RankSalary = {
+  businessDate: string;
+  months: RankSalaryMonth[];
+  upcoming: { month: string; rankCode: string; amountUsdt: string; claimableFrom: string } | null;
+  nextClaimableFrom: string | null;
+};
+/** 领取过程（6.3、6.4）：claiming 请求中（D5）；confirming 结果未知、PROCESSING 或回执读不到（D6）；resend 回执 NOT_FOUND（D6，给重新提交入口）。 */
+export type SalaryClaimPhase = "idle" | "claiming" | "confirming" | "resend";
+
+type Copy = Record<string, string>;
+export type SalaryTag = { label: string; tone: "brand" | "warning" | "neutral"; busy?: boolean };
+export type SalaryTip = { tone: "neutral" | "warning"; lines: string[] };
+export type SalaryCardView = {
+  tag: SalaryTag | null;
+  caption: string; // 「11 月 · V3」；读取失败时为空
+  amount: string; // 「50」「—」「••••」
+  tip: SalaryTip | null;
+  note: string; // 底注；空则不画
+  resend: boolean; // 底注位换成「上次领取未送达｜重新提交」
+  statusKey: string; // 状态变化时卡片主体交叉淡入（10.1 领取）
+};
+export type SalaryDock =
+  | { kind: "claim"; label: string; month: string; amountUsdt: string }
+  | { kind: "tray"; copy: string; button: string }
+  | { kind: "busy"; label: string }
+  | { kind: "status"; label: string }
+  | { kind: "none" };
+export type SalaryDialog = { title: string; body: string; primary: string; secondary: string };
+
+const DAY = 86400000;
+const toUtc = (date: string) => Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10) || 1), 12);
+const shiftDate = (date: string, days: number) => new Date(toUtc(date) + days * DAY).toISOString().slice(0, 10);
+const daysBetween = (from: string, to: string) => Math.round((toUtc(to) - toUtc(from)) / DAY);
+const LOWER = new Set(["vi", "ru", "kk", "uz"]);
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** 月份和日期的写法同画板（DESIGN 11.1 第 11 条）：vi、ru、kk、uz 小写传入，整句渲染后再把首字母大写。 */
+export function salaryDates(localeCode: string) {
+  const lang = uiLocale(localeCode);
+  const intl = (date: string, options: Intl.DateTimeFormatOptions) => {
+    const text = new Intl.DateTimeFormat(lang, { ...options, timeZone: "UTC" }).format(new Date(toUtc(date)));
+    return LOWER.has(lang) ? text.toLocaleLowerCase(lang) : text;
+  };
+  const m = (date: string) => Number(date.slice(5, 7));
+  return {
+    /** 「11 月」「Nov」「ноябрь」 */
+    month: (date: string) => lang === "zh" ? `${m(date)} 月` : lang === "en" ? MON[m(date) - 1] : intl(date, { month: "long" }),
+    /** 「11 月 30 日」「Nov 30」「30 ноября」 */
+    day: (date: string) => lang === "zh" ? `${m(date)} 月 ${Number(date.slice(8, 10))} 日` : lang === "en" ? `${MON[m(date) - 1]} ${Number(date.slice(8, 10))}` : intl(date, { month: "long", day: "numeric" }),
+    /** carryNote 的「November’s」，其他语言同 month */
+    monthWord: (date: string) => lang === "zh" ? `${m(date)} 月` : lang === "en" ? `${MONL[m(date) - 1]}’s` : intl(date, { month: "long" }),
+    sentence: (text: string) => LOWER.has(lang) ? text.charAt(0).toLocaleUpperCase(lang) + text.slice(1) : text,
+  };
+}
+
+/** 窗口结束（不含）的前一天，即最后可领的那天。 */
+export const lastClaimDay = (expiresAt: string) => shiftDate(expiresAt, -1);
+
+/** 卡片显示 months[0]（最先到期的，6.1）；另一项只给 D4e 的底注用。 */
+export function salaryView(input: {
+  salary: RankSalary | null; // null：读取失败（D9）
+  phase: SalaryClaimPhase;
+  hidden: boolean;
+  locale: string;
+  copy: Copy;
+  mask: (value: string) => string;
+}): { card: SalaryCardView | null; dock: SalaryDock | null; promo: { end: boolean; month: string; date: string; now: string; next: string; rank: string } | null } {
+  const { salary, phase, hidden, copy } = input;
+  const d = salaryDates(input.locale);
+  const num = (value: string) => formatHowNumber(value, input.locale);
+  const usdt = (value: string) => hidden ? "••••" : `${num(value)}\u00A0USDT`;
+  const say = (template: string, params: Record<string, string | number>) => d.sentence(fmt(template, params));
+  if (salary === null) return { card: { tag: null, caption: "", amount: "—", tip: null, note: "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
+  const item = salary.months[0];
+  if (!item) return { card: null, dock: null, promo: null };
+  const other = salary.months[1];
+  const caption = say(copy.monthRank, { m: d.month(item.month), r: input.mask(item.rankCode) });
+  const lastDay = shiftDate(item.expiresAt, -1);
+  const claimBy = say(copy.claimBy, { d: d.day(lastDay) });
+  const amount = hidden ? "••••" : num(item.amountUsdt);
+  const businessMonth = salary.businessDate.slice(0, 7);
+  const card: SalaryCardView = { tag: null, caption, amount, tip: null, note: "", resend: false, statusKey: item.status };
+  let dock: SalaryDock | null = null;
+  let promo: ReturnType<typeof salaryView>["promo"] = null;
+
+  if (item.status === "PENDING") {
+    const end = item.claimableFrom.slice(0, 7) !== item.month; // 当月最后一天首次到达：只有下月 1 日可领（D1b）
+    card.tag = end ? { label: say(copy.pendingEndTag, { d: d.day(item.claimableFrom) }), tone: "warning" } : { label: copy.pendingTag, tone: "warning" };
+    card.tip = end
+      ? { tone: "warning", lines: splitSentences(say(copy.pendingEndNote, { d: d.day(item.claimableFrom), m: d.month(item.month), a: usdt(item.amountUsdt) })) }
+      : { tone: "neutral", lines: [say(copy.pendingNote, { a: usdt(item.amountUsdt) })] };
+  } else if (item.status === "CLAIMED") {
+    card.tag = { label: copy.claimedTag, tone: "neutral" };
+    if (salary.nextClaimableFrom) card.note = say(copy.claimedNext, { d: d.day(salary.nextClaimableFrom), m: d.month(salary.nextClaimableFrom) });
+  } else {
+    const carry = item.month < businessMonth; // 上月延期项，今天截止（D4e）
+    const up = salary.upcoming && Number(salary.upcoming.amountUsdt) > Number(item.amountUsdt) ? salary.upcoming : null; // 只在明天的金额严格更高时（6.2）
+    const daysLeft = daysBetween(salary.businessDate, item.expiresAt);
+    card.note = claimBy;
+    if (carry) {
+      card.tag = { label: copy.todayTag, tone: "warning" };
+      card.tip = { tone: "warning", lines: splitSentences(say(copy.carryNote, { m: d.monthWord(item.month) })) };
+      if (other) card.note = say(copy.nextMonthNote, { pm: d.month(item.month), m: d.month(other.month), a: usdt(other.amountUsdt), d: d.day(shiftDate(other.expiresAt, -1)) });
+      dock = { kind: "claim", label: hidden ? copy.claimSalary : say(copy.claimMonthBtn, { m: d.month(item.month), a: usdt(item.amountUsdt) }), month: item.month, amountUsdt: item.amountUsdt };
+    } else if (up) {
+      const end = up.claimableFrom.slice(0, 7) !== item.month; // 月末最后一天晋升：下月 1 日（D4c）
+      card.tag = { label: copy.claimable, tone: "brand" };
+      card.tip = { tone: "warning", lines: splitSentences(end
+        ? say(copy.promoEndNote, { d: d.day(up.claimableFrom), r: input.mask(up.rankCode), m: d.month(item.month), a: usdt(up.amountUsdt), b: usdt(item.amountUsdt) })
+        : say(copy.promoNote, { a: usdt(up.amountUsdt), b: usdt(item.amountUsdt) })) };
+      dock = { kind: "tray", copy: end ? say(copy.trayWaitEnd, { m: d.month(item.month), a: usdt(up.amountUsdt), d: d.day(up.claimableFrom) }) : say(copy.trayWait, { a: usdt(up.amountUsdt) }), button: say(copy.trayNow, { b: usdt(item.amountUsdt) }) };
+      promo = { end, month: d.month(item.month), date: d.day(up.claimableFrom), now: usdt(item.amountUsdt), next: usdt(up.amountUsdt), rank: up.rankCode };
+    } else if (daysLeft <= 3) {
+      card.tag = { label: say(copy.expiringTag, { n: daysLeft }), tone: "warning" };
+      card.tip = { tone: "warning", lines: [say(copy.expiringNote, { d: d.day(item.expiresAt) })] };
+    } else {
+      card.tag = { label: copy.claimable, tone: "brand" };
+      card.tip = { tone: "neutral", lines: splitSentences(copy.claimRules) };
+    }
+    if (!dock) dock = { kind: "claim", label: hidden ? copy.claimSalary : say(copy.claimBtn, { a: usdt(item.amountUsdt) }), month: item.month, amountUsdt: item.amountUsdt };
+  }
+
+  // 领取过程覆盖卡片标签、底注和底部（2.1、D5、D6）。
+  if (phase === "claiming") {
+    card.tag = { label: copy.claimingTag, tone: "warning", busy: true };
+    card.tip = { tone: "neutral", lines: splitSentences(copy.claimRules) };
+    card.statusKey = "claiming";
+    dock = { kind: "busy", label: copy.claimingBtn };
+  } else if (phase === "confirming") {
+    card.tag = { label: copy.confirmingTag, tone: "warning", busy: true };
+    card.tip = null;
+    card.note = copy.confirmingNote;
+    card.statusKey = "confirming";
+    dock = { kind: "status", label: copy.confirmingCap };
+  } else if (phase === "resend") {
+    // 回执 NOT_FOUND：服务端没收到。原因和「重新提交」就地放在卡片底注位（03 §3.5.2 保留就地入口、§3.1 提交动作重试为文字按钮），
+    // 底部不再放领取，避免两个入口；重新提交沿用同一幂等键、同一月份和金额。
+    card.tip = null;
+    card.note = "";
+    card.resend = true;
+    card.statusKey = "resend";
+    dock = { kind: "none" };
+  }
+  if (hidden) card.tip = null; // 隐藏统计时不出提示（画板 Ch）
+  return { card, dock, promo };
+}
+
+/** 气泡每句一段（03 §3.5.1）：按句末标点切开，中文按「。」。 */
+export function splitSentences(text: string): string[] {
+  return text.split(/(?<=[。！？])|(?<=[.!?])\s+/).map(line => line.trim()).filter(Boolean);
+}

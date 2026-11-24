@@ -1,6 +1,6 @@
 <template>
   <AppChassis active="team">
-    <view class="rank-page" :class="{ 'rank-page--dock': !!dockAction }">
+    <view class="rank-page" :class="{ 'rank-page--dock': hasDock }">
       <SubPageHeader back="/pages/team/team" :title="t.rank.pageTitle" plain design :action-label="copy.rankRules" :action="() => go('/pages/team/rank-how')" />
       <view class="rank-content">
         <template v-if="rankAvailable">
@@ -19,7 +19,8 @@
             </view>
             <RankConditions v-if="prog.next" :key="String(auth.accountId)" class="rank-focus__conditions" :heading="fmt(t.myRank.needFor, { r: nextName })" :tag="gapTag" :tag-tone="reviewPending ? 'warning' : 'neutral'" :hint="countsHint" :rows="nextConditions" :prior="priorConditions" :prior-title="fmt(t.myRank.foldTitle, { n: visibility.mask(priorMissing) })" :hidden="visibility.hidden" :sweep="!motion.still.value" />
           </view>
-          <!-- 月薪项：rankPending.salaryPresent（/api/team/rank 带 salary 字段）时在这里放月薪卡（DESIGN 第 6 节，画板 C、D）；没有 salary 字段时按 CA 构图，焦点卡后直接接「升到 Vn 后」。 -->
+          <!-- 月薪卡（DESIGN 第 6 节，画板 C、D）：salary 字段存在且 months 不为空时显示；salary 为 null（读取失败）时金额「—」（D9）；没有 salary 字段时按 CA 构图。 -->
+          <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :resend-label="t.myRank.resendBtn" :swap="salarySwap" @resend="resendSalaryClaim" />
           <view v-if="gains.length" class="rank-section">
             <view class="rank-section__head">
               <TeamRankEmblem v-if="!visibility.hidden" class="rank-section__badge" :rank="prog.next!.v" :size="28" />
@@ -65,7 +66,16 @@
       </view>
     </view>
     <!-- 底部操作栏（DESIGN 2.1）的非领取状态：补差距最有效的一步。领取月薪的按钮、托盘和确认框由月薪项接在 dockAction 的 claim 分支。 -->
-    <template #pageFixed><view v-if="dockAction" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="go(dockAction.href)">{{ dockAction.label }}</NxButton></view></template>
+    <template #pageFixed>
+      <!-- 领取（2.1）：悬浮按钮「领取 N USDT」；晋升当天为托盘；领取中为灰色禁用按钮；结果确认中为状态胶囊。 -->
+      <view v-if="salaryDock?.kind === 'claim'" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="claimSalary">{{ salaryDock.label }}</NxButton></view>
+      <view v-else-if="salaryDock?.kind === 'tray'" class="rank-dock nx-glass-bar"><text class="nx-tray-copy rank-dock__copy">{{ salaryDock.copy }}</text><view class="nx-tray-text rank-dock__text" role="button" tabindex="0" @click="salaryDialog = 'promo'" @keydown.enter.prevent="salaryDialog = 'promo'" @keydown.space.prevent="salaryDialog = 'promo'"><text>{{ salaryDock.button }}</text></view></view>
+      <view v-else-if="salaryDock?.kind === 'busy'" class="rank-dock nx-glass-bar"><NxButton variant="primary" disabled><view class="rank-dock__spin" aria-hidden="true" /><text>{{ salaryDock.label }}</text></NxButton></view>
+      <view v-else-if="salaryDock?.kind === 'status'" class="rank-dock nx-glass-bar"><view class="nx-tray-status rank-dock__status" role="status"><view class="rank-dock__spin" aria-hidden="true" /><text>{{ salaryDock.label }}</text></view></view>
+      <view v-else-if="!salaryDock && dockAction" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="go(dockAction.href)">{{ dockAction.label }}</NxButton></view>
+      <!-- 确认框（03 §3.5 决定级）：D4b／D4d 晋升当天，D10 金额已变化；返回、Esc、点蒙层等同文字按钮。 -->
+      <NxNoticeDialog :open="!!salaryDialogView" :title="salaryDialogView?.title ?? ''" :body="salaryDialogView?.body" :primary="salaryDialogView?.primary ?? ''" :secondary="salaryDialogView?.secondary" mask-secondary focus-title @primary="confirmSalaryDialog" @secondary="salaryDialog = null" />
+    </template>
   </AppChassis>
 </template>
 
@@ -74,6 +84,10 @@ import NxIcon, { type NxIconName } from "@/components/ui/nx-icon.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import NxHintTip from "@/components/ui/nx-hint-tip.vue";
 import RankConditions, { type RankConditionRow } from "@/components/team/rank-conditions.vue";
+import RankSalaryCard from "@/components/team/rank-salary-card.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import { lastClaimDay, salaryDates, salaryView, type RankSalary, type SalaryClaimPhase } from "@/lib/rank-salary-view";
+import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useRankFxMotion } from "@/composables/use-rank-fx-guard";
 import { teamRankProgress } from "@/lib/team-rank-progress";
@@ -82,7 +96,7 @@ import { navTo } from "@/lib/route";
 import { platformDisplayText } from "@/lib/brand-copy";
 import { isEntitlementVRankReward, rankEntitlementLabel } from "@/lib/rank-entitlement-label";
 import { RANK_ASSETS, rankAsset, rankTierStyle, rankTierVars } from "@/lib/rank-tier-style";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -125,12 +139,10 @@ const rankAvailable = computed(() => !remoteApiEnabled || vState.remoteReady);
 // 逻辑项把字段接进 VRankDef／store 后替换这里即可，各区块只看自己依赖的那一项：
 // - purchaseL2Rate：「升到 Vn 后」的「好友的好友购买奖励」行（旧 → 新，不同才列）。
 // - monthlySalaryUsdt：「每月月薪」行；只在 salaryPresent 时列（当前为 0 时只写新值）。
-// - salaryPresent：/api/team/rank 带 salary 字段（不论 months 是否为空）；false 即「没有月薪数据」的 CA 构图。月薪卡和领取由月薪项做。
 // - v8ReviewRequired：/api/config/v-ranks 的 V8 带 reviewRequired；V7 数值条件（含前序）全满足时焦点卡标签换成「审核中」。
 const rankPending = {
   purchaseL2Rate: (_rank: VRankDef): number | undefined => undefined,
   monthlySalaryUsdt: (_rank: VRankDef): number | undefined => undefined,
-  salaryPresent: false,
   v8ReviewRequired: false,
 };
 
@@ -234,10 +246,92 @@ const gains = computed<Gain[]>(() => {
   const uvt = uvtReward(next);
   if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: `+${formatHowNumber(uvt, locale.code)}`, unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: nextName.value })] });
   const salaryFrom = rankPending.monthlySalaryUsdt(current) ?? 0, salaryTo = rankPending.monthlySalaryUsdt(next) ?? 0;
-  if (rankPending.salaryPresent && salaryTo > 0 && salaryTo !== salaryFrom) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, old: salaryFrom > 0 ? formatHowNumber(salaryFrom, locale.code) : undefined, value: formatHowNumber(salaryTo, locale.code), unit: 'USDT' });
+  if (salaryPending.salary !== undefined && salaryTo > 0 && salaryTo !== salaryFrom) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, old: salaryFrom > 0 ? formatHowNumber(salaryFrom, locale.code) : undefined, value: formatHowNumber(salaryTo, locale.code), unit: 'USDT' });
   return rows;
 });
 const gainArrowInk = computed(() => prog.value.next ? rankTierVars(prog.value.next.v, theme.resolved, visibility.hidden)['--tier-ink'] : '');
+
+// ── 月薪卡与领取（DESIGN 2.1、第 6 节，画板 C、D 组）· 逻辑项接入点 ──────────────────────────────
+// salary：/api/team/rank 的 salary（6.1）。undefined＝响应里没有这个字段（CA：不显示月薪卡和月薪行）；
+//   null＝读取失败（salary null＋salaryUnavailable，D9：金额「—」，按 useAutoRecovery 自动重读，不提示）。
+// phase：领取过程（idle／claiming D5／confirming D6／resend D6 NOT_FOUND）。
+// submit(month, amountUsdt)：点「领取」或确认框主按钮后发 POST /api/team/rank/salary/claim（新幂等键，6.3）；
+// resend()：回执 NOT_FOUND 后用户点「重新提交」，同一幂等键、同一月份、原金额重发（6.4，按本次任务书改为用户发起）。
+// 请求或回执有结果后调 showSalaryResult（下方），由它切换卡片、底部、确认框和 toast；成功、已领、不可领后逻辑项重读 /api/team/rank。
+// 离开页面再回来、本地还留着未结的键时，逻辑项先把 phase 设为 confirming 再查回执。
+const salaryPending = reactive<{ salary: RankSalary | null | undefined; phase: SalaryClaimPhase; submit: (month: string, amountUsdt: string) => void; resend: () => void }>({
+  salary: undefined,
+  phase: "idle",
+  submit: () => {},
+  resend: () => {},
+});
+const salaryCopy = computed(() => t.value.myRank as unknown as Record<string, string>);
+const salary = computed(() => salaryPending.salary === undefined
+  ? { card: null, dock: null, promo: null }
+  : salaryView({ salary: salaryPending.salary, phase: salaryPending.phase, hidden: visibility.hidden, locale: locale.code, copy: salaryCopy.value, mask: visibility.mask }));
+const salaryDock = computed(() => salary.value.dock);
+const hasDock = computed(() => salaryDock.value ? salaryDock.value.kind !== "none" : !!dockAction.value);
+// 卡片主体只在领取过程里交叉淡入（10.1 领取），首屏随页面入场。
+const salarySwap = ref(false);
+// 确认框：promo＝晋升当天（D4b，月末 D4d）；amount＝金额已变化（D10）。
+const salaryDialog = ref<"promo" | "amount" | null>(null);
+const amountChange = ref<{ month: string; amountUsdt: string; rankCode: string } | null>(null);
+const salaryDialogView = computed(() => {
+  const copy = t.value.myRank, d = salaryDates(locale.code), usdt = (value: string) => `${formatHowNumber(value, locale.code)}\u00A0USDT`;
+  const promo = salary.value.promo;
+  if (salaryDialog.value === "promo" && promo) return {
+    title: d.sentence(fmt(copy.dlgTitle, { b: promo.now })),
+    body: d.sentence(promo.end ? fmt(copy.dlgEndBody, { d: promo.date, a: promo.next, m: promo.month }) : fmt(copy.dlgBody, { a: promo.next })),
+    primary: fmt(copy.dlgPrimary, { b: promo.now }),
+    secondary: promo.end ? d.sentence(fmt(copy.dlgWaitDate, { d: promo.date })) : copy.dlgSecondary,
+  };
+  const change = amountChange.value;
+  if (salaryDialog.value === "amount" && change) return {
+    title: fmt(copy.amtTitle, { a: usdt(change.amountUsdt) }),
+    body: fmt(copy.amtBody, { r: change.rankCode }),
+    primary: fmt(copy.claimBtn, { a: usdt(change.amountUsdt) }),
+    secondary: copy.amtCancel,
+  };
+  return null;
+});
+function submitSalary(month: string, amountUsdt: string) {
+  salarySwap.value = true;
+  salaryPending.phase = "claiming";
+  salaryPending.submit(month, amountUsdt);
+}
+function claimSalary() {
+  const dock = salaryDock.value;
+  if (dock?.kind === "claim") submitSalary(dock.month, dock.amountUsdt);
+}
+function confirmSalaryDialog() {
+  const which = salaryDialog.value, item = salaryPending.salary?.months[0], change = amountChange.value;
+  salaryDialog.value = null;
+  if (which === "promo" && item) submitSalary(item.month, item.amountUsdt);
+  if (which === "amount" && change) submitSalary(change.month, change.amountUsdt);
+}
+function resendSalaryClaim() {
+  salarySwap.value = true;
+  salaryPending.phase = "claiming";
+  salaryPending.resend();
+}
+/** 领取结果（6.3、6.4）→ 界面。逻辑项在 POST 或回执有结果时调用。 */
+type SalaryResult =
+  | { kind: "ok"; amountUsdt: string } // 200／回执 SUCCEEDED：D7
+  | { kind: "amountChanged"; month: string; amountUsdt: string; rankCode: string } // 409 SALARY_AMOUNT_CHANGED：D10
+  | { kind: "coverage"; expiresAt: string; lastDay: boolean } // 422／503：D8，截止日是今天 D8b
+  | { kind: "alreadyClaimed" } // 409 SALARY_ALREADY_CLAIMED：不提示，重读后显示已领
+  | { kind: "notClaimable"; month: string; gone: boolean } // 409 SALARY_NOT_CLAIMABLE：该月已不在 months 里时 toast
+  | { kind: "unknown" } // 超时、断开、回执 PROCESSING 或回执读不到：D6 确认中，只读
+  | { kind: "notFound" }; // 回执 NOT_FOUND：D6 给「重新提交」
+function showSalaryResult(result: SalaryResult) {
+  const copy = t.value.myRank, d = salaryDates(locale.code), usdt = (value: string) => `${formatHowNumber(value, locale.code)}\u00A0USDT`;
+  salaryPending.phase = result.kind === "unknown" ? "confirming" : result.kind === "notFound" ? "resend" : "idle";
+  if (result.kind === "ok") toast.success(fmt(copy.toastOkTitle, { a: usdt(result.amountUsdt) }), copy.toastOkDesc);
+  if (result.kind === "amountChanged") { amountChange.value = result; salaryDialog.value = "amount"; }
+  if (result.kind === "coverage") toast.warn(copy.toastFailTitle, result.lastDay ? copy.toastFailToday : d.sentence(fmt(copy.toastFailDesc, { d: d.day(lastClaimDay(result.expiresAt)) })));
+  if (result.kind === "notClaimable" && result.gone) toast.warn(d.sentence(fmt(copy.expiredToast, { m: d.month(result.month) })));
+}
+void showSalaryResult; // 逻辑项接入前没有调用方
 
 // ── 底部操作栏（2.1 非领取状态）与「加快晋级」（2.4：同三个目的地，底部按钮已覆盖的不重复）──
 const missingKinds = computed(() => new Set(prog.value.missing.map(row => row.kind)));
@@ -330,8 +424,21 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 /* 底部悬浮按钮（04.0）：内容底部留白为 48＋离底＋16，chassis 已给离底＋18。 */
 .rank-page--dock { padding-bottom:46px; }
 .rank-content { padding:4px 16px 0; }
-.rank-dock { position:fixed;z-index:35;display:flex; }
+.rank-dock { position:fixed;z-index:35;display:flex;align-items:center; }
 .rank-dock > .nx-button { flex:1; }
+/* 托盘（D4、D4c）：左短状态 13/18（360 12/16）辅助色，浅色 ink-2 保证叠在内容上仍可读；右无底文字按钮，中性墨色、高 48。 */
+.rank-dock__copy { flex:1;min-width:0;font:var(--ui-type-list-subtitle-weight,400) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.rank-dock__copy:lang(zh) { word-break:keep-all; }
+[data-theme="light"] .rank-dock__copy { color:var(--v5-ink-2); }
+.rank-dock__text { display:flex;align-items:center;flex:none;height:48px;padding:0 12px;font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);white-space:nowrap;cursor:pointer; }
+.rank-dock__text text { white-space:nowrap; }
+.rank-dock__text:active { opacity:.6; }
+.rank-dock__text:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px;border-radius:999px; }
+/* 领取中按钮、确认中胶囊：灰色玻璃由共享层给（03 §3.1），这里只排加载指示和文字。 */
+.rank-dock__status { display:flex;align-items:center;justify-content:center;gap:8px;flex:1;height:48px;border-radius:999px;color:var(--ui-tray-disabled-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
+.rank-dock__spin { flex:none;width:18px;height:18px;box-sizing:border-box;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:rank-dock-spin 800ms linear infinite; }
+@keyframes rank-dock-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rank-dock__spin { animation-duration:2.4s; } }
 /* 焦点卡（DESIGN 第 4 节、7.5）：.nx-tint 取等级色相（rankTierVars 的 --nx-tint），圆角 22、内边距 20；身份区竖排，徽章居中。 */
 .rank-focus { position:relative;isolation:isolate;overflow:hidden;padding:20px;border-radius:var(--ui-radius-surface); }
 .rank-identity { display:flex;flex-direction:column;align-items:center;text-align:center; }

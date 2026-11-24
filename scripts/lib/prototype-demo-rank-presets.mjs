@@ -17,7 +17,7 @@ export const RANK_RULES=[
   [8,29999,3999999,399,[4,3],50000,.08,.055,'15000'],
 ];
 export const rankPresetOptions=[['follow','跟随原演示数据'],...RANK_RULES.map(([v])=>['v'+v,'V'+v+(v===8?'（会员）':v===7?'（冲 V8）':'')])];
-export const rankSalaryOptions=[['present','有月薪（V2 起本月可领）'],['absent','没有 salary 字段（月薪接口未上线）'],['unavailable','月薪读取失败（salary null）']];
+export const rankSalaryOptions=[['present','有月薪（V2 起本月可领，C）'],['pending','月中首次到达，明天起可领（D1）'],['pending-end','月末最后一天首次到达，仅下月 1 日可领（D1b）'],['expiring','还剩 3 天（D2）'],['claimed','本月已领（D3）'],['promo','晋升当天，明天金额更高（D4）'],['promo-end','月末最后一天晋升（D4c）'],['carry','1 日：上月今天截止＋本月（D4e）'],['empty','有 salary，months 为空（不显示卡）'],['absent','没有 salary 字段（月薪接口未上线）'],['unavailable','月薪读取失败（salary null，D9）']];
 export const rankReviewOptions=[['required','V8 需审核（reviewRequired）'],['off','V8 不带审核标记']];
 export const rankPriorOptions=[['met','前序条件全部满足'],['one-short','前序差 1 人（本级 V{n}+ 人数少 1，H5）']];
 export const rankCoolingOptions=[['normal','好友购买冷却 7 天'],['zero','好友购买不冷却（0 天）']];
@@ -39,13 +39,25 @@ export function rankPresetProgress(v,prior='met'){
   return {selfComputePoints:value(1),teamComputePoints:value(2),directRefs:value(3),vDownlineCounts:Object.fromEntries(Object.entries(counts).filter(([,n])=>n>0).map(([r,n])=>[String(r),n]))};
 }
 
-/** /api/team/rank 的 salary（6.1）：V2 起当月一项 CLAIMABLE，按服务端业务日期；V0、V1 months 为空。 */
-export function rankPresetSalary(v,businessDate){
+/** /api/team/rank 的 salary（6.1、6.5）：V2 起按状态给当月一项，业务日期按状态挪到月中、月末或 1 日；V0、V1 months 为空。
+ *  晋升当天（promo、promo-end）：当前可领项按上一级的月薪，upcoming 为本级（只有上一级月薪大于 0 才成立，否则按 pending）。 */
+export function rankPresetSalary(v,businessDate,state='present'){
   const [year,month]=businessDate.split('-').map(Number);
-  const next=new Date(Date.UTC(year,month,1)).toISOString().slice(0,10);
-  const monthKey=businessDate.slice(0,7),amount=RANK_RULES[v][8];
-  const months=Number(amount)>0?[{month:monthKey,rankCode:'V'+v,amountUsdt:amount,status:'CLAIMABLE',claimableFrom:monthKey+'-01',expiresAt:next}]:[];
-  return {businessDate,months,upcoming:null,nextClaimableFrom:null};
+  const iso=(y,m,d)=>new Date(Date.UTC(y,m-1,d)).toISOString().slice(0,10);
+  const ym=businessDate.slice(0,7),first=iso(year,month,1),nextFirst=iso(year,month+1,1),lastDay=iso(year,month+1,0),mid=iso(year,month,15),midNext=iso(year,month,16);
+  const amount=RANK_RULES[v][8],prior=v>0?RANK_RULES[v-1][8]:'0';
+  const item=(status,extra={})=>({month:ym,rankCode:'V'+v,amountUsdt:amount,status,claimableFrom:first,expiresAt:nextFirst,...extra});
+  const salary=(date,months,upcoming=null,nextClaimableFrom=null)=>({businessDate:date,months,upcoming,nextClaimableFrom});
+  if(!(Number(amount)>0)||state==='empty')return salary(businessDate,[]);
+  const promo=Number(prior)>0;
+  if(state==='pending'||(state==='promo'&&!promo))return salary(mid,[item('PENDING',{claimableFrom:midNext})]);
+  if(state==='pending-end'||(state==='promo-end'&&!promo))return salary(lastDay,[item('PENDING',{claimableFrom:nextFirst,expiresAt:iso(year,month+1,2)})]);
+  if(state==='expiring')return salary(iso(year,month+1,-2),[item('CLAIMABLE')]);
+  if(state==='claimed')return salary(businessDate,[item('CLAIMED',{claimNo:'SAL'+ym.replace('-','')+'0001',claimedAt:businessDate+'T09:30:00Z'})],null,nextFirst);
+  if(state==='promo')return salary(mid,[item('CLAIMABLE',{rankCode:'V'+(v-1),amountUsdt:prior})],{month:ym,rankCode:'V'+v,amountUsdt:amount,claimableFrom:midNext});
+  if(state==='promo-end')return salary(lastDay,[item('CLAIMABLE',{rankCode:'V'+(v-1),amountUsdt:prior})],{month:ym,rankCode:'V'+v,amountUsdt:amount,claimableFrom:nextFirst});
+  if(state==='carry'){const prev=iso(year,month-1,1).slice(0,7);return salary(first,[{month:prev,rankCode:'V'+v,amountUsdt:amount,status:'CLAIMABLE',claimableFrom:prev+'-01',expiresAt:iso(year,month,2)},item('CLAIMABLE')]);}
+  return salary(businessDate,[item('CLAIMABLE')]);
 }
 
 /** 预设开着时接管 /api/config/v-ranks 和 /api/team/rank；其余路径返回 undefined。base 是原有应答（保留校验需要的公共字段）。 */
@@ -68,7 +80,7 @@ export function rankPresetResponse(pathname,base,state,businessDate){
     const data={...base,rankCode:'V'+v,progress:{...base.progress,...rankPresetProgress(v,state.rankPriorState)}};
     delete data.salary;delete data.salaryUnavailable;
     if(state.rankSalaryState==='unavailable')Object.assign(data,{salary:null,salaryUnavailable:true});
-    else if(state.rankSalaryState!=='absent')data.salary=rankPresetSalary(v,businessDate);
+    else if(state.rankSalaryState!=='absent')data.salary=rankPresetSalary(v,businessDate,state.rankSalaryState);
     return data;
   }
   return undefined;
