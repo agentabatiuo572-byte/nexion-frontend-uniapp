@@ -19,7 +19,7 @@ export const RANK_RULES=[
 export const rankPresetOptions=[['follow','跟随原演示数据'],...RANK_RULES.map(([v])=>['v'+v,'V'+v+(v===8?'（会员）':v===7?'（冲 V8）':'')])];
 export const rankSalaryOptions=[['present','有月薪（V2 起本月可领，C）'],['pending','月中首次到达，明天起可领（D1）'],['pending-end','月末最后一天首次到达，仅下月 1 日可领（D1b）'],['expiring','还剩 3 天（D2）'],['claimed','本月已领（D3）'],['promo','晋升当天，明天金额更高（D4）'],['promo-end','月末最后一天晋升（D4c）'],['carry','1 日：上月今天截止＋本月（D4e）'],['empty','有 salary，months 为空（不显示卡）'],['absent','没有 salary 字段（月薪接口未上线）'],['unavailable','月薪读取失败（salary null，D9）']];
 export const rankReviewOptions=[['required','V8 需审核（reviewRequired）'],['off','V8 不带审核标记']];
-export const rankPriorOptions=[['met','前序条件全部满足'],['one-short','前序差 1 人（本级 V{n}+ 人数少 1，H5）']];
+export const rankPriorOptions=[['met','前序条件全部满足'],['one-short','前序差 1 人（本级 V{n}+ 人数少 1，H5）'],['next-met','下一级数值条件全部达到（V7 审核中，H7）']];
 export const rankCoolingOptions=[['normal','好友购买冷却 7 天'],['zero','好友购买不冷却（0 天）']];
 // rankCoolingState zero: the direct-referral purchase cooling is 0 days, for the credited-right-away wording.
 export const rankPresetDefaults={rankPreset:'follow',rankSalaryState:'present',rankReviewState:'required',rankPriorState:'met',rankCoolingState:'normal'};
@@ -33,9 +33,10 @@ export function rankPresetProgress(v,prior='met'){
   const counts={};
   const atLeast=rank=>Object.entries(counts).reduce((sum,[r,n])=>Number(r)>=rank?sum+n:sum,0);
   for(const [,, , ,leaders] of RANK_RULES.slice(1,v+1))if(leaders&&atLeast(leaders[0])<leaders[1])counts[leaders[0]]=(counts[leaders[0]]??0)+leaders[1]-atLeast(leaders[0]);
-  if(next?.[4]){const [rank,need]=next[4],have=atLeast(rank);if(have<need)counts[rank]=(counts[rank]??0)+Math.floor((need-have)*.6);}
+  if(next?.[4]){const [rank,need]=next[4],have=atLeast(rank);if(have<need)counts[rank]=(counts[rank]??0)+(prior==='next-met'?need-have:Math.floor((need-have)*.6));}
   if(prior==='one-short'&&own[4]){const [rank,need]=own[4],drop=atLeast(rank)-(need-1);counts[rank]=(counts[rank]??0)-drop;if(rank>1)counts[rank-1]=(counts[rank-1]??0)+drop;}
-  const value=index=>next?toward(own[index],next[index]):own[index];
+  // next-met：朝下一级的数值条件全部停在下一级门槛（V7 数值全满足、等待 V8 审核，H7）。
+  const value=index=>next?(prior==='next-met'?next[index]:toward(own[index],next[index])):own[index];
   return {selfComputePoints:value(1),teamComputePoints:value(2),directRefs:value(3),vDownlineCounts:Object.fromEntries(Object.entries(counts).filter(([,n])=>n>0).map(([r,n])=>[String(r),n]))};
 }
 

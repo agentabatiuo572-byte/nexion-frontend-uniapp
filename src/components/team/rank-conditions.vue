@@ -1,7 +1,7 @@
 <template>
   <view class="rank-conditions">
     <view class="rank-conditions__head">
-      <view class="rank-conditions__lead"><text class="rank-conditions__title">{{ heading }}</text><NxHintTip v-if="hint.length" :lines="hint" /></view>
+      <view class="rank-conditions__lead"><TeamRankEmblem v-if="badge !== undefined" class="rank-conditions__badge" :rank="badge" :size="28" /><text class="rank-conditions__title">{{ heading }}</text><NxHintTip v-if="hint.length" :lines="hint" /></view>
       <NxTag v-if="tag" :tone="tagTone">{{ tag }}</NxTag>
     </view>
     <view class="rank-conditions__rows">
@@ -33,6 +33,7 @@ import { getCurrentInstance, ref } from "vue";
 import NxHintTip from "@/components/ui/nx-hint-tip.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import TeamRankEmblem from "@/components/team/team-rank-emblem.vue";
 
 export interface RankConditionRow {
   key: string;
@@ -61,6 +62,8 @@ withDefaults(defineProps<{
   /** 折叠头写结论「前序条件 · N 项未满足」（04.0）。 */
   priorTitle: string;
   hidden: boolean;
+  /** 标题前的目标等级小徽章 28px（V7 的纯色条件卡里放金色 V8，DESIGN 7.2）。 */
+  badge?: number;
   /** 条件环从 0 扫到当前值（07 §7.1.1）；减少动态或省电时为 false，直接显示终值。 */
   sweep: boolean;
 }>(), { tagTone: "neutral" });
@@ -74,6 +77,7 @@ const priorOpen = ref(false);
 .rank-conditions__lead { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
 .rank-conditions__title { min-width: 0; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .rank-conditions__lead :deep(.nx-hint-tip) { margin-left: 4px; }
+.rank-conditions__badge { margin-right: 6px; }
 .rank-conditions__rows { display: flex; flex-direction: column; }
 .rank-condition-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-height: 40px; padding: 6px 0; box-sizing: border-box; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 6%, transparent); }
 .rank-condition-row:last-child { border-bottom: 0; }

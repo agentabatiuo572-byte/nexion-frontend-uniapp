@@ -4,9 +4,13 @@
       <SubPageHeader back="/pages/team/team" :title="t.rank.pageTitle" plain design :action-label="copy.rankRules" :action="() => go('/pages/team/rank-how')" />
       <view class="rank-content">
         <template v-if="rankAvailable">
-          <!-- 焦点卡（DESIGN 7.5）。V7/V8 项：myRank 为 7 时换成卡外星河舞台＋纯色条件卡，为 8 时换成黑金会员卡；条件区复用 RankConditions。在那之前 V7、V8 也按这张卡显示，信息不丢。 -->
-          <view class="rank-focus nx-tint" :class="`rank-focus--${tierSegment}`" :style="focusVars">
-            <view class="rank-identity" :style="{ paddingTop: identityTop + 'px' }">
+          <!-- 身份区（DESIGN 7.5、第 8 节）：V0–V6 为焦点卡（等级色相整体底色）；V7 为卡外星河舞台＋纯色条件卡；V8 为黑金会员卡。
+               隐藏统计时 V7、V8 也回到中性焦点卡（徽章换成 •••• 圆），不从舞台或卡面露出等级。 -->
+          <view v-if="identityKind === 'v7'" class="rank-headbg" :class="{ 'is-solid': !stageUnderHeader }" aria-hidden="true" />
+          <RankV7Stage v-if="identityKind === 'v7'" :caption="t.rank.currentRank" :theme="theme.resolved"><view ref="headSentinel" class="rank-headbg__sentinel" aria-hidden="true" /></RankV7Stage>
+          <RankV8Card v-else-if="identityKind === 'v8'" :caption="t.rank.currentRank" :top-rank="t.myRank.topRank" />
+          <view v-if="identityKind === 'tier' || prog.next" :class="identityKind === 'tier' ? ['rank-focus', 'nx-tint', `rank-focus--${tierSegment}`] : ['rank-card', 'rank-cond-card']" :style="identityKind === 'tier' ? focusVars : undefined">
+            <view v-if="identityKind === 'tier'" class="rank-identity" :style="{ paddingTop: identityTop + 'px' }">
               <view class="rank-plate" :style="{ width: canvas + 'px', height: canvas + 'px' }">
                 <template v-if="!visibility.hidden">
                   <image v-for="src in patternSrcs" :key="src" class="rank-plate__pattern" :src="src" mode="aspectFit" aria-hidden="true" />
@@ -17,10 +21,30 @@
               <text class="rank-identity__caption">{{ t.rank.currentRank }}</text>
               <text class="rank-identity__num">{{ visibility.hidden ? '••••' : `V${myRank}` }}</text>
             </view>
-            <RankConditions v-if="prog.next" :key="String(auth.accountId)" class="rank-focus__conditions" :heading="fmt(t.myRank.needFor, { r: nextName })" :tag="gapTag" :tag-tone="reviewPending ? 'warning' : 'neutral'" :hint="countsHint" :rows="nextConditions" :prior="priorConditions" :prior-title="fmt(t.myRank.foldTitle, { n: visibility.mask(priorMissing) })" :hidden="visibility.hidden" :sweep="!motion.still.value" />
+            <RankConditions v-if="prog.next" :key="String(auth.accountId)" :class="{ 'rank-focus__conditions': identityKind === 'tier' }" :badge="identityKind === 'v7' ? prog.next.v : undefined" :heading="fmt(t.myRank.needFor, { r: nextName })" :tag="gapTag" :tag-tone="reviewPending ? 'warning' : 'neutral'" :hint="countsHint" :rows="nextConditions" :prior="priorConditions" :prior-title="fmt(t.myRank.foldTitle, { n: visibility.mask(priorMissing) })" :hidden="visibility.hidden" :sweep="!motion.still.value">
+              <!-- V8 的两项文字条件（2.3）：只在 v-ranks 的 V8 带 reviewRequired 时列在「另需」下；中性图标，不画环、不计数。 -->
+              <template v-if="textConditions.length">
+                <text class="rank-also">{{ t.myRank.condAlso }}</text>
+                <view v-for="item in textConditions" :key="item.key" class="rank-also__row"><view class="rank-also__lead" aria-hidden="true"><NxIcon :name="item.icon" :size="16" /></view><text class="rank-also__name">{{ item.name }}</text></view>
+              </template>
+              <!-- H7 审核中：卡底文字链接「联系客服 ›」（03 §3.1 P-67），不加流程、不承诺时间。 -->
+              <view v-if="reviewPending" class="nx-card-footer rank-cond-card__footer"><view class="nx-card-link" role="link" tabindex="0" @click="contactSupport" @keydown.enter.prevent="contactSupport" @keydown.space.prevent="contactSupport"><text>{{ t.tradein.recoveryContactSupport }}</text><NxIcon class="nx-card-link__chevron" name="chevron-right" :size="16" /></view></view>
+            </RankConditions>
           </view>
           <!-- 月薪卡（DESIGN 第 6 节，画板 C、D）：salary 字段存在且 months 不为空时显示；salary 为 null（读取失败）时金额「—」（D9）；没有 salary 字段时按 CA 构图。 -->
           <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :swap="salarySwap" />
+          <!-- V8 会员页（H0）：月薪卡后是 V8 专享权益（大号）和「你现在的权益」。 -->
+          <RankV8Perks v-if="identityKind === 'v8'" size="hero" :title="fmt(t.myRank.perksCap, { r: 'V8' })" :count="fmt(t.myRank.perksCount, { n: v8Perks.length })" :perks="v8Perks" :theme="theme.resolved" />
+          <view v-if="identityKind === 'v8' && currentBenefits.length" class="rank-section">
+            <view class="rank-section__head"><text class="rank-section__title" role="heading" aria-level="2">{{ t.myRank.myBenefits }}</text></view>
+            <view class="rank-card rank-gains">
+              <view v-for="gain in currentBenefits" :key="gain.key" class="rank-gain">
+                <NxIconTile :tone="gain.tone" size="s"><NxIcon :name="gain.icon" :size="20" /></NxIconTile>
+                <view class="rank-gain__name"><text>{{ gain.name }}</text><NxHintTip v-if="gain.hint" :lines="gain.hint" /></view>
+                <view class="rank-gain__value"><text>{{ gain.value }}</text><text v-if="gain.unit" class="rank-gain__unit" :class="{ 'rank-gain__unit--uvt': gain.unit === 'UVT' }">&#160;{{ gain.unit }}</text></view>
+              </view>
+            </view>
+          </view>
           <view v-if="gains.length" class="rank-section">
             <view class="rank-section__head">
               <TeamRankEmblem v-if="!visibility.hidden" class="rank-section__badge" :rank="prog.next!.v" :size="28" />
@@ -37,6 +61,8 @@
               </view>
             </view>
           </view>
+          <!-- V7：「升到 V8 后」之后接小一号的 V8 专享权益（第 1 节第 4 条）。 -->
+          <RankV8Perks v-if="identityKind === 'v7'" size="small" :title="fmt(t.myRank.perksCap, { r: 'V8' })" :count="fmt(t.myRank.perksCount, { n: v8Perks.length })" :perks="v8Perks" :theme="theme.resolved" />
           <view v-if="speedUpRows.length" class="rank-section">
             <NxSection :title="t.myRank.speedUp" />
             <view class="rank-speed">
@@ -44,21 +70,54 @@
             </view>
           </view>
         <view class="rank-ladder-section">
-          <NxSection :title="copy.allRanks" :meta="rankDefs.length ? `V${rankDefs[0].v}–V${rankDefs[rankDefs.length-1].v} · ${copy.expandRank}` : ''" />
-          <view class="rank-ladder">
-            <view v-for="r in rankDefs" :key="r.v" class="rank-ladder-row" :data-status="rowStatus(r.v)">
-              <view class="rank-row-heading" role="button" tabindex="0" :aria-label="rankLabel(r.v,locale.code,rankDefs)" :aria-expanded="expandedRank === r.v" :aria-controls="`rank-details-${r.v}`" @click="toggleRank(r.v)" @keydown.enter.prevent="toggleRank(r.v)" @keydown.space.prevent="toggleRank(r.v)">
-                <TeamRankEmblem :rank="r.v" :size="40" /><text class="rank-row-title">V{{ r.v }}</text><text class="rank-row-sub" :class="{'rank-row-sub--active':rowStatus(r.v)!=='locked'}">{{ rowStatus(r.v)==='done' ? t.rank.done : rowStatus(r.v)==='current' ? t.rank.currentRank : prog.next?.v === r.v ? nextRankLabel : '' }}</text>
+          <NxSection :title="t.myRank.allRanks" :meta="rankDefs.length ? `V${rankDefs[0].v}–V${rankDefs[rankDefs.length-1].v}` : ''" />
+          <!-- 全部等级横条（DESIGN 第 4 节阶梯项、10.1、10.3、10.5）：tablist，一块玻璃选中面滑到被选项；被选徽章按等级强度弹起（V3 起光圈，V7／V8 加星点层）。
+               隐藏统计时（Ch）不标「当前」「下一级」，也不写等级名，只留徽章。 -->
+          <scroll-view class="rank-rail" scroll-x :scroll-left="railScroll" scroll-with-animation :show-scrollbar="false">
+            <view class="rank-rail__track" role="tablist" :aria-label="t.myRank.allRanks">
+              <view class="rank-rail__ind" :class="{ 'is-on': railInd.on }" :style="{ width: railInd.w + 'px', height: railInd.h + 'px', transform: `translateX(${railInd.x}px)` }" aria-hidden="true" />
+              <view v-for="r in rankDefs" :id="`rank-tab-${r.v}`" :key="r.v" class="rank-rail__item" :class="[`rank-rail__item--${rowStatus(r.v)}`, { 'is-pop': popRank === r.v }]" :data-t="railTier(r.v)" role="tab" tabindex="0" :aria-selected="expandedRank === r.v ? 'true' : 'false'" :aria-controls="`rank-details-${r.v}`" :aria-label="rankLabel(r.v,locale.code,rankDefs)" @click="selectRank(r.v)" @keydown.enter.prevent="selectRank(r.v)" @keydown.space.prevent="selectRank(r.v)">
+                <view class="rank-rail__badge" :style="{ '--rail-accent': railAccent(r.v) }">
+                  <TeamRankEmblem class="rank-rail__emb" :rank="r.v" :size="40" />
+                  <view v-if="popRank === r.v && rankTierStyle(r.v).select.ring" class="rank-rail__ring" aria-hidden="true" />
+                  <image v-if="popRank === r.v && rankTierStyle(r.v).select.burst" class="rank-rail__burst" :src="railBurst(r.v)" mode="aspectFit" aria-hidden="true" />
+                </view>
+                <text v-if="!visibility.hidden" class="rank-rail__v" :class="{ 'rank-rail__v--v8': r.v === 8 }">V{{ r.v }}</text>
+                <text class="rank-rail__s">{{ railLabel(r.v) }}</text>
               </view>
             </view>
-          </view>
-          <template v-for="r in rankDefs" :key="`details-${r.v}`">
-              <view v-if="expandedRank === r.v" :id="`rank-details-${r.v}`" class="rank-details">
-                <text class="rank-detail-label">{{ t.rank.conditionsLabel }}</text><view v-for="condition in conditionItems(r)" :key="condition" class="rank-condition-copy"><view class="rank-condition-dot" aria-hidden="true" /><text>{{ condition }}</text></view><text v-if="r.v>1" class="rank-detail-hint">{{ t.rank.previousConditions }}</text>
-                <text class="rank-detail-label rank-detail-label--spaced">{{ t.rank.benefitsLabel }}</text><view class="rank-perk-grid"><view v-for="perk in benefitItems(r)" :key="perk.label" class="rank-perk"><text class="rank-caption">{{ perk.label }}</text><text class="rank-perk-value">{{ perk.value }}</text></view></view><view v-if="r.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view>
-                <text class="rank-detail-label rank-detail-label--spaced">{{ t.rank.rewardsLabel }}</text><view v-for="(reward,rewardIndex) in r.rewards" :key="rewardIndex" class="rank-reward-item nx-tint"><template v-if="cultivationReward(reward)"><view class="rank-reward-summary"><text class="rank-reward-title">{{ cultivationCopy.title }}</text><text class="rank-reward-amount">{{ rewardText(reward) }}</text></view><text class="rank-reward-description">{{ fmt(cultivationCopy.trigger, { n: r.v, amount: rewardText(reward) }) }}</text><text class="rank-reward-note">{{ cultivationCopy.recipient }}</text></template><text v-else class="rank-reward">{{ rewardText(reward) }}</text></view><text v-if="!r.rewards.length" class="rank-reward-note">{{ t.rank.noRewards }}</text>
+          </scroll-view>
+          <!-- 等级详情卡（E、E2）：状态标签、条件行（名称、当前／门槛、达成勾）、V8 的「另需」、权益行。门槛为 0 的条件不列。 -->
+          <view v-if="detail" :id="`rank-details-${detail.v}`" :key="detail.v" class="rank-detail" :class="{ 'rank-detail--in': detailAnim }" role="tabpanel" :aria-labelledby="`rank-tab-${detail.v}`">
+            <view class="rank-detail__head">
+              <TeamRankEmblem :rank="detail.v" :size="40" />
+              <text class="rank-detail__name" :class="{ 'rank-detail__name--v8': detail.v === 8 }">V{{ detail.v }}</text>
+              <NxTag class="rank-detail__tag" :tone="detail.tone">{{ detail.tag }}</NxTag>
+            </view>
+            <template v-if="detail.conditions.length">
+              <view class="rank-detail__label"><text>{{ t.rank.conditionsLabel }}</text><NxHintTip v-if="detail.prevNote" :lines="[detail.prevNote]" /></view>
+              <view v-for="row in detail.conditions" :key="row.key" class="rank-detail__kv">
+                <text class="rank-detail__k">{{ row.name }}</text>
+                <view class="rank-detail__v"><template v-if="row.current !== null"><text class="rank-detail__cur">{{ row.current }}</text><text> / </text></template><text class="rank-detail__tgt" :class="{ 'rank-detail__tgt--only': row.current === null }">{{ row.target }}</text><text v-if="row.unit">&#160;{{ row.unit }}</text>
+                  <view v-if="row.state !== 'hidden'" class="rank-detail__st" :class="`rank-detail__st--${row.state}`" aria-hidden="true"><NxIcon v-if="row.state === 'met'" name="check" :size="16" /></view>
+                </view>
               </view>
-          </template>
+            </template>
+            <template v-if="detail.text.length">
+              <text class="rank-detail__label">{{ t.myRank.condAlso }}</text>
+              <view v-for="item in detail.text" :key="item.key" class="rank-detail__kv rank-detail__kv--text"><view class="rank-also__lead rank-also__lead--s" aria-hidden="true"><NxIcon :name="item.icon" :size="14" /></view><text class="rank-detail__k">{{ item.name }}</text></view>
+            </template>
+            <text class="rank-detail__label">{{ t.myRank.benefits }}</text>
+            <view v-for="gain in detail.benefits" :key="gain.key" class="rank-gain rank-gain--detail">
+              <NxIconTile :tone="gain.tone" size="s"><NxIcon :name="gain.icon" :size="20" /></NxIconTile>
+              <view class="rank-gain__name"><text>{{ gain.name }}</text><NxHintTip v-if="gain.hint" :lines="gain.hint" /></view>
+              <view class="rank-gain__value"><text>{{ gain.value }}</text><text v-if="gain.unit" class="rank-gain__unit" :class="{ 'rank-gain__unit--uvt': gain.unit === 'UVT' }">&#160;{{ gain.unit }}</text></view>
+            </view>
+            <view v-if="detail.def.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><NxIcon name="chevron-right" :size="16" /></view>
+          </view>
+          <!-- 非 V8 用户选中 V8 时，详情卡下接小一号的 V8 专享权益（E2）。 -->
+          <RankV8Perks v-if="detail?.v === 8 && identityKind !== 'v8' && !visibility.hidden" size="small" :title="fmt(t.myRank.perksCap, { r: 'V8' })" :count="fmt(t.myRank.perksCount, { n: v8Perks.length })" :perks="v8Perks" :theme="theme.resolved" />
+          <text v-if="!detail" class="rank-ladder-hint">{{ t.myRank.expandRank }}</text>
         </view>
         </template>
         <EmptyState v-else-if="vState.remoteError" kind="recoverable-error" page :title="t.rank.loadError" :cta-label="t.ui.reload" @cta="retryRank" />
@@ -86,18 +145,23 @@ import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import NxHintTip from "@/components/ui/nx-hint-tip.vue";
 import RankConditions, { type RankConditionRow } from "@/components/team/rank-conditions.vue";
 import RankSalaryCard from "@/components/team/rank-salary-card.vue";
+import RankV7Stage from "@/components/team/rank-v7-stage.vue";
+import RankV8Card from "@/components/team/rank-v8-card.vue";
+import RankV8Perks from "@/components/team/rank-v8-perks.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import { CHASSIS_QUERY_SCOPE, useLoopsInView } from "@/composables/use-loops-in-view";
+import { advisorChatRoute } from "@/lib/advisor-chat-route";
+import { useConversations } from "@/store/conversations";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import { lastClaimDay, salaryDates, salaryView, type RankSalary, type SalaryClaimPhase } from "@/lib/rank-salary-view";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useRankFxMotion } from "@/composables/use-rank-fx-guard";
 import { teamRankProgress } from "@/lib/team-rank-progress";
-import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
-import { platformDisplayText } from "@/lib/brand-copy";
-import { isEntitlementVRankReward, rankEntitlementLabel } from "@/lib/rank-entitlement-label";
-import { RANK_ASSETS, rankAsset, rankTierStyle, rankTierVars } from "@/lib/rank-tier-style";
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { isEntitlementVRankReward } from "@/lib/rank-entitlement-label";
+import { RANK_ASSETS, rankAsset, rankTierStyle, rankTierVars, type RankPerk } from "@/lib/rank-tier-style";
+import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -109,8 +173,8 @@ import { rankGuideCopy } from '@/i18n/rank-guide-copy';
 import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useVRank, type VRank, type VRankDef, type VRankReward, type VRankConditions } from "@/store/v-rank";
-import { rankConditionsText, rankCultivationCopy, rankLabel } from "@/lib/v-rank-copy";
+import { useVRank, type VRank, type VRankDef } from "@/store/v-rank";
+import { rankLabel } from "@/lib/v-rank-copy";
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { useLocaleStore } from "@/store/locale";
 import { useAuth } from "@/store/auth";
@@ -118,13 +182,11 @@ import { useTheme } from "@/store/theme";
 import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
 import { onShow } from "@dcloudio/uni-app";
-import { uiLocale } from '@/i18n';
 
 const t = useT();
 const copy = useAuditUiCopy();
 const locale = useLocaleStore();
 const guideCopy = computed(() => rankGuideCopy(locale.code));
-const cultivationCopy = computed(() => rankCultivationCopy(locale.code));
 const vState = useVRank();
 const auth = useAuth();
 const theme = useTheme();
@@ -141,11 +203,11 @@ const rankAvailable = computed(() => !remoteApiEnabled || vState.remoteReady);
 // - purchaseL2Rate：「升到 Vn 后」的「好友的好友购买奖励」行（旧 → 新，不同才列）。
 // - monthlySalaryUsdt：「每月月薪」行；只在 salaryPresent 时列（当前为 0 时只写新值）。
 // - v8ReviewRequired：/api/config/v-ranks 的 V8 带 reviewRequired；V7 数值条件（含前序）全满足时焦点卡标签换成「审核中」。
-const rankPending = {
-  purchaseL2Rate: (_rank: VRankDef): number | undefined => undefined,
-  monthlySalaryUsdt: (_rank: VRankDef): number | undefined => undefined,
+const rankPending = reactive<{ purchaseL2Rate: (rank: VRankDef) => number | undefined; monthlySalaryUsdt: (rank: VRankDef) => number | undefined; v8ReviewRequired: boolean }>({
+  purchaseL2Rate: () => undefined,
+  monthlySalaryUsdt: () => undefined,
   v8ReviewRequired: false,
-};
+});
 
 // The API supplies exact L1 rank buckets; the engine counts members at or above
 // each required rank. This projection is only for the observed progress display.
@@ -157,8 +219,6 @@ const previewData = computed(() => ({
   vDownlineCounts: vState.vDownlineCounts,
 }));
 const prog = computed(() => teamRankProgress(previewData.value, rankDefs.value));
-const nextRankLabel = computed(() => ({ zh: "下一级", en: "Next", vi: "Hạng kế", id: "Berikutnya", ms: "Seterusnya", fil: "Susunod", ru: "Далее", kk: "Келесі", uz: "Keyingi" })[uiLocale(locale.code)]);
-function toggleRank(v: VRank) { expandedRank.value = expandedRank.value === v ? null : v; }
 const expandedRank = ref<VRank | null>(null);
 let expandedAccount = auth.accountId;
 let expansionInitialized = false;
@@ -172,13 +232,18 @@ watch(() => [auth.accountId, rankAvailable.value, myRank.value, rankDefs.value.m
   // invalidate the chosen tier; null after initialization is an intentional fold.
   if (!ready) return;
   if (!expansionInitialized || (expandedRank.value !== null && !rankDefs.value.some(rank => rank.v === expandedRank.value))) {
-    const preferred = prog.value.next?.v ?? myRank.value;
-    expandedRank.value = rankDefs.value.some(rank => rank.v === preferred) ? preferred : null;
+    // 阶梯默认展开当前等级；V8 会员默认不展开，横条滚到 V8，下面一句「点开查看条件与权益」（11.2 第 6 条）。
+    const preferred = myRank.value === 8 ? null : myRank.value;
+    expandedRank.value = preferred !== null && rankDefs.value.some(rank => rank.v === preferred) ? preferred : null;
     expansionInitialized = true;
   }
 }, { immediate: true });
 
 // ── 焦点卡身份区（DESIGN 7.2、7.5；隐藏统计时中性取值、徽章换成 •••• 圆）──
+// V7 星河舞台、V8 黑金会员卡（第 8 节）；隐藏统计时回到中性焦点卡。
+const identityKind = computed<'tier' | 'v7' | 'v8'>(() => visibility.hidden ? 'tier' : myRank.value === 7 ? 'v7' : myRank.value === 8 ? 'v8' : 'tier');
+// V7 页头底色（8.1 第 2 条）：舞台底部滚到页头下面时，页头下面一层无模糊的页面底色淡入（200ms）。哨兵在舞台底部往上一个页头高的位置。
+const { elRef: headSentinel, running: stageUnderHeader } = useLoopsInView('.rank-headbg__sentinel');
 const tierStyle = computed(() => rankTierStyle(myRank.value));
 const tierSegment = computed(() => visibility.hidden ? 'hidden' : tierStyle.value.segment);
 const focusVars = computed(() => rankTierVars(myRank.value, theme.resolved, visibility.hidden));
@@ -251,6 +316,17 @@ const gains = computed<Gain[]>(() => {
   return rows;
 });
 const gainArrowInk = computed(() => prog.value.next ? rankTierVars(prog.value.next.v, theme.resolved, visibility.hidden)['--tier-ink'] : '');
+// 一级的权益行（详情卡、「你现在的权益」）：好友购买、好友的好友购买（逻辑项接 purchaseL2Rate）、晋级奖励、每月月薪（有 salary 字段且大于 0）。
+function benefitRows(rank: VRankDef): Gain[] {
+  const rows: Gain[] = [{ key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, value: percentText(rank.directBonus) }];
+  const l2 = rankPending.purchaseL2Rate(rank);
+  if (l2 !== undefined) rows.push({ key: 'l2', icon: 'rank-rate-l2', tone: 'sky', name: t.value.myRank.gainF2, value: percentText(l2) });
+  const uvt = uvtReward(rank);
+  if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: formatHowNumber(uvt, locale.code), unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: `V${rank.v}` })] });
+  const salaryUsdt = rankPending.monthlySalaryUsdt(rank) ?? 0;
+  if (salaryPending.salary !== undefined && salaryUsdt > 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, value: formatHowNumber(salaryUsdt, locale.code), unit: 'USDT' });
+  return rows;
+}
 
 // ── 月薪卡与领取（DESIGN 2.1、第 6 节，画板 C、D 组）· 逻辑项接入点 ──────────────────────────────
 // salary：/api/team/rank 的 salary（6.1）。undefined＝响应里没有这个字段（CA：不显示月薪卡和月薪行）；
@@ -333,7 +409,6 @@ function showSalaryResult(result: SalaryResult) {
   if (result.kind === "notClaimable" && result.gone) toast.warn(d.sentence(fmt(copy.expiredToast, { m: d.month(result.month) })));
 }
 void showSalaryResult; // 逻辑项接入前没有调用方
-
 // ── 底部操作栏（2.1 非领取状态）与「加快晋级」（2.4：同三个目的地，底部按钮已覆盖的不重复）──
 const missingKinds = computed(() => new Set(prog.value.missing.map(row => row.kind)));
 const dockAction = computed(() => {
@@ -376,46 +451,116 @@ function rowStatus(v: VRank): "done" | "current" | "locked" {
   return v < vState.myRank ? "done" : v === vState.myRank ? "current" : "locked";
 }
 
-// Mirrors VRankRewardDispatcher.dispatchNexReward/hasSelfMarker: only positive
-// NEX without a self/direct marker follows the sponsor-with-self-fallback rule.
-// cultivationBonus aggregates all NEX and cannot classify an individual reward.
-function cultivationReward(reward: VRankReward): boolean {
-  return !isEntitlementVRankReward(reward) && reward.type === 'UVT'
-    && Number.isFinite(reward.amount) && reward.amount > 0
-    && !/self|direct/i.test(reward.customLabel ?? '');
-}
-function rewardText(reward: VRankReward): string {
-  if (isEntitlementVRankReward(reward)) return platformDisplayText(rankEntitlementLabel(reward, t.value.rank.rewardUnavailable));
-  const amount = `${formatAmount(reward.amount)}\u00A0${reward.type === "UVT" ? "UVT" : reward.type}`;
-  return amount;
-}
-
-// 三语:词典里 rank.cond.* 五条早就有(此前是死键,这里原本拼英文)
-function conditionItems(r: VRankDef): string[] {
-  const c = r.conditions, items: VRankConditions[] = [];
-  if (c.selfComputePoints !== undefined) items.push({selfComputePoints:c.selfComputePoints});
-  if (c.directRefs) items.push({directRefs:c.directRefs});
-  if (c.teamComputePoints !== undefined) items.push({teamComputePoints:c.teamComputePoints});
-  for (const [v,n] of Object.entries(c.vDownlines ?? {})) if(n) items.push({vDownlines:{[v]:n}});
-  return (items.length ? items : [{}]).map(item=>rankConditionsText(t.value,item,locale.code));
-}
-
 function go(url: string) {
   navTo(url);
 }
 
-// chips.votes holds the plural forms a language needs, "one|few|many" (ru) or "one|other" (en); others have one word.
-function voteWord(n: number) {
-  const forms = t.value.rank.chips.votes.split('|');
-  if (forms.length === 1) return forms[0];
-  const form = new Intl.PluralRules(locale.code).select(n);
-  return forms.length === 2 ? forms[form === 'one' ? 0 : 1] : forms[form === 'one' ? 0 : form === 'many' ? 2 : 1];
+// ── 全部等级横条（DESIGN 第 4 节阶梯项、10.1、10.3、10.5）──────────────────────────────
+// 状态字：已达成／当前／下一级；隐藏统计时（Ch）一律不写，横条不暴露当前等级。
+function railLabel(v: VRank): string {
+  if (visibility.hidden) return '';
+  const status = rowStatus(v);
+  if (status === 'done') return t.value.rank.done;
+  if (status === 'current') return t.value.myRank.sCur;
+  return prog.value.next?.v === v ? t.value.myRank.sNext : '';
 }
-function benefitItems(r: VRankDef): {label:string;value:string}[] {
-  const items: {label:string;value:string}[]=[{label:t.value.rank.chips.direct,value:formatHowNumber(r.directBonus*100,locale.code)+'%'}];
-  if(r.peerBonus>0) items.push({label:t.value.rank.chips.peer,value:vState.capabilities.peer ? formatHowNumber(r.peerBonus*100,locale.code)+'%' : fmt(t.value.rank.chips.peerNotDispatched,{n:formatHowNumber(r.peerBonus*100,locale.code)})});
-  if(r.leadershipVotes>0) items.push({label:t.value.rank.chips.pool,value:`${r.leadershipVotes}\u00A0${voteWord(r.leadershipVotes)}`});
-  return items;
+// 点选动画强度档（10.3）：0＝V0–V2，1＝V3–V4，2＝V5–V6，3＝V7–V8。
+const railTier = (v: number) => v >= 7 ? 3 : v >= 5 ? 2 : v >= 3 ? 1 : 0;
+const railAccent = (v: number) => rankTierStyle(v).accent?.[theme.resolved] ?? 'var(--v5-brand)';
+const railBurst = (v: number) => rankAsset(rankTierStyle(v).select.burst === 'gold' ? RANK_ASSETS.burstGold : RANK_ASSETS.burstPlat, theme.resolved);
+// 一次性点选动画组（≤320ms）：开始新的一组时上一组的类直接移走，动画随之结束（10.4 P10）。减少动态、省电时不播。
+const popRank = ref<VRank | null>(null);
+let popTimer: ReturnType<typeof setTimeout> | undefined;
+function selectRank(v: VRank) {
+  expandedRank.value = v;
+  if (popTimer) clearTimeout(popTimer);
+  popRank.value = null;
+  if (motion.still.value) return;
+  void nextTick(() => {
+    popRank.value = v;
+    popTimer = setTimeout(() => { popRank.value = null; }, rankTierStyle(v).select.ms + 20);
+  });
+}
+onUnmounted(() => { if (popTimer) clearTimeout(popTimer); });
+// 选中面：一块绝对定位的玻璃面按选中项的位置平移（240ms），横条平滑滚到选中项居中。App 逻辑层没有 DOM，用选择器查询量位置。
+const queryScope = inject(CHASSIS_QUERY_SCOPE, null) ?? getCurrentInstance()?.proxy ?? null;
+const railInd = reactive({ x: 0, w: 0, h: 0, on: false });
+const railScroll = ref(0);
+function measureRail() {
+  const v = expandedRank.value ?? (myRank.value === 8 ? 8 : null);
+  const query = queryScope ? uni.createSelectorQuery().in(queryScope) : uni.createSelectorQuery();
+  query.select('.rank-rail__track').boundingClientRect();
+  query.select('.rank-rail').boundingClientRect();
+  if (v !== null) query.select(`#rank-tab-${v}`).boundingClientRect();
+  query.exec((res: (UniApp.NodeInfo | null)[]) => {
+    const [track, rail, item] = res;
+    if (!track || !rail || !item || item.left === undefined || track.left === undefined || rail.width === undefined) return;
+    const x = item.left - track.left;
+    if (expandedRank.value !== null) Object.assign(railInd, { x, w: item.width ?? 0, h: item.height ?? 0, on: true });
+    else railInd.on = false;
+    railScroll.value = Math.max(0, Math.round(x - (rail.width - (item.width ?? 0)) / 2));
+  });
+}
+watch(() => [expandedRank.value, rankDefs.value.length, locale.code, visibility.hidden, rankAvailable.value] as const, () => { void nextTick(measureRail); }, { immediate: true });
+
+// ── 等级详情卡（E、E2；Ch 只遮当前值和状态标签）──
+const VRANK_TEXT_ICONS = { letter: 'rank-letter', review: 'rank-review' } as const;
+const textConditionsFor = (v: number) => v === 8 && rankPending.v8ReviewRequired
+  ? [{ key: 'letter', icon: VRANK_TEXT_ICONS.letter as NxIconName, name: fmt(t.value.myRank.condLetter, { r: 'V8' }) }, { key: 'review', icon: VRANK_TEXT_ICONS.review as NxIconName, name: t.value.myRank.condReview }]
+  : [];
+const textConditions = computed(() => prog.value.next ? textConditionsFor(prog.value.next.v) : []);
+const atLeast = (level: number) => Object.entries(vState.vDownlineCounts).reduce((sum, [rank, count]) => Number(rank) >= level ? sum + count : sum, 0);
+type DetailRow = { key: string; name: string; current: string | null; target: string; unit: string; state: 'met' | 'missing' | 'unknown' | 'hidden' };
+const detail = computed(() => {
+  const def = rankDefs.value.find(rank => rank.v === expandedRank.value);
+  if (!def) return null;
+  // 已达成和当前等级只写门槛加达成勾；更高的等级写「当前 / 门槛」（画板 E、E2、H6）。
+  const reached = !visibility.hidden && def.v <= myRank.value;
+  const c = def.conditions, rows: DetailRow[] = [];
+  const add = (key: string, name: string, current: number | undefined, required: number, people: boolean) => {
+    if (!(required > 0)) return; // 门槛为 0 的条件不列（rank-rules）
+    const known = typeof current === 'number' && Number.isFinite(current);
+    rows.push({ key, name, current: reached ? null : visibility.mask(number(known ? current : undefined)), target: number(required), unit: people ? t.value.myRank.people : '',
+      state: visibility.hidden ? 'hidden' : reached || (known && current! >= required) ? 'met' : !known ? 'unknown' : 'missing' });
+  };
+  add('self', t.value.myRank.self, vState.selfComputePoints, c.selfComputePoints ?? 0, false);
+  add('team', t.value.myRank.team, vState.teamComputePoints, c.teamComputePoints ?? 0, false);
+  add('buyers', t.value.myRank.buyers, vState.directRefs, c.directRefs ?? 0, true);
+  for (const [level, required] of Object.entries(c.vDownlines ?? {})) add(`v${level}`, fmt(t.value.myRank.leaders, { r: `V${level}` }), atLeast(Number(level)), required ?? 0, true);
+  const status = rowStatus(def.v);
+  const tag = visibility.hidden ? '••••' : status === 'done' ? t.value.rank.done : status === 'current' ? t.value.myRank.isCurrent : t.value.myRank.notMet;
+  const tone: 'neutral' | 'brand' | 'success' = visibility.hidden ? 'neutral' : status === 'done' ? 'success' : status === 'current' ? 'brand' : 'neutral';
+  return {
+    v: def.v, def, tag, tone, conditions: rows,
+    prevNote: def.v >= 2 ? fmt(t.value.myRank.prevNote, { a: 'V1', r: `V${def.v - 1}` }) : '',
+    text: textConditionsFor(def.v),
+    benefits: benefitRows(def),
+  };
+});
+const detailAnim = computed(() => !motion.still.value);
+
+// ── V8 专享权益（五项固定文案和资源，2.3）──
+const v8Perks = computed(() => {
+  const copy = t.value.myRank;
+  const rows: { key: RankPerk; title: string; desc: string }[] = [
+    { key: 'promo', title: copy.perkPromoT, desc: copy.perkPromoD },
+    { key: 'trip', title: copy.perkTripT, desc: copy.perkTripD },
+    { key: 'support', title: copy.perkSupportT, desc: copy.perkSupportD },
+    { key: 'transfer', title: copy.perkTransferT, desc: copy.perkTransferD },
+    { key: 'market', title: copy.perkMarketT, desc: copy.perkMarketD },
+  ];
+  return rows;
+});
+// 「你现在的权益」（H0）：V8 的比例、晋级奖励、月薪；没有 salary 字段时三行（12.0）。
+const currentBenefits = computed(() => {
+  const current = rankDefs.value.find(rank => rank.v === myRank.value);
+  return current ? benefitRows(current) : [];
+});
+
+// H7「联系客服」：打开顾问会话（同 agent-application 的去向）。
+const conversations = useConversations();
+async function contactSupport() {
+  go(await advisorChatRoute(conversations));
 }
 useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry: () => vState.refreshCanonicalVRank() });
 </script>
@@ -478,62 +623,76 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-scope-link > text { min-width:0;overflow-wrap:break-word; }
 .rank-scope-link > svg, .rank-scope-link > .nx-native-svg { flex:none; }
 .rank-scope-link:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
-.rank-caption { display:block;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
-.rank-ladder-section { margin-top:var(--ui-space-section-gap); }
-.rank-ladder { overflow:hidden;border:1px solid var(--v5-border);border-radius:22px;background:var(--v5-surface); }
-.rank-ladder-row { position:relative; }
-.rank-ladder-row::before { content:'';position:absolute;left:33px;top:0;bottom:0;width:2px;background:var(--v5-border-strong);pointer-events:none; }
-.rank-ladder-row:first-child::before { top:32px; }
-.rank-ladder-row:last-child::before { bottom:calc(100% - 32px); }
-.rank-ladder-row[data-status="done"]::before { background:color-mix(in srgb,var(--v5-brand) 55%,var(--v5-surface)); }
-.rank-ladder-row[data-status="current"] { background:color-mix(in srgb,var(--v5-brand) 6%,transparent); }
-.rank-row-heading { position:relative;display:flex;align-items:center;gap:12px;min-height:64px;box-sizing:border-box;padding:10px 16px;cursor:pointer; }
-.rank-row-heading :deep(.team-rank-emblem) { background:var(--v5-surface);border-radius:12px; }
-.rank-ladder-row[data-status="current"] .rank-row-heading :deep(.team-rank-emblem) { box-shadow:0 0 0 4px color-mix(in srgb,var(--v5-brand) 14%,transparent),0 6px 18px color-mix(in srgb,var(--v5-brand) 25%,transparent); }
-.rank-row-heading:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
-.rank-row-heading:focus-visible { outline-offset:-3px; }
-.rank-row-copy { flex:1;min-width:0; }
-.rank-row-title { display:block;font:500 var(--ui-type-list-title)/20px var(--font-v5);overflow-wrap:break-word; }
-.rank-row-sub { display:block;margin-top:2px;font:400 var(--ui-type-list-subtitle)/18px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
-.rank-row-sub--active { color:var(--v5-brand); }
-.rank-row-chevron { flex:none;color:var(--v5-ink-3);transition:transform 180ms; }.rank-row-chevron--open { transform:rotate(180deg); }
-.rank-details { position:relative;padding:2px 16px 18px 64px; }
-.rank-detail-label { display:block;font:500 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-2);margin-bottom:6px; }
-.rank-detail-label--spaced { margin-top:14px; }
-.rank-condition-copy { display:flex;gap:8px;align-items:baseline;margin:0;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
-.rank-condition-dot { width:5px;height:5px;border-radius:50%;background:var(--v5-ink-3);flex:none;transform:translateY(-2px); }
-.rank-detail-hint,.rank-reward-note { display:block;margin-top:8px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
-.rank-perk-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px; }
-.rank-perk { display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--v5-border);border-radius:12px;background:var(--ui-perk); }
-.rank-perk-value { font:500 14px/20px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
-.rank-reward-item + .rank-reward-item { margin-top:12px; }
-.rank-reward-summary { display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;color:var(--v5-nex); }
-.rank-reward-title { display:block;font:600 var(--ui-type-section)/22px var(--font-v5); }
-.rank-reward-amount { display:block;font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
-.rank-reward-description { display:block;margin-top:2px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
-.rank-reward { display:block;margin-top:2px;font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-nex);overflow-wrap:break-word; }
 .rank-state { padding:32px 0;color:var(--v5-ink-2); }.rank-state text { display:block;margin-top:var(--ui-space-row-y); }
-@media(max-width:350px) { .rank-details { padding-left:48px; }.rank-perk { padding-inline:8px; } }
-@media(prefers-reduced-motion:reduce) { .rank-row-chevron { transition:none; } }
-.rank-ladder { display:flex;gap:6px;overflow-x:auto;padding:4px 2px 2px;border:0;border-radius:0;background:transparent;scrollbar-width:none; }
-.rank-ladder::-webkit-scrollbar { display:none; }
-.rank-ladder-row { flex:none;background:none !important; }
-.rank-ladder-row::before { display:none; }
-/* A rank can be wider than 56px when its status word is long (fil, id, kk, ms); the track scrolls sideways, so the item grows instead of its label running into the next one. */
-.rank-row-heading { flex-direction:column;align-items:center;gap:4px;min-width:56px;width:auto;min-height:88px;padding:6px 6px;border-radius:16px; }
-.rank-row-heading[aria-expanded="true"] { background:color-mix(in srgb,var(--v5-ink) 6%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-ink) 12%,transparent); }
-.rank-row-title { font:500 12px/16px var(--font-metric);text-align:center; }
-.rank-row-sub { margin-top:0;font:500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;white-space:nowrap; }
-.rank-ladder-row[data-status="locked"] .rank-row-heading :deep(.team-rank-emblem) { opacity:.55; }
-.rank-details { margin-top:12px;padding:20px;border-radius:28px;background:var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
-/* P-42 round 2 */
-.rank-ladder-row + .rank-ladder-row::after { content:"";position:absolute;left:-6px;top:26px;width:6px;height:2px;background:var(--v5-surface-3); }
-.rank-ladder-row[data-status="done"] + .rank-ladder-row::after,.rank-ladder-row[data-status="current"]::after { background:var(--v5-brand); }
-.rank-ladder-row[data-status="done"] .rank-row-sub { color:var(--v5-ink-3); }
-.rank-perk-value { font:500 22px/26px var(--font-metric);color:var(--v5-brand); }
-.rank-perk + .rank-perk .rank-perk-value { color:var(--v5-nex); }
-.rank-reward-item { --nx-tint:var(--v5-warning);padding:14px;border-radius:16px; }
-.rank-reward-summary { justify-content:space-between; }
-.rank-reward-title { font:500 13px/18px var(--font-v5);color:var(--v5-ink); }
-.rank-reward-amount { font:500 16px/20px var(--font-metric);color:var(--v5-nex-ink); }
+/* V7 页头底色（8.1 第 2 条）：页头在星河上透明；舞台底部滚到页头下面后，页头下面一层无模糊的页面底色淡入 200ms linear。 */
+.rank-headbg { position:sticky;top:0;z-index:49;height:56px;margin:0 -16px -56px;background:var(--v5-bg);opacity:0;transition:opacity 200ms linear;pointer-events:none; }
+.rank-headbg.is-solid { opacity:1; }
+.rank-headbg__sentinel { position:absolute;left:0;bottom:68px;width:1px;height:1px;pointer-events:none; }
+/* V7 纯色条件卡（.hero--cond）：舞台是本屏区焦点，条件区改为纯色卡。 */
+.rank-cond-card { padding:16px 20px; }
+.rank-cond-card__footer { margin-top:12px;padding-top:0;min-height:44px;justify-content:flex-end; }
+/* 「另需」文字条件（2.3）：12/16 ink-3 小标题；行＝28px 中性圆＋16px 图形｜名称，右侧空。 */
+.rank-also { display:block;margin-top:10px;font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);color:var(--v5-ink-3); }
+.rank-also__row { display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;column-gap:10px;min-height:40px;padding:6px 0;box-sizing:border-box;border-bottom:1px solid color-mix(in srgb,var(--v5-ink) 6%,transparent); }
+.rank-also__row:last-of-type { border-bottom:0; }
+.rank-also__lead { display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--v5-ink) 6%,transparent);color:var(--v5-ink-3); }
+.rank-also__lead--s { flex:none;width:24px;height:24px; }
+.rank-also__name { min-width:0;font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);color:var(--v5-ink);overflow-wrap:break-word; }
+/* 全部等级横条（第 4 节阶梯项）：项宽 64（&lt;375 为 58）、间距 6；徽章 40、「V3」12/16 Mono 500（V8 金色）、状态 12/16 500。 */
+.rank-ladder-section { margin-top:var(--ui-space-section-gap); }
+.rank-rail { margin:0 -16px;width:auto;white-space:nowrap; }
+.rank-rail__track { position:relative;display:inline-flex;gap:6px;padding:4px 16px 2px; }
+.rank-rail__ind { position:absolute;left:0;top:4px;border-radius:16px;background:color-mix(in srgb,var(--v5-ink) 7%,transparent);box-shadow:var(--ui-glass-edge-shadow);opacity:0;transition:transform 240ms cubic-bezier(.32,.72,0,1);pointer-events:none; }
+.rank-rail__ind.is-on { opacity:1; }
+.rank-rail__item { position:relative;z-index:0;display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;min-width:64px;box-sizing:border-box;padding:6px;border-radius:16px;cursor:pointer; }
+.rank-rail__item + .rank-rail__item::before { content:"";position:absolute;left:-6px;top:26px;width:6px;height:2px;background:var(--v5-surface-3); }
+.rank-rail__item--done + .rank-rail__item::before, .rank-rail__item--current::before { background:var(--v5-brand) !important; }
+.rank-rail__item:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
+.rank-rail__badge { position:relative;width:40px;height:40px; }
+.rank-rail__item--locked .rank-rail__emb { opacity:.55; }
+.rank-rail__item[aria-selected="true"] .rank-rail__emb { transform:translateY(-2px) scale(1.06); }
+.rank-rail__v { font:500 12px/16px var(--font-metric);color:var(--v5-ink); }
+.rank-rail__v--v8 { color:#E2BC62; }
+[data-theme="light"] .rank-rail__v--v8 { color:#765816; }
+.rank-rail__s { min-height:16px;font:500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
+.rank-rail__item--current .rank-rail__s { color:var(--v5-brand); }
+/* 点选一次性动画（10.3，整组 ≤320ms，只动 transform／opacity）：徽章按等级强度弹起；V3 起一道点缀色光圈；V7、V8 加星点层。 */
+.rank-rail__item.is-pop .rank-rail__emb { animation:rank-pop-0 240ms cubic-bezier(.2,1.4,.4,1); }
+.rank-rail__item[data-t="1"].is-pop .rank-rail__emb { animation:rank-pop-1 280ms cubic-bezier(.2,1.4,.4,1); }
+.rank-rail__item[data-t="2"].is-pop .rank-rail__emb { animation:rank-pop-2 300ms cubic-bezier(.2,1.4,.4,1); }
+.rank-rail__item[data-t="3"].is-pop .rank-rail__emb { animation:rank-pop-3 320ms cubic-bezier(.2,1.4,.4,1); }
+@keyframes rank-pop-0 { 0% { transform:none; } 50% { transform:translateY(-2px) scale(1.08); } 100% { transform:translateY(-2px) scale(1.06); } }
+@keyframes rank-pop-1 { 0% { transform:none; } 50% { transform:translateY(-3px) scale(1.12); } 100% { transform:translateY(-2px) scale(1.06); } }
+@keyframes rank-pop-2 { 0% { transform:none; } 50% { transform:translateY(-3px) scale(1.14); } 100% { transform:translateY(-2px) scale(1.06); } }
+@keyframes rank-pop-3 { 0% { transform:none; } 50% { transform:translateY(-3px) scale(1.16); } 100% { transform:translateY(-2px) scale(1.06); } }
+.rank-rail__ring { position:absolute;inset:0;border-radius:50%;border:2px solid var(--rail-accent);opacity:0;pointer-events:none;animation:rank-ring 300ms cubic-bezier(.2,.8,.2,1); }
+@keyframes rank-ring { 0% { opacity:.75;transform:scale(.7); } 100% { opacity:0;transform:scale(1.55); } }
+.rank-rail__burst { position:absolute;left:-20px;top:-20px;width:80px;height:80px;opacity:0;pointer-events:none;animation:rank-burst 320ms cubic-bezier(.2,.8,.2,1); }
+@keyframes rank-burst { 0% { opacity:0;transform:scale(.5); } 40% { opacity:1; } 100% { opacity:0;transform:scale(1.15); } }
+.rank-ladder-hint { display:block;margin-top:8px;font:400 var(--ui-type-meta)/18px var(--font-v5);color:var(--v5-ink-3); }
+/* 等级详情卡（第 4 节）：纯色卡；标题行徽章 40＋等级名（卡片标题）＋状态标签；条件行名称 13/20 ink-3、值主文字、达成勾在行尾；权益行高 48。 */
+.rank-detail { margin-top:12px;padding:16px;border-radius:var(--ui-radius-surface);background:var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .rank-detail { box-shadow:inset 0 0 0 1px var(--v5-border),var(--v5-glass-shadow); }
+.rank-detail--in { animation:rank-detail-in 200ms cubic-bezier(.2,.8,.2,1) 80ms backwards; }
+@keyframes rank-detail-in { from { opacity:0;transform:translateY(8px); } }
+.rank-detail__head { display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px; }
+.rank-detail__name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-metric);color:var(--v5-ink); }
+.rank-detail__name--v8 { color:#E2BC62; }
+[data-theme="light"] .rank-detail__name--v8 { color:#765816; }
+.rank-detail__tag { margin-left:auto; }
+.rank-detail__label { display:flex;align-items:center;gap:2px;margin:16px 0 4px;font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);color:var(--v5-ink-3); }
+.rank-detail__kv { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;min-height:40px;padding:8px 0;box-sizing:border-box;border-bottom:1px solid color-mix(in srgb,var(--v5-ink) 8%,transparent); }
+.rank-detail__kv--text { justify-content:flex-start;gap:10px; }
+.rank-detail__k { min-width:0;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.rank-detail__v { display:inline-flex;align-items:center;margin-left:auto;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3);white-space:nowrap;font-variant-numeric:tabular-nums; }
+.rank-detail__v text { white-space:pre; }
+.rank-detail__cur { font-family:var(--font-metric);font-weight:500;color:var(--v5-ink); }
+.rank-detail__tgt { font-family:var(--font-metric); }
+.rank-detail__tgt--only { font-weight:500;color:var(--v5-ink); }
+.rank-detail__st { display:grid;place-items:center;width:16px;height:16px;margin-left:6px;color:var(--v5-success-ink); }
+.rank-detail__st--missing, .rank-detail__st--unknown { box-sizing:border-box;width:14px;height:14px;margin:1px 1px 1px 7px;border-radius:50%;border:1.5px solid var(--v5-ink-4); }
+.rank-gain--detail { min-height:48px; }
+.rank-gain--detail .rank-gain__name { font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3); }
+@media (max-width:374px) { .rank-rail__item { min-width:58px; } }
+@media (prefers-reduced-motion:reduce) { .rank-rail__ind { transition:none; } .rank-detail--in, .rank-rail__item.is-pop .rank-rail__emb { animation:none; } }
 </style>
