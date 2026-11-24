@@ -365,7 +365,8 @@ function stopTrialPoll() {
 }
 
 const IDLE_READ_MS = 30 * 60_000;
-const trialReadRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/me", "pages/me/devices", "pages/me/trial"]);
+const trialReadRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/me", "pages/me/devices", "pages/me/trial",
+  "pages/store/store", "pages/store/detail"]);
 let scheduledReadBinding = "";
 let idleReadOffset = 0;
 let lastIdleSlot = 0;

@@ -619,6 +619,10 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     if (expected.scopeCurrent?.() === false) { finish(null); return; }
     const cause = asApiError(error);
+    if (expected.kind === 'TRIAL_CONVERT' && isApiRefusal(cause, 409, 'TRIAL_EXISTING_PURCHASE')) {
+      finish(null);
+      return;
+    }
     if (expected.kind === 'ORDER_PAY' && orderTopupMethod(method) && isApiRefusal(cause, 409, 'ORDER_USDT_USE_TOPUP')) {
       await redirectOrderUsdt(method, version, accountKey);
       return;
@@ -791,6 +795,11 @@ async function submitOriginal() {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
+      if (pending.kind === 'TRIAL_CONVERT' && isApiRefusal(cause, 409, 'TRIAL_EXISTING_PURCHASE')) {
+        releaseUncreatedPayment(pending, accountKey);
+        finish(null);
+        return;
+      }
       if (pending.kind === 'ORDER_PAY' && orderTopupMethod(pending.paymentMethod ?? state.method) && isApiRefusal(cause, 409, 'ORDER_USDT_USE_TOPUP')) {
         const readOnly = { ...pending, useOrderTopup: true };
         state.pending = readOnly;
@@ -1013,6 +1022,27 @@ export function resumeCheckoutCapacityPayment(accountKey: string, kind: 'CAPACIT
   if (!pending || intentNo && pending.intentNo && pending.intentNo !== intentNo) return false;
   void resume(intentNo ? { ...pending, intentNo } : pending, checkout);
   return true;
+}
+
+/** A trial's state names its original intent even on a device that never opened the payment. */
+export async function resumeTrialPurchasePayment(
+  paymentNo: string,
+  productNo: string,
+  summary: string,
+  current: () => boolean,
+  checkout: CheckoutCapacityResume,
+): Promise<void> {
+  if (state.open || !current()) return;
+  const intent = await api.snapshot(paymentNo);
+  if (!current() || state.open) return;
+  if (!intent || intent.intentNo !== paymentNo || intent.kind !== 'TRIAL_CONVERT')
+    throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
+  if (intent.status === 'EXPIRED') { checkout.onExpired(); return; }
+  await resume({
+    fingerprint: JSON.stringify(['TRIAL_CONVERT', { productNo, expectedAmountUsdt: intent.subtotalUsdt }]),
+    kind: intent.kind, commandKey: intent.commandKey, paymentQuoteId: intent.paymentQuoteId,
+    intentNo: paymentNo, paymentMethod: intent.paymentMethod, network: intent.network, summary, lookupOnly: true,
+  }, checkout);
 }
 // The App runtime keeps a page's query on $page.options; H5 also sets options.
 function pageQuery(page: unknown) {
