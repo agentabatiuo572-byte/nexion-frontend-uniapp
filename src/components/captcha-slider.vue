@@ -297,6 +297,7 @@ onUnmounted(() => {
     90–100  底盘 chrome(.nx-top-chrome 90 · .nx-header/.nx-navheader 100)
        110  底盘之上的常驻件(模拟设备状态栏)
        780  里程碑庆祝 —— 必须在业务 UI 之下(2026-08-03 定,2026-08-16 兑现,见 milestone-celebration.vue)
+   785/786  提示气泡(nx-hint-tip:App 端点外关闭的透明接触层 785 · 气泡 786;非模态,在业务半屏之下)
    790/800  业务半屏(trial-claim · slot-action · lucky-spin · voucher-claim · tradein · trial
             · 消息抽屉 · opensea 外链弹窗 · PC 设备卡长按菜单
             · device-deactivate · fx-rate-line · wallet-withdraw 费用说明)

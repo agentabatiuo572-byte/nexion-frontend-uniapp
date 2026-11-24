@@ -327,7 +327,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 /* 底部悬浮按钮（04.0）：内容底部留白为 48＋离底＋16，chassis 已给离底＋18。 */
 .rank-page--dock { padding-bottom:46px; }
 .rank-content { padding:4px 16px 0; }
-.rank-dock { position:fixed;display:flex; }
+.rank-dock { position:fixed;z-index:35;display:flex; }
 .rank-dock > .nx-button { flex:1; }
 /* 焦点卡（DESIGN 第 4 节、7.5）：.nx-tint 取等级色相（rankTierVars 的 --nx-tint），圆角 22、内边距 20；身份区竖排，徽章居中。 */
 .rank-focus { position:relative;isolation:isolate;overflow:hidden;padding:20px;border-radius:var(--ui-radius-surface); }

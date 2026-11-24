@@ -133,7 +133,7 @@ const openTip = sharedRef<number | null>(null);
 .nx-hint-tip__button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -10px; }
 .nx-hint-tip__bubble {
   position: fixed;
-  z-index: 9500;
+  z-index: 786;
   box-sizing: border-box;
   width: max-content;
   max-width: min(280px, calc(100vw - 24px));
@@ -155,7 +155,8 @@ const openTip = sharedRef<number | null>(null);
 .nx-hint-tip__bubble--above::before { top: auto; bottom: -6px; }
 .nx-hint-tip__line { display: block; white-space: normal; }
 .nx-hint-tip__line + .nx-hint-tip__line { margin-top: 4px; }
-.nx-hint-tip__catcher { position: fixed; inset: 0; z-index: 9499; }
+/* 层级（captcha-slider.vue 秩序表）：在吸底栏（35）和里程碑庆祝（780）之上、业务半屏（790/800）、弹窗和滑块验证之下。 */
+.nx-hint-tip__catcher { position: fixed; inset: 0; z-index: 785; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .nx-hint-tip__bubble { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--v5-toast-solid); }
 }
