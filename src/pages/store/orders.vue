@@ -121,7 +121,13 @@
       </view>
     </view>
     <NxNoticeDialog :open="!!deleteTarget" :title="t.orders.expiredDeleteTitle" :body="t.orders.expiredDeleteBody" :primary="t.orders.expiredDelete" :secondary="t.ui.cancel"
-      icon="trash" tone="danger" @primary="confirmDeleteExpired" @secondary="deleteTarget = null" />
+      icon="trash" tone="danger" @primary="confirmDeleteExpired" @secondary="deleteTarget = null">
+      <!-- The order being deleted (03 §3.5 明确对象): its full product name, and the order number as one long code (03 §3.6.1). -->
+      <view v-if="deleteTarget" class="order-delete-target">
+        <text class="order-delete-target__name">{{ commerceOrderTitle(deleteTarget, locale.code) }}</text>
+        <view class="order-delete-target__code"><text class="order-delete-target__label">{{ t.orders.orderId }}</text><NxCodeValue class="order-delete-target__value" :value="deleteTarget.id" :label="t.orders.orderId" :copyable="false" /></view>
+      </view>
+    </NxNoticeDialog>
   </AppChassis>
 </template>
 
@@ -583,6 +589,11 @@ const browseBtnStyle: CSSProperties = {
 .order-card__code-label { flex: none; white-space: nowrap; }
 .order-card__code-value { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 /* Genesis: the order-number row sits under the tappable row, aligned with the text column; its copy button has a 44px target and does not open the card. */
+.order-delete-target { align-self: stretch; margin-top: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-l); background: var(--v5-surface-2); display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-1); min-width: 0; }
+.order-delete-target__name { font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.order-delete-target__code { display: flex; align-items: baseline; justify-content: center; gap: var(--v5-space-1); max-width: 100%; min-width: 0; }
+.order-delete-target__label { flex: none; white-space: nowrap; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.order-delete-target__value { color: var(--v5-ink-2); }
 .order-card__code--copy { align-items: center; min-height: 44px; margin: 4px 0 -10px; padding-left: 110px; cursor: default; }
 .order-card__code--copy :deep(.copy-code-button) { width: 44px; height: 44px; margin: 0 -10px 0 auto; }
 .order-card__row[role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
