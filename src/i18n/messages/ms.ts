@@ -4693,7 +4693,7 @@ export const ms: Messages = {
     todayTag: "Hari terakhir",
     expiredToast: "Tarikh tuntutan ganjaran bulan {m} sudah lepas",
     resendNote: "Tuntutan sebelum ini tidak sampai",
-    resendBtn: "Hantar semula",
+    resendBtn: "Hantar semula tuntutan",
     topRank: "Pangkat tertinggi",
     trayNow: "Tuntut {b}",
     trayWait: "Mulai esok {a}",

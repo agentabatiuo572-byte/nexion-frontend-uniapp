@@ -15,11 +15,8 @@
       </view>
     </view>
     <text v-if="view.note" class="rank-salary__note">{{ view.note }}</text>
-    <!-- 回执 NOT_FOUND（D6）：原因在左，就地的文字按钮在右（03 §3.5.2、§3.1；10.2 重试 13/18 500）。 -->
-    <view v-else-if="view.resend" class="rank-salary__resend">
-      <view class="rank-salary__resend-why"><NxIcon name="hint-warn" :size="16" /><text>{{ resendNote }}</text></view>
-      <view class="rank-salary__resend-btn" role="button" tabindex="0" @click="$emit('resend')" @keydown.enter.prevent="$emit('resend')" @keydown.space.prevent="$emit('resend')"><text>{{ resendLabel }}</text></view>
-    </view>
+    <!-- 回执 NOT_FOUND（D6）：底注位只写原因，警示色加图标；重新提交在底部主按钮。 -->
+    <view v-else-if="view.resend" class="rank-salary__resend"><NxIcon name="hint-warn" :size="16" /><text>{{ resendNote }}</text></view>
   </view>
 </template>
 
@@ -30,8 +27,7 @@ import NxTag from "@/components/ui/nx-tag.vue";
 import NxHintTip from "@/components/ui/nx-hint-tip.vue";
 import type { SalaryCardView } from "@/lib/rank-salary-view";
 
-defineProps<{ title: string; view: SalaryCardView; resendNote: string; resendLabel: string; /** 状态变化时主体交叉淡入（10.1 领取），首屏不播 */ swap: boolean }>();
-defineEmits<{ (event: "resend"): void }>();
+defineProps<{ title: string; view: SalaryCardView; resendNote: string; /** 状态变化时主体交叉淡入（10.1 领取），首屏不播 */ swap: boolean }>();
 </script>
 
 <style scoped>
@@ -52,14 +48,9 @@ defineEmits<{ (event: "resend"): void }>();
 /* 提示图标贴在金额右侧，不把金额推离中线。不用 transform：它会成为气泡（position: fixed）的定位容器，把气泡挪走。 */
 .rank-salary__tip { position:absolute;left:100%;top:50%;margin:-10px 0 0 6px; }
 .rank-salary__note { display:block;margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--v5-ink) 8%,transparent);font:400 12px/18px var(--font-v5);color:var(--v5-ink-3);text-align:center;overflow-wrap:break-word; }
-/* 03 §3.6.1：文字在左、按钮在右；放不下时按钮整体换到下一行靠右。 */
-.rank-salary__resend { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0 12px;margin-top:10px;padding-top:2px;border-top:1px solid color-mix(in srgb,var(--v5-ink) 8%,transparent); }
-.rank-salary__resend-why { display:flex;align-items:center;gap:6px;flex:1 1 160px;min-width:0;padding:8px 0;color:var(--v5-warning-ink);font:400 12px/18px var(--font-v5);overflow-wrap:break-word; }
-.rank-salary__resend-why > :first-child { flex:none; }
-.rank-salary__resend-btn { display:flex;align-items:center;flex:none;min-height:44px;margin-left:auto;padding:0 2px;color:var(--v5-brand);font:500 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5);white-space:nowrap;cursor:pointer; }
-.rank-salary__resend-btn text { white-space:nowrap; }
-.rank-salary__resend-btn:active { opacity:.6; }
-.rank-salary__resend-btn:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px;border-radius:8px; }
+/* 异常提醒用警示色加图标（design-rules），排法同底注：居中、上方 1px 分隔。 */
+.rank-salary__resend { display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--v5-ink) 8%,transparent);color:var(--v5-warning-ink);font:400 12px/18px var(--font-v5);text-align:center;overflow-wrap:break-word; }
+.rank-salary__resend > :first-child { flex:none; }
 /* 10.1 领取：状态变化时新内容从下 8px 淡入 200ms（延迟 80），只动 transform、opacity。 */
 .rank-salary__body--swap { animation:rank-salary-in 200ms 80ms cubic-bezier(.2,.8,.2,1) backwards; }
 @keyframes rank-salary-in { from { opacity:0;transform:translateY(8px); } }

@@ -4693,7 +4693,7 @@ export const id: Messages = {
     todayTag: "Hari terakhir",
     expiredToast: "Batas klaim hadiah bulan {m} sudah lewat",
     resendNote: "Klaim sebelumnya tidak terkirim",
-    resendBtn: "Kirim ulang",
+    resendBtn: "Kirim ulang klaim",
     topRank: "Peringkat tertinggi",
     trayNow: "Klaim {b}",
     trayWait: "Mulai besok {a}",

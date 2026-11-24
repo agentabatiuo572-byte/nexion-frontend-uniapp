@@ -33,7 +33,7 @@ export type SalaryCardView = {
   amount: string; // 「50」「—」「••••」
   tip: SalaryTip | null;
   note: string; // 底注；空则不画
-  resend: boolean; // 底注位换成「上次领取未送达｜重新提交」
+  resend: boolean; // 底注位换成警示色原因「上次领取未送达」
   statusKey: string; // 状态变化时卡片主体交叉淡入（10.1 领取）
 };
 export type SalaryDock =
@@ -41,7 +41,7 @@ export type SalaryDock =
   | { kind: "tray"; copy: string; button: string }
   | { kind: "busy"; label: string }
   | { kind: "status"; label: string }
-  | { kind: "none" };
+  | { kind: "resend"; label: string };
 export type SalaryDialog = { title: string; body: string; primary: string; secondary: string };
 
 const DAY = 86400000;
@@ -151,13 +151,13 @@ export function salaryView(input: {
     card.statusKey = "confirming";
     dock = { kind: "status", label: copy.confirmingCap };
   } else if (phase === "resend") {
-    // 回执 NOT_FOUND：服务端没收到。原因和「重新提交」就地放在卡片底注位（03 §3.5.2 保留就地入口、§3.1 提交动作重试为文字按钮），
-    // 底部不再放领取，避免两个入口；重新提交沿用同一幂等键、同一月份和金额。
+    // 回执 NOT_FOUND：服务端没收到。卡片底注位只写原因；重新提交放在发出这次领取的底部主按钮（03 §3.5.2 就地入口、04.0），
+    // 沿用同一幂等键、同一月份和金额。
     card.tip = null;
     card.note = "";
     card.resend = true;
     card.statusKey = "resend";
-    dock = { kind: "none" };
+    dock = { kind: "resend", label: copy.resendBtn };
   }
   if (hidden) card.tip = null; // 隐藏统计时不出提示（画板 Ch）
   return { card, dock, promo };

@@ -4693,7 +4693,7 @@ export const kk: Messages = {
     todayTag: "Соңғы күн",
     expiredToast: "{m} айының төлемін алу мерзімі өтті",
     resendNote: "Алдыңғы сұрау жетпеді",
-    resendBtn: "Қайта жіберу",
+    resendBtn: "Сұрауды қайта жіберу",
     topRank: "Ең жоғары дәреже",
     trayNow: "Қазір {b} алу",
     trayWait: "Ертеңнен {a}",

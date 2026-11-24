@@ -4693,7 +4693,7 @@ export const ru: Messages = {
     todayTag: "Последний день",
     expiredToast: "Срок получения выплаты за {m} истёк",
     resendNote: "Прошлый запрос не дошёл",
-    resendBtn: "Отправить снова",
+    resendBtn: "Отправить запрос снова",
     topRank: "Высший ранг",
     trayNow: "Получить {b}",
     trayWait: "С завтрашнего дня {a}",

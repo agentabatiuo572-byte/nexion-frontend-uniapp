@@ -20,7 +20,7 @@
             <RankConditions v-if="prog.next" :key="String(auth.accountId)" class="rank-focus__conditions" :heading="fmt(t.myRank.needFor, { r: nextName })" :tag="gapTag" :tag-tone="reviewPending ? 'warning' : 'neutral'" :hint="countsHint" :rows="nextConditions" :prior="priorConditions" :prior-title="fmt(t.myRank.foldTitle, { n: visibility.mask(priorMissing) })" :hidden="visibility.hidden" :sweep="!motion.still.value" />
           </view>
           <!-- 月薪卡（DESIGN 第 6 节，画板 C、D）：salary 字段存在且 months 不为空时显示；salary 为 null（读取失败）时金额「—」（D9）；没有 salary 字段时按 CA 构图。 -->
-          <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :resend-label="t.myRank.resendBtn" :swap="salarySwap" @resend="resendSalaryClaim" />
+          <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :swap="salarySwap" />
           <view v-if="gains.length" class="rank-section">
             <view class="rank-section__head">
               <TeamRankEmblem v-if="!visibility.hidden" class="rank-section__badge" :rank="prog.next!.v" :size="28" />
@@ -70,6 +70,7 @@
       <!-- 领取（2.1）：悬浮按钮「领取 N USDT」；晋升当天为托盘；领取中为灰色禁用按钮；结果确认中为状态胶囊。 -->
       <view v-if="salaryDock?.kind === 'claim'" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="claimSalary">{{ salaryDock.label }}</NxButton></view>
       <view v-else-if="salaryDock?.kind === 'tray'" class="rank-dock nx-glass-bar"><text class="nx-tray-copy rank-dock__copy">{{ salaryDock.copy }}</text><view class="nx-tray-text rank-dock__text" role="button" tabindex="0" @click="salaryDialog = 'promo'" @keydown.enter.prevent="salaryDialog = 'promo'" @keydown.space.prevent="salaryDialog = 'promo'"><text>{{ salaryDock.button }}</text></view></view>
+      <view v-else-if="salaryDock?.kind === 'resend'" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="resendSalaryClaim">{{ salaryDock.label }}</NxButton></view>
       <view v-else-if="salaryDock?.kind === 'busy'" class="rank-dock nx-glass-bar"><NxButton variant="primary" disabled><view class="rank-dock__spin" aria-hidden="true" /><text>{{ salaryDock.label }}</text></NxButton></view>
       <view v-else-if="salaryDock?.kind === 'status'" class="rank-dock nx-glass-bar"><view class="nx-tray-status rank-dock__status" role="status"><view class="rank-dock__spin" aria-hidden="true" /><text>{{ salaryDock.label }}</text></view></view>
       <view v-else-if="!salaryDock && dockAction" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="go(dockAction.href)">{{ dockAction.label }}</NxButton></view>
@@ -256,7 +257,7 @@ const gainArrowInk = computed(() => prog.value.next ? rankTierVars(prog.value.ne
 //   null＝读取失败（salary null＋salaryUnavailable，D9：金额「—」，按 useAutoRecovery 自动重读，不提示）。
 // phase：领取过程（idle／claiming D5／confirming D6／resend D6 NOT_FOUND）。
 // submit(month, amountUsdt)：点「领取」或确认框主按钮后发 POST /api/team/rank/salary/claim（新幂等键，6.3）；
-// resend()：回执 NOT_FOUND 后用户点「重新提交」，同一幂等键、同一月份、原金额重发（6.4，按本次任务书改为用户发起）。
+// resend()：回执 NOT_FOUND 后用户点底部「重新提交领取」，同一幂等键、同一月份、原金额重发（6.4，用户发起）。
 // 请求或回执有结果后调 showSalaryResult（下方），由它切换卡片、底部、确认框和 toast；成功、已领、不可领后逻辑项重读 /api/team/rank。
 // 离开页面再回来、本地还留着未结的键时，逻辑项先把 phase 设为 confirming 再查回执。
 const salaryPending = reactive<{ salary: RankSalary | null | undefined; phase: SalaryClaimPhase; submit: (month: string, amountUsdt: string) => void; resend: () => void }>({
@@ -270,7 +271,7 @@ const salary = computed(() => salaryPending.salary === undefined
   ? { card: null, dock: null, promo: null }
   : salaryView({ salary: salaryPending.salary, phase: salaryPending.phase, hidden: visibility.hidden, locale: locale.code, copy: salaryCopy.value, mask: visibility.mask }));
 const salaryDock = computed(() => salary.value.dock);
-const hasDock = computed(() => salaryDock.value ? salaryDock.value.kind !== "none" : !!dockAction.value);
+const hasDock = computed(() => !!salaryDock.value || !!dockAction.value);
 // 卡片主体只在领取过程里交叉淡入（10.1 领取），首屏随页面入场。
 const salarySwap = ref(false);
 // 确认框：promo＝晋升当天（D4b，月末 D4d）；amount＝金额已变化（D10）。

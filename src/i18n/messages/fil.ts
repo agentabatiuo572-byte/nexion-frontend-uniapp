@@ -4693,7 +4693,7 @@ export const fil: Messages = {
     todayTag: "Huling araw",
     expiredToast: "Lampas na ang claim date ng reward para sa {m}",
     resendNote: "Hindi umabot ang huling claim",
-    resendBtn: "Ipadala muli",
+    resendBtn: "Ipadala muli ang claim",
     topRank: "Pinakamataas na rank",
     trayNow: "I-claim ang {b}",
     trayWait: "Simula bukas {a}",
