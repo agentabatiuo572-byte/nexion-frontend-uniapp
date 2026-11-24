@@ -88,9 +88,9 @@
             <CheckoutAmount class="bundle-bar__total" :value="promotionBundle.footer.total" currency="USD" />
             <text class="bundle-bar__meta"><template v-if="promotionBundle.footer.saved !== null">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(promotionBundle.footer.saved) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
           </view>
-          <NxButton class="bundle-bar__cta" variant="primary" :label="promotionBundle.footer.total !== null && !promotionBundle.footer.devices ? fmt(t.bundle.checkoutAria, { amount: moneyText(promotionBundle.footer.total) }) : promotionBundle.footer.continueLabel" :disabled="!promotionBundle.footer.canContinue" @click="promotionBundle.footer.continue"><text>{{ promotionBundle.footer.continueLabel }}</text><NxIcon v-if="promotionBundle.footer.canContinue" name="arrow-right" :size="20" /></NxButton>
+          <view class="bundle-bar__cta" role="button" :tabindex="promotionBundle.footer.canContinue ? 0 : -1" :aria-disabled="!promotionBundle.footer.canContinue" :aria-label="promotionBundle.footer.total !== null && !promotionBundle.footer.devices ? fmt(t.bundle.checkoutAria, { amount: moneyText(promotionBundle.footer.total) }) : promotionBundle.footer.continueLabel" @click="promotionBundle.footer.continue" @keydown="activate($event, promotionBundle.footer.continue)"><text>{{ promotionBundle.footer.continueLabel }}</text><NxIcon v-if="promotionBundle.footer.canContinue" name="arrow-right" :size="20" /></view>
         </template>
-        <NxButton v-else class="bundle-bar__cta" variant="primary" :label="t.promotion.signIn" @click="promotionBundle.footer.signIn"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></NxButton>
+        <view v-else class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
       </view>
       <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure" class="bundle-bar nx-glass-bar">
         <text v-if="bundleTrayNote" class="nx-tray-note" role="status">{{ bundleTrayNote }}</text>
@@ -98,7 +98,13 @@
           <CheckoutAmount class="bundle-bar__total" :value="total" currency="USD" />
           <text class="bundle-bar__meta"><template v-if="discountUSD > 0">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(discountUSD) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
         </view>
-        <NxButton class="bundle-bar__cta" variant="primary" :label="ctaLabel" :disabled="checkoutUnavailable" :busy="submitting || walletRefreshing" @click="onCheckout"><text>{{ t.bundle.checkout }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></NxButton>
+        <!-- A private view, as before: it only looks unavailable (aria-disabled, the tray's flat grey) and every tap still
+             reaches onCheckout, whose own guards decide (an unpaid original resumes before the eligibility gate). Busy
+             keeps the width and shows a spinner in place of the label (03 §3.1). -->
+        <view class="bundle-bar__cta" role="button" tabindex="0" :aria-disabled="checkoutUnavailable" :aria-busy="submitting || walletRefreshing" :aria-label="ctaLabel" @click.stop="onCheckout" @keydown="activate($event, onCheckout)">
+          <view class="bundle-bar__label" :class="{ 'bundle-bar__label--busy': submitting || walletRefreshing }"><text>{{ t.bundle.checkout }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></view>
+          <view v-if="submitting || walletRefreshing" class="bundle-bar__spinner" aria-hidden="true" />
+        </view>
       </view>
     </template>
   </AppChassis>
@@ -867,8 +873,18 @@ const catalogStateBodyStyle: CSSProperties = {
 .bundle-bar__total { display: block; color: var(--v5-ink); font: 500 20px/24px var(--font-amount); white-space: nowrap; }
 .bundle-bar__meta { display: block; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); white-space: nowrap; }
 .bundle-bar__saved { color: var(--v5-ink); font-weight: 500; font-variant-numeric: tabular-nums; }
-.bundle-bar__cta { flex: 0 0 auto; min-width: 150px; margin-left: auto; }
+/* Primary L 48 (03 §3.1): solid brand while available; the shared tray rules restyle it while aria-disabled (flat grey in
+   the tray, grey glass when it floats alone). */
+.bundle-bar__cta { position: relative; flex: 0 0 auto; min-width: 150px; margin-left: auto; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; min-height: 48px; padding: 0 20px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bundle-bar__cta :deep(uni-text), .bundle-bar__cta :deep(text) { white-space: nowrap; }
+.bundle-bar__cta:not([aria-disabled="true"]):active { transform: scale(.98); }
+.bundle-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .bundle-bar > .nx-tray-note + .bundle-bar__cta, .bundle-bar > .bundle-bar__cta:only-child { flex: 1 1 100%; }
+.bundle-bar__label { display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* Busy: the label stays laid out but transparent (width and name hold), a spinner takes its place. */
+.bundle-bar__label--busy { opacity: 0; }
+.bundle-bar__spinner { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: bundle-spin 800ms linear infinite; }
+@keyframes bundle-spin { to { transform: rotate(360deg); } }
 /* Room for the tray: a hidden copy of its rows (same widths: 12 sides, 8 padding and gap). The page already ends 64
    below the last row (pb-6 24 + chassis 40); the tray needs its height + 22 + 16, so the copy gives back 26. */
 .bundle-bar-space { visibility: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px -26px; padding: 8px; }
@@ -880,6 +896,7 @@ const catalogStateBodyStyle: CSSProperties = {
 .bundle-bar-space__note + .bundle-bar-space__cta { flex: 1 1 100%; }
 @keyframes bundle-bar-in { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .bundle-bar, .bundle-rise { animation: none; }
+  .bundle-bar, .bundle-rise, .bundle-bar__spinner { animation: none; }
+  .bundle-bar__cta:active { transform: none; }
 }
 </style>

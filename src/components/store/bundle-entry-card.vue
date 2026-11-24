@@ -107,8 +107,10 @@ function open() {
 .bundle-entry__eyebrow text { white-space: nowrap; }
 .bundle-entry__title { display: block; margin-top: 8px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .bundle-entry__desc { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; text-wrap: pretty; }
-.bundle-entry__viz { position: relative; height: 156px; margin: 12px 20px 0; }
-.bundle-entry--degraded .bundle-entry__viz { height: 100px; }
+/* The stage is at least the board's 156px and grows when two-line tier labels make the stairs taller, so the top rate
+   never crowds the title. */
+.bundle-entry__viz { position: relative; display: flex; justify-content: flex-end; align-items: flex-end; min-height: 156px; margin: 12px 20px 0; }
+.bundle-entry--degraded .bundle-entry__viz { min-height: 100px; }
 .bundle-entry__cluster { position: absolute; left: -8px; bottom: 0; width: 150px; height: 140px; }
 .bundle-entry--degraded .bundle-entry__cluster { left: 50%; margin-left: -75px; }
 /* Floor light under the machines (01 §1.1.2 page effect, device teal into sky); static, it carries no data. */
@@ -131,7 +133,7 @@ function open() {
 .bundle-entry__cluster--personal-2 .bundle-entry__ghost { left: calc(88px * var(--bundle-scale)); }
 .bundle-entry__ghost::before { content: ""; position: absolute; left: 12%; right: 12%; bottom: 14%; height: 26%; border: 1.5px dashed color-mix(in srgb, var(--v5-ink) 24%, transparent); border-radius: 50%; }
 .bundle-entry__ghost > * { position: relative; margin-top: 6%; }
-.bundle-entry__stairs { position: absolute; right: 0; bottom: 0; display: flex; align-items: flex-end; gap: 8px; }
+.bundle-entry__stairs { position: relative; display: flex; align-items: flex-end; gap: 8px; }
 .bundle-entry__step { width: 48px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 /* Each rate is a stat figure (10.1 卡内主数值, JetBrains Mono for a non-money metric); the top rate is the card's one
    key number: brand and one step larger (the large discount figure, 10.2 exception pending). */
