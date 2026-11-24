@@ -140,7 +140,7 @@
     <template #pageFixed>
       <!-- 领取（2.1）：悬浮按钮「领取 N USDT」；晋升当天为托盘；领取中为灰色禁用按钮；结果确认中为状态胶囊。 -->
       <view v-if="salaryDock?.kind === 'claim'" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="claimSalary">{{ salaryDock.label }}</NxButton></view>
-      <view v-else-if="salaryDock?.kind === 'tray'" class="rank-dock nx-glass-bar"><text class="nx-tray-copy rank-dock__copy">{{ salaryDock.copy }}</text><view class="nx-tray-text rank-dock__text" role="button" tabindex="0" @click="salaryDialog = 'promo'" @keydown.enter.prevent="salaryDialog = 'promo'" @keydown.space.prevent="salaryDialog = 'promo'"><text>{{ salaryDock.button }}</text></view></view>
+      <view v-else-if="salaryDock?.kind === 'tray'" class="rank-dock nx-glass-bar"><text class="nx-tray-copy rank-dock__copy">{{ salaryDock.copy }}</text><view class="nx-tray-text rank-dock__text" role="button" tabindex="0" @click="openSalaryPromo" @keydown.enter.prevent="openSalaryPromo" @keydown.space.prevent="openSalaryPromo"><text>{{ salaryDock.button }}</text></view></view>
       <view v-else-if="salaryDock?.kind === 'resend'" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="resendSalaryClaim">{{ salaryDock.label }}</NxButton></view>
       <view v-else-if="salaryDock?.kind === 'busy'" class="rank-dock nx-glass-bar"><NxButton variant="primary" disabled><view class="rank-dock__spin" aria-hidden="true" /><text>{{ salaryDock.label }}</text></NxButton></view>
       <view v-else-if="salaryDock?.kind === 'status'" class="rank-dock nx-glass-bar"><view class="nx-tray-status rank-dock__status" role="status"><view class="rank-dock__spin" aria-hidden="true" /><text>{{ salaryDock.label }}</text></view></view>
@@ -165,7 +165,7 @@ import { CHASSIS_QUERY_SCOPE, useLoopsInView } from "@/composables/use-loops-in-
 import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { compareSalaryAmounts, displayedSalaryMonth, lastClaimDay, salaryDates, salaryView, type SalaryClaimPhase } from "@/lib/rank-salary-view";
+import { compareSalaryAmounts, displayedSalaryMonth, lastClaimDay, salaryDates, salaryView } from "@/lib/rank-salary-view";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useRankFxMotion } from "@/composables/use-rank-fx-guard";
@@ -193,6 +193,8 @@ import { useAuth } from "@/store/auth";
 import { useTheme } from "@/store/theme";
 import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
+import type { RankSalary, RankSalaryAttempt, RankSalaryClaim } from "@/api/v-rank-api";
+import { useRankSalaryClaim } from "@/composables/use-rank-salary-claim";
 import { onShow } from "@dcloudio/uni-app";
 
 const t = useT();
@@ -327,84 +329,129 @@ function benefitRows(rank: VRankDef): Gain[] {
   return rows;
 }
 
-// ── 月薪卡与领取（DESIGN 2.1、第 6 节，画板 C、D 组）· 逻辑项接入点 ──────────────────────────────
-// phase：领取过程（idle／claiming D5／confirming D6／resend D6 NOT_FOUND）。
-// submit(month, amountUsdt)：点「领取」或确认框主按钮后发 POST /api/team/rank/salary/claim（新幂等键，6.3）；
-// resend()：回执 NOT_FOUND 后用户点底部「重新提交领取」，同一幂等键、同一月份、原金额重发（6.4，用户发起）。
-// 请求或回执有结果后调 showSalaryResult（下方），由它切换卡片、底部、确认框和 toast；成功、已领、不可领后逻辑项重读 /api/team/rank。
-// 离开页面再回来、本地还留着未结的键时，逻辑项先把 phase 设为 confirming 再查回执。
-const salaryPending = reactive<{ phase: SalaryClaimPhase; submit: (month: string, amountUsdt: string) => void; resend: () => void }>({
-  phase: "idle",
-  submit: () => {},
-  resend: () => {},
+// ── 月薪卡与领取（DESIGN 2.1、第 6 节，画板 C、D 组）──
+const salarySwap = ref(false);
+const salaryDialog = ref<"promo" | "amount" | null>(null);
+const promoSalary = ref<RankSalary | null>(null);
+const amountChange = ref<RankSalaryAttempt | null>(null);
+const reconfirm = ref<RankSalaryClaim | null>(null);
+const salaryAccount = () => auth.isAuthenticated && auth.accountId !== "default" ? auth.accountId : null;
+const salaryAmountText = (value: string) => visibility.mask(`${formatHowNumber(value, locale.code)}\u00A0USDT`);
+
+const { phase: salaryPhase, pending: salaryAttempt, submit: submitClaim, resend: resendClaim } = useRankSalaryClaim({
+  account: salaryAccount,
+  failed: () => toast.warn(t.value.myRank.toastFailTitle),
+  async settled(result, attempt, isVisible) {
+    const copy = t.value.myRank;
+    const dates = salaryDates(locale.code);
+    const { item } = attempt;
+    if (result.status === "SUCCEEDED") {
+      toast.success(fmt(copy.toastOkTitle, { a: salaryAmountText(result.amountUsdt) }), copy.toastOkDesc);
+      await vState.refreshCanonicalVRank();
+      return;
+    }
+    const code = result.status === "REJECTED" ? result.rejectionCode : "";
+    if (code === "COVERAGE_BELOW_REDLINE" || code === "COVERAGE_UNAVAILABLE") {
+      const deadline = lastClaimDay(item.expiresAt);
+      const today = vState.salary?.businessDate ?? attempt.businessDate;
+      const desc = today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
+      toast.warn(copy.toastFailTitle, desc);
+    } else if (code === "SALARY_ALREADY_CLAIMED" || code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_AMOUNT_CHANGED") {
+      await vState.refreshCanonicalVRank();
+      if (!isVisible()) return;
+      if (code === "SALARY_NOT_CLAIMABLE" && vState.salary && !vState.salary.months.some(month => month.month === item.month)) {
+        toast.warn(dates.sentence(fmt(copy.expiredToast, { m: dates.month(item.month) })));
+      }
+      if (result.status === "REJECTED" && code === "SALARY_AMOUNT_CHANGED" && result.amountUsdt !== undefined) {
+        reconfirm.value = { month: item.month, amountUsdt: result.amountUsdt };
+        openAmountChange();
+      }
+    } else {
+      toast.warn(copy.toastFailTitle);
+    }
+  },
 });
-const salaryCopy = computed(() => t.value.myRank as unknown as Record<string, string>);
-const salary = computed(() => vState.salary === undefined
-  ? { card: null, dock: null, promo: null }
-  : salaryView({ salary: vState.salary, phase: salaryPending.phase, hidden: visibility.hidden, locale: locale.code, copy: salaryCopy.value, mask: visibility.mask }));
+
+function openAmountChange() {
+  const change = reconfirm.value;
+  if (!change || !vState.salary) return;
+  const current = vState.salary.months.find(month => month.month === change.month);
+  reconfirm.value = null;
+  if (current?.status !== "CLAIMABLE") return;
+  // The rejected receipt carries an amount but no rank. Use the same month's
+  // fresh rank, and its amount if the qualification changed again since the receipt.
+  const amountUsdt = compareSalaryAmounts(current.amountUsdt, change.amountUsdt) === 0
+    ? change.amountUsdt : current.amountUsdt;
+  amountChange.value = { item: { ...current, amountUsdt }, businessDate: vState.salary.businessDate };
+  salaryDialog.value = "amount";
+}
+watch(() => vState.salary, openAmountChange);
+watch(salaryAccount, () => {
+  salaryDialog.value = null;
+  promoSalary.value = null;
+  amountChange.value = null;
+  reconfirm.value = null;
+});
+
+const salaryViewOptions = computed(() => ({
+  hidden: visibility.hidden,
+  locale: locale.code,
+  copy: t.value.myRank,
+  mask: visibility.mask,
+}));
+const salary = computed(() => salaryView({
+  ...salaryViewOptions.value,
+  salary: vState.salary,
+  phase: salaryPhase.value,
+  pending: salaryAttempt.value,
+}));
 const salaryDock = computed(() => salary.value.dock);
 const hasDock = computed(() => !!salaryDock.value || !!dockAction.value);
-// 卡片主体只在领取过程里交叉淡入（10.1 领取），首屏随页面入场。
-const salarySwap = ref(false);
-// 确认框：promo＝晋升当天（D4b，月末 D4d）；amount＝金额已变化（D10）。
-const salaryDialog = ref<"promo" | "amount" | null>(null);
-const amountChange = ref<{ month: string; amountUsdt: string; rankCode: string } | null>(null);
 const salaryDialogView = computed(() => {
-  const copy = t.value.myRank, d = salaryDates(locale.code), usdt = (value: string) => `${formatHowNumber(value, locale.code)}\u00A0USDT`;
-  const promo = salary.value.promo;
+  const copy = t.value.myRank, d = salaryDates(locale.code);
+  const promo = promoSalary.value && salaryView({ ...salaryViewOptions.value, salary: promoSalary.value, phase: "idle" }).promo;
   if (salaryDialog.value === "promo" && promo) return {
     title: d.sentence(fmt(copy.dlgTitle, { b: promo.now })),
     body: d.sentence(promo.end ? fmt(copy.dlgEndBody, { d: promo.date, a: promo.next, m: promo.month }) : fmt(copy.dlgBody, { a: promo.next })),
     primary: fmt(copy.dlgPrimary, { b: promo.now }),
     secondary: promo.end ? d.sentence(fmt(copy.dlgWaitDate, { d: promo.date })) : copy.dlgSecondary,
   };
-  const change = amountChange.value;
+  const change = amountChange.value?.item;
   if (salaryDialog.value === "amount" && change) return {
-    title: fmt(copy.amtTitle, { a: usdt(change.amountUsdt) }),
-    body: fmt(copy.amtBody, { r: change.rankCode }),
-    primary: fmt(copy.claimBtn, { a: usdt(change.amountUsdt) }),
+    title: fmt(copy.amtTitle, { a: salaryAmountText(change.amountUsdt) }),
+    body: fmt(copy.amtBody, { r: visibility.mask(change.rankCode) }),
+    primary: fmt(copy.claimBtn, { a: salaryAmountText(change.amountUsdt) }),
     secondary: copy.amtCancel,
   };
   return null;
 });
-function submitSalary(month: string, amountUsdt: string) {
+function submitSalary(attempt: RankSalaryAttempt) {
   salarySwap.value = true;
-  salaryPending.phase = "claiming";
-  salaryPending.submit(month, amountUsdt);
+  submitClaim(attempt);
 }
 function claimSalary() {
-  const dock = salaryDock.value;
-  if (dock?.kind === "claim") submitSalary(dock.month, dock.amountUsdt);
+  const source = vState.salary;
+  const item = displayedSalaryMonth(source);
+  if (salaryDock.value?.kind === "claim" && source && item) submitSalary({ item, businessDate: source.businessDate });
+}
+function openSalaryPromo() {
+  if (salaryDock.value?.kind !== "tray" || !vState.salary) return;
+  promoSalary.value = vState.salary;
+  salaryDialog.value = "promo";
 }
 function confirmSalaryDialog() {
-  const which = salaryDialog.value, item = displayedSalaryMonth(vState.salary), change = amountChange.value;
+  const which = salaryDialog.value, source = promoSalary.value, change = amountChange.value;
   salaryDialog.value = null;
-  if (which === "promo" && item) submitSalary(item.month, item.amountUsdt);
-  if (which === "amount" && change) submitSalary(change.month, change.amountUsdt);
+  if (which === "promo" && source) {
+    const item = displayedSalaryMonth(source);
+    if (item) submitSalary({ item, businessDate: source.businessDate });
+  }
+  if (which === "amount" && change) submitSalary(change);
 }
 function resendSalaryClaim() {
   salarySwap.value = true;
-  salaryPending.phase = "claiming";
-  salaryPending.resend();
+  resendClaim();
 }
-/** 领取结果（6.3、6.4）→ 界面。逻辑项在 POST 或回执有结果时调用。 */
-type SalaryResult =
-  | { kind: "ok"; amountUsdt: string } // 200／回执 SUCCEEDED：D7
-  | { kind: "amountChanged"; month: string; amountUsdt: string; rankCode: string } // 409 SALARY_AMOUNT_CHANGED：D10
-  | { kind: "coverage"; expiresAt: string; lastDay: boolean } // 422／503：D8，截止日是今天 D8b
-  | { kind: "alreadyClaimed" } // 409 SALARY_ALREADY_CLAIMED：不提示，重读后显示已领
-  | { kind: "notClaimable"; month: string; gone: boolean } // 409 SALARY_NOT_CLAIMABLE：该月已不在 months 里时 toast
-  | { kind: "unknown" } // 超时、断开、回执 PROCESSING 或回执读不到：D6 确认中，只读
-  | { kind: "notFound" }; // 回执 NOT_FOUND：D6 给「重新提交」
-function showSalaryResult(result: SalaryResult) {
-  const copy = t.value.myRank, d = salaryDates(locale.code), usdt = (value: string) => `${formatHowNumber(value, locale.code)}\u00A0USDT`;
-  salaryPending.phase = result.kind === "unknown" ? "confirming" : result.kind === "notFound" ? "resend" : "idle";
-  if (result.kind === "ok") toast.success(fmt(copy.toastOkTitle, { a: usdt(result.amountUsdt) }), copy.toastOkDesc);
-  if (result.kind === "amountChanged") { amountChange.value = result; salaryDialog.value = "amount"; }
-  if (result.kind === "coverage") toast.warn(copy.toastFailTitle, result.lastDay ? copy.toastFailToday : d.sentence(fmt(copy.toastFailDesc, { d: d.day(lastClaimDay(result.expiresAt)) })));
-  if (result.kind === "notClaimable" && result.gone) toast.warn(d.sentence(fmt(copy.expiredToast, { m: d.month(result.month) })));
-}
-void showSalaryResult; // 逻辑项接入前没有调用方
 // ── 底部操作栏（2.1 非领取状态）与「加快晋级」（2.4：同三个目的地，底部按钮已覆盖的不重复）──
 const missingKinds = computed(() => new Set(prog.value.missing.map(row => row.kind)));
 const dockAction = computed(() => {
@@ -585,7 +632,7 @@ async function contactSupport() {
   go(await advisorChatRoute(conversations));
 }
 useAutoRecovery({
-  failed: () => remoteApiEnabled && (!!vState.remoteError || vState.salary === null),
+  failed: () => remoteApiEnabled && salaryPhase.value === "idle" && (!!vState.remoteError || vState.salary === null),
   retry: () => vState.refreshCanonicalVRank(),
   repeatMs: 30_000,
 });

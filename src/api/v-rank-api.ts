@@ -93,6 +93,25 @@ export interface RankSalary {
   nextClaimableFrom: string | null;
 }
 
+export interface RankSalaryClaim {
+  month: string;
+  amountUsdt: string;
+}
+
+export type RankSalaryReceipt =
+  | { status: "NOT_FOUND" }
+  | { status: "PROCESSING" }
+  | { status: "SUCCEEDED"; month: string; rankCode: string; amountUsdt: string; claimNo: string }
+  | { status: "REJECTED"; month: string; rejectionCode: string; amountUsdt?: string };
+
+const SALARY_CLAIM_REJECTIONS = [
+  { status: 409, code: 409, message: "SALARY_AMOUNT_CHANGED" },
+  { status: 409, code: 409, message: "SALARY_ALREADY_CLAIMED" },
+  { status: 422, code: 422, message: "COVERAGE_BELOW_REDLINE" },
+  { status: 503, code: 503, message: "COVERAGE_UNAVAILABLE" },
+  { status: 503, code: 503, message: "SALARY_CREDIT_UNAVAILABLE" },
+] as const;
+
 export interface CanonicalVRankState {
   source: string;
   serverCanonical: true;
@@ -111,6 +130,8 @@ export interface CanonicalVRankState {
 export interface VRankApi {
   ladder(): Promise<CanonicalVRankLadder>;
   current(): Promise<CanonicalVRankState>;
+  claimSalary(key: string, claim: RankSalaryClaim): Promise<RankSalaryReceipt>;
+  salaryReceipt(key: string, month: string): Promise<RankSalaryReceipt>;
 }
 
 function invalid(): never {
@@ -186,25 +207,62 @@ function salaryEntry(source: Record<string, unknown>): RankSalaryAmount {
   return { month, rankCode, amountUsdt: salaryAmount(source.amountUsdt), claimableFrom: salaryInstant(source.claimableFrom) };
 }
 
-function readSalary(value: unknown): RankSalary {
-  const source = record(value);
-  const { businessDate } = source;
-  if (typeof businessDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate) || !Array.isArray(source.months)) return invalid();
+function salaryBusinessDate(businessDate: unknown): string {
+  if (typeof businessDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) return invalid();
   const day = new Date(businessDate + "T00:00:00Z");
   if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== businessDate) return invalid();
-  const months = source.months.map((value): RankSalaryMonth => {
-    const row = record(value);
-    const { status } = row;
-    if (status !== "PENDING" && status !== "CLAIMABLE" && status !== "CLAIMED") return invalid();
-    const claimNo = row.claimNo == null && status !== "CLAIMED" ? row.claimNo : text(row.claimNo);
-    const claimedAt = row.claimedAt == null && status !== "CLAIMED" ? row.claimedAt : salaryInstant(row.claimedAt);
-    return { ...salaryEntry(row), status, expiresAt: salaryInstant(row.expiresAt), claimNo, claimedAt };
-  });
+  return businessDate;
+}
+
+function salaryMonth(value: unknown): RankSalaryMonth {
+  const row = record(value);
+  const { status } = row;
+  if (status !== "PENDING" && status !== "CLAIMABLE" && status !== "CLAIMED") return invalid();
+  const claimNo = row.claimNo == null && status !== "CLAIMED" ? row.claimNo : text(row.claimNo);
+  const claimedAt = row.claimedAt == null && status !== "CLAIMED" ? row.claimedAt : salaryInstant(row.claimedAt);
+  return { ...salaryEntry(row), status, expiresAt: salaryInstant(row.expiresAt), claimNo, claimedAt };
+}
+
+export interface RankSalaryAttempt {
+  item: RankSalaryMonth;
+  businessDate: string;
+}
+
+export function readRankSalaryAttempt(value: unknown): RankSalaryAttempt {
+  const source = record(value);
+  const item = salaryMonth(source.item);
+  if (item.status !== "CLAIMABLE") return invalid();
+  return { item, businessDate: salaryBusinessDate(source.businessDate) };
+}
+
+function readSalary(value: unknown): RankSalary {
+  const source = record(value);
+  if (!Array.isArray(source.months)) return invalid();
   return {
-    businessDate, months,
+    businessDate: salaryBusinessDate(source.businessDate),
+    months: source.months.map(salaryMonth),
     upcoming: source.upcoming === null ? null : salaryEntry(record(source.upcoming)),
     nextClaimableFrom: source.nextClaimableFrom === null ? null : salaryInstant(source.nextClaimableFrom),
   };
+}
+
+function readSalaryReceipt(value: unknown, month: string, httpStatus: number): RankSalaryReceipt {
+  const row = record(value);
+  const { status } = row;
+  if (httpStatus === 200 && (status === "PROCESSING" || status === "NOT_FOUND")) return { status };
+  if (row.month !== month) return invalid();
+  if (httpStatus === 200 && status === "SUCCEEDED"
+    && typeof row.rankCode === "string" && /^V[2-8]$/.test(row.rankCode)) {
+    return { status, month, rankCode: row.rankCode, amountUsdt: salaryAmount(row.amountUsdt), claimNo: text(row.claimNo) };
+  }
+  if (status === "REJECTED") {
+    const rejectionCode = text(row.rejectionCode);
+    if (httpStatus !== 200 && !SALARY_CLAIM_REJECTIONS.some(entry =>
+      entry.status === httpStatus && entry.message === rejectionCode && entry.code === row.httpStatus)) return invalid();
+    const amountUsdt = rejectionCode === "SALARY_AMOUNT_CHANGED" ? salaryAmount(row.amountUsdt) : undefined;
+    return { status, month, rejectionCode, amountUsdt };
+  }
+  return invalid();
 }
 
 function reward(value: unknown): CanonicalVRankReward {
@@ -325,6 +383,23 @@ export function createVRankApi(client: ApiClient, mode: ApiEnvironment = "prod")
         method: "GET",
         path: "/api/team/rank",
       }), mode);
+    },
+    claimSalary(key, claim) {
+      return client.request<RankSalaryReceipt>({
+        method: "POST",
+        path: "/api/team/rank/salary/claim",
+        idempotencyKey: key,
+        body: claim,
+        acceptedResponses: SALARY_CLAIM_REJECTIONS,
+        parseResponseData: (value, status) => readSalaryReceipt(value, claim.month, status),
+      });
+    },
+    salaryReceipt(key, month) {
+      return client.request<RankSalaryReceipt>({
+        method: "GET",
+        path: `/api/team/rank/salary/claims/${encodeURIComponent(key)}`,
+        parseResponseData: (value, status) => readSalaryReceipt(value, month, status),
+      });
     },
   };
 }

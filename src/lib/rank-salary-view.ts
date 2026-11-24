@@ -1,10 +1,9 @@
 // 我的等级 · 月薪卡与领取的界面状态（team-rank DESIGN 2.1、2.6、第 6 节，画板 C、D 组）。
 // 只做显示映射：服务端 salary（6.1）＋领取过程的阶段 → 卡片、底部和确认框要显示什么。
-// 领取请求、幂等键、回执查询由逻辑项接（rank.vue 的 salaryPending），这里不发请求。
 import { fmt } from "@/i18n/format";
 import { uiLocale } from "@/i18n";
 import { formatHowNumber } from "@/lib/rank-how-content";
-import type { RankSalary } from "@/api/v-rank-api";
+import type { RankSalary, RankSalaryAttempt, RankSalaryMonth } from "@/api/v-rank-api";
 import { businessDayKey } from "@/lib/business-calendar";
 
 export type { RankSalary, RankSalaryMonth } from "@/api/v-rank-api";
@@ -72,30 +71,39 @@ export function salaryDates(localeCode: string) {
 /** 窗口结束（不含）的前一天，即最后可领的那天。 */
 export const lastClaimDay = (expiresAt: string) => shiftDate(salaryDay(expiresAt), -1);
 
+const STATUS_ORDER = { CLAIMABLE: 0, PENDING: 1, CLAIMED: 2 };
 export function displayedSalaryMonth(salary: RankSalary | null | undefined) {
-  return salary?.months.reduce<RankSalary["months"][number] | undefined>((first, month) => {
+  if (!salary) return undefined;
+  return salary.months.reduce<RankSalaryMonth | undefined>((first, month) => {
+    if (salary.businessDate >= salaryDay(month.expiresAt)
+      || (month.status === "CLAIMABLE" && salary.businessDate < salaryDay(month.claimableFrom))) return first;
     if (!first) return month;
-    if (first.status === "CLAIMED" && month.status !== "CLAIMED") return month;
-    if (month.status === "CLAIMED" && first.status !== "CLAIMED") return first;
-    return Date.parse(month.expiresAt) < Date.parse(first.expiresAt) ? month : first;
+    const order = STATUS_ORDER[month.status] - STATUS_ORDER[first.status]
+      || Date.parse(month.expiresAt) - Date.parse(first.expiresAt)
+      || month.month.localeCompare(first.month);
+    return order < 0 ? month : first;
   }, undefined);
 }
 
 /** 卡片优先显示未领且最先到期的月份；另一项只给 D4e 的底注用。 */
 export function salaryView(input: {
-  salary: RankSalary | null; // null：读取失败（D9）
+  salary: RankSalary | null | undefined; // null：读取失败（D9）
+  pending?: RankSalaryAttempt | null;
   phase: SalaryClaimPhase;
   hidden: boolean;
   locale: string;
   copy: Copy;
   mask: (value: string) => string;
 }): { card: SalaryCardView | null; dock: SalaryDock | null; promo: { end: boolean; month: string; date: string; now: string; next: string; rank: string } | null } {
-  const { salary, phase, hidden, copy } = input;
+  const { pending, phase, hidden, copy } = input;
+  // Keep D5/D6 tied to the requested month during readback, even across a new business day.
+  const salary = pending ? { businessDate: pending.businessDate, months: [pending.item], upcoming: null, nextClaimableFrom: null } : input.salary;
   const d = salaryDates(input.locale);
   const num = (value: string) => formatHowNumber(value, input.locale);
   const usdt = (value: string) => hidden ? "••••" : `${num(value)}\u00A0USDT`;
   const say = (template: string, params: Record<string, string | number>) => d.sentence(fmt(template, params));
   if (salary === null) return { card: { tag: null, caption: "", amount: hidden ? "••••" : "—", tip: null, note: "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
+  if (!salary) return { card: null, dock: null, promo: null };
   const item = displayedSalaryMonth(salary);
   if (!item) return { card: null, dock: null, promo: null };
   const other = salary.months.find(month => month.month !== item.month && month.status !== "CLAIMED");
@@ -135,6 +143,7 @@ export function salaryView(input: {
     } else if (up) {
       const opensOn = salaryDay(up.claimableFrom);
       const end = opensOn.slice(0, 7) !== item.month; // 月末最后一天晋升：下月 1 日（D4c）
+      if (end) card.note = say(copy.claimBy, { d: d.day(lastClaimDay(up.claimableFrom)) });
       card.tag = { label: copy.claimable, tone: "brand" };
       card.tip = { tone: "warning", lines: splitSentences(end
         ? say(copy.promoEndNote, { d: d.day(opensOn), r: input.mask(up.rankCode), m: d.month(item.month), a: usdt(up.amountUsdt), b: usdt(item.amountUsdt) })
