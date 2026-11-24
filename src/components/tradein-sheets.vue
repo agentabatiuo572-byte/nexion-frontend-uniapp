@@ -164,7 +164,7 @@
       <template v-else-if="state.kind === 'tradein' && remoteApiEnabled && purchaseMessage === 'error'">
         <view class="tis-hd"><text :id="titleId" class="tis-title">{{ t.tradein.retireTitle }}</text></view>
         <view class="tis-bd">
-          <view class="tis-status-row">
+          <view class="tis-status-row tis-status-row--retry">
             <view class="tis-status" :class="`tis-status--${(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn')}`" role="status" :aria-busy="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'loading'">
             <svg v-if="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'loading'" class="tis-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".2" /><path d="M21 12a9 9 0 0 0-9-9" /></svg>
             <svg v-else-if="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'warn'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
@@ -204,7 +204,7 @@
               <NxHintBubble v-model:open="basisTipOpen" :text="t.tradein.basisTip" />
             </view>
           </template>
-          <PurchaseEligibilityPanel v-if="remoteApiEnabled && purchaseBlocked" class="tis-purchase" :status="purchaseStatus" :snapshot="purchaseSnapshot" blocking-only />
+          <PurchaseEligibilityPanel v-if="remoteApiEnabled && purchaseBlocked" :id="purchasePanelId" class="tis-purchase" :status="purchaseStatus" :snapshot="purchaseSnapshot" blocking-only />
         </view>
         <view class="tis-ft">
           <view v-if="purchaseConfirmed && (tradeinView.taskVoid || tradeinView.fundsGap)" class="tis-hints">
@@ -217,7 +217,9 @@
               <text class="tis-hint__text"><text v-for="(part, index) in tradeinView.fundsGap" :key="index" :class="{ 'tis-num': part.value }">{{ part.text }}</text></text>
             </view>
           </view>
-          <NxButton variant="primary" :label="confirmActionText" :disabled="purchaseActionDisabled" :busy="purchaseActionBusy" @click="onConfirmTradein" />
+          <!-- Quota used up: the reason is the eligibility panel above, so the disabled button is described by it. -->
+          <NxButton variant="primary" :label="confirmActionText" :disabled="purchaseActionDisabled" :busy="purchaseActionBusy"
+            :aria-describedby="remoteApiEnabled && purchaseMessage === 'quotaDepleted' ? purchasePanelId : undefined" @click="onConfirmTradein" />
           <NxButton class="tis-quiet" variant="text" :label="t.tradein.sheetCancel" @click="hide" />
         </view>
       </template>
@@ -386,7 +388,7 @@ import { asApiError, isApiRefusal } from "@/api/errors";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { releaseAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
-import { readCheckoutTradein } from "@/lib/checkout-order-recovery";
+import { readCheckoutTradein, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
 import { CAPACITY_RECOVERY_TABLE, capacityIntent, capacityPaymentKind, readCapacityPending, type CapacityPending } from '@/lib/capacity-command-recovery';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { CAPACITY_COMMAND_TABLE, type PendingKeepCommand } from "@/lib/keep-command-recovery";
@@ -398,6 +400,7 @@ const props = withDefaults(defineProps<{ active?: boolean; checkoutCapacityTarge
 const emit = defineEmits<{ (event: "checkout-capacity-cleared", target: string): void }>();
 // Each step renders exactly one .tis-title; the dialog takes its accessible name from whichever one is on screen.
 const titleId = `tis-title-${getCurrentInstance()?.uid}`;
+const purchasePanelId = `tis-purchase-${getCurrentInstance()?.uid}`;
 const sheet = useTradeinSheet();
 const app = useApp();
 const pending = usePendingCheckout();
@@ -543,6 +546,8 @@ let purchaseOpeningRead: {
 const purchaseStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 const purchaseReadFailed = ref(false);
 const purchaseRecovery = ref<"none" | "pending" | "error">("none");
+// The original record that last made purchaseRecovery "pending"; the recovery confirm shows its devices and amount.
+const purchaseRecoveryRecord = ref<CheckoutTradeinRecovery | null>(null);
 let purchaseReadGeneration = 0;
 let purchaseSheetEpoch = 0;
 let purchaseMounted = true;
@@ -583,9 +588,11 @@ const purchaseActionText = computed(() => purchaseRecovery.value === "pending" ?
 function readTradeinRecovery(): "none" | "pending" | "error" {
   const current = state.value;
   purchaseRecovery.value = "none";
+  purchaseRecoveryRecord.value = null;
   if (!remoteApiEnabled || current.kind !== "tradein" || !props.active) return "none";
   try {
-    purchaseRecovery.value = readCheckoutTradein(app.accountKey, current.newKind) ? "pending" : "none";
+    purchaseRecoveryRecord.value = readCheckoutTradein(app.accountKey, current.newKind);
+    purchaseRecovery.value = purchaseRecoveryRecord.value ? "pending" : "none";
   } catch {
     purchaseRecovery.value = "error";
   }
@@ -1059,8 +1066,9 @@ watch([remoteRetireLoadKey, state], () => {
 }, { immediate: true, flush: "sync" });
 
 // Display parts of an amount: the main-amount figure keeps its whole part in the main ink, the decimals muted (01 §1.2).
-function amountParts(value: number): { int: string; dec: string } {
-  const [int, dec] = formatGroupedAmount(value).split(".");
+// precision 6 keeps an original record's full amount (at least two decimals) instead of rounding it to cents (03 §3.6).
+function amountParts(value: number, precision: 2 | 6 = 2): { int: string; dec: string } {
+  const [int, dec] = formatGroupedAmount(value, precision).split(".");
   return { int, dec: dec === undefined ? "" : `.${dec}` };
 }
 // A translated sentence split around its placeholders, so the filled-in figures can take their own weight in any word order.
@@ -1957,25 +1965,26 @@ const recoveryNoticeOpen = computed(() => props.active && state.value.kind === "
 const sheetVisible = computed(() => props.active && state.value.kind !== "none"
   && state.value.kind !== "keep-recovery" && !recoveryNoticeOpen.value
   && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none"));
-// The confirm shows the original command's devices and the amount it still owes, read from the same saved record the
-// pending state came from; an unreadable record shows 「—」.
+// The confirm shows the original command's devices and the amount it still owes, all from the record readTradeinRecovery
+// found (it is looked up by account and target, so it may name another old device than the one picked now). A source
+// device that is gone shows the quote's name; no record shows 「—」.
 const recoveryNotice = computed(() => {
   const s = state.value;
   if (!recoveryNoticeOpen.value || s.kind !== "tradein") return null;
-  let quote: CanonicalTradeinQuote | null = null;
-  try { quote = readCheckoutTradein(app.accountKey, s.newKind)?.tradeinQuote ?? null; } catch { quote = null; }
-  const oldDevice = app.devices.find((d) => d.id === s.oldDeviceId);
-  const oldName = oldDevice ? kindLabel(oldDevice.kind) : quote?.sourceProductName ?? "—";
-  const newName = kindLabel(s.newKind);
-  return { oldDevice, oldName, newKind: s.newKind, newName, newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
-    pairLabel: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }), due: quote ? amountParts(quote.payableUsdt) : null };
+  const quote = purchaseRecoveryRecord.value?.tradeinQuote ?? null;
+  const oldDevice = quote ? app.devices.find((d) => Number(d.id) === quote.sourceDeviceId) : undefined;
+  const oldName = oldDevice ? kindLabel(oldDevice.kind) : quote?.sourceProductName || "—";
+  const newKind = (quote?.targetProductNo ?? s.newKind) as DeviceKind;
+  const newName = kindLabel(newKind);
+  return { oldDevice, oldName, newKind, newName, newImageUrl: getProduct(newKind)?.imageUrl ?? null,
+    pairLabel: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }), due: quote ? amountParts(quote.payableUsdt, 6) : null };
 });
 // The capacity resume confirm (board B-6c): the machine and the amount still due, from the saved original command.
 const capacityNotice = computed(() => {
   const original = capacityOriginal.value;
   if (!original) return null;
   return { target: original.target, name: original.productName, imageUrl: getProduct(original.target)?.imageUrl ?? null,
-    due: amountParts(original.payableUsdt) };
+    due: amountParts(original.payableUsdt, 6) };
 });
 // The basis hint bubble (03 §3.5.1). While it is open, Esc and back close the bubble first and leave the sheet up.
 const basisTipOpen = ref(false);
@@ -2068,6 +2077,9 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 /* Status beside its retry: when the text would be squeezed past two lines the retry drops to the next line, right-aligned (03 §3.6.1). */
 .tis-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--v5-space-1) var(--v5-space-2); }
 .tis-status-row > .tis-status { flex: 1 1 calc(var(--ui-type-description) * 16); }
+/* Eligibility read failed (board B-4b): the row is as tall as the retry's 44px target, which sets its space to the title and to 取消. */
+.tis-status-row--retry { min-height: 44px; }
+.tis-status-row--retry > .nx-card-recovery-action { align-self: center; }
 /* Retire: the source device and what to pick for it. */
 .tis-lead { display: flex; flex-direction: column; gap: calc(var(--v5-space-1) * 1.5); margin-top: -10px; }
 .tis-source { display: flex; align-items: center; gap: var(--v5-space-2); }

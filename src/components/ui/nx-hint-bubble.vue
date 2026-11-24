@@ -101,8 +101,9 @@ onBeforeUnmount(() => { if (typeof document !== 'undefined') listen(false); });
 .nx-hint__trigger::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: calc(50% - 22px); right: calc(50% - 22px); }
 .nx-hint__trigger:active { opacity: .6; }
 .nx-hint__trigger:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 4px; border-radius: 50%; }
-/* The toast's face (03 §3.5.1): dark translucent in both themes, light text, blur, the shared top highlight. */
-.nx-hint__bubble { position: absolute; z-index: 3; bottom: calc(100% + 10px); box-sizing: border-box; width: max-content; max-width: min(280px, calc(100vw - 32px));
+/* The toast's face (03 §3.5.1): dark translucent in both themes, light text, blur, the shared top highlight. It sits 16px
+   above the icon, so the 6px arrow's tip stays about 10px clear of the line it explains. */
+.nx-hint__bubble { position: absolute; z-index: 3; bottom: calc(100% + 16px); box-sizing: border-box; width: max-content; max-width: min(280px, calc(100vw - 32px));
   display: flex; flex-direction: column; gap: var(--v5-space-1); padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m);
   background: var(--v5-toast-bg); box-shadow: var(--v5-toast-shadow); -webkit-backdrop-filter: blur(12px) saturate(125%); backdrop-filter: blur(12px) saturate(125%);
   opacity: 0; pointer-events: none; }
@@ -110,6 +111,12 @@ onBeforeUnmount(() => { if (typeof document !== 'undefined') listen(false); });
 .nx-hint__line { display: block; font: 400 13px/18px var(--font-v5); color: var(--v5-toast-ink); white-space: normal; overflow-wrap: break-word; }
 .nx-hint__arrow { position: absolute; top: 100%; width: 12px; height: 6px; margin-left: -6px; background: var(--v5-toast-bg); clip-path: polygon(0 0, 100% 0, 50% 100%); }
 @media (prefers-reduced-motion: reduce) { .nx-hint__bubble--placed { transition: none; } }
+/* Reduced transparency or more contrast: the shared surfaces' fallback (glass-surfaces.css), an opaque face and no blur.
+   The theme's toast colour is laid over black, so the face stays the toast's dark in both themes. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .nx-hint__bubble, .nx-hint__arrow { background: linear-gradient(var(--v5-toast-bg), var(--v5-toast-bg)), #000; }
+  .nx-hint__bubble { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 @media (forced-colors: active) {
   .nx-hint__bubble { border: 1px solid CanvasText; background: Canvas; forced-color-adjust: auto; }
   .nx-hint__line { color: CanvasText; }
