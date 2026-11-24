@@ -216,7 +216,11 @@ async function loadRemotePreview() {
     if (cause instanceof ApiError && ["REFERRAL_PREVIEW_INVALID", "REFERRAL_PREVIEW_NOT_FOUND"].includes(cause.message)) requestedCode.value = null;
   }
 }
-useAutoRecovery({ failed: () => remoteApiEnabled && !!requestedCode.value && remotePreviewState.value === "unavailable", retry: loadRemotePreview });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!requestedCode.value && remotePreviewState.value === "unavailable",
+  retry: loadRemotePreview,
+  repeatMs: 30_000,
+});
 function cleanupReferralLoad() {
   referralMounted = false;
   referralLoadVersion += 1;

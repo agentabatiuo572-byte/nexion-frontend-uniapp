@@ -977,7 +977,7 @@ async function finish() {
         if (posted && giftPosted) {
           toast.success(
             `+$${formatAmount(gift.usdt)} + ${formatAmount(gift.nex)} UVT`,
-            sponsorPreview.value
+            sponsorPreview.value?.kind === "USER"
               ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: displayNickname(sponsorPreview.value.displayName) })
               : t.value.register.giftCreditedToastSub,
           );

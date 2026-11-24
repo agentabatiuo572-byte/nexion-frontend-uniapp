@@ -120,6 +120,7 @@ import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
+import { useAuth } from "@/store/auth";
 import { useConfig } from "@/store/config";
 import { useMarket } from "@/store/market";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
@@ -130,6 +131,7 @@ import { serverLanguage } from "@/i18n";
 
 const t = useT();
 const w = computed(() => t.value.nexHowItWorks);
+const auth = useAuth();
 const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => serverLanguage(locale.code));
 const { sections, status, hasSnapshot, refresh } = usePublishedTrust();
@@ -154,6 +156,7 @@ async function loadNarrative(force = false): Promise<boolean> {
     && request === narrativeReadRequest
     && loaded
     && narrative.value.state === "ready"
+    && auth.isAuthenticated
   ) recordPublishedTrustViews(["nexNarrative"], language.value);
   return loaded;
 }
