@@ -10,8 +10,8 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved || pendingCreateTerms) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || pendingCreateTerms }">
-        <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="pendingCreateTitle" :description="pendingCreateDescription" />
+      <view v-if="(originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateUnresolved || pendingCreateTerms) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || pendingCreateTerms }">
+        <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalCheckoutClosedTitle || pendingCreateTitle" :description="originalCheckoutClosed ? undefined : pendingCreateDescription" />
         <view v-if="pendingCreateTerms" class="checkout-group checkout-fees">
           <CheckoutRow :label="t.store.coRowTotal" :value="reviewMoney(pendingCreateTerms.amount, false, true)" class="checkout-fee" />
           <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" :code="pendingCreateTerms.productCode" class="checkout-fee" />
@@ -273,7 +273,7 @@
       </view>
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
-      <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <text v-if="checkoutTrayBlock" class="nx-tray-note w-full" role="status">{{ checkoutTrayBlock }}</text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
@@ -430,7 +430,15 @@ let checkoutBackApproved = false;
 type CheckoutLeaveIntent = 'resume-cancel' | 'cancel' | 'confirmed-leave';
 let checkoutLeaveRetry: CheckoutLeaveIntent = 'cancel';
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
-const originalOrderReadUnavailable = ref(false);
+const originalCheckoutClosed = ref<'expired' | 'cancelled' | 'missing' | null>(null);
+const originalCheckoutClosedTitle = computed(() => {
+  switch (originalCheckoutClosed.value) {
+    case 'expired': return t.value.orders.statusExpired;
+    case 'cancelled': return t.value.orders.cancelStatus;
+    case 'missing': return t.value.orders.notFound;
+    default: return '';
+  }
+});
 const failedKnownOrderNo = ref<string | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
@@ -1372,7 +1380,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   pendingCheckoutCreate.value = null;
   pendingCreatePointer.value = null;
   foregroundTradeinSignature = null;
-  originalOrderReadUnavailable.value = false;
+  originalCheckoutClosed.value = null;
   failedKnownOrderNo.value = null;
   confirmedMissingCreateKey.value = null;
   pendingCreateFound.value = false;
@@ -1736,7 +1744,7 @@ const stepLabels = computed(() => [
 ]);
 const stepDisplay = computed(() => ['confirmed','activating','live'].includes(step.value) ? 2 : ['pay-instructions','awaiting'].includes(step.value) ? 1 : 0);
 async function submitReview() {
-  if (dialogsOpen > 0 || reAddingTradein.value || originalExternalPaying.value || checkoutTrayBlock.value || pendingCreateUnresolved.value
+  if (dialogsOpen > 0 || reAddingTradein.value || originalCheckoutClosed.value || originalExternalPaying.value || checkoutTrayBlock.value || pendingCreateUnresolved.value
       || checkoutPurchaseChecking.value || originalOrderNavigationFailed.value) return;
   if (cancelBlockedPayment.value && cancelBlockedPayment.value.orderNo === createdCheckoutOrder.value?.orderNo) {
     await resumeBlockedPayment();
@@ -2192,7 +2200,7 @@ const originalExternalPaying = computed(() => {
 function originalCheckoutAwaitingPayment(): boolean {
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value || created.paymentStatus !== 'PENDING'
-      || pendingCheckoutCreate.value || originalOrderReadUnavailable.value || originalExternalPaying.value) return false;
+      || pendingCheckoutCreate.value || originalCheckoutClosed.value || originalExternalPaying.value) return false;
   if (cancelBlockedPayment.value?.orderNo === created.orderNo) return false;
   const original = orders.getById(created.orderNo);
   if (original && original.status !== 'placed') return false;
@@ -2265,7 +2273,7 @@ function requestCheckoutBack() {
   if (promotionRoute.value) { promotionCheckout.value?.back(); return; }
   if (checkoutLeaving.value || paymentFlowBusy.value || confirming) return;
   const created = createdCheckoutOrder.value;
-  if (created) {
+  if (created && !originalCheckoutClosed.value) {
     try {
       if (readOrderAction(app.accountKey, created.orderNo)?.kind === 'cancel') {
         void cancelCheckout('resume-cancel');
@@ -2830,7 +2838,7 @@ async function submitRemoteOrder(): Promise<void> {
   const walletReceiptScope = app.captureRemoteAccountRequest();
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
-  if (!p || checkoutOutOfStock.value || originalCheckoutOutOfStock.value || (!hasOriginalCheckout.value && purchaseUnavailable.value)) {
+  if (!p || originalCheckoutClosed.value || checkoutOutOfStock.value || originalCheckoutOutOfStock.value || (!hasOriginalCheckout.value && purchaseUnavailable.value)) {
     confirming = false;
     return;
   }
@@ -2944,7 +2952,7 @@ async function submitRemoteOrder(): Promise<void> {
       return;
     }
     canonicalOrderCommitted = true;
-    const paymentCurrent = () => scopeIsCurrent()&&createdCheckoutOrder.value?.orderNo===created.orderNo
+    const paymentCurrent = () => scopeIsCurrent()&&!originalCheckoutClosed.value&&createdCheckoutOrder.value?.orderNo===created.orderNo
       &&createdCheckoutOrder.value.amountUsdt===created.amountUsdt&&reviewedTotal===netPrice.value
       &&(persisted.expiresAt===null || nowTick.value<persisted.expiresAt);
     if (originalCheckoutOutOfStock.value) return;
@@ -3197,7 +3205,8 @@ async function refreshKnownCheckoutOrder(scope: CheckoutRouteScope, orderNo: str
   }
   if (!current()) return;
   failedKnownOrderNo.value = null;
-  originalOrderReadUnavailable.value = !order;
+  originalCheckoutClosed.value = !order ? 'missing'
+    : order.status === 'expired' || order.status === 'cancelled' ? order.status : null;
   if (order && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status)) {
     orderId.value = orderNo;
     presentSettledPurchase(false);

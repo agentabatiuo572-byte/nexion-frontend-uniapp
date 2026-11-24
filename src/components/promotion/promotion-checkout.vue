@@ -43,7 +43,7 @@
         </view>
         <view class="checkout-order-no"><text class="checkout-order-no__label">{{ p.orderNo }}</text><NxCodeValue class="checkout-order-no__code" :value="order.orderNo" :label="p.orderNo" :copyable="false" /></view>
       </view>
-      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
+      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="props.orderNo ? recover() : loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
       <!-- Two or more models: one card, 已选 N 款 with the tier tag, and a two-column grid of model tiles (board CkNew):
            device art, name, line price, then 数量 with the stepper, or 数量 N once the order exists. One model keeps the row below. -->
       <view v-if="items.length>1" class="checkout-bundle" role="group" :aria-label="fmt(flowCopy.bundleSelected,{n:items.length})">
@@ -209,6 +209,7 @@ import { confirmOrderTopupPayment, hasUsdt, orderTopupHref, orderTopupPayable, o
 import { onPurchaseRecordReleased, unfinishedOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { attributedBundleDiscount } from '@/api/bundle-quote';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
+import { isTransientReadFailure } from '@/lib/remote-read-failure';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { openOrderAdvisorChat } from '@/lib/advisor-chat-route';
 import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-review';
@@ -829,10 +830,17 @@ async function readCheckout(foreground=false):Promise<boolean>{
   recoveryGeneration=generation;
   const operation=session.record.pending?.operation;
   const recoveringCreation=operation==='createOrder'||operation==='createBundle';
+  const routedOrderToRead = !session.record.order && !session.record.pending ? props.orderNo : undefined;
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
     &&!session.record.pending&&!unknown.value&&!recoveryReadFailed.value;
   try{
-    if(!clockOnly)await session.recover();
+    if(routedOrderToRead){
+      const receipt=await promotionApi.findOrder(routedOrderToRead);
+      if(!readCurrent(generation))return false;
+      if(!receipt)throw new Error('ORIGINAL_ORDER_NOT_FOUND');
+      session.resume(receipt);
+      error.value='';
+    }else if(!clockOnly)await session.recover();
     if(!readCurrent(generation))return false;
     if(recoveringCreation&&session.confirmed&&!session.record.pending&&session.record.order){
       error.value='';activityConflict.value=false;
@@ -869,9 +877,16 @@ async function readCheckout(foreground=false):Promise<boolean>{
     await loadOrderClock();
     if(!readCurrent(generation))return false;
     if(order.value?.paymentStatus==='PAID')await readActivation();
-    else if(!clockOnly&&!foreground)await refreshWallet(true,true);
+    else if(!clockOnly&&(!foreground||routedOrderToRead))await refreshWallet(true,true);
     return readCurrent(generation)&&!unknown.value;
-  }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
+  }catch(cause){
+    if(readCurrent(generation)){
+      const missingRoutedOrder = routedOrderToRead && !session.record.order;
+      if(missingRoutedOrder)error.value=p.value.error;
+      recoveryReadFailed.value=!missingRoutedOrder||isTransientReadFailure(cause);
+    }
+    return false;
+  }
   finally{recoveryGeneration=null;}
 }
 const conversations=useConversations();
@@ -1045,6 +1060,7 @@ function refreshForegroundReview():boolean{
       if(session.record.pending||session.record.order)void recover(true);
       return true;
     }
+    if(props.orderNo&&recoveryReadFailed.value&&!session.record.order)void recover(true);
     if(session.record.pending||session.record.order||props.orderNo)return true;
     // The checkout host automatically reads any original command found here.
     if(!recoverKeepBeforeNewPurchase())void loadQuote(true,true);
@@ -1069,7 +1085,8 @@ function show(){
   startWalletTimer();
   if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(allowAuxiliaryNavigation);
   if(busy.value){refreshOnIdle=true;return;}
-  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);if(!quoteBlock.value||recheckCapacity)void loadQuote(recheckCapacity);}
+  if(session.record.pending||session.record.order||(props.orderNo&&auth.isAuthenticated))void recover();
+  else if(!props.orderNo){void refreshWallet(true);if(!quoteBlock.value||recheckCapacity)void loadQuote(recheckCapacity);}
 }
 watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible.value&&current())show();}});
 const footer = computed(() => {
@@ -1149,13 +1166,7 @@ onMounted(async()=>{
   if(auth.isAuthenticated)catalogRefresh=refreshProductCatalog(true).catch(()=>false);
   try {
     if(auth.isAuthenticated){
-      if(props.orderNo&&!session.record.order&&!session.record.pending){
-        const receipt=await promotionApi.findOrder(props.orderNo);if(!current())return;
-        if(!receipt)throw new Error('ORIGINAL_ORDER_NOT_FOUND');
-        session.resume(receipt);
-        revision.value++;
-      }
-      if(session.record.pending||session.record.order)await recover();else await Promise.all([loadQuote(),refreshWallet(true)]);
+      if(props.orderNo||session.record.pending||session.record.order)await recover();else await Promise.all([loadQuote(),refreshWallet(true)]);
     }
   }catch{if(current())error.value=p.value.error;}finally{if(current())loading.value=false;}
 });

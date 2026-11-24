@@ -50,6 +50,6 @@ export function usePromotionContext(activityId: Ref<string>, retainPresentation 
   onShow(() => { visible = true; void refresh(true); });
   onHide(() => { visible = false; fence.invalidate(); status.value = 'idle'; if (!retainPresentation) activity.value = null; });
   onBeforeUnmount(() => { visible = false; fence.invalidate(); activity.value = null; });
-  const available = computed(() => !environmentInvalidated && status.value === 'ready' && canPreviewPromotion(activity.value));
+  const available = computed(() => !environmentInvalidated && canPreviewPromotion(activity.value));
   return { activity, status, available, refresh };
 }

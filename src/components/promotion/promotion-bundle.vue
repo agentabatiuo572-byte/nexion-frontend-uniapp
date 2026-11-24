@@ -248,7 +248,7 @@ function tileTag(id: string) {
 const selectionBlock = computed(() => selection.value.map(item => selectedProductBlock(item.productNo)).find(Boolean) ?? '');
 const productsReady = computed(() => catalogStatus.value === 'ready' && !selectionBlock.value);
 const canReadQuote=computed(()=>visible.value&&foregroundReadAllowed()&&signedIn.value&&app.accountKey!=='default'
-  &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
+  &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||contextStatus.value==='ready'&&available.value));
 const canContinue=computed(()=>canReadQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE'&&!termsMissing.value);
 const canOpenDevices=computed(()=>visible.value&&signedIn.value&&!selectionBlock.value&&!activityProductsBlock.value&&quoteBlock.value==='capacity');
 useAutoRecovery({
