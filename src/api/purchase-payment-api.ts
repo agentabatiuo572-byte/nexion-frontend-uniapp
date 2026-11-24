@@ -23,6 +23,8 @@ export type PurchasePaymentIntent = {
   address: string | null; expiresAt: string; reason: string | null; receipt: unknown;
   fulfilmentStatus?: 'DELIVERED';
   paymentAllowed?: boolean; expirationTime?: string; createdAt?: string;
+  /** A refunded payment still reports MANUAL_REVIEW to user clients; refundStatus says it has ended. */
+  refundStatus?: 'REFUNDED';
 } & PurchaseFinancialSnapshot;
 const invalid = () => new ApiError({ kind: 'protocol', message: 'PURCHASE_PAYMENT_RESPONSE_INVALID' });
 const object = (raw: unknown): Record<string, unknown> => {
@@ -102,6 +104,7 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
     ...(raw.fulfilmentStatus === 'DELIVERED' ? { fulfilmentStatus: 'DELIVERED' as const } : {}),
     ...(raw.paymentAllowed !== undefined ? { paymentAllowed: raw.paymentAllowed as boolean } : {}),
     ...(createdAt ? { createdAt } : {}),
+    ...(raw.refundStatus === 'REFUNDED' ? { refundStatus: 'REFUNDED' as const } : {}),
     ...(expirationTime ? { expirationTime } : {}) };
 }
 export function createPurchasePaymentApi(client: ApiClient) {

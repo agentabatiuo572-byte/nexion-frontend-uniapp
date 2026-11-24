@@ -189,7 +189,7 @@ function pendingPayments() {
   try {
     const records = displayRecords();
     state.pendingReadError = false;
-    return records.filter(row => row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+    return records.filter(row => row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'REFUNDED' && !(row.lastStatus === 'DELIVERED' && row.validated));
   } catch {
     state.pendingReadError = true;
     return [];
@@ -197,7 +197,8 @@ function pendingPayments() {
 }
 // Rows closed on the floating bar, for this run of the App only. The records stay; a new payment or a new status shows again.
 const dismissedResume = reactive(new Set<string>());
-const resumeKey = (row: PendingExternal) => [account(), row.commandKey, row.lastStatus ?? '', row.businessDelivered ? 1 : 0].join('|');
+// Only entering manual confirmation brings a closed payment back (PRD 购买付款流程 line 50); other status changes do not.
+const resumeKey = (row: PendingExternal) => [account(), row.commandKey, row.lastStatus === 'MANUAL_REVIEW' ? 'MANUAL_REVIEW' : '', row.businessDelivered ? 1 : 0].join('|');
 function unsettledCheckoutPayments(includeTradein: boolean) {
   return pendingPayments().filter(row => (row.kind === 'ORDER_PAY' || (includeTradein && row.kind === 'TRADE_IN'))
     && row.lastStatus !== 'MANUAL_REVIEW' && row.lastStatus !== 'DELIVERED' && !row.businessDelivered);
@@ -243,14 +244,16 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   if (!isVisiblePayment(intent)) { hideOriginalPayment(accountKey, pending, intent); return; }
   matches(intent, pending);
   const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
-  if (!businessDelivered && (intent.status === pending.lastStatus || !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
+  // A manual refund ends the payment, though user clients still receive MANUAL_REVIEW for it.
+  const status = intent.refundStatus === 'REFUNDED' ? 'REFUNDED' : intent.status;
+  if (!businessDelivered && (status === pending.lastStatus || !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
   const orderDeadlineAt = pending.kind === 'ORDER_PAY' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined;
   if (intent.status === 'EXPIRED') {
     saveExpiry(accountKey, pending.commandKey, pending.kind, { ...pending, intentNo: intent.intentNo,
       paymentMethod: intent.paymentMethod, network: intent.network, orderDeadlineAt });
   } else {
     if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
-    save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
+    save({ ...pending, intentNo: intent.intentNo, lastStatus: status, businessDelivered }, accountKey);
   }
   if (pending.kind === 'ORDER_PAY') return JSON.parse(pending.fingerprint)[1].orderNo;
 }
@@ -300,7 +303,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   // Legacy recovery rows have only the quote identity; bind their first validated original intent for subsequent reads.
   const known = { ...pending, paymentMethod: intent.paymentMethod, network: intent.network,
     orderDeadlineAt: pending.kind === 'ORDER_PAY' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined,
-    intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
+    intentNo: intent.intentNo, lastStatus: intent.refundStatus === 'REFUNDED' ? 'REFUNDED' : intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
   if (isOrderPaymentDiscoveryOnly(pending)) known.resumedOnThisDevice = true;
   delete known.quotaRefusal;
   if (known.businessDelivered) {
@@ -846,7 +849,7 @@ export function requestPurchasePayment(value: PurchasePaymentContext): Promise<P
   const refused = value.refusedPaymentKey ? records[value.refusedPaymentKey] : undefined;
   if (refused && !isVisiblePayment(refused)) return Promise.resolve(null);
   const existing = value.refusedPaymentKey ? refused
-    : Object.values(records).find(row => isVisiblePayment(row) && row.fingerprint === scope && row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+    : Object.values(records).find(row => isVisiblePayment(row) && row.fingerprint === scope && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'REFUNDED' && !(row.lastStatus === 'DELIVERED' && row.validated));
   if (value.refusedPaymentKey && (!existing?.quotaRefusal || existing.fingerprint !== scope)) throw new Error('ORIGINAL_PAYMENT_MISMATCH');
   context = value;
   open(value, existing ?? null);
@@ -940,7 +943,7 @@ export function purchaseRecordPayload(row: PendingExternal): Record<string, unkn
 
 export function isUnfinishedPurchaseRecord(row: PendingExternal): boolean {
   return !row.validated && !row.businessDelivered && !row.quotaRefusal
-    && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'DELIVERED';
+    && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'DELIVERED' && row.lastStatus !== 'REFUNDED';
 }
 
 function isOrderPaymentDiscoveryOnly(row: PendingExternal): boolean {
@@ -993,7 +996,7 @@ export function hasUnfinishedOrderPayment(accountKey: string, orderNo: string): 
 export function pendingOrderPayment(accountKey: string, orderNo: string, knownOnly = false): PendingExternal | null {
   try {
     const records = Object.values(rows(accountKey).records).filter(row => row.kind === 'ORDER_PAY' && isVisiblePayment(row) && JSON.parse(row.fingerprint)[1]?.orderNo === orderNo
-      && !row.quotaRefusal && !['EXPIRED', 'DELIVERED'].includes(row.lastStatus ?? '') && !row.businessDelivered
+      && !row.quotaRefusal && !['EXPIRED', 'DELIVERED', 'REFUNDED'].includes(row.lastStatus ?? '') && !row.businessDelivered
       && (row.lastStatus !== 'MANUAL_REVIEW' || row.lookupOnly && !!row.intentNo));
     return records.find(row => row.intentNo) ?? (knownOnly ? null : records[0] ?? null);
   } catch { return null; }
@@ -1014,7 +1017,7 @@ export async function discoverOrderPayment(accountKey: string, orderNo: string, 
         && intent.status !== 'EXPIRED' && intent.status !== 'DELIVERED') {
       save({ fingerprint: JSON.stringify(['ORDER_PAY', { orderNo }]), kind: intent.kind, commandKey: intent.commandKey,
         paymentQuoteId: intent.paymentQuoteId, paymentMethod: intent.paymentMethod, network: intent.network, intentNo,
-        summary, lastStatus: intent.status, lookupOnly: true }, accountKey);
+        summary, lastStatus: intent.refundStatus === 'REFUNDED' ? 'REFUNDED' : intent.status, lookupOnly: true }, accountKey);
     }
   } catch {
     // Discovery is silent. A failed lookup cannot declare the original payment absent.
