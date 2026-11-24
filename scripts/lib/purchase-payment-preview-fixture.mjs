@@ -140,7 +140,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       // The alternative scenario has no original unpaid provider order. Retain that
       // sample outside the live intent store so no read, write or observer can use it.
       for (const [no, intent] of intents) {
-        if (intent.status !== 'AWAITING_PAYMENT') continue;
+        if (intent.status !== 'AWAITING_PAYMENT' || intent.topupSample) continue;
         suspendedIntents.set(no, intent);
         intents.delete(no);
         removeDemoPaymentQuotaHold(state, intent.quotaHold);
@@ -229,7 +229,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const noProviderSuccess = [...waitingModes, 'expired', 'mismatch'];
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent, now) {
-    const age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
+    // Ordinary provider outcomes do not advance the independently seeded B84 stories.
+    const age = now - intent.createdAt, scenario = intent.topupSample ? 'waiting' : paymentMode();
+    const bank = intent.paymentMethod === 'HDPAY_BANK';
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED') {
       if (intent.reason === 'PAYMENT_FAILED' && graceOver) closeUnpaidOrder(intent);
@@ -296,7 +298,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, replacementQuote, quotaHold, ...row} = intent, open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, ...row} = intent, open = Date.now() < deadline;
     const networkEnabled = networkOpen(row.paymentMethod);
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
@@ -454,7 +456,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (snapshot && method === 'GET') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
       const intent = intents.get(decodeURIComponent(snapshot[1]));
-      if (intent?.orderNo === sampleOrderNo && state.orderTopupState === 'snapshot-error')
+      if (intent?.snapshotUnavailable && openOrderPayment(intent.orderNo) === intent && intent.status !== 'MANUAL_REVIEW')
         return refused(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE');
       return readIntent(intent);
     }
@@ -475,26 +477,26 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}), true, true);
   }
   const seedRemoteOrderPayment = origin => seedHistoricalOrderPayment(origin, sampleOrderNo, 'CREGIS_USDT_BSC');
-  function seedOrderTopupOriginal(origin, orderNo, scene) {
-    const paymentMethod = scene === 'open-intent-usdt' ? 'CREGIS_USDT_ERC20' : 'HDPAY_BANK';
-    const status = { 'open-intent-readonly': 'FUNDS_CONFIRMED', 'finance-review': 'MANUAL_REVIEW', paid: 'DELIVERED' }[scene]
-      ?? 'AWAITING_PAYMENT';
-    const original = openOrderPayment(orderNo);
-    if (original) {
-      const matches = original.status === status && (scene === 'finance-review' || original.paymentMethod === paymentMethod);
-      return scene === 'snapshot-error' || matches ? {status: 200} : refused(409, 'PREVIEW_ORDER_TOPUP_RESET_REQUIRED');
-    }
+  function seedOrderTopupOriginal(origin, orderNo, {paymentMethod, status, snapshotUnavailable}) {
     const result = seedHistoricalOrderPayment(origin, orderNo, paymentMethod);
-    if (!result.data) return result;
+    if (result.status !== 200) return result;
     const intent = intents.get(result.data.intentNo);
-    if (scene === 'open-intent-readonly') Object.assign(intent, {status: 'FUNDS_CONFIRMED', paidAt: Date.now()});
-    if (scene === 'finance-review') Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_AMOUNT_MISMATCH'});
-    if (scene === 'paid') {
-      // The preset supplies a successful provider observation for this new original.
+    intent.topupSample = true;
+    intent.snapshotUnavailable = snapshotUnavailable;
+    if (status === 'MANUAL_REVIEW') Object.assign(intent, {status, reason: 'PAYMENT_AMOUNT_MISMATCH'});
+    if (status === 'FUNDS_CONFIRMED' || status === 'DELIVERED') {
       const now = Date.now();
       Object.assign(intent, {status: 'FUNDS_CONFIRMED', paidAt: now});
-      deliverOrderPayment(intent, now);
-      if (intent.status !== 'DELIVERED') return refused(409, intent.reason);
+      if (status === 'DELIVERED') {
+        deliverOrderPayment(intent, now);
+        if (intent.status !== 'DELIVERED') {
+          removeDemoPaymentQuotaHold(state, intent.quotaHold);
+          intents.delete(intent.intentNo);
+          quotes.delete(intent.paymentQuoteId);
+          delete state.intentOrders[orderNo];
+          return refused(409, intent.reason);
+        }
+      }
     }
     return { ...result, data: view(intent) };
   }

@@ -139,7 +139,7 @@ export const demoOptions = {
   stakingOpenState:[['unmodeled','开仓未配置（演示拒绝）'],['disclosure','开仓拒绝·需风险确认（HTTP 200 / code 409）']],
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
   // Order top-up page scenarios (scripts/lib/prototype-demo-order-topup.mjs).
-  orderTopupState:[['off','跟随其他场景'],['disabled','订单 USDT 开关关闭'],['policy-loading','充值策略读取中'],['policy-error','充值策略读取失败'],['erc20-only','只开放 ERC20'],['waiting','为订单充值 · 等待到账'],['partial','为订单充值 · 已到账一部分'],['min-floor','为订单充值 · 还差很少（按最低额建议）'],['covered','为订单充值 · 余额已够'],['debt','为订单充值 · 余额为负（含欠款）'],['below-min','为订单充值 · 有一笔低于最低额'],['preparing','为订单充值 · 地址准备中'],['paused','为订单充值 · 充值暂停'],['address-error','为订单充值 · 地址读不到'],['order-error','为订单充值 · 订单读不到（503）'],['open-intent','为订单充值 · 有在途银行卡付款'],['open-intent-usdt','为订单充值 · 有在途 USDT（ERC20）付款'],['open-intent-readonly','为订单充值 · 只读原付款单'],['snapshot-error','为订单充值 · 付款单读不到'],['review','为订单充值 · 银行会话需要核对'],['finance-review','为订单充值 · 财务需要核对'],['expired','为订单充值 · 已超时取消'],['closed','为订单充值 · 已关闭（非超时）'],['deadline','为订单充值 · 已到截止、待读回结果'],['missing','为订单充值 · 订单不存在（404）'],['paid','为订单充值 · 已付款'],['paid-unverified','为订单充值 · 已付款无金额和时间']],
+  orderTopupState:[['off','跟随其他场景'],['disabled','订单 USDT 开关关闭'],['policy-loading','充值策略读取中'],['policy-error','充值策略读取失败'],['erc20-only','只开放 ERC20'],['waiting','为订单充值 · 等待到账'],['partial','为订单充值 · 已到账一部分'],['min-floor','为订单充值 · 还差很少（按最低额建议）'],['covered','为订单充值 · 余额已够'],['zero-voucher','为订单充值 · 零元券'],['debt','为订单充值 · 余额为负（含欠款）'],['below-min','为订单充值 · 有一笔低于最低额'],['preparing','为订单充值 · 地址准备中'],['paused','为订单充值 · 充值暂停'],['address-error','为订单充值 · 地址读不到'],['order-error','为订单充值 · 订单读不到（503）'],['open-intent','为订单充值 · 有在途银行卡付款'],['open-intent-usdt','为订单充值 · 有在途 USDT（ERC20）付款'],['open-intent-readonly','为订单充值 · 只读原付款单'],['snapshot-error','为订单充值 · 付款单读不到'],['review','为订单充值 · 银行会话需要核对'],['finance-review','为订单充值 · 财务需要核对'],['expired','为订单充值 · 已超时取消'],['closed','为订单充值 · 已关闭（非超时）'],['deadline','为订单充值 · 已到截止、待读回结果'],['missing','为订单充值 · 订单不存在（404）'],['paid','为订单充值 · 已付款'],['paid-unverified','为订单充值 · 已付款无实付凭证'],['provisioning-failed','为订单充值 · 开通失败'],['chargeback','为订单充值 · 付款争议'],['refunded','为订单充值 · 已退款']],
   withdrawRecoveryState:withdrawRecoveryOptions,
   withdrawNetworksState:[['bep20-erc20','提现网络 · BEP20 和 ERC20'],['bep20','提现网络 · 仅 BEP20'],['erc20','提现网络 · 仅 ERC20'],['closed','提现网络 · 全部关闭']],
   billRefsState:[['normal','账单 · 默认'],['long-refs','账单 · 真实长单号（订单、退款、学习奖励）'],['b84-deposit','账单 · 双网 USDT 精确入账及详情缺失']],
@@ -434,7 +434,7 @@ const deadlineTaskDelay=60000;
 export const demoTimedOutOrder={canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'};
 export const demoOrderPaymentDeadline=order=>order.payBy?Math.min(order.expiresAt,Date.parse(order.payBy)):order.expiresAt;
 export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'
-  &&demoOrderPaymentDeadline(order)+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo];
+  &&demoOrderPaymentDeadline(order)+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo]&&!order.retiredBankPaymentSession;
 const repurchaseSampleDays={inside:12,boundary:30,outside:12};
 const longBillOrderNo='ORD-7F3A9C2E5B8D41F6A0C3E9B27D5F1A84';
 function demoOrders(products,state,now,device41) {
@@ -490,8 +490,7 @@ function demoScenarioOrders(products,state,now,device41) {
   const seeded=state.promotionBuyer==='sponsored-new'?[]:demoOrders(products,state,now,device41).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
     &&(device41||order.orderNo!=='DEMO-ORDER-004'));
-  return [...own,...seeded].filter(order=>order.orderNo!==state.orderTopupMissingOrderNo)
-    .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order);
+  return [...own,...seeded].map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order);
 }
 const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${unit}`;
 function demoOrderDeviceId(state, instanceNo) {
@@ -1319,7 +1318,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(request.tracksOrderCreate&&!quote)return response;
     return remember(lines.length>1?'createBundle':'createOrder',quote?.quoteId||order.orderNo,response,order);
   }
-  const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
+  const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+|DEMO-B84-[A-Z0-9-]+)\/(pay|cancel)$/);
   if(orderAction){
     const [,orderNo,action]=orderAction;
     let order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);

@@ -262,6 +262,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
       if (external.openOrderPayment(orderNo)) return {status:409,message:'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS',data:null};
       if (action[2] === 'cancel') {
+        if (order.retiredBankPaymentSession) return {status:409,message:'HDPAY_ORDER_NOT_CANCELLABLE',data:null};
         const result = ok(demoFixture(url,locale(),state,request));
         if (omitCancelReceipt) { omitCancelReceipt = undefined; return unavailableReceipt; }
         return result;
@@ -280,7 +281,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       const firstPayment=order.paymentStatus==='PENDING';
       let settled;
       try {
-        if (firstPayment && state.orderTopupBankReviewOrderNo === orderNo)
+        if (firstPayment && order.retiredBankPaymentSession)
           throw Object.assign(new Error('HDPAY_COMMERCE_PAYMENT_REVIEW_REQUIRED'), {status:409});
         settled = demoFixture(url,locale(),state,request);
       }
@@ -295,6 +296,13 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       return {...ok(settled),drop:pin.state.dropNextPayment?(pin.state.dropNextPayment=false,true):false};
     }
     return ok(demoFixture(url,locale(),state,request));
+  }
+  function seedOrderTopupWalletReceipt(order, walletBalanceAfterUsdt) {
+    const commandKey = `wallet-pay:${order.orderNo}:history`;
+    pin.commands.set('order-pay:' + commandKey, {kind:'order-pay',commandKey,status:'SUCCEEDED',canResumeSameKey:false,code:0,
+      receipt:{orderNo:order.orderNo,paymentNo:order.paymentNo,paymentMethod:order.paymentMethod,amountUsdt:order.amountUsdt,
+        paymentStatus:'PAID',orderStatus:'PAID',paidTotalUsdt:order.paidTotalUsdt,walletBalanceAfterUsdt,
+        serverCanonical:true,source:'server',sourceEnvironment:'PRODUCTION',runId:'',idempotent:false}});
   }
   function configureCheckoutReadback(update) {
     if (update.omitNextCancelReceipt === true) omitCancelReceipt = true;
@@ -312,7 +320,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
     confirmLateOrderPayment:external.confirmLateOrderPayment, topupIntent:external.topupIntent,
-    seedOrderTopupOriginal:external.seedOrderTopupOriginal, deliveredOrderPayment:external.deliveredOrderPayment,
+    seedOrderTopupOriginal:external.seedOrderTopupOriginal, seedOrderTopupWalletReceipt, deliveredOrderPayment:external.deliveredOrderPayment,
     failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},
     selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
     selectPaymentMode:external.selectPaymentMode,configureCheckoutReadback};

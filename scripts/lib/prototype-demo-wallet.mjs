@@ -138,19 +138,21 @@ export function recordDemoChainDeposit(state, { network, grossAmountUsdt, credit
   const sequence = events.length + 1, depositId = 'CR-' + (1000 + sequence);
   const txHash = '0x' + sequence.toString(16).padStart(64, '0');
   const credited = Number(creditedUsdt) > 0;
-  events.push({
+  const event = {
     depositId, network, txHash, address: demoChainDepositAddress(state, network, true), createdAt,
     grossAmountUsdt: Number(grossAmountUsdt), grossAmountUsdtExact: grossAmountUsdt,
     creditedUsdt: Number(creditedUsdt), creditedUsdtExact: creditedUsdt,
     confirmations: 15, requiredConfirmations: 15, status: credited ? 'CREDITED' : 'DUST_HOLD',
     creditedAt: credited ? createdAt : null,
-  });
-  if (!credited) return;
+  };
+  events.push(event);
+  if (!credited) return event;
   postDemoWalletEntries(state, {
     bizNo: depositId, bizType: 'CHAIN_TOPUP', asset: 'USDT', direction: 'IN', category: 'topup', at: createdAt,
     amount: Number(creditedUsdt), amountExact: creditedUsdt, network,
     deposit: { network, txHash, grossAmountUsdt, feeUsdt: demoChainDepositFee, creditedUsdt },
   });
+  return event;
 }
 
 export function demoTeamPeriod(period,now,snapshotAt) {
