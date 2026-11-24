@@ -22,6 +22,7 @@ import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.m
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
+import { demoTradeinRecovery, tradeinRecoveryStates } from './lib/prototype-demo-tradein-recovery.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -78,10 +79,11 @@ const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-ac
 const serverRun=Date.now().toString(36);
 // The scenario a page or a reply belongs to: this server run and its scenario epoch.
 const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
+let tradeinRecoverySeed;
 // Runs in every App page before the App starts (design rule at demoSeedFleet). It drops the records of another
 // scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
-function previewScenarioPage(scenario,keys,purchaseCashierPrefix,eventScene){
+function previewScenarioPage(scenario,keys,purchaseCashierPrefix,eventScene,recoveryEntries){
   // Keep the bank top-up placeholder on its current page.
   window.navigation?.addEventListener('navigate',event=>{if(event.destination.url==='https://api.hdpayadmin.com/pay/demo-preview-only')event.preventDefault();});
   // The app validates the hosted address first. Rewrite it before assigning the iframe's source.
@@ -90,7 +92,11 @@ function previewScenarioPage(scenario,keys,purchaseCashierPrefix,eventScene){
     const local=typeof value==='string'&&value.startsWith(purchaseCashierPrefix)?new URL(value).pathname:value;
     iframeSrc.set.call(this,local);
   }});
-  if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
+  if(localStorage.getItem('uvel-preview-scenario')!==scenario){
+    for(const key of keys)localStorage.removeItem(key);
+    for(const [key,value] of recoveryEntries)localStorage.setItem(key,JSON.stringify(value));
+    localStorage.setItem('uvel-preview-scenario',scenario);
+  }
   // An Activity preset replaces the event scene without a new scenario: the event commands awaiting confirmation go with it.
   if(localStorage.getItem('uvel-preview-event-scene')!==eventScene){localStorage.removeItem('uvel-event-pending-accounts-v1');localStorage.setItem('uvel-preview-event-scene',eventScene);}
   const follow=value=>{if(value&&value!==scenario)location.reload();};
@@ -155,7 +161,9 @@ function selectedSupportAccount(url) {
 }
 function scenarioSeed(url) {
   const sample=state.messageState==='transferred'?selectedSupportAccount(url)?.supportTransferSample:null;
-  return '<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+','+JSON.stringify(previewPurchaseCashier.href)+','+JSON.stringify(scenarioId()+':'+(state.eventSceneEpoch??0))+');'
+  const recoveryEntries=tradeinRecoverySeed?.accountId===previewSelectedAccountId(state)?tradeinRecoverySeed.entries:[];
+  const scenarioArgs=[scenarioId(),scenarioStorageKeys,previewPurchaseCashier.href,scenarioId()+':'+(state.eventSceneEpoch??0),recoveryEntries];
+  return '<script>('+previewScenarioPage+')('+scenarioArgs.map(value=>JSON.stringify(value)).join(',')+');'
     +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(sample??null)+','+JSON.stringify(demoAccountId)+');</script>';
 }
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
@@ -228,6 +236,11 @@ const server=http.createServer(async(req,res)=>{
         }
         // API-only preview controls for live quota changes and pre-hold compatibility.
         if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
+        if(update.quotaProductNo===null)delete state.quotaProductNo;
+        else if(typeof update.quotaProductNo==='string'&&demoProducts(state).some(product=>
+          product.id===update.quotaProductNo&&product.productType==='DEVICE'&&product.inventoryMode==='FINITE'))
+          state.quotaProductNo=update.quotaProductNo;
+        if(['normal','quote-loading','error'].includes(update.tradeinReadState))state.tradeinReadState=update.tradeinReadState;
         if(typeof update.quotaPaused==='boolean')state.quotaPaused=update.quotaPaused;
         if(['hold-on-create','legacy-live-quota'].includes(update.quotaHoldMode))state.quotaHoldMode=update.quotaHoldMode;
         if(update.reset&&update.quotaSalesSample==='sold-out')state.quotaSalesSample=update.quotaSalesSample;
@@ -247,7 +260,8 @@ const server=http.createServer(async(req,res)=>{
         // late) is one too. Presentation knobs keep them.
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
-        const scenarioChange=promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
+        const tradeinRecoverySelection=tradeinRecoveryStates.includes(update.tradeinRecoveryState)?update.tradeinRecoveryState:null;
+        const scenarioChange=Boolean(tradeinRecoverySelection)||promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -266,6 +280,8 @@ const server=http.createServer(async(req,res)=>{
         if(update.reset||scenarioChange){
           state.scenarioEpoch=++scenarioEpoch;
           checkoutFlow?.syncScenario();
+          tradeinRecoverySeed=undefined;
+          delete state.tradeinRecoveryState;
         }
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
@@ -315,6 +331,16 @@ const server=http.createServer(async(req,res)=>{
           if(supportAccount)setTransferSampleOutcome(supportAccount,update.supportReadbackState);
         }
         checkoutFlow?.selectPaymentMode(wasMissing);
+        if(tradeinRecoverySelection&&tradeinRecoverySelection!=='off'){
+          const accountId=previewSelectedAccountId(state);
+          if(!checkoutFlow||!accountId||accountId!==demoPurchasingAccountId(state))
+            return sendJson(res,{code:409,message:'PREVIEW_TRADEIN_RECOVERY_ACCOUNT_REQUIRED',data:null},409);
+          const {entries,command}=demoTradeinRecovery(tradeinRecoverySelection,accountId,scenarioId(),(pathname,body)=>
+            fixtureFor(new URL(pathname,url.origin),{method:()=>body?'POST':'GET',postDataJSON:()=>body,headers:()=>({})}));
+          if(command)checkoutFlow.pin.commands.set(command.kind+':'+command.commandKey,command);
+          tradeinRecoverySeed={accountId,entries};
+          state.tradeinRecoveryState=tradeinRecoverySelection;
+        }
         if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
@@ -382,6 +408,13 @@ const server=http.createServer(async(req,res)=>{
         return sendJson(res,{code:503,message:'TRIAL_STATE_UNAVAILABLE',data:null},503);
       if(req.method==='GET'&&url.pathname==='/api/notifications'&&url.searchParams.has('cursor')&&state.notificationPageState==='error')
         return sendJson(res,{code:503,message:'NOTIFICATION_PAGE_UNAVAILABLE',data:null},503);
+      const tradeinQuoteRead=req.method==='POST'&&url.pathname==='/api/app/trade-in/quote';
+      const tradeinRead=tradeinQuoteRead||(req.method==='POST'&&url.pathname==='/api/app/trade-in/eligibility')
+        ||(req.method==='GET'&&url.pathname==='/api/app/trade-in/config');
+      if(tradeinQuoteRead&&state.tradeinReadState==='quote-loading')
+        await new Promise(resolve=>setTimeout(resolve,10000)); // Keep the amount unknown within the App's 12-second timeout.
+      if(tradeinRead&&state.tradeinReadState==='error')
+        return sendJson(res,{code:503,message:'TRADEIN_READ_UNAVAILABLE',data:null},503);
       const businessRead=req.method==='GET'&&(recoveryReads.has(url.pathname)||/^\/api\/(config\/(platform|v-rank|exchange|repurchase|staking|commission)|store\/(catalog|purchase-eligibility)|team\/(rank|binary)|app\/(team|payments|deposits|home\/overview|proof|network|security|support|developer)|content\/(learning|trust|how-it-works|i18n)|quests\/state|events|points\/state|devices\/earnings|exchange|repurchase|withdrawals|payout-addresses|deposits|notifications|goals|promotions|promotion-rewards|tasks|payment-methods|developer|public\/referrals|legal\/(privacy|risk)|staking|stakes)/.test(url.pathname));
       if(bankTopupEndpoint&&state.dataState==='error')return sendJson(res,{code:503,message:url.pathname.endsWith('/config')?'PAYMENT_CONFIG_UNAVAILABLE':url.pathname.endsWith('/fx-quote')?'FX_QUOTE_UNAVAILABLE':'VIETQR_RUNTIME_PROFILE_INVALID',data:null},503);
       const walletBillsRead=req.method==='GET'&&url.pathname==='/api/app/wallet/bills';
