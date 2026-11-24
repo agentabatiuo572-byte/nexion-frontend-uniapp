@@ -203,7 +203,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch, onUnmounted } from "vue";
 import { useMeEntryRead } from "@/composables/use-me-entry-read";
 import { isShownInventoryDevice } from "@/lib/me-entry-facts";
 import { useMeEntrySeen } from "@/store/me-entry-seen";
@@ -234,11 +234,13 @@ import { useFreeTrial } from "@/store/free-trial";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalTradeinConfig } from "@/api/device-e3-api";
 import { isSettledRejection } from "@/api/errors";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogState } from "@/store/product-catalog";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
+import { invalidatePassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 
 const t = useT();
@@ -278,6 +280,7 @@ onShow(() => {
 });
 onHide(() => {
   inventoryPageVisible.value = false;
+  quoteInfoDeviceId.value = null;
   app.setDeviceInventoryVisible(false);
   closeReplacementDialogs();
 });
@@ -285,6 +288,9 @@ const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
 const quoteInfoDeviceId = ref<string | null>(null);
+watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
+  quoteInfoDeviceId.value = null;
+}, { flush: "sync" });
 
 // A failed trial read cannot remove the account's previously confirmed devices.
 // Slot counts and mutations have their own stricter readiness below.
@@ -414,7 +420,61 @@ onLoad(async options => {
   if (device) await handleDeactivate(device);
 });
 
-const { tradeinStrip, handleTradein } = useTradeinStrip();
+const { tradeinStrip: readTradeinStrip, handleTradein, tradeinQuote, refreshRemoteTradeinQuote } = useTradeinStrip();
+const ladderConfig = ref<Pick<CanonicalTradeinConfig, "creditRatesPct" | "outputRatioCutsPct"> | null>(null);
+const ladderConfigFailed = ref(false);
+let ladderConfigGeneration = 0;
+const openedTradeinInfo = () => remoteApiEnabled && inventoryPageVisible.value ? quoteInfoDeviceId.value : null;
+
+async function loadLadderConfig(retry = false) {
+  if (!openedTradeinInfo()) return;
+  const generation = ladderConfigGeneration;
+  const scope = captureAccountScope();
+  const current = () => generation === ladderConfigGeneration && isCurrentAccountScope(scope);
+  ladderConfigFailed.value = false;
+  if (retry) invalidatePassiveTabRead("tradein-config");
+  try {
+    const { creditRatesPct, outputRatioCutsPct } = await runPassiveTabRead("tradein-config", () => deviceE3Api.tradeinConfig());
+    if (current()) ladderConfig.value = { creditRatesPct, outputRatioCutsPct };
+  } catch {
+    if (current()) ladderConfigFailed.value = true;
+  }
+}
+
+watch([openedTradeinInfo, () => apiRuntimeConfig.environment, () => apiRuntimeConfig.baseUrl], () => {
+  ladderConfigGeneration += 1;
+  ladderConfig.value = null;
+  ladderConfigFailed.value = false;
+  void loadLadderConfig();
+}, { flush: "sync" });
+onUnmounted(() => { ladderConfigGeneration += 1; });
+
+useAutoRecovery({
+  active: () => openedTradeinInfo() !== null,
+  failed: () => {
+    const id = openedTradeinInfo();
+    return id !== null && (ladderConfigFailed.value || tradeinQuote(id) === null);
+  },
+  retry: async () => {
+    const id = openedTradeinInfo();
+    if (id === null) return;
+    await Promise.all([
+      ladderConfigFailed.value ? loadLadderConfig(true) : undefined,
+      tradeinQuote(id) === null ? refreshRemoteTradeinQuote(Number(id)) : undefined,
+    ]);
+  },
+  repeatMs: 30_000,
+});
+
+function tradeinStrip(device: Device) {
+  const strip = readTradeinStrip(device);
+  if (openedTradeinInfo() !== device.id) return strip;
+  return {
+    ...strip,
+    tradeinLadderConfig: ladderConfig.value ?? undefined,
+    tradeinLadderQuote: tradeinQuote(device.id) ?? undefined,
+  };
+}
 
 function openSlotReplacement(device: Device) {
   if (replacementBusy.value || device.kind === "phone" || device.replacement) return;

@@ -262,7 +262,7 @@ function demoPaidPurchase(order) {
     &&!['REFUNDED','CHARGEBACK'].includes(order.orderStatus);
 }
 
-const approvedQuotaSku='stellarbox-s1';
+const approvedQuotaSku=state=>state.quotaProductNo??'stellarbox-s1';
 const demoPaymentQuotaHolds=new WeakMap();
 
 function demoHardwareQuota(product,state,points,now){
@@ -274,7 +274,7 @@ function demoHardwareQuota(product,state,points,now){
     &&order.hardwareQuotaUsedAt!=null&&sameMonth(order.hardwareQuotaUsedAt))
     .flatMap(order=>order.lineItems).filter(line=>line.sku===product.id).reduce((sum,line)=>sum+line.quantity,0);
   const soldThisMonth=seeded+sold;
-  const pendingThisMonth=[...(demoPaymentQuotaHolds.get(state)??[])].filter(hold=>sameMonth(hold.at))
+  const pendingThisMonth=[...(demoPaymentQuotaHolds.get(state)??[])].filter(hold=>hold.productNo===product.id&&sameMonth(hold.at))
     .reduce((sum,hold)=>sum+hold.quantity,0);
   const usedThisMonth=soldThisMonth+pendingThisMonth;
   const remaining=Math.max(0,monthlyStock-usedThisMonth);
@@ -301,7 +301,7 @@ function demoE1PurchaseRule(state,product,now,checkLiveQuota=true) {
 function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota=true) {
   const e1=demoE1PurchaseRule(state,product,now,checkLiveQuota);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
-  if(checkLiveQuota&&state.quotaState==='approved'&&product.id===approvedQuotaSku){
+  if(checkLiveQuota&&state.quotaState==='approved'&&product.id===approvedQuotaSku(state)){
     const quota=demoHardwareQuota(product,state,points,now);
     const [condition]=quota.conditions;
     const gap=condition?Math.max(0,condition.required-condition.current):0;
@@ -325,7 +325,7 @@ function requireDemoMonthlyQuota(state,policy) {
 }
 
 export function requireDemoExternalPaymentQuota(state,products,items,now) {
-  const product=products.find(row=>row.id===approvedQuotaSku);
+  const product=products.find(row=>row.id===approvedQuotaSku(state));
   const quantity=state.quotaState==='approved'&&product
     ? items.filter(item=>item.productNo===product.id).reduce((sum,item)=>sum+item.quantity,0) : 0;
   if(quantity>0){
@@ -347,7 +347,7 @@ export function requireDemoExternalOrderGate(state,products,items,now) {
 export function reserveDemoPaymentQuotaHold(state,now,quantity) {
   if(state.quotaHoldMode==='legacy-live-quota')return null;
   // Even a purchase without a configured tier captures the decision made at intent creation.
-  const hold={at:now,quantity};
+  const hold={at:now,quantity,productNo:approvedQuotaSku(state)};
   addDemoPaymentQuotaHold(state,hold);
   return hold;
 }
@@ -1053,7 +1053,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }
     if(!['approved','catalog-error'].includes(state.quotaState))
       throw Object.assign(new Error('TEAM_QUOTA_NOT_READY'),{status:503});
-    const approvedProduct=!empty&&state.quotaState==='approved'&&products.find(product=>product.id===approvedQuotaSku);
+    const approvedProduct=!empty&&state.quotaState==='approved'&&products.find(product=>product.id===approvedQuotaSku(state));
     if(!approvedProduct)throw Object.assign(new Error('TEAM_QUOTA_CATALOG_NOT_READY'),{status:503});
     const direct=demoH4TeamMembers(state,now).filter(member=>member.layer===1);
     return {...authority,source:'server',generatedAt:iso,facts:{rank:demoH4Account(state).rank,
