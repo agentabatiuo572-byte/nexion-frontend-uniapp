@@ -267,6 +267,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-orbit__center:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .network-orbit__dot { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 999px; box-shadow: 0 0 0 3px var(--v5-surface); font: 500 10px/1 var(--font-v5); color: var(--v5-on-brand); }
 .network-orbit__dot--inner { width: 26px; height: 26px; margin: -13px 0 0 -13px; }
+/* Lobster capitals are 0.75em tall: about 45% of the 22px and 26px dots. */
+.network-orbit__dot .nx-avatar-letter { font-size: 13px; }
+.network-orbit__dot--inner .nx-avatar-letter { font-size: 15px; }
 .network-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--v5-space-2) var(--v5-space-3); padding-top: var(--ui-space-row-y); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); color: var(--v5-ink-3); }
 .network-legend__item { display: flex; align-items: center; gap: 5px; }
 .network-meta { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); margin-top: var(--v5-space-1); overflow-wrap: break-word; }

@@ -67,7 +67,7 @@ const avatarStyle: CSSProperties = {
   background: "var(--v5-brand)",
 };
 const avatarTextStyle: CSSProperties = {
-  fontSize: "20px",
+  fontSize: "34px",
   color: "var(--v5-on-brand)",
 };
 const nameStyle: CSSProperties = {
