@@ -32,7 +32,7 @@ export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; resumedOnThisDevice?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
-  orderDeadlineAt?: number; hiddenOrder?: { sku: string; total: Order['total'] };
+  orderDeadlineAt?: number; hiddenOrder?: { sku: string; total: Order['total']; placedAt?: number };
   lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
@@ -280,6 +280,8 @@ export async function readCheckoutCapacityPayment(accountKey: string, kind: 'CAP
   if (intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED') {
     return { status: 'SUCCEEDED', canResumeSameKey: false, receipt: intent.receipt };
   }
+  // A manual refund ended it; user reads still say MANUAL_REVIEW, the command query says REJECTED for the same key.
+  if (intent.refundStatus === 'REFUNDED') return { status: 'REJECTED', canResumeSameKey: false, message: 'PURCHASE_PAYMENT_REFUNDED' };
   const timing = purchasePaymentTiming(intent, Date.now());
   if (timing.canPay) return { status: 'AWAITING_PAYMENT', intentNo: intent.intentNo, cutoff: timing.cutoff };
   return { status: 'PROCESSING', canResumeSameKey: false };
@@ -972,7 +974,7 @@ export function rememberOrderPaymentBeforeHide(accountKey: string, order: Order)
       if (row.kind !== 'ORDER_PAY' || row.lastStatus !== 'EXPIRED' || !row.intentNo || row.validated || row.businessDelivered
         || !isOrdersPurchaseRecord(row) || purchaseRecordPayload(row).orderNo !== order.id) continue;
       save({ ...row, orderDeadlineAt: orderPaymentDeadline(row, order),
-        hiddenOrder: { sku: order.lineItems?.[0]?.sku ?? order.productId, total: order.total } }, accountKey);
+        hiddenOrder: { sku: order.lineItems?.[0]?.sku ?? order.productId, total: order.total, placedAt: order.placedAt } }, accountKey);
     }
   } catch {
     toast.error(getT().errors.txNotSavedTitle);
