@@ -160,6 +160,13 @@ export class PromotionCheckoutSession {
     if (!order || !this.confirmed || order.paymentStatus !== 'PENDING') throw new Error('ORDER_NOT_CONFIRMED');
     await this.mutate('cancelOrder', order.orderNo, key => this.ports.api.cancel(order.orderNo, key));
   }
+  /** The server definitively refused this cancellation because the order is being paid. */
+  async readAfterExternalPaymentRefusal(orderNo: string): Promise<void> {
+    const pending = this.record.pending;
+    if (pending?.operation !== 'cancelOrder' || pending.targetId !== orderNo) return;
+    const order = await this.ports.api.findOrder(orderNo);
+    if (order && this.ports.current() && this.record.pending?.key === pending.key) this.acceptOrder(order);
+  }
   private async mutate(operation: PromotionOperation, targetId: string, command: (key: string) => Promise<OrderReceipt>): Promise<void> {
     const previous = this.record.pending;
     // A refused external payment created nothing, so the order can still be cancelled; its key stays on record.

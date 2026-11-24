@@ -1198,7 +1198,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       Object.assign(line,{promotionDiscountUsdt:moneyFromMicros(quoteMicros(line.promotionDiscountUsdt??0)+discount),discountUsdt:moneyFromMicros(quoteMicros(line.discountUsdt)+discount),payableUsdt:moneyFromMicros(quoteMicros(line.payableUsdt)-discount)});
       Object.assign(quote,{promotionDiscountUsdt:moneyFromMicros(quoteMicros(quote.promotionDiscountUsdt??0)+discount),discountUsdt:moneyFromMicros(quoteMicros(quote.discountUsdt)+discount),amountUsdt:moneyFromMicros(quoteMicros(quote.amountUsdt)-discount)});
     }
-    if(quote.promotionDiscountUsdt&&Number(quote.amountUsdt)<=0)refuse('PROMOTION_DISCOUNT_REQUIRES_PAYMENT');
+    if(Number(quote.promotionDiscountUsdt)>0&&Number(quote.amountUsdt)<=0)refuse('PROMOTION_DISCOUNT_REQUIRES_PAYMENT');
     state.quotes||={};state.quotes[quote.quoteId]={...quote,voucherGrantId:voucher?.grantId};return quote;
   }
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);

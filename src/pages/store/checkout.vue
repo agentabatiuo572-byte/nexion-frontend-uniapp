@@ -2,7 +2,8 @@
 <template>
   <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : promotionRoute && promotionCheckout?.orderPending ? t.promotion.pending : auditCopy.review" /></template>
-    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle">
+    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle"
+      :external-order-no="cancelBlockedPayment?.orderNo" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
       </template>
@@ -278,6 +279,8 @@
            as order detail's dialogs do, so the tray can stay over the content under its mask. -->
       <NxNoticeDialog :open="leaveKeepOpen" icon="clock" tone="warning" :title="flowCopy.leaveKeepTitle" :body="purchasePaymentCopy(locale.code).keepOrderBody"
         :primary="flowCopy.cancelOrder" primary-tone="danger" :secondary="flowCopy.keepAndBack" focus-title @primary="leaveKeepCancel" @secondary="leaveKeepBack" />
+      <NxNoticeDialog :open="cancelBlockedOpen" icon="clock" :title="t.orders.cancelBlockedTitle" :body="t.orders.cancelBlockedBody"
+        :primary="t.orders.paymentInProgressContinue" :secondary="t.orders.cancelBlockedOk" @primary="resumeBlockedPayment" @secondary="cancelBlockedOpen = false" />
     </template>
     <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout(leaveCancelNeedsReadback)" /></view></NxSheet>
     <NxSheet :open="paymentBlocked !== ''" :title="flowCopy.cannotPay" @close="!checkoutLeaving && (paymentBlocked = '')"><view class="checkout-exit-error"><text>{{ paymentBlocked }}</text><NxButton :label="flowCopy.cancelOrder" :busy="checkoutLeaving" @click="cancelCheckout()" /></view></NxSheet>
@@ -360,7 +363,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { discoverOrderPayment, hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
@@ -412,6 +415,8 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 const locale = useLocaleStore();
 const flowCopy = computed(() => checkoutFlowCopy(locale.code));
 const leaveKeepOpen = ref(false);
+const cancelBlockedOpen = ref(false);
+const cancelBlockedPayment = shallowRef<{ orderNo: string; summary: string } | null>(null);
 let checkoutBackApproved = false;
 let leaveCancelNeedsReadback = false;
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
@@ -1359,6 +1364,8 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   paymentBlocked.value = '';
   settledResultReplay.value = false;
   checkoutLeaveError.value = '';
+  cancelBlockedOpen.value = false;
+  cancelBlockedPayment.value = null;
   checkoutLeaving.value = false;
   closePaymentSheet();
   remoteOrderFailure.value = null;
@@ -1714,6 +1721,10 @@ const stepDisplay = computed(() => ['confirmed','activating','live'].includes(st
 async function submitReview() {
   if (dialogsOpen > 0 || reAddingTradein.value || checkoutTrayBlock.value || pendingCreateUnresolved.value
       || checkoutPurchaseChecking.value || originalOrderNavigationFailed.value) return;
+  if (cancelBlockedPayment.value && cancelBlockedPayment.value.orderNo === createdCheckoutOrder.value?.orderNo) {
+    await resumeBlockedPayment();
+    return;
+  }
   const scope = captureCheckoutRoute();
   // A tap during a trial read waits for it, then goes on with fresh authority.
   if (trialQuoteUnavailable.value && !trialQuoteScreenUnavailable.value) {
@@ -2162,6 +2173,7 @@ function canConfirmCheckoutLeave(): boolean {
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value || created.paymentStatus !== 'PENDING'
       || confirming || paymentFlowBusy.value || checkoutLeaving.value || pendingCheckoutCreate.value) return false;
+  if (cancelBlockedPayment.value?.orderNo === created.orderNo) return false;
   const original = orders.getById(created.orderNo);
   if (original && original.status !== 'placed') return false;
   try {
@@ -2169,6 +2181,30 @@ function canConfirmCheckoutLeave(): boolean {
   } catch {
     return false;
   }
+}
+
+async function showCancelPaymentRefusal(orderNo: string, summary: string) {
+  const target = { orderNo, summary };
+  cancelBlockedPayment.value = target;
+  const scope = captureCheckoutRoute();
+  const current = () => isCurrentCheckoutRoute(scope) && cancelBlockedPayment.value === target;
+  await discoverOrderPayment(scope.accountKey, orderNo, summary, current);
+  if (current()) cancelBlockedOpen.value = true;
+}
+
+async function resumeBlockedPayment() {
+  const target = cancelBlockedPayment.value;
+  if (!target || purchasePayment.state.open) return;
+  const scope = captureCheckoutRoute();
+  const current = () => isCurrentCheckoutRoute(scope) && cancelBlockedPayment.value === target;
+  let payment = pendingOrderPayment(scope.accountKey, target.orderNo, true);
+  if (!payment) {
+    await discoverOrderPayment(scope.accountKey, target.orderNo, target.summary, current);
+    payment = pendingOrderPayment(scope.accountKey, target.orderNo, true);
+  }
+  if (!current()) return;
+  cancelBlockedOpen.value = !payment;
+  if (payment) void purchasePayment.resume(payment);
 }
 
 function leaveCheckout() {
@@ -2250,7 +2286,8 @@ async function cancelCheckout(explicitLeave = false) {
     const action = readOrderAction(scope.accountKey, created.orderNo);
     // A bank or USDT payment already started cannot be cancelled (ORDER_EXTERNAL_PAYMENT_IN_PROGRESS): back leaves the
     // order as it is, the payment bar keeps it in reach, and an unpaid one closes at its deadline.
-    if ((action?.kind === 'pay' && action.paymentMethod === 'EXTERNAL') || pendingOrderPayment(scope.accountKey, created.orderNo)) {
+    if ((action?.kind === 'pay' && action.paymentMethod === 'EXTERNAL') || pendingOrderPayment(scope.accountKey, created.orderNo)
+        || cancelBlockedPayment.value?.orderNo === created.orderNo) {
       leaveCheckout();
       return;
     }
@@ -2279,9 +2316,20 @@ async function cancelCheckout(explicitLeave = false) {
       // After an ambiguous response, the explicit retry only reads the original until its state is settled.
       if (explicitLeave && action?.kind === 'cancel') throw new Error('ORDER_CANCELLATION_UNCONFIRMED');
       const cancellation = beginOrderAction(scope.accountKey, 'cancel', created.orderNo, null);
-      const cancelled = await orders.cancelOrderRemote(created.orderNo);
+      const outcome = await orders.cancelOrderRemoteResult(created.orderNo);
       if (!isCurrentCheckoutRoute(scope)) return;
-      if (!cancelled) {
+      if (outcome === 'payment-in-progress') {
+        const latest = await orders.ensureRemoteOrder(created.orderNo).catch(() => undefined);
+        if (!isCurrentCheckoutRoute(scope)) return;
+        if (latest && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(latest.status)) {
+          orderId.value = latest.id;
+          presentSettledPurchase(false);
+          return;
+        }
+        await showCancelPaymentRefusal(order.id, order.productName);
+        return;
+      }
+      if (outcome !== 'cancelled') {
         const latest = orders.orders.find(item => item.id === created.orderNo);
         if (latest?.status === 'activated' || latest?.status === 'inventory') {
           clearOrderAction(scope.accountKey, created.orderNo, cancellation.key);

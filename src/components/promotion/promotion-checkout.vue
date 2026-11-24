@@ -210,7 +210,11 @@ import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-rev
 import { useConversations } from '@/store/conversations';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
 // trayHeight: the host's bottom tray as rendered (H5 measures it); without it the tray spacer estimates from the footer.
-const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number}>();
+const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number;externalOrderNo?:string}>();
+const emit=defineEmits<{
+  (event:'cancel-blocked',orderNo:string,summary:string):void;
+  (event:'resume-external'):void;
+}>();
 function formatDiscount(value: Parameters<typeof formatAmount>[0]): string {
   return formatCheckoutReviewAmount(value, 'USD', { discount: true });
 }
@@ -460,7 +464,8 @@ watch(()=>productCatalogState.status,status=>{
 });
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!createBlock.value&&!quoteBlock.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
 const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!paymentEligibilityRecoveryBusy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
-const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
+const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'
+  &&order.value.orderNo!==props.externalOrderNo&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
 function showOperationError(cause:unknown){
   const rejection=orderPaymentRejection(cause,locale.code);
@@ -659,6 +664,9 @@ async function checkPaymentEligibility(expected:PromotionOrder,entryCurrent:()=>
   return {ready:!blocked&&!rejected,blocked};
 }
 async function pay(){
+  if(order.value?.paymentStatus==='PENDING'&&order.value.orderNo===props.externalOrderNo){
+    emit('resume-external');return;
+  }
   updateClock();if(paymentEntryChecking.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
   if(session.externalPaymentRefused){
     paymentSheetOpen.value=true;
@@ -878,14 +886,21 @@ useAutoRecovery({
   repeatMs:15_000,
 });
 async function startNewPurchase(){if(!canStartNew.value||props.orderNo||openedOriginal)return;session.startNewPurchase();voucherId.value=props.voucherId?.trim()||null;revision.value++;await loadQuote();}
-async function cancelOrder(explicitLeave=false):Promise<boolean>{
+async function cancelOrder(explicitLeave=false):Promise<boolean|'payment-in-progress'>{
   if(!canCancel.value||!current()||!visible.value)return false;
   const original=order.value!.orderNo;
-  let verified=false;
+  const summary=order.value!.items?.map(selectedItemName).join(', ')||t.value.store.coConfirmPurchase;
+  let verified=false,paymentInProgress=false;
   await run(async()=>{
     try{await session.cancel();}
+    catch(cause){
+      if(!isApiRefusal(cause,409,'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS'))throw cause;
+      paymentInProgress=true;
+      if(current()&&visible.value)await session.readAfterExternalPaymentRefusal(original).catch(()=>undefined);
+      return;
+    }
     finally{
-      if(current()){
+      if(!paymentInProgress&&current()){
         // A late payment may win the server's order lock. Read the original outcome even after a lost/409 cancel response.
         if(!explicitLeave||session.record.pending?.operation==='cancelOrder')await session.recover();
         verified=true;
@@ -893,6 +908,9 @@ async function cancelOrder(explicitLeave=false):Promise<boolean>{
     }
   });
   if(current()&&visible.value&&!unknown.value&&order.value?.paymentStatus==='PAID'){error.value='';await readActivation();return false;}
+  if(paymentInProgress&&current()&&visible.value){
+    error.value='';emit('cancel-blocked',original,summary);return 'payment-in-progress';
+  }
   const cancelled=verified&&current()&&visible.value&&order.value?.orderNo===original&&!unknown.value&&['CANCELLED','EXPIRED'].includes(order.value.paymentStatus);
   if(!cancelled&&current())error.value=flowCopy.value.cancelFailed;
   return cancelled;
@@ -908,7 +926,7 @@ let paymentLeaveApproved=false;
 function canConfirmLeave():boolean{
   const original=session.record.order;
   return !!original&&original.paymentStatus==='PENDING'&&!session.unknown&&!session.record.pending
-    &&!pendingOrderPayment(account,original.orderNo)&&current()&&visible.value&&!writeBusy.value
+    &&original.orderNo!==props.externalOrderNo&&!pendingOrderPayment(account,original.orderNo)&&current()&&visible.value&&!writeBusy.value
     &&!paymentConfirming.value&&!paymentEntryChecking.value&&!leaving.value;
 }
 async function requestLeave(explicitCancel=false):Promise<boolean>{
@@ -917,7 +935,7 @@ async function requestLeave(explicitCancel=false):Promise<boolean>{
   // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
   const pending=session.record.pending;
   if((pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)
-    ||(order.value&&pendingOrderPayment(account,order.value.orderNo)))return !explicitCancel&&!writeBusy.value&&!paymentConfirming.value;
+    ||(order.value&&(order.value.orderNo===props.externalOrderNo||pendingOrderPayment(account,order.value.orderNo))))return !explicitCancel&&!writeBusy.value&&!paymentConfirming.value;
   if(!current()||!visible.value||writeBusy.value||paymentConfirming.value||paymentEntryChecking.value||leaving.value)return false;
   if(!session.record.order&&!session.record.pending)return true;
   leaving.value=true;paymentSheetOpen.value=false;
@@ -933,6 +951,7 @@ async function requestLeave(explicitCancel=false):Promise<boolean>{
     if(payWindow.value===null){error.value=p.value.unknown;return false;}
     if(explicitCancel&&(session.record.pending||pendingOrderPayment(account,original.orderNo)))return false;
     const cancelled=await cancelOrder(explicitCancel);
+    if(cancelled==='payment-in-progress')return false;
     if(!cancelled&&current()&&visible.value&&session.record.order?.paymentStatus!=='PAID'&&!error.value)error.value=t.value.orders.resultReadback;
     return cancelled;
   }finally{leaving.value=false;}

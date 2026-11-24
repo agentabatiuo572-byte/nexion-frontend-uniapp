@@ -3,6 +3,7 @@ import { fixture as reviewFixture } from './design-review-fixture.mjs';
 
 // Synthetic SMS code for the local harness only; it is never included in an API response or product UI.
 export const paymentPinFixtureOtp = '012345';
+const paymentWindow = 30 * 60_000;
 
 export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
   const orders = new Map(), quotes = new Map(), commands = new Map(), challenges = new Map(), proofs = new Map();
@@ -87,25 +88,64 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     }
     if(path.startsWith(pin+'/commands/'))return ok(commands.get('security:'+decodeURIComponent(path.split('/').at(-1)))??{commandKey:decodeURIComponent(path.split('/').at(-1)),status:'NOT_SEEN',canResumeSameKey:false});
     if(path==='/api/orders/quote'){
-      const quote=reviewFixture(url,'zh',{},request);quote.quoteId='pin-quote-'+(quotes.size+1);quote.quoteHash=quote.quoteId;
-      quotes.set(quote.quoteId,quote);return ok(quote);
+      const quotedAt=now();
+      const quote=reviewFixture(url,'zh',{},request);
+      let activityEndsAt=Infinity;
+      if(body.activityId){
+        const {items:offers}=reviewFixture(new URL('/api/promotions',url.origin),'zh',{promotions:true},request);
+        const activity=offers.find(offer=>offer.activityId===body.activityId);
+        activityEndsAt=Date.parse(activity?.endsAt);
+        if(!activity||activity.state!=='ACTIVE'||Date.parse(activity.startsAt)>quotedAt||!(activityEndsAt>quotedAt))
+          return fail(409,'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
+        for(const item of quote.items){
+          const rule=activity.rewardRules.find(rule=>rule.productNo===item.productNo&&item.quantity>=rule.minBuyQty);
+          if(!rule)continue;
+          const {disclosure,...reward}=rule.buyerReward;
+          quote.expectedRewards.push({lineId:item.lineId,activityId:activity.activityId,version:activity.version,
+            ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,
+            groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});
+        }
+        if(!quote.expectedRewards.length)return fail(409,'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
+        quote.activityId=activity.activityId;quote.activityVersion=activity.version;
+      }
+      quote.quoteId='pin-quote-'+(quotes.size+1);quote.quoteHash=quote.quoteId;
+      quote.serverTime=new Date(quotedAt).toISOString();
+      quote.expiresAt=new Date(Math.min(quotedAt+300000,activityEndsAt)).toISOString();
+      quotes.set(quote.quoteId,{quote,activityEndsAt});return ok(quote);
     }
     if((path==='/api/orders'||path==='/api/orders/bundle')&&method==='POST'){
-      const quote=quotes.get(body.promotionQuoteId);if(!quote)return fail(422,'QUOTE_REQUIRED');
-      quote.quantity=quote.items.reduce((total,item)=>total+item.quantity,0);
-      const now=Date.now(), orderNo='PIN-FLOW-'+(orders.size+1), amount=Number(quote.amountUsdt);
-      const order={orderNo,productId:1,productNo:quote.items[0].productNo,productName:'UVEL Box S1',quantity:quote.quantity,subtotalUsdt:Number(quote.subtotalUsdt),unitPriceUsdt:1299,discountUsdt:0,amountUsdt:quote.amountUsdt,promotionQuoteId:quote.quoteId,paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',orderType:quote.items.length>1?'BUNDLE':'SINGLE',placedAt:now,expiresAt:now+300000,paidAt:null,activatedAt:null,refundedAt:null,refundAmountUsdt:null,refundChannel:null,refundBillNo:null,dataCenter:null,tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:null,itemCount:quote.itemCount,payBy:new Date(now+300000).toISOString(),rewards:[],items:quote.items.map((item,i)=>({...item,lineId:'pin-line-'+i,productName:'UVEL Box S1'})),lineItems:null};
+      const entry=quotes.get(body.promotionQuoteId);if(!entry)return fail(422,'QUOTE_REQUIRED');
+      const {quote,activityEndsAt}=entry,placedAt=now();
+      if(placedAt>=Date.parse(quote.expiresAt))return fail(409,'QUOTE_EXPIRED');
+      const expiresAt=Math.min(placedAt+paymentWindow,activityEndsAt);
+      const {products}=reviewFixture(new URL('/api/store/catalog',url.origin),'zh',{},request);
+      const items=quote.items.map(item=>({...item,productName:products.find(product=>product.id===item.productNo).name}));
+      const lineItems=items.map(({productNo,productName,quantity,unitPriceUsdt,subtotalUsdt})=>({
+        sku:productNo,name:productName,quantity,unitPriceUsdt:Number(unitPriceUsdt),lineAmountUsdt:Number(subtotalUsdt),
+      }));
+      const [first]=lineItems,orderNo='PIN-FLOW-'+(orders.size+1);
+      const order={orderNo,productId:products.findIndex(product=>product.id===first.sku)+1,
+        productNo:first.sku,productName:first.name,quantity:quote.quantity,subtotalUsdt:Number(quote.subtotalUsdt),
+        unitPriceUsdt:first.unitPriceUsdt,discountUsdt:Number(quote.discountUsdt),amountUsdt:quote.amountUsdt,
+        promotionQuoteId:quote.quoteId,paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',
+        orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',
+        orderType:items.length>1?'BUNDLE':'SINGLE',placedAt,expiresAt,paidAt:null,activatedAt:null,
+        refundedAt:null,refundAmountUsdt:null,refundChannel:null,refundBillNo:null,dataCenter:null,
+        tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:null,
+        itemCount:items.length,payBy:new Date(expiresAt).toISOString(),rewards:quote.expectedRewards,items,lineItems};
       orders.set(orderNo,order);return ok({...order,paymentMethod:null});
     }
     const pay=path.match(/^\/api\/orders\/([^/]+)\/pay$/);
     if(pay&&method==='POST'){
       const order=orders.get(decodeURIComponent(pay[1]));if(!order)return fail(404,'ORDER_NOT_FOUND');
       if(order.paymentStatus==='PAID')return ok(order);
+      if(order.expiresAt<=now())return fail(409,'ORDER_PAYMENT_EXPIRED');
       const authorization=authorize(body);
       if(authorization.status!==200)return authorization;
       const amount=Number(order.amountUsdt);
       state.payWrites++;state.balance-=amount;
-      Object.assign(order,{paymentMethod:amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt:amount.toFixed(2),paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paidAt:Date.now(),activatedAt:Date.now(),targetDeviceId:90301,targetDeviceInstanceNo:'PIN-FLOW-DEVICE',paymentNo:'PIN-FLOW-PAYMENT'});
+      const paidAt=now();
+      Object.assign(order,{paymentMethod:amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt:amount.toFixed(2),paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paidAt,activatedAt:paidAt,targetDeviceId:90301,targetDeviceInstanceNo:'PIN-FLOW-DEVICE',paymentNo:'PIN-FLOW-PAYMENT'});
       commands.set('order-pay:'+key,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,receipt:order});
       return {...ok(order),drop:state.dropNextPayment?(state.dropNextPayment=false,true):false};
     }
