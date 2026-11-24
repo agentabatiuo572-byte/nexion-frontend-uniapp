@@ -201,6 +201,13 @@ function pendingPayments() {
     return [];
   }
 }
+export function unfinishedPurchasePayments(records = pendingPayments()) {
+  return records.filter(isUnfinishedPurchaseRecord);
+}
+
+export function unfinishedOrderPayment(orderNo: string) {
+  return unfinishedPurchasePayments().find(row => row.kind === 'ORDER_PAY' && purchaseRecordPayload(row).orderNo === orderNo);
+}
 // Rows closed on the floating bar, for this run of the App only. The records stay; a new payment or a new status shows again.
 const dismissedResume = reactive(new Set<string>());
 // Only entering manual confirmation brings a closed payment back (PRD 购买付款流程 line 50); other status changes do not.

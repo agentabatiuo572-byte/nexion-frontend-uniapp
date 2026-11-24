@@ -201,7 +201,7 @@ import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadlin
 import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { promotionBundleHref, promotionCheckoutHref, promotionStoreHref, type PromotionDisclosure } from '@/lib/promotion-entry';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { onPurchaseRecordReleased, pendingOrderPayment, refusedPurchasePayment, replaceWithOrder, usePurchasePayment } from '@/store/purchase-payment';
+import { onPurchaseRecordReleased, unfinishedOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { attributedBundleDiscount } from '@/api/bundle-quote';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
@@ -210,7 +210,7 @@ import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-rev
 import { useConversations } from '@/store/conversations';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
 // trayHeight: the host's bottom tray as rendered (the host reads it); until it is read the tray spacer estimates from the footer.
-const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number;externalOrderNo?:string}>();
+const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number;externalOrderNo?:string;leaveConfirmationOpen?:boolean}>();
 const emit=defineEmits<{
   (event:'cancel-blocked',orderNo:string,summary:string):void;
   (event:'resume-external'):void;
@@ -674,27 +674,29 @@ async function pay(){
     return;
   }
   paymentEntryChecking.value=true;
+  const generation=readGeneration;
+  const stillChecking=()=>readCurrent(generation)&&!props.leaveConfirmationOpen&&!leaving.value&&!nativeBackApproved;
   try{
     // Keep the original order amount. A current quote is not current purchase
     // permission: all original lines need fresh overall server decisions.
     const recovered=await recover();
-    if(recoveryReadFailed.value&&current()&&visible.value)error.value=flowCopy.value.queryFailed;
-    if(!recovered||!canPay.value||!current()||!visible.value)return;
+    if(!stillChecking())return;
+    if(recoveryReadFailed.value)error.value=flowCopy.value.queryFailed;
+    if(!recovered||!canPay.value)return;
     const expectedOrder=order.value;
     if(!expectedOrder)return;
-    const entryCurrent=paymentEntryFence(expectedOrder);
-    let ready=false,blocked='';
-    await run(async()=>{
-      const result=await checkPaymentEligibility(expectedOrder,entryCurrent);
-      ready=result?.ready??false;
-      blocked=result?.blocked??'';
-    });
-    if(ready&&entryCurrent()&&canPay.value){paymentSheetOpen.value=true;void confirmPayment();}
-    else if(blocked&&entryCurrent()&&canCancel.value){
-      const cancel=await confirm({title:flowCopy.value.cannotPay,message:blocked,confirmLabel:p.value.cancelOrder,cancelLabel:p.value.keep,owner:paymentDialogOwner});
+    const originalCurrent=paymentEntryFence(expectedOrder);
+    const entryCurrent=()=>stillChecking()&&originalCurrent();
+    error.value='';activityConflict.value=false;
+    const result=await checkPaymentEligibility(expectedOrder,entryCurrent);
+    if(!entryCurrent())return;
+    if(result?.ready&&canPay.value){paymentSheetOpen.value=true;void confirmPayment();}
+    else if(result?.blocked&&canCancel.value){
+      const cancel=await confirm({title:flowCopy.value.cannotPay,message:result.blocked,confirmLabel:p.value.cancelOrder,cancelLabel:p.value.keep,owner:paymentDialogOwner});
       if(cancel&&entryCurrent())await cancelOrder();
     }
-  }finally{paymentEntryChecking.value=false;}
+  }catch(cause){if(stillChecking())showOperationError(cause);}
+  finally{paymentEntryChecking.value=false;}
 }
 async function confirmPayment(){
   updateClock();if(!paymentSheetOpen.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
@@ -923,7 +925,7 @@ function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(pro
 let disposeGuard:(()=>void)|null=null;
 // A leave the user confirmed inside the payment flow keeps the order for later; it is not a checkout cancel.
 let paymentLeaveApproved=false;
-const backDisabled=computed(()=>writeBusy.value||paymentConfirming.value||paymentEntryChecking.value||leaving.value);
+const backDisabled=computed(()=>writeBusy.value||paymentConfirming.value||leaving.value);
 function canConfirmLeave():boolean{
   return current()&&visible.value&&!backDisabled.value&&session.confirmed&&!session.unknown&&!recoveryReadFailed.value
     &&!session.record.pending&&order.value?.paymentStatus==='PENDING'&&!externalPaying.value;
@@ -949,7 +951,7 @@ async function requestLeave(intent:'back'|'route'|'cancel'):Promise<boolean>{
     // Missing trusted time cannot turn an unresolved original order into a
     // successful cancellation. Keep it visible until a read settles it.
     if(payWindow.value===null){error.value=p.value.unknown;return false;}
-    if(explicitCancel&&(session.record.pending||pendingOrderPayment(account,original.orderNo)))return false;
+    if(explicitCancel&&(session.record.pending||externalPaying.value))return false;
     const cancelled=await cancelOrder(explicitCancel);
     if(cancelled==='payment-in-progress')return false;
     if(!cancelled&&current()&&visible.value&&session.record.order?.paymentStatus!=='PAID'&&!error.value)error.value=t.value.orders.resultReadback;
@@ -985,7 +987,7 @@ function refreshForegroundReview():boolean{
   if(!current()||!visible.value||!auth.isAuthenticated||purchaseReadBusy())return false;
   try{
     const changed=session.restoreForegroundRecovery();
-    const signature=order.value?JSON.stringify(pendingOrderPayment(account,order.value.orderNo)):undefined;
+    const signature=order.value?JSON.stringify(unfinishedOrderPayment(order.value.orderNo)??null):undefined;
     const paymentChanged=signature!==foregroundPaymentSignature;
     foregroundPaymentSignature=signature;
     if(changed||paymentChanged){
@@ -1058,14 +1060,12 @@ const trayNotice=computed(()=>{
 });
 // The page title says 待支付 while the original order waits for payment (board CkPend).
 const orderPending=computed(()=>order.value?.paymentStatus==='PENDING');
-const purchasePayment=usePurchasePayment();
 const externalPaying=computed(()=>{
   void revision.value;
-  void purchasePayment.state.revision;
   const original=order.value,pending=session.record.pending;
   return original?.paymentStatus==='PENDING'&&(original.orderNo===props.externalOrderNo
     ||pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused
-    ||!!pendingOrderPayment(account,original.orderNo));
+    ||!!unfinishedOrderPayment(original.orderNo));
 });
 // The quote carries a policy version but no tier rate.
 const bundleTierPct=null;

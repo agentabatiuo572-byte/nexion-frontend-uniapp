@@ -3,7 +3,7 @@
   <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : promotionRoute && promotionCheckout?.orderPending ? t.promotion.pending : auditCopy.review" /></template>
     <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle"
-      :external-order-no="cancelBlockedPayment?.orderNo" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment">
+      :external-order-no="cancelBlockedPayment?.orderNo" :leave-confirmation-open="leaveKeepOpen" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
       </template>
@@ -364,7 +364,7 @@ import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
-import { discoverOrderPayment, hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { discoverOrderPayment, hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, unfinishedOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { parseTrialConvertReceipt } from "@/api/trial-api";
@@ -2172,10 +2172,9 @@ function releaseSessionOnLeave() {
 }
 
 const originalExternalPaying = computed(() => {
-  void purchasePayment.state.revision;
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value) return false;
-  return !!pendingOrderPayment(app.accountKey, created.orderNo);
+  return !!unfinishedOrderPayment(created.orderNo);
 });
 
 function originalCheckoutAwaitingPayment(): boolean {
@@ -3165,7 +3164,12 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
 }
 
 async function refreshKnownCheckoutOrder(scope: CheckoutRouteScope, orderNo: string) {
-  const order = await orders.ensureRemoteOrder(orderNo).catch(() => undefined);
+  let order;
+  try {
+    order = await orders.ensureRemoteOrder(orderNo);
+  } catch {
+    return; // A failed read leaves the last known order in effect.
+  }
   if (!isCurrentCheckoutRoute(scope) || createdCheckoutOrder.value?.orderNo !== orderNo) return;
   originalOrderReadUnavailable.value = !order;
   if (order && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status)) {
