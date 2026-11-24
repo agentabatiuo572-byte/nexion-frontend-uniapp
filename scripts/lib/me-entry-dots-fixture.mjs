@@ -16,7 +16,8 @@ const weeklyQuestCode = 'demo-me-dot-week-0';
 const weeklyRewardNex = 150;
 const dayOneQuestCode = 'demo-me-dot-day-one';
 const dayOneRewardNex = 500;
-const paymentOrderNo = 'DEMO-ME-DOT-PAY';
+const orderPrefix = 'DEMO-ME-DOT-';
+const paymentOrderNo = orderPrefix + 'PAY';
 const paymentLookupPath = '/api/app/purchase-payment-intents/by-order/' + paymentOrderNo;
 const canonical = { serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '' };
 const refuse = (status, message) => { throw Object.assign(new Error(message), { status }); };
@@ -57,7 +58,7 @@ function specimenOrders(payload, fixture) {
   const template = payload.orders.find(row => row.canonicalStatus === 'cancelled');
   const delivered = payload.orders.find(row => row.canonicalStatus === 'activated');
   const rows = fixture.waves.map((at, index) => ({
-    ...delivered, orderNo: 'DEMO-ME-DOT-' + (index + 1), placedAt: at - 600_000,
+    ...delivered, orderNo: orderPrefix + (index + 1), placedAt: at - 600_000,
     paidAt: at - 480_000, activatedAt: at - 420_000, targetDeviceInstanceNo: inventoryInstance(index),
   }));
   if (fixture.payment !== 'none') {
@@ -85,7 +86,7 @@ function specimenOrders(payload, fixture) {
     });
     rows.push(pending);
     for (let index = 0; index < fixture.newerOrders; index++) {
-      rows.push({ ...template, orderNo: 'DEMO-ME-DOT-HISTORY-' + index, placedAt: placedAt + 1000 * (index + 1) });
+      rows.push({ ...template, orderNo: orderPrefix + 'HISTORY-' + index, placedAt: placedAt + 1000 * (index + 1) });
     }
   }
   return rows.sort((left, right) => right.placedAt - left.placedAt);
@@ -177,7 +178,7 @@ export function createMeEntryDotsFixture(previewState) {
     return demoOrderTimedOut(order, previewState, now) ? 'expired' : 'placed';
   }
 
-  function configure(accountId, update) {
+  function configure(accountId, update, resetOrderHides) {
     let fixture = update.reset ? undefined : accounts.get(accountId);
     if (update.weekState !== undefined) refuse(422, 'ME_DOTS_USE_SERVER_TIME');
     if (fixture && (update.week !== undefined || update.weekTarget !== undefined)) refuse(409, 'ME_DOTS_WEEK_ALREADY_PUBLISHED');
@@ -248,11 +249,19 @@ export function createMeEntryDotsFixture(previewState) {
     if (update.delay === null || [...Object.values(sources), 'receipt-detail'].includes(update.delay)) fixture.delay = update.delay;
     fixture.failStatus = update.failStatus === 403 ? 403 : 503;
     fixture.delayMs = Math.max(0, Math.min(10000, Number(update.delayMs ?? fixture.delayMs ?? 1500)));
+    if (update.reset) resetOrderHides?.(accountId, orderNo => orderNo.startsWith(orderPrefix));
     accounts.set(accountId, fixture);
     return { ...fixture, serverNow: now, currentWeek: week };
   }
 
-  async function read(url, accountId, baseRead) {
+  function orderProjection(accountId, payload) {
+    const fixture = accounts.get(accountId);
+    if (!fixture) return undefined;
+    fixture.payment = paymentAt(fixture, serverNow(fixture));
+    return { ...payload, orders: specimenOrders(payload, fixture) };
+  }
+
+  async function read(url, accountId, baseRead, paginateOrderPage) {
     const fixture = accounts.get(accountId);
     const path = url.pathname;
     if (!fixture) return undefined;
@@ -273,14 +282,15 @@ export function createMeEntryDotsFixture(previewState) {
     let data;
     if (!failed) {
       if (source === 'orders') {
-        fixture.payment = paymentAt(fixture, serverNow(fixture));
-        const payload = baseRead(path);
-        const rows = specimenOrders(payload, fixture);
-        const limit = Number(url.searchParams.get('pageSize') ?? 20);
-        const cursor = url.searchParams.get('beforeOrderNo');
-        const offset = cursor ? rows.findIndex(row => row.orderNo === cursor) + 1 : 0;
-        const orders = rows.slice(offset, offset + limit);
-        data = { ...payload, orders, nextCursor: rows.length > offset + limit ? orders.at(-1).orderNo : null };
+        const payload = orderProjection(accountId, baseRead(path));
+        if (paginateOrderPage) data = paginateOrderPage(url, accountId, payload, 20);
+        else {
+          const limit = Number(url.searchParams.get('pageSize') ?? 20);
+          const cursor = url.searchParams.get('beforeOrderNo');
+          const offset = cursor ? payload.orders.findIndex(row => row.orderNo === cursor) + 1 : 0;
+          const orders = payload.orders.slice(offset, offset + limit);
+          data = { ...payload, orders, nextCursor: payload.orders.length > offset + limit ? orders.at(-1).orderNo : null };
+        }
       } else if (source === 'missions') {
         data = specimenQuests(baseRead(url.pathname + url.search), fixture, serverNow(fixture), url.searchParams.get('locale'));
       } else {
@@ -373,5 +383,5 @@ export function createMeEntryDotsFixture(previewState) {
     };
   }
 
-  return { configure, read, handlesClaim, claim, handlesCancel, cancelOrder };
+  return { configure, read, orderProjection, handlesClaim, claim, handlesCancel, cancelOrder };
 }

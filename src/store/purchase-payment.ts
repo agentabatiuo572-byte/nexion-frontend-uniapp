@@ -1,4 +1,4 @@
-import { reactive } from 'vue';
+import { reactive, type InjectionKey, type Ref } from 'vue';
 import { canSelectNewUsdtNetwork, isVisibleUsdtNetwork } from '@/lib/usdt-network-options';
 import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
@@ -6,7 +6,7 @@ import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
 import type { PaymentCommandReceipt } from '@/api/payment-command-api';
 import { useApp } from './app';
-import { useOrders } from './orders';
+import { useOrders, type Order } from './orders';
 import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
 import { clearOrderAction, readOrderAction } from '@/lib/order-command-fence';
 import { navTo, navReplace, navBack } from '@/lib/route';
@@ -19,6 +19,9 @@ import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order
 import { getT } from '@/i18n/use-t';
 import { toast } from './ui';
 
+/** Height of the page's floating payment bar, 0 while it is hidden. The bar measures itself and writes it; the chassis
+ *  only reads it to lift the support shortcut and pad the content, so the two never measure each other. */
+export const PAYMENT_BAR_HEIGHT_KEY: InjectionKey<Ref<number>> = Symbol('nx-payment-bar-height');
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
   scopeCurrent?: () => boolean;
@@ -28,7 +31,9 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
 export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
-  intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
+  intentNo?: string; lookupOnly?: boolean; resumedOnThisDevice?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
+  orderDeadlineAt?: number; hiddenOrder?: { sku: string; total: Order['total'] };
+  lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
@@ -94,7 +99,17 @@ const account = () => useApp().accountKey;
 function rows(accountKey = account()): PendingRow { return readAccountRow<PendingRow>(TABLE, accountKey, true) ?? { records: {} }; }
 function save(pending: PendingExternal, accountKey = state.accountKey) {
   const value = rows(accountKey);
-  if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: pending } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
+  const previous = value.records[pending.commandKey];
+  const record = { ...pending, startedAt: previous?.startedAt ?? pending.startedAt,
+    resumedOnThisDevice: pending.resumedOnThisDevice ?? previous?.resumedOnThisDevice,
+    orderDeadlineAt: pending.orderDeadlineAt ?? previous?.orderDeadlineAt,
+    hiddenOrder: pending.hiddenOrder ?? previous?.hiddenOrder };
+  if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: record } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
+  if (record.lastStatus !== 'EXPIRED') {
+    const expired = unsavedExpiries.get(accountKey);
+    expired?.delete(record.commandKey);
+    if (expired && !expired.size) unsavedExpiries.delete(accountKey);
+  }
   state.revision++;
 }
 function saveExpiry(accountKey: string, commandKey: string, kind: PurchaseKind, observed?: PendingExternal) {
@@ -189,24 +204,30 @@ function unsettledCheckoutPayments(includeTradein: boolean) {
 }
 
 /** The progress bar can outlive both a closed payment layer and a released checkout pointer. */
-// Checkout and the floating bar read the same unfinished payments: one read at a time, at most every 10 seconds, shared by both.
+// Checkout, the floating bar and Orders share one passive read, at most every 10 seconds.
 let passiveRead: Promise<unknown> | null = null, passiveReadAt = 0;
 function sharedPassiveRead(run: () => Promise<unknown>): Promise<unknown> {
   if (passiveRead || Date.now() - passiveReadAt < 10_000) return passiveRead ?? Promise.resolve();
   passiveRead = run().finally(() => { passiveRead = null; passiveReadAt = Date.now(); });
   return passiveRead;
 }
-/** The floating bar reads its payments while it shows: an ended payment leaves the bar, and a final status replaces "in progress". */
-export function refreshPendingPayments(accountKey: string, current: () => boolean, shouldRead: (row: PendingExternal) => boolean = () => true): Promise<unknown> {
+/** Read the currently displayed payments and project their latest confirmed result. */
+export function refreshPendingPayments(accountKey: string, current: () => boolean, shouldRead: (row: PendingExternal) => boolean = () => true,
+  includeExpiredOrderPayments = false): Promise<unknown> {
   if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
   const app = useApp();
   const binding = app.accountBindingEpoch;
   const sameAccount = () => app.accountKey === accountKey && app.accountBindingEpoch === binding;
-  const records = pendingPayments().filter(row => row.lastStatus !== 'DELIVERED' && !row.businessDelivered && shouldRead(row));
+  let candidates: PendingExternal[];
+  try { candidates = includeExpiredOrderPayments ? displayRecords() : pendingPayments(); }
+  catch { return Promise.resolve(); }
+  const records = candidates.filter(row => row.lastStatus !== 'DELIVERED' && !row.businessDelivered && shouldRead(row));
   if (!records.length) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(records.map(async pending => {
-    const intent = await readIntent(pending);
+    const expired = pending.lastStatus === 'EXPIRED';
+    const intent = expired && pending.intentNo ? await api.snapshot(pending.intentNo) : await readIntent(pending);
     if (!sameAccount() || !current() || state.open || !shouldRead(pending)) return;
+    if (expired && intent && intent.status !== 'MANUAL_REVIEW') return;
     const orderNo = projectPassivePayment(accountKey, pending, intent);
     if (orderNo) await useOrders().reconcileRemoteOrder(orderNo, () => sameAccount() && foregroundReadAllowed());
   })));
@@ -221,11 +242,13 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   }
   if (!isVisiblePayment(intent)) { hideOriginalPayment(accountKey, pending, intent); return; }
   matches(intent, pending);
-  if (intent.status === pending.lastStatus || !settled(intent)) return;
+  const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
+  if (!businessDelivered && (intent.status === pending.lastStatus || !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
+  const orderDeadlineAt = pending.kind === 'ORDER_PAY' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined;
   if (intent.status === 'EXPIRED') {
-    saveExpiry(accountKey, pending.commandKey, pending.kind);
+    saveExpiry(accountKey, pending.commandKey, pending.kind, { ...pending, intentNo: intent.intentNo,
+      paymentMethod: intent.paymentMethod, network: intent.network, orderDeadlineAt });
   } else {
-    const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
     if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
     save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
   }
@@ -276,7 +299,9 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   matches(intent, pending);
   // Legacy recovery rows have only the quote identity; bind their first validated original intent for subsequent reads.
   const known = { ...pending, paymentMethod: intent.paymentMethod, network: intent.network,
+    orderDeadlineAt: pending.kind === 'ORDER_PAY' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined,
     intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
+  if (isOrderPaymentDiscoveryOnly(pending)) known.resumedOnThisDevice = true;
   delete known.quotaRefusal;
   if (known.businessDelivered) {
     const payload = JSON.parse(known.fingerprint)[1] as Record<string, unknown>;
@@ -597,7 +622,8 @@ async function query() {
         if (intent.kind === 'TRIAL_CONVERT') payload.expectedAmountUsdt = intent.subtotalUsdt;
         else if (intent.businessAmountUsdt) payload.expectedPayableUsdt = intent.businessAmountUsdt;
         const original = { ...recovery, fingerprint: JSON.stringify([recovery.kind, payload]),
-          commandKey: intent.commandKey, paymentQuoteId: intent.paymentQuoteId, lookupOnly: true };
+          commandKey: intent.commandKey, paymentQuoteId: intent.paymentQuoteId, lookupOnly: true,
+          startedAt: intent.createdAt ? Date.parse(intent.createdAt) : undefined };
         if (context) {
           const caller = activeChoice;
           context = null;
@@ -769,8 +795,10 @@ async function confirm() {
   clearTimeout(quoteTimer);
   const original = rows(state.accountKey).records[commandKey];
   if (original) { state.pending = original; await query(); return; }
+  const orderDeadlineAt = expected.kind === 'ORDER_PAY'
+    ? (quote.deadlineAt ? Date.parse(quote.deadlineAt) : expected.deadlineAt ?? undefined) : undefined;
   const pending = { fingerprint: scope, kind: expected.kind, commandKey, paymentQuoteId: quote.paymentQuoteId,
-    paymentMethod: quote.paymentMethod, network: quote.network, summary: expected.summary };
+    paymentMethod: quote.paymentMethod, network: quote.network, summary: expected.summary, startedAt: Date.now(), orderDeadlineAt };
   save(pending); state.pending = pending;
   await submitOriginal();
 }
@@ -901,6 +929,66 @@ export function acknowledgePurchasePayment(result: Extract<PurchaseChoice, { met
     toast.error(getT().errors.billMissingTitle);
   }
 }
+
+export function purchaseRecordPayload(row: PendingExternal): Record<string, unknown> {
+  try {
+    const payload: unknown = JSON.parse(row.fingerprint)[1];
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) return payload as Record<string, unknown>;
+  } catch { /* An unreadable local record has no purchase fields to display. */ }
+  return {};
+}
+
+export function isUnfinishedPurchaseRecord(row: PendingExternal): boolean {
+  return !row.validated && !row.businessDelivered && !row.quotaRefusal
+    && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'DELIVERED';
+}
+
+function isOrderPaymentDiscoveryOnly(row: PendingExternal): boolean {
+  return row.kind === 'ORDER_PAY' && !!row.lookupOnly && row.startedAt === undefined && row.resumedOnThisDevice !== true;
+}
+
+/** Orders shows discovered order payments and checks their expiry after an explicit local resume. */
+export function isOrdersPurchaseRecord(row: PendingExternal): boolean {
+  if (row.kind === 'ORDER_PAY') return !isOrderPaymentDiscoveryOnly(row);
+  return !row.lookupOnly || row.startedAt !== undefined || !!row.intentNo;
+}
+
+export function orderPaymentDeadline(row: PendingExternal, order?: Pick<Order, 'expiresAt' | 'placedAt'>): number | undefined {
+  if (row.orderDeadlineAt !== undefined && Number.isFinite(row.orderDeadlineAt)) return row.orderDeadlineAt;
+  const deadlineAt = purchaseRecordPayload(row).deadlineAt;
+  const time = typeof deadlineAt === 'string' ? Date.parse(deadlineAt) : deadlineAt;
+  if (typeof time === 'number' && Number.isFinite(time)) return time;
+  if (order) return order.expiresAt ?? order.placedAt + 30 * 60_000;
+}
+
+/** Keep the expired order's facts before B81 can remove it from later reads. */
+export function rememberOrderPaymentBeforeHide(accountKey: string, order: Order) {
+  if (accountKey !== account()) return;
+  try {
+    for (const row of displayRecords()) {
+      if (row.kind !== 'ORDER_PAY' || row.lastStatus !== 'EXPIRED' || !row.intentNo || row.validated || row.businessDelivered
+        || !isOrdersPurchaseRecord(row) || purchaseRecordPayload(row).orderNo !== order.id) continue;
+      save({ ...row, orderDeadlineAt: orderPaymentDeadline(row, order),
+        hiddenOrder: { sku: order.lineItems?.[0]?.sku ?? order.productId, total: order.total } }, accountKey);
+    }
+  } catch {
+    toast.error(getT().errors.txNotSavedTitle);
+  }
+}
+
+/** An order with a known unfinished payment cannot be hidden, even during confirmation. */
+export function hasUnfinishedOrderPayment(accountKey: string, orderNo: string): boolean {
+  state.revision;
+  try {
+    const expired = unsavedExpiries.get(accountKey);
+    return Object.values(rows(accountKey).records).some(row => row.kind === 'ORDER_PAY'
+      && isUnfinishedPurchaseRecord(row) && expired?.get(row.commandKey) !== row.kind
+      && purchaseRecordPayload(row).orderNo === orderNo);
+  } catch {
+    return true;
+  }
+}
+
 /** The order detail asks whether this order already has an external payment underway. */
 export function pendingOrderPayment(accountKey: string, orderNo: string, knownOnly = false): PendingExternal | null {
   try {

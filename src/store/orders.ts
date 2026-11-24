@@ -610,6 +610,29 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
+  async function hideExpiredOrder(id: string): Promise<boolean> {
+    if (!remoteApiEnabled || getById(id)?.status !== "expired") return false;
+    const requestEpoch = boundEpoch;
+    const currentAccount = () => boundEpoch === requestEpoch;
+    try {
+      await orderApi.hide(id, `order-hide:${id}`);
+      if (!currentAccount()) return false;
+      // A pre-command list response can still contain the expired row. Keep the
+      // current cursor: the server accepts an owned order even after it is hidden.
+      refreshGeneration += 1;
+      loadingMore.value = false;
+      orders.value = orders.value.filter(order => order.id !== id || order.status !== "expired");
+      failedOrderReadbacks.value.delete(id);
+      return true;
+    } catch (error) {
+      if (currentAccount() && isApiRefusal(error, 409, "ORDER_NOT_HIDEABLE")) {
+        // Reconcile the same row and let the existing read recovery retry failures.
+        await reconcileRemoteOrder(id, currentAccount).catch(() => undefined);
+      }
+      return false;
+    }
+  }
+
   return {
     orders, visibleOrders,
     nextCursor,
@@ -622,6 +645,7 @@ export const useOrders = defineStore("orders", () => {
     cancelOrderRemote,
     cancelOrderRemoteResult,
     getById,
+    hideExpiredOrder,
     bindAccount,
     currentAccountKey,
     currentAccountBindingRevision,

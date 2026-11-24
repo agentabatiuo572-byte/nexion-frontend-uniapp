@@ -8,7 +8,7 @@
   measured navigation height includes the safe area.
 -->
 <template>
-    <view class="nx-support-bubble" :class="{ 'nx-support-bubble--dimmed': dimmed, 'nx-support-bubble--light': theme.resolved === 'light', 'nx-support-bubble--unread': showUnreadBadge }" role="button" :tabindex="dimmed ? -1 : 0" :aria-hidden="dimmed || undefined" :aria-label="t.coreReview.supportHelp" @click="open" @keydown.enter.prevent="!dimmed && open()" @keydown.space.prevent="!dimmed && open()">
+    <view class="nx-support-bubble" :class="{ 'nx-support-bubble--dimmed': dimmed, 'nx-support-bubble--light': theme.resolved === 'light', 'nx-support-bubble--unread': showUnreadBadge }" :style="lift ? { transform: `translateY(-${lift}px)` } : undefined" role="button" :tabindex="dimmed ? -1 : 0" :aria-hidden="dimmed || undefined" :aria-label="t.coreReview.supportHelp" @click="open" @keydown.enter.prevent="!dimmed && open()" @keydown.space.prevent="!dimmed && open()">
       <view class="nx-support-motion">
         <view v-if="showUnreadBadge" class="nx-support-beat" aria-hidden="true" />
         <view class="nx-support-btn">
@@ -30,7 +30,8 @@ import SupportAvatar from "./support-avatar.vue";
 import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useTheme } from "@/store/theme";
 
-defineProps<{ dimmed?: boolean }>();
+// lift: how far the shortcut moves up while the floating payment bar sits under it (bar height + 12, set by the chassis).
+defineProps<{ dimmed?: boolean; lift?: number }>();
 
 const t = useT();
 const theme = useTheme();
@@ -66,7 +67,7 @@ onMounted(() => {
   bottom: calc(100% + 12px);
   z-index: 1;
   color: var(--v5-ink);
-  transition: opacity 150ms, transform 120ms cubic-bezier(.2,.8,.2,1);
+  transition: opacity 150ms, transform 280ms cubic-bezier(.2,.8,.2,1);
   /* Rounded hit area returns transparent corners to the underlying content. */
   border-radius: 999px;
 }
@@ -99,8 +100,10 @@ onMounted(() => {
   0% { transform: scale(1); opacity: var(--nx-support-beat-from, .45); }
   70%, 100% { transform: scale(1.58); opacity: 0; }
 }
-/* Press belongs to the outer hit target; idle float belongs to the inner visual. */
-.nx-support-bubble:active {
+/* The outer hit target's transform is the lift above the payment bar, so the press scales the button inside it;
+   idle float belongs to the motion layer between them. */
+.nx-support-btn { transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+.nx-support-bubble:active .nx-support-btn {
   transform: scale(.94);
 }
 .nx-support-btn {
@@ -143,8 +146,8 @@ onMounted(() => {
 .nx-support-avatar { position: relative; z-index: 1; }
 .nx-support-bubble:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
-  .nx-support-bubble { transition: none; }
-  .nx-support-bubble:active { transform: none; }
+  .nx-support-bubble, .nx-support-btn { transition: none; }
+  .nx-support-bubble:active .nx-support-btn { transform: none; }
   .nx-support-motion, .nx-support-badge, .nx-support-beat { animation: none; }
 }
 </style>

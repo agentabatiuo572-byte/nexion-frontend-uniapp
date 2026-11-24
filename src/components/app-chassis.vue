@@ -110,7 +110,7 @@
     <!-- Bottom chrome: floating pill TabBar (tab routes) + home indicator (always) -->
     <view class="nx-tabbar-wrap">
       <!-- Anchor to the actual navigation height, including its safe area. -->
-      <SupportBubble v-if="showFloatingSupport" :dimmed="scrolling" />
+      <SupportBubble v-if="showFloatingSupport" :dimmed="scrolling" :lift="supportLift" />
       <GlassSegments v-if="isTabRoute" :key="navigationReset" class="nx-tabbar-pill" variant="navigation" selection="flat" :options="navigationOptions" :model-value="activeTab" :from-value="navigationReset ? undefined : navigationFrom" :navigation-on-arrival="tabHost ? false : undefined" @select="selectNavigation">
         <template #option="{ option: tab, selected }">
           <view class="nx-tab__icon" aria-hidden="true">
@@ -148,7 +148,7 @@
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
 import { ref, readonly, computed, watch, onMounted, onUnmounted, inject, provide, getCurrentInstance } from "vue";
-import { CHASSIS_SCROLLING } from "@/composables/use-loops-in-view";
+import { CHASSIS_QUERY_SCOPE, CHASSIS_SCROLLING } from "@/composables/use-loops-in-view";
 import { checkoutKeepResumeKey, openCheckoutCapacityProgressKey, reportCheckoutKeepResumeKey } from "@/components/checkout/checkout-keep-resume";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
@@ -156,6 +156,7 @@ import GlobalUi from "@/components/global-ui.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { taskCenterReceiptKey, type OpenTaskReceipt } from "@/store/receipts";
 import SupportBubble from "@/components/support/support-bubble.vue";
+import { PAYMENT_BAR_HEIGHT_KEY } from "@/store/purchase-payment";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
 import SlotActionSheet from "@/components/slot-action-sheet.vue";
 import StickyCtaBar from "@/components/sticky-cta-bar.vue";
@@ -323,6 +324,7 @@ watch(
 const scrollEl = ref<unknown>(null);
 const scrolling = ref(false);
 provide(CHASSIS_SCROLLING, readonly(scrolling));
+provide(CHASSIS_QUERY_SCOPE, getCurrentInstance()!.proxy!);
 const scrollLocks = ref(0);
 provide(DIALOG_SCROLL_LOCK, () => {
   scrollLocks.value += 1;
@@ -470,10 +472,16 @@ const TABBAR_CLEARANCE = 36; // HomeIndicator (22) + 14px gap, in addition to th
 const SUB_BOTTOM = 40; //  home indicator (~22) + 18 breathing (was 26)
 const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HEADER_H : navHeaderH.value));
 const showFloatingSupport = computed(() => isTabRoute.value && ['home', 'earn', 'team'].includes(activeTab.value));
-// Let the last page action scroll fully above the floating support shortcut.
+// The floating payment bar writes its measured height here (0 while hidden); this side only reads it (user 2026-11-24).
+const paymentBarHeight = ref(0);
+provide(PAYMENT_BAR_HEIGHT_KEY, paymentBarHeight);
+const paymentBarClearance = computed(() => (paymentBarHeight.value > 0 ? paymentBarHeight.value + 12 : 0));
+// The support shortcut moves up above the bar while it shows, and back when it closes.
+const supportLift = computed(() => (showFloatingSupport.value ? paymentBarClearance.value : 0));
+// Let the last page action scroll fully above the floating support shortcut and the payment bar.
 const contentBottom = computed(() => isTabRoute.value
-  ? `calc(var(--nx-tabbar-height, 56px) + ${TABBAR_CLEARANCE + (showFloatingSupport.value ? 60 : 0)}px)`
-  : `${SUB_BOTTOM}px`);
+  ? `calc(var(--nx-tabbar-height, 56px) + ${TABBAR_CLEARANCE + (showFloatingSupport.value ? 60 : 0) + paymentBarClearance.value}px)`
+  : `${SUB_BOTTOM + paymentBarClearance.value}px`);
 // ── 待支付浮动条的落位 ──
 // 浮动条永远占 chrome 之下自己的一条带(top = contentTop + 8),页面内容整体下让 PENDING_BAR_INSET,
 // 任何页都不被盖住:tab 页 / useSetPageHeader 子页的 chassis 头在带之上;用 sub-page-header(内容内

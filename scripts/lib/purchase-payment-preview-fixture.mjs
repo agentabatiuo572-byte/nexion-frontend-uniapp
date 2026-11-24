@@ -263,6 +263,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (intent.paidAt >= intent.deadline) return lateArrival(intent, intent.paidAt);
       intent.status = 'FUNDS_CONFIRMED';
     }
+    if (scenario === 'funds-confirmed') return intent;
     if (networkGate(intent.paymentMethod)) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CREGIS_DIRECT_PAYMENT_PAUSED', reconciliationStatus: 'REVIEW'});
     if (age < DELIVER_AFTER) return intent;
     if (scenario === 'delivery-failed') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
@@ -464,5 +465,39 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return handlePayment(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}), true);
   }
-  return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments};
+  // Compress the deadline and grace so the App can observe expiry before a separate late receipt.
+  function expireOrderPayment(orderNo) {
+    const intent = openOrderPayment(orderNo);
+    if (intent?.status !== 'AWAITING_PAYMENT') return false;
+    const now = Date.now(), deadline = now - graceEnd(intent.paymentMethod, 0) - 1000;
+    const order = closeUnpaidOrder(intent);
+    if (!order) return false;
+    Object.assign(order, {placedAt: deadline - paymentWindow, expiresAt: deadline});
+    Object.assign(intent, {createdAt: deadline - 60000, deadline, expiresAt: new Date(deadline).toISOString(),
+      deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(intent.paymentMethod, deadline)).toISOString()});
+    expire(intent, 'PAYMENT_TIMEOUT');
+    return true;
+  }
+  function observeLateOrderPayment(orderNo) {
+    const open = openOrderPayment(orderNo);
+    if (open && !expireOrderPayment(orderNo)) return false;
+    const intent = [...intents.values()].findLast(row=>row.orderNo===orderNo&&row.status==='EXPIRED');
+    const now = Date.now();
+    if (!intent || now<graceEnd(intent.paymentMethod,intent.deadline)) return false;
+    lateArrival(intent, now);
+    return true;
+  }
+  // An explicit operator correction is separate from provider observation and
+  // from fulfilment. A late receipt alone never changes the expired order.
+  function confirmLateOrderPayment(orderNo) {
+    sync();
+    const intent = [...intents.values()].findLast(row=>row.orderNo===orderNo&&row.status==='MANUAL_REVIEW'&&row.reason==='PAYMENT_LATE_REVIEW');
+    const order = state.createdOrders?.find(row=>row.orderNo===orderNo&&row.orderStatus==='EXPIRED'&&row.paymentStatus==='EXPIRED');
+    if (!intent?.paidAt || !order) return false;
+    Object.assign(order,{canonicalStatus:'paid',paymentStatus:'PAID',orderStatus:'PAID',activationStatus:'WAITING_PROVISIONING',
+      paymentMethod:intent.paymentMethod,paymentNo:intent.intentNo,paidAt:intent.paidAt,paidTotalUsdt:intent.totalUsdt,closeReasonCode:null});
+    return true;
+  }
+  return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments,
+    expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
 }

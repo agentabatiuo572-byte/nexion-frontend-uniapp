@@ -174,6 +174,7 @@ export interface OrderApi {
   create(request: CreateOrderRequest): Promise<CreatedOrder>;
   createCommand(idempotencyKey: string): Promise<OrderCreateCommand>;
   cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
+  hide(orderNo: string, idempotencyKey: string): Promise<void>;
   pay(orderNo: string, idempotencyKey: string, authorization?: import('./payment-password-api').PaymentPasswordAuthorization): Promise<PaidOrderReceipt>;
 }
 
@@ -620,6 +621,17 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
         path: `/api/orders/${encodeURIComponent(normalized)}/cancel`,
         idempotencyKey,
       }));
+    },
+
+    async hide(orderNo, idempotencyKey): Promise<void> {
+      const normalized = orderNo.trim();
+      if (!normalized || !idempotencyKey.trim()) return invalid();
+      const result = record(await client.request<unknown>({
+        method: "POST",
+        path: `/api/app/orders/${encodeURIComponent(normalized)}/hide`,
+        idempotencyKey,
+      }));
+      if (result.orderNo !== normalized || result.hidden !== true) return invalid();
     },
 
     async pay(orderNo, idempotencyKey, authorization): Promise<PaidOrderReceipt> {

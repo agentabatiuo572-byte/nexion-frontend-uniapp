@@ -12,12 +12,16 @@ import { useDataVisibility } from "@/store/data-visibility";
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onShow, onHide } from '@/composables/use-tab-page-lifecycle';
 import { useApp } from '@/store/app';
+import { useAuth } from '@/store/auth';
 import { useQuest } from '@/store/quest';
 import { useOrders } from '@/store/orders';
 import { useVoucher } from '@/store/voucher';
 import { useFreeTrial } from '@/store/free-trial';
 import { useConfig } from '@/store/config';
-import { accountApi, remoteApiEnabled } from '@/api/runtime';
+import { accountApi, remoteApiEnabled, sessionVault } from '@/api/runtime';
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from '@/api/order-api';
+import { binarySessionReady } from '@/lib/binary-session-ready';
+import { foregroundReadAllowed } from '@/lib/foreground-read';
 import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
 import { useT } from '@/i18n/use-t';
@@ -33,11 +37,16 @@ import HomeActionRowView, { type HomeActionRow } from './home-action-row.vue';
 import { uiLocale } from "@/i18n";
 const visibility = useDataVisibility();
 const app = useApp(), quest = useQuest(), orders = useOrders(), voucher = useVoucher(), trial = useFreeTrial(), config = useConfig(), copy = useAuditUiCopy();
+const auth = useAuth();
 const expanded = ref(false), securityNeedsAction = ref(false), ordersReady = ref(false);
 const t = useT(), initialPending = ref(remoteApiEnabled);
 const locale = useLocaleStore(), now = useNow();
 const detailCopy = computed(() => homeActionsCopy[uiLocale(locale.code)]);
 let visible = true, generation = 0;
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled, authenticated: auth.isAuthenticated, accountId: auth.accountId,
+  appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
 const rows = computed<HomeActionRow[]>(() => {
   const list: HomeActionRow[] = [];
   const task = quest.remoteStatus === 'ready' ? homeTaskSummary({ quests: quest.remoteQuests, dayOneRequiredTaskCount: quest.dayOneRequiredTaskCount, dayOneSnapshotStatus: quest.dayOneSnapshotStatus, dayOneRewardNex: quest.dayOneRewardNex }, now.value * 1000, config.isEnabled('stakingVisible')) : null;
@@ -49,6 +58,15 @@ const rows = computed<HomeActionRow[]>(() => {
   return list.sort((a, b) => priority.indexOf(a.key) - priority.indexOf(b.key));
 });
 const shown = computed(() => expanded.value ? rows.value : rows.value.slice(0,3));
+async function refreshOrderActions() {
+  if (!remoteApiEnabled || !visible || !remoteSessionReady.value || !foregroundReadAllowed()) return;
+  const epoch = app.accountBindingEpoch;
+  const runtime = captureRuntimeRevision();
+  try {
+    await runPassiveTabRead('orders', () => orders.refreshRemote());
+    if (visible && epoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime)) ordersReady.value = true;
+  } catch { /* Keep any previously loaded order snapshot. */ }
+}
 async function refresh() {
   const request = ++generation, scope = passiveTabReadScope(false);
   if (!visible) return;
@@ -56,7 +74,7 @@ async function refresh() {
   const current = () => visible && request === generation && scope === passiveTabReadScope(false);
   await Promise.allSettled([
     quest.ensureRemote(), runPassiveTabRead('trial-state', () => trial.refreshRemote()), voucher.revalidateRemote(),
-    runPassiveTabRead('orders', () => orders.refreshRemote()).then(() => { if(current()) ordersReady.value = true; }).catch(() => { if(current()) ordersReady.value = false; }),
+    refreshOrderActions(),
     runPassiveTabRead('security-overview', () => accountApi.securityOverview()).then(security => { if(current()) securityNeedsAction.value = !security.twoFactorEnabled; }).catch(() => { if(current()) securityNeedsAction.value = false; }),
   ]);
   if (current()) initialPending.value = false;
@@ -64,7 +82,17 @@ async function refresh() {
 onMounted(refresh);
 onShow(() => { visible = true; void refresh(); });
 onHide(() => { visible = false; generation++; });
-onUnmounted(() => { visible = false; generation++; });
+// A new catalog revision clears orders even when the signed-in account stays
+// the same. Refill the shared list through the same passive read on Home.
+const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
+  ordersReady.value = false;
+  invalidatePassiveTabRead('orders');
+  void refreshOrderActions();
+});
+watch([remoteSessionReady, foregroundReadAllowed], ([ready, allowed]) => {
+  if (ready && allowed) void refreshOrderActions();
+});
+onUnmounted(() => { visible = false; generation++; unsubscribeOrdersRevision(); });
 defineExpose({ refresh });
 watch(() => [app.accountKey,app.accountBindingEpoch], () => { initialPending.value = remoteApiEnabled; securityNeedsAction.value = false; ordersReady.value = false; expanded.value = false; void refresh(); });
 </script>

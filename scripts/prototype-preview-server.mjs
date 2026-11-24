@@ -66,7 +66,7 @@ demoFleetFacts(new URL('http://127.0.0.1:'+port),locale,state);
 // unless DEMO_CHECKOUT_FLOW=0.
 // Continue from an imported epoch, so the first scenario change never reuses it.
 let scenarioEpoch=state.scenarioEpoch??0;
-const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
+const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale,meEntryDots.orderProjection):null;
 // Keep trial wallet authorization available when the full checkout fixture is disabled.
 const trialPin=createPaymentPinFlowFixture();
 Object.assign(trialPin.state,{loggedIn:true,password:'246802',version:1});
@@ -196,6 +196,14 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.dropNextPayment==='boolean')checkoutFlow.pin.state.dropNextPayment=update.dropNextPayment;
         if(update.observePayments===true)checkoutFlow.observePayments();
         if(update.delayNextCreate===true)checkoutFlow.delayCreate();
+        if('orderListScene' in update)checkoutFlow.selectOrderListScene(update.orderListScene);
+        if('failNextHide' in update)checkoutFlow.failNextHide(update.failNextHide);
+        if(typeof update.expireOrderPayment==='string'&&!checkoutFlow.expireOrderPayment(update.expireOrderPayment))
+          return sendJson(res,{simulation:true,message:'PREVIEW_AWAITING_ORDER_PAYMENT_REQUIRED'},409);
+        if(typeof update.observeLateOrderPayment==='string'&&!checkoutFlow.observeLateOrderPayment(update.observeLateOrderPayment))
+          return sendJson(res,{simulation:true,message:'PREVIEW_EXPIRED_ORDER_PAYMENT_REQUIRED'},409);
+        if(typeof update.confirmLateOrderPayment==='string'&&!checkoutFlow.confirmLateOrderPayment(update.confirmLateOrderPayment))
+          return sendJson(res,{simulation:true,message:'PREVIEW_LATE_ORDER_PAYMENT_REQUIRED'},409);
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,setupWrites:checkoutFlow.pin.state.setupWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }
@@ -203,7 +211,7 @@ const server=http.createServer(async(req,res)=>{
       let raw='';for await(const chunk of req)raw+=chunk;
       const update=JSON.parse(raw||'{}'),accountId=String(update.accountId??previewSelectedAccountId(state)??'');
       if(!/^\d+$/.test(accountId))return sendJson(res,{code:422,message:'ME_DOTS_ACCOUNT_REQUIRED',data:null},422);
-      return sendJson(res,{accountId,...meEntryDots.configure(accountId,update)});
+      return sendJson(res,{accountId,...meEntryDots.configure(accountId,update,checkoutFlow?.resetOrderHides)});
     }
     if(url.pathname==='/__demo/auth-requests')return sendJson(res,{simulation:true,requests:authDemo.trace});
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
@@ -362,7 +370,7 @@ const server=http.createServer(async(req,res)=>{
         const accountId=url.pathname==='/api/genesis/state'
           ? previewSelectedAccountId(state) : previewAccountId(state,req.headers);
         const data=await meEntryDots.read(url,accountId,path=>
-          fixtureFor(new URL(path,url.origin),{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>({})}));
+          fixtureFor(new URL(path,url.origin),{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>({})}),checkoutFlow?.paginateOrderPage);
         if(data!==undefined)return sendJson(res,{code:0,message:'OK',data});
       }
       // B12 handoff: this rejection precedes command recording and all money writes.
