@@ -189,8 +189,7 @@ function pendingPayments() {
   try {
     const records = displayRecords();
     state.pendingReadError = false;
-    return records.filter(row => !isOrderPaymentDiscoveryOnly(row) && row.lastStatus !== 'EXPIRED'
-      && !(row.lastStatus === 'DELIVERED' && row.validated));
+    return records.filter(row => row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
   } catch {
     state.pendingReadError = true;
     return [];
@@ -948,7 +947,7 @@ function isOrderPaymentDiscoveryOnly(row: PendingExternal): boolean {
   return row.kind === 'ORDER_PAY' && !!row.lookupOnly && row.startedAt === undefined && row.resumedOnThisDevice !== true;
 }
 
-/** A discovered order payment belongs to order detail until it is opened here. */
+/** Orders shows discovered order payments and checks their expiry after an explicit local resume. */
 export function isOrdersPurchaseRecord(row: PendingExternal): boolean {
   if (row.kind === 'ORDER_PAY') return !isOrderPaymentDiscoveryOnly(row);
   return !row.lookupOnly || row.startedAt !== undefined || !!row.intentNo;
@@ -982,7 +981,7 @@ export function hasUnfinishedOrderPayment(accountKey: string, orderNo: string): 
   state.revision;
   try {
     const expired = unsavedExpiries.get(accountKey);
-    return Object.values(rows(accountKey).records).some(row => row.kind === 'ORDER_PAY' && !isOrderPaymentDiscoveryOnly(row)
+    return Object.values(rows(accountKey).records).some(row => row.kind === 'ORDER_PAY'
       && isUnfinishedPurchaseRecord(row) && expired?.get(row.commandKey) !== row.kind
       && purchaseRecordPayload(row).orderNo === orderNo);
   } catch {
