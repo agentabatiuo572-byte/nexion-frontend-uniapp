@@ -65,7 +65,7 @@
         <text class="earn-stage__name" role="heading" aria-level="3">{{ displayName }}</text>
         <view class="earn-stage__status"><view class="earn-stage__dot" :class="{ 'nx-online-dot': statusOnline }" /><text>{{ statusLabel || t.home.deviceOffline }}</text></view>
       </view>
-      <view v-if="phoneFactsReady || degradable" class="earn-stage__more nx-frosted-button" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="`${t.home.fleetManage} · ${displayName}`" @click.stop="openMenu" @keydown.enter.stop.prevent="openMenu" @keydown.space.stop.prevent="openMenu">
+      <view v-if="phoneFactsReady || degradable" class="earn-stage__more nx-frosted-button nx-keep-clear" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="`${t.home.fleetManage} · ${displayName}`" @click.stop="openMenu" @keydown.enter.stop.prevent="openMenu" @keydown.space.stop.prevent="openMenu">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
       </view>
     </view>

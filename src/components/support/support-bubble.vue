@@ -21,8 +21,8 @@
 
 <script setup lang="ts">
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
-import { computed, onMounted, ref, watch } from "vue";
-import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
+import { CHASSIS_QUERY_SCOPE } from "@/composables/use-loops-in-view";
 import { useConversations } from "@/store/conversations";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useMessageDrawer } from "@/store/message-drawer";
@@ -32,7 +32,8 @@ import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useTheme } from "@/store/theme";
 
 // lift: how far the shortcut moves up while the floating payment bar sits under it (bar height + 12, set by the chassis).
-const props = defineProps<{ dimmed?: boolean; lift?: number }>();
+// visit: changes when the page shows or switches tab; layout: changes when the page content changes size (both from the chassis).
+const props = defineProps<{ dimmed?: boolean; lift?: number; visit?: string; layout?: number }>();
 
 const t = useT();
 const theme = useTheme();
@@ -49,26 +50,28 @@ const totalUnread = computed(() => humanUnread.value);
 const showUnreadBadge = computed(() => totalUnread.value > 0);
 const unreadLabel = computed(() => formatUnreadBadge(totalUnread.value));
 
-// While the bar lifts it, the shortcut must not cover a benefit CTA, a close button or a key value (02 §2.4); pages mark
-// those .nx-keep-clear. At rest it takes the lowest spot above the bar that keeps 8px clear of every marked target in its
-// column, and stays hidden (as while scrolling) when only the header is left. Without the bar it keeps its usual place.
+// At rest the shortcut must not cover anything the page lets you tap or a key value (02 §2.4; coordinator 2026-11-24: any
+// control). Pages mark those .nx-keep-clear. It takes the lowest spot at its usual place, or above the payment bar while
+// that shows (lift), that keeps 8px clear of every marked target in its column, and stays hidden (as while scrolling) when
+// only the header is left. With nothing in the way it sits at its usual place, so closing the bar brings it back there.
 const SUPPORT_GAP = 12; // the shortcut's own bottom offset above the navigation (CSS below)
 const KEEP_CLEAR_GAP = 8;
 const avoid = ref(0);
 const blocked = ref(false);
-// After the bar appears or a scroll stops, the shortcut stays hidden (and untappable) until its spot has been re-read, then
-// fades in there; it never shows at a spot it has not checked.
-const pending = ref(false);
+// After the page shows, the bar comes or goes or a scroll stops, the shortcut stays hidden (and untappable) until its spot
+// has been re-read, then fades in there; it never shows at a spot it has not checked.
+const pending = ref(true);
 const offset = computed(() => (props.lift ?? 0) + avoid.value);
 const hidden = computed(() => props.dimmed || blocked.value || pending.value);
 let reading = 0;
+// The chassis that mounts the shortcut: its targets are searched there, not in the page uni takes as current.
+const chassisScope = inject(CHASSIS_QUERY_SCOPE)!;
 type Rect = { top: number; bottom: number; left: number; right: number; height: number };
 function settle() {
-  const lift = props.lift ?? 0;
-  if (!lift) { avoid.value = 0; blocked.value = false; pending.value = false; return; }
   if (props.dimmed) return;
+  const lift = props.lift ?? 0;
   const read = ++reading;
-  uni.createSelectorQuery().select('.nx-tabbar-wrap').boundingClientRect().select('.nx-support-bubble').boundingClientRect()
+  uni.createSelectorQuery().in(chassisScope).select('.nx-tabbar-wrap').boundingClientRect().select('.nx-support-bubble').boundingClientRect()
     .selectAll('.nx-keep-clear').boundingClientRect().select('.nx-header').boundingClientRect()
     .exec(([wrap, self, targets, header]: [Rect | null, Rect | null, Rect[] | null, Rect | null]) => {
       if (read !== reading || !wrap || !self || lift !== (props.lift ?? 0) || props.dimmed) return;
@@ -85,9 +88,17 @@ function settle() {
       if (pending.value) setTimeout(() => { if (read === reading) pending.value = false; }, 50);
     });
 }
-watch(() => [props.lift, props.dimmed], () => { if (props.lift) pending.value = true; setTimeout(settle, 50); }, { immediate: true });
-// Benefit cards and values load and animate in after the bar shows; the spot is re-read while the bar lifts the shortcut.
-useVisibleInterval(settle, 1000, () => !!props.lift);
+// Re-read only when something moved: the page shows or switches tab (visit; content that arrives late, like the benefit
+// cards, gets a few more reads in its first seconds, then reading stops), the page content changes size (layout), a scroll
+// stops (dimmed) or the bar comes, goes or changes height (lift).
+let burst: ReturnType<typeof setTimeout>[] = [];
+watch(() => [props.lift, props.dimmed, props.visit], () => {
+  pending.value = true;
+  burst.forEach(clearTimeout);
+  burst = [50, 400, 1200, 2500].map(ms => setTimeout(settle, ms));
+}, { immediate: true });
+watch(() => props.layout, () => { setTimeout(settle, 0); });
+onUnmounted(() => burst.forEach(clearTimeout));
 
 // Human support uses the same full-page center as the bell, opening Service.
 function open() {

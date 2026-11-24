@@ -1,5 +1,5 @@
 <template>
-  <view class="home-action-row" :data-action-key="row.key" :role="row.action ? undefined : 'link'" :tabindex="row.action ? undefined : 0"
+  <view class="home-action-row nx-keep-clear" :data-action-key="row.key" :role="row.action ? undefined : 'link'" :tabindex="row.action ? undefined : 0"
     @click="!row.action && emit('open')" @keydown.enter.prevent="activateRow">
     <view v-if="row.progress" ref="ringRef" class="home-action-ring" :class="{ 'home-action-ring--wait': !ringInView }" :style="row.progress.total ? { '--home-ring-done': (row.progress.done! / row.progress.total * 87.965).toFixed(3) } : undefined" :aria-label="visibility.hidden ? row.title + ' · ' + visibility.mask('') : row.progressLabel">
       <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--v5-surface-3)" stroke-width="3"/><circle v-if="!visibility.hidden && row.progress.total" cx="18" cy="18" r="14" fill="none" class="home-action-ring__arc" stroke="var(--v5-brand)" stroke-width="3" stroke-linecap="round" transform="rotate(-90 18 18)"/></svg>

@@ -17,7 +17,7 @@
       <view><text class="fleet-stage__empty-title">{{ t.earn.addDevice }}</text><text class="fleet-stage__empty-sub">{{ freeSlotsText }}</text></view>
     </view>
     <template v-else>
-      <view class="fleet-stage__chips" role="tablist" :aria-label="t.earn.selectDevice">
+      <view class="fleet-stage__chips nx-keep-clear" role="tablist" :aria-label="t.earn.selectDevice">
         <view v-for="item in items" :key="item.key" class="fleet-stage__chip" :class="{ 'fleet-stage__chip--selected nx-frosted-button': item.key === selected?.key, 'fleet-stage__chip--off': !item.online }" role="tab" :tabindex="item.key === selected?.key ? 0 : -1" :aria-selected="item.key === selected?.key ? 'true' : 'false'" @click="select(item.key)" @keydown.right.prevent="move(1)" @keydown.left.prevent="move(-1)">
           <DeviceArt v-if="item.device" class="fleet-stage__chip-art" :device="item.device" />
           <DeviceArt v-else class="fleet-stage__chip-art" :src="trialArt" />
