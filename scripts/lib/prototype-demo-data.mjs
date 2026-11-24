@@ -652,8 +652,9 @@ function demoBundlePlacement(url, locale, state, quantity) {
 
 // Price estimates do not reserve slots. Both payment rails place the paid order against the fleet at delivery.
 export function demoOrderDelivery(url, locale, state, order, now) {
-  if (order.orderType !== 'BUNDLE') return { canonicalStatus:'activated', activationStatus:'ACTIVATED', activatedAt:now };
-  const { inventoryQuantity } = demoBundlePlacement(url, locale, state, order.quantity);
+  const inventoryQuantity = order.orderType === 'BUNDLE'
+    ? demoBundlePlacement(url, locale, state, order.quantity).inventoryQuantity
+    : 0;
   const ids = order.lineItems.flatMap((line, i) => Array.from({ length:line.quantity },
     (_, unit) => demoOrderDeviceId(state, demoOrderDeviceInstance(order.orderNo, i, unit))));
   const activatedQuantity = ids.length - inventoryQuantity;
@@ -970,7 +971,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(pathname==='/api/store/purchase-eligibility'){
       const productNo=url.searchParams.get('productNo');
       const product=products.find(item=>item.id===productNo);
-      if(empty||!product||(product.inventoryMode==='FINITE'&&product.stock<1))throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+      if(empty||!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+      if(product.inventoryMode==='FINITE'&&product.stock<1)refuse('PRODUCT_OUT_OF_STOCK');
       return {...authority,runId:null,productNo,...demoSkuPurchaseRules(state,product,teamComputePoints,now),
         evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
     }

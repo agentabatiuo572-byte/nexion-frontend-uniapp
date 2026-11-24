@@ -81,9 +81,11 @@ export function createPurchaseEligibilityStore(
       })
       .catch((error: unknown) => {
         if (!scope.isCurrent(requestScope) || inFlight.get(key) !== request) return false;
-        if (isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
+        const outOfStock = isApiRefusal(error, 409, "PRODUCT_OUT_OF_STOCK");
+        if (outOfStock || isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
           entry.snapshot = null;
           entry.status = "unavailable";
+          entry.error = outOfStock ? "PRODUCT_OUT_OF_STOCK" : "PRODUCT_NOT_AVAILABLE";
           return false;
         }
         entry.status = "error";
@@ -133,13 +135,14 @@ export function bindPurchaseEligibility(
   const eligibility = computed(() => {
     const entry = store.state(product.value);
     const status = entry.status;
+    const outOfStock = status === "unavailable" && entry.error === "PRODUCT_OUT_OF_STOCK";
     // Keep the actionable snapshot fresh. The conditions page can retain the
     // presentation for this account and SKU while a fresh decision is pending.
     return {
       ...entry,
-      status: status === "unavailable" ? "error" as const : status,
-      error: status === "unavailable" ? "PRODUCT_NOT_AVAILABLE" : entry.error,
+      status: status === "unavailable" && !outOfStock ? "error" as const : status,
       unavailable: status === "unavailable",
+      outOfStock,
       snapshot: status === "ready" ? entry.snapshot : null,
       displaySnapshot: entry.snapshot,
     };

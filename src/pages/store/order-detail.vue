@@ -231,7 +231,7 @@ import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { apiClient,orderApi,purchaseEligibilityApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
 import { openOrderAdvisorChat } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
-import { asApiError } from "@/api/errors";
+import { asApiError, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { paidOrderReceipt, type PaidOrderReceipt } from "@/api/order-api";
 import { readPaymentCommand } from '@/api/payment-command-api';
@@ -1024,8 +1024,9 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
     void handleWalletPayment();
   } catch (error) {
     if (isCurrentDetailScope(scope)) {
-      paymentNoticeReason.value = pendingCopy.value.queryFailed;
-      paymentNotice.value = 'query';
+      const stockRefused = isApiRefusal(error, 409, 'PRODUCT_OUT_OF_STOCK');
+      paymentNoticeReason.value = stockRefused ? t.value.store.temporarilyOutOfStock : pendingCopy.value.queryFailed;
+      paymentNotice.value = stockRefused ? 'blocked' : 'query';
     }
   } finally {
     // Data authority may expire during bootstrap; the attempt still owns its

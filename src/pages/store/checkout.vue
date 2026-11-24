@@ -381,7 +381,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { productCatalogLanguageReadFailed, productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
 import { serverTagline } from "@/lib/product-copy";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
-import { isProductAvailable } from "@/store/product-availability";
+import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
 import { uiLocale } from "@/i18n";
@@ -726,6 +726,11 @@ async function refreshPurchaseEligibility(scope = captureCheckoutRoute(), refres
     if (!current()) return "stale";
     remotePurchaseEligibility.value = null;
     remotePurchaseEligibilityStatus.value = "error";
+    if (isApiRefusal(error, 409, "PRODUCT_OUT_OF_STOCK")) {
+      eligibilityCatalogUnconfirmed.value = false;
+      checkoutStockRefused.value = true;
+      return "outOfStock";
+    }
     if (refreshCatalogOnMissing && isApiRefusal(error, 404, "PRODUCT_NOT_AVAILABLE")) {
       const ready = await settleProductCatalogRefresh(refreshProductCatalog(true), { requireFresh: true });
       if (!current()) return "stale";
@@ -965,10 +970,6 @@ const checkoutTagline = computed(() => {
   return remoteApiEnabled ? serverTagline(t.value, listing, locale.code) : listing.tagline;
 });
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
-function productOutOfStock(product: Product | undefined): boolean {
-  return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
-    || product?.inventoryMode === "FINITE" && product.stock === 0;
-}
 const checkoutOutOfStock = computed(() => !hasOriginalCheckout.value && !activeSession.value
   && (checkoutStockRefused.value || productOutOfStock(product.value)));
 const checkoutEligibilityBlock = computed(() => {

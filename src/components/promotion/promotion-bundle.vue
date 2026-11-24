@@ -90,7 +90,7 @@ import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { productCatalogPresentation,productCatalogState,refreshProductCatalog } from '@/store/product-catalog';
 import { useProductPhase } from '@/composables/use-product-phase';
-import { isProductAvailable } from '@/store/product-availability';
+import { isProductAvailable, productOutOfStock } from '@/store/product-availability';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { productTaskLevelsText } from '@/lib/product-copy';
@@ -220,7 +220,7 @@ function jumpToSuggestions(){
 function selectedProductBlock(id: string) {
   if (catalogStatus.value === 'ready') {
     const product = productFor(id);
-    if (!product || !isProductAvailable(product, phase.value)) return t.value.store.temporarilyOutOfStock;
+    if (!product || !isProductAvailable(product, phase.value) || productOutOfStock(product)) return t.value.store.temporarilyOutOfStock;
   }
   if (scopeId.value && activity.value && !activity.value.productNos.includes(id)) return t.value.promotion.noMatchingProducts;
   return '';
@@ -236,7 +236,7 @@ const productsReady = computed(() => catalogStatus.value === 'ready' && !selecti
 const canReadQuote=computed(()=>visible.value&&foregroundReadAllowed()&&signedIn.value&&app.accountKey!=='default'
   &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
 const canContinue=computed(()=>canReadQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE'&&!termsMissing.value);
-const canOpenDevices=computed(()=>visible.value&&signedIn.value&&quoteBlock.value==='capacity');
+const canOpenDevices=computed(()=>visible.value&&signedIn.value&&!selectionBlock.value&&quoteBlock.value==='capacity');
 useAutoRecovery({
   active:()=>visible.value,
   failed:()=>canReadQuote.value&&(quoteStatus.value==='error'||quoteBlock.value==='unavailable'),

@@ -129,6 +129,7 @@ import { productTierCode } from "@/lib/product-image";
 import { useProductImage } from "@/composables/use-product-image";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
+import { productOutOfStock } from "@/store/product-availability";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { productCatalogState } from "@/store/product-catalog";
@@ -156,8 +157,6 @@ const promotionUnavailable=computed(()=>!!props.activityId&&(!props.promotionRea
 const promotionPresentationReady=computed(()=>!!props.activityId&&canPreviewPromotion(props.promotion??null)&&!!props.promotion?.productNos.includes(props.product.id));
 const promotionPresentationSignIn=computed(()=>promotionPresentationReady.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
 const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
-const stockUnavailable = computed(() => props.product.inventoryMode === "FINITE"
-  && props.product.stock === 0);
 const { imageSrc, imageError: fallbackProductImage } = useProductImage(() => props.product.imageUrl);
 const photo = computed(() => {
   const imageUrl = imageSrc.value;
@@ -188,6 +187,7 @@ const { elRef: mediaRef, running: artInView } = useLoopsInView(".product-media")
 const entered = ref(false);
 watch(artInView, visible => { if (visible) entered.value = true; });
 const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id, cardInView);
+const stockUnavailable = computed(() => productOutOfStock(props.product) || eligibility.value.outOfStock);
 useAutoRecovery({ failed: () => remoteApiEnabled && cardInView.value && eligibility.value.status === "error", retry: retryEligibility });
 const gate = computed(() => stockUnavailable.value
   ? {

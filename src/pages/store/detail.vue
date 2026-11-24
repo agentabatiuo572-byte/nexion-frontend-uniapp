@@ -253,7 +253,7 @@ import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable } from "@/store/product-availability";
+import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { warrantyMonths } from "@/lib/warranty-months";
@@ -401,8 +401,6 @@ watch([catalogStatus, () => product.value?.id], () => {
 
 const isShare = computed(() => product.value?.productType === "SHARE");
 const earnConfig = useEarnConfig();
-const stockUnavailable = computed(() => product.value?.inventoryMode === "FINITE"
-  && product.value.stock === 0);
 // Localized SKU copy (tagline / badge). Empty strings until `id` resolves —
 // both consumers are inside `v-if="product"`, so the blanks never render.
 const copy = computed(() =>
@@ -430,6 +428,7 @@ const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(
   () => product.value?.id ?? "",
   () => stickyPageVisible.value && foregroundReadAllowed(),
 );
+const stockUnavailable = computed(() => productOutOfStock(product.value) || eligibility.value.outOfStock);
 const purchaseEligibilityMessage = computed(() => resolvePurchaseEligibilityMessage(
   eligibility.value.status,
   eligibility.value.snapshot,

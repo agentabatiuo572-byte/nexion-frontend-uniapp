@@ -9,3 +9,8 @@ export function isProductAvailable(product: Product, currentPhase: PhaseParams):
   if (typeof product.available === "boolean") return product.available;
   return !product.unlocksAtPhase || isPhaseReached(currentPhase, product.unlocksAtPhase);
 }
+
+export function productOutOfStock(product: Product | undefined): boolean {
+  return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
+    || product?.inventoryMode === "FINITE" && product.stock === 0;
+}
