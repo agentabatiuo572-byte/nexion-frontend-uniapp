@@ -46,9 +46,9 @@
 -->
 <template>
   <view v-if="sheetVisible" class="tis-root" role="dialog" aria-modal="true" :aria-labelledby="titleId">
-    <view class="tis-backdrop" @click="hide" />
+    <view class="tis-backdrop nx-sheet-fade-in" @click="hide" />
 
-    <view class="nx-glass-sheet tis-panel" @click.stop>
+    <view class="nx-glass-sheet tis-panel nx-sheet-slide-up" @click.stop>
       <view class="tis-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="hide"  @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
         <LiquidGlass :radius="22" tone="control" />
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
@@ -84,82 +84,133 @@
       </template>
 
       <!-- ─────────── 1.5 retire — FEAT-DEV02 主动下架:选升级目标 ─────────── -->
+      <!-- Shell rhythm (boards B-1…B-4): title, body blocks 16 apart, footer actions; the quiet exit is always last. -->
       <template v-else-if="state.kind === 'retire' && retireView">
-        <view class="tis-head">
-          <text :id="titleId" class="tis-title">{{ t.tradein.retireTitle }}</text>
-          <text class="tis-subtitle" role="status" :aria-busy="retireView.loading">{{ retireView.subtitle }}</text>
-        </view>
-        <view class="tis-opt-list">
-          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onPickTarget(p.id)"  @keydown.enter.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))">
-            <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /></svg>
-            <text class="tis-opt-text">{{ p.label }}</text>
-            <!-- Each target opens its confirm step: a list entry, so a trailing chevron (03 §3.1). -->
-            <svg class="tis-opt-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ t.tradein.retireTitle }}</text></view>
+        <view class="tis-bd">
+          <view v-if="retireView.source" class="tis-lead">
+            <view class="tis-source">
+              <DeviceArt class="tis-source__art" :device="retireView.source" />
+              <text class="tis-source__text">{{ retireView.subtitle }}</text>
+            </view>
+            <view class="tis-status" :class="`tis-status--${retireView.status.tone}`" role="status" :aria-busy="retireView.status.tone === 'loading'" v-if="retireView.status">
+            <svg v-if="retireView.status.tone === 'loading'" class="tis-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".2" /><path d="M21 12a9 9 0 0 0-9-9" /></svg>
+            <svg v-else-if="retireView.status.tone === 'warn'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
+            <text class="tis-status__text">{{ retireView.status.text }}</text>
+          </view>
+          </view>
+          <view class="tis-status" :class="`tis-status--${retireView.status.tone}`" role="status" :aria-busy="retireView.status.tone === 'loading'" v-else-if="retireView.status">
+            <svg v-if="retireView.status.tone === 'loading'" class="tis-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".2" /><path d="M21 12a9 9 0 0 0-9-9" /></svg>
+            <svg v-else-if="retireView.status.tone === 'warn'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
+            <text class="tis-status__text">{{ retireView.status.text }}</text>
+          </view>
+          <!-- One target: the machine is the page's visual, and the action is a primary button (04 §4.0 项数少时换布局). -->
+          <view v-if="retireSingle" class="tis-hero">
+            <view class="tis-hero__stage"><view class="tis-hero__floor" /><CatalogMachineImage class="tis-hero__art" :sku="retireSingle.id" :image-url="retireSingle.imageUrl" scope-key="tradein-target" /></view>
+            <text class="tis-hero__name">{{ retireSingle.name }}</text>
+            <view class="tis-hero__sub"><text class="tis-target__price">{{ retireSingle.price }}</text><NxTag v-if="retireSingle.early" tone="brand">{{ t.tradein.retireEarlyTag }}</NxTag></view>
+            <text class="tis-hero__label">{{ t.tradein.sheetNetCostLabel }}</text>
+            <text v-if="retireSingle.net" class="tis-amt tis-amt--hero"><text class="tis-amt__cur">$</text>{{ retireSingle.net.int }}<text class="tis-amt__dec">{{ retireSingle.net.dec }}</text></text>
+            <text v-else class="tis-amt tis-amt--hero tis-amt--unknown">—</text>
+          </view>
+          <view v-else-if="retireView.targets.length">
+            <!-- Every row shows the same figure, so its name is written once above the column (03 §3.6.1). -->
+            <text class="tis-col-label" aria-hidden="true">{{ t.tradein.sheetNetCostLabel }}</text>
+            <view class="tis-list">
+              <view v-for="p in retireView.targets" :key="p.id" class="tis-target" :class="{ 'tis-target--disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" :aria-label="p.label" @click="onPickTarget(p.id)"  @keydown.enter.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onPickTarget(p.id))">
+                <CatalogMachineImage class="tis-target__art" :sku="p.id" :image-url="p.imageUrl" scope-key="tradein-target" />
+                <view class="tis-target__meta">
+                  <text class="tis-target__name">{{ p.name }}</text>
+                  <view class="tis-target__sub"><text class="tis-target__price">{{ p.price }}</text><NxTag v-if="p.early" tone="brand">{{ t.tradein.retireEarlyTag }}</NxTag></view>
+                </view>
+                <text v-if="p.net" class="tis-amt tis-amt--row"><text class="tis-amt__cur">$</text>{{ p.net.int }}<text class="tis-amt__dec">{{ p.net.dec }}</text></text>
+                <text v-else class="tis-amt tis-amt--row tis-amt--unknown">—</text>
+                <!-- Each target opens its confirm step: a list entry, so a trailing chevron (03 §3.1). -->
+                <svg class="tis-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+              </view>
+            </view>
           </view>
         </view>
-        <text v-if="retireView.statusText" class="tis-disclaimer" role="status" :aria-busy="retireView.loading">{{ retireView.statusText }}</text>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-          <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
+        <view class="tis-ft">
+          <NxButton v-if="retireSingle" variant="primary" :label="t.tradein.retireSingleCta" :busy="quoteLoading" @click="onPickTarget(retireSingle.id)" />
+          <NxButton class="tis-quiet" variant="text" :label="t.tradein.sheetCancel" @click="hide" />
         </view>
       </template>
 
       <!-- ─────────── 2. tradein — 置换确认(去结算) ─────────── -->
-      <template v-else-if="state.kind === 'tradein' && purchaseRecovery !== 'none'">
-        <view class="tis-head">
-          <text :id="titleId" class="tis-title">{{ purchaseRecovery === 'error' ? t.tradein.retireTitle : t.tradein.recoveryPending }}</text>
-          <!-- The recovery record could not be read yet: it is re-read automatically (03 §3.5.2), so only say so, no button. -->
-          <text v-if="purchaseRecovery === 'error'" class="tis-status" role="status" aria-busy="true">{{ t.tradein.recoveryReading }}</text>
+      <!-- The original command could not be read yet: it is re-read automatically (03 §3.5.2), so only say so, no button.
+           A readable original (pending) is a decision and opens the centred confirm below instead of this sheet. -->
+      <template v-else-if="state.kind === 'tradein' && purchaseRecovery === 'error'">
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ t.tradein.retireTitle }}</text></view>
+        <view class="tis-bd">
+          <view class="tis-status" role="status" aria-busy="true">
+            <svg class="tis-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".2" /><path d="M21 12a9 9 0 0 0-9-9" /></svg>
+            <text class="tis-status__text">{{ t.tradein.recoveryReading }}</text>
+          </view>
         </view>
-        <view v-if="purchaseRecovery === 'pending'" class="tis-cta" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text class="tis-cta-text">{{ purchaseActionText }}</text></view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
+        <view class="tis-ft"><NxButton class="tis-quiet" variant="text" :label="t.tradein.sheetCancel" @click="hide" /></view>
       </template>
+      <!-- Eligibility not confirmed yet (PRD §7.5.3 F08): one small status, the in-place retry when the read failed, no quote. -->
       <template v-else-if="state.kind === 'tradein' && remoteApiEnabled && purchaseMessage === 'error'">
-        <view class="tis-head" role="status" :aria-busy="purchaseStatus === 'loading' || purchaseStatus === 'idle'">
-          <text :id="titleId" class="tis-title">{{ purchaseStatus === 'loading' || purchaseStatus === 'idle' ? t.store.purchaseEligibilityLoading : t.store.purchaseEligibilityError }}</text>
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ t.tradein.retireTitle }}</text></view>
+        <view class="tis-bd">
+          <view class="tis-status-row">
+            <view class="tis-status" :class="`tis-status--${(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn')}`" role="status" :aria-busy="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'loading'">
+            <svg v-if="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'loading'" class="tis-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".2" /><path d="M21 12a9 9 0 0 0-9-9" /></svg>
+            <svg v-else-if="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'warn'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
+            <text class="tis-status__text">{{ purchaseStatus === 'loading' || purchaseStatus === 'idle' ? t.store.purchaseEligibilityLoading : t.store.purchaseEligibilityError }}</text>
+          </view>
+            <view v-if="purchaseStatus === 'error' || purchaseStatus === 'ready'" class="nx-card-recovery-action nx-card-recovery-action--inline" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text>{{ t.store.purchaseEligibilityRetry }}</text></view>
+          </view>
         </view>
-        <view v-if="purchaseStatus === 'error' || purchaseStatus === 'ready'" class="nx-card-recovery-action" role="button" tabindex="0" @click="onConfirmTradein" @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)"><text>{{ t.store.purchaseEligibilityRetry }}</text></view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
+        <view class="tis-ft"><NxButton class="tis-quiet" variant="text" :label="t.tradein.sheetCancel" @click="hide" /></view>
       </template>
       <template v-else-if="state.kind === 'tradein' && tradeinView">
-        <view class="tis-head tis-head-mb4">
-          <text :id="titleId" class="tis-title">{{ purchaseConfirmed ? tradeinView.title : t.tradein.purchaseBlockedTitle }}</text>
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ purchaseConfirmed ? t.tradein.retireTitle : t.tradein.purchaseBlockedTitle }}</text></view>
+        <view class="tis-bd">
+          <template v-if="purchaseConfirmed">
+            <!-- Old machine → new machine: what is handed in and what arrives (board B-2). -->
+            <view class="tis-pair" role="img" :aria-label="tradeinView.title">
+              <view class="tis-pair__src" aria-hidden="true"><DeviceArt class="tis-pair__src-art" :device="tradeinView.oldDevice" /><text class="tis-pair__src-name">{{ tradeinView.oldName }}</text></view>
+              <svg class="tis-pair__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+              <view class="tis-pair__dst" aria-hidden="true"><CatalogMachineImage class="tis-pair__dst-art" :sku="tradeinView.newKind" :image-url="tradeinView.newImageUrl" scope-key="tradein-target" /><text class="tis-pair__dst-name">{{ tradeinView.newName }}</text></view>
+            </view>
+            <view class="tis-due">
+              <text class="tis-due__label">{{ t.tradein.sheetNetCostLabel }}</text>
+              <text class="tis-amt tis-amt--hero"><text class="tis-amt__cur">$</text>{{ tradeinView.estNet.int }}<text class="tis-amt__dec">{{ tradeinView.estNet.dec }}</text></text>
+            </view>
+            <!-- The credit as a share of the target price, then the two amounts it is drawn from (03 §3.6 .nx-progress). -->
+            <view class="tis-credit">
+              <view class="nx-progress" role="progressbar" :aria-label="t.tradein.sheetCreditLabel" :aria-valuenow="tradeinView.creditPct ?? undefined" aria-valuemin="0" aria-valuemax="100"><view class="nx-progress__fill nx-viz-grow" :style="{ width: `${tradeinView.creditPct ?? 0}%` }" /></view>
+              <view class="tis-credit__row">
+                <view><text class="tis-credit__label">{{ t.tradein.sheetCreditLabel }}</text><text class="tis-credit__value tis-credit__value--brand">−${{ tradeinView.credit }}</text></view>
+                <view class="tis-credit__end"><text class="tis-credit__label">{{ t.tradein.sheetTargetPriceLabel }}</text><text class="tis-credit__value">${{ tradeinView.targetPrice }}</text></view>
+              </view>
+            </view>
+            <!-- What the credit is based on; the rule behind it sits in the hint bubble (03 §3.5.1). -->
+            <view class="tis-basis">
+              <text class="tis-basis__text"><text v-for="(part, index) in tradeinView.basis" :key="index" :class="{ 'tis-num': part.value }">{{ part.text }}</text></text>
+              <NxHintBubble v-model:open="basisTipOpen" :text="t.tradein.basisTip" />
+            </view>
+          </template>
+          <PurchaseEligibilityPanel v-if="remoteApiEnabled && purchaseBlocked" class="tis-purchase" :status="purchaseStatus" :snapshot="purchaseSnapshot" blocking-only />
         </view>
-
-        <!-- 旧机 / 累计产出 / 档位 / 抵扣 / 预计应付 — soft surface card, no border -->
-        <view v-if="purchaseConfirmed" class="tis-card">
-          <view class="tis-row">
-            <text class="tis-row-label">{{ t.tradein.sheetOldDeviceLabel }}</text>
-            <text class="tis-row-value">{{ tradeinView.oldDeviceText }}</text>
+        <view class="tis-ft">
+          <view v-if="purchaseConfirmed && (tradeinView.taskVoid || tradeinView.fundsGap)" class="tis-hints">
+            <view v-if="tradeinView.taskVoid" class="tis-hint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+              <text class="tis-hint__text">{{ t.tradein.sheetTaskVoidHint }}</text>
+            </view>
+            <view v-if="tradeinView.fundsGap" class="tis-hint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v3" /><path d="M3 5v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3" /><path d="M21 12h-4a2 2 0 0 0 0 4h4" /></svg>
+              <text class="tis-hint__text"><text v-for="(part, index) in tradeinView.fundsGap" :key="index" :class="{ 'tis-num': part.value }">{{ part.text }}</text></text>
+            </view>
           </view>
-          <view class="tis-row">
-            <text class="tis-row-label">{{ t.tradein.sheetEarnedLabel }}</text>
-            <text class="tis-row-value tis-num">${{ tradeinView.earned }}</text>
-          </view>
-          <view class="tis-row">
-            <text class="tis-row-label">{{ t.tradein.sheetBandLabel }}</text>
-            <text class="tis-row-value">{{ tradeinView.bandText }}</text>
-          </view>
-          <view class="tis-row">
-            <text class="tis-row-label">{{ t.tradein.sheetCreditLabel }}</text>
-            <text class="tis-row-value tis-row-brand tis-num">−${{ tradeinView.credit }}</text>
-          </view>
-          <view class="tis-hr" />
-          <view class="tis-row">
-            <text class="tis-row-label">{{ t.tradein.sheetNetCostLabel }}</text>
-            <text class="tis-row-value tis-row-emph tis-num">${{ tradeinView.estNet }}</text>
-          </view>
-        </view>
-
-        <PurchaseEligibilityPanel v-if="remoteApiEnabled" class="tis-purchase" :status="purchaseStatus" :snapshot="purchaseSnapshot" :blocking-only="purchaseBlocked" />
-        <text v-if="purchaseConfirmed && remoteApiEnabled && canonicalQuote && !canonicalQuote.sufficientFunds" class="tis-disclaimer">{{ fmt(t.tradein.purchaseFundsGap, { amount: formatGroupedAmount(canonicalQuote.walletShortfallUsdt) }) }}</text>
-
-        <text v-if="purchaseConfirmed" class="tis-disclaimer">{{ tradeinView.note }}</text>
-
-        <view class="tis-cta" :class="{ 'tis-cta-disabled': purchaseActionDisabled }" role="button" :tabindex="purchaseActionDisabled ? -1 : 0" :aria-disabled="purchaseActionDisabled" :aria-busy="purchaseActionBusy" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
-          <text class="tis-cta-text">{{ purchaseActionText }}</text>
-        </view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-          <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
+          <NxButton variant="primary" :label="confirmActionText" :disabled="purchaseActionDisabled" :busy="purchaseActionBusy" @click="onConfirmTradein" />
+          <NxButton class="tis-quiet" variant="text" :label="t.tradein.sheetCancel" @click="hide" />
         </view>
       </template>
 
@@ -253,6 +304,21 @@
       </template>
     </view>
   </view>
+  <!-- The last trade-in's payment result is not confirmed: continuing it is a 决定 (03 §3.5.1), so a centred confirm with the
+       device pair and the amount still due, the same anatomy as the capacity resume below. Back / Esc take 稍后再说. -->
+  <NxNoticeDialog :open="recoveryNoticeOpen" icon="clock" tone="warning" :title="t.tradein.recoveryPending"
+    :primary="purchaseActionText" :secondary="t.tradein.recoveryLater" @primary="onConfirmTradein" @secondary="hide">
+    <view v-if="recoveryNotice" class="tis-dlg-pair" role="img" :aria-label="recoveryNotice.pairLabel">
+      <view class="tis-dlg-pair__side" aria-hidden="true"><DeviceArt class="tis-dlg-pair__art tis-dlg-pair__art--src" :device="recoveryNotice.oldDevice" /><text class="tis-dlg-pair__name">{{ recoveryNotice.oldName }}</text></view>
+      <svg class="tis-dlg-pair__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+      <view class="tis-dlg-pair__side" aria-hidden="true"><CatalogMachineImage class="tis-dlg-pair__art" :sku="recoveryNotice.newKind" :image-url="recoveryNotice.newImageUrl" scope-key="tradein-target" /><text class="tis-dlg-pair__name tis-dlg-pair__name--dst">{{ recoveryNotice.newName }}</text></view>
+    </view>
+    <view v-if="recoveryNotice" class="tis-dlg-due">
+      <text class="tis-dlg-due__label">{{ t.tradein.recoveryDueLabel }}</text>
+      <text v-if="recoveryNotice.due" class="tis-dlg-due__amount">{{ recoveryNotice.due.int }}<text class="tis-amt__dec">{{ recoveryNotice.due.dec }}</text><text class="tis-dlg-due__unit">USDT</text></text>
+      <text v-else class="tis-dlg-due__amount tis-amt--unknown">—</text>
+    </view>
+  </NxNoticeDialog>
   <!-- Resuming the original payment is a 决定 (03 §3.5.1): a centred confirm, one solid action, a text exit, no close glyph.
        Back / Esc take the text exit; while the original command is being read the action shows busy at full ink and the
        exits stay live, since that step only reads (03 §3.5.2).
@@ -271,6 +337,11 @@ import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-r
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
+import DeviceArt from "@/components/device-art.vue";
+import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { capacityCheckoutHref, capacityOrderLine, checkoutCapacityUnreadableTargetKey, describeCapacityOriginal, reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
@@ -928,17 +999,34 @@ watch([remoteRetireLoadKey, state], () => {
   void loadRemoteRetireTargets();
 }, { immediate: true, flush: "sync" });
 
+// Display parts of an amount: the main-amount figure keeps its whole part in the main ink, the decimals muted (01 §1.2).
+function amountParts(value: number): { int: string; dec: string } {
+  const [int, dec] = formatGroupedAmount(value).split(".");
+  return { int, dec: dec === undefined ? "" : `.${dec}` };
+}
+// A translated sentence split around its placeholders, so the filled-in figures can take their own weight in any word order.
+function fmtParts(template: string, values: Record<string, string>): { text: string; value: boolean }[] {
+  return template.split(/(\{\w+\})/).filter(Boolean).map((part) => {
+    const key = /^\{(\w+)\}$/.exec(part)?.[1];
+    return key !== undefined && key in values ? { text: values[key], value: true } : { text: part, value: false };
+  });
+}
+
 const retireView = computed(() => {
   const s = state.value;
   if (s.kind !== "retire") return null;
+  const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
+  const loadingStatus = { tone: "loading" as const, text: t.value.store.purchaseEligibilityLoading };
+  const failedStatus = { tone: "warn" as const, text: t.value.tradein.retireReadFailed };
   if (remoteApiEnabled && (productCatalogState.status !== "ready" || !canonicalTradeinConfig.value)) {
     const failed = productCatalogState.status === "error" || canonicalTradeinConfigStatus.value === "error";
+    // While reading, the source stays named (03 §3.4); a failed read is one status line that says it retries itself (03 §3.5.2).
     return {
-      subtitle: failed ? t.value.store.purchaseEligibilityError : t.value.store.purchaseEligibilityLoading,
-      targets: [], loading: !failed, statusText: "",
+      source: failed ? null : device,
+      subtitle: device ? fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }) : "",
+      targets: [], loading: !failed, status: failed ? failedStatus : loadingStatus,
     };
   }
-  const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!device) return null;
   const paid = device.paidPriceUsdt ?? 0;
   // 目标 = 目录中合规的可购 SKU(select 列表,不手输;规格 DEV02A ⑥)。
@@ -955,26 +1043,27 @@ const retireView = computed(() => {
     const early = !!p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase)
       && (!remoteApiEnabled || canonicalTradeinConfig.value?.earlyAccessEnabled === true);
     const remotePayable = remoteRetirePayables.value.get(p.id);
-    // Display values carry their own $ and ≈, so a pending or failed quote reads a bare 「—」 (01 §1.2).
-    const net = remoteApiEnabled
-      ? (remotePayable == null ? "—" : `≈$${formatGroupedAmount(remotePayable)}`)
-      : `≈$${formatGroupedAmount(Math.max(0, p.price - previewCredit(device, p.price)))}`;
-    const base = fmt(t.value.tradein.retireTargetOption, {
-      name: p.name,
-      price: `$${formatGroupedAmount(p.price)}`,
-      net,
-    });
-    return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
+    // A pending or failed quote reads a bare 「—」 (01 §1.2); the figure is the server quote, never estimated here.
+    const net = remoteApiEnabled ? remotePayable ?? null : Math.max(0, p.price - previewCredit(device, p.price));
+    const price = `$${formatGroupedAmount(p.price)}`;
+    const label = fmt(t.value.tradein.retireTargetOption, { name: p.name, price, net: net == null ? "—" : `$${formatGroupedAmount(net)}` });
+    return { id: p.id, name: p.name, price, imageUrl: p.imageUrl ?? null, early,
+      net: net == null ? null : amountParts(net), label: early ? `${label} · ${t.value.tradein.retireEarlyTag}` : label };
   });
+  const pending = remoteApiEnabled && remoteRetirePending.value;
+  const failed = remoteApiEnabled && remoteRetireLoadError.value;
   return {
-    subtitle: targets.length ? fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) })
-      : remoteApiEnabled && remoteRetirePending.value ? t.value.store.purchaseEligibilityLoading
-      : remoteApiEnabled && remoteRetireLoadError.value ? t.value.store.purchaseEligibilityError : t.value.tradein.retireNoTargets,
-    targets, loading: remoteApiEnabled && remoteRetirePending.value,
-    statusText: !remoteApiEnabled || !targets.length ? "" : remoteRetirePending.value ? t.value.store.purchaseEligibilityLoading
-      : remoteRetireLoadError.value ? t.value.store.purchaseEligibilityError : "",
+    // The source row names the device while there are targets or they are still being read; a final empty or failed read is one status line.
+    source: targets.length || pending ? device : null,
+    subtitle: fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }),
+    targets, loading: pending,
+    status: pending ? loadingStatus : failed ? failedStatus
+      : targets.length ? null : { tone: "info" as const, text: t.value.tradein.retireNoTargets },
   };
 });
+// One target, fully read: the single-machine layout. While rows still arrive the list stays, so the layout does not flip mid-read.
+const retireSingle = computed(() => retireView.value && !retireView.value.loading && retireView.value.targets.length === 1
+  ? retireView.value.targets[0] : null);
 
 function onPickTarget(productId: string) {
   const s = state.value;
@@ -1006,29 +1095,37 @@ const tradeinView = computed(() => {
   const earned = remoteQuote?.cumulativeOutputUsdt ?? Math.max(0, oldDevice.cumulativeEarningsUsdt ?? 0);
   const credit = remoteQuote?.discountUsdt ?? previewCredit(oldDevice, s.newPrice);
   const band = remoteQuote ? null : ladderBandFor(paid, earned);
+  const creditRatePct = remoteQuote ? remoteQuote.creditRatePct : band?.creditPct ?? null;
   const estNet = remoteQuote?.payableUsdt ?? Math.max(0, +(s.newPrice - credit).toFixed(2));
+  const targetPrice = remoteQuote?.targetPriceUsdt ?? s.newPrice;
   return {
+    // The device pair's accessible name: what is handed in and what it becomes.
     title: fmt(t.value.tradein.sheetTitle, {
       from: kindLabel(oldDevice.kind),
       to: kindLabel(s.newKind),
     }),
-    // 只给设备名——内部 id 是工程标识,禁止渲染(页面文案禁字段名/枚举值)。
-    oldDeviceText: oldDevice.name,
-    earned: formatGroupedAmount(earned),
-    bandText: remoteQuote
-      ? fmt(t.value.tradein.remoteQuoteBandLabel, { pct: remoteQuote.creditRatePct })
-      : band
-      ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
-      : "—",
+    oldDevice,
+    oldName: kindLabel(oldDevice.kind),
+    newKind: s.newKind,
+    newName: kindLabel(s.newKind),
+    newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
+    estNet: amountParts(estNet),
     credit: formatGroupedAmount(credit),
-    // What happens to the old device, then the credit rule, as one paragraph (no space after 。 in Chinese).
-    note: [(remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null)
-      ? t.value.tradein.inheritActiveHint : t.value.tradein.inheritInventoryHint, t.value.tradein.sheetDisclaimer]
-      .join(locale.code === "zh" ? "" : " "),
-    estNet: formatGroupedAmount(estNet),
+    targetPrice: formatGroupedAmount(targetPrice),
+    // How much of the target price the credit covers, drawn from the two server figures; no bar position when either is unknown.
+    creditPct: targetPrice > 0 ? Math.round(Math.min(100, Math.max(0, credit / targetPrice * 100))) : null,
+    // 抵扣 = 比例 × 旧机实付净额 (PRD §7.5.1): the base and the rate behind the credit.
+    basis: fmtParts(t.value.tradein.sheetBasis, { paid: `$${formatGroupedAmount(paid)}`, pct: creditRatePct == null ? "—" : String(creditRatePct) }),
+    // An active old device loses its running job on payment (PRD §7.5.1, BUG-542); same condition as before, both branches.
+    taskVoid: remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null,
+    fundsGap: remoteQuote && !remoteQuote.sufficientFunds
+      ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: `$${formatGroupedAmount(remoteQuote.walletShortfallUsdt)}` }) : null,
     ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet) }),
   };
 });
+// Quota used up keeps the confirm label on the disabled button; the reason is the panel right above it (board B-4d).
+const confirmActionText = computed(() => remoteApiEnabled && purchaseMessage.value === "quotaDepleted"
+  ? tradeinView.value?.ctaText ?? "" : purchaseActionText.value);
 
 async function onConfirmTradein() {
   const s = state.value;
@@ -1782,10 +1879,32 @@ function onForce() {
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
+// A readable original trade-in (pending) is answered in the centred confirm, not in the sheet (03 §3.5.1 决定).
+const recoveryNoticeOpen = computed(() => props.active && state.value.kind === "tradein" && purchaseRecovery.value === "pending");
 const sheetVisible = computed(() => props.active && state.value.kind !== "none"
-  && state.value.kind !== "keep-recovery"
+  && state.value.kind !== "keep-recovery" && !recoveryNoticeOpen.value
   && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none"));
-useDialogA11y(sheetVisible, ".tis-root", hide, true);
+// The confirm shows the original command's devices and the amount it still owes, read from the same saved record the
+// pending state came from; an unreadable record shows 「—」.
+const recoveryNotice = computed(() => {
+  const s = state.value;
+  if (!recoveryNoticeOpen.value || s.kind !== "tradein") return null;
+  let quote: CanonicalTradeinQuote | null = null;
+  try { quote = readCheckoutTradein(app.accountKey, s.newKind)?.tradeinQuote ?? null; } catch { quote = null; }
+  const oldDevice = app.devices.find((d) => d.id === s.oldDeviceId);
+  const oldName = oldDevice ? kindLabel(oldDevice.kind) : quote?.sourceProductName ?? "—";
+  const newName = kindLabel(s.newKind);
+  return { oldDevice, oldName, newKind: s.newKind, newName, newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
+    pairLabel: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }), due: quote ? amountParts(quote.payableUsdt) : null };
+});
+// The basis hint bubble (03 §3.5.1). While it is open, Esc and back close the bubble first and leave the sheet up.
+const basisTipOpen = ref(false);
+watch([sheetVisible, () => state.value], () => { basisTipOpen.value = false; });
+function closeSheetLayer() {
+  if (basisTipOpen.value) basisTipOpen.value = false;
+  else hide();
+}
+useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 
 
 </script>
@@ -1796,13 +1915,12 @@ useDialogA11y(sheetVisible, ".tis-root", hide, true);
   inset: 0;
   z-index: 895;
 }
+/* Same scrim as the shared NxSheet: a plain dim layer, no blur (03 §3.5). Entrance: .nx-sheet-fade-in / .nx-sheet-slide-up,
+   which carry the reduced-motion fallback (07 §7.1). */
 .tis-backdrop {
   position: absolute;
   inset: 0;
-  background: var(--v5-bg-color-mask);
-  backdrop-filter: blur(8px) saturate(150%);
-  -webkit-backdrop-filter: blur(8px) saturate(150%);
-  animation: tradein-fade 0.24s ease-out;
+  background: #0008;
 }
 .tis-panel { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge);
   position: absolute;
@@ -1811,23 +1929,12 @@ useDialogA11y(sheetVisible, ".tis-root", hide, true);
   bottom: 0;
   z-index: 800;
   box-sizing: border-box;
-  max-height: calc(100% - var(--nx-overlay-top));
+  max-height: min(88%, calc(100% - var(--nx-overlay-top)));
   overflow-y: auto;
-
-
   background: var(--nx-glass-fill);
   border: none;
   padding: 18px 16px;
   padding-bottom: var(--nx-overlay-bottom);
-  animation: tradein-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes tradein-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes tradein-slide-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
 }
 .tis-close {
   position: absolute;
@@ -1854,20 +1961,10 @@ useDialogA11y(sheetVisible, ".tis-root", hide, true);
   margin-bottom: 12px;
   padding-right: 40px;
 }
-.tis-head-mb4 {
-  margin-bottom: 16px;
-}
 .tis-title {
   display: block;
   font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);
   color: var(--v5-ink);
-}
-.tis-status {
-  display: block;
-  margin-top: 4px;
-  font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);
-  color: var(--v5-ink-2);
-  text-wrap: pretty;
 }
 .tis-subtitle {
   display: block;
@@ -1897,10 +1994,6 @@ useDialogA11y(sheetVisible, ".tis-root", hide, true);
 }
 .tis-opt-ico {
   flex-shrink: 0;
-}
-.tis-opt-chev {
-  flex-shrink: 0;
-  color: var(--v5-ink-4);
 }
 /* Option rows carry a name and price: list title role, content-row weight (10 §10.1). */
 .tis-opt-text {
@@ -1938,43 +2031,6 @@ useDialogA11y(sheetVisible, ".tis-root", hide, true);
   margin-top: 4px;
   line-height: 1.5;
   text-wrap: pretty;
-}
-.tis-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.tis-row-label {
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink-3);
-}
-/* Field name muted, value in the main ink (01 §1.1.1 pairing 1). */
-.tis-row-value {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--v5-ink);
-}
-.tis-num {
-  font-variant-numeric: tabular-nums;
-}
-.tis-row-brand {
-  color: var(--v5-brand);
-}
-.tis-row-emph {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--v5-ink);
-}
-.tis-hr {
-  height: 1px;
-  background: var(--v5-border);
-}
-/* Sheet notes use the description role (10.1 辅助说明: 13/20 at 390, 12/18 at 360). */
-.tis-disclaimer {
-  display: block;
-  font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);
-  color: var(--v5-ink-3);
-  margin-bottom: 16px;
 }
 /* CTAs */
 .tis-cta {
@@ -2074,5 +2130,103 @@ useDialogA11y(sheetVisible, ".tis-root", hide, true);
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.625;
+}
+/* ── Retire and confirm states (boards B-1…B-4): title, body blocks 16 apart, footer actions. ── */
+.tis-hd { padding-right: 48px; }
+.tis-hd .tis-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.tis-hd .tis-title:lang(zh) { letter-spacing: 0; }
+.tis-bd { display: flex; flex-direction: column; gap: var(--v5-space-4); margin-top: var(--v5-space-3); }
+.tis-ft { display: flex; flex-direction: column; gap: var(--v5-space-1); margin-top: var(--v5-space-3); }
+/* The text exit is its label line; 12px above and below give it the board's 44px row under the primary. */
+.tis-quiet { margin-block: var(--v5-space-3); }
+.tis-num { font-weight: 500; font-variant-numeric: tabular-nums; }
+/* Main-amount figures (01 §1.2): Montserrat, tabular, $ and decimals in the auxiliary ink. */
+.tis-amt { font-family: var(--font-amount); font-variant-numeric: tabular-nums; font-weight: 500; color: var(--v5-ink); white-space: nowrap; }
+.tis-amt__cur { color: var(--v5-ink-3); font-size: max(12px, .55em); }
+.tis-amt__dec { color: var(--v5-ink-3); }
+.tis-amt--row { flex: none; font-size: var(--ui-type-card-figure); line-height: var(--ui-type-card-figure-lh); }
+.tis-amt--hero { display: block; font-size: var(--ui-type-wallet-amount); line-height: var(--ui-type-wallet-amount-lh); letter-spacing: -0.02em; }
+.tis-amt--unknown { color: var(--v5-ink-3); }
+/* Status line: one sentence with its icon; loading spins, a failed read is the warning ink (design-rules: warnings stand out). */
+.tis-status { flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-start; gap: var(--v5-space-2); color: var(--v5-ink-2); }
+.tis-status > svg { flex: none; margin-top: calc(var(--v5-space-1) / 2); }
+.tis-status--warn > svg { color: var(--v5-warning-ink); }
+.tis-status__text { min-width: 0; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
+.tis-spin { color: var(--v5-brand); animation: tis-spin 800ms linear infinite; }
+@keyframes tis-spin { to { transform: rotate(360deg); } }
+.tis-status-row { display: flex; align-items: center; gap: var(--v5-space-2); }
+/* Retire: the source device and what to pick for it. */
+.tis-lead { display: flex; flex-direction: column; gap: calc(var(--v5-space-1) * 1.5); margin-top: -10px; }
+.tis-source { display: flex; align-items: center; gap: var(--v5-space-2); }
+.tis-source__art { flex: none; width: 36px; height: 36px; margin: -4px 0; }
+.tis-source__text { min-width: 0; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.tis-col-label { display: block; padding: 0 32px 6px 0; text-align: right; white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-list { overflow: hidden; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); padding: var(--v5-space-1) 0; }
+.tis-target { display: flex; align-items: center; gap: var(--v5-space-3); padding: var(--ui-space-row-y) var(--v5-space-3) var(--ui-space-row-y) var(--v5-space-2); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tis-target + .tis-target { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.tis-target:active { background: color-mix(in srgb, var(--v5-ink) 4%, transparent); }
+.tis-target:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; }
+.tis-target--disabled { opacity: .5; cursor: default; }
+.tis-target__art { flex: none; width: 64px; height: 64px; margin: -4px 0; }
+.tis-target__meta { flex: 1 1 auto; min-width: 0; }
+.tis-target__name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
+.tis-target__sub { display: flex; flex-wrap: wrap; align-items: center; gap: var(--v5-space-1) calc(var(--v5-space-1) * 1.5); margin-top: calc(var(--v5-space-1) / 2); }
+.tis-target__price { white-space: nowrap; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
+.tis-chev { flex: none; margin-left: -4px; color: var(--v5-ink-4); }
+/* Retire with one target: the machine on a floor shadow, its price and what is left to pay. */
+.tis-hero { display: flex; flex-direction: column; align-items: center; text-align: center; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); padding: var(--v5-space-2) var(--v5-space-4) var(--v5-space-5); }
+.tis-hero__stage { position: relative; display: grid; place-items: center; width: 200px; height: 160px; }
+.tis-hero__floor { position: absolute; left: 50%; bottom: 20px; width: 150px; height: 22px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 16%, transparent), transparent); pointer-events: none; }
+.tis-hero__art { position: relative; width: 172px; height: 172px; }
+.tis-hero__name { display: block; overflow-wrap: break-word; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); }
+.tis-hero__sub { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--v5-space-1) calc(var(--v5-space-1) * 1.5); margin-top: calc(var(--v5-space-1) / 2); }
+.tis-hero__label { display: block; margin-top: var(--v5-space-3); white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* Confirm: old → new machine, what is left to pay, the credit and its base. */
+.tis-pair { display: flex; align-items: center; justify-content: center; gap: calc(var(--v5-space-1) * 1.5); }
+.tis-pair__src, .tis-pair__dst { display: flex; align-items: center; gap: calc(var(--v5-space-1) * 1.5); }
+.tis-pair__src { min-width: 0; }
+.tis-pair__dst { flex: none; }
+.tis-pair__src-art { flex: none; width: 48px; height: 48px; opacity: .82; }
+.tis-pair__dst-art { flex: none; width: 56px; height: 56px; }
+.tis-pair__src-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-pair__dst-name { white-space: nowrap; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); }
+.tis-pair__arrow { flex: none; margin: 0 4px; color: var(--v5-ink-4); }
+.tis-due { text-align: center; }
+.tis-due__label { display: block; white-space: nowrap; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-credit__row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-2); }
+.tis-credit__end { text-align: right; }
+.tis-credit__label { display: block; white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-credit__value { display: block; white-space: nowrap; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-ink); }
+.tis-credit__value--brand { color: var(--v5-brand); }
+.tis-basis { display: flex; align-items: center; justify-content: center; gap: calc(var(--v5-space-1) * 1.5); }
+.tis-basis__text { min-width: 0; text-align: center; overflow-wrap: break-word; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-bd .tis-purchase { margin: 0; }
+/* Footer hints: this order's consequences, one line each at 390 zh, warning icon, main ink (design-rules: warnings stand out). */
+.tis-hints { display: flex; flex-direction: column; gap: var(--v5-space-2); padding: var(--v5-space-1) 0 var(--v5-space-3); }
+.tis-hint { display: flex; align-items: flex-start; gap: calc(var(--v5-space-1) * 1.5); }
+.tis-hint > svg { flex: none; margin-top: calc(var(--v5-space-1) / 2); color: var(--v5-warning-ink); }
+.tis-hint__text { min-width: 0; overflow-wrap: break-word; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink); }
+/* Recovery confirm (B-4e): the device pair stacked small, then the amount still due. */
+.tis-dlg-pair { align-self: stretch; display: flex; align-items: flex-start; justify-content: center; gap: var(--ui-space-row-y); margin-top: var(--v5-space-4); }
+.tis-dlg-pair__side { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); width: 104px; min-width: 0; }
+.tis-dlg-pair__art { width: 44px; height: 44px; }
+.tis-dlg-pair__art--src { opacity: .82; }
+.tis-dlg-pair__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-dlg-pair__name--dst { font-weight: 500; color: var(--v5-ink); }
+.tis-dlg-pair__arrow { flex: none; margin-top: var(--v5-space-3); color: var(--v5-ink-4); }
+.tis-dlg-due { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); margin-top: var(--v5-space-4); }
+.tis-dlg-due__label { white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-dlg-due__amount { white-space: nowrap; font-family: var(--font-amount); font-weight: 500; font-size: var(--ui-type-page-title); line-height: var(--ui-type-page-title-lh); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--v5-ink); }
+.tis-dlg-due__unit { margin-left: var(--v5-space-1); letter-spacing: 0; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* 360 band (≤374): smaller machines so the pair and the rows keep the 16px edge (board ≤374 rule). */
+@media (max-width: 374px) {
+  .tis-pair__src-art { width: 40px; height: 40px; }
+  .tis-pair__dst-art { width: 48px; height: 48px; }
+  .tis-pair__src-name { max-width: 76px; }
+  .tis-target { gap: var(--ui-space-row-y); }
+  .tis-target__art { width: 52px; height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tis-spin { animation: none; }
 }
 </style>
