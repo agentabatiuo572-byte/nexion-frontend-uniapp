@@ -337,7 +337,12 @@ const head = computed(() => {
     // Only the order's own canonical status may say it timed out (contract canonicalStatus).
     case "closed": return { tone: "neutral" as const, icon: read.value?.canonicalStatus === "expired" ? "clock" as const : undefined, title: resultTitle.value, body: c.expiredBody };
     case "missing": return { tone: "neutral" as const, icon: "alert" as const, title: c.orderMissingTitle, body: c.orderMissing };
-    case "open-intent": return { tone: "warning" as const, icon: "clock" as const, title: c.openIntentTitle, body: c.openIntentBody };
+    // Name the channel of the payment in progress (B84 openIntent.paymentMethod): the bank card, or USDT on the intent's own network, which can differ from this page's.
+    case "open-intent": {
+      const method = read.value?.openIntent?.paymentMethod;
+      const usdt = method === "CREGIS_USDT_BSC" ? c.bep20 : method === "CREGIS_USDT_ERC20" ? c.erc20 : method === "CREGIS_USDT_TRC20" ? c.trc20 : "";
+      return { tone: "warning" as const, icon: "clock" as const, title: usdt ? fill(c.openIntentUsdtTitle, { network: usdt }) : c.openIntentTitle, body: c.openIntentBody };
+    }
     case "review": return { tone: "warning" as const, icon: "shield" as const, title: c.reviewHoldTitle, body: c.reviewHold };
     default: return null;
   }

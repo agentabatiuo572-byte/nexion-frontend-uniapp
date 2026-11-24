@@ -5,7 +5,7 @@ import { demoWalletUsdt } from './prototype-demo-wallet.mjs';
 
 const FEE = '0.123456', MIN = '50', MICRO = 1000000n;
 const sampleOrder = 'DEMO-ORDER-001', sampleIntent = 'PPI-PREVIEW-7001';
-const bankSampleStates = ['open-intent', 'open-intent-readonly', 'snapshot-error'];
+const intentSampleStates = ['open-intent', 'open-intent-usdt', 'open-intent-readonly', 'snapshot-error'];
 const micro = value => {
   const text = String(value), negative = text.startsWith('-');
   const [whole, fraction = ''] = text.replace('-', '').split('.');
@@ -28,7 +28,7 @@ export function demoOrderTopupPayRefusal(state, orderNo) {
   if (scenario === 'deadline' || scenario === 'expired') return 'ORDER_PAYMENT_EXPIRED';
   if (['closed', 'paid', 'paid-unverified'].includes(scenario)) return 'ORDER_NOT_PAYABLE';
   if (scenario === 'review') return 'HDPAY_COMMERCE_PAYMENT_REVIEW_REQUIRED';
-  if (scenario === 'finance-review' || orderNo === sampleOrder && bankSampleStates.includes(scenario)) return 'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS';
+  if (scenario === 'finance-review' || orderNo === sampleOrder && intentSampleStates.includes(scenario)) return 'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS';
   return null;
 }
 
@@ -39,17 +39,18 @@ function deposit(network, gross, credited, status, at) {
     confirmations: 15, requiredConfirmations: 15, status, createdAt: at, creditedAt: status === 'CREDITED' ? at : null };
 }
 
-function sampleBankIntent(order, allowed) {
+// The original payment behind the open-intent samples: a bank card one, or a historical ERC20 USDT one.
+function sampleIntentSnapshot(order, allowed, usdt) {
   const deadline = order.expiresAt;
   const timing = new Date(deadline).toISOString();
   const subtotalUsdt = Number(order.amountUsdt).toFixed(2);
   return { intentNo: sampleIntent, commandKey: `wallet-pay:${order.orderNo}:other-device`, paymentQuoteId: 'PPQ-PREVIEW-7001',
-    kind: 'ORDER_PAY', paymentMethod: 'HDPAY_BANK', network: 'VND_BANK', status: 'AWAITING_PAYMENT', subtotalUsdt,
+    kind: 'ORDER_PAY', paymentMethod: usdt ? 'CREGIS_USDT_ERC20' : 'HDPAY_BANK', network: usdt ? 'ERC20' : 'VND_BANK', status: 'AWAITING_PAYMENT', subtotalUsdt,
     channelFeeUsdt: '0.00', networkConfirmFeeUsdt: '0.00', totalUsdt: subtotalUsdt,
-    amountVnd: String(Math.round(Number(subtotalUsdt) * 25000)), fxRateVndPerUsdt: '25000.000000', feePolicyVersion: 3,
+    amountVnd: usdt ? null : String(Math.round(Number(subtotalUsdt) * 25000)), fxRateVndPerUsdt: usdt ? null : '25000.000000', feePolicyVersion: 3,
     expiresAt: timing, deadlineAt: timing, confirmationGraceEndsAt: new Date(deadline + 5 * 60000).toISOString(),
-    paymentAllowed: allowed, paymentUrl: allowed ? `https://api.hdpayadmin.com/__demo/purchase-cashier/${sampleIntent}` : null,
-    address: null, reason: null, receipt: null };
+    paymentAllowed: allowed, paymentUrl: allowed && !usdt ? `https://api.hdpayadmin.com/__demo/purchase-cashier/${sampleIntent}` : null,
+    address: usdt ? address('ERC20') : null, reason: null, receipt: null };
 }
 
 export function demoOrderTopupResponse(url, state, locale, now, headers, findIntent) {
@@ -79,7 +80,7 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, findInt
       : deposit(net, '20', '0', 'DUST_HOLD', at)));
   }
   const match = path.match(/^\/api\/app\/orders\/([^/]+)\/usdt-topup$/);
-  const sampleSnapshot = path === snapshotPath && bankSampleStates.includes(scenario);
+  const sampleSnapshot = path === snapshotPath && intentSampleStates.includes(scenario);
   if (!match && !sampleSnapshot) return undefined;
   if (match && !networks.includes(network)) return refuse(400, 'ORDER_TOPUP_NETWORK_INVALID');
   if (match && scenario === 'disabled') return refuse(409, 'ORDER_USDT_TOPUP_DISABLED');
@@ -88,7 +89,7 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, findInt
   const order = owns && demoAccountOrders(url, locale, state, now).find(row => row.orderNo === orderNo);
   if (!order || scenario === 'missing') return refuse(404, sampleSnapshot ? 'PURCHASE_PAYMENT_INTENT_NOT_FOUND' : 'ORDER_NOT_FOUND');
   if (sampleSnapshot) return scenario === 'snapshot-error' ? refuse(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE')
-    : ok(sampleBankIntent(order, scenario === 'open-intent' && now < order.expiresAt));
+    : ok(sampleIntentSnapshot(order, ['open-intent', 'open-intent-usdt'].includes(scenario) && now < order.expiresAt, scenario === 'open-intent-usdt'));
   if (scenario === 'order-error' || state.dataState === 'error') return refuse(503, 'ORDER_TOPUP_READ_FAILED');
 
   const actualPaid = order.paidAt != null || ['PAID', 'REFUNDED', 'CHARGEBACK'].includes(order.paymentStatus);
@@ -98,10 +99,11 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, findInt
   const deadline = !pending ? null : scenario === 'deadline' ? now - 1000
     : Math.min(order.expiresAt, order.payBy ? Date.parse(order.payBy) : Number.POSITIVE_INFINITY);
   const intent = pending ? findIntent?.(orderNo) : null;
-  const bankSample = pending && orderNo === sampleOrder && bankSampleStates.includes(scenario);
+  const intentSample = pending && orderNo === sampleOrder && intentSampleStates.includes(scenario);
   const openIntent = intent && intent.status !== 'MANUAL_REVIEW'
     ? { intentNo: intent.intentNo, paymentMethod: intent.paymentMethod, paymentAllowed: intent.paymentAllowed }
-    : bankSample ? { intentNo: sampleIntent, paymentMethod: 'HDPAY_BANK', paymentAllowed: scenario === 'open-intent' && now < deadline } : null;
+    : intentSample ? { intentNo: sampleIntent, paymentMethod: scenario === 'open-intent-usdt' ? 'CREGIS_USDT_ERC20' : 'HDPAY_BANK',
+      paymentAllowed: ['open-intent', 'open-intent-usdt'].includes(scenario) && now < deadline } : null;
   const reviewReason = pending && !openIntent ? intent?.status === 'MANUAL_REVIEW' || scenario === 'finance-review'
     ? 'FINANCE_REVIEW' : scenario === 'review' ? 'BANK_SESSION' : null : null;
   const blocker = openIntent ? 'OPEN_INTENT' : reviewReason ? 'NEEDS_REVIEW' : 'NONE';
