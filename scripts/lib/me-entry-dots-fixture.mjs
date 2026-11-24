@@ -250,7 +250,14 @@ export function createMeEntryDotsFixture(previewState) {
     return { ...fixture, serverNow: now, currentWeek: week };
   }
 
-  async function read(url, accountId, baseRead) {
+  function orderProjection(accountId, payload) {
+    const fixture = accounts.get(accountId);
+    if (!fixture) return undefined;
+    fixture.payment = paymentAt(fixture, serverNow(fixture));
+    return { ...payload, orders: specimenOrders(payload, fixture) };
+  }
+
+  async function read(url, accountId, baseRead, paginateOrderPage) {
     const fixture = accounts.get(accountId);
     const path = url.pathname;
     if (!fixture) return undefined;
@@ -271,14 +278,15 @@ export function createMeEntryDotsFixture(previewState) {
     let data;
     if (!failed) {
       if (source === 'orders') {
-        fixture.payment = paymentAt(fixture, serverNow(fixture));
-        const payload = baseRead(path);
-        const rows = specimenOrders(payload, fixture);
-        const limit = Number(url.searchParams.get('pageSize') ?? 20);
-        const cursor = url.searchParams.get('beforeOrderNo');
-        const offset = cursor ? rows.findIndex(row => row.orderNo === cursor) + 1 : 0;
-        const orders = rows.slice(offset, offset + limit);
-        data = { ...payload, orders, nextCursor: rows.length > offset + limit ? orders.at(-1).orderNo : null };
+        const payload = orderProjection(accountId, baseRead(path));
+        if (paginateOrderPage) data = paginateOrderPage(url, accountId, payload, 20);
+        else {
+          const limit = Number(url.searchParams.get('pageSize') ?? 20);
+          const cursor = url.searchParams.get('beforeOrderNo');
+          const offset = cursor ? payload.orders.findIndex(row => row.orderNo === cursor) + 1 : 0;
+          const orders = payload.orders.slice(offset, offset + limit);
+          data = { ...payload, orders, nextCursor: payload.orders.length > offset + limit ? orders.at(-1).orderNo : null };
+        }
       } else if (source === 'missions') {
         data = specimenQuests(baseRead(url.pathname + url.search), fixture, serverNow(fixture), url.searchParams.get('locale'));
       } else {
@@ -364,5 +372,5 @@ export function createMeEntryDotsFixture(previewState) {
     };
   }
 
-  return { configure, read, handlesClaim, claim, handlesCancel, cancelOrder };
+  return { configure, read, orderProjection, handlesClaim, claim, handlesCancel, cancelOrder };
 }

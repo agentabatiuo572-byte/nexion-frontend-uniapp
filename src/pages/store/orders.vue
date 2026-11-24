@@ -149,7 +149,7 @@ import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import ConversationSwipeRow from "@/components/support/conversation-swipe-row.vue";
-import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isUnfinishedPurchaseRecord, purchaseRecordPayload, refreshPendingPayments, usePurchasePayment } from "@/store/purchase-payment";
+import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isUnfinishedPurchaseRecord, orderPaymentDeadline, purchaseRecordPayload, refreshPendingPayments, rememberHiddenOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { GENESIS_MEDIA, getProductMedia } from "@/lib/product-media";
@@ -232,12 +232,14 @@ const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap(
   const currency = commercePaymentCurrency(row.paymentMethod);
   if (row.kind === "ORDER_PAY") {
     if (typeof payload.orderNo !== "string") return [];
-    // Only a known order that has left placed needs a payment card.
     const order = orders.getById(payload.orderNo);
-    if (!order || order.status === "placed") return [];
-    const amount = commerceOrderAmount(order);
-    return [{ ...base, sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, orderNo: order.id, kindLabel: "", method: "",
-      amount: row.paymentMethod ? { ...amount, currency } : amount }];
+    // An absent order needs a recorded hide before its payment can appear here.
+    if (order?.status === "placed") return [];
+    const details = order ? { sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, amount: commerceOrderAmount(order) }
+      : row.hiddenOrder && { sku: row.hiddenOrder.sku, imageUrl: row.hiddenOrder.imageUrl, amount: { value: row.hiddenOrder.total, currency: "USD" as const } };
+    if (!details) return [];
+    return [{ ...base, ...details, orderNo: payload.orderNo, kindLabel: "", method: "",
+      amount: row.paymentMethod ? { ...details.amount, currency } : details.amount }];
   }
   const kindLabel = row.kind === "TRADE_IN" ? t.value.search.routes.tradeIn.label : row.kind === "CAPACITY_REPLACE" ? slotCopy.value.replace
     : row.kind === "CAPACITY_KEEP" ? c.kindCapacityKeep : c.kindTrialConvert;
@@ -276,14 +278,15 @@ async function confirmDeleteExpired() {
   const id = deleteTarget.value?.id;
   deleteTarget.value = null;
   swipeOpenId.value = "";
-  const order = orderList.value.find(item => item.kind === "commerce" && item.id === id);
+  const order = orderList.value.find((item): item is CommerceOrderListItem => item.kind === "commerce" && item.id === id);
   if (!order || !swipeable(order) || hidingOrderId.value) return;
   const epoch = app.accountBindingEpoch;
   hidingOrderId.value = order.id;
   const hidden = await orders.hideExpiredOrder(order.id);
   if (epoch !== app.accountBindingEpoch) return;
   hidingOrderId.value = "";
-  if (!hidden) toast.error(t.value.security.opFailed);
+  if (hidden) rememberHiddenOrderPayment(app.accountKey, order);
+  else toast.error(t.value.security.opFailed);
 }
 // One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
 const tintedPendingId = computed(() => filteredCards.value.find((order): order is CommerceOrderListItem =>
@@ -331,8 +334,11 @@ const orderPaymentReadKeys = computed(() => new Set(paymentRecords.value.filter(
   if (isUnfinishedPurchaseRecord(row)) return true;
   if (row.kind !== "ORDER_PAY" || row.lastStatus !== "EXPIRED" || !row.intentNo || row.businessDelivered || row.validated) return false;
   const { orderNo } = purchaseRecordPayload(row);
-  const order = typeof orderNo === "string" ? orders.getById(orderNo) : undefined;
-  return order?.status === "expired" && nowSeconds.value * 1000 < (order.expiresAt ?? order.placedAt + 30 * 60_000) + latePaymentReadWindow;
+  if (typeof orderNo !== "string") return false;
+  const order = orders.getById(orderNo);
+  if (order && order.status !== "expired") return false;
+  const deadline = orderPaymentDeadline(row, order);
+  return deadline !== undefined && nowSeconds.value * 1000 < deadline + latePaymentReadWindow;
 }).map(row => row.commandKey)));
 const watchesPayments = () => remoteSessionReady.value && orderPaymentReadKeys.value.size > 0 && !payment.state.open && foregroundReadAllowed();
 useVisibleInterval(() => {

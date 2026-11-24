@@ -57,7 +57,7 @@ demoFleetFacts(new URL('http://127.0.0.1:'+port),locale,state);
 // unless DEMO_CHECKOUT_FLOW=0.
 // Continue from an imported epoch, so the first scenario change never reuses it.
 let scenarioEpoch=state.scenarioEpoch??0;
-const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
+const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale,meEntryDots.orderProjection):null;
 const fixtureFor=(url,request)=>{
   if(['/api/app/team/quota','/api/store/purchase-eligibility'].includes(url.pathname))checkoutFlow?.observePayments();
   return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,request),state);
@@ -342,7 +342,7 @@ const server=http.createServer(async(req,res)=>{
         const accountId=url.pathname==='/api/genesis/state'
           ? previewSelectedAccountId(state) : previewAccountId(state,req.headers);
         const data=await meEntryDots.read(url,accountId,path=>
-          fixtureFor(new URL(path,url.origin),{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>({})}));
+          fixtureFor(new URL(path,url.origin),{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>({})}),checkoutFlow?.paginateOrderPage);
         if(data!==undefined)return sendJson(res,{code:0,message:'OK',data});
       }
       if(req.method==='POST'&&meEntryDots.handlesCancel(url.pathname)){
