@@ -3666,7 +3666,6 @@ export const id: Messages = {
     tabAll: "Semua",
     tabIn: "Masuk",
     tabOut: "Keluar",
-    tabReward: "Hadiah",
     assetGroupLabel: "Aset",
     overviewMonth: "Pendapatan bulan ini ({asset})",
     overviewToday: "Hari ini",

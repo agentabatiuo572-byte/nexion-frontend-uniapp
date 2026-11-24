@@ -3666,7 +3666,6 @@ export const ms: Messages = {
     tabAll: "Semua",
     tabIn: "Kredit",
     tabOut: "Debit",
-    tabReward: "Ganjaran",
     assetGroupLabel: "Aset",
     overviewMonth: "Pendapatan bulan ini ({asset})",
     overviewToday: "Hari ini",

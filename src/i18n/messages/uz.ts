@@ -3666,7 +3666,6 @@ export const uz: Messages = {
     tabAll: "Hammasi",
     tabIn: "Kirim",
     tabOut: "Chiqim",
-    tabReward: "Mukofot",
     assetGroupLabel: "Aktiv",
     overviewMonth: "Shu oylik daromad ({asset})",
     overviewToday: "Bugun",
