@@ -324,7 +324,9 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
     try { save(known); }
     catch (error) {
       if (!settled(intent)) throw error;
-      toast.error(known.businessDelivered ? getT().errors.billMissingTitle : getT().errors.txNotSavedTitle);
+      if (pending.lastStatus !== known.lastStatus || (pending.businessDelivered ?? false) !== known.businessDelivered) {
+        toast.error(known.businessDelivered ? getT().errors.billMissingTitle : getT().errors.txNotSavedTitle);
+      }
     }
   }
   const previousConclusion = purchaseConclusion(state.intent);
