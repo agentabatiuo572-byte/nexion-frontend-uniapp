@@ -88,7 +88,36 @@
     <!-- An explanation the user opens is a bottom sheet (03 §3.5.1); taps inside it stay off the page's close-on-tap. -->
     <view v-if="tradeinCreditText || tradeinDisabledText" @click.stop>
       <NxSheet :open="quoteInfoOpen" :title="t.tradein.quoteInfoLabel" @close="emit('quote-info', false)">
-        <text class="device-inventory-row__sheet-copy">{{ t.tradein.ladderIntro }}</text>
+        <!-- Board B-8a: this device's output and credit, the five-tier table with its current tier, one footnote. -->
+        <view class="device-inventory-row__ladder-device">
+          <view class="device-inventory-row__ladder-art" aria-hidden="true"><image v-if="imageSrc" class="device-inventory-row__ladder-image" :src="imageSrc" mode="aspectFit" @error="imageError" /></view>
+          <view class="device-inventory-row__ladder-meta">
+            <text class="device-inventory-row__ladder-name">{{ deviceName(t, device) }}</text>
+            <text class="device-inventory-row__ladder-sub">{{ t.tradein.ladderEarnedLabel }} <text class="device-inventory-row__ladder-num">{{ earnedText }}</text></text>
+          </view>
+          <view class="device-inventory-row__ladder-credit">
+            <text class="device-inventory-row__label">{{ t.tradein.inventoryCreditLabel }}</text>
+            <text v-if="ladderCredit" class="device-inventory-row__ladder-amount"><text class="device-inventory-row__ladder-muted">$</text>{{ ladderCredit.int }}<text class="device-inventory-row__ladder-muted">{{ ladderCredit.dec }}</text></text>
+            <text v-else class="device-inventory-row__ladder-amount">{{ visibility.mask("—") }}</text>
+          </view>
+        </view>
+        <view class="device-inventory-row__ladder" role="img" :aria-label="ladder.aria">
+          <text class="device-inventory-row__label" aria-hidden="true">{{ t.tradein.ladderRateCaption }}</text>
+          <view class="device-inventory-row__ladder-grid device-inventory-row__ladder-rates" aria-hidden="true">
+            <text v-for="(cell, i) in ladder.rates" :key="i" :class="{ 'device-inventory-row__ladder-on': i === ladder.current }">{{ cell }}</text>
+          </view>
+          <view class="device-inventory-row__ladder-track" aria-hidden="true">
+            <view class="device-inventory-row__ladder-grid"><view v-for="(_, i) in ladder.rates" :key="i" class="device-inventory-row__ladder-seg" :class="{ 'device-inventory-row__ladder-seg--on': i === ladder.current }" /></view>
+            <view v-if="ladder.marker != null" class="device-inventory-row__ladder-dot" :style="{ left: `calc(${ladder.marker}% - 4px)` }" />
+          </view>
+          <view class="device-inventory-row__ladder-grid device-inventory-row__ladder-ranges" aria-hidden="true">
+            <text v-for="(cell, i) in ladder.ranges" :key="i" :class="{ 'device-inventory-row__ladder-on': i === ladder.current }">{{ cell }}</text>
+          </view>
+          <view class="device-inventory-row__ladder-foot" aria-hidden="true">
+            <text class="device-inventory-row__label">{{ t.tradein.ladderRatioCaption }}</text>
+            <text class="device-inventory-row__label" :class="{ 'device-inventory-row__ladder-on': ladder.current >= 0 }">{{ ladder.produced }}</text>
+          </view>
+        </view>
         <text class="device-inventory-row__sheet-footnote">{{ t.tradein.ladderFootnote }}</text>
       </NxSheet>
     </view>
@@ -103,7 +132,8 @@ import type { Device } from "@/store/types";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import { useT } from "@/i18n/use-t";
-import { fmtMoney } from "@/i18n/format";
+import { fmt, fmtMoney } from "@/i18n/format";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { deviceName } from "@/lib/device-copy";
 import { useDataVisibility } from "@/store/data-visibility";
 import { deviceOnlineState } from "@/lib/hashpower";
@@ -144,6 +174,8 @@ const props = withDefaults(
     quoteInfoOpen?: boolean;
     tradeinCtaLabel?: string;
     tradeinDisabledText?: string;
+    /** The explainer's tier table from the server config and this device's quote; absent until wired, so every cell reads 「—」. */
+    tradeinLadder?: { creditRatesPct: number[]; outputRatioCutsPct: number[]; outputRatioPct: number | null };
   }>(),
   { disabled: false, actionDisabled: false, showAction: true, runtimeConfirmed: true, tasksConfirmed: true, quoteInfoOpen: false },
 );
@@ -178,6 +210,42 @@ const actionDisabled = computed(() => props.disabled || props.actionDisabled);
 const actionLabel = computed(() =>
   props.active ? props.deactivateLabel : props.disabled ? props.disabledLabel ?? props.slotsFullLabel : props.activateLabel,
 );
+// The 可抵 explainer (board B-8a). The credit and this device's output ratio follow the hide-stats switch (03.10); tier rates
+// and ranges are public rules and stay visible.
+const ladderCredit = computed(() => {
+  if (visibility.hidden || props.tradeinQuoteAmount === undefined) return null;
+  const [int, dec] = formatGroupedAmount(props.tradeinQuoteAmount).split(".");
+  return { int, dec: dec === undefined ? "" : `.${dec}` };
+});
+const ladder = computed(() => ladderView(props.tradeinLadder, visibility.hidden));
+/** Cells, current tier, marker position and the screen-reader sentence of the tier table, built from the data (PRD §7.5.4). */
+function ladderView(data: { creditRatesPct: number[]; outputRatioCutsPct: number[]; outputRatioPct: number | null } | undefined, hidden: boolean) {
+  const c = t.value.tradein;
+  const pct = (value: number) => `${Number(value.toFixed(1))}%`;
+  const rates = data?.creditRatesPct ?? [];
+  const cuts = data?.outputRatioCutsPct ?? [];
+  // Rates step down from the first tier; cuts are the boundaries between tiers, so there is one fewer of them.
+  const known = rates.length > 1 && cuts.length === rates.length - 1;
+  const count = known ? rates.length : 5;
+  const ranges = known ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${pct(cuts[i - 1])}–${pct(cuts[i])}`)
+    : Array.from({ length: count }, () => "—");
+  const output = known && !hidden && data?.outputRatioPct != null ? data.outputRatioPct : null;
+  const current = output == null ? -1 : cuts.filter((cut) => output >= cut).length;
+  // The dot sits inside the current tier in proportion; the open-ended last tier has no upper bound, so it sits at its middle.
+  let marker: number | null = null;
+  if (output != null) {
+    const lo = current === 0 ? 0 : cuts[current - 1];
+    const hi = current < cuts.length ? cuts[current] : null;
+    const within = hi == null ? 0.5 : Math.min(1, Math.max(0, (output - lo) / (hi - lo)));
+    marker = Number(((current + within) / count * 100).toFixed(1));
+  }
+  const produced = fmt(c.ladderProduced, { pct: hidden ? visibility.mask("—") : output == null ? "—" : pct(output) });
+  const aria = known
+    ? [`${c.ladderRateCaption}: ${rates.map((rate, i) => fmt(c.ladderAriaBand, { range: ranges[i], rate: pct(rate) })).join("; ")}.`,
+      output == null ? produced : fmt(c.ladderAriaYou, { pct: pct(output), n: current + 1 })].join(" ")
+    : `${c.ladderRateCaption}: —. ${produced}`;
+  return { rates: known ? rates.map(pct) : ranges, ranges, current, marker, produced, aria };
+}
 function onAction() {
   if (!props.showAction || actionDisabled.value) return;
   emit("toggle");
@@ -252,9 +320,33 @@ async function chooseMenu(action: "toggle" | "tradein") {
    only 6px down: wrapped buttons start 8px below, and their own hit boxes stay theirs. */
 .device-inventory-row__quote::after { content: ""; position: absolute; inset: calc(var(--ui-type-list-subtitle-lh) + 6px - 44px) -4px -6px; }
 .device-inventory-row__actions { display: flex; gap: 8px; flex: none; margin-left: auto; }
-.device-inventory-row__sheet-copy, .device-inventory-row__sheet-footnote { display: block; }
-.device-inventory-row__sheet-copy { color: var(--v5-ink-2); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
-.device-inventory-row__sheet-footnote { margin-top: var(--v5-space-2); color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
+/* Explainer sheet (board B-8a): device row and tier table are surface-2 blocks 16 apart, then one footnote line. */
+.device-inventory-row__ladder-device, .device-inventory-row__ladder { border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
+.device-inventory-row__ladder-device { display: flex; align-items: center; gap: 12px; padding: 12px 16px 12px 8px; }
+.device-inventory-row__ladder-art { position: relative; flex: none; width: 64px; height: 56px; }
+.device-inventory-row__ladder-image { position: absolute; left: 0; top: 50%; width: 64px; height: 64px; transform: translateY(-50%); }
+.device-inventory-row__ladder-meta { flex: 1 1 auto; min-width: 0; }
+.device-inventory-row__ladder-name { display: block; overflow-wrap: break-word; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.device-inventory-row__ladder-sub { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.device-inventory-row__ladder-num { font-weight: 500; font-variant-numeric: tabular-nums; }
+.device-inventory-row__ladder-credit { flex: none; display: flex; flex-direction: column; align-items: flex-end; }
+/* The credit is this row's main figure: card-figure role in Montserrat, $ and decimals muted (01 §1.2, 10 §10.1). */
+.device-inventory-row__ladder-amount { white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric: tabular-nums; }
+.device-inventory-row__ladder-muted { color: var(--v5-ink-3); }
+.device-inventory-row__ladder-muted:first-child { font-size: max(12px, .55em); }
+.device-inventory-row__ladder { margin-top: 16px; padding: 14px 16px; }
+.device-inventory-row__ladder-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 4px; text-align: center; }
+/* Tier rates use the inline-figure role (JetBrains Mono 500); the current tier is brand and one step larger (list-title size). */
+.device-inventory-row__ladder-rates { margin-top: 6px; align-items: end; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-list-title-lh) var(--font-metric); }
+.device-inventory-row__ladder-rates .device-inventory-row__ladder-on { font-size: var(--ui-type-list-title); }
+.device-inventory-row__ladder-ranges { margin-top: 8px; color: var(--v5-ink-3); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
+.device-inventory-row__ladder-on { color: var(--v5-brand); }
+.device-inventory-row__ladder-track { position: relative; margin-top: 10px; }
+.device-inventory-row__ladder-seg { height: 3px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.device-inventory-row__ladder-seg--on { background: color-mix(in srgb, var(--v5-brand) 60%, transparent); }
+.device-inventory-row__ladder-dot { position: absolute; top: -2.5px; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand); }
+.device-inventory-row__ladder-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.device-inventory-row__sheet-footnote { display: block; margin-top: 16px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 [role="button"] { cursor: pointer; }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @keyframes device-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }

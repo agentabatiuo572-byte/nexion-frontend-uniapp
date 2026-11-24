@@ -54,32 +54,40 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
-      <!-- ─────────── 1. choice — trade-in or full price ─────────── -->
-      <template v-if="state.kind === 'choice'">
-        <view class="tis-head">
-          <text :id="titleId" class="tis-title">{{ remoteApiEnabled ? t.tradein.checkoutReAdd : t.tradein.choiceTitle }}</text>
+      <!-- ─────────── 1. choice — checkout: credit a paid old device, or pay full price (boards B-5a, B-5b) ─────────── -->
+      <template v-if="state.kind === 'choice' && choiceView">
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ remoteApiEnabled ? t.tradein.checkoutReAdd : t.tradein.choiceTitle }}</text></view>
+        <view class="tis-bd">
+          <!-- One old device: the machine is the visual and the action a primary button (04 §4.0 项数少时换布局). -->
+          <view v-if="choiceView.single" class="tis-hero">
+            <view class="tis-hero__stage"><view class="tis-hero__floor" /><DeviceArt class="tis-hero__art" :device="choiceView.single.device" /></view>
+            <text class="tis-hero__name">{{ choiceView.single.name }}</text>
+            <text class="tis-hero__credit">{{ t.tradein.inventoryCreditLabel }} <text class="tis-num">{{ choiceView.single.credit }}</text></text>
+            <text class="tis-hero__label">{{ t.tradein.sheetNetCostLabel }}</text>
+            <text v-if="choiceView.single.net" class="tis-amt tis-amt--hero"><text class="tis-amt__cur">$</text>{{ choiceView.single.net.int }}<text class="tis-amt__dec">{{ choiceView.single.net.dec }}</text></text>
+            <text v-else class="tis-amt tis-amt--hero tis-amt--unknown">—</text>
+          </view>
+          <view v-else-if="choiceView.rows.length">
+            <!-- Every row shows the same figure, so its name is written once above the column (03 §3.6.1). -->
+            <text class="tis-col-label" aria-hidden="true">{{ t.tradein.sheetNetCostLabel }}</text>
+            <view class="tis-list">
+              <view v-for="row in choiceView.rows" :key="row.id" class="tis-target" :class="{ 'tis-target--disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" :aria-label="row.label" @click="onChooseTradein(row.id)"  @keydown.enter.prevent="onKeyboardActivate($event, () => onChooseTradein(row.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onChooseTradein(row.id))">
+                <DeviceArt class="tis-target__art" :device="row.device" />
+                <view class="tis-target__meta">
+                  <text class="tis-target__name">{{ row.name }}</text>
+                  <view class="tis-target__sub"><text class="tis-target__price">{{ t.tradein.inventoryCreditLabel }} <text class="tis-num">{{ row.credit }}</text></text></view>
+                </view>
+                <text v-if="row.net" class="tis-amt tis-amt--row"><text class="tis-amt__cur">$</text>{{ row.net.int }}<text class="tis-amt__dec">{{ row.net.dec }}</text></text>
+                <text v-else class="tis-amt tis-amt--row tis-amt--unknown">—</text>
+                <!-- Each row opens its confirm step: a list entry, so a trailing chevron (03 §3.1). -->
+                <svg class="tis-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+              </view>
+            </view>
+          </view>
         </view>
-        <view class="tis-opt-list">
-          <view
-            v-for="src in choiceSources"
-            :key="src.id"
-            class="tis-opt"
-            :class="{ 'tis-cta-disabled': quoteLoading }"
-            role="button"
-            :tabindex="quoteLoading ? -1 : 0"
-            :aria-disabled="quoteLoading"
-            :aria-busy="quoteLoading"
-            @click="onChooseTradein(src.id)"
-
-            @keydown.enter.prevent="onKeyboardActivate($event, () => onChooseTradein(src.id))" @keydown.space.prevent="onKeyboardActivate($event, () => onChooseTradein(src.id))"
-          >
-            <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4" /><path d="M20 7H4" /><path d="m8 21-4-4 4-4" /><path d="M4 17h16" /></svg>
-            <text class="tis-opt-text">{{ src.label }}</text>
-          </view>
-          <view class="tis-opt" :class="{ 'tis-cta-disabled': quoteLoading }" role="button" :tabindex="quoteLoading ? -1 : 0" :aria-disabled="quoteLoading" :aria-busy="quoteLoading" @click="onChooseFullPrice"  @keydown.enter.prevent="onKeyboardActivate($event, onChooseFullPrice)" @keydown.space.prevent="onKeyboardActivate($event, onChooseFullPrice)">
-            <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18 8 4A2 2 0 0 1 22 8v8a2 2 0 0 1-1.17 1.82l-8 4a2 2 0 0 1-1.66 0l-8-4A2 2 0 0 1 2 16V8a2 2 0 0 1 1.17-1.82l8-4a2 2 0 0 1 1.66 0z" /><path d="m7 4.5 10 5" /></svg>
-            <text class="tis-opt-text">{{ t.tradein.choiceFullPriceOption }}</text>
-          </view>
+        <view class="tis-ft">
+          <NxButton v-if="choiceView.single" variant="primary" :label="t.tradein.choiceSingleCta" :busy="quoteLoading" @click="onChooseTradein(choiceView.single.id)" />
+          <NxButton class="tis-quiet" variant="text" :label="t.tradein.choiceFullPriceOption" :disabled="quoteLoading" @click="onChooseFullPrice" />
         </view>
       </template>
 
@@ -214,93 +222,80 @@
         </view>
       </template>
 
-      <!-- ─────────── 3. replace — Path B slot-full ─────────── -->
+      <!-- ─────────── 3. replace — slot full: the new machine, what it costs, and which device steps down (boards B-6a, B-6b) ─────────── -->
       <template v-else-if="state.kind === 'replace' && replaceView">
-        <view class="tis-head">
-          <text :id="titleId" class="tis-title">{{ t.tradein.replaceTitle }}</text>
-          <text class="tis-subtitle">{{ replaceView.warning }}</text>
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ t.tradein.replaceTitle }}</text></view>
+        <view class="tis-bd">
+          <view class="tis-arrive">
+            <view class="tis-arrive__stage"><view class="tis-arrive__floor" /><CatalogMachineImage class="tis-arrive__art" :sku="replaceView.newKind" :image-url="replaceView.newImageUrl" scope-key="tradein-target" /></view>
+            <text class="tis-hero__name">{{ replaceView.newName }}</text>
+          </view>
+          <view class="tis-due">
+            <text class="tis-due__label">{{ t.tradein.sheetNetCostLabel }}</text>
+            <text class="tis-amt tis-amt--hero"><text class="tis-amt__cur">$</text>{{ replaceView.due.int }}<text class="tis-amt__dec">{{ replaceView.due.dec }}</text></text>
+          </view>
+          <!-- The device that steps down moves to the warehouse; it is not taken back (PRD §7.5.3), so no old → new arrow. -->
+          <view class="tis-yield">
+            <DeviceArt v-if="replaceView.source.device" class="tis-yield__art" :device="replaceView.source.device" />
+            <text class="tis-yield__name">{{ replaceView.source.line }}</text>
+            <view v-if="replaceView.source.online" class="tis-online"><view class="tis-online__dot" aria-hidden="true" /><text>{{ t.earn.online }}</text></view>
+          </view>
         </view>
-
-        <view class="tis-card tis-card-mb4">
-          <text class="tis-card-cap">{{ t.tradein.replaceLowestDeviceLabel }}</text>
-          <text class="tis-card-line">{{ replaceView.lowestText }}</text>
-          <text class="tis-card-cap tis-card-note">{{ t.tradein.replaceTaskHint }}</text>
-        </view>
-
-        <view
-          class="tis-cta"
-          :class="{ 'tis-cta-disabled': replaceView.insufficient || confirming }"
-          role="button"
-          :tabindex="replaceView.insufficient || confirming ? -1 : 0"
-          :aria-disabled="replaceView.insufficient || confirming"
-          :aria-busy="confirming"
-          @click="onReplace"
-
-          @keydown.enter.prevent="onReplace" @keydown.space.prevent="onReplace"
-        >
-          <text class="tis-cta-text">{{ replaceView.replaceCta }}</text>
-        </view>
-        <view
-          v-if="!remoteApiEnabled || (state.kind === 'replace' && state.canonicalCapacityQuote?.decision === 'CAPACITY_AVAILABLE')"
-          class="tis-secondary nx-frosted-button"
-          :class="{ 'tis-cta-disabled': replaceView.insufficient || confirming }"
-          role="button"
-          :tabindex="replaceView.insufficient || confirming ? -1 : 0"
-          :aria-disabled="replaceView.insufficient || confirming"
-          :aria-busy="confirming"
-          @click="onKeepBuy"
-
-          @keydown.enter.prevent="onKeepBuy" @keydown.space.prevent="onKeepBuy"
-        >
-          <text class="tis-secondary-text">{{ replaceView.keepCta }}</text>
-        </view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-          <text class="tis-ghost-text">{{ t.tradein.replaceCancel }}</text>
+        <view class="tis-ft">
+          <view class="tis-hints">
+            <view v-if="replaceView.fundsGap" class="tis-hint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v3" /><path d="M3 5v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3" /><path d="M21 12h-4a2 2 0 0 0 0 4h4" /></svg>
+              <text class="tis-hint__text"><text v-for="(part, index) in replaceView.fundsGap" :key="index" :class="{ 'tis-num': part.value }">{{ part.text }}</text></text>
+            </view>
+            <view class="tis-hint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+              <text class="tis-hint__text">{{ t.tradein.replaceTaskHint }}</text>
+            </view>
+          </view>
+          <NxButton variant="primary" :label="replaceView.replaceCta" :disabled="replaceView.insufficient" :busy="confirming" @click="onReplace" />
+          <NxButton
+            v-if="!remoteApiEnabled || (state.kind === 'replace' && state.canonicalCapacityQuote?.decision === 'CAPACITY_AVAILABLE')"
+            class="tis-second" variant="secondary" :label="replaceView.keepCta" :disabled="replaceView.insufficient" :busy="confirming" @click="onKeepBuy" />
+          <NxButton class="tis-quiet" variant="text" :label="t.tradein.replaceCancel" @click="hide" />
         </view>
       </template>
 
       <!-- 空态兜底:kind 已定但对应 view 为 null(设备/目标在弹层开着时消失,
            PR-D 债 #1)。置于全部具体分支之后、block 之前,只接住 view-null 漏网。 -->
       <template v-else-if="state.kind === 'retire' || state.kind === 'tradein' || state.kind === 'replace'">
-        <view class="tis-head">
-          <text :id="titleId" class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
-        </view>
-        <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-          <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
-        </view>
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text></view>
+        <view class="tis-ft"><NxButton class="tis-quiet" variant="text" :label="t.tradein.sheetCancel" @click="hide" /></view>
       </template>
 
-      <!-- ─────────── 4. block — pending-task block ─────────── -->
-      <template v-else-if="state.kind === 'block'">
-        <view class="tis-block-head">
-          <svg class="tis-block-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-          <view class="tis-block-meta">
-            <text :id="titleId" class="tis-title">{{ blockTitle }}</text>
-            <text class="tis-block-warn">{{ state.origin === 'retire' ? t.tradein.retireBlockWarning : t.tradein.blockWarning }}</text>
+      <!-- ─────────── 4. block — the old device is running a job (boards B-7a, B-7b; not reachable in the remote build) ─────────── -->
+      <template v-else-if="state.kind === 'block' && blockView">
+        <view class="tis-hd"><text :id="titleId" class="tis-title">{{ blockTitle }}</text></view>
+        <view class="tis-bd">
+          <view class="tis-job">
+            <DeviceArt v-if="blockView.device" class="tis-job__art" :device="blockView.device" />
+            <view class="tis-job__meta">
+              <view class="tis-job__head"><text class="tis-job__name">{{ blockView.name }}</text><text class="tis-job__pct">{{ blockView.pctText }}</text></view>
+              <text class="tis-job__sub">{{ t.earn.currentTask }} · {{ blockView.taskType }}</text>
+              <view class="nx-progress tis-job__bar" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="blockView.pct ?? undefined" aria-valuemin="0" aria-valuemax="100"><view class="nx-progress__fill nx-viz-grow" :style="{ width: `${blockView.pct ?? 0}%` }" /></view>
+            </view>
+          </view>
+          <!-- retire 阻断:等作业完成即可置换(无 force,规格 DEV02A 异常2) -->
+          <view v-if="state.origin === 'retire'" class="tis-status" role="status">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
+            <text class="tis-status__text">{{ t.tradein.retireBlockWarning }}</text>
           </view>
         </view>
-
-        <!-- retire 阻断:等任务完成即可下架 → 查看任务 / 知道了(无 force,规格 DEV02A 异常2) -->
-        <template v-if="state.origin === 'retire'">
-          <view class="tis-cta" role="button" tabindex="0" @click="onGoTasks"  @keydown.enter.prevent="onKeyboardActivate($event, onGoTasks)" @keydown.space.prevent="onKeyboardActivate($event, onGoTasks)">
-            <text class="tis-cta-text">{{ t.tradein.retireBlockViewTask }}</text>
-          </view>
-          <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-            <text class="tis-ghost-text">{{ t.ui.close }}</text>
-          </view>
-        </template>
-        <template v-else>
-          <view class="tis-cta" role="button" tabindex="0" @click="onWait"  @keydown.enter.prevent="onKeyboardActivate($event, onWait)" @keydown.space.prevent="onKeyboardActivate($event, onWait)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
-            <text class="tis-cta-text">{{ t.tradein.blockWaitCta }}</text>
-          </view>
-          <view class="tis-warn-ghost" role="button" :tabindex="confirming ? -1 : 0" :aria-disabled="confirming" :aria-busy="confirming" @click="onForce"  @keydown.enter.prevent="onKeyboardActivate($event, onForce)" @keydown.space.prevent="onKeyboardActivate($event, onForce)">
-            <text class="tis-warn-ghost-text">{{ t.tradein.blockForceCta }}</text>
-          </view>
-          <view class="tis-ghost" role="button" tabindex="0" @click="hide"  @keydown.enter.prevent="onKeyboardActivate($event, hide)" @keydown.space.prevent="onKeyboardActivate($event, hide)">
-            <text class="tis-ghost-text">{{ t.tradein.blockCancel }}</text>
-          </view>
-        </template>
+        <view class="tis-ft">
+          <template v-if="state.origin === 'retire'">
+            <NxButton variant="primary" :label="t.tradein.retireBlockViewTask" @click="onGoTasks" />
+            <NxButton class="tis-quiet" variant="text" :label="t.ui.close" @click="hide" />
+          </template>
+          <!-- The two buttons already state the choice; forcing is the destructive one, neutral glass with error text (03 §3.1). -->
+          <template v-else>
+            <NxButton variant="primary" :label="t.tradein.blockWaitCta" @click="onWait" />
+            <NxButton class="tis-second tis-danger" variant="secondary" :label="t.tradein.blockForceCta" :busy="confirming" @click="onForce" />
+          </template>
+        </view>
       </template>
     </view>
   </view>
@@ -321,13 +316,21 @@
   </NxNoticeDialog>
   <!-- Resuming the original payment is a 决定 (03 §3.5.1): a centred confirm, one solid action, a text exit, no close glyph.
        Back / Esc take the text exit; while the original command is being read the action shows busy at full ink and the
-       exits stay live, since that step only reads (03 §3.5.2).
+       exits stay live, since that step only reads (03 §3.5.2). The machine and the amount still due stand on their own lines (board B-6c).
        It steps aside while the payment layer it opened is up (that layer sits below z 960), and returns if the user backs out of it. -->
   <NxNoticeDialog :open="capacitySheetOpen && !!capacityOriginal && !payment.state.open" icon="clock" tone="warning"
     :title="capacityRecovery?.operation === 'replace' ? t.tradein.recoveryUnpaid : t.tradein.keepRecoveryUnpaid"
-    :body="capacityOriginal ? fmt(t.tradein.recoveryResumeBody, { order: capacityOrderLine(capacityOriginal) }) : ''"
     :primary="recoveryCopy.resume" :secondary="t.tradein.recoveryLater" :busy="capacityResumeBusy" secondary-while-busy
-    @primary="resumeCapacityCommand" @secondary="hide" />
+    @primary="resumeCapacityCommand" @secondary="hide">
+    <view v-if="capacityNotice" class="tis-dlg-machine">
+      <CatalogMachineImage class="tis-dlg-machine__art" :sku="capacityNotice.target" :image-url="capacityNotice.imageUrl" scope-key="tradein-target" />
+      <text class="tis-dlg-machine__name">{{ capacityNotice.name }}</text>
+    </view>
+    <view v-if="capacityNotice" class="tis-dlg-due">
+      <text class="tis-dlg-due__label">{{ t.tradein.recoveryDueLabel }}</text>
+      <text class="tis-dlg-due__amount">{{ capacityNotice.due.int }}<text class="tis-amt__dec">{{ capacityNotice.due.dec }}</text><text class="tis-dlg-due__unit">USDT</text></text>
+    </view>
+  </NxNoticeDialog>
 </template>
 
 <script setup lang="ts">
@@ -342,7 +345,7 @@ import NxTag from "@/components/ui/nx-tag.vue";
 import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
 import DeviceArt from "@/components/device-art.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
-import { capacityCheckoutHref, capacityOrderLine, checkoutCapacityUnreadableTargetKey, describeCapacityOriginal, reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
+import { capacityCheckoutHref, checkoutCapacityUnreadableTargetKey, describeCapacityOriginal, reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
@@ -388,6 +391,8 @@ import { CAPACITY_RECOVERY_TABLE, capacityIntent, capacityPaymentKind, readCapac
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { CAPACITY_COMMAND_TABLE, type PendingKeepCommand } from "@/lib/keep-command-recovery";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
+import { deviceOnlineState } from "@/lib/hashpower";
+import { taskProgressPercent } from "@/lib/task-progress";
 
 const props = withDefaults(defineProps<{ active?: boolean; checkoutCapacityTarget?: string | null }>(), { active: true });
 const emit = defineEmits<{ (event: "checkout-capacity-cleared", target: string): void }>();
@@ -783,21 +788,29 @@ function goDevices() {
 
 // ───────────────────────── 1. choice ─────────────────────────
 
-const choiceSources = computed(() => {
+// Checkout old-device choice (boards B-5a, B-5b): each paid source with its credit and what is left to pay.
+// The remote branch reads no quote when this sheet opens, so both figures are 「—」 until the wiring item supplies a per-source
+// server quote (discountUsdt → credit, payableUsdt → net) through `choiceQuote`; nothing is estimated here (01 §1.2).
+function choiceQuote(_deviceId: string): { credit: number; payable: number } | null {
+  return null; // WIRING: per-source quote for the checkout target, read by the wiring item.
+}
+const choiceView = computed(() => {
   const s = state.value;
-  if (s.kind !== "choice") return [];
-  return s.tradeInSources
+  if (s.kind !== "choice") return null;
+  const rows = s.tradeInSources
     .map((id) => app.devices.find((d) => d.id === id))
     .filter((d): d is Device => !!d && (!remoteApiEnabled || d.paidPriceUsdt > 0))
-    .map((d) => ({
-      id: d.id,
-      label: remoteApiEnabled
-        ? `${deviceName(t.value, d)} · ${t.value.tradein.remoteQuoteCreditLabel}`
-        : fmt(t.value.tradein.choiceTradeInOption, {
-        name: deviceName(t.value, d),
-        credit: formatGroupedAmount(previewCredit(d, s.newPrice)),
-      }),
-    }));
+    .map((d) => {
+      const quote = remoteApiEnabled ? choiceQuote(d.id) : null;
+      const credit = remoteApiEnabled ? quote?.credit ?? null : previewCredit(d, s.newPrice);
+      const net = remoteApiEnabled ? quote?.payable ?? null : Math.max(0, +(s.newPrice - (credit ?? 0)).toFixed(2));
+      const name = deviceName(t.value, d);
+      const creditText = credit == null ? "—" : `$${formatGroupedAmount(credit)}`;
+      const netText = net == null ? "—" : `$${formatGroupedAmount(net)}`;
+      return { id: d.id, device: d, name, credit: creditText, net: net == null ? null : amountParts(net),
+        label: `${name} · ${t.value.tradein.inventoryCreditLabel} ${creditText} · ${t.value.tradein.sheetNetCostLabel} ${netText}` };
+    });
+  return { rows, single: rows.length === 1 ? rows[0] : null };
 });
 
 async function openTradeinQuote(oldDevice: Device, targetKind: DeviceKind, newPrice: number): Promise<void> {
@@ -1194,30 +1207,34 @@ async function onConfirmTradein() {
 const replaceView = computed(() => {
   const s = state.value;
   if (s.kind !== "replace") return null;
+  // The arriving machine, what it costs, and the device that steps down (board B-6a); the runtime-published copy may still
+  // carry {newKind}, so it is still passed to the button labels.
+  const base = { newKind: s.newKind, newName: kindLabel(s.newKind), newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
+    replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
+    keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: kindLabel(s.newKind) }) };
   if (remoteApiEnabled && s.canonicalCapacityQuote) {
+    const quote = s.canonicalCapacityQuote;
+    const device = quote.sourceDeviceId == null ? null : app.devices.find((d) => Number(d.id) === quote.sourceDeviceId) ?? null;
     return {
-      warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
-      lowestText: fmt(t.value.tradein.replaceLowestText, {
-        name: s.canonicalCapacityQuote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
-        earn: "—", // unknown today's earnings stay a bare dash (01 §1.2)
-      }),
+      ...base,
+      due: amountParts(quote.payableUsdt),
+      source: { device, online: !!device && deviceOnlineState(device, Date.now()) === "online",
+        line: fmt(t.value.tradein.replaceSourceLine, { name: quote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable }) },
       insufficient: false, // The shared payment selector checks wallet balance; external methods remain available.
-      replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
-      keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: kindLabel(s.newKind) }),
+      fundsGap: null,
     };
   }
   const lowest = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!lowest) return null; // snapshot device vanished — render nothing
   const insufficient = s.newPrice - app.user.usdtBalance > 0;
   return {
-    warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
-    lowestText: fmt(t.value.tradein.replaceLowestText, {
-      name: lowest.name,
-      earn: `$${formatGroupedAmount(lowest.todayEarnings)}`,
-    }),
+    ...base,
+    due: amountParts(s.newPrice),
+    source: { device: lowest, online: deviceOnlineState(lowest, Date.now()) === "online",
+      line: fmt(t.value.tradein.replaceSourceLine, { name: lowest.name }) },
     insufficient,
-    replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
-    keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: kindLabel(s.newKind) }),
+    // Same shortfall the composer checks; shown as one hint line above the disabled buttons (board B-6b).
+    fundsGap: insufficient ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(s.newPrice - app.user.usdtBalance) }) : null,
   };
 });
 
@@ -1768,6 +1785,15 @@ const blockTitle = computed(() => {
   if (s.kind !== "block") return "";
   return fmt(t.value.tradein.blockTitle, { deviceName: s.oldDeviceName });
 });
+// The running job behind the block (boards B-7a, B-7b): the device, its job type and progress; unknown reads 「—」.
+const blockView = computed(() => {
+  const s = state.value;
+  if (s.kind !== "block") return null;
+  const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
+  const pct = device ? taskProgressPercent(device.currentTask, Date.now(), device.interruptedAt,
+    device.kind === "phone" ? device.phoneValidUntil : null) : null;
+  return { device, name: s.oldDeviceName, taskType: device?.currentTask?.type ?? "—", pct, pctText: pct == null ? "—" : `${pct}%` };
+});
 
 function onWait() {
   // Cancel the replace flow — user retries once the task is done.
@@ -1898,6 +1924,13 @@ const recoveryNotice = computed(() => {
   return { oldDevice, oldName, newKind: s.newKind, newName, newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
     pairLabel: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }), due: quote ? amountParts(quote.payableUsdt) : null };
 });
+// The capacity resume confirm (board B-6c): the machine and the amount still due, from the saved original command.
+const capacityNotice = computed(() => {
+  const original = capacityOriginal.value;
+  if (!original) return null;
+  return { target: original.target, name: original.productName, imageUrl: getProduct(original.target)?.imageUrl ?? null,
+    due: amountParts(original.payableUsdt) };
+});
 // The basis hint bubble (03 §3.5.1). While it is open, Esc and back close the bubble first and leave the sheet up.
 const basisTipOpen = ref(false);
 watch([sheetVisible, () => state.value], () => { basisTipOpen.value = false; });
@@ -1958,179 +1991,10 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-close:active {
   opacity: 0.7;
 }
-.tis-head {
-  margin-bottom: 12px;
-  padding-right: 40px;
-}
 .tis-title {
   display: block;
   font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);
   color: var(--v5-ink);
-}
-.tis-subtitle {
-  display: block;
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink-3);
-  margin-top: 4px;
-  line-height: 1.5;
-}
-/* option list (choice sheet) */
-.tis-opt-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.tis-opt {
-  width: 100%;
-  min-height: 56px;
-  border-radius: 12px;
-  background: var(--v5-surface-2);
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.tis-opt:active {
-  background: var(--v5-surface-3);
-}
-.tis-opt-ico {
-  flex-shrink: 0;
-}
-/* Option rows carry a name and price: list title role, content-row weight (10 §10.1). */
-.tis-opt-text {
-  flex: 1;
-  min-width: 0;
-  font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);
-  color: var(--v5-ink);
-  overflow-wrap: break-word;
-}
-/* detail card (tradein / replace sheets) */
-.tis-card {
-  border-radius: 12px;
-  background: var(--v5-surface-2);
-  padding: 12px;
-  margin-bottom: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.tis-card-mb4 {
-  margin-bottom: 16px;
-  gap: 4px;
-}
-.tis-card-cap {
-  display: block;
-  font-size: 12px;
-  color: var(--v5-ink-3);
-}
-.tis-card-line {
-  display: block;
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink);
-}
-.tis-card-note {
-  margin-top: 4px;
-  line-height: 1.5;
-  text-wrap: pretty;
-}
-/* CTAs */
-.tis-cta {
-  width: 100%;
-  min-height: 48px;
-  box-sizing: border-box;
-  padding: 8px 20px;
-  border-radius: 999px;
-  background: var(--v5-brand);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.tis-cta:active {
-  transform: scale(0.98);
-}
-.tis-cta-disabled {
-  opacity: 0.5;
-}
-.tis-cta-text {
-  text-align: center;
-  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
-  color: var(--v5-on-brand);
-}
-/* Secondary actions are the shared neutral glass L (03 §3.1); the material comes from .nx-frosted-button. */
-.tis-secondary {
-  width: 100%;
-  min-height: 48px;
-  box-sizing: border-box;
-  padding: 8px 20px;
-  margin-top: 8px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tis-secondary:active {
-  transform: scale(0.98);
-}
-.tis-secondary-text {
-  text-align: center;
-  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
-  color: var(--v5-ink);
-}
-/* Cancel and close are text buttons: brand text at the button role (03 §3.1). */
-.tis-ghost {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tis-ghost:active {
-  opacity: 0.7;
-}
-.tis-ghost-text {
-  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
-  color: var(--v5-brand);
-}
-.tis-warn-ghost {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 8px;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tis-warn-ghost:active {
-  opacity: 0.7;
-}
-/* A destructive choice only swaps the text to the error colour (03 §3.1). */
-.tis-warn-ghost-text {
-  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
-  color: var(--v5-danger);
-}
-/* block sheet header */
-.tis-block-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-right: 40px;
-}
-.tis-block-ico {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.tis-block-meta {
-  min-width: 0;
-}
-.tis-block-warn {
-  display: block;
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink-3);
-  margin-top: 4px;
-  line-height: 1.625;
 }
 /* ── Retire and confirm states (boards B-1…B-4): title, body blocks 16 apart, footer actions. ── */
 .tis-hd { padding-right: 48px; }
@@ -2221,6 +2085,36 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-dlg-due__label { white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .tis-dlg-due__amount { white-space: nowrap; font-family: var(--font-amount); font-weight: 500; font-size: var(--ui-type-page-title); line-height: var(--ui-type-page-title-lh); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--v5-ink); }
 .tis-dlg-due__unit { margin-left: var(--v5-space-1); letter-spacing: 0; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* Retire / choice with one item: the stated credit under the name (board B-5b). */
+.tis-hero__credit { display: block; margin-top: calc(var(--v5-space-1) / 2); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
+/* Slot full (B-6a): the arriving machine on its floor shadow, then the device that steps down in a surface-2 row. */
+.tis-arrive { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.tis-arrive__stage { position: relative; display: grid; place-items: center; width: 180px; height: 120px; }
+.tis-arrive__floor { position: absolute; left: 50%; bottom: 14px; width: 140px; height: 20px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 16%, transparent), transparent); pointer-events: none; }
+.tis-arrive__art { position: relative; width: 128px; height: 128px; }
+.tis-yield { display: flex; align-items: center; gap: var(--v5-space-3); padding: var(--v5-space-2) var(--v5-space-4) var(--v5-space-2) var(--v5-space-2); border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
+.tis-yield__art { flex: none; width: 52px; height: 52px; margin: -2px 0; }
+.tis-yield__name { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
+/* Confirmed online keeps the fixed English Online with a green dot (01 §1.1). */
+.tis-online { flex: none; display: inline-flex; align-items: center; gap: calc(var(--v5-space-1) * 1.5); white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-online__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success-ink); }
+/* A second full-width action sits 8px under the primary (board: 4px spacer + the footer's 4px gap). */
+.tis-second { margin-top: var(--v5-space-1); }
+/* The destructive choice keeps the neutral glass and only swaps its text to the error colour (03 §3.1). */
+.tis-ft .tis-danger { --ui-button-ink: var(--v5-danger); color: var(--v5-danger); }
+/* Block (B-7a/7b): the device with its running job and progress (03 §3.6 .nx-progress). */
+.tis-job { display: flex; align-items: center; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) var(--v5-space-3) var(--v5-space-2); border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
+.tis-job__art { flex: none; width: 64px; height: 64px; margin: -4px 0; }
+.tis-job__meta { flex: 1 1 auto; min-width: 0; }
+.tis-job__head { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); }
+.tis-job__name { min-width: 0; overflow-wrap: break-word; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
+.tis-job__pct { flex: none; white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); font-weight: 500; color: var(--v5-ink-3); }
+.tis-job__sub { display: block; margin-top: calc(var(--v5-space-1) / 2); overflow-wrap: break-word; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-job__bar { margin-top: 10px; }
+/* Capacity resume (B-6c): the machine and its name, then the amount due. */
+.tis-dlg-machine { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-1); max-width: 100%; margin-top: var(--v5-space-4); }
+.tis-dlg-machine__art { width: 64px; height: 64px; }
+.tis-dlg-machine__name { max-width: 100%; overflow-wrap: break-word; font: 500 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); }
 /* 360 band (≤374): smaller machines so the pair and the rows keep the 16px edge (board ≤374 rule). */
 @media (max-width: 374px) {
   .tis-pair__src-art { width: 40px; height: 40px; }
