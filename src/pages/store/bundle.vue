@@ -77,9 +77,10 @@
     <!-- Page main action in the shared bottom tray (04 §4.0, 03 §3.1): the total and 已省 in the price slot, one solid
          「去结算」; under two models the reason sits above the button and the button is the tray's flat grey. -->
     <template #pageFixed>
-      <!-- Activity with one model on sale: its one action as a lone floating button (the bar's floating form). -->
+      <!-- Activity with one model on sale: its one action as a lone floating button (the bar's floating form), the shared
+           primary L button (03 §3.1); the arrow says it opens the next page. -->
       <view v-if="promotionActivityId && promotionBundle?.single" class="bundle-bar nx-glass-bar">
-        <view class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.single.open" @keydown="activate($event, promotionBundle.single.open)"><text>{{ promotionBundle.single.label }}</text><NxIcon name="arrow-right" :size="20" /></view>
+        <NxButton variant="primary" :label="promotionBundle.single.label" @click="promotionBundle.single.open"><text>{{ promotionBundle.single.label }}</text><NxIcon name="arrow-right" :size="20" /></NxButton>
       </view>
       <view v-if="promotionActivityId && promotionBundle?.footer" class="bundle-bar nx-glass-bar">
         <text v-if="promotionBundle.footer.note" class="nx-tray-note" role="status">{{ promotionBundle.footer.note }}</text>
@@ -893,7 +894,7 @@ const catalogStateBodyStyle: CSSProperties = {
 .bundle-bar__cta :deep(uni-text), .bundle-bar__cta :deep(text) { white-space: nowrap; }
 .bundle-bar__cta:not([aria-disabled="true"]):active { transform: scale(.98); }
 .bundle-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-.bundle-bar > .nx-tray-note + .bundle-bar__cta, .bundle-bar > .bundle-bar__cta:only-child { flex: 1 1 100%; }
+.bundle-bar > .nx-tray-note + .bundle-bar__cta, .bundle-bar > .bundle-bar__cta:only-child, .bundle-bar > .nx-button:only-child { flex: 1 1 100%; }
 .bundle-bar__label { display: flex; align-items: center; justify-content: center; gap: 6px; }
 /* Busy: the label stays laid out but transparent (width and name hold), a spinner takes its place. */
 .bundle-bar__label--busy { opacity: 0; }

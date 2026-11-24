@@ -126,7 +126,8 @@ useAutoRecovery({ ...repeatWithoutPull, failed: () => contextStatus.value === "e
 const catalog=computed(()=>productCatalogPresentation.value?.products??[]);
 const productFor=(id:string)=>catalog.value.find(product=>product.id===id);
 const levelsFor=(id:string)=>productTaskLevelsText(t.value,productFor(id)?.taskLevels??[]);
-const nameFor=(id:string)=>productFor(id)?.name??t.value.uiChrome.unavailable;
+// A draft model the catalogue does not list (still loading, or no longer sold) has no name to show: the unknown mark (03 §3.4).
+const nameFor=(id:string)=>productFor(id)?.name??'—';
 const imageFor=(id:string)=>scopeId.value?activity.value?.productImages?.[id]:productFor(id)?.imageUrl;
 const ruleTerms=computed(()=>activity.value?[
   localized(activity.value.terms,locale.code),
@@ -231,7 +232,9 @@ function jumpToSuggestions(){
 function selectedProductBlock(id: string) {
   if (catalogStatus.value === 'ready') {
     const product = productFor(id);
-    if (!product || !isProductAvailable(product, phase.value) || productOutOfStock(product)) return t.value.store.temporarilyOutOfStock;
+    // No longer in the catalogue: not for sale, rather than out of stock (tile tag 不可购买, 03 §3.8).
+    if (!product) return t.value.promotion.noMatchingProducts;
+    if (!isProductAvailable(product, phase.value) || productOutOfStock(product)) return t.value.store.temporarilyOutOfStock;
   }
   if (scopeId.value && activity.value && !activity.value.productNos.includes(id)) return t.value.promotion.noMatchingProducts;
   return '';
@@ -322,7 +325,7 @@ const footerNote = computed(() => {
   if (inventoryNote.value) return inventoryNote.value;
   if (quoteWarning.value) return quoteWarning.value;
   if (selection.value.length < 2) return t.value.promotion.selectTwo;
-  if (quoteStatus.value === 'error') return t.value.promotion.errorNote;
+  // A failed quote read is read again on its own (03 §3.5.2): the note stays the reading note, never a retry the page does not offer.
   return signedIn.value && !quote.value ? t.value.promotion.loading : '';
 });
 // The page renders these states and actions in its existing tray.

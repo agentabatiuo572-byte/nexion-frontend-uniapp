@@ -82,7 +82,7 @@
     <view
       ref="scrollEl"
       class="nx-content nx-scroll"
-      :class="{ 'nx-content--locked': scrollLocks > 0 }"
+      :class="{ 'nx-content--locked': scrollLocks > 0, 'nx-content--lifted': liftedLocks > 0 }"
     >
       <!-- themed pull-to-refresh indicator — anchored just below the header,
            centered in the pull gap. -->
@@ -109,6 +109,7 @@
              chrome to frost → it read as solid black. (P-041) `backwards` fill on
              the entrance so no transform lingers. -->
         <view class="nx-page-enter" :class="{ 'nx-page-enter--tab': isTabRoute }" :style="{ paddingTop: (contentTop + pendingBarInset) + 'px', paddingBottom: contentBottom }">
+          <ChassisDialogScope :acquire="acquireLiftedScrollLock">
           <slot name="pageTop" />
           <!-- #ifdef APP-PLUS -->
           <view v-if="isTabRoute && pageVisible && hostVisible && noticeKey" class="nx-update-notice" role="status">
@@ -120,6 +121,7 @@
                5 protected tab pages stay untouched (ALIGNMENT red-line). Self-
                hides unless a claimable voucher targets the current surface. -->
           <slot />
+          </ChassisDialogScope>
         </view>
       </view>
     </view>
@@ -176,6 +178,7 @@ import BrandLockup from "@/components/brand-lockup.vue";
 import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
 // #endif
 import GlobalUi from "@/components/global-ui.vue";
+import ChassisDialogScope from "@/components/chassis-dialog-scope.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { taskCenterReceiptKey, type OpenTaskReceipt } from "@/store/receipts";
 import { toast } from "@/store/ui";
@@ -360,11 +363,22 @@ const scrolling = ref(false);
 provide(CHASSIS_SCROLLING, readonly(scrolling));
 provide(CHASSIS_QUERY_SCOPE, getCurrentInstance()!.proxy!);
 const scrollLocks = ref(0);
-provide(DIALOG_SCROLL_LOCK, () => {
+// Locks held by dialogs inside the scroller (ChassisDialogScope): they also lift the scroller over the chrome (see the
+// .nx-content--lifted rule). Dialogs outside it only hold the page still.
+const liftedLocks = ref(0);
+function holdScrollLock(lifted: boolean): () => void {
   scrollLocks.value += 1;
+  if (lifted) liftedLocks.value += 1;
   let held = true;
-  return () => { if (held) { held = false; scrollLocks.value -= 1; } };
-});
+  return () => {
+    if (!held) return;
+    held = false;
+    scrollLocks.value -= 1;
+    if (lifted) liftedLocks.value -= 1;
+  };
+}
+provide(DIALOG_SCROLL_LOCK, () => holdScrollLock(false));
+const acquireLiftedScrollLock = () => holdScrollLock(true);
 
 // H5-only DOM access for the existing same-tab return-to-top action.
 function chassisScrollDom(): HTMLElement | null {
@@ -856,14 +870,18 @@ export default chassisView;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
 }
-/* An open dialog keeps the page under its mask still. iOS WebKit stacks a fixed dialog mounted
-   inside this scroller with the scroller itself, below the header (100) and the tab bar (30)
-   whatever its own z-index; raising the scroller puts every in-page dialog's mask over the chrome.
-   785 also keeps in-page dialogs above the milestone celebration (780), as on other engines, while
-   chassis sheets (790+) and the global overlay host stay above them. */
+/* An open dialog keeps the page under its mask still. */
 .nx-content--locked {
-  z-index: 785;
   overflow-y: hidden;
+}
+/* A dialog mounted inside this scroller: iOS WebKit stacks it with the scroller itself, below the
+   header (100), the tab bar (30) and the bottom trays (36) whatever its own z-index; raising the
+   scroller puts its mask over the chrome. 785 also keeps it above the milestone celebration (780),
+   as on other engines, while chassis sheets (790+) and the global overlay host stay above it.
+   Only these dialogs lift it: under a dialog outside the scroller (#pageFixed, the global overlay
+   host) the page content stays below the trays' glass, and their own mask covers both (04 §4.0). */
+.nx-content--lifted {
+  z-index: 785;
 }
 /* hide scrollbar (match the prototype's no-scrollbar utility) */
 .nx-content::-webkit-scrollbar {

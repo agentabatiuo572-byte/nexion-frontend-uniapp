@@ -109,24 +109,25 @@
               <view class="order-summary__line-thumb" aria-hidden="true"><CatalogMachineImage class="order-summary__line-image" :sku="item.sku" :image-url="item.imageUrl" :scope-key="order.id" /></view>
               <view class="flex-1 min-w-0">
                 <text class="order-summary__line-name">{{ (item.name) }}</text>
-                <text class="order-summary__line-meta">{{ item.quantity }} × {{ lineMoney(item.unitPriceUsdt) }}</text>
+                <text class="order-summary__line-meta">{{ item.quantity }} × {{ lineMoney(item.unitPriceUsdt) }}<text v-if="lineUnitHidden" class="nx-sr-only"> USDT</text></text>
               </view>
-              <text class="order-summary__line-amount">{{ lineMoney(item.lineAmountUsdt) }}</text>
+              <text class="order-summary__line-amount">{{ lineMoney(item.lineAmountUsdt) }}<text v-if="lineUnitHidden" class="nx-sr-only"> USDT</text></text>
             </view>
           </view>
           <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
           <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
           <!-- The label follows the source of the full discount shown in this row. -->
           <DetailRow v-if="order.discount > 0" :label="bundleDiscountOnly ? pendingCopy.bundleDiscount : t.orders.discount" :value="discountMoney(order.discount)" />
-          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="discountMoney(order.tradeInCredit ?? 0)" brand />
-          <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
-          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="discountMoney(order.promoDiscountUSD ?? 0)" brand />
-          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="discountMoney(order.trialOffsetUSD ?? 0)" brand />
-          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="discountMoney(order.earlyDiscountUSD ?? 0)" brand />
+          <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="discountMoney(order.tradeInCredit ?? 0)" />
+          <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). Every amount
+               row here is a value in ink with the minus sign (01 §1.1.1 #1, #4; 06 §6.2); the card's one key figure is the total. -->
+          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="discountMoney(order.promoDiscountUSD ?? 0)" />
+          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="discountMoney(order.trialOffsetUSD ?? 0)" />
+          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="discountMoney(order.earlyDiscountUSD ?? 0)" />
           <DetailRow v-if="summaryPaid" :label="paymentCopy.payable" :value="summaryMoney(order.total, true)" />
-          <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" brand />
+          <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" />
           <template v-if="order.status === 'refunded'">
-            <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="usdt(order.refundAmountUsdt)" brand />
+            <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="usdt(order.refundAmountUsdt)" />
             <DetailRow v-if="order.refundChannel" :label="t.orders.refundChannel" :value="refundChannelLabel" />
             <DetailRow v-if="order.refundBillNo" :label="t.orders.refundBillNo" :value="order.refundBillNo" mono copyable />
             <text v-if="order.trialReward?.reversedOnRefund && trialRewardText" class="order-summary__note">{{ purchaseCopy.orderRewardsReversed }}</text>
@@ -1241,6 +1242,8 @@ function summaryMoney(value: number | string, unit = false): string {
 function lineMoney(value: number): string {
   return order.value && commerceOrderAmount(order.value).currency === 'USDT' ? formatAmount(value) : `$${formatAmount(value)}`;
 }
+// The bare USDT line numbers still carry their unit for screen readers (03 §3.6.1 读屏仍读单位).
+const lineUnitHidden = computed(() => !!order.value && commerceOrderAmount(order.value).currency === 'USDT');
 // Deduction rows read −$50.00 as on checkout (the same formatter); USDT-paid orders keep the unit like their subtotal and total rows.
 function discountMoney(value: number): string {
   return formatCheckoutReviewAmount(value, order.value ? commerceOrderAmount(order.value).currency : 'USD', { discount: true, unit: true });
