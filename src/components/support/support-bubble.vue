@@ -56,17 +56,22 @@ const SUPPORT_GAP = 12; // the shortcut's own bottom offset above the navigation
 const KEEP_CLEAR_GAP = 8;
 const avoid = ref(0);
 const blocked = ref(false);
+// After the bar appears or a scroll stops, the shortcut stays hidden (and untappable) until its spot has been re-read, then
+// fades in there; it never shows at a spot it has not checked.
+const pending = ref(false);
 const offset = computed(() => (props.lift ?? 0) + avoid.value);
-const hidden = computed(() => props.dimmed || blocked.value);
+const hidden = computed(() => props.dimmed || blocked.value || pending.value);
+let reading = 0;
 type Rect = { top: number; bottom: number; left: number; right: number; height: number };
 function settle() {
   const lift = props.lift ?? 0;
-  if (!lift) { avoid.value = 0; blocked.value = false; return; }
+  if (!lift) { avoid.value = 0; blocked.value = false; pending.value = false; return; }
   if (props.dimmed) return;
+  const read = ++reading;
   uni.createSelectorQuery().select('.nx-tabbar-wrap').boundingClientRect().select('.nx-support-bubble').boundingClientRect()
     .selectAll('.nx-keep-clear').boundingClientRect().select('.nx-header').boundingClientRect()
     .exec(([wrap, self, targets, header]: [Rect | null, Rect | null, Rect[] | null, Rect | null]) => {
-      if (!wrap || !self || lift !== (props.lift ?? 0) || props.dimmed) return;
+      if (read !== reading || !wrap || !self || lift !== (props.lift ?? 0) || props.dimmed) return;
       const base = wrap.top - SUPPORT_GAP - lift;
       const blockers = (targets ?? []).filter(r => r.height > 0 && r.right > self.left - KEEP_CLEAR_GAP && r.left < self.right + KEEP_CLEAR_GAP);
       let bottom = base;
@@ -76,9 +81,11 @@ function settle() {
       }
       blocked.value = bottom - self.height < (header?.bottom ?? 0) + KEEP_CLEAR_GAP;
       avoid.value = blocked.value ? 0 : Math.round(base - bottom);
+      // Reveal one frame after the jump, so the move itself is never animated in view.
+      if (pending.value) setTimeout(() => { if (read === reading) pending.value = false; }, 50);
     });
 }
-watch(() => [props.lift, props.dimmed], () => setTimeout(settle, 50), { immediate: true });
+watch(() => [props.lift, props.dimmed], () => { if (props.lift) pending.value = true; setTimeout(settle, 50); }, { immediate: true });
 // Benefit cards and values load and animate in after the bar shows; the spot is re-read while the bar lifts the shortcut.
 useVisibleInterval(settle, 1000, () => !!props.lift);
 
@@ -105,7 +112,8 @@ onMounted(() => {
   /* Rounded hit area returns transparent corners to the underlying content. */
   border-radius: 999px;
 }
-.nx-support-bubble--dimmed { opacity: 0; pointer-events: none; }
+/* Hidden, it moves without animating; showing again only fades in. */
+.nx-support-bubble--dimmed { opacity: 0; pointer-events: none; transition: opacity 150ms; }
 .nx-support-bubble--dimmed .nx-support-motion,
 .nx-support-bubble--dimmed .nx-support-beat { animation-play-state: paused; }
 .nx-support-bubble--light .nx-support-btn {
