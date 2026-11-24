@@ -12,8 +12,8 @@
 
       <!-- An ordinary order paid with USDT (plan C.2): the network is fixed by the payment sheet, so no channel switch or bank pane. -->
       <template v-if="orderNet">
-        <OrderUsdtTopup ref="orderPane" :order-no="orderNet.orderNo" :network="orderNet.network" :name="orderNet.name"
-          @pay="payOrder" @open-intent="openOrder" @view-order="openOrder" @support="openSupport" />
+        <OrderUsdtTopup ref="orderPane" :order-no="orderNet.orderNo" :network="orderNet.network" :name="orderNet.name" :visible="topupVisible"
+          @pay="payOrder" @open-intent="openIntent" @view-order="openOrder" @support="openSupport" @disabled="returnToOrder" />
         <view class="topup-order-clear" />
       </template>
       <template v-else>
@@ -71,7 +71,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, type CSSProperties, computed, watch } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { takeNavigationQuery, navTo } from "@/lib/route";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useApp } from "@/store/app";
@@ -92,6 +92,8 @@ import { useFx } from "@/store/fx";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { findResumablePaymentIntent } from "@/lib/hosted-payment";
+import { orderTopupNetwork, type OrderTopupIntent, type OrderTopupNetwork } from "@/api/purchase-payment-api";
+import { replaceWithOrder, usePurchasePayment } from "@/store/purchase-payment";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
@@ -100,10 +102,9 @@ const segments = remoteApiEnabled ? SEGMENTS.filter((item) => item.id !== "card"
 const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
 onLoad((query) => {
   const pending = new URLSearchParams(takeNavigationQuery('/pages/me/wallet-topup'));
-  // PLACEHOLDER(B84): the payment sheet opens this page with the order and the USDT network it chose (plan C.2).
-  const network = query?.network ?? pending.get('network');
+  const network = orderTopupNetwork(query?.network ?? pending.get('network'));
   const orderNoForNet = query?.orderNo ?? pending.get('orderNo');
-  if (orderNoForNet && (network === 'BEP20' || network === 'ERC20')) {
+  if (orderNoForNet && network) {
     orderNet.value = { orderNo: orderNoForNet, network, name: query?.name ?? pending.get('name') ?? '' };
     return;
   }
@@ -123,13 +124,25 @@ onLoad((query) => {
   }
 });
 const app = useApp();
-const orderNet = ref<{ orderNo: string; network: 'BEP20' | 'ERC20'; name: string } | null>(null);
+const orderNet = ref<{ orderNo: string; network: OrderTopupNetwork; name: string } | null>(null);
+const topupVisible = ref(false);
+onShow(() => { topupVisible.value = true; });
+onHide(() => { topupVisible.value = false; });
 const orderPane = ref<InstanceType<typeof OrderUsdtTopup> | null>(null);
 const orderBar = computed(() => orderNet.value ? orderPane.value?.barAction ?? null : null);
-// PLACEHOLDER(B84): 去支付 re-reads the order and opens the existing wallet payment and PIN (plan C.3 去支付); the open
-// payment and the view-order exits go to the order, where the existing resume bar and actions live.
-function payOrder() { if (orderNet.value) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNet.value.orderNo)}&pay=1`); }
-function openOrder() { if (orderNet.value) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNet.value.orderNo)}`); }
+let navigatingOrder = false;
+function orderHref() { return `/pages/store/order-detail?id=${encodeURIComponent(orderNet.value!.orderNo)}`; }
+async function payOrder() {
+  if (!orderNet.value || navigatingOrder) return;
+  navigatingOrder = true;
+  try { await navTo(`${orderHref()}&pay=1&topupNetwork=${orderNet.value.network}`); }
+  finally { navigatingOrder = false; }
+}
+function openIntent(intent: OrderTopupIntent) {
+  if (orderNet.value) usePurchasePayment().openOrderTopupIntent(orderNet.value.orderNo, orderNet.value.name, intent);
+}
+function openOrder() { if (orderNet.value) void navTo(orderHref()); }
+function returnToOrder() { if (orderNet.value) void replaceWithOrder(orderHref()); }
 function openSupport() { void navTo('/pages/support/messages'); }
 const payCopy = computed(() => purchasePaymentCopy(locale.code));
 const orderTopup = ref<{ orderNo: string | null; amount: number; shortfall: number | null; name: string; deadlineAt: number | null } | null>(null);

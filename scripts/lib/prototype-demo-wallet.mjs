@@ -95,6 +95,19 @@ export function demoTeamWeek(at) {
 export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
   ?{depositId:'CR-77',grossAmountUsdt:50.123456,creditedUsdt:50,createdAt:state.previewFactsAt}:null;
 
+export function demoCreditedDeposits(state) {
+  const original = demoCreditedDeposit(state);
+  if (!original) return [];
+  const deposit = (network, marker, grossAmountUsdt, creditedUsdt) => ({ network, txHash: '0x' + marker.repeat(64),
+    grossAmountUsdt, feeUsdt: '0.123456', creditedUsdt });
+  if (state.billRefsState !== 'b84-deposit') return [{ ...original, deposit: deposit('BEP20', 'a', '50.123456', '50') }];
+  return [
+    { ...original, deposit: deposit('BEP20', 'a', '50.234567', '50.111111'), creditedUsdt: 50.111111 },
+    { depositId: 'CR-78', createdAt: original.createdAt - 1000, deposit: deposit('ERC20', 'b', '62.345678', '62.222222'), creditedUsdt: 62.222222 },
+    { depositId: 'CR-79', createdAt: original.createdAt - 2000, deposit: null, creditedUsdt: 73.333333 },
+  ];
+}
+
 export function demoTeamPeriod(period,now,snapshotAt) {
   const end=snapshotAt?.trim()?Date.parse(snapshotAt):now;
   if(!Number.isFinite(end)||end>now+5000){
@@ -247,10 +260,10 @@ export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
   if(demoHasOpeningMilestone(state))openingMilestones.add(1);
   for(const {result} of state.milestoneClaimReceipts??[])if(result)openingMilestones.delete(result.milestoneId);
   const checkIns=openingCheckIns(state).filter(row=>!posted.has('DAILY:900001:'+row.checkInDate));
-  const deposit=demoCreditedDeposit(state);
+  const chainDeposits=demoCreditedDeposits(state);
   const seeds=!demoHasEarningsHistory(state)?[]:[
     ['COMPUTE_EARNING','UVT','IN',15,'earn',seedAt],
-    ...(deposit?[['CHAIN_TOPUP','USDT','IN',deposit.creditedUsdt,'topup',deposit.createdAt,'SUCCESS',deposit.depositId]]:[]),
+    ...chainDeposits.map(deposit=>['CHAIN_TOPUP','USDT','IN',deposit.creditedUsdt,'topup',deposit.createdAt,'SUCCESS',deposit.depositId]),
     ['REFERRAL_REWARD','UVT','IN',10,'bonus',seedAt-day,'SUCCESS',
       state.walletLegacySeed?undefined:'REF-000000000000000000000001:INVITER'],
     ['DEVICE_PURCHASE','USDT','OUT',1299,'purchase',seedAt-2*day],
@@ -276,6 +289,12 @@ export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo])=>({
     id:`seed:${asset}:${bizNo??`${bizType}:${direction}:${amount}`}`,bizNo:bizNo??`DEMO-${bizType}-${amount}`,bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
+  for (const row of seeds.filter(row => row.bizType === 'CHAIN_TOPUP')) {
+    const original = chainDeposits.find(entry => entry.depositId === row.bizNo);
+    row.deposit = original.deposit;
+    row.amountExact = original.deposit?.creditedUsdt ?? String(original.creditedUsdt);
+    if (original.deposit) row.network = original.deposit.network;
+  }
   const history=demoDeletionHistory(state);
   const swap=history?.swap;
   const stake=demoDeletionStake(state);

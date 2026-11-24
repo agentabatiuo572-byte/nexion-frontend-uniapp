@@ -3,7 +3,7 @@ import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-acc
 import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawalUser } from './prototype-demo-secondary.mjs';
-import { demoCreditedDeposit, demoWalletNex, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoCreditedDeposits, demoWalletNex, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const day=86400000;
 const money = amount => Number(amount.toFixed(6));
 const exchangeDay = new Intl.DateTimeFormat('en-CA', {
@@ -301,7 +301,11 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       minDepositUsdtExact: policy.minDepositUsdtExact, confirmations: policy.confirmations };
   }
   if(p==='/api/deposits'){
-    const deposit=demoCreditedDeposit(state);
-    return deposit?[{ ...deposit, network: "BEP20", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdtExact: "50.123456", creditedUsdtExact: "50", confirmations: 15, status: "CREDITED" }]:[];
+    return demoCreditedDeposits(state).filter(row=>row.deposit).map(({ depositId, createdAt, deposit })=>({
+      depositId, createdAt, creditedAt: createdAt, network: deposit.network, txHash: deposit.txHash,
+      address: `0x${(deposit.network === 'ERC20' ? '2' : '1').repeat(40)}`,
+      grossAmountUsdt: Number(deposit.grossAmountUsdt), grossAmountUsdtExact: deposit.grossAmountUsdt,
+      creditedUsdt: Number(deposit.creditedUsdt), creditedUsdtExact: deposit.creditedUsdt, confirmations: 15, status: 'CREDITED',
+    }));
   }
 };

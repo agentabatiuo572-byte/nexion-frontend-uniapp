@@ -29,6 +29,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const networkOpen = method => !(paymentMode() === 'erc20-off' && method === 'CREGIS_USDT_ERC20'
     || paymentMode() === 'usdt-off' && method !== 'HDPAY_BANK');
   const refused = (status, message) => ({status, message, data: null});
+  const orderTopupEnabled = () => state.orderTopupState !== 'disabled';
+  const orderUsdt = (kind, method) => kind === 'ORDER_PAY' && ['CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].includes(method);
   const handles = path => path.startsWith(base);
   // The preview models one purchasing account, including its seeded payments.
   const ownsPreviewPayments = request => previewAccountId(state, request.headers?.() ?? {}) === demoPurchasingAccountId(state);
@@ -225,8 +227,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const waitingModes = ['waiting', 'urgent', 'late', 'remote-in-progress', 'intent-missing'];
   const noProviderSuccess = [...waitingModes, 'expired', 'mismatch'];
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
-  function advance(intent) {
-    const now = Date.now(), age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
+  function advance(intent, now) {
+    const age = now - intent.createdAt, scenario = paymentMode(), bank = intent.paymentMethod === 'HDPAY_BANK';
     const graceOver = now >= graceEnd(intent.paymentMethod, intent.deadline);
     if (intent.status === 'EXPIRED') {
       if (intent.reason === 'PAYMENT_FAILED' && graceOver) closeUnpaidOrder(intent);
@@ -260,6 +262,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (noProviderSuccess.includes(scenario) || (bank && scenario === 'bank-failed')) return intent;
     if (intent.status === 'AWAITING_PAYMENT') {
       intent.paidAt = intent.createdAt + ARRIVE_AFTER;
+      if (graceOver) return lateArrival(intent, now);
       if (intent.paidAt >= intent.deadline) return lateArrival(intent, intent.paidAt);
       intent.status = 'FUNDS_CONFIRMED';
     }
@@ -311,9 +314,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       message: intent.reason ?? 'PURCHASE_PAYMENT_PROCESSING'};
   }
   // The preview server observes providers independently of order, intent and receipt reads.
-  function observePayments() {
+  function observePayments(observedAt = Date.now()) {
     sync();
-    for (const intent of intents.values()) advance(intent);
+    for (const intent of intents.values()) advance(intent, observedAt);
   }
   // AppOrderCommandService refuses a wallet pay or a cancel while an order's external payment is open.
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
@@ -324,7 +327,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   function handle(url, request) {
     return handlePayment(url, request, ownsPreviewPayments(request));
   }
-  function handlePayment(url, request, ownsPayments) {
+  function handlePayment(url, request, ownsPayments, historicalSeed = false) {
     sync();
     const path = url.pathname, method = request.method();
     const byOrder = path.match(/^\/api\/app\/purchase-payment-intents\/by-order\/([^/]+)$/);
@@ -335,14 +338,18 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const intent = openIntent({kind: 'ORDER_PAY', orderNo});
       return {status: 200, message: 'OK', data: {orderNo, state: intent ? 'IN_PROGRESS' : 'NONE', intentNo: intent?.intentNo ?? null}};
     }
-    if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: paymentMethods.map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
+    if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3,
+      ...(orderTopupEnabled() ? {orderPayUsdtRoute: 'WALLET_TOPUP'} : {}),
+      channels: paymentMethods.map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
     if (path === `${base}-quotes` && method === 'POST') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const body = request.postDataJSON(), {kind, payload} = body;
+      if (kind === 'CAPACITY_REPLACE') return refused(409, 'CAPACITY_REPLACEMENT_PURCHASE_RETIRED');
       if (!Object.hasOwn(commandKinds, kind) || !payload) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
       const products = demoProducts(state, url.origin), subject = purchaseSubject(kind, payload, products);
       const existing = openIntent(subject);
       if (existing) return existingIntentRefusal(existing, payload);
+      if (!historicalSeed && orderTopupEnabled() && orderUsdt(kind, body.paymentMethod)) return refused(409, 'ORDER_USDT_USE_TOPUP');
       if (!paymentMethods.includes(body.paymentMethod)) return refused(503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
       if (!networkOpen(body.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       const order = kind === 'ORDER_PAY' ? ordersOf(url.origin).find(row => row.orderNo === subject.orderNo) : null;
@@ -396,6 +403,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       const existing = openIntent(subject);
       if (existing) return existingIntentRefusal(existing, source.payload);
+      if (!historicalSeed && orderTopupEnabled() && orderUsdt(subject.kind, source.quote.paymentMethod)) return refused(409, 'ORDER_USDT_USE_TOPUP');
       if (!networkOpen(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
       if (Date.parse(source.quote.expiresAt) <= Date.now()) return refused(409, 'PURCHASE_PAYMENT_QUOTE_EXPIRED');
@@ -454,10 +462,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const orderNo = 'DEMO-ORDER-001';
     if (openOrderPayment(orderNo)) return {status: 200};
     const request = (body, headers = {}) => ({method: () => 'POST', postDataJSON: () => body, headers: () => headers});
-    const quote = handlePayment(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_BSC', payload: {orderNo}}), true);
+    // Import the fixture's historical direct-payment sample under its original quote and key.
+    const quote = handlePayment(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_BSC', payload: {orderNo}}), true, true);
     if (quote.status !== 200) return quote;
     return handlePayment(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
-      {'idempotency-key': `wallet-pay:${orderNo}:other-device`}), true);
+      {'idempotency-key': `wallet-pay:${orderNo}:other-device`}), true, true);
   }
   // Compress the deadline and grace so the App can observe expiry before a separate late receipt.
   function expireOrderPayment(orderNo) {
@@ -493,6 +502,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       paymentMethod:intent.paymentMethod,paymentNo:intent.intentNo,paidAt:intent.paidAt,paidTotalUsdt:intent.totalUsdt,closeReasonCode:null});
     return true;
   }
-  return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments,
+  const topupIntent = orderNo => {
+    const originals = [...intents.values()].filter(row => row.kind === 'ORDER_PAY' && row.orderNo === orderNo);
+    const open = originals.findLast(row => !['DELIVERED', 'EXPIRED', 'MANUAL_REVIEW'].includes(row.status));
+    const row = open ?? originals.findLast(row => row.status === 'MANUAL_REVIEW');
+    return row ? view(row) : null;
+  };
+  return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, topupIntent, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments,
     expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
 }

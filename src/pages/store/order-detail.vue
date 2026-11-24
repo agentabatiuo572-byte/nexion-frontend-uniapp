@@ -225,10 +225,12 @@ import { useOrders, type OrderStatus, type Order, timelineFor } from "@/store/or
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { trialReservesSlotNow } from "@/store/free-trial";
-import { confirm as uiConfirm, toast } from "@/store/ui";
+import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
-import { apiClient,orderApi,purchaseEligibilityApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
+import { apiClient,orderApi,purchaseEligibilityApi, purchasePaymentApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
+import { orderTopupNetwork, type OrderTopupNetwork } from "@/api/purchase-payment-api";
+import { confirmOrderTopupPayment, hasUsdt, orderTopupHref, orderTopupPayable, orderTopupPaymentChanged } from "@/lib/order-usdt-topup";
 import { openOrderAdvisorChat } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import { asApiError, isApiRefusal } from "@/api/errors";
@@ -251,6 +253,8 @@ const auth = useAuth();
 
 const id = ref("");
 const autoPayRequested = ref(false);
+const topupNetwork = ref<OrderTopupNetwork | null>(null);
+const topupConfirmOwner = `order-topup:${Date.now()}:${Math.random()}`;
 let automaticPaymentDiscovery = true;
 let pendingPaymentIntentAccount = '';
 // FEAT-TRIAL05: `?result=trial` (set by checkout) opens the purchase result once; the order view is one tap away.
@@ -299,7 +303,8 @@ onLoad((options) => {
   trialResultRequested.value = result === "trial";
   showInventoryResult.value = result === "delivery";
   autoPayRequested.value = (o.pay ?? (queryMatchesOrder && query.getAll('pay').length === 1 ? query.get('pay') : '')) === '1';
-  automaticPaymentDiscovery = (o.readback ?? (queryMatchesOrder ? query.get('readback') : null)) !== '1';
+  topupNetwork.value = autoPayRequested.value ? orderTopupNetwork(o.topupNetwork ?? (queryMatchesOrder ? query.get('topupNetwork') : null)) : null;
+  automaticPaymentDiscovery = !topupNetwork.value && (o.readback ?? (queryMatchesOrder ? query.get('readback') : null)) !== '1';
   orderOrigin.value = from === "me" || from === "store" ? from : "";
   ordersBackHref.value = orderOrigin.value ? `/store/orders?from=${orderOrigin.value}` : "/store/orders";
   preserveOrderOriginInH5();
@@ -399,6 +404,7 @@ onShow(() => {
   void refreshOrderWallet();
 });
 onHide(() => {
+  useUI().clearConfirmsBy(topupConfirmOwner);
   detailVisible = false;
   detailEpoch += 1;
   paymentSheetOpen.value = false;
@@ -414,6 +420,7 @@ const orderEnvironmentInvalidated = ref(false);
 watch(() => apiRuntimeConfig?.environment, () => { orderEnvironmentInvalidated.value = true; orderPresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, locale.code], () => { orderPresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, apiRuntimeConfig?.environment], () => {
+  useUI().clearConfirmsBy(topupConfirmOwner);
   paymentResultOrder.value = null; paymentResultVisible.value = false;
   confirmedPaymentReceipt.value = null;
   paymentSheetOpen.value = false; paymentNotice.value = '';
@@ -951,6 +958,7 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
     return;
   }
   const scope = captureDetailScope();
+  const network = topupNetwork.value;
   if (originalJustRead && pendingPaymentIntentAccount && pendingPaymentIntentAccount !== scope.accountScope.accountKey) {
     autoPayRequested.value = false;
     pendingPaymentIntentAccount = '';
@@ -979,15 +987,17 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
     }
     if ((orderAction.value || orderCommandUnavailable.value) && !externalPayment.value) {
       await recoverOrderAction(false);
-      if (!isCurrentDetailScope(scope) || orderAction.value || orderCommandUnavailable.value) return;
+      if (!isCurrentDetailScope(scope) || orderCommandUnavailable.value || orderAction.value
+          && !(network && orderAction.value.paymentMethod === 'WALLET' && resumePaymentAllowed.value)) return;
       if (!liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
       original = liveOrder.value;
     }
     if (commerceOrderIsPaid(original)) {
-      paymentResultVisible.value = true;
+      if (!network) paymentResultVisible.value = true;
+      else autoPayRequested.value = false;
       return;
     }
-    if (original.status !== 'placed' || original.expiresAt == null || original.expiresAt <= Date.now()) {
+    if (original.status !== 'placed' || !network && (original.expiresAt == null || original.expiresAt <= Date.now())) {
       paymentNoticeReason.value = original.status === 'placed' ? pendingCopy.value.expiredPending : pendingCopy.value.closed;
       paymentNotice.value = 'blocked';
       return;
@@ -995,7 +1005,17 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
     if (original.promotionQuoteId) {
       autoPayRequested.value = false;
       pendingPaymentIntentAccount = '';
-      await navTo(`/pages/store/checkout?orderNo=${encodeURIComponent(original.id)}`);
+      const query = new URLSearchParams({ orderNo: original.id });
+      if (network) query.set('topupNetwork', network);
+      await navTo(`/pages/store/checkout?${query}`);
+      return;
+    }
+    const facts = network ? await purchasePaymentApi.orderTopup(original.id, network) : null;
+    if (!isCurrentDetailScope(scope)) return;
+    if (facts && (!orderTopupPayable(facts) || hasUsdt(facts.shortfallUsdt))) {
+      autoPayRequested.value = false;
+      if (facts.state === 'PAID') await refreshOrder(false);
+      else await navTo(orderTopupHref(original.id, network!, original.productName));
       return;
     }
     // The backend owns ALL/EITHER qualification semantics; do not recompute
@@ -1010,7 +1030,7 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
       paymentNotice.value = 'blocked';
       return;
     }
-    const walletReady = await refreshOrderWallet();
+    await refreshOrderWallet();
     if (!isCurrentDetailScope(scope)) return;
     // A wallet snapshot is optional for choosing an external payment method.
     if (!canPayFromWallet.value || liveOrder.value?.id !== original.id || liveOrder.value?.total !== original.total
@@ -1019,9 +1039,15 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
       paymentNotice.value = 'query';
       return;
     }
+    if (facts) {
+      const confirmed = await confirmOrderTopupPayment(facts.amountDueUsdt, topupConfirmOwner);
+      if (!isCurrentDetailScope(scope)) return;
+      autoPayRequested.value = false;
+      if (!confirmed) return;
+    }
     paymentSheetAmount.value = original.total;
     paymentSheetOpen.value = true;
-    void handleWalletPayment();
+    void handleWalletPayment(facts?.deadlineAt ?? undefined, facts?.amountDueUsdt);
   } catch (error) {
     if (isCurrentDetailScope(scope)) {
       const stockRefused = isApiRefusal(error, 409, 'PRODUCT_OUT_OF_STOCK');
@@ -1074,7 +1100,7 @@ async function runPaymentNoticeAction(): Promise<void> {
   } finally { cancellingOrder.value = false; }
 }
 
-async function handleWalletPayment() {
+async function handleWalletPayment(topupDeadline?: string, topupAmount?: string) {
   if (!canPayFromWallet.value || payingFromWallet.value || !liveOrder.value) return;
   if (paymentSheetOpen.value && paymentSheetAmount.value !== liveOrder.value.total) {
     paymentSheetOpen.value = false; paymentNoticeReason.value = recoveryCopy.value.changed; paymentNotice.value = 'query'; return;
@@ -1084,13 +1110,16 @@ async function handleWalletPayment() {
   const originalOrder = liveOrder.value;
   const requestOrderNo = liveOrder.value.id;
   const requestAmountUsdt = liveOrder.value.total;
+  const walletOnly = topupDeadline !== undefined;
+  const deadlineAt = topupDeadline ? Date.parse(topupDeadline) : originalOrder.expiresAt;
   const requestItems = liveOrder.value.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
     ?? [{ productNo: liveOrder.value.productId, quantity: liveOrder.value.quantity }];
   const paymentOrderScopeCurrent = () => isCurrentDetailScope(scope) && !orderEnvironmentInvalidated.value;
   function paymentOrderMatches(): boolean {
     const current = liveOrder.value;
+    const cutoff = walletOnly ? deadlineAt : current?.expiresAt;
     if (!current || current.id !== requestOrderNo || current.total !== requestAmountUsdt
-        || current.status !== 'placed' || current.expiresAt == null || current.expiresAt <= Date.now()) return false;
+        || current.status !== 'placed' || cutoff == null || cutoff <= Date.now()) return false;
     const items = current.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
       ?? [{ productNo: current.productId, quantity: current.quantity }];
     return items.length === requestItems.length && items.every((item, index) => item.productNo === requestItems[index].productNo && item.quantity === requestItems[index].quantity);
@@ -1108,7 +1137,7 @@ async function handleWalletPayment() {
   paymentSheetOpen.value = false;
   let paymentConfirmed = false;
   try {
-      const receipt = await executeSelectedPurchase({amount:requestAmountUsdt,currency:'USDT',summary:liveOrder.value?.productName??t.value.store.coConfirmPurchase},
+      const receipt = await executeSelectedPurchase({amount:topupAmount ?? requestAmountUsdt,currency:'USDT',summary:liveOrder.value?.productName??t.value.store.coConfirmPurchase},
         async authorization=>{
           if (!paymentOrderCurrent()) {
             if (isCurrentDetailScope(scope)) { paymentNoticeReason.value = recoveryCopy.value.changed; paymentNotice.value = 'query'; }
@@ -1126,7 +1155,7 @@ async function handleWalletPayment() {
           }
         },
         paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},scopeCurrent:paymentOrderScopeCurrent,checkCurrent:checkPaymentOrder,commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
-          orderNo:requestOrderNo,deadlineAt:liveOrder.value.expiresAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')});
+          orderNo:requestOrderNo,deadlineAt:deadlineAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')}, walletOnly);
       // A refused payment means this page's order is out of date.
       if (!receipt) { if (isCurrentDetailScope(scope)) void refreshOrder(); return; }
     if (!isCurrentDetailScope(scope)) return;
@@ -1160,11 +1189,14 @@ async function handleWalletPayment() {
       // the next attempt is a new command, and give the reason, not "confirming".
       const message = asApiError(error).message;
       const rejection = orderPaymentRejection(error, locale.code);
-      if ((rejection || message === "ORDER_WALLET_INSUFFICIENT") && orderAction.value?.kind === 'pay') {
+      const topupChanged = walletOnly && topupNetwork.value && orderTopupPaymentChanged(error);
+      if ((rejection || topupChanged || message === "ORDER_WALLET_INSUFFICIENT") && orderAction.value?.kind === 'pay') {
         clearOrderAction(scope.accountScope.accountKey, requestOrderNo, orderAction.value.key, true);
         orderAction.value = null;
       }
-      if (message === "ORDER_WALLET_INSUFFICIENT") {
+      if (topupChanged && topupNetwork.value) {
+        await navTo(orderTopupHref(requestOrderNo, topupNetwork.value, originalOrder.productName));
+      } else if (message === "ORDER_WALLET_INSUFFICIENT") {
         await offerWalletTopup(requestAmountUsdt);
       } else if (rejection) {
         paymentNoticeReason.value = rejection;

@@ -102,7 +102,7 @@
           <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_TRC20' ? copy.gasTrc20 : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
           <view v-if="s.originalRecovery || s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying && !s.originalRecovery }" aria-hidden="true" /><text>{{ quoteStatus }}</text></view>
         </template>
-        <NxButton v-if="orderTopupNet" class="pp-cta" :label="copy.topup" variant="primary" @click="goOrderTopup" />
+        <NxButton v-if="orderTopupNet" class="pp-cta" :label="copy.topup" variant="primary" :disabled="!payment.available(s.method)" @click="payment.goOrderTopup()" />
         <NxButton v-else class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="!!s.originalRecovery || (s.step === 'methods' ? !walletEnough : !s.quote || s.loading)" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
       </view>
     </view>
@@ -399,21 +399,14 @@ const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight 
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
 const walletEnough = computed(() => Number(s.amount) === 0 || balanceKnown.value && app.user.usdtBalance >= Number(s.amount));
 const shortfall = computed(() => balanceKnown.value && Number(s.amount) > 0 ? Math.max(0, Number(s.amount) - app.user.usdtBalance) : 0);
-const networks = computed(() => [
-  { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
-  { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
-  { id: 'CREGIS_USDT_TRC20' as const, title: copy.value.trc20, chain: copy.value.trc20Chain },
-].filter(tab => payment.available(tab.id)));
+const networks = computed(() => {
+  const bep20 = { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain };
+  const erc20 = { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain };
+  const trc20 = { id: 'CREGIS_USDT_TRC20' as const, title: copy.value.trc20, chain: copy.value.trc20Chain };
+  return (s.kind === 'ORDER_PAY' ? [bep20, erc20] : [erc20, bep20, trc20]).filter(tab => payment.available(tab.id));
+});
 const usdtAvailable = computed(() => networks.value.length > 0);
-// PLACEHOLDER(B84): BE-06 — an ordinary order takes the top-up path when the payment policy returns
-// orderPayUsdtRoute === 'WALLET_TOPUP', with its networks from GET /api/deposits/policy and no quote. Until that field is
-// read, every ordinary order shows it; trial conversion and trade-in keep the external payment.
 const orderTopupNet = computed(() => s.step === 'network' && s.kind === 'ORDER_PAY');
-function goOrderTopup() {
-  const href = `/pages/me/wallet-topup?orderNo=${encodeURIComponent(s.orderNo)}&network=${s.method === 'CREGIS_USDT_ERC20' ? 'ERC20' : 'BEP20'}&name=${encodeURIComponent(s.summary)}`;
-  payment.close();
-  void navTo(href);
-}
 // A concluded payment has nothing left to offer behind its notice.
 const sheetOpen = computed(() => active.value && s.open && !s.pending && !s.concluded);
 const pageOpen = computed(() => active.value && s.open && !!s.pending && !s.concluded);
@@ -731,7 +724,7 @@ let appHidden = false;
 const appHide = () => { appHidden = true; payment.pause(); };
 const appShow = () => { appHidden = false; if (active.value && s.open) payment.wake(); };
 function visibility() { if (typeof document === 'undefined' || !s.open) return; if (document.hidden) payment.pause(); else if (active.value) payment.wake(); }
-watch(() => app.accountKey, () => payment.close());
+watch([() => app.accountKey, () => app.accountBindingEpoch], () => payment.close());
 watch(appReadOnline, online => {
   if (online && active.value && s.open && foregroundReadAllowed()) void payment.query();
 });

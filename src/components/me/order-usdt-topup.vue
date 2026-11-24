@@ -5,9 +5,6 @@
   covers the order the address steps aside and the page bar offers 去支付. Blocked, cancelled and paid orders show a
   result head and no transfer or pay entry. The page renders this pane's bar action in its fixed bottom bar (04.0).
 
-  PLACEHOLDER(B84): the reads below are one-shot placeholders so the preview can show every state. Codex replaces them
-  with the BE-05 order read, the existing deposit address and deposit list reads, their refresh cadence, automatic
-  recovery (03 §3.5.2), stale-response guards and account switches (plan C.3). Field names follow contract-b84.md.
 -->
 <template>
   <view class="out">
@@ -38,8 +35,8 @@
     <!-- Blocked, cancelled or paid: one result head (03 §3.6.1), no QR, address or pay entry. -->
     <view v-else-if="head" class="out-result">
       <NxResultHead :tone="head.tone" :icon="head.icon" :title="head.title" :description="head.body" />
-      <view v-if="view === 'paid' && read" class="out-card out-facts">
-        <view class="out-fact"><text class="out-fact__k">{{ copy.paidAmount }}</text><text class="out-fact__v out-fact__v--amt">{{ amt(read.paidAmountUsdt) }}<text class="out-unit">{{ USDT }}</text></text></view>
+      <view v-if="view === 'paid' && read && (read.paidAmountUsdt !== null || read.paidAt)" class="out-card out-facts">
+        <view v-if="read.paidAmountUsdt !== null" class="out-fact"><text class="out-fact__k">{{ copy.paidAmount }}</text><text class="out-fact__v out-fact__v--amt">{{ amt(read.paidAmountUsdt) }}<text class="out-unit">{{ USDT }}</text></text></view>
         <view v-if="read.paidAt" class="out-fact"><text class="out-fact__k">{{ copy.paidAt }}</text><text class="out-fact__v tabular-nums">{{ paidAtLabel }}</text></view>
       </view>
     </view>
@@ -88,7 +85,7 @@
         <template v-if="address.state === 'ready'">
           <text class="out-addr__cap">{{ copy.addrScan }}</text>
           <NxCodeValue class="out-addr__code" :value="address.address" :label="copy.addrTitle" full :copyable="false" />
-          <view class="out-addr__act"><NxButton variant="brand" size="medium" :label="copy.addrCopy" @click="copyText(address.address, copy.copied)" /></view>
+          <view class="out-addr__act"><NxButton variant="brand" size="medium" :label="copy.addrCopy" @click="copyAddress" /></view>
           <view class="out-qr"><image class="out-qr__img" :src="qrImage" mode="aspectFit" :aria-label="copy.addressQr" /></view>
         </template>
         <view v-else class="out-state out-state--inline" role="status">
@@ -111,95 +108,192 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import qrcode from "qrcode-generator";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import { apiClient, cregisDepositApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { cregisDepositApi, purchasePaymentApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { isApiRefusal } from "@/api/errors";
-import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { walletBillTimeLabel } from "@/lib/wallet-bill-date";
 import { purchasePaymentCopy, fillCopy as fill } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 import { toast } from "@/store/ui";
+import { useOrders } from "@/store/orders";
+import { useT } from "@/i18n/use-t";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { hasUsdt, orderTopupPayable, usdtUnits } from "@/lib/order-usdt-topup";
+import type { OrderTopupIntent, OrderTopupNetwork, OrderUsdtTopupRead } from "@/api/purchase-payment-api";
 
-const props = defineProps<{ orderNo: string; network: "BEP20" | "ERC20"; name: string }>();
-const emit = defineEmits<{ (event: "pay" | "open-intent" | "support" | "view-order"): void }>();
+const props = defineProps<{ orderNo: string; network: OrderTopupNetwork; name: string; visible: boolean }>();
+const emit = defineEmits<{
+  (event: "pay" | "support" | "view-order" | "disabled"): void;
+  (event: "open-intent", intent: OrderTopupIntent): void;
+}>();
 const locale = useLocaleStore();
+const t = useT();
 const copy = computed(() => purchasePaymentCopy(locale.code));
 const USDT = "\u00A0USDT";
-
-/** PLACEHOLDER(B84): BE-05 GET /api/app/orders/{orderNo}/usdt-topup?network= — field names as contract-b84.md. */
-type OrderUsdtTopupRead = {
-  orderNo: string; network: string; state: "PENDING" | "PAID" | "CLOSED"; canonicalStatus: string; payable: boolean; deadlineAt: string | null;
-  amountDueUsdt: string; walletAvailableUsdt: string; shortfallUsdt: string; minDepositUsdt: string; depositFeeUsdt: string;
-  suggestedTransferUsdt: string; blocker: "NONE" | "OPEN_INTENT" | "NEEDS_REVIEW";
-  openIntent: { intentNo: string; paymentMethod: string; paymentAllowed: boolean } | null;
-  reviewReason: "BANK_SESSION" | "FINANCE_REVIEW" | null; paidAt: string | null; paidAmountUsdt: string | null;
-};
-const read = ref<OrderUsdtTopupRead | null>(null);
-const orderFailed = ref(false);
-const orderMissing = ref(false);
-type AddressView = { state: "ready"; address: string } | { state: "loading" | "preparing" | "paused" | "error"; address: "" };
-const address = ref<AddressView>({ state: "loading", address: "" });
-const latest = ref<string | null>(null);
-const dust = ref<string | null>(null);
-
-// PLACEHOLDER(B84): one read per show. Codex: cadence, recovery, stale responses, deadline re-read (plan C.3).
-async function load() {
-  try {
-    read.value = await apiClient.request<OrderUsdtTopupRead>({ path: `/api/app/orders/${encodeURIComponent(props.orderNo)}/usdt-topup?network=${props.network}` });
-    orderFailed.value = false;
-    orderMissing.value = false;
-  } catch (error) {
-    // 404 ORDER_NOT_FOUND is a definite answer (another account's or no such order); other failures recover.
-    orderMissing.value = isApiRefusal(error, 404, "ORDER_NOT_FOUND");
-    orderFailed.value = !orderMissing.value;
-  }
-  try {
-    const snapshot = await cregisDepositApi.address(props.network);
-    address.value = snapshot.enabled && snapshot.creditEnabled && snapshot.address ? { state: "ready", address: snapshot.address }
-      : { state: snapshot.reason === "CREGIS_ADDRESS_PREPARING" ? "preparing" : "paused", address: "" };
-  } catch {
-    address.value = { state: "error", address: "" };
-  }
-  // PLACEHOLDER(B84): which deposit counts as 「最近到账」 and which hold shows the below-minimum line is Codex's (window, network).
-  const rows = await cregisDepositApi.list().catch(() => []);
-  const mine = rows.filter((row) => row.network === props.network && Date.now() - row.createdAt < 30 * 60_000);
-  const credited = mine.find((row) => row.status === "CREDITED");
-  const held = mine.find((row) => row.status === "DUST_HOLD");
-  latest.value = credited ? credited.creditedUsdtExact ?? String(credited.creditedUsdt) : null;
-  dust.value = held ? held.grossAmountUsdtExact ?? String(held.grossAmountUsdt) : null;
-}
-// Same session gate as DepositUsdtPane: read once this account's session is restored.
 const app = useApp();
 const auth = useAuth();
+const orders = useOrders();
 const sessionReady = computed(() => {
   void app.accountBindingEpoch;
   return binarySessionReady({ remote: remoteApiEnabled, authenticated: auth.isAuthenticated, accountId: auth.accountId,
     appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null });
 });
-watch(sessionReady, (ready) => { if (ready) void load(); }, { immediate: true });
-onShow(() => { if (sessionReady.value && (read.value || orderFailed.value)) void load(); });
+const active = () => props.visible && sessionReady.value;
+const readingAllowed = () => active() && foregroundReadAllowed();
 
+const read = ref<OrderUsdtTopupRead | null>(null);
+const orderFailed = ref(false);
+const orderMissing = ref(false);
+type AddressView = { state: "ready"; address: string } | { state: "preparing" | "paused" | "error"; address: "" };
+const address = ref<AddressView>({ state: "preparing", address: "" });
+const latest = ref<string | null>(null);
+const dust = ref<string | null>(null);
+const historyFailed = ref(false);
+let placedAt: number | undefined;
+let generation = 0;
+let inFlight: Promise<void> | null = null;
+let nextReadAt = 0;
 const now = ref(Date.now());
-useVisibleInterval(() => { now.value = Date.now(); }, 1000);
 const deadline = computed(() => read.value?.deadlineAt ? Date.parse(read.value.deadlineAt) : null);
+let deadlineReadAt: number | null = null;
+
+function resetAddress() {
+  address.value = { state: "preparing", address: "" };
+}
+
+function refresh(): Promise<void> {
+  if (inFlight || !readingAllowed() || orderMissing.value) return inFlight ?? Promise.resolve();
+  const run = generation;
+  const { orderNo, network } = props;
+  const current = () => run === generation && readingAllowed();
+  nextReadAt = Number.POSITIVE_INFINITY;
+  void app.refreshRemoteFleet(app.captureRemoteAccountRequest(), { coalesce: true }).catch(() => false);
+  inFlight = (async () => {
+    let facts: OrderUsdtTopupRead;
+    try {
+      facts = await purchasePaymentApi.orderTopup(orderNo, network);
+      if (!current()) return;
+      now.value = Date.now();
+      read.value = facts;
+      orderFailed.value = false;
+    } catch (error) {
+      if (!current()) return;
+      read.value = null;
+      resetAddress();
+      historyFailed.value = false;
+      if (isApiRefusal(error, 409, "ORDER_USDT_TOPUP_DISABLED")) {
+        emit("disabled");
+        return;
+      }
+      orderMissing.value = isApiRefusal(error, 404, "ORDER_NOT_FOUND");
+      orderFailed.value = !orderMissing.value;
+      return;
+    }
+    const transferring = orderTopupPayable(facts) && hasUsdt(facts.shortfallUsdt);
+    if (!transferring) resetAddress();
+    await Promise.all([
+      transferring ? refreshAddress() : undefined,
+      orderTopupPayable(facts) ? refreshHistory() : undefined,
+    ]);
+
+    async function refreshAddress() {
+      try {
+        const result = await cregisDepositApi.address(network);
+        if (!current() || !orderTopupPayable(facts)) return;
+        address.value = result.enabled === true && result.creditEnabled === true && result.address
+          ? { state: "ready", address: result.address }
+          : { state: result.reason === "CREGIS_ADDRESS_PREPARING" ? "preparing"
+            : result.enabled && result.creditEnabled === undefined ? "error" : "paused", address: "" };
+      } catch {
+        if (current()) address.value = { state: "error", address: "" };
+      }
+    }
+
+    async function refreshHistory() {
+      try {
+        const placed = placedAt ?? (orders.getById(orderNo) ?? await orders.ensureRemoteOrder(orderNo))?.placedAt;
+        if (!current()) return;
+        if (!placed) throw new Error("ORDER_PLACEMENT_UNAVAILABLE");
+        placedAt = placed;
+        const records = await cregisDepositApi.list();
+        if (!current()) return;
+        const mine = records.filter(row => row.network === network && row.createdAt > placed);
+        const credited = mine.filter(row => row.status === "CREDITED")
+          .sort((a, b) => (b.creditedAt ?? b.createdAt) - (a.creditedAt ?? a.createdAt))[0];
+        const held = mine.filter(row => row.status === "DUST_HOLD").sort((a, b) => b.createdAt - a.createdAt)[0];
+        latest.value = credited ? credited.creditedUsdtExact ?? String(credited.creditedUsdt) : null;
+        dust.value = held ? held.grossAmountUsdtExact ?? String(held.grossAmountUsdt) : null;
+        historyFailed.value = false;
+      } catch {
+        if (current()) historyFailed.value = true;
+      }
+    }
+  })().finally(() => {
+    if (!current()) return;
+    inFlight = null;
+    const preparing = view.value === "waiting" && address.value.state === "preparing";
+    nextReadAt = Date.now() + (preparing ? 5_000 + Math.random() * 5_000 : 30_000 + Math.random() * 15_000);
+    if (deadline.value !== null && Date.now() >= deadline.value && deadlineReadAt !== deadline.value) tick();
+  });
+  return inFlight;
+}
+
+function invalidate() {
+  generation++;
+  inFlight = null;
+  resetAddress();
+}
+
+watch([() => app.accountKey, () => app.accountBindingEpoch, () => props.orderNo, () => props.network, sessionReady], () => {
+  invalidate();
+  read.value = null;
+  orderMissing.value = orderFailed.value = historyFailed.value = false;
+  latest.value = dust.value = null;
+  placedAt = undefined;
+  deadlineReadAt = null;
+  void refresh();
+}, { flush: "sync" });
+watch(readingAllowed, allowed => {
+  if (allowed) { now.value = Date.now(); void refresh(); }
+  else invalidate();
+}, { immediate: true, flush: "sync" });
+watch(() => app.user.usdtBalance, () => { void refresh(); });
+watch(active, (vis, _, onCleanup) => {
+  if (vis) onCleanup(registerActivePageRefresh(refresh, "pages/me/wallet-topup"));
+}, { immediate: true });
+onBeforeUnmount(invalidate);
+const failed = () => orderFailed.value || historyFailed.value || view.value === "waiting" && address.value.state === "error";
+function tick() {
+  now.value = Date.now();
+  if (!readingAllowed()) return;
+  if (!inFlight && deadline.value !== null && now.value >= deadline.value && deadlineReadAt !== deadline.value) {
+    deadlineReadAt = deadline.value;
+    resetAddress();
+    void refresh();
+  } else if (!failed() && now.value >= nextReadAt) void refresh();
+}
+useVisibleInterval(tick, 1000, readingAllowed);
+useAutoRecovery({ failed, retry: refresh, active, repeatMs: 30_000, quiet: false });
+
 const closesIn = computed(() => {
   if (deadline.value === null) return "";
   const left = Math.max(0, Math.ceil((deadline.value - now.value) / 1000));
   return `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
 });
 
-const nonZero = (value: string) => /[1-9]/.test(value);
 // Order facts first (plan C.3, contract state): paid, closed, blocked, past the deadline, then the balance.
 const view = computed(() => {
   const r = read.value;
@@ -210,19 +304,38 @@ const view = computed(() => {
   if (r.blocker === "NEEDS_REVIEW") return "review";
   // Pending but no longer payable with no blocker, or the local clock has reached the deadline: collapse the transfer
   // and pay entries until the re-read gives the result (plan C.3 截止).
-  if (!r.payable || deadline.value !== null && now.value >= deadline.value) return "deadline";
-  return nonZero(r.shortfallUsdt) ? "waiting" : "covered";
+  if (!orderTopupPayable(r, now.value)) return "deadline";
+  return hasUsdt(r.shortfallUsdt) ? "waiting" : "covered";
 });
 const covered = computed(() => view.value === "covered");
 // The suggestion was raised to the minimum deposit (shortfall + fee is below it): say so instead of the fee line.
-const minimumFloor = computed(() => !!read.value && formatAmount(read.value.suggestedTransferUsdt, "full") === formatAmount(read.value.minDepositUsdt, "full")
-  && nonZero(read.value.shortfallUsdt));
+const minimumFloor = computed(() => {
+  const r = read.value;
+  if (!r || !hasUsdt(r.shortfallUsdt)) return false;
+  const [min, shortfall, fee] = usdtUnits(r.minDepositUsdt, r.shortfallUsdt, r.depositFeeUsdt);
+  return min > shortfall + fee;
+});
+const resultTitle = computed(() => {
+  const c = t.value.orders;
+  switch (read.value?.canonicalStatus) {
+    case "paid": return copy.value.paidTitle;
+    case "provisioning": return c.statusProvisioning;
+    case "activated": return c.statusActivated;
+    case "inventory": return c.statusInventory;
+    case "expired": return copy.value.expiredTitle;
+    case "payment_failed": return c.statusPaymentFailed;
+    case "provisioning_failed": return c.statusProvisioningFailed;
+    case "refunded": return c.statusRefunded;
+    case "chargeback": return c.statusChargeback;
+    default: return copy.value.closedTitle;
+  }
+});
 const head = computed(() => {
   const c = copy.value;
   switch (view.value) {
-    case "paid": return { tone: "success" as const, icon: undefined, title: c.paidTitle, body: "" };
+    case "paid": return { tone: "success" as const, icon: undefined, title: resultTitle.value, body: "" };
     // Only the order's own canonical status may say it timed out (contract canonicalStatus).
-    case "closed": return { tone: "neutral" as const, icon: read.value?.canonicalStatus === "expired" ? "clock" as const : undefined, title: read.value?.canonicalStatus === "expired" ? c.expiredTitle : c.closedTitle, body: c.expiredBody };
+    case "closed": return { tone: "neutral" as const, icon: read.value?.canonicalStatus === "expired" ? "clock" as const : undefined, title: resultTitle.value, body: c.expiredBody };
     case "missing": return { tone: "neutral" as const, icon: "alert" as const, title: c.orderMissingTitle, body: c.orderMissing };
     case "open-intent": return { tone: "warning" as const, icon: "clock" as const, title: c.openIntentTitle, body: c.openIntentBody };
     case "review": return { tone: "warning" as const, icon: "shield" as const, title: c.reviewHoldTitle, body: c.reviewHold };
@@ -241,14 +354,15 @@ const amountSize = computed(() => {
   const length = heroParts.value.whole.length + (heroParts.value.fraction ? heroParts.value.fraction.length + 1 : 0);
   return length > 14 ? "is-xlong" : length > 9 ? "is-long" : "";
 });
-const debt = computed(() => !!read.value && read.value.walletAvailableUsdt.trim().startsWith("-"));
+const debt = computed(() => !!read.value && read.value.walletAvailableUsdt.startsWith("-") && hasUsdt(read.value.walletAvailableUsdt));
 const balanceAbs = computed(() => read.value?.walletAvailableUsdt.replace(/^\s*-/, "") ?? null);
 // The bar's geometry only: balance as a share of the amount due; a debt draws no fill.
 const fillPct = computed(() => {
   const r = read.value;
   if (!r || debt.value) return 0;
-  const due = Number(r.amountDueUsdt), balance = Number(r.walletAvailableUsdt);
-  return due > 0 ? Math.round(Math.min(100, Math.max(0, balance / due * 100)) * 10) / 10 : 100;
+  const [due, balance] = usdtUnits(r.amountDueUsdt, r.walletAvailableUsdt);
+  if (due === 0n || balance >= due) return 100;
+  return Number((balance * 2000n + due) / (due * 2n)) / 10;
 });
 const paidAtLabel = computed(() => read.value?.paidAt ? walletBillTimeLabel(Date.parse(read.value.paidAt), locale.code) : "—");
 const networkName = computed(() => props.network === "ERC20" ? copy.value.erc20 : copy.value.bep20);
@@ -270,13 +384,30 @@ function copyText(value: string, done: string) {
   uni.setClipboardData({ data: value, showToast: false, success: () => { uni.hideToast(); toast.success(done); }, fail: () => {} });
 }
 
+function copyAddress() {
+  if (!readingAllowed() || !read.value || !orderTopupPayable(read.value) || !hasUsdt(read.value.shortfallUsdt) || address.value.state !== "ready") return;
+  copyText(address.value.address, copy.value.copied);
+}
+
+async function pay() {
+  const run = generation;
+  await refresh();
+  if (run === generation && readingAllowed() && read.value && orderTopupPayable(read.value)
+      && !hasUsdt(read.value.shortfallUsdt)) emit("pay");
+}
+
+function openIntent() {
+  const intent = read.value?.openIntent;
+  if (readingAllowed() && intent) emit("open-intent", intent);
+}
+
 /** The page's bottom bar for this state (04.0): one primary; a disabled one says why above it (03 §3.1). */
 const barAction = computed(() => {
   const c = copy.value;
   switch (view.value) {
     case "waiting": return { label: c.goPay, enabled: false, note: c.payWhenEnough, run: () => {} };
-    case "covered": return { label: c.goPay, enabled: true, note: c.payReady, run: () => emit("pay") };
-    case "open-intent": return { label: c.openIntent, enabled: true, note: "", run: () => emit("open-intent") };
+    case "covered": return { label: c.goPay, enabled: true, note: c.payReady, run: pay };
+    case "open-intent": return { label: c.openIntent, enabled: true, note: "", run: openIntent };
     case "review": return { label: c.support, enabled: true, note: "", run: () => emit("support") };
     case "paid": case "closed": return { label: c.viewOrder, enabled: true, note: "", run: () => emit("view-order") };
     default: return null;

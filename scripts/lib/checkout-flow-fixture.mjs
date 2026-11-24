@@ -4,6 +4,7 @@ import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoFixture,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
+import {demoOrderTopupPayRefusal} from './prototype-demo-order-topup.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeOrders) {
   const pin = createPaymentPinFlowFixture();
@@ -282,7 +283,11 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       if (authorization.status !== 200) return authorization;
       const firstPayment=order.paymentStatus==='PENDING';
       let settled;
-      try { settled = demoFixture(url,locale(),state,request); }
+      try {
+        const blocked = firstPayment && demoOrderTopupPayRefusal(state, orderNo);
+        if (blocked) throw Object.assign(new Error(blocked), {status:409});
+        settled = demoFixture(url,locale(),state,request);
+      }
       catch (error) {
         const refusal = {status:error.status??409,message:error.message,data:null};
         if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
@@ -310,7 +315,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   }
   return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
-    confirmLateOrderPayment:external.confirmLateOrderPayment,
+    confirmLateOrderPayment:external.confirmLateOrderPayment, topupIntent:external.topupIntent,
     failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},
     selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
     selectPaymentMode:external.selectPaymentMode,configureCheckoutReadback};

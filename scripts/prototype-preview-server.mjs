@@ -183,7 +183,8 @@ const server=http.createServer(async(req,res)=>{
         let raw='';for await(const chunk of req)raw+=chunk;const update=JSON.parse(raw||'{}');
         if(update.resetPin){checkoutFlow.pin.state.password=null;checkoutFlow.pin.state.version=0;checkoutFlow.pin.state.attempts=5;checkoutFlow.pin.state.lockedUntil=null;}
         if(typeof update.dropNextPayment==='boolean')checkoutFlow.pin.state.dropNextPayment=update.dropNextPayment;
-        if(update.observePayments===true)checkoutFlow.observePayments();
+        if(update.observePayments===true)
+          checkoutFlow.observePayments(Number.isSafeInteger(update.observedAt) ? update.observedAt : undefined);
         if(update.delayNextCreate===true)checkoutFlow.delayCreate();
         if('orderListScene' in update)checkoutFlow.selectOrderListScene(update.orderListScene);
         if('failNextHide' in update)checkoutFlow.failNextHide(update.failNextHide);
@@ -259,6 +260,14 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
         else if(scenarioChange&&paymentMode==='low-balance')state.walletBalance=820.64;
         else if((update.reset||scenarioChange)&&state.dataState!=='empty'&&paymentMode==='reward-clawback-debt')seedDemoRewardClawback(state,Date.now());
+        if (update.orderTopupState) {
+          const balance = { waiting: 120.5, partial: 620.5, debt: -12.123456, 'below-min': 120.5, covered: 52800.64 }[state.orderTopupState];
+          if (balance !== undefined) {
+            state.walletBalance = balance;
+            state.walletUsdtCheckpoint = balance;
+          }
+          state.orderTopupTransferAt = Date.now();
+        }
         const recoverySelection = demoOptions.withdrawRecoveryState.find(([value]) => value === update.withdrawRecoveryState);
         if (recoverySelection || update.reset || scenarioChange) {
           state.withdrawRecoveryState = recoverySelection?.[0] ?? 'off';
@@ -340,7 +349,9 @@ const server=http.createServer(async(req,res)=>{
     if(/^\/(api|auth)\//.test(url.pathname)) {
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
-      const orderTopup=req.method==='GET'&&state.dataState!=='error'?demoOrderTopupResponse(url,state,locale,Date.now()):undefined;
+      if(req.method==='GET'&&url.pathname==='/api/deposits/policy'&&state.orderTopupState==='policy-loading')
+        await new Promise(resolve=>setTimeout(resolve,2500));
+      const orderTopup=req.method==='GET'?demoOrderTopupResponse(url,state,locale,Date.now(),req.headers,checkoutFlow?.topupIntent):undefined;
       if(orderTopup)return sendJson(res,orderTopup.body,orderTopup.status);
       if(req.method==='GET'){
         const accountId=url.pathname==='/api/genesis/state'

@@ -2,11 +2,22 @@ import type { ApiClient } from './api-client';
 import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
+import { ORDER_STATUSES, type CanonicalOrderStatus } from './order-api';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
 export type ExternalPaymentMethod = 'HDPAY_BANK' | 'CREGIS_USDT_BSC' | 'CREGIS_USDT_ERC20' | 'CREGIS_USDT_TRC20';
 export type PurchaseMethod = 'WALLET' | ExternalPaymentMethod;
+export type OrderTopupNetwork = 'BEP20' | 'ERC20';
+export const orderTopupNetwork = (value: unknown): OrderTopupNetwork | null => value === 'BEP20' || value === 'ERC20' ? value : null;
+export type OrderTopupIntent = { intentNo: string; paymentMethod: ExternalPaymentMethod; paymentAllowed: boolean };
+export type OrderUsdtTopupRead = {
+  orderNo: string; network: OrderTopupNetwork; state: 'PENDING' | 'PAID' | 'CLOSED'; canonicalStatus: CanonicalOrderStatus;
+  payable: boolean; deadlineAt: string | null; amountDueUsdt: string; walletAvailableUsdt: string; shortfallUsdt: string;
+  minDepositUsdt: string; depositFeeUsdt: string; suggestedTransferUsdt: string; blocker: 'NONE' | 'OPEN_INTENT' | 'NEEDS_REVIEW';
+  openIntent: OrderTopupIntent | null; reviewReason: 'BANK_SESSION' | 'FINANCE_REVIEW' | null; paidAt: string | null; paidAmountUsdt: string | null;
+};
+const externalMethods: readonly string[] = ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20', 'CREGIS_USDT_TRC20'];
 type PurchaseFinancialSnapshot = { businessAmountUsdt?: string; roundingAdjustmentUsdt?: string; fxRateVndPerUsdt: string | null; feePolicyVersion: number;
   deadlineAt?: string; confirmationGraceEndsAt?: string };
 export type PurchaseQuote = {
@@ -48,7 +59,7 @@ const timestamp = (raw: unknown): string => {
 };
 function common(raw: Record<string, unknown>) {
   if (!purchaseKinds.includes(raw.kind as PurchaseKind) || typeof raw.paymentMethod !== 'string'
-    || !['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20', 'CREGIS_USDT_TRC20'].includes(raw.paymentMethod)) throw invalid();
+    || !externalMethods.includes(raw.paymentMethod)) throw invalid();
   const paymentMethod = raw.paymentMethod as ExternalPaymentMethod;
   const network = raw.network == null ? null : text(raw.network);
   if (paymentMethod === 'CREGIS_USDT_BSC' && !['BSC', 'BEP20', 'USDT-BSC'].includes(network ?? '')) throw invalid();
@@ -107,18 +118,48 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
     ...(raw.refundStatus === 'REFUNDED' ? { refundStatus: 'REFUNDED' as const } : {}),
     ...(expirationTime ? { expirationTime } : {}) };
 }
+function parseOrderTopup(value: unknown, orderNo: string, network: OrderTopupNetwork): OrderUsdtTopupRead {
+  const raw = object(value);
+  const { state, canonicalStatus, payable, blocker, reviewReason } = raw;
+  if (raw.orderNo !== orderNo || raw.network !== network || !ORDER_STATUSES.includes(canonicalStatus as CanonicalOrderStatus)
+      || (state !== 'PENDING' && state !== 'PAID' && state !== 'CLOSED') || typeof payable !== 'boolean'
+      || (blocker !== 'NONE' && blocker !== 'OPEN_INTENT' && blocker !== 'NEEDS_REVIEW')) throw invalid();
+  if (state !== 'PENDING' && (payable || blocker !== 'NONE') || payable && blocker !== 'NONE') throw invalid();
+  if (blocker === 'NEEDS_REVIEW' ? reviewReason !== 'BANK_SESSION' && reviewReason !== 'FINANCE_REVIEW' : reviewReason !== null) throw invalid();
+  const deadlineAt = raw.deadlineAt === null ? null : timestamp(raw.deadlineAt);
+  if ((state === 'PENDING') !== (deadlineAt !== null) || state !== 'PAID' && (raw.paidAt !== null || raw.paidAmountUsdt !== null)) throw invalid();
+  let openIntent: OrderTopupIntent | null = null;
+  if (blocker === 'OPEN_INTENT') {
+    const intent = object(raw.openIntent);
+    if (typeof intent.paymentMethod !== 'string' || !externalMethods.includes(intent.paymentMethod) || typeof intent.paymentAllowed !== 'boolean') throw invalid();
+    openIntent = { intentNo: text(intent.intentNo), paymentMethod: intent.paymentMethod as ExternalPaymentMethod, paymentAllowed: intent.paymentAllowed };
+  } else if (raw.openIntent !== null) throw invalid();
+  const decimal = (amount: unknown, signed = false) => {
+    if (typeof amount !== 'string' || !/^\d+(?:\.\d+)?$/.test(signed ? amount.replace(/^-/, '') : amount)) throw invalid();
+    return amount;
+  };
+  return { orderNo, network, state, canonicalStatus: canonicalStatus as CanonicalOrderStatus, payable, blocker, openIntent,
+    reviewReason: reviewReason as OrderUsdtTopupRead['reviewReason'], deadlineAt,
+    paidAt: raw.paidAt === null ? null : timestamp(raw.paidAt), paidAmountUsdt: raw.paidAmountUsdt === null ? null : decimal(raw.paidAmountUsdt),
+    amountDueUsdt: decimal(raw.amountDueUsdt), walletAvailableUsdt: decimal(raw.walletAvailableUsdt, true), shortfallUsdt: decimal(raw.shortfallUsdt),
+    minDepositUsdt: decimal(raw.minDepositUsdt), depositFeeUsdt: decimal(raw.depositFeeUsdt), suggestedTransferUsdt: decimal(raw.suggestedTransferUsdt) };
+}
 export function createPurchasePaymentApi(client: ApiClient) {
   const base = '/api/app/purchase-payment';
   return {
     /** Which external channels operations have configured; unlisted channels count as unavailable. */
-    async policy(): Promise<Partial<Record<ExternalPaymentMethod, boolean>>> {
+    async policy() {
       const raw = object(await client.request({ path: `${base}-policy` }));
       if (!Array.isArray(raw.channels)) throw invalid();
-      return Object.fromEntries(raw.channels.map(value => {
+      const channels: Partial<Record<ExternalPaymentMethod, boolean>> = Object.fromEntries(raw.channels.map(value => {
         const row = object(value);
         if (typeof row.paymentMethod !== 'string' || typeof row.configured !== 'boolean') throw invalid();
         return [row.paymentMethod, row.configured];
       }));
+      return { channels, orderPayUsdtRoute: typeof raw.orderPayUsdtRoute === 'string' ? raw.orderPayUsdtRoute : null };
+    },
+    async orderTopup(orderNo: string, network: OrderTopupNetwork) {
+      return parseOrderTopup(await client.request({ path: `/api/app/orders/${encodeURIComponent(orderNo)}/usdt-topup?network=${network}` }), orderNo, network);
     },
     async quote(kind: PurchaseKind, paymentMethod: ExternalPaymentMethod, payload: Record<string, unknown>) {
       return parsePurchaseQuote(await client.request({ method: 'POST', path: `${base}-quotes`, body: { kind, paymentMethod, payload } }));

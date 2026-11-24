@@ -1,4 +1,4 @@
-import { formatAmount } from "./amount-display";
+import { formatAmount, formatGroupedAmount } from "./amount-display";
 import { formatUsd } from "./usd-display";
 import { fmt } from "@/i18n/format";
 import type { BillType } from "@/store/bills";
@@ -40,17 +40,17 @@ export function resolveWalletBillMemo(bill: DisplayBill, memo: Record<string, st
 }
 
 /** Unsigned bill amount in the ledger's own precision (USDT detail, UVT overview); Vietnamese swaps the separators. */
-export function formatWalletBillDecimal(exact: string | undefined, fallback: number, symbol: "USDT" | "UVT", locale: string): string {
+export function formatWalletBillDecimal(exact: string | undefined, fallback: number, symbol: "USDT" | "UVT", locale: string, full = false): string {
   const amount = exact === undefined ? Math.abs(fallback) : exact.replace(/^-/, "");
-  return formatWalletBillValue(amount, symbol, locale);
+  return formatWalletBillValue(amount, symbol, locale, full);
 }
 
 export function formatWalletBillBalance(exact: string | undefined, fallback: number, symbol: "USDT" | "UVT", locale: string): string {
   return formatWalletBillValue(exact ?? fallback, symbol, locale);
 }
 
-function formatWalletBillValue(amount: string | number, symbol: "USDT" | "UVT", locale: string): string {
-  const formatted = formatUsd(amount, symbol === "USDT" ? "detail" : "overview").replace("$", "");
+function formatWalletBillValue(amount: string | number, symbol: "USDT" | "UVT", locale: string, full = false): string {
+  const formatted = full ? formatGroupedAmount(amount, "full") : formatUsd(amount, symbol === "USDT" ? "detail" : "overview").replace("$", "");
   return locale.startsWith("vi") ? formatted.replace(/[.,]/g, mark => mark === "." ? "," : ".") : formatted;
 }
 

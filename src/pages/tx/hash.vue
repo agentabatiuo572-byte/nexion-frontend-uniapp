@@ -32,7 +32,7 @@
         </view>
       </view>
 
-      <view v-else-if="remoteApiEnabled" class="nx-glass-card mx-4" data-testid="tx-detail-hold" :style="holdStyle">
+      <view v-else-if="remoteApiEnabled || depositMode" class="nx-glass-card mx-4" data-testid="tx-detail-hold" :style="holdStyle">
         <text class="block" :style="holdTitleStyle">{{ hash ? w.detailUnavailableTitle : hashProvided ? recoveryCopy.txInvalidTitle : recoveryCopy.txMissingTitle }}</text>
         <text class="block" :style="holdBodyStyle">{{ hash ? w.detailUnavailableBody : hashProvided ? recoveryCopy.txInvalidBody : recoveryCopy.txMissingBody }}</text>
         <view v-if="hash" style="margin-top: 16px">
@@ -103,8 +103,12 @@ import Row from "@/components/tx/tx-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
-import { remoteApiEnabled } from "@/api/runtime";
-import { navTo } from "@/lib/route";
+import { fundsServerEnabled, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { useBills } from "@/store/bills";
+import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady } from "@/lib/binary-session-ready";
+import { navTo, takeNavigationQuery } from "@/lib/route";
 import { validatedTransactionHash } from "@/lib/transaction-hash-input";
 import { useEntryRecoveryCopy } from "@/i18n/entry-recovery";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
@@ -116,7 +120,7 @@ import { useLocaleStore } from "@/store/locale";
 const t = useT();
 const recoveryCopy = useEntryRecoveryCopy();
 const w = computed(() => t.value.tx);
-const hash = ref("");
+const queryHash = ref("");
 const hashProvided = ref(false);
 const copyBusy = ref(false);
 let copyVersion = 0;
@@ -135,9 +139,26 @@ const qConfs = ref<number | null>(null);
 const qNet = ref<string | null>(null);
 const qTo = ref<string | null>(null);
 const qAgeMin = ref<number | null>(null);
-// A top-up row from Bills (src=deposit). PLACEHOLDER(B84): Bills builds these from BE-07 `deposit`
-// ({network, txHash, grossAmountUsdt, feeUsdt, creditedUsdt}); with `deposit: null` it sends only the credited amount and time.
-const deposit = ref<{ network: "BEP20" | "ERC20" | null; gross: string; fee: string; credited: string; at: number | null } | null>(null);
+const app = useApp();
+const auth = useAuth();
+const bills = useBills();
+const depositMode = ref(false);
+const billId = ref("");
+const billAccountKey = ref("");
+const billAccountEpoch = ref(-1);
+const depositBill = computed(() => {
+  if (!depositMode.value || app.accountKey !== billAccountKey.value || app.accountBindingEpoch !== billAccountEpoch.value
+      || !binarySessionReady({ remote: fundsServerEnabled, authenticated: auth.isAuthenticated, accountId: auth.accountId,
+        appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null })) return;
+  return bills.findChainTopup(billAccountKey.value, billId.value);
+});
+const deposit = computed(() => {
+  const bill = depositBill.value;
+  if (!bill) return null;
+  return { network: bill.deposit?.network ?? null, gross: bill.deposit?.grossAmountUsdt ?? "",
+    fee: bill.deposit?.feeUsdt ?? "", credited: bill.deposit?.creditedUsdt ?? bill.amountExact ?? "", at: bill.ts };
+});
+const hash = computed(() => depositMode.value ? depositBill.value?.deposit?.txHash ?? "" : queryHash.value);
 const locale = useLocaleStore();
 const payCopy = computed(() => purchasePaymentCopy(locale.code));
 const depositAmount = (value: string) => value ? formatGroupedAmount(value, "full") : "—";
@@ -148,8 +169,16 @@ onLoad((options) => {
   copyState.value = "idle";
   copyBusy.value = false;
   if (copyResetTimer) clearTimeout(copyResetTimer);
+  const pending = new URLSearchParams(takeNavigationQuery("/pages/tx/hash"));
+  depositMode.value = (options?.src ?? pending.get("src")) === "deposit";
+  if (depositMode.value) {
+    billAccountKey.value = app.accountKey;
+    billAccountEpoch.value = app.accountBindingEpoch;
+    billId.value = options?.billId ?? pending.get("billId") ?? "";
+    return;
+  }
   hashProvided.value = typeof options?.hash === "string" && !!options.hash.trim();
-  hash.value = validatedTransactionHash(options?.hash);
+  queryHash.value = validatedTransactionHash(options?.hash);
   const amt = String(options?.amount ?? "");
   qAmount.value = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(amt) && Number(amt) > 0 ? amt : null;
   const confs = parseInt(String(options?.confs ?? ""), 10);
@@ -158,14 +187,7 @@ onLoad((options) => {
   qTo.value = typeof options?.to === "string" && options.to.length >= 10 ? options.to : null;
   const age = parseInt(String(options?.age ?? ""), 10);
   qAgeMin.value = Number.isFinite(age) && age >= 0 ? Math.max(1, age) : null;
-  const exact = (value: unknown) => typeof value === "string" && /^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(value) ? value : "";
-  const at = Number(options?.at);
-  const chain = options?.net === "BEP20" || options?.net === "ERC20" ? options.net : null;
-  const complete = !!chain && !!hash.value && !!exact(options?.gross) && !!exact(options?.fee) && !!exact(options?.credited);
-  deposit.value = options?.src === "deposit" ? {
-    network: complete ? chain : null, gross: exact(options?.gross), fee: exact(options?.fee), credited: exact(options?.credited),
-    at: Number.isFinite(at) && at > 0 ? at : null,
-  } : null;
+
 });
 
 function hashSeed(h: string): number {

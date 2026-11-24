@@ -1,9 +1,8 @@
 import { reactive, type InjectionKey, type Ref } from 'vue';
 import { canSelectNewUsdtNetwork, isVisibleUsdtNetwork } from '@/lib/usdt-network-options';
-import { apiClient, purchaseEligibilityApi } from '@/api/runtime';
+import { cregisDepositApi as deposits, purchasePaymentApi as api, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
-import { createCregisDepositApi } from '@/api/cregis-deposit-api';
-import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
+import type { ExternalPaymentMethod, OrderTopupIntent, PurchaseKind, PurchaseMethod, PurchasePaymentIntent, PurchaseQuote } from '@/api/purchase-payment-api';
 import type { PaymentCommandReceipt } from '@/api/payment-command-api';
 import { useApp } from './app';
 import { useOrders, type Order } from './orders';
@@ -14,6 +13,7 @@ import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { orderTopupHref } from '@/lib/order-usdt-topup';
 import { appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { getT } from '@/i18n/use-t';
@@ -31,7 +31,7 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
 export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
-  intentNo?: string; lookupOnly?: boolean; resumedOnThisDevice?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
+  intentNo?: string; lookupOnly?: boolean; resumedOnThisDevice?: boolean; useOrderTopup?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
   orderDeadlineAt?: number; hiddenOrder?: { sku: string; imageUrl?: string; total: Order['total']; placedAt?: number };
   lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
@@ -74,15 +74,15 @@ function paymentRefusalNotice(cause: ApiError, kind: PurchaseKind): DefinitePaym
     }
   }
 }
-const api = createPurchasePaymentApi(apiClient);
-const deposits = createCregisDepositApi(apiClient);
 const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', productNo: '', image: '', deadlineAt: null as number | null,
-  policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, notice: '' as PurchaseNotice, cashier: false,
+  policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, orderPayUsdtRoute: null as string | null,
+  orderTopupNetworks: [] as ExternalPaymentMethod[], notice: '' as PurchaseNotice, cashier: false,
   retryNotice: '' as '' | EligibilityRetry,
   pausedPaymentMethod: null as ExternalPaymentMethod | null,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
   originalRecovery: null as { intentNo: string; kind: PurchaseKind; fingerprint: string; summary: string } | null,
+  orderTopupIntent: null as OrderTopupIntent | null,
   loading: false, retrying: false, reading: false, busy: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
 // Detail can discover the original payment in another H5 tab while checkout and its floating bar stay mounted.
 // #ifdef H5
@@ -94,6 +94,9 @@ let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
 let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void; onExpired?: () => void } | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
+let policyVersion = 0;
+let policyRead: Promise<void> | null = null;
+let accountBindingEpoch = 0;
 let quoteTimer: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<typeof setTimeout> | undefined;
 const releaseListeners = new Set<(accountKey: string, commandKey: string) => void>();
 const unsavedExpiries = new Map<string, Map<string, PurchaseKind>>();
@@ -165,7 +168,10 @@ function fingerprint(value: PurchasePaymentContext): string {
     : Array.isArray(raw) ? raw.map(stable) : raw;
   return JSON.stringify([value.kind, stable(value.payload)]);
 }
-function owns(version: number, accountKey: string) { return state.open && requestVersion === version && account() === accountKey && state.accountKey === accountKey; }
+function owns(version: number, accountKey: string) {
+  return state.open && requestVersion === version && account() === accountKey && state.accountKey === accountKey
+    && useApp().accountBindingEpoch === accountBindingEpoch;
+}
 function matches(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (intent.commandKey !== pending.commandKey || intent.kind !== pending.kind || intent.paymentQuoteId !== pending.paymentQuoteId
     || pending.paymentMethod !== undefined && intent.paymentMethod !== pending.paymentMethod
@@ -328,6 +334,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
     intentNo: intent.intentNo, lastStatus: intent.refundStatus === 'REFUNDED' ? 'REFUNDED' : intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
   if (isOrderPaymentDiscoveryOnly(pending)) known.resumedOnThisDevice = true;
   delete known.quotaRefusal;
+  delete known.useOrderTopup;
   if (known.businessDelivered) {
     const payload = JSON.parse(known.fingerprint)[1] as Record<string, unknown>;
     validatePurchasePaymentReceipt(known.kind, payload, intent.receipt, intent);
@@ -392,7 +399,8 @@ function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, {
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
   const expired = state.intent?.status === 'EXPIRED';
-  requestVersion++; stopTimers(); openCashierOnReady = false;
+  requestVersion++; policyVersion++; stopTimers(); openCashierOnReady = false;
+  policyRead = null;
   reviewedQuote = confirmedQuote = null;
   Object.assign(state, { open: false, loading: false, retrying: false, reading: false, busy: false, cashier: false, notice: '', concluded: false,
     originalRecovery: null, canResubmit: false });
@@ -491,12 +499,20 @@ function schedule(version: number, accountKey: string, failed: boolean) {
   pollTimer = setTimeout(() => { if (owns(version, accountKey)) void query(); },
     inReview ? REVIEW_POLL_MS : failed ? POLL_BACKOFF[Math.min(pollFailures - 1, POLL_BACKOFF.length - 1)]! : POLL_MS);
 }
-async function loadPolicy() {
-  const accountKey = state.accountKey;
+function loadPolicy(): Promise<void> {
+  if (policyRead) return policyRead;
+  const request = readPolicy().finally(() => { if (policyRead === request) policyRead = null; });
+  policyRead = request;
+  return request;
+}
+async function readPolicy() {
+  const accountKey = state.accountKey, binding = useApp().accountBindingEpoch, version = ++policyVersion;
+  state.orderPayUsdtRoute = null;
+  state.orderTopupNetworks = [];
   const [fees, networks] = await Promise.allSettled([api.policy(), deposits.policy()]);
-  if (!state.open || state.accountKey !== accountKey) return;
+  if (!state.open || state.accountKey !== accountKey || account() !== accountKey || useApp().accountBindingEpoch !== binding || version !== policyVersion) return;
   // A failed read leaves the existing quote-led availability behaviour in place.
-  const policy: Partial<Record<ExternalPaymentMethod, boolean>> = fees.status === 'fulfilled' ? fees.value : { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true };
+  const policy: Partial<Record<ExternalPaymentMethod, boolean>> = fees.status === 'fulfilled' ? fees.value.channels : { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true };
   // TRC20 needs both explicit channel configuration and a current open-network policy.
   policy.CREGIS_USDT_TRC20 = policy.CREGIS_USDT_TRC20 === true && networks.status === 'fulfilled'
     && networks.value.some(row => row.network === 'TRC20' && row.enabled);
@@ -509,11 +525,33 @@ async function loadPolicy() {
     if (state.policy?.[method] === false) policy[method] = false;
   }
   state.policy = policy;
+  state.orderPayUsdtRoute = fees.status === 'fulfilled' ? fees.value.orderPayUsdtRoute : null;
+  if (networks.status === 'fulfilled') {
+    state.orderTopupNetworks = networks.value.flatMap(row => !row.enabled || row.network === 'TRC20' ? []
+      : [row.network === 'BEP20' ? 'CREGIS_USDT_BSC' : 'CREGIS_USDT_ERC20']);
+  }
   reconcileChannel();
 }
+const orderTopupMethod = (method: PurchaseMethod) => method === 'CREGIS_USDT_BSC' || method === 'CREGIS_USDT_ERC20';
 function available(method: PurchaseMethod) {
   if (!canSelectNewUsdtNetwork(method)) return false;
+  if (state.kind === 'ORDER_PAY' && method !== 'HDPAY_BANK' && method !== 'WALLET') {
+    return !!state.orderNo && state.orderPayUsdtRoute === 'WALLET_TOPUP' && state.orderTopupNetworks.includes(method);
+  }
   return method === 'WALLET' || !state.policy || state.policy[method] === true;
+}
+function goOrderTopup(method = state.method) {
+  if (state.kind !== 'ORDER_PAY' || !orderTopupMethod(method) || !available(method) || !state.orderNo) return false;
+  closeAndNavigate(orderTopupHref(state.orderNo, method === 'CREGIS_USDT_ERC20' ? 'ERC20' : 'BEP20', state.summary));
+  return true;
+}
+async function redirectOrderUsdt(method: PurchaseMethod, version: number, accountKey: string) {
+  await loadPolicy();
+  if (!owns(version, accountKey)) return;
+  if (!goOrderTopup(method)) {
+    if (context) choose('WALLET');
+    else finish(null);
+  }
 }
 function channelUnavailable(error: unknown, method: PurchaseMethod) {
   return isApiRefusal(error, 503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED')
@@ -528,6 +566,7 @@ function hideChannel(method: ExternalPaymentMethod) {
 function reconcileChannel() {
   if (state.concluded || state.pending || state.originalRecovery || state.step === 'methods' || available(state.method)) return;
   state.notice = ''; reviewedQuote = confirmedQuote = null;
+  if (state.kind === 'ORDER_PAY' && state.step === 'network') return;
   const networks = !canSelectNewUsdtNetwork(state.method)
     ? (['CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'] as const)
     : (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC'] as const);
@@ -549,6 +588,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   clearTimeout(quoteTimer);
   const version = ++requestVersion, accountKey = state.accountKey, expected = context;
   if (method === 'WALLET' || !available(method)) { state.loading = false; return; }
+  if (expected.kind === 'ORDER_PAY' && orderTopupMethod(method)) { state.loading = false; return; }
   state.loading = true;
   try {
     const before = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
@@ -574,6 +614,10 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     if (expected.scopeCurrent?.() === false) { finish(null); return; }
     const cause = asApiError(error);
+    if (expected.kind === 'ORDER_PAY' && orderTopupMethod(method) && isApiRefusal(cause, 409, 'ORDER_USDT_USE_TOPUP')) {
+      await redirectOrderUsdt(method, version, accountKey);
+      return;
+    }
     if (cause.purchaseIntentNo && expected.kind !== 'ORDER_PAY') {
       state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: expected.kind, fingerprint: fingerprint(expected), summary: expected.summary };
       await query();
@@ -613,9 +657,9 @@ function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (state.originalRecovery) return;
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
-  const network = (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC'] as const)
-    .find(available) ?? 'CREGIS_USDT_ERC20';
-  void select(network, 'network');
+  const methods = state.kind === 'ORDER_PAY' ? ['CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'] as const : ['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC'] as const;
+  const network = methods.find(available);
+  if (network || state.kind !== 'ORDER_PAY') void select(network ?? 'CREGIS_USDT_ERC20', 'network');
 }
 function samePaymentTerms(left: PurchaseQuote, right: PurchaseQuote) {
   const amountAllowed = left.kind === 'TRIAL_CONVERT' ? Number(right.totalUsdt) <= Number(left.totalUsdt)
@@ -632,12 +676,24 @@ function proceed() {
 async function query() {
   const pending = state.pending;
   const recovery = state.originalRecovery;
+  const topupIntent = state.orderTopupIntent;
   if (!appReadOnline.value || !(pending || recovery)
       || state.busy || state.reading || paymentReadFinished()) return;
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false;
   state.reading = true;
   try {
+    if (topupIntent && pending) {
+      const intent = await api.snapshot(topupIntent.intentNo);
+      if (!owns(version, accountKey)) return;
+      if (!intent || intent.intentNo !== topupIntent.intentNo || intent.kind !== 'ORDER_PAY' || intent.paymentMethod !== topupIntent.paymentMethod) {
+        throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
+      }
+      state.intent = topupIntent.paymentAllowed ? intent : { ...intent, paymentAllowed: false };
+      state.pending = { ...pending, intentNo: intent.intentNo, paymentMethod: intent.paymentMethod, network: intent.network };
+      if (intent.deadlineAt) state.deadlineAt = Date.parse(intent.deadlineAt);
+      return;
+    }
     if (recovery) {
       let intent = await api.snapshot(recovery.intentNo);
       if (!owns(version, accountKey) || state.concluded) return;
@@ -687,6 +743,11 @@ async function query() {
       state.canResubmit = false;
       accept(result, pending);
     }
+    else if (pending.useOrderTopup) {
+      const method = pending.paymentMethod ?? state.method;
+      releaseUncreatedPayment(pending, accountKey);
+      await redirectOrderUsdt(method, version, accountKey);
+    }
     else if (pending.quotaRefusal) {
       releaseUncreatedPayment(pending, accountKey);
       conclude(pending.quotaRefusal);
@@ -706,7 +767,7 @@ function retryOriginal() {
 async function submitOriginal() {
   const pending = state.pending;
   if (!pending || state.busy || state.reading || state.concluded) return;
-  if (state.originalRecovery || pending.intentNo || pending.lookupOnly || pending.quotaRefusal) return query();
+  if (state.originalRecovery || pending.intentNo || pending.lookupOnly || pending.quotaRefusal || pending.useOrderTopup) return query();
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false, lookup = false;
   Object.assign(state, { busy: true, canResubmit: false, retryNotice: '' });
@@ -719,6 +780,13 @@ async function submitOriginal() {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
+      if (pending.kind === 'ORDER_PAY' && orderTopupMethod(pending.paymentMethod ?? state.method) && isApiRefusal(cause, 409, 'ORDER_USDT_USE_TOPUP')) {
+        const readOnly = { ...pending, useOrderTopup: true };
+        state.pending = readOnly;
+        lookup = true;
+        try { save(readOnly); } catch { /* Keep the original key and read-only recovery in this session. */ }
+        return;
+      }
       if (cause.purchaseIntentNo && pending.kind !== 'ORDER_PAY') {
         state.originalRecovery = { intentNo: cause.purchaseIntentNo, kind: pending.kind, fingerprint: pending.fingerprint, summary: pending.summary };
         Object.assign(state, { retrying: false, retryNotice: '' });
@@ -871,13 +939,15 @@ function choosePaymentMethodAgain() {
 }
 function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload' | 'orderNo' | 'image' | 'deadlineAt'> & { amount?: number | string }, pending: PendingExternal | null) {
   const accountKey = account();
-  stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
+  accountBindingEpoch = useApp().accountBindingEpoch;
+  stopTimers(); requestVersion++; policyVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
+  policyRead = null;
   reviewedQuote = confirmedQuote = null;
   const productNo = value.kind === 'TRIAL_CONVERT' ? value.payload.productNo : value.payload.targetProductNo;
   Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', productNo: typeof productNo === 'string' ? productNo.trim() : '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null,
-    policy: null, notice: '', retryNotice: '', cashier: false,
-    pausedPaymentMethod: null, quote: null, intent: null, pending, originalRecovery: null,
+    policy: null, orderPayUsdtRoute: null, orderTopupNetworks: [], notice: '', retryNotice: '', cashier: false,
+    pausedPaymentMethod: null, quote: null, intent: null, pending, originalRecovery: null, orderTopupIntent: null,
     loading: false, retrying: false, reading: false, busy: false, canResubmit: false, concluded: false });
 }
 export function requestPurchasePayment(value: PurchasePaymentContext): Promise<PurchaseChoice | null> {
@@ -904,6 +974,15 @@ async function resume(pending: PendingExternal, checkout?: CheckoutCapacityResum
   open({ summary: pending.summary, kind: pending.kind, payload, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
   waitForResumedChoice(checkout);
   await query();
+}
+function openOrderTopupIntent(orderNo: string, summary: string, intent: OrderTopupIntent) {
+  if (state.open) return;
+  const payload = { orderNo };
+  const value = { summary, kind: 'ORDER_PAY' as const, payload, orderNo };
+  open(value, { fingerprint: fingerprint({ ...value, amount: '', current: () => true }), kind: value.kind,
+    commandKey: '', paymentQuoteId: '', paymentMethod: intent.paymentMethod, summary, lookupOnly: true });
+  state.orderTopupIntent = intent;
+  void query();
 }
 function waitForResumedChoice(checkout?: CheckoutCapacityResume) {
   // No active purchase callback after reload. A delivered intent returns to the original order.
@@ -935,7 +1014,7 @@ function onOrderPage(orderNo: string) {
 }
 export function usePurchasePayment() {
   return { state, select, choose, proceed, confirm, query, retryOriginal, restart, choosePaymentMethodAgain, loadPolicy, close: () => finish(null),
-    back: () => choose('WALLET'), available,
+    back: () => choose('WALLET'), available, goOrderTopup, openOrderTopupIntent,
     notify: (notice: PurchaseNotice) => { state.notice = notice; },
     openCashier: () => { if (state.intent?.paymentUrl && purchasePaymentTiming(state.intent, Date.now(), state.deadlineAt).canPay) state.cashier = true; },
     closeCashier: () => { state.cashier = false; paused = false; if (!state.busy) void query(); },
