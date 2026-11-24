@@ -53,7 +53,18 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       referralCode,referral:{invitedCount,lifetimeInviterNex},team:{totalMembers,activeMembers},
       availability:empty||!streak.lastCheckInDate?{status:'PARTIAL',...(!streak.lastCheckInDate&&{streak:'UNAVAILABLE'}),...(empty&&{percentile:'UNAVAILABLE'})}:{status:'READY'}};
   }
-  if(p==='/api/config/commission/direct-referral')return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',nexUsdtPrice:empty?null:.128,purchase:{enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays:state.rankCoolingState==='zero'?0:7},deviceEarning:{enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,coolingDays:0}};
+  if(p==='/api/config/commission/direct-referral'){
+    const coolingDays=state.rankCoolingState==='zero'?0:7;
+    const purchase={enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays};
+    const deviceEarning={enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,
+      coolingDays:state.rankPreset==='follow'?0:coolingDays,level2RatePct:state.rankDeviceLevel2State==='on'?2:0};
+    const v2=url.searchParams.get('schemaVersion')==='2';
+    return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',
+      nexUsdtPrice:empty?null:.128,purchase,deviceEarning,
+      ...(v2&&{schemaVersion:2,settlementMode:'SEVEN_V2',purchaseSplitConfigured:!empty,
+        purchaseSplit:{enabled:!empty,usdtSharePct:60},
+        sevenLayerReference:{revision:empty?0:3,baseRatePct:empty?null:10,coolingDays:empty?null:coolingDays,legacyNexPerUsd:0}})};
+  }
   if(p==='/api/app/team/insights/direct-referral') {
     const version=Number(url.searchParams.get('schemaVersion')??1);
     const filter=version===2?url.searchParams.get('kind')??'all':'all';

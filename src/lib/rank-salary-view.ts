@@ -4,23 +4,10 @@
 import { fmt } from "@/i18n/format";
 import { uiLocale } from "@/i18n";
 import { formatHowNumber } from "@/lib/rank-how-content";
+import type { RankSalary } from "@/api/v-rank-api";
+import { businessDayKey } from "@/lib/business-calendar";
 
-export type RankSalaryMonth = {
-  month: string; // "2026-11"
-  rankCode: string; // "V3"
-  amountUsdt: string; // 十进制字符串
-  status: "PENDING" | "CLAIMABLE" | "CLAIMED";
-  claimableFrom: string; // "2026-11-25"
-  expiresAt: string; // 窗口结束（不含）
-  claimNo?: string;
-  claimedAt?: string;
-};
-export type RankSalary = {
-  businessDate: string;
-  months: RankSalaryMonth[];
-  upcoming: { month: string; rankCode: string; amountUsdt: string; claimableFrom: string } | null;
-  nextClaimableFrom: string | null;
-};
+export type { RankSalary, RankSalaryMonth } from "@/api/v-rank-api";
 /** 领取过程（6.3、6.4）：claiming 请求中（D5）；confirming 结果未知、PROCESSING 或回执读不到（D6）；resend 回执 NOT_FOUND（D6，给重新提交入口）。 */
 export type SalaryClaimPhase = "idle" | "claiming" | "confirming" | "resend";
 
@@ -48,6 +35,17 @@ const DAY = 86400000;
 const toUtc = (date: string) => Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10) || 1), 12);
 const shiftDate = (date: string, days: number) => new Date(toUtc(date) + days * DAY).toISOString().slice(0, 10);
 const daysBetween = (from: string, to: string) => Math.round((toUtc(to) - toUtc(from)) / DAY);
+const salaryDay = (instant: string) => businessDayKey("GROWTH_TEAM", Date.parse(instant));
+
+/** The API accepts up to 12 whole and 6 fractional digits. Compare those digits directly. */
+export function compareSalaryAmounts(left: string, right: string): number {
+  const fixed = (amount: string) => {
+    const [whole, fraction = ""] = amount.split(".");
+    return whole.padStart(12, "0") + fraction.padEnd(6, "0");
+  };
+  const a = fixed(left), b = fixed(right);
+  return a === b ? 0 : a > b ? 1 : -1;
+}
 const LOWER = new Set(["vi", "ru", "kk", "uz"]);
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -72,9 +70,18 @@ export function salaryDates(localeCode: string) {
 }
 
 /** 窗口结束（不含）的前一天，即最后可领的那天。 */
-export const lastClaimDay = (expiresAt: string) => shiftDate(expiresAt, -1);
+export const lastClaimDay = (expiresAt: string) => shiftDate(salaryDay(expiresAt), -1);
 
-/** 卡片显示 months[0]（最先到期的，6.1）；另一项只给 D4e 的底注用。 */
+export function displayedSalaryMonth(salary: RankSalary | null | undefined) {
+  return salary?.months.reduce<RankSalary["months"][number] | undefined>((first, month) => {
+    if (!first) return month;
+    if (first.status === "CLAIMED" && month.status !== "CLAIMED") return month;
+    if (month.status === "CLAIMED" && first.status !== "CLAIMED") return first;
+    return Date.parse(month.expiresAt) < Date.parse(first.expiresAt) ? month : first;
+  }, undefined);
+}
+
+/** 卡片优先显示未领且最先到期的月份；另一项只给 D4e 的底注用。 */
 export function salaryView(input: {
   salary: RankSalary | null; // null：读取失败（D9）
   phase: SalaryClaimPhase;
@@ -88,12 +95,13 @@ export function salaryView(input: {
   const num = (value: string) => formatHowNumber(value, input.locale);
   const usdt = (value: string) => hidden ? "••••" : `${num(value)}\u00A0USDT`;
   const say = (template: string, params: Record<string, string | number>) => d.sentence(fmt(template, params));
-  if (salary === null) return { card: { tag: null, caption: "", amount: "—", tip: null, note: "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
-  const item = salary.months[0];
+  if (salary === null) return { card: { tag: null, caption: "", amount: hidden ? "••••" : "—", tip: null, note: "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
+  const item = displayedSalaryMonth(salary);
   if (!item) return { card: null, dock: null, promo: null };
-  const other = salary.months[1];
-  const caption = say(copy.monthRank, { m: d.month(item.month), r: input.mask(item.rankCode) });
-  const lastDay = shiftDate(item.expiresAt, -1);
+  const other = salary.months.find(month => month.month !== item.month && month.status !== "CLAIMED");
+  const caption = hidden ? input.mask("") : say(copy.monthRank, { m: d.month(item.month), r: item.rankCode });
+  const lastDay = lastClaimDay(item.expiresAt);
+  const expiresOn = salaryDay(item.expiresAt);
   const claimBy = say(copy.claimBy, { d: d.day(lastDay) });
   const amount = hidden ? "••••" : num(item.amountUsdt);
   const businessMonth = salary.businessDate.slice(0, 7);
@@ -102,35 +110,40 @@ export function salaryView(input: {
   let promo: ReturnType<typeof salaryView>["promo"] = null;
 
   if (item.status === "PENDING") {
-    const end = item.claimableFrom.slice(0, 7) !== item.month; // 当月最后一天首次到达：只有下月 1 日可领（D1b）
-    card.tag = end ? { label: say(copy.pendingEndTag, { d: d.day(item.claimableFrom) }), tone: "warning" } : { label: copy.pendingTag, tone: "warning" };
+    const opensOn = salaryDay(item.claimableFrom);
+    const end = opensOn.slice(0, 7) !== item.month; // 当月最后一天首次到达：只有下月 1 日可领（D1b）
+    card.tag = end ? { label: say(copy.pendingEndTag, { d: d.day(opensOn) }), tone: "warning" } : { label: copy.pendingTag, tone: "warning" };
     card.tip = end
-      ? { tone: "warning", lines: splitSentences(say(copy.pendingEndNote, { d: d.day(item.claimableFrom), m: d.month(item.month), a: usdt(item.amountUsdt) })) }
+      ? { tone: "warning", lines: splitSentences(say(copy.pendingEndNote, { d: d.day(opensOn), m: d.month(item.month), a: usdt(item.amountUsdt) })) }
       : { tone: "neutral", lines: [say(copy.pendingNote, { a: usdt(item.amountUsdt) })] };
   } else if (item.status === "CLAIMED") {
     card.tag = { label: copy.claimedTag, tone: "neutral" };
-    if (salary.nextClaimableFrom) card.note = say(copy.claimedNext, { d: d.day(salary.nextClaimableFrom), m: d.month(salary.nextClaimableFrom) });
+    if (salary.nextClaimableFrom) {
+      const opensOn = salaryDay(salary.nextClaimableFrom);
+      card.note = say(copy.claimedNext, { d: d.day(opensOn), m: d.month(opensOn) });
+    }
   } else {
     const carry = item.month < businessMonth; // 上月延期项，今天截止（D4e）
-    const up = salary.upcoming && Number(salary.upcoming.amountUsdt) > Number(item.amountUsdt) ? salary.upcoming : null; // 只在明天的金额严格更高时（6.2）
-    const daysLeft = daysBetween(salary.businessDate, item.expiresAt);
+    const up = salary.upcoming?.month === item.month && compareSalaryAmounts(salary.upcoming.amountUsdt, item.amountUsdt) > 0 ? salary.upcoming : null;
+    const daysLeft = daysBetween(salary.businessDate, expiresOn);
     card.note = claimBy;
     if (carry) {
       card.tag = { label: copy.todayTag, tone: "warning" };
       card.tip = { tone: "warning", lines: splitSentences(say(copy.carryNote, { m: d.monthWord(item.month) })) };
-      if (other) card.note = say(copy.nextMonthNote, { pm: d.month(item.month), m: d.month(other.month), a: usdt(other.amountUsdt), d: d.day(shiftDate(other.expiresAt, -1)) });
+      if (other) card.note = say(copy.nextMonthNote, { pm: d.month(item.month), m: d.month(other.month), a: usdt(other.amountUsdt), d: d.day(lastClaimDay(other.expiresAt)) });
       dock = { kind: "claim", label: hidden ? copy.claimSalary : say(copy.claimMonthBtn, { m: d.month(item.month), a: usdt(item.amountUsdt) }), month: item.month, amountUsdt: item.amountUsdt };
     } else if (up) {
-      const end = up.claimableFrom.slice(0, 7) !== item.month; // 月末最后一天晋升：下月 1 日（D4c）
+      const opensOn = salaryDay(up.claimableFrom);
+      const end = opensOn.slice(0, 7) !== item.month; // 月末最后一天晋升：下月 1 日（D4c）
       card.tag = { label: copy.claimable, tone: "brand" };
       card.tip = { tone: "warning", lines: splitSentences(end
-        ? say(copy.promoEndNote, { d: d.day(up.claimableFrom), r: input.mask(up.rankCode), m: d.month(item.month), a: usdt(up.amountUsdt), b: usdt(item.amountUsdt) })
+        ? say(copy.promoEndNote, { d: d.day(opensOn), r: input.mask(up.rankCode), m: d.month(item.month), a: usdt(up.amountUsdt), b: usdt(item.amountUsdt) })
         : say(copy.promoNote, { a: usdt(up.amountUsdt), b: usdt(item.amountUsdt) })) };
-      dock = { kind: "tray", copy: end ? say(copy.trayWaitEnd, { m: d.month(item.month), a: usdt(up.amountUsdt), d: d.day(up.claimableFrom) }) : say(copy.trayWait, { a: usdt(up.amountUsdt) }), button: say(copy.trayNow, { b: usdt(item.amountUsdt) }) };
-      promo = { end, month: d.month(item.month), date: d.day(up.claimableFrom), now: usdt(item.amountUsdt), next: usdt(up.amountUsdt), rank: up.rankCode };
+      dock = { kind: "tray", copy: end ? say(copy.trayWaitEnd, { m: d.month(item.month), a: usdt(up.amountUsdt), d: d.day(opensOn) }) : say(copy.trayWait, { a: usdt(up.amountUsdt) }), button: say(copy.trayNow, { b: usdt(item.amountUsdt) }) };
+      promo = { end, month: d.month(item.month), date: d.day(opensOn), now: usdt(item.amountUsdt), next: usdt(up.amountUsdt), rank: up.rankCode };
     } else if (daysLeft <= 3) {
       card.tag = { label: say(copy.expiringTag, { n: daysLeft }), tone: "warning" };
-      card.tip = { tone: "warning", lines: [say(copy.expiringNote, { d: d.day(item.expiresAt) })] };
+      card.tip = { tone: "warning", lines: [say(copy.expiringNote, { d: d.day(expiresOn) })] };
     } else {
       card.tag = { label: copy.claimable, tone: "brand" };
       card.tip = { tone: "neutral", lines: splitSentences(copy.claimRules) };

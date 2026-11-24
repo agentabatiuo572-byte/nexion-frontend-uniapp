@@ -17,7 +17,7 @@
           <HowSection anchor="friend-purchase" :title="rankCopy.f1Sec" :lead="rankCopy.f1Lead" list>
             <HowItem :n="1" :title="rankCopy.f1I1T" :body="rankCopy.f1I1D" />
             <HowItem :n="2" :title="rankCopy.f1I2T" :body="rankCopy.f1I2D" />
-            <HowItem :n="3" :title="creditsAtOnce(purchaseCoolingDays) ? rankCopy.f1NowT : rankCopy.f1I3T" :body="creditsAtOnce(purchaseCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1I3D, { d: purchaseCoolingDays })" />
+            <HowItem :n="3" :title="creditsAtOnce(purchaseDays) ? rankCopy.f1NowT : rankCopy.f1I3T" :body="creditsAtOnce(purchaseDays) ? rankCopy.f1NowD : fmt(rankCopy.f1I3D, { d: purchaseDays ?? '—' })" />
           </HowSection>
 
           <HowSection anchor="purchase-rates" :title="rankCopy.f1RatesT" :lead="myRankCode ? fmt(rankCopy.f1RatesLead, { r: myRankCode }) : undefined">
@@ -30,7 +30,7 @@
           <HowSection anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
             <HowItem :n="1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
             <HowItem :n="2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
-            <HowItem :n="3" :title="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowT : rankCopy.f1DevI3T" :body="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays })" />
+            <HowItem :n="3" :title="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowT : rankCopy.f1DevI3T" :body="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays ?? '—' })" />
           </HowSection>
         </template>
 
@@ -120,10 +120,11 @@ import { createDirectReferralApi } from "@/api/direct-referral-api";
 import { buildCommissionsHowContent, createCommissionsHowResource, type CommissionsHowState } from "@/lib/commissions-how-content";
 import { navBack } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
+import { useDataVisibility } from "@/store/data-visibility";
 import { deviceLevel2On, deviceLevel2RatePct } from "@/lib/device-earning-level2";
-import { creditsAtOnce } from "@/lib/reward-cooling";
+import { creditsAtOnce, purchaseCoolingDays } from "@/lib/reward-cooling";
 import { fmt, dateLocale } from "@/i18n/format";
-import { formatHowNumber } from "@/lib/rank-how-content";
+import { formatHowNumber, formatRankPurchaseRate } from "@/lib/rank-how-content";
 import { serverLanguage } from "@/i18n";
 
 const t = useT();
@@ -151,7 +152,9 @@ function makeResource() {
       howContentApi.published("team-commissions-how", serverLanguage(language)),
       directReferralApi.policy(), commissionGuideApi.read(), vRankApi.ladder(),
     ]);
-    return { document, directPolicy, guide, ranks: ladder.ranks };
+    const needsRates = ladder.ranks.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined);
+    const rates = needsRates ? await commissionGuideApi.rates().catch(() => undefined) : undefined;
+    return { document, directPolicy, guide, ranks: ladder.ranks, rates };
   },
   apply: next => {
     if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
@@ -184,21 +187,22 @@ const directory = computed(() => [
 ]);
 const rankCopy = computed(() => t.value.myRank);
 const vrank = useVRank();
+const visibility = useDataVisibility();
 const policy = computed(() => state.value.snapshot?.directPolicy ?? null);
 const pct = (value: number | null) => value === null || !Number.isFinite(value) ? "—" : `${formatHowNumber(value, dateLocale())}%`;
-const myRankCode = computed(() => vrank.remoteReady ? `V${vrank.myRank}` : "");
-const purchaseCoolingDays = computed(() => {
-  const p = policy.value;
-  const days = !p ? null : p.settlementMode === "SEVEN_V2" ? p.sevenLayerReference?.coolingDays ?? null : p.purchase.coolingDays;
-  return days === null ? "—" : days;
-});
-// LOGIC SEAMS (DESIGN 5): v-ranks purchaseL1Rate / purchaseL2Rate and direct-referral deviceEarning.level2RatePct are
-// not parsed yet. L1 uses directBonus (equal to purchaseL1Rate by contract); L2 shows "—". The device lead and
-// first item follow the level-2 switch in lib/device-earning-level2.ts.
-const rankPurchaseL2Pct = (_v: number): number | null => null;
+const myRankCode = computed(() => vrank.remoteReady ? visibility.mask(`V${vrank.myRank}`) : "");
+const purchaseDays = computed(() => purchaseCoolingDays(policy.value));
 const deviceL2On = computed(() => deviceLevel2On(policy.value));
-const rateRows = computed(() => (state.value.snapshot?.ranks ?? []).filter(rank => rank.visible).sort((a, b) => a.v - b.v)
-  .map(rank => ({ v: rank.v, l1: pct(Math.round(rank.directBonus * 1000) / 10), l2: pct(rankPurchaseL2Pct(rank.v)), mine: vrank.remoteReady && rank.v === vrank.myRank })));
+const rateRows = computed(() => {
+  const snapshot = state.value.snapshot;
+  const legacy = snapshot?.rates?.unilevelUsdt;
+  return (snapshot?.ranks ?? []).filter(rank => rank.visible).sort((a, b) => a.v - b.v).map(rank => ({
+    v: rank.v,
+    l1: formatRankPurchaseRate(rank.purchaseL1Rate ?? legacy?.[1], dateLocale()),
+    l2: formatRankPurchaseRate(rank.purchaseL2Rate ?? legacy?.[2], dateLocale()),
+    mine: !visibility.hidden && vrank.remoteReady && rank.v === vrank.myRank,
+  }));
+});
 const deviceRateTitle = computed(() => {
   const rule = policy.value?.deviceEarning;
   const a = pct(rule ? rule.totalRatePct : null);
@@ -208,7 +212,7 @@ const deviceSplit = computed(() => {
   const share = policy.value?.deviceEarning.usdtSharePct;
   return share === undefined ? { u: "—", n: "—" } : { u: formatHowNumber(share, dateLocale()), n: formatHowNumber(100 - share, dateLocale()) };
 });
-const deviceCoolingDays = computed(() => policy.value?.deviceEarning.coolingDays ?? "—");
+const deviceCoolingDays = computed(() => policy.value?.deviceEarning.coolingDays ?? null);
 const statuses = computed(() => ([["cooling", "warning"], ["unlocked", "success"], ["withdrawn", "neutral"]] as const).map(([id, tone]) => ({ ...s(id), tone })));
 // The demo template folds its scope sentence and the order base into one body; split them so
 // only the amount takes figure styling. A plain published sentence stays a note.

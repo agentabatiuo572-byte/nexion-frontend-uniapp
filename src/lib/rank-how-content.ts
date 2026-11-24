@@ -116,8 +116,14 @@ export function formatHowNumber(value: number | string, locale: string) {
   const fixed = rounded.join("");
   const vietnamese = locale.split("-")[0] === "vi";
   const decimals = fixed.slice(-6).replace(/0+$/, "");
-  return (negative ? "-" : "") + fixed.slice(0, -6).replace(/\B(?=(\d{3})+(?!\d))/g, vietnamese ? "." : ",")
+  return (negative ? "-" : "") + fixed.slice(0, -6).replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, vietnamese ? "." : ",")
     + (decimals ? `${vietnamese ? "," : "."}${decimals}` : "");
+}
+
+export function formatRankPurchaseRate(rate: string | number | undefined, locale: string): string {
+  if (rate === undefined) return "—";
+  const [digits, exponent = "0"] = String(rate).split("e");
+  return `${formatHowNumber(`${digits}e${Number(exponent) + 2}`, locale)}%`;
 }
 
 export function buildRankHowContent(policy: RankHowPolicy | null, ranks: CanonicalVRankRow[], capabilities: CommissionCapabilities, locale: string, labels: RankHowConditionLabels) {

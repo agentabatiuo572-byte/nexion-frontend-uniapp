@@ -53,7 +53,7 @@ export interface DirectReferralPolicy {
   effectiveAt: string | null;
   nexUsdtPrice: number | null;
   purchase: DirectReferralRule;
-  deviceEarning: DirectReferralRule;
+  deviceEarning: DirectReferralRule & { level2RatePct?: number };
 }
 function invalid(): never { throw new ApiError({ kind: "protocol", message: "DIRECT_REFERRAL_POLICY_INVALID" }); }
 function row(value: unknown): Record<string, unknown> {
@@ -142,7 +142,9 @@ export function createDirectReferralApi(client: ApiClient, mode: ApiEnvironment 
       const policyVersion = number(source.policyVersion);
       const effectiveAt = source.effectiveAt;
       if (!Number.isSafeInteger(policyVersion) || (effectiveAt !== null && (typeof effectiveAt !== "string" || !Number.isFinite(Date.parse(effectiveAt))))) return invalid();
-      const deviceEarning = rule(source.deviceEarning);
+      const rawDevice = row(source.deviceEarning);
+      const deviceEarning = { ...rule(rawDevice),
+        ...(rawDevice.level2RatePct === undefined ? {} : { level2RatePct: number(rawDevice.level2RatePct, 0, 100) }) };
       // v2 does not reinterpret the legacy independent purchase rate as an L1 budget.
       const v2 = source.schemaVersion === 2;
       if (source.schemaVersion !== undefined && !v2) return invalid();

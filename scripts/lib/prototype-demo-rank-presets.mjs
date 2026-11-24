@@ -20,9 +20,9 @@ export const rankPresetOptions=[['follow','跟随原演示数据'],...RANK_RULES
 export const rankSalaryOptions=[['present','有月薪（V2 起本月可领，C）'],['pending','月中首次到达，明天起可领（D1）'],['pending-end','月末最后一天首次到达，仅下月 1 日可领（D1b）'],['expiring','还剩 3 天（D2）'],['claimed','本月已领（D3）'],['promo','晋升当天，明天金额更高（D4）'],['promo-end','月末最后一天晋升（D4c）'],['carry','1 日：上月今天截止＋本月（D4e）'],['empty','有 salary，months 为空（不显示卡）'],['absent','没有 salary 字段（月薪接口未上线）'],['unavailable','月薪读取失败（salary null，D9）']];
 export const rankReviewOptions=[['required','V8 需审核（reviewRequired）'],['off','V8 不带审核标记']];
 export const rankPriorOptions=[['met','前序条件全部满足'],['one-short','前序差 1 人（本级 V{n}+ 人数少 1，H5）'],['next-met','下一级数值条件全部达到（V7 审核中，H7）']];
-export const rankCoolingOptions=[['normal','好友购买冷却 7 天'],['zero','好友购买不冷却（0 天）']];
-// rankCoolingState zero: the direct-referral purchase cooling is 0 days, for the credited-right-away wording.
-export const rankPresetDefaults={rankPreset:'follow',rankSalaryState:'present',rankReviewState:'required',rankPriorState:'met',rankCoolingState:'normal'};
+export const rankCoolingOptions=[['normal','奖励冷却 7 天'],['zero','奖励不冷却（0 天）']];
+export const rankDeviceLevel2Options=[['off','设备收益二级为 0%'],['on','设备收益二级为 2%']];
+export const rankPresetDefaults={rankPreset:'follow',rankSalaryState:'present',rankReviewState:'required',rankPriorState:'met',rankCoolingState:'normal',rankDeviceLevel2State:'off'};
 
 const toward=(current,target)=>current+Math.floor((target-current)*.6);
 
@@ -45,10 +45,16 @@ export function rankPresetProgress(v,prior='met'){
 export function rankPresetSalary(v,businessDate,state='present'){
   const [year,month]=businessDate.split('-').map(Number);
   const iso=(y,m,d)=>new Date(Date.UTC(y,m-1,d)).toISOString().slice(0,10);
+  const atStart=date=>new Date(Date.parse(date+'T00:00:00+07:00')).toISOString();
   const ym=businessDate.slice(0,7),first=iso(year,month,1),nextFirst=iso(year,month+1,1),lastDay=iso(year,month+1,0),mid=iso(year,month,15),midNext=iso(year,month,16);
   const amount=RANK_RULES[v][8],prior=v>0?RANK_RULES[v-1][8]:'0';
   const item=(status,extra={})=>({month:ym,rankCode:'V'+v,amountUsdt:amount,status,claimableFrom:first,expiresAt:nextFirst,...extra});
-  const salary=(date,months,upcoming=null,nextClaimableFrom=null)=>({businessDate:date,months,upcoming,nextClaimableFrom});
+  const salary=(date,months,upcoming=null,nextClaimableFrom=null)=>({
+    businessDate:date,
+    months:months.map(row=>({...row,claimableFrom:atStart(row.claimableFrom),expiresAt:atStart(row.expiresAt)})),
+    upcoming:upcoming&&{...upcoming,claimableFrom:atStart(upcoming.claimableFrom)},
+    nextClaimableFrom:nextClaimableFrom&&atStart(nextClaimableFrom),
+  });
   if(!(Number(amount)>0)||state==='empty')return salary(businessDate,[]);
   const promo=Number(prior)>0;
   if(state==='pending'||(state==='promo'&&!promo))return salary(mid,[item('PENDING',{claimableFrom:midNext})]);

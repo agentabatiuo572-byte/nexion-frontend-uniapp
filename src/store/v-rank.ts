@@ -4,7 +4,7 @@ import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTab
 import { defineStore } from "pinia";
 import { onScopeDispose, ref, watch } from "vue";
 import { apiRuntimeConfig, remoteApiEnabled, vRankApi } from "@/api/runtime";
-import type { CanonicalVRankLadder, CanonicalVRankState } from "@/api/v-rank-api";
+import type { CanonicalVRankLadder, CanonicalVRankState, RankSalary } from "@/api/v-rank-api";
 import { asApiError } from "@/api/errors";
 import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -40,6 +40,10 @@ export interface VRankDef {
   cnTitle: string;            // 中文头衔
   conditions: VRankConditions;
   directBonus: number;        // L1 直推奖比例
+  purchaseL1Rate?: string;
+  purchaseL2Rate?: string;
+  monthlySalaryUsdt?: string;
+  reviewRequired?: boolean;
   unilevelDepth: number;      // unilevel 覆盖深度 (1=只有L1, 7=L1-L7)
   peerBonus: number;          // 平级奖比例
   leadershipVotes: number;    // 领导池票数(单源,与 leadership-pool.ts V_VOTES 一致)
@@ -163,6 +167,8 @@ function canonicalRank(row: Awaited<ReturnType<typeof vRankApi.ladder>>["ranks"]
   return {
     v: row.v as VRank, title: row.title, cnTitle: row.cnTitle, conditions,
     directBonus: row.directBonus, unilevelDepth: row.unilevelDepth, peerBonus: row.peerBonus,
+    purchaseL1Rate: row.purchaseL1Rate, purchaseL2Rate: row.purchaseL2Rate,
+    monthlySalaryUsdt: row.monthlySalaryUsdt, reviewRequired: row.reviewRequired,
     leadershipVotes: row.leadershipVotes, cultivationBonus: row.cultivationBonus, rewards: row.rewards,
   };
 }
@@ -206,6 +212,7 @@ export const useVRank = defineStore("vRank", () => {
   const directRefs = ref(init.directRefs);
   const vDownlineCounts = ref<Record<VRank, number>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
+  const salary = ref<RankSalary | null>();
   // 服务端能力位:某类收益今天是否真的会派发(与佣金指南同源)。等级阶梯里的
   // peerBonus 是「配置比例」,不是「已生效权益」—— 渲染时必须靠这个位区分(#79)。
   // 本地(mock)模式没有服务端能力位,按「会派发」处理,与 V_RANKS 的展示一致。
@@ -227,6 +234,7 @@ export const useVRank = defineStore("vRank", () => {
     directRefs.value = 0;
     vDownlineCounts.value = {};
     ladder.value = [];
+    salary.value = undefined;
     capabilities.value = { peer: false, genesis: false };
     prizeName.value = "";
     remoteReady.value = false;
@@ -311,11 +319,13 @@ export const useVRank = defineStore("vRank", () => {
       vDownlineCounts.value = Object.fromEntries(
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Record<VRank, number>;
+      salary.value = remoteCurrent.salary;
       remoteReady.value = true;
       remoteError.value = null; retryAt = 0; remoteRateLimited.value = false; remoteTransientFailure.value = false;
       const progress = teamRankProgress({ myRank: myRank.value, selfComputePoints: selfComputePoints.value, directRefs: directRefs.value, teamComputePoints: teamComputePoints.value, vDownlineCounts: vDownlineCounts.value }, ladder.value);
-      saveTabSnapshot(snapshotWrite, "rank", { rank: myRank.value, next: progress.next?.v ?? null, missing: progress.missing.length,
-        bars: progress.rows.filter(row => row.tier === progress.next?.v).map(row => ({ key: row.key, kind: row.kind, vLevel: row.vLevel ?? null, percent: row.status === "unknown" ? null : row.required === 0 ? 100 : Math.min(100, Math.round(row.current! / row.required * 100)) })) }, null);
+      saveTabSnapshot(snapshotWrite, "rank", { rank: myRank.value, next: progress.next?.v ?? null, missing: progress.unmetCount,
+        ...(progress.reviewPending ? { reviewPending: true } : {}),
+        bars: progress.rows.filter(row => row.tier === progress.next?.v).map(row => ({ key: row.key, kind: row.kind, vLevel: row.vLevel ?? null, percent: row.status === "unknown" ? null : Math.min(100, Math.round(row.current! / row.required * 100)) })) }, null);
     };
     let strictFailure = false, failureRecorded = false, pairGeneration = 0;
     const isLocalSessionPending = (cause: ReturnType<typeof asApiError>) => cause.kind === "auth"
@@ -401,7 +411,7 @@ export const useVRank = defineStore("vRank", () => {
 
   return {
     selfComputePoints, teamComputePoints,
-    myRank, directRefs, vDownlineCounts, ladder, prizeName,
+    myRank, directRefs, vDownlineCounts, ladder, prizeName, salary,
     capabilities,
     remoteReady, remoteError, remoteRateLimited, remoteTransientFailure,
     setMyRank, setProgress, bindAccount, refreshCanonicalVRank, ensureCanonicalVRank, invalidateReadOwner,
@@ -507,7 +517,7 @@ function rankConditionChecks(state: VRankData, c: VRankConditions) {
 
 export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRankGapInfo {
   const current = ladder[state.myRank] ?? EMPTY_V_RANK;
-  const next = ladder[state.myRank + 1];
+  const { next, rows, unmet, unmetCount } = teamRankProgress(state, ladder);
   if (!next) {
     return {
       next: null,
@@ -519,11 +529,19 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
     };
   }
 
-  const { gaps, progressPct, progressKnown } = rankConditionChecks(state, next.conditions);
-
-  const primaryGap = gaps.length
-    ? gaps.reduce((worst, g) => (g.progress < worst.progress ? g : worst))
-    : null;
+  const ratio = (row: typeof rows[number]) => row.status === "unknown" ? 0 : Math.min(1, row.current! / row.required);
+  const nextRows = rows.filter(row => row.tier === next.v);
+  const progressPct = nextRows.length ? nextRows.reduce((sum, row) => sum + ratio(row), 0) / nextRows.length : 1;
+  const progressKnown = !unmet.some(row => row.status === "unknown");
+  const hardest = unmet.reduce<typeof rows[number] | undefined>((worst, row) => !worst || ratio(row) < ratio(worst) ? row : worst, undefined);
+  const gap = hardest?.gap;
+  let primaryGap: PrimaryGap | null = null;
+  if (gap && hardest) {
+    const progress = ratio(hardest);
+    if (gap.kind === "vDownlines") primaryGap = { kind: gap.kind, vLevel: gap.vLevel, remaining: gap.n, progress };
+    else if (gap.kind === "directRefs") primaryGap = { kind: gap.kind, remaining: gap.n, progress };
+    else primaryGap = { kind: gap.kind, remaining: gap.amount, progress };
+  }
 
   const unlocks: PerkUnlock[] = [];
   if (current.peerBonus === 0 && next.peerBonus > 0) {
@@ -549,5 +567,5 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
     .sort((a, b) => PERK_WEIGHT[b.kind] - PERK_WEIGHT[a.kind])
     .slice(0, TOP_UNLOCKS_CAP);
 
-  return { next, progressPct, progressKnown, primaryGap, unmetCount: gaps.length, topUnlocks };
+  return { next, progressPct, progressKnown, primaryGap, unmetCount, topUnlocks };
 }

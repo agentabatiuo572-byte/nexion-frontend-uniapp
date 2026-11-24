@@ -28,7 +28,7 @@
                 <view v-for="item in textConditions" :key="item.key" class="rank-also__row"><view class="rank-also__lead" aria-hidden="true"><NxIcon :name="item.icon" :size="16" /></view><text class="rank-also__name">{{ item.name }}</text></view>
               </template>
               <!-- H7 审核中：卡底文字链接「联系客服 ›」（03 §3.1 P-67），不加流程、不承诺时间。 -->
-              <view v-if="reviewPending" class="nx-card-footer rank-cond-card__footer"><view class="nx-card-link" role="link" tabindex="0" @click="contactSupport" @keydown.enter.prevent="contactSupport" @keydown.space.prevent="contactSupport"><text>{{ t.tradein.recoveryContactSupport }}</text><NxIcon class="nx-card-link__chevron" name="chevron-right" :size="16" /></view></view>
+              <view v-if="reviewPending && !visibility.hidden" class="nx-card-footer rank-cond-card__footer"><view class="nx-card-link" role="link" tabindex="0" @click="contactSupport" @keydown.enter.prevent="contactSupport" @keydown.space.prevent="contactSupport"><text>{{ t.tradein.recoveryContactSupport }}</text><NxIcon class="nx-card-link__chevron" name="chevron-right" :size="16" /></view></view>
             </RankConditions>
           </view>
           <!-- 月薪卡（DESIGN 第 6 节，画板 C、D）：salary 字段存在且 months 不为空时显示；salary 为 null（读取失败）时金额「—」（D9）；没有 salary 字段时按 CA 构图。 -->
@@ -165,7 +165,7 @@ import { CHASSIS_QUERY_SCOPE, useLoopsInView } from "@/composables/use-loops-in-
 import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { lastClaimDay, salaryDates, salaryView, type RankSalary, type SalaryClaimPhase } from "@/lib/rank-salary-view";
+import { compareSalaryAmounts, displayedSalaryMonth, lastClaimDay, salaryDates, salaryView, type SalaryClaimPhase } from "@/lib/rank-salary-view";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useRankFxMotion } from "@/composables/use-rank-fx-guard";
@@ -187,7 +187,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useVRank, type VRank, type VRankDef } from "@/store/v-rank";
 import { rankLabel } from "@/lib/v-rank-copy";
-import { formatHowNumber } from "@/lib/rank-how-content";
+import { formatHowNumber, formatRankPurchaseRate } from "@/lib/rank-how-content";
 import { useLocaleStore } from "@/store/locale";
 import { useAuth } from "@/store/auth";
 import { useTheme } from "@/store/theme";
@@ -209,19 +209,7 @@ const myRank = computed(() => vState.myRank);
 const rankDefs = computed(() => vState.ladder);
 const rankAvailable = computed(() => !remoteApiEnabled || vState.remoteReady);
 
-// ── 逻辑项接入点（DESIGN 第 5、6、12.0 节）──────────────────────────────────────────────
-// 接口读取（src/api/v-rank-api.ts rankRow、rank state → src/store/v-rank.ts）还没带下面这些字段，界面先按「没有」显示，
-// 逻辑项把字段接进 VRankDef／store 后替换这里即可，各区块只看自己依赖的那一项：
-// - purchaseL2Rate：「升到 Vn 后」的「好友的好友购买奖励」行（旧 → 新，不同才列）。
-// - monthlySalaryUsdt：「每月月薪」行；只在 salaryPresent 时列（当前为 0 时只写新值）。
-// - v8ReviewRequired：/api/config/v-ranks 的 V8 带 reviewRequired；V7 数值条件（含前序）全满足时焦点卡标签换成「审核中」。
-const rankPending = reactive<{ purchaseL2Rate: (rank: VRankDef) => number | undefined; monthlySalaryUsdt: (rank: VRankDef) => number | undefined; v8ReviewRequired: boolean }>({
-  purchaseL2Rate: () => undefined,
-  monthlySalaryUsdt: () => undefined,
-  v8ReviewRequired: false,
-});
-
-// The API supplies exact L1 rank buckets; the engine counts members at or above
+// The API supplies exact rank buckets; the engine counts members at or above
 // each required rank. This projection is only for the observed progress display.
 const previewData = computed(() => ({
   myRank: vState.myRank,
@@ -297,20 +285,19 @@ const conditionRows = computed(() => prog.value.rows
   }));
 const nextConditions = computed(() => conditionRows.value.filter(row => row.tier === prog.value.next?.v));
 const priorConditions = computed(() => conditionRows.value.filter(row => row.tier !== prog.value.next?.v));
-// 「还差 N 项」：下一级未满足的条件数＋前序未满足的条件数，三处共用一个口径（2.2）。统一计数函数由逻辑项接（src/lib/team-rank-progress.ts），这里先用现有的 missing。
-const priorMissing = computed(() => prog.value.missing.filter(row => row.tier !== prog.value.next?.v).length);
-const reviewPending = computed(() => rankPending.v8ReviewRequired && myRank.value === 7 && prog.value.next?.v === 8
-  && prog.value.missing.length === 0 && prog.value.unknown.length === 0);
+const priorMissing = computed(() => prog.value.unmet.filter(row => row.tier !== prog.value.next?.v).length);
+const reviewPending = computed(() => prog.value.reviewPending);
 const gapTag = computed(() => {
-  if (reviewPending.value) return t.value.myRank.reviewTag;
-  if (prog.value.unknown.length || !prog.value.missing.length) return '';
-  return fmt(t.value.myRank.leftTag, { n: visibility.mask(prog.value.missing.length) });
+  if (reviewPending.value) return visibility.mask(t.value.myRank.reviewTag);
+  if (!prog.value.unmetCount) return '';
+  return fmt(t.value.myRank.leftTag, { n: visibility.mask(prog.value.unmetCount) });
 });
 const countsHint = computed(() => prog.value.rows.some(row => row.tier === prog.value.next?.v && (row.kind === 'directRefs' || row.kind === 'vDownlines'))
   ? [t.value.myRank.countsNote] : []);
 
 // ── 「升到 Vn 后」：只列升级后会变的项（DESIGN 第 5 节；7.2 箭头用目标等级点缀色）──
-const percentText = (rate: number) => `${formatHowNumber(Math.round(rate * 10000) / 100, locale.code)}%`;
+const percentText = (rate: string | number) => formatRankPurchaseRate(rate, locale.code);
+const l1Rate = (rank: VRankDef) => rank.purchaseL1Rate ?? String(rank.directBonus);
 const uvtReward = (rank: VRankDef) => rank.rewards.reduce((sum, reward) => !isEntitlementVRankReward(reward) && reward.type === 'UVT' && Number.isFinite(reward.amount) ? sum + reward.amount : sum, 0);
 type Gain = { key: string; icon: NxIconName; tone: 'sky' | 'purple' | 'amber'; name: string; old?: string; value: string; unit?: string; hint?: string[] };
 const gains = computed<Gain[]>(() => {
@@ -318,46 +305,43 @@ const gains = computed<Gain[]>(() => {
   const current = rankDefs.value.find(rank => rank.v === myRank.value);
   if (!next || !current) return [];
   const rows: Gain[] = [];
-  if (current.directBonus !== next.directBonus) rows.push({ key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, old: percentText(current.directBonus), value: percentText(next.directBonus) });
-  const l2From = rankPending.purchaseL2Rate(current), l2To = rankPending.purchaseL2Rate(next);
+  if (l1Rate(current) !== l1Rate(next)) rows.push({ key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, old: percentText(l1Rate(current)), value: percentText(l1Rate(next)) });
+  const l2From = current.purchaseL2Rate, l2To = next.purchaseL2Rate;
   if (l2To !== undefined && l2To !== l2From) rows.push({ key: 'l2', icon: 'rank-rate-l2', tone: 'sky', name: t.value.myRank.gainF2, old: l2From === undefined ? undefined : percentText(l2From), value: percentText(l2To) });
   const uvt = uvtReward(next);
   if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: `+${formatHowNumber(uvt, locale.code)}`, unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: nextName.value })] });
-  const salaryFrom = rankPending.monthlySalaryUsdt(current) ?? 0, salaryTo = rankPending.monthlySalaryUsdt(next) ?? 0;
-  if (salaryPending.salary !== undefined && salaryTo > 0 && salaryTo !== salaryFrom) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, old: salaryFrom > 0 ? formatHowNumber(salaryFrom, locale.code) : undefined, value: formatHowNumber(salaryTo, locale.code), unit: 'USDT' });
+  const salaryFrom = current.monthlySalaryUsdt ?? '0', salaryTo = next.monthlySalaryUsdt;
+  if (vState.salary !== undefined && salaryTo && compareSalaryAmounts(salaryTo, '0') > 0 && compareSalaryAmounts(salaryTo, salaryFrom) !== 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, old: compareSalaryAmounts(salaryFrom, '0') > 0 ? formatHowNumber(salaryFrom, locale.code) : undefined, value: formatHowNumber(salaryTo, locale.code), unit: 'USDT' });
   return rows;
 });
 const gainArrowInk = computed(() => prog.value.next ? rankTierVars(prog.value.next.v, theme.resolved, visibility.hidden)['--tier-ink'] : '');
-// 一级的权益行（详情卡、「你现在的权益」）：好友购买、好友的好友购买（逻辑项接 purchaseL2Rate）、晋级奖励、每月月薪（有 salary 字段且大于 0）。
+// 一级的权益行（详情卡、「你现在的权益」）。
 function benefitRows(rank: VRankDef): Gain[] {
-  const rows: Gain[] = [{ key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, value: percentText(rank.directBonus) }];
-  const l2 = rankPending.purchaseL2Rate(rank);
+  const rows: Gain[] = [{ key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, value: percentText(l1Rate(rank)) }];
+  const l2 = rank.purchaseL2Rate;
   if (l2 !== undefined) rows.push({ key: 'l2', icon: 'rank-rate-l2', tone: 'sky', name: t.value.myRank.gainF2, value: percentText(l2) });
   const uvt = uvtReward(rank);
   if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: formatHowNumber(uvt, locale.code), unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: `V${rank.v}` })] });
-  const salaryUsdt = rankPending.monthlySalaryUsdt(rank) ?? 0;
-  if (salaryPending.salary !== undefined && salaryUsdt > 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, value: formatHowNumber(salaryUsdt, locale.code), unit: 'USDT' });
+  const salaryUsdt = rank.monthlySalaryUsdt;
+  if (vState.salary !== undefined && salaryUsdt && compareSalaryAmounts(salaryUsdt, '0') > 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, value: formatHowNumber(salaryUsdt, locale.code), unit: 'USDT' });
   return rows;
 }
 
 // ── 月薪卡与领取（DESIGN 2.1、第 6 节，画板 C、D 组）· 逻辑项接入点 ──────────────────────────────
-// salary：/api/team/rank 的 salary（6.1）。undefined＝响应里没有这个字段（CA：不显示月薪卡和月薪行）；
-//   null＝读取失败（salary null＋salaryUnavailable，D9：金额「—」，按 useAutoRecovery 自动重读，不提示）。
 // phase：领取过程（idle／claiming D5／confirming D6／resend D6 NOT_FOUND）。
 // submit(month, amountUsdt)：点「领取」或确认框主按钮后发 POST /api/team/rank/salary/claim（新幂等键，6.3）；
 // resend()：回执 NOT_FOUND 后用户点底部「重新提交领取」，同一幂等键、同一月份、原金额重发（6.4，用户发起）。
 // 请求或回执有结果后调 showSalaryResult（下方），由它切换卡片、底部、确认框和 toast；成功、已领、不可领后逻辑项重读 /api/team/rank。
 // 离开页面再回来、本地还留着未结的键时，逻辑项先把 phase 设为 confirming 再查回执。
-const salaryPending = reactive<{ salary: RankSalary | null | undefined; phase: SalaryClaimPhase; submit: (month: string, amountUsdt: string) => void; resend: () => void }>({
-  salary: undefined,
+const salaryPending = reactive<{ phase: SalaryClaimPhase; submit: (month: string, amountUsdt: string) => void; resend: () => void }>({
   phase: "idle",
   submit: () => {},
   resend: () => {},
 });
 const salaryCopy = computed(() => t.value.myRank as unknown as Record<string, string>);
-const salary = computed(() => salaryPending.salary === undefined
+const salary = computed(() => vState.salary === undefined
   ? { card: null, dock: null, promo: null }
-  : salaryView({ salary: salaryPending.salary, phase: salaryPending.phase, hidden: visibility.hidden, locale: locale.code, copy: salaryCopy.value, mask: visibility.mask }));
+  : salaryView({ salary: vState.salary, phase: salaryPending.phase, hidden: visibility.hidden, locale: locale.code, copy: salaryCopy.value, mask: visibility.mask }));
 const salaryDock = computed(() => salary.value.dock);
 const hasDock = computed(() => !!salaryDock.value || !!dockAction.value);
 // 卡片主体只在领取过程里交叉淡入（10.1 领取），首屏随页面入场。
@@ -393,7 +377,7 @@ function claimSalary() {
   if (dock?.kind === "claim") submitSalary(dock.month, dock.amountUsdt);
 }
 function confirmSalaryDialog() {
-  const which = salaryDialog.value, item = salaryPending.salary?.months[0], change = amountChange.value;
+  const which = salaryDialog.value, item = displayedSalaryMonth(vState.salary), change = amountChange.value;
   salaryDialog.value = null;
   if (which === "promo" && item) submitSalary(item.month, item.amountUsdt);
   if (which === "amount" && change) submitSalary(change.month, change.amountUsdt);
@@ -448,10 +432,10 @@ const speedUpRows = computed(() => {
 
 onMounted(() => {
   // Local rank data is not used in remote mode; the ladder and member progress arrive together.
-  if (remoteApiEnabled) void vState.refreshCanonicalVRank();
+  if (remoteApiEnabled) void vState.ensureCanonicalVRank();
 });
 onShow(() => {
-  if (remoteApiEnabled) void vState.refreshCanonicalVRank();
+  if (remoteApiEnabled) void vState.ensureCanonicalVRank();
 });
 
 function retryRank() {
@@ -543,7 +527,7 @@ watch(() => [expandedRank.value, rankDefs.value.length, locale.code, visibility.
 
 // ── 等级详情卡（E、E2；Ch 只遮当前值和状态标签）──
 const VRANK_TEXT_ICONS = { letter: 'rank-letter', review: 'rank-review' } as const;
-const textConditionsFor = (v: number) => v === 8 && rankPending.v8ReviewRequired
+const textConditionsFor = (v: number) => v === 8 && rankDefs.value.find(rank => rank.v === 8)?.reviewRequired === true
   ? [{ key: 'letter', icon: VRANK_TEXT_ICONS.letter as NxIconName, name: fmt(t.value.myRank.condLetter, { r: 'V8' }) }, { key: 'review', icon: VRANK_TEXT_ICONS.review as NxIconName, name: t.value.myRank.condReview }]
   : [];
 const textConditions = computed(() => prog.value.next ? textConditionsFor(prog.value.next.v) : []);
@@ -600,7 +584,11 @@ const conversations = useConversations();
 async function contactSupport() {
   go(await advisorChatRoute(conversations));
 }
-useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry: () => vState.refreshCanonicalVRank() });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && (!!vState.remoteError || vState.salary === null),
+  retry: () => vState.refreshCanonicalVRank(),
+  repeatMs: 30_000,
+});
 </script>
 
 <style scoped>

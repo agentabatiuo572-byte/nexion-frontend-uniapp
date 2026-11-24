@@ -257,12 +257,14 @@ const rankProgress = computed(() => teamRankProgress({
 const rankGapText = computed(() => {
   if (!rankReadable.value) return designCopy.value.benefitsAndRewards;
   const snapshot = !vrank.remoteReady ? readTabSnapshot("rank") : null;
+  const underReview = (rank: number) => `${fmt(t.value.myRank.g2Toward, { r: `V${rank}` })} · ${t.value.myRank.reviewTag}`;
   if (snapshot) return snapshot.next === null ? t.value.home.rankTopTier
+    : snapshot.reviewPending ? underReview(snapshot.next)
     : fmt(t.value.myRank.gapTag, { r: `V${snapshot.next}`, n: snapshot.missing });
   const next = rankProgress.value.next;
   if (!next) return t.value.home.rankTopTier;
-  // DESIGN 2.2: next-rank plus earlier-rank unmet numeric conditions. LOGIC SEAM: the shared count (and V7→V8 「审核中」) belongs to the logic item.
-  return fmt(t.value.myRank.gapTag, { r: `V${next.v}`, n: rankProgress.value.missing.length });
+  return rankProgress.value.reviewPending ? underReview(next.v)
+    : fmt(t.value.myRank.gapTag, { r: `V${next.v}`, n: rankProgress.value.unmetCount });
 });
 // One short bar per condition of the next rank; unknown progress keeps an empty track.
 const rankBars = computed(() => {
@@ -279,7 +281,7 @@ const rankBars = computed(() => {
   return rankProgress.value.rows.filter(row => row.tier === next.v).sort((a, b) => order[a.kind] - order[b.kind]).map(row => ({
     key: row.key,
     label: label(row.kind, row.vLevel),
-    percent: row.status === "unknown" ? null : row.required === 0 ? 100 : Math.min(100, Math.round(row.current! / row.required * 100)),
+    percent: row.status === "unknown" ? null : Math.min(100, Math.round(row.current! / row.required * 100)),
   }));
 });
 const { elRef: rankBarsEl, inView: rankBarsInView } = useScrollGrowProgress();
@@ -311,7 +313,7 @@ const ledger = computed(() => {
     if (e.status === "unlocked") uU += e.amountUSDT;
     if (e.status === "cooling") cU += e.amountUSDT;
     tU += e.amountUSDT;
-    if (e.kind === "direct_purchase" || e.kind === "direct_device_earning" || (e.kind === "unilevel" && e.layer === 1)) dU += e.amountUSDT;
+    if (e.layer === 1 && (e.kind === "direct_purchase" || e.kind === "direct_device_earning" || e.kind === "unilevel")) dU += e.amountUSDT;
     else eU += e.amountUSDT;
   }
   if (remoteApiEnabled) {

@@ -77,9 +77,10 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { useVRank } from "@/store/v-rank";
+import { useCommission } from "@/store/commission";
 import { teamRuleGuideCopy } from "@/components/team/team-rule-guide-copy";
 import { deviceLevel2On, deviceLevel2RatePct } from "@/lib/device-earning-level2";
-import { creditsAtOnce } from "@/lib/reward-cooling";
+import { creditsAtOnce, purchaseCoolingDays } from "@/lib/reward-cooling";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
@@ -107,7 +108,7 @@ import { createScopedReadCoalescer } from "@/lib/binary-read-coalescer";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { navTo } from "@/lib/route";
-import { formatHowNumber } from "@/lib/rank-how-content";
+import { formatHowNumber, formatRankPurchaseRate } from "@/lib/rank-how-content";
 
 const t = useT(), app = useApp(), auth = useAuth();
 const locale = useLocaleStore();
@@ -117,6 +118,7 @@ const auditCopy = computed(() => networkReauditCopy(locale.code));
 const showSettlementDetails = ref(false);
 const rankCopy = computed(() => t.value.myRank);
 const vrank = useVRank();
+const commission = useCommission();
 const readEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
 let environmentInvalidated = false;
 watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
@@ -191,7 +193,11 @@ watch(period, () => { invalidate(); retryRemote(); }, { flush: 'sync' });
 watch(filter, () => { invalidate(false); retryRemote(); }, { flush: 'sync' });
 watch(() => [locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { invalidate(); retryRemote(); }, { flush: 'sync' });
 const unsubscribeRuntimeRevision = subscribeRuntimeRevision(() => { remoteRequest++; readCoalescer = createScopedReadCoalescer(); querySnapshotAt = null; retryRemote(); });
-onMounted(retryRemote); onShow(() => { querySnapshotAt = null; retryRemote(); });
+onMounted(retryRemote); onShow(() => {
+  querySnapshotAt = null;
+  retryRemote();
+  if (remoteSessionReady.value) void vrank.ensureCanonicalVRank();
+});
 onUnmounted(() => { mounted = false; invalidate(); unsubscribeRuntimeRevision(); });
 const totals = computed(() => {
   const snapshot = remoteSnapshot.value;
@@ -203,21 +209,16 @@ const totals = computed(() => {
   return snapshot.split.deviceEarning;
 });
 const remoteTotalUSDT = computed(() => totals.value.amountUSDT), remoteTotalNEX = computed(() => totals.value.amountNEX), remoteGroupCount = computed(() => totals.value.count);
-// LOGIC SEAMS (DESIGN 5): the per-rank purchase rates (v-ranks purchaseL1Rate / purchaseL2Rate) and the device
-// level-2 rate (direct-referral deviceEarning.level2RatePct) are not parsed yet. Until the logic item fills them,
-// the L1 rate falls back to the rank's directBonus (equal to purchaseL1Rate by contract), the L2 rate shows "—",
-// and the device wording follows the level-2 switch (lib/device-earning-level2.ts).
-const rankPurchaseL2Pct = computed<number | null>(() => null);
+const currentRank = computed(() => vrank.remoteReady ? vrank.ladder[vrank.myRank] : undefined);
+watch(currentRank, rank => {
+  if (remoteApiEnabled && rank && (rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined)) void commission.ensureCanonicalConfig();
+}, { immediate: true });
 const deviceL2On = computed(() => deviceLevel2On(policy.value));
 const guideCopy = computed(() => teamRuleGuideCopy(locale.code));
 const pctText = (value: number | null | undefined) => value === null || value === undefined || !Number.isFinite(value) ? "—" : `${formatHowNumber(value, dateLocale())}%`;
-const purchaseCoolingDays = computed(() => {
-  const p = policy.value;
-  if (!p) return null;
-  return p.settlementMode === "SEVEN_V2" ? p.sevenLayerReference?.coolingDays ?? null : p.purchase.coolingDays;
-});
+const purchaseDays = computed(() => purchaseCoolingDays(policy.value));
 const detailsSummary = computed(() => {
-  const days = filter.value === "device_earning" ? policy.value?.deviceEarning.coolingDays ?? null : purchaseCoolingDays.value;
+  const days = filter.value === "device_earning" ? policy.value?.deviceEarning.coolingDays ?? null : purchaseDays.value;
   const device = filter.value === "device_earning", copy = rankCopy.value;
   if (days === null) return copy.f2Details;
   if (creditsAtOnce(days)) return device ? copy.f2DevDetailsSumNow : copy.f2DetailsSumNow;
@@ -228,8 +229,14 @@ const ruleDescription = computed(() => {
   if (!p) return "";
   if (filter.value !== "device_earning") {
     if (p.settlementMode === "SEVEN_V2" && (p.purchaseSplitConfigured === false || p.sevenLayerReference?.baseRatePct === null || p.sevenLayerReference?.coolingDays === null)) return t.value.directReferral.purchaseUnconfigured;
-    const current = vrank.remoteReady ? vrank.ladder[vrank.myRank] : undefined;
-    return fmt(creditsAtOnce(purchaseCoolingDays.value) ? rankCopy.value.f2RuleNow : rankCopy.value.f2Rule, { r: current ? `V${current.v}` : "—", a: pctText(current ? current.directBonus * 100 : null), b: pctText(rankPurchaseL2Pct.value), d: purchaseCoolingDays.value ?? "—" });
+    const current = currentRank.value;
+    const legacy = commission.config?.unilevelUsdt;
+    return fmt(creditsAtOnce(purchaseDays.value) ? rankCopy.value.f2RuleNow : rankCopy.value.f2Rule, {
+      r: visibility.mask(current ? `V${current.v}` : "—"),
+      a: formatRankPurchaseRate(current?.purchaseL1Rate ?? legacy?.[1], dateLocale()),
+      b: formatRankPurchaseRate(current?.purchaseL2Rate ?? legacy?.[2], dateLocale()),
+      d: purchaseDays.value ?? "—",
+    });
   }
   const device = p.deviceEarning;
   if (!device.enabled) return t.value.directReferral.disabled;

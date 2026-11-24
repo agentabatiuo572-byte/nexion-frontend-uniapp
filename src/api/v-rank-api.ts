@@ -24,6 +24,10 @@ export interface CanonicalVRankRow {
   requiredDownlineRank?: number;
   requiredDownlineCount?: number;
   directBonus: number;
+  purchaseL1Rate?: string;
+  purchaseL2Rate?: string;
+  monthlySalaryUsdt?: string;
+  reviewRequired?: boolean;
   unilevelDepth: number;
   peerBonus: number;
   leadershipVotes: number;
@@ -68,12 +72,34 @@ export interface CanonicalVRankLadder {
   ranks: CanonicalVRankRow[];
 }
 
+export interface RankSalaryAmount {
+  month: string;
+  rankCode: string;
+  amountUsdt: string;
+  claimableFrom: string;
+}
+
+export interface RankSalaryMonth extends RankSalaryAmount {
+  status: "PENDING" | "CLAIMABLE" | "CLAIMED";
+  expiresAt: string;
+  claimNo?: string | null;
+  claimedAt?: string | null;
+}
+
+export interface RankSalary {
+  businessDate: string;
+  months: RankSalaryMonth[];
+  upcoming: RankSalaryAmount | null;
+  nextClaimableFrom: string | null;
+}
+
 export interface CanonicalVRankState {
   source: string;
   serverCanonical: true;
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
   runId: string;
   rankCode: string;
+  salary?: RankSalary | null;
   progress: {
     selfComputePoints: number;
     directRefs: number;
@@ -134,6 +160,53 @@ function optionalText(value: unknown): string | undefined {
   return text(value);
 }
 
+function salaryAmount(value: unknown): string {
+  if (typeof value !== "string" || !/^[0-9]{1,12}(\.[0-9]{1,6})?$/.test(value)) return invalid();
+  return value;
+}
+
+// Jackson emits BigDecimal purchase rates as JSON numbers. Keep their decimal
+// representation from the boundary onward, including an explicit zero rate.
+function optionalPurchaseRate(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  const rate = typeof value === "number" ? String(value) : value;
+  if (typeof rate !== "string" || !/^(0(\.\d+)?|1(\.0+)?)$/.test(rate)) return invalid();
+  return rate.replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+}
+
+function salaryInstant(value: unknown): string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T.*Z$/.test(value) || !Number.isFinite(Date.parse(value))) return invalid();
+  return value;
+}
+
+function salaryEntry(source: Record<string, unknown>): RankSalaryAmount {
+  const { month, rankCode } = source;
+  if (typeof month !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)
+    || typeof rankCode !== "string" || !/^V[0-8]$/.test(rankCode)) return invalid();
+  return { month, rankCode, amountUsdt: salaryAmount(source.amountUsdt), claimableFrom: salaryInstant(source.claimableFrom) };
+}
+
+function readSalary(value: unknown): RankSalary {
+  const source = record(value);
+  const { businessDate } = source;
+  if (typeof businessDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate) || !Array.isArray(source.months)) return invalid();
+  const day = new Date(businessDate + "T00:00:00Z");
+  if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== businessDate) return invalid();
+  const months = source.months.map((value): RankSalaryMonth => {
+    const row = record(value);
+    const { status } = row;
+    if (status !== "PENDING" && status !== "CLAIMABLE" && status !== "CLAIMED") return invalid();
+    const claimNo = row.claimNo == null && status !== "CLAIMED" ? row.claimNo : text(row.claimNo);
+    const claimedAt = row.claimedAt == null && status !== "CLAIMED" ? row.claimedAt : salaryInstant(row.claimedAt);
+    return { ...salaryEntry(row), status, expiresAt: salaryInstant(row.expiresAt), claimNo, claimedAt };
+  });
+  return {
+    businessDate, months,
+    upcoming: source.upcoming === null ? null : salaryEntry(record(source.upcoming)),
+    nextClaimableFrom: source.nextClaimableFrom === null ? null : salaryInstant(source.nextClaimableFrom),
+  };
+}
+
 function reward(value: unknown): CanonicalVRankReward {
   const source = record(value);
   const type = text(source.type).toUpperCase();
@@ -156,6 +229,7 @@ function rankRow(value: unknown): CanonicalVRankRow {
     ? undefined
     : integer(String(source.requiredDownlineRank).replace(/^V/i, ""));
   if (!Array.isArray(source.rewards)) return invalid();
+  if (source.reviewRequired !== undefined && typeof source.reviewRequired !== "boolean") return invalid();
   return {
     v,
     title: text(source.title),
@@ -166,6 +240,10 @@ function rankRow(value: unknown): CanonicalVRankRow {
     requiredDownlineRank: requiredRank,
     requiredDownlineCount: optionalNumber(source.requiredDownlineCount),
     directBonus: number(source.directBonus),
+    purchaseL1Rate: optionalPurchaseRate(source.purchaseL1Rate),
+    purchaseL2Rate: optionalPurchaseRate(source.purchaseL2Rate),
+    monthlySalaryUsdt: source.monthlySalaryUsdt === undefined ? undefined : salaryAmount(source.monthlySalaryUsdt),
+    reviewRequired: source.reviewRequired,
     unilevelDepth: integer(source.unilevelDepth),
     peerBonus: number(source.peerBonus),
     leadershipVotes: integer(source.leadershipVotes),
@@ -218,10 +296,12 @@ function current(value: unknown, mode: ApiEnvironment): CanonicalVRankState {
   }
   const rankCode = text(source.rankCode).toUpperCase();
   if (!/^V[0-8]$/.test(rankCode)) return invalid();
+  if (source.salary === null ? source.salaryUnavailable !== true : source.salaryUnavailable === true) return invalid();
   return {
     source: text(source.source),
     ...proof,
     rankCode,
+    ...(source.salary === undefined ? {} : { salary: source.salary === null ? null : readSalary(source.salary) }),
     progress: {
       selfComputePoints: computePoints(progress.selfComputePoints),
       directRefs: integer(progress.directRefs),
