@@ -44,8 +44,8 @@
         <text class="lg-sub" role="status" aria-live="polite">{{ loading ? t.login.signingIn : loginResultUnknown ? t.login.unknownAttempt : t.login.verificationPending }}</text>
         <text v-if="retryContext?.context.phone" class="lg-phone lg-recovery__account">{{ retryContext?.context.countryCode }} {{ retryContext?.context.phone }}</text>
         <text v-if="retryNeedsPassword || retryNeedsCode" class="lg-sub">{{ t.login.retryOriginalHint }}</text>
-        <input class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
-        <input class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
+        <input id="lg-retry-password" class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" :cursor-spacing="keyboardSpacing.retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
+        <input id="lg-retry-code" class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" :cursor-spacing="keyboardSpacing.retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
         <view class="lg-cta lg-recovery__action" :class="canRetryOriginal || loading ? 'lg-cta--on' : ''" role="button" :tabindex="canRetryOriginal ? 0 : -1" :aria-disabled="!canRetryOriginal" data-system-chrome-primary @click="retryOriginalLogin()" @keydown.enter.prevent="retryOriginalLogin()" @keydown.space.prevent="retryOriginalLogin()"><text class="lg-cta__t" :class="canRetryOriginal || loading ? 'lg-cta__t--on' : ''">{{ loading ? t.login.signingIn : t.login.retryOriginal }}</text></view>
         <view v-if="!loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="cancelLoginVerification" @keydown.enter.prevent="cancelLoginVerification" @keydown.space.prevent="cancelLoginVerification"><text>{{ t.ui.cancel }}</text></view>
       </view>
@@ -57,12 +57,12 @@
               <text class="lg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :placeholder="t.login.phonePlaceholder" :aria-label="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @blur="phoneTouched = true" @confirm="onPhoneConfirm" />
+            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :cursor-spacing="keyboardSpacing.phone" :placeholder="t.login.phonePlaceholder" :aria-label="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @blur="phoneTouched = true" @confirm="onPhoneConfirm" />
           </view>
           <text id="login-phone-format" data-testid="auth-phone-hint" class="lg-phone-hint" :class="{ 'lg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <template v-if="mode === 'password'">
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
-              <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" :focus="passwordFocused" confirm-type="done" @input="onPwd" @blur="passwordFocused = false" @confirm="onPrimary" />
+              <input id="lg-password" class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" :cursor-spacing="keyboardSpacing.password" :focus="passwordFocused" confirm-type="done" @input="onPwd" @blur="passwordFocused = false" @confirm="onPrimary" />
               <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
                 <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -77,7 +77,7 @@
         <!-- Step 2: OTP -->
         <view v-else-if="step === 2" class="lg-col">
           <view class="lg-otp">
-            <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :aria-label="fmt(t.login.otpDigitLabel, { n: i + 1 })" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onPrimary()" />
+            <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :cursor-spacing="keyboardSpacing.otp" :aria-label="fmt(t.login.otpDigitLabel, { n: i + 1 })" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onPrimary()" />
           </view>
           <view v-if="developmentOtpEnabled" class="lg-development-otp" data-testid="development-otp-code" role="status">
             <text class="lg-development-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
@@ -92,14 +92,14 @@
         <!-- Step 3: new password (reset) -->
         <view v-else class="lg-col">
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': newPassword && !newPwdOk }">
-            <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :aria-label="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" confirm-type="next" @input="onNewPwd" @confirm="focusResetConfirmation" />
+            <input id="lg-new-password" class="lg-field--flex" :cursor-spacing="keyboardSpacing.newPassword" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :aria-label="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" confirm-type="next" @input="onNewPwd" @confirm="focusResetConfirmation" />
             <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
               <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
           </view>
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': confirmPwd && newPassword !== confirmPwd }">
-            <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.confirmPasswordPlaceholder" :aria-label="t.login.confirmPasswordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="confirmPwd" :focus="confirmPasswordFocused" confirm-type="done" @input="onConfirm" @blur="confirmPasswordFocused = false" @confirm="onPrimary" />
+            <input id="lg-confirm-password" class="lg-field--flex" :cursor-spacing="keyboardSpacing.confirmPassword" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.confirmPasswordPlaceholder" :aria-label="t.login.confirmPasswordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="confirmPwd" :focus="confirmPasswordFocused" confirm-type="done" @input="onConfirm" @blur="confirmPasswordFocused = false" @confirm="onPrimary" />
           </view>
         </view>
       </view>
@@ -137,6 +137,9 @@
         <text v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister">{{ t.login.signUp }}</text></text>
       </view>
     </view>
+    <!-- #ifdef H5 -->
+    <view v-if="keyboardInset" :style="{ height: keyboardInset + 'px' }" />
+    <!-- #endif -->
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
     <!-- i18n-en-ok: Server CAPTCHA protocol scene enum, sent only to backend verification and never rendered. -->
@@ -158,6 +161,7 @@ import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
+import { useKeyboardPrimaryReach } from "@/composables/use-keyboard-primary-reach";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -398,6 +402,21 @@ const developmentOtpEnabled = computed(() =>
   apiRuntimeConfig.environment === "dev"
   && /^\d{6}$/.test(developmentOtpCode)
 );
+// Seeds: primary button bottom − input bottom + 12, measured on each step's default layout (same at 360 and 390).
+const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
+  root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta",
+  inputs: {
+    phone: { selector: ".lg-phone__in", seed: 243 },
+    password: { selector: "#lg-password", seed: 149 },
+    otp: { selector: ".lg-otp__in", seed: 120 },
+    newPassword: { selector: "#lg-new-password", seed: 161 },
+    confirmPassword: { selector: "#lg-confirm-password", seed: 93 },
+    retryPassword: { selector: "#lg-retry-password", seed: 172 },
+    retryCode: { selector: "#lg-retry-code", seed: 104 },
+  },
+  layout: () => [step.value, mode.value, loginRecoveryPending.value, retryNeedsPassword.value, retryNeedsCode.value,
+    error.value, phoneFormatMessage.value, developmentOtpEnabled.value],
+});
 const primaryText = computed(() => {
   if (step.value === 1) return mode.value === "password" ? t.value.login.signIn : t.value.login.sendCode;
   if (step.value === 2) return t.value.login.verify;
