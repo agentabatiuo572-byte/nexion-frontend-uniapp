@@ -367,7 +367,7 @@ export interface ChassisConfiguration {
 }
 
 export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = {}, notifyScrollBottom?: (key: string) => void,
-  notifyScrolling?: (value: boolean) => void, notifyRefresh?: (visit: string) => void, notifyLayout?: () => void) {
+  notifyScrolling?: (value: boolean) => void, notifyRefresh?: (visit: string) => void) {
   const scroll = root.querySelector<HTMLElement>(".nx-content")!;
   const indicator = scroll.querySelector<HTMLElement>(".nx-refresher")!;
   const icon = indicator.querySelector<HTMLElement>(".nx-refresher-icon")!;
@@ -572,12 +572,6 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   resize?.observe(scroll);
   const body = scroll.querySelector<HTMLElement>(".nx-page-enter");
   if (body) resize?.observe(body);
-  // Content that changes size (cards arriving, a row going away) is reported once it settles, for the floating support
-  // shortcut to re-check that it covers nothing.
-  let layoutQuiet: ReturnType<typeof setTimeout> | undefined;
-  const contentResize = !notifyLayout || typeof ResizeObserver === "undefined" ? undefined
-    : new ResizeObserver(() => { clearTimeout(layoutQuiet); layoutQuiet = setTimeout(notifyLayout, 120); });
-  if (body) contentResize?.observe(body);
   if (initial.memoryKey && getScrollPos(initial.memoryKey) !== undefined) restore();
   onScroll(); paintPull();
   const documentVisibility = () => {
@@ -624,7 +618,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     scroll.removeEventListener("touchend", touchEnd); scroll.removeEventListener("touchcancel", touchCancel);
     for (const event of cancelEvents) scroll.removeEventListener(event, cancelRestore);
     scroll.removeEventListener("uvel-scroll-to-top", requestTop); root.removeEventListener("keydown", keyScroll);
-    observer.disconnect(); resize?.disconnect(); contentResize?.disconnect(); clearTimeout(layoutQuiet);
+    observer.disconnect(); resize?.disconnect();
     document.removeEventListener("visibilitychange", documentVisibility); window.removeEventListener("blur", interrupted);
   } };
 }
@@ -665,5 +659,4 @@ export const chassisView = viewAdapter<ChassisConfiguration>((host, value, insta
   mountChassis(host, value,
     key => instance.$ownerInstance?.callMethod("onNativeScrollLoadMore", key),
     scrolling => instance.$ownerInstance?.callMethod("onChassisScrolling", scrolling),
-    visit => instance.$ownerInstance?.callMethod("onChassisRefresh", visit),
-    () => instance.$ownerInstance?.callMethod("onChassisLayout", 0)));
+    visit => instance.$ownerInstance?.callMethod("onChassisRefresh", visit)));

@@ -3,7 +3,7 @@
   <NxSection v-if="offerCount + pendingCount > 0" :title="copy.benefits" class="home-benefits" data-home-section="benefits">
     <view class="hb-stack" :class="{ 'hb-stack--enter': entering }">
       <view v-if="offerCount" class="hb-row" :class="{ 'hb-row--pair': offerCount === 2 }">
-        <view v-if="voucherOffer" class="hb-card nx-keep-clear hb-glow-warn vb-card" :class="offerCount === 2 ? 'hb-half' : 'hb-wv'" :style="{ '--hb-i': 0 }" role="button" tabindex="0" :aria-label="fmt(copy.benefitVoucherAria, { v: offerFace.label })" @click="openVoucher" @keydown.enter.prevent="openVoucher" @keydown.space.prevent="openVoucher">
+        <view v-if="voucherOffer" class="hb-card hb-glow-warn vb-card" :class="offerCount === 2 ? 'hb-half' : 'hb-wv'" :style="{ '--hb-i': 0 }" role="button" tabindex="0" :aria-label="fmt(copy.benefitVoucherAria, { v: offerFace.label })" @click="openVoucher" @keydown.enter.prevent="openVoucher" @keydown.space.prevent="openVoucher">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art" :src="COUPON_ART" mode="aspectFit" aria-hidden="true" /></view>
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text v-if="offerFace.money" class="hb-amount__minor">$</text>{{ offerFace.text }}</text><text class="hb-half__sub">{{ copy.benefitVoucherSub }}</text></view>
@@ -17,7 +17,7 @@
             <view class="hb-wv__stub"><text class="hb-pill nx-frosted-button">{{ t.trial.homeClaimShort }}</text></view>
           </template>
         </view>
-        <view v-if="trialOffer" class="hb-card nx-keep-clear hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="confirmedOffer?.status ?? status" role="button" :tabindex="trialOfferEnabled || showCapacityManagement ? 0 : -1" :aria-disabled="trialOfferEnabled || showCapacityManagement ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
+        <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="confirmedOffer?.status ?? status" role="button" :tabindex="trialOfferEnabled || showCapacityManagement ? 0 : -1" :aria-disabled="trialOfferEnabled || showCapacityManagement ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art hb-half__art--device" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
@@ -46,13 +46,13 @@
         </view>
       </view>
       <view v-if="pendingCount" class="hb-row" :class="{ 'hb-row--pair': pendingCount === 2 }">
-        <view v-if="voucherPending" class="hb-card nx-keep-clear hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popVoucher }" :style="{ '--hb-i': offerCount }" role="button" tabindex="0" :aria-label="`${pendingName} · ${copy.benefitVoucherReady} · ${copy.benefitVoucherUse}`" @click="useVoucherNow" @keydown.enter.prevent="useVoucherNow" @keydown.space.prevent="useVoucherNow">
+        <view v-if="voucherPending" class="hb-card hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popVoucher }" :style="{ '--hb-i': offerCount }" role="button" tabindex="0" :aria-label="`${pendingName} · ${copy.benefitVoucherReady} · ${copy.benefitVoucherUse}`" @click="useVoucherNow" @keydown.enter.prevent="useVoucherNow" @keydown.space.prevent="useVoucherNow">
           <view class="hb-icon" aria-hidden="true"><image class="hb-icon__img" :src="COUPON_ART" mode="aspectFit" /></view>
           <view class="hb-pend__text"><text class="hb-pend__title">{{ pendingName }}</text><text class="hb-pend__sub"><text class="hb-warn">{{ copy.benefitVoucherReady }}</text><template v-if="pendingCount === 1">{{ copy.benefitVoucherAuto }}</template></text></view>
           <text v-if="pendingCount === 1" class="hb-act nx-after-arrow">{{ copy.benefitVoucherUse }}</text>
           <view v-else class="hb-chev" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
         </view>
-        <view v-if="trialPending" class="hb-card nx-keep-clear hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popTrial }" :style="{ '--hb-i': offerCount + (voucherPending ? 1 : 0) }" :data-trial-state="status" role="button" tabindex="0" :aria-label="trialPendingAria" @click="openTrialDetails" @keydown.enter.prevent="openTrialDetails" @keydown.space.prevent="openTrialDetails">
+        <view v-if="trialPending" class="hb-card hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popTrial }" :style="{ '--hb-i': offerCount + (voucherPending ? 1 : 0) }" :data-trial-state="status" role="button" tabindex="0" :aria-label="trialPendingAria" @click="openTrialDetails" @keydown.enter.prevent="openTrialDetails" @keydown.space.prevent="openTrialDetails">
           <view class="hb-icon" :class="{ 'hb-icon--dim': status === 'ended' }" aria-hidden="true"><image class="hb-icon__img" :src="trialArt" mode="aspectFit" /><view v-if="online" class="hb-online home-benefits__online" /></view>
           <view v-if="pendingCount === 2" class="hb-pend__text">
             <text class="hb-pend__title">{{ status === 'active' ? copy.benefitTrialActive : status === 'grace' ? `${lifecycleCopy.cardGraceTitle} ${visibility.mask(creditText.replace(/\.00$/, ''))}` : lifecycleCopy.endedTitle }}</text>

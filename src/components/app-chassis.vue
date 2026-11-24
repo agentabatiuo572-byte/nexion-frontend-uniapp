@@ -130,7 +130,7 @@
     <!-- Bottom chrome: floating pill TabBar (tab routes) + home indicator (always) -->
     <view class="nx-tabbar-wrap">
       <!-- Anchor to the actual navigation height, including its safe area. -->
-      <SupportBubble v-if="showFloatingSupport" :dimmed="scrolling" :lift="supportLift" :visit="`${activeTab}:${pageVisit}:${tabRevision}`" :layout="layoutRevision" />
+      <SupportBubble v-if="showFloatingSupport" :dimmed="scrolling" :lift="supportLift" />
       <GlassSegments v-if="isTabRoute" :key="navigationReset" class="nx-tabbar-pill" variant="navigation" selection="flat" :options="navigationOptions" :model-value="activeTab" :from-value="navigationReset ? undefined : navigationFrom" :navigation-on-arrival="tabHost ? false : undefined" @select="selectNavigation">
         <template #option="{ option: tab, selected }">
           <view class="nx-tab__icon" aria-hidden="true">
@@ -235,7 +235,6 @@ defineOptions({ inheritAttrs: false, methods: {
   onChassisScrolling(this: { $: { exposed: { receiveChassisScrolling(value: boolean): void } | null } }, value: boolean) { this.$.exposed?.receiveChassisScrolling(value); },
   onChassisRefresh(this: { $: { exposed: { receiveChassisRefresh(visit: string): void } | null } }, visit: string) { this.$.exposed?.receiveChassisRefresh(visit); },
   onNativeScrollLoadMore(this: { $: { exposed: { receiveNativeScrollLoadMore(key: string): void } | null } }, key: string) { this.$.exposed?.receiveNativeScrollLoadMore(key); },
-  onChassisLayout(this: { $: { exposed: { receiveChassisLayout(): void } | null } }) { this.$.exposed?.receiveChassisLayout(); },
 } });
 const taskCenterReceipt = ref<OpenTaskReceipt>(null);
 provide(taskCenterReceiptKey, taskCenterReceipt);
@@ -632,17 +631,10 @@ function receiveNativeScrollLoadMore(key: string) {
 function receiveChassisScrolling(value: boolean) {
   scrolling.value = value;
 }
-// The page content changed size (renderjs observes it): the floating support shortcut re-checks its spot.
-const layoutRevision = ref(0);
-function receiveChassisLayout() {
-  // A kept page that is hidden re-measures on its next show (visit), not on every size change while hidden.
-  if (!pageVisible.value || !props.hostVisible) return;
-  layoutRevision.value += 1;
-}
 function receiveChassisRefresh(visit: string) {
   if (canPullRefresh.value && visit === chromeConfiguration.value.visit && !refresh.isRefreshing) void refresh.refresh();
 }
-defineExpose({ receiveNativeScrollLoadMore, receiveChassisScrolling, receiveChassisRefresh, receiveChassisLayout });
+defineExpose({ receiveNativeScrollLoadMore, receiveChassisScrolling, receiveChassisRefresh });
 declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void };
 const navigationOptions = computed(() => tabs.value.map(tab => ({ ...tab, value: tab.key })));
 const navigationFrom = consumeGlassNavigation(activeTab.value);
