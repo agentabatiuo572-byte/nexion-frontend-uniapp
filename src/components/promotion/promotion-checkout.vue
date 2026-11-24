@@ -883,7 +883,8 @@ async function readCheckout(foreground=false):Promise<boolean>{
     if(readCurrent(generation)){
       const missingRoutedOrder = routedOrderToRead && !session.record.order;
       if(missingRoutedOrder)error.value=p.value.error;
-      recoveryReadFailed.value=!missingRoutedOrder||isTransientReadFailure(cause);
+      recoveryReadFailed.value=!missingRoutedOrder||isTransientReadFailure(cause)
+        ||(cause instanceof ApiError&&cause.kind==='protocol');
     }
     return false;
   }

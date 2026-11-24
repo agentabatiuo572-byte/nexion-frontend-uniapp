@@ -3205,15 +3205,20 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
 
 async function refreshKnownCheckoutOrder(scope: CheckoutRouteScope, orderNo: string) {
   const current = () => isCurrentCheckoutRoute(scope) && createdCheckoutOrder.value?.orderNo === orderNo;
-  let order;
+  let lookup;
   try {
-    order = await orders.ensureRemoteOrder(orderNo);
+    lookup = await orders.lookupRemoteOrder(orderNo);
   } catch (cause) {
     // A failed read leaves the last known order in effect.
     if (current()) failedKnownOrderNo.value = isTransientReadFailure(cause) ? orderNo : null;
     return;
   }
   if (!current()) return;
+  if (!lookup?.isCurrent()) {
+    failedKnownOrderNo.value = orderNo;
+    return;
+  }
+  const { order } = lookup;
   failedKnownOrderNo.value = null;
   originalCheckoutClosed.value = !order ? 'missing'
     : order.status === 'expired' || order.status === 'cancelled' ? order.status : null;
