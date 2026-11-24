@@ -49,7 +49,7 @@
       </view>
       <template v-else>
 
-      <BundleHero class="bundle-rise" :count="products.length" :tiers="activeDiscountTiers" :items="heroTiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :daily="products.length ? `$${cumulativeDailyEarnText}${t.store.cardPerDaySuffix}` : ''" :addable="suggestions.length > 0" :add-disabled="limitReached" @remove="remove" @add="jumpToSuggestions">
+      <BundleHero class="bundle-rise" :count="products.length" :tiers="activeDiscountTiers" :items="heroTiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :daily="products.length ? `$${cumulativeDailyEarnText}${t.store.cardPerDaySuffix}` : ''" :addable="suggestions.length > 0" :add-disabled="limitReached || !catalogReady" @remove="remove" @add="jumpToSuggestions">
         <template #tile="{ item }">
           <text v-if="productById(item.id)?.productType === 'SHARE'" class="bundle-tile-note">{{ t.store.shareYieldDisclaimer }}</text>
           <text v-if="productById(item.id)?.taskLevels.length" class="bundle-tile-note">{{ productTaskLevelsText(t, productById(item.id)?.taskLevels ?? []) }}</text>
@@ -80,7 +80,7 @@
       <view v-if="promotionActivityId && promotionBundle?.footer" class="bundle-bar nx-glass-bar">
         <text v-if="promotionBundle.footer.note" class="nx-tray-note" role="status">{{ promotionBundle.footer.note }}</text>
         <template v-if="promotionBundle.footer.signedIn">
-          <view v-if="promotionBundle.footer.total !== null" class="bundle-bar__copy nx-tray-copy">
+          <view v-if="promotionBundle.footer.showTotal" class="bundle-bar__copy nx-tray-copy">
             <CheckoutAmount class="bundle-bar__total" :value="promotionBundle.footer.total" currency="USD" />
             <text class="bundle-bar__meta"><template v-if="promotionBundle.footer.saved !== null">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(promotionBundle.footer.saved) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
           </view>
@@ -94,12 +94,9 @@
           <CheckoutAmount class="bundle-bar__total" :value="total" currency="USD" />
           <text class="bundle-bar__meta"><template v-if="discountUSD > 0">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(discountUSD) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
         </view>
-        <!-- A private view, as before: it only looks unavailable (aria-disabled, the tray's flat grey) and every tap still
-             reaches onCheckout, whose own guards decide (an unpaid original resumes before the eligibility gate). Busy
-             keeps the width and shows a spinner in place of the label (03 §3.1). -->
-        <view class="bundle-bar__cta" role="button" tabindex="0" :aria-disabled="checkoutUnavailable" :aria-busy="submitting || walletRefreshing" :aria-label="ctaLabel" @click.stop="onCheckout" @keydown="activate($event, onCheckout)">
-          <view class="bundle-bar__label" :class="{ 'bundle-bar__label--busy': submitting || walletRefreshing }"><text>{{ t.bundle.checkout }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></view>
-          <view v-if="submitting || walletRefreshing" class="bundle-bar__spinner" aria-hidden="true" />
+        <view class="bundle-bar__cta" role="button" :tabindex="checkoutUnavailable ? -1 : 0" :aria-disabled="checkoutUnavailable" :aria-busy="checkoutBusy" :aria-label="ctaLabel" @click.stop="onCheckout" @keydown="activate($event, onCheckout)">
+          <view class="bundle-bar__label" :class="{ 'bundle-bar__label--busy': checkoutBusy }"><text>{{ t.bundle.checkout }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></view>
+          <view v-if="checkoutBusy" class="bundle-bar__spinner" aria-hidden="true" />
         </view>
       </view>
     </template>
@@ -179,6 +176,7 @@ const catalogStatus = computed(() => productCatalogState.status);
 const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
 const hasCatalog = computed(() => catalogReady.value || !!productCatalogPresentation.value?.products.length);
 const { policy, failed: policyReadFailed, refresh: refreshBundlePolicy } = useBundleDiscountPolicy();
+const reviewVisit = ref(0);
 
 onLoad((options) => {
   const query=(options??{}) as Record<string,string>;
@@ -188,6 +186,7 @@ onLoad((options) => {
 });
 
 onShow(() => {
+  reviewVisit.value++;
   void refreshProductCatalog(true);
   void ensureServerProductPhase();
   void refreshBundleWallet();
@@ -250,7 +249,7 @@ const suggestionRows = computed<BundleSuggestion[]>(() => suggestions.value.map(
     action: unavailable ? "none" : locked ? "locked" : "add",
     actionLabel: locked ? `${p.name} · ${t.value.store.gateBlockedToast}` : fmt(t.value.uiChrome.addItem, { name: p.name }),
     openable: true,
-    disabled: limitReached.value,
+    disabled: limitReached.value || !catalogReady.value,
   };
 }));
 function addSuggestionById(id: string) {
@@ -374,23 +373,30 @@ async function refreshBundleWallet(): Promise<void> {
   }
 }
 
-const checkoutUnavailable = computed(() => submitting.value || walletRefreshing.value || !catalogReady.value
-  || products.value.length < 2 || products.value.length > 8 || (!remoteApiEnabled && !bundleQuote.value)
-  || (remoteApiEnabled && products.value.some((p) => {
-    const entry = purchaseEligibilityStore.state(p.id);
-    return entry.status !== "ready" || !entry.eligible;
-  })));
-const checkoutHint = computed(() => {
-  if (products.value.length < 2) return t.value.promotion.selectTwo;
-  if (!remoteApiEnabled) return "";
-  const entries = products.value.map((p) => purchaseEligibilityStore.state(p.id));
+const catalogNote = computed(() => catalogReady.value ? "" : catalogStatus.value === "error"
+  ? t.value.store.catalogErrorTitle : t.value.store.catalogLoadingTitle);
+const reviewTarget = computed(() => {
+  void reviewVisit.value;
+  void app.accountBindingEpoch;
+  return bundleReviewTarget(products.value);
+});
+const checkoutBusy = computed(() => submitting.value || (walletRefreshing.value && !isRecoveryTarget(reviewTarget.value)));
+const checkoutUnavailable = computed(() => checkoutBusy.value || !!checkoutBlock(products.value, reviewTarget.value));
+function checkoutBlock(list: Product[], target: BundleReviewTarget): string {
+  if (isRecoveryTarget(target)) return "";
+  if (catalogNote.value) return catalogNote.value;
+  if (list.length < 2) return t.value.promotion.selectTwo;
+  if (list.length > 8) return t.value.promotion.quantityLimit;
+  if (!remoteApiEnabled) return bundleQuote.value ? "" : t.value.store.coTotalQuoteChanged;
+  const entries = list.map(p => purchaseEligibilityStore.state(p.id));
   if (entries.some((entry) => entry.status === "unavailable")) return t.value.store.temporarilyOutOfStock;
   if (entries.some((entry) => entry.status === "error")) return t.value.store.purchaseEligibilityError;
   if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
   return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
-});
+}
 const bundleTrayNote = computed(() => {
-  if (checkoutUnavailable.value && checkoutHint.value) return checkoutHint.value;
+  const reason = checkoutBlock(products.value, reviewTarget.value) || catalogNote.value;
+  if (reason) return reason;
   if (!remoteApiEnabled || products.value.length < 2 || app.remoteSlotsUsed === null) return "";
   const slots = Math.max(0, app.slotCap - app.remoteSlotsUsed);
   const inventory = products.value.length - slots;
@@ -442,14 +448,14 @@ function clear() {
   cart.clear();
 }
 async function onAddSuggestion(p: Product) {
-  if (!catalogReady.value || limitReached.value) return;
   if (remoteApiEnabled) {
     const entry = purchaseEligibilityStore.state(p.id);
     if (entry.status === "unavailable") return;
     if (entry.status === "ready" && !entry.eligible) {
-      navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
+      openDetail(p.id);
       return;
     }
+    if (!catalogReady.value || limitReached.value) return;
     const scope = captureAccountScope();
     const eligible = await purchaseEligibilityStore.ensure(p.id, entry.status !== "loading");
     if (!isCurrentAccountScope(scope)) return;
@@ -457,7 +463,7 @@ async function onAddSuggestion(p: Product) {
       const status = purchaseEligibilityStore.state(p.id).status;
       if (status === "unavailable") return;
       if (status === "error") toast.warn(t.value.store.purchaseEligibilityError);
-      else navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
+      else openDetail(p.id);
       return;
     }
   }
@@ -525,40 +531,57 @@ async function offerBundleWalletTopup(requiredUsdt: number): Promise<void> {
   if (accepted && isCurrentAccountScope(accountScope)) navTo("/pages/me/wallet-topup");
 }
 
-// Existing durable commands stay in their original recovery path. New bundles
-// use the shared items review, legal terms and explicit payment confirmation.
-async function openBundleReview(list:Product[]):Promise<boolean> {
-  if(receiptWriteFailure.value)return true;
-  submitting.value=true;
+type BundleReviewTarget = "new" | "checkout-original" | "legacy-inline" | "orders" | "storage-error";
+
+function isRecoveryTarget(target: BundleReviewTarget): boolean {
+  return target === "checkout-original" || target === "orders";
+}
+
+function bundleReviewTarget(list: Product[]): BundleReviewTarget {
+  if (!remoteApiEnabled) return "new";
   try {
     const rows=readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY,orders.currentAccountKey(),true);
     const commands=rows?.commands??{};
-    if(Object.keys(commands).length){
-      if(commands[bundleFingerprint(list)])return false;
-      toast.warn(t.value.bundle.checkoutOutcomeUnknown);void navTo('/pages/store/orders');return true;
-    }
+    if (Object.keys(commands).length) return commands[bundleFingerprint(list)] ? "legacy-inline" : "orders";
+  } catch {
+    return "storage-error";
+  }
+  try {
     const items=list.map(product=>({productNo:product.id,quantity:1}));
-    // Unresolved originals (a checkout command, an unpaid original order, a
-    // capacity KEEP/REPLACE command) resume in the checkout before any
-    // new-purchase gate. If they cannot be read, the checkout shows that state.
-    let original=true;
-    try{
-      const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:'',items});
-      original=!!record?.pending||record?.order?.paymentStatus==='PENDING'
-        ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
-    }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
-    if (!original && list.some((p) => eligibilityUnavailable(p.id))) return true;
-    await navTo(promotionCheckoutHref(items));
+    const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:'',items});
+    if (record?.pending || record?.order?.paymentStatus === 'PENDING'
+      || list.some(product => !!readCapacityPending(app.accountKey, product.id))) return "checkout-original";
+  } catch { /* The checkout reads its recovery storage again before allowing a new purchase. */ }
+  return "new";
+}
+
+// Existing commands stay on their recovery path, while new bundles open the shared review.
+async function openBundleReview(list: Product[], target: BundleReviewTarget): Promise<boolean> {
+  if (receiptWriteFailure.value || target === "storage-error") {
+    if (target === "storage-error") toast.warn(t.value.bundle.checkoutOutcomeUnknown);
+    return true;
+  }
+  if (target === "legacy-inline") return false;
+  submitting.value = true;
+  try {
+    const items = list.map(product => ({ productNo: product.id, quantity: 1 }));
+    if (target === "orders" || !validEntryItems(items)) {
+      toast.warn(t.value.bundle.checkoutOutcomeUnknown);
+      await navTo("/pages/store/orders");
+    } else {
+      await navTo(promotionCheckoutHref(items));
+    }
   }catch{toast.warn(t.value.bundle.checkoutOutcomeUnknown);}
   finally{submitting.value=false;}
   return true;
 }
 async function onCheckout() {
   const list = products.value;
-  if (!catalogReady.value || !validEntryItems(list.map(p => ({ productNo: p.id, quantity: 1 })), 2)
-      || submitting.value || walletRefreshing.value) return;
+  const target = bundleReviewTarget(list);
+  if (submitting.value || (walletRefreshing.value && !isRecoveryTarget(target)) || checkoutBlock(list, target)) return;
+  if (!isRecoveryTarget(target) && !validEntryItems(list.map(p => ({ productNo: p.id, quantity: 1 })), 2)) return;
   if (remoteApiEnabled) {
-    if(await openBundleReview(list))return;
+    if(await openBundleReview(list, target))return;
     if (list.some((p) => eligibilityUnavailable(p.id))) return;
     const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();

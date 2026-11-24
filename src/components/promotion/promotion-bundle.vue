@@ -24,7 +24,7 @@
     <BundleHero :count="selection.length" :tiers="quotedTiers" :items="tiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :addable="suggestions.length > 0" :add-disabled="limitReached" @remove="remove" @add="jumpToSuggestions">
       <template #tile="{ item }">
         <text v-if="levelsFor(item.id)" class="promotion-bundle__tile-note">{{ levelsFor(item.id) }}</text>
-        <text v-if="!productFor(item.id)" class="promotion-bundle__tile-note">{{ t.promotion.noMatchingProducts }}</text>
+        <NxTag v-if="selectedProductBlock(item.id)" tone="unavailable" :label="selectedProductBlock(item.id)" />
         <text v-for="(reward,index) in rewardsFor(item.id)" :key="index" class="promotion-bundle__tile-reward"><text class="promotion-bundle__reward-amount">+{{ reward.amount }}</text><text class="promotion-bundle__reward-unit" :class="{ 'is-uvt': reward.uvt }">{{ reward.unit }}</text></text>
         <view class="promotion-bundle__stepper" role="group" :aria-label="item.name+' · '+t.promotion.quantity">
           <view class="promotion-bundle__step" role="button" :tabindex="quantityOf(item.id)<=1?-1:0" :aria-disabled="quantityOf(item.id)<=1" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.id,-1)" @keydown.enter.prevent="changeQuantity(item.id,-1)" @keydown.space.prevent="changeQuantity(item.id,-1)"><NxIcon name="minus" :size="16" /></view>
@@ -52,7 +52,7 @@
     <view v-if="footer" class="bundle-bar-space" aria-hidden="true">
       <text v-if="footer.note" class="bundle-bar-space__note">{{ footer.note }}</text>
       <template v-if="footer.signedIn">
-        <view v-if="footer.total!==null" class="bundle-bar-space__copy"><text class="bundle-bar-space__total">{{ footer.total }}</text><text class="bundle-bar-space__meta">{{ t.bundle.saved }}</text></view>
+        <view v-if="footer.showTotal" class="bundle-bar-space__copy"><text class="bundle-bar-space__total">{{ footer.total ?? '—' }}</text><text class="bundle-bar-space__meta">{{ footer.saved !== null ? t.bundle.saved : t.bundle.total }}</text></view>
         <text class="bundle-bar-space__cta">{{ footer.continueLabel }}</text>
       </template>
       <text v-else class="bundle-bar-space__cta bundle-bar-space__cta--wide">{{ t.promotion.signIn }}</text>
@@ -136,7 +136,7 @@ const ruleTerms=computed(()=>activity.value?[
 ].join('\n\n'):'');
 const totalUnits=computed(()=>selection.value.reduce((total,item)=>total+item.quantity,0));
 const signedIn=computed(()=>{void app.accountBindingEpoch;void app.accountKey;return !!sessionVault.read();});
-const singleActivityProduct=computed(()=>{if(!scopeId.value||!available.value||catalogStatus.value!=='ready')return null;const products=catalog.value.filter(p=>p.productType!=='SHARE'&&isProductAvailable(p,phase.value)&&activity.value?.productNos.includes(p.id));return products.length===1?products[0]:null;});
+const singleActivityProduct=computed(()=>{if(!scopeId.value||!available.value||catalogStatus.value!=='ready'||selectionBlock.value)return null;const products=catalog.value.filter(p=>p.productType!=='SHARE'&&isProductAvailable(p,phase.value)&&activity.value?.productNos.includes(p.id));return products.length===1?products[0]:null;});
 function openSingleProduct(){if(singleActivityProduct.value)void navTo(promotionDetailHref(singleActivityProduct.value.id,scopeId.value));}
 const suggestions=computed(()=>catalog.value.filter(product=>!selection.value.some(item=>item.productNo===product.id)&&product.productType!=='SHARE'&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(product.id))));
 // Display rows for the shared bundle layout (board B). Tiles and the list read the same catalogue and quote as before.
@@ -214,7 +214,16 @@ function jumpToSuggestions(){
   page?.$getAppWebview?.().evalJS("var t=document.getElementById('bundle-more');if(t){t.scrollIntoView({block:'start',behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});t.focus({preventScroll:true});}");
   // #endif
 }
-const productsReady=computed(()=>catalogStatus.value==='ready'&&selection.value.every(item=>{const product=productFor(item.productNo);return product&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(item.productNo));}));
+function selectedProductBlock(id: string) {
+  if (catalogStatus.value === 'ready') {
+    const product = productFor(id);
+    if (!product || !isProductAvailable(product, phase.value)) return t.value.store.temporarilyOutOfStock;
+  }
+  if (scopeId.value && activity.value && !activity.value.productNos.includes(id)) return t.value.promotion.noMatchingProducts;
+  return '';
+}
+const selectionBlock = computed(() => selection.value.map(item => selectedProductBlock(item.productNo)).find(Boolean) ?? '');
+const productsReady = computed(() => catalogStatus.value === 'ready' && !selectionBlock.value);
 const canReadQuote=computed(()=>visible.value&&foregroundReadAllowed()&&signedIn.value&&app.accountKey!=='default'
   &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
 const canContinue=computed(()=>canReadQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE'&&!termsMissing.value);
@@ -277,6 +286,7 @@ async function refreshQuote(recheckCapacity=false){
 const footerNote = computed(() => {
   if (scopeId.value && contextStatus.value === 'ready' && !available.value)
     return localized(activity.value?.eligibilityMessage,locale.code) || t.value.promotion.disabled;
+  if (selectionBlock.value) return selectionBlock.value;
   if (quoteIneligible.value || (quote.value && quote.value.eligibility !== 'ELIGIBLE')) return t.value.promotion.disabledNote;
   // Expired quotes are read again on their own (03 §3.5.2), so the note only says it is updating; the checkout keeps
   // its own quoteExpired copy.
@@ -295,7 +305,7 @@ const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity
   note:footerNote.value,
   signedIn:signedIn.value,canContinue:canOpenDevices.value||canContinue.value,
   continueLabel:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.bundle.checkout,
-  // Tray price slot: the quote's amount due and its discount (已省); null until a quote is in.
+  showTotal:selection.value.length>=2,
   total:quote.value&&quoteStatus.value==='ready'?quote.value.amountUsdt:null,
   saved:quote.value&&quoteStatus.value==='ready'&&Number(quote.value.discountUsdt)>0?quote.value.discountUsdt:null,
   devices:canOpenDevices.value,

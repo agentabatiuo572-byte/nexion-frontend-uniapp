@@ -56,7 +56,8 @@ function demoVoucherRedemption(state,voucherId,lines,subtotal,now){
   if(grant?.grantStatus!=='AVAILABLE'||subtotal<grant.minPurchaseUsd)refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
   return {voucherId,grantId:grant.grantId,status:'REDEEMED',discountUsdt:Math.min(subtotal,grant.amountUsd,grant.maxDiscountUsd)};
 }
-const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
+const bundleDiscountTiers=[{minItems:2,rate:.04},{minItems:3,rate:.07},{minItems:4,rate:.11}];
+const bundleRate=count=>bundleDiscountTiers.findLast(tier=>count>=tier.minItems)?.rate??0;
 const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||state.milestoneClaims?.includes(id)
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
@@ -320,6 +321,24 @@ function requireDemoOrderQuantity(quantity) {
   if(!Number.isInteger(quantity)||quantity<1){
     throw Object.assign(new Error('ORDER_QUANTITY_INVALID'),{status:422});
   }
+}
+
+function validateDemoOrderItems(items, bundle = false) {
+  const invalidItems = bundle ? 'BUNDLE_PRODUCTS_INVALID' : 'PROMOTION_ITEMS_INVALID';
+  const invalidQuantity = bundle ? 'BUNDLE_QUANTITY_INVALID' : 'PROMOTION_ORDER_QUANTITY_LIMIT';
+  function reject(message) { throw Object.assign(new Error(message), { status: 422 }); }
+  if (!Array.isArray(items) || items.length < (bundle ? 2 : 1) || items.length > 8) reject(invalidItems);
+  const products = new Set();
+  let quantity = 0;
+  for (const item of items) {
+    const id = typeof item?.productNo === 'string' ? item.productNo.trim() : '';
+    if (!id || products.has(id)) reject(invalidItems);
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) reject(bundle ? invalidQuantity : invalidItems);
+    products.add(id);
+    quantity += item.quantity;
+  }
+  if (quantity > 100) reject(invalidQuantity);
+  return quantity;
 }
 
 export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null) {
@@ -812,7 +831,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     overview.onGrid.activeJobs=previewHomeDisplaySample(state,now).activeJobs;
     return overview;
   }
-  if(pathname==='/api/store/bundle-discount')return {source:'server',serverCanonical:true,policyVersion:1,tiers:[{minItems:2,rate:.04},{minItems:3,rate:.07},{minItems:4,rate:.11}]};
+  if(pathname==='/api/store/bundle-discount')return {source:'server',serverCanonical:true,policyVersion:1,tiers:bundleDiscountTiers};
   const finance=financeDemo(url,state,request);
   if(finance!==undefined){
     if(pathname==='/api/exchange')finance.wallet.nexAvailable=demoWalletNex(state,now);
@@ -1073,10 +1092,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/app/trade-in/capacity-quote')return capacityQuote();
   if(pathname==='/api/orders/quote') {
     const input=request.postDataJSON();
-    const quoteProducts=input.items.map(item=>{
-      requireDemoOrderQuantity(item.quantity);
-      return products.find(product=>product.id===item.productNo);
-    });
+    const quantity=validateDemoOrderItems(input.items);
+    const quoteProducts=input.items.map(item=>products.find(product=>product.id===item.productNo));
     if(empty||quoteProducts.some(product=>!product)){
       throw Object.assign(new Error('PROMOTION_RESOURCE_NOT_FOUND'),{status:404});
     }
@@ -1099,8 +1116,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       refuse('PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
     }
     requireDemoPurchase(state,products,input.items,now);
-    if(!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
-    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
+    // Keep the single-item capacity scenario. Bundles have an inventory placement projection.
+    if(items.length===1&&!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
+    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity,items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
     for(const {line,rule} of matches){
       for(const spec of [rule.buyerReward,rule.inviterReward].filter(Boolean)){
         const {disclosure,...reward}=spec;
@@ -1108,6 +1126,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
           ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,
           groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});
       }
+    }
+    if (items.length > 1) {
+      const fleet = demoFleetFacts(url, locale, state);
+      const buyerGifts = quote.expectedRewards.reduce((sum, entry) =>
+        entry.beneficiaryRole === 'BUYER' && entry.reward.type === 'DEVICE' ? sum + entry.reward.quantity * entry.groups : sum, 0);
+      quote.assignableSlots = Math.max(0, fleet.slotCap - fleet.slotsUsed);
+      quote.inventoryQuantity = Math.max(0, quantity + buyerGifts - quote.assignableSlots);
     }
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
     const voucher=demoVoucherRedemption(state,quote.voucherId,items,Number(subtotal),now);
@@ -1140,11 +1165,21 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
+    const bundle=pathname==='/api/orders/bundle';
+    let bundleItems;
+    if (bundle) {
+      if ((input.items == null) === (input.productNos == null) || (input.productNos != null && !Array.isArray(input.productNos))) {
+        throw Object.assign(new Error('BUNDLE_PRODUCTS_INVALID'), { status: 422 });
+      }
+      bundleItems = input.items ?? input.productNos.map(productNo => ({ productNo, quantity: 1 }));
+      validateDemoOrderItems(bundleItems, true);
+    } else if (quote?.items.length > 1) {
+      refuse('PROMOTION_QUOTE_INPUT_CHANGED');
+    }
     if(quote?.activityId&&quote.expectedRewards.length){
       const current=demoFixture(new URL('/api/promotions/'+quote.activityId,url.origin),locale,state,{...request,method:()=>'GET'},now);
       if(current.state==='ACTIVE'&&current.eligibility==='INELIGIBLE')refuse('PROMOTION_ELIGIBILITY_CHANGED');
     }
-    const bundle=pathname==='/api/orders/bundle';
     const quantityRequested=input.quantity??1;
     let productNo=input.productNo,voucherId=input.voucherId;
     if(!bundle){
@@ -1163,8 +1198,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         if(original)return original;
       }
     }
-    const lines=quote?.items||(bundle&&(input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))))
-      ||[{productNo,quantity:quantityRequested}];
+    const lines=quote?.items??bundleItems??[{productNo,quantity:quantityRequested}];
+    if (bundle && quote) validateDemoOrderItems(lines, true);
     const lineProducts=lines.map(line=>products.find(p=>p.id===line.productNo)),[product]=lineProducts;
     if(bundle&&(empty||lineProducts.some(p=>!p)))refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
     if(lineProducts.some(p=>!p)||lines.some(line=>!Number.isInteger(line.quantity)||line.quantity<1))throw new Error('Invalid demo order items');

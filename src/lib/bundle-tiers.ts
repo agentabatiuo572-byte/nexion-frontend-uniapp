@@ -10,9 +10,9 @@ export function bundleSteps(tiers: ReadonlyArray<BundleDiscountTier> | null | un
   return sorted.filter((tier, index) => index === 0 || tier.pct > sorted[index - 1].pct);
 }
 
-/** A rate as written after the minus sign: 0.04 → "4", 0.075 → "7.5". */
+/** Display the percentage at E1's 0.01 percentage-point precision. */
 export function bundlePct(pct: number): string {
-  return String(Math.round(pct * 1000) / 10);
+  return String(Math.round(pct * 10_000) / 100);
 }
 
 /** "2 款", "3 款" … and "4 款+" for the last tier, which also covers every larger bundle. */
