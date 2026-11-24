@@ -79,7 +79,8 @@ const priorOpen = ref(false);
 .rank-condition-row:last-child { border-bottom: 0; }
 /* 28px 小圆环：环宽 3.5，轨道前景色 8%，填充品牌色；达成满环加 16px 勾。只在入场时扫一次（--nx-viz-ring）。 */
 .rank-condition-row__ring { position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--v5-brand); }
-.rank-condition-row__ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%), color-mix(in srgb, var(--v5-ink) 8%, transparent) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); }
+/* --nx-viz-ring 注册为不继承，伪元素要显式继承环上的值（含扫描动画中的值）。 */
+.rank-condition-row__ring::before { content: ""; position: absolute; inset: 0; --nx-viz-ring: inherit; border-radius: 50%; background: conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%), color-mix(in srgb, var(--v5-ink) 8%, transparent) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); }
 .rank-condition-row__ring :deep(.nx-icon) { position: relative; }
 .rank-condition-row__name { min-width: 0; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .rank-condition-row__value { display: flex; align-items: baseline; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }

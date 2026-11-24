@@ -182,8 +182,11 @@ const nextName = computed(() => visibility.mask(prog.value.next ? `V${prog.value
 
 // ── 条件区（DESIGN 第 4 节条件行、2.2 计数、2.6 提示）──
 const number = (value: number | undefined) => value === undefined ? '—' : formatHowNumber(value, locale.code);
+// 门槛为 0 的条件表示该级不要求这一项，不列（rank-rules）；顺序同画板：自购、团队、已购人数、V{n}+ 人数。
+const CONDITION_ORDER = ['selfComputePoints', 'teamComputePoints', 'directRefs', 'vDownlines'];
 const conditionRows = computed(() => prog.value.rows
-  .filter(row => row.tier === prog.value.next?.v || row.status !== 'met')
+  .filter(row => row.required > 0 && (row.tier === prog.value.next?.v || row.status !== 'met'))
+  .sort((a, b) => a.tier - b.tier || CONDITION_ORDER.indexOf(a.kind) - CONDITION_ORDER.indexOf(b.kind))
   .map(row => {
     const known = row.status !== 'unknown';
     const name = row.kind === 'selfComputePoints' ? t.value.myRank.self : row.kind === 'teamComputePoints' ? t.value.myRank.team
