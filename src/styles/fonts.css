@@ -54,8 +54,9 @@
 @font-face { font-family: "UVEL Figures"; src: url("../static/fonts/GeneralSans-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; unicode-range: U+0024-0025, U+002B-003A, U+2212; }
 /* Main amounts: Montserrat variable latin subset, digits and numeric symbols only (DS-27). */
 @font-face { font-family: "UVEL Amount"; src: url("../static/fonts/Montserrat-latin.woff2") format("woff2"); font-weight: 500 600; font-style: normal; font-display: swap; unicode-range: U+0024-0025, U+002B-003A, U+2212; }
-/* Signup-gift figures on the invite landing page: Bebas Neue latin subset, digits and numeric symbols only. */
-@font-face { font-family: "UVEL Gift"; src: url("../static/fonts/BebasNeue.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+0024-0025, U+002B-003A, U+2212; }
+/* Signup-gift figures on the invite landing page: Bebas Neue latin subset, digits and numeric symbols only.
+   U+0020 is included so Bebas is the line's first available font and sets the figures' line box. */
+@font-face { font-family: "UVEL Gift"; src: url("../static/fonts/BebasNeue.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+0020, U+0024-0025, U+002B-003A, U+2212; }
 /* Avatar letters (.nx-avatar-letter): Lobster, each subset with its original unicode-range, so only the
    subsets the letters on a page need are loaded; Chinese and other scripts fall back to --font-v5. */
 @font-face { font-family: "UVEL Avatar"; src: url("../static/fonts/Lobster-cyrillic-ext.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F; }
