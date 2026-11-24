@@ -25,7 +25,7 @@ export interface RankTierStyle {
   /** 光晕色相占比（%），直径为徽章画布的 1.6 倍；null 为无光晕或由舞台／卡面自带。 */
   halo: { dark: number; light: number } | null;
   pattern: RankPattern;
-  /** 等级数字 26/34 的填充：纯色或上→下渐变。 */
+  /** 等级数字 26/34 的填充：一项为纯色，多项为上→下渐变的色标（带位置，取值同画板 tiers.css、v8.css）。 */
   numberFill: { dark: string[]; light: string[] };
   /** 点缀色：「升到 Vn 后」旧值→新值箭头、横条点选的光圈、星点和掠光。V0 不会是目标等级。 */
   accent: ThemePair | null;
@@ -50,24 +50,24 @@ export const RANK_TIER_STYLES: readonly RankTierStyle[] = [
   { v: 2, segment: "steel", canvas: 128, canvas360: 128, identityHeight: 214, identityTop: 24, hue: brandPair, halo: { dark: 18, light: 12 }, pattern: null,
     numberFill: { dark: [BRAND], light: [BRAND] }, accent: brandPair, select: steelSelect, loops: [] },
   { v: 3, segment: "crystal", canvas: 136, canvas360: 136, identityHeight: 238, identityTop: 40, hue: { dark: "#2DD4BF", light: "#0CC4D6" }, halo: { dark: 22, light: 14 }, pattern: "rings",
-    numberFill: { dark: ["#C9FFF6", "#2DD4BF"], light: ["#0B8A95", "#06616A"] }, accent: { dark: "#2DD4BF", light: "#0B7F8A" }, select: crystalSelect, loops: [] },
+    numberFill: { dark: ["#C9FFF6 10%", "#2DD4BF 100%"], light: ["#0B8A95 10%", "#06616A 100%"] }, accent: { dark: "#2DD4BF", light: "#0B7F8A" }, select: crystalSelect, loops: [] },
   { v: 4, segment: "crystal", canvas: 136, canvas360: 136, identityHeight: 238, identityTop: 40, hue: { dark: "#4FA8FF", light: "#1E7BE8" }, halo: { dark: 24, light: 15 }, pattern: "rings",
-    numberFill: { dark: ["#DCEEFF", "#4FA8FF"], light: ["#1E6FD0", "#0E3F80"] }, accent: { dark: "#4FA8FF", light: "#175FB5" }, select: crystalSelect, loops: [] },
+    numberFill: { dark: ["#DCEEFF 10%", "#4FA8FF 100%"], light: ["#1E6FD0 10%", "#0E3F80 100%"] }, accent: { dark: "#4FA8FF", light: "#175FB5" }, select: crystalSelect, loops: [] },
   { v: 5, segment: "metal", canvas: 144, canvas360: 144, identityHeight: 250, identityTop: 44, hue: { dark: "#FF7A3D", light: "#FF5A1F" }, halo: { dark: 26, light: 16 }, pattern: "lattice",
-    numberFill: { dark: ["#FFD9C4", "#FF7A3D"], light: ["#C2410C", "#7A2000"] }, accent: { dark: "#FF7A3D", light: "#B42F00" }, select: metalSelect, loops: [] },
+    numberFill: { dark: ["#FFD9C4 10%", "#FF7A3D 100%"], light: ["#C2410C 10%", "#7A2000 100%"] }, accent: { dark: "#FF7A3D", light: "#B42F00" }, select: metalSelect, loops: [] },
   { v: 6, segment: "metal", canvas: 144, canvas360: 144, identityHeight: 250, identityTop: 44, hue: { dark: "#F2A27E", light: "#C9714B" }, halo: { dark: 30, light: 18 }, pattern: "lattice-sparkles",
-    numberFill: { dark: ["#FFE6DA", "#E8A07E"], light: ["#A5573A", "#6E3320"] }, accent: { dark: "#F2A27E", light: "#9A4A2E" }, select: metalSelect, loops: [] },
+    numberFill: { dark: ["#FFE6DA 10%", "#E8A07E 100%"], light: ["#A5573A 10%", "#6E3320 100%"] }, accent: { dark: "#F2A27E", light: "#9A4A2E" }, select: metalSelect, loops: [] },
   { v: 7, segment: "galaxy", canvas: 144, canvas360: 144, identityHeight: 318, identityTop: 22, hue: null, halo: null, pattern: "galaxy",
-    numberFill: { dark: ["#FFFFFF", "#DCE6F5", "#93A3BF"], light: ["#2B3446", "#4A5873", "#1D2433"] }, accent: { dark: "#C9D6EA", light: "#43506B" },
+    numberFill: { dark: ["#FFFFFF 10%", "#DCE6F5 50%", "#93A3BF 100%"], light: ["#2B3446 10%", "#4A5873 55%", "#1D2433 100%"] }, accent: { dark: "#C9D6EA", light: "#43506B" },
     select: { peak: 1.16, settle: 1.06, ms: 320, ring: true, sheen: true, burst: "plat" }, loops: ["satellite", "twinkle"] },
   // V8 黑金卡面两种主题同一卡面（8.1 第 1 条），等级数字和点缀色以外的卡面取值只在卡组件里定义。
   { v: 8, segment: "blackgold", canvas: 112, canvas360: 100, identityHeight: 208, identityTop: 0, hue: null, halo: null, pattern: "blackgold",
-    numberFill: { dark: ["#FFF3CF", "#EBCB7A", "#B8913F"], light: ["#FFF3CF", "#EBCB7A", "#B8913F"] }, accent: { dark: "#E2BC62", light: "#765816" },
+    numberFill: { dark: ["#FFF3CF 8%", "#EBCB7A 52%", "#B8913F 100%"], light: ["#FFF3CF 8%", "#EBCB7A 52%", "#B8913F 100%"] }, accent: { dark: "#E2BC62", light: "#765816" },
     select: { peak: 1.16, settle: 1.06, ms: 320, ring: true, sheen: true, burst: "gold" }, loops: ["sheen", "crown"] },
 ];
 
-/** 隐私遮罩（隐藏统计）时：徽章换成「••••」圆，底色中性，箭头不用等级点缀色（12.1 第 3 步）。 */
-export const RANK_TIER_HIDDEN = { hue: { dark: INK, light: INK } as ThemePair, numberFill: [INK], accent: INK } as const;
+/** 隐私遮罩（隐藏统计）时：徽章换成「••••」圆，底色中性，箭头不用等级点缀色、回到默认的禁用色（12.1 第 3 步；画板 .gc__arr）。 */
+export const RANK_TIER_HIDDEN = { hue: { dark: INK, light: INK } as ThemePair, numberFill: [INK], accent: "var(--v5-ink-4)" } as const;
 
 /** V8 名称（横条、详情卡标题、专享权益标题格里的「V8」两个字符）用金色（8.1 第 5 条）。 */
 export const RANK_V8_NAME_INK: ThemePair = { dark: "#E2BC62", light: "#765816" };
@@ -85,7 +85,7 @@ export function rankTierStyle(v: number): RankTierStyle {
 export function rankTierVars(v: number, theme: RankTheme, hidden = false): Record<string, string> {
   if (hidden) {
     return { "--tier-hue": RANK_TIER_HIDDEN.hue[theme], "--nx-tint": RANK_TIER_HIDDEN.hue[theme], "--halo": "0%",
-      "--tier-ink": RANK_TIER_HIDDEN.accent, "--tier-num-color": INK, "--tier-num-fill": "none" };
+      "--tier-ink": RANK_TIER_HIDDEN.accent, "--tier-num-color": RANK_TIER_HIDDEN.numberFill[0], "--tier-num-fill": "none" };
   }
   const style = rankTierStyle(v);
   const hue = style.hue?.[theme] ?? INK;
@@ -97,7 +97,7 @@ export function rankTierVars(v: number, theme: RankTheme, hidden = false): Recor
     "--halo": `${style.halo?.[theme] ?? 0}%`,
     "--tier-ink": style.accent?.[theme] ?? BRAND,
     "--tier-num-color": gradient ? "transparent" : stops[0],
-    "--tier-num-fill": gradient ? `linear-gradient(180deg,${stops.map((stop, index) => `${stop} ${index === 0 ? 10 : Math.round(index / (stops.length - 1) * 100)}%`).join(",")})` : "none",
+    "--tier-num-fill": gradient ? `linear-gradient(180deg,${stops.join(",")})` : "none",
   };
 }
 
