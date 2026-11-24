@@ -148,7 +148,7 @@
         </view>
 
         <OrderRewards v-if="remoteApiEnabled && id" :order-no="id" />
-        <view :class="stickyActionsVisible ? 'order-tray-space' : 'order-end-space'" />
+        <view :class="stickyActionsVisible ? 'order-tray-space' : 'order-end-space'" :style="stickyActionsVisible && orderTrayHeight ? { height: 'calc(' + orderTrayHeight + 'px - 2px)' } : undefined" />
       </template>
     </view>
     <template #pageFixed>
@@ -161,7 +161,7 @@
         <NxButton v-if="paymentResultState !== 'failed' && paymentResultState !== 'inventory'" variant="secondary" :label="purchaseCopy.resultOrder" @click="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false" />
         <NxButton v-for="exit in paymentResult.exits" :key="exit.key" :variant="exit.primary ? 'primary' : 'secondary'" :label="exit.label" @click="exit.run()" />
       </view>
-      <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
+      <view v-if="order && stickyActionsVisible && !resultShown" ref="orderTray" class="order-sticky order-actions-tray nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel nx-reverse-action" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
           <!-- One verb for paying an open order on every surface (结算页, 外付中, 钱包待付): 继续付款; the name also says the amount. -->
@@ -206,6 +206,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import { useTrayHeight } from "@/composables/use-tray-height";
 import { discoverOrderPayment, pendingOrderPayment, refusedPurchasePayment, usePurchasePayment, onPurchaseRecordReleased, type PurchaseContextCheck } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
@@ -671,6 +672,9 @@ const pendingOrderActionsVisible = computed(() => order.value?.status === "place
 // Any state with a next action gets the bottom action bar.
 const stickyActionsVisible = computed(() => !!order.value && (pendingOrderActionsVisible.value || needsRecovery.value
   || order.value.status === 'activated' || order.value.status === 'inventory' || canBuyAgain.value));
+// The actions tray as rendered: two buttons wrap to two rows in a long language, and the content clears that (04 §4.0).
+const orderTray = ref<unknown>(null);
+const orderTrayHeight = useTrayHeight(orderTray, '.order-actions-tray');
 const cancellable = computed(() => canCancelCurrentOrder()
   && !cancellingOrder.value);
 const paymentExpired = computed(() => order.value?.expiresAt != null
@@ -1282,8 +1286,9 @@ const sectionLabelStyle: CSSProperties = {
 .order-hero__pay { flex-grow: 2; }
 .order-sticky { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
 /* Content clearance under the bottom actions (04 §4.0), so the last card scrolls to 16 above them, less what the chassis
-   already pads below the content (tray bottom + 18): a lone button 48 + 22 + 16; two buttons share a one-row tray,
-   64 + 22 + 16 (the same two-child test as the shared tray form). */
+   already pads below the content (tray bottom + 18): the measured tray height − 2 (orderTrayHeight, two rows when a long
+   language wraps the pair). Until it is read: a lone button 48 + 22 + 16; two buttons share a one-row tray, 64 + 22 + 16
+   (the same two-child test as the shared tray form). */
 .order-tray-space { height: calc(48px + 16px - 18px); }
 .nx-chassis:has(> .order-sticky > :nth-child(2)) .order-tray-space { height: calc(var(--nx-tray-clearance) - var(--nx-tray-bottom) - 18px); }
 .order-end-space { height: 24px; }

@@ -249,7 +249,7 @@
         <NxButton v-if="promotionBuyAgain" data-testid="checkout-buy-again" variant="secondary" :label="(promotionRoute?.items.length ?? 0) > 1 ? flowCopy.buyBundleAgain : t.promotion.buyAgain" @click="promotionCheckout?.startNewPurchase()" />
         <NxButton v-for="exit in resultBar.exits" :key="exit.key" :variant="exit.primary ? 'primary' : 'secondary'" :label="exit.label" @click="exit.run()" />
       </view>
-      <view v-if="promotionRoute && promotionCheckout?.footer" ref="promotionTray" class="checkout-sticky nx-glass-bar" :class="{ 'checkout-sticky--single': promotionCheckout.footer.amountless }">
+      <view v-if="promotionRoute && promotionCheckout?.footer" ref="promotionTray" class="checkout-sticky checkout-promotion-tray nx-glass-bar" :class="{ 'checkout-sticky--single': promotionCheckout.footer.amountless }">
         <!-- One note above the button: the bar's own block reason first, else the page's most pressing notice (decision ⑦). -->
         <text v-if="promotionCheckout.footer.note || promotionCheckout.trayNotice" class="nx-tray-note w-full" role="status">{{ promotionCheckout.footer.note || promotionCheckout.trayNotice }}</text>
         <view v-if="!promotionCheckout.footer.amountless" class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
@@ -300,6 +300,7 @@ import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
+import { useTrayHeight } from "@/composables/use-tray-height";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
@@ -512,20 +513,9 @@ const keepResumeAllowed = computed(() => {
 const keepRecoveryNotice = computed(() => capacityRecoveryNotice(t.value, keepCheckoutReadError.value, keepRecoveryOperation.value, keepResumeAllowed.value));
 defineExpose({ keepRecoveryOperation, keepRecoveryProduct, keepResumeAllowed, openKeepResume });
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
-// The bundle / activity tray as rendered: its note and a long language's wrap change its height, and the review content
-// clears exactly that (04 §4.0). H5 measures it; the App's logic layer has no DOM and leaves the spacer's own estimate.
+// The bundle / activity tray as rendered, which the review content clears (04 §4.0).
 const promotionTray=ref<unknown>(null);
-const promotionTrayHeight=ref(0);
-let promotionTrayObserver: ResizeObserver | undefined;
-watch(promotionTray, (value) => {
-  promotionTrayObserver?.disconnect(); promotionTrayObserver = undefined;
-  const el = (value as { $el?: HTMLElement } | null)?.$el ?? value as HTMLElement | null;
-  if (!el?.getBoundingClientRect) { promotionTrayHeight.value = 0; return; }
-  const apply = () => { promotionTrayHeight.value = Math.round(el.getBoundingClientRect().height); };
-  apply();
-  if (typeof ResizeObserver !== 'undefined') { promotionTrayObserver = new ResizeObserver(apply); promotionTrayObserver.observe(el); }
-}, { flush: 'post' });
-onUnmounted(() => promotionTrayObserver?.disconnect());
+const promotionTrayHeight=useTrayHeight(promotionTray, '.checkout-promotion-tray');
 const storeResult=ref<InstanceType<typeof CheckoutResult>|null>(null);
 const resultBar=computed(()=>promotionRoute.value?promotionCheckout.value?.resultView:storeResult.value);
 const promotionBuyAgain=computed(()=>!!promotionRoute.value&&promotionCheckout.value?.resultBuyAgain===true);

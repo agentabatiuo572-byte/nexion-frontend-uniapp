@@ -509,10 +509,11 @@ function landingSpot(el: HTMLElement | null | undefined): HTMLElement | null {
   }
   return el;
 }
-/** Focus something real inside el: its first usable control, else el itself. */
-function focusInside(el: HTMLElement): void {
+/** Focus something real inside el: the layer's own first focus if it names one, else its first usable control, else el
+ *  itself. */
+function focusInside(el: HTMLElement, first?: () => Element | null | undefined): void {
   if (el.contains(document.activeElement) && canTake(document.activeElement)) return;
-  focusFirst([() => firstFocusable(el), () => landingSpot(el)]);
+  focusFirst([() => { const target = first?.(); return target && el.contains(target) ? target : null; }, () => firstFocusable(el), () => landingSpot(el)]);
 }
 const MAIN_REGION = '[role="main"], main, uni-page-body';
 // The sub-page header title (either header component): the page's own title when the content draws no heading of its
@@ -612,6 +613,9 @@ export function useDialogA11y(
   close?: () => void,
   nativeBack = true,
   nativePriority = 0,
+  // What takes focus first when the layer opens, before its first control: a decision whose primary is destructive
+  // opens on its title (tabindex -1, no Tab stop), so the first focus is not a control Enter would run (03 §3.5).
+  initialFocus?: () => Element | null | undefined,
 ): void {
   // #ifdef APP-PLUS
   registerNativeDialog(open, close, nativeBack, nativePriority);
@@ -755,7 +759,7 @@ export function useDialogA11y(
         if (top && top.layer.order > openedAt) break; // a newer layer already took over
         syncInert();
         const el = rootEl();
-        if (el && (firstFocusable(el) || frame === 5)) { focusInside(el); break; }
+        if (el && (firstFocusable(el) || frame === 5)) { focusInside(el, initialFocus); break; }
         await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
       }
       return;

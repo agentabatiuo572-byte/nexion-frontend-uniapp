@@ -22,7 +22,7 @@
   </view>
 </template>
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, watch } from 'vue';
+import { computed, getCurrentInstance } from 'vue';
 import NxButton from './nx-button.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 // Centered notice (DS 03 §3.5 居中确认框, the same anatomy as the global confirm()): icon, title, one short explanation,
@@ -37,15 +37,11 @@ const props = withDefaults(defineProps<{ open: boolean; title: string; body?: st
   focusTitle?: boolean }>(), { icon: 'alert', tone: 'warning' });
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
-// Esc / Android back take the quiet action when there is one; a notice without one must be answered.
-useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary'); }, true, 6);
-// useDialogA11y lands on the first control right after the render; the title takes focus a frame later. Tab still cycles
-// through the buttons (the title has tabindex -1 and is no Tab stop).
-watch(() => props.open && props.focusTitle, async (focus) => {
-  if (!focus || typeof document === 'undefined') return;
-  await nextTick();
-  requestAnimationFrame(() => requestAnimationFrame(() => { if (props.open) document.getElementById(`${id}-title`)?.focus(); }));
-}, { immediate: true });
+// Esc / Android back take the quiet action when there is one; a notice without one must be answered. With focusTitle the
+// layer's first focus is the title itself (no control is focused first); Tab still cycles through the buttons (the title
+// has tabindex -1 and is no Tab stop).
+useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary'); }, true, 6,
+  () => props.focusTitle ? document.getElementById(`${id}-title`) : null);
 </script>
 <style scoped>
 .nx-notice-mask { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 24px 23px; box-sizing: border-box; background: var(--v5-bg-color-mask); }

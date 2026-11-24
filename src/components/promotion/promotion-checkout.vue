@@ -209,7 +209,7 @@ import { openOrderAdvisorChat } from '@/lib/advisor-chat-route';
 import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-review';
 import { useConversations } from '@/store/conversations';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
-// trayHeight: the host's bottom tray as rendered (H5 measures it); without it the tray spacer estimates from the footer.
+// trayHeight: the host's bottom tray as rendered (the host reads it); until it is read the tray spacer estimates from the footer.
 const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number;externalOrderNo?:string}>();
 const emit=defineEmits<{
   (event:'cancel-blocked',orderNo:string,summary:string):void;
