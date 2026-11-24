@@ -148,6 +148,7 @@ import GlassSegments from "@/components/glass-segments.vue";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import { landFocusOnPage } from "@/composables/use-dialog-a11y";
 import ConversationSwipeRow from "@/components/support/conversation-swipe-row.vue";
 import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isUnfinishedPurchaseRecord, orderPaymentDeadline, purchaseRecordPayload, refreshPendingPayments, rememberOrderPaymentBeforeHide, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
@@ -287,6 +288,8 @@ async function confirmDeleteExpired() {
   if (epoch !== app.accountBindingEpoch) return;
   hidingOrderId.value = "";
   if (!hidden) toast.error(t.value.security.opFailed);
+  // The swipe action that opened the dialog is gone either way; focus lands on the page title instead of the page root (03 §3.5).
+  landFocusOnPage();
 }
 // One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
 const tintedPendingId = computed(() => filteredCards.value.find((order): order is CommerceOrderListItem =>
