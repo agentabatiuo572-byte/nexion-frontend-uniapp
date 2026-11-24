@@ -64,7 +64,7 @@ import { useConfig } from "@/store/config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
-import { questTargetBusiness, unclaimableBusinessQuests, questBusinessContractViolation, type QuestTargetAvailability } from "@/lib/quest-business-availability";
+import { isWeeklyQuestTargetClosed, unclaimableBusinessQuests, questBusinessContractViolation } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -164,14 +164,13 @@ const periodText = computed(() => {
  */
 const questTargetClosed = computed(() => {
   const q = quest.value;
-  if (!q || questTargetBusiness(q) === null) return false;
-  const availability: QuestTargetAvailability = {
+  if (!q) return false;
+  return isWeeklyQuestTargetClosed(q, {
     // 「还不知道」不等于「已经关了」:configUnavailable 属前者,不能停 CTA。
     genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value),
     stakingClosed: targetAvailability.value.stakingClosed,
     exchangeClosed: targetAvailability.value.exchangeClosed,
-  };
-  return unclaimableBusinessQuests([{ ...q, status: "PENDING" }], availability).length > 0;
+  }, false);
 });
 
 function onCta() {

@@ -81,6 +81,17 @@ function targetUnavailable(quest: Pick<CanonicalQuest, "actionRoute">, availabil
   }
 }
 
+/** The weekly list can use the secondary-market gate for marketplace rows. */
+export function isWeeklyQuestTargetClosed(
+  quest: Pick<CanonicalQuest, "layer" | "actionRoute">,
+  availability: QuestTargetAvailability,
+  secondaryGenesisBlocked: boolean,
+): boolean {
+  return targetUnavailable(quest, quest.layer === "WEEKLY_T2" && questActionDomain(quest.actionRoute) === "genesis-secondary"
+    ? { ...availability, genesisBlocked: secondaryGenesisBlocked }
+    : availability);
+}
+
 /**
  * 服务端派了、而本地开关说「现在做不了」的任务。
  *

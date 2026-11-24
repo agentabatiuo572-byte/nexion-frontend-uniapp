@@ -111,6 +111,36 @@ function releaseClock() {
   }
 }
 
+/** Consume the existing public projection without retaining a polling clock. */
+export function useGenesisSaleBlocks(now: () => number) {
+  const cfg = useGenesisConfig();
+  const genesis = useGenesis();
+  const block = computed(() =>
+    genesisPurchaseBlock({
+      // `0 / 0` is the remote public-supply bootstrap/failure sentinel.  The
+      // config projection may already be readable, but a sale cannot be called
+      // sold out until its independently owned supply projection is confirmed.
+      configLoaded: cfg.loaded && (!remoteApiEnabled || genesis.remoteSupplyKnown),
+      marketOpenState: cfg.config.marketOpenState,
+      // Remote mode consumes the J1 server projection. The local mock keeps an
+      // explicit local value; an unavailable remote refresh is already fail-closed
+      // via configLoaded=false and also projects halted=true in the store.
+      halted: remoteApiEnabled ? cfg.config.halted : false,
+      remaining: genesis.totalSlots - genesis.soldSlots,
+      saleStartAt: cfg.config.saleStartAt,
+      now: now(),
+    }),
+  );
+
+  // 走共享纯函数,与 store 的 acquireSecondary 同一套输入口径(见其定义处的注释)。
+  const secondaryBlock = computed(() =>
+    genesisSecondaryBlock({ loaded: cfg.loaded, marketOpenState: cfg.config.marketOpenState,
+      halted: remoteApiEnabled ? cfg.config.halted : false, now: now() }),
+  );
+
+  return { block, secondaryBlock };
+}
+
 export function useGenesisSaleGate(): UseGenesisSaleGateResult {
   const cfg = useGenesisConfig();
   const genesis = useGenesis();
@@ -135,28 +165,7 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
     releaseClock();
   });
 
-  const block = computed(() =>
-    genesisPurchaseBlock({
-      // `0 / 0` is the remote public-supply bootstrap/failure sentinel.  The
-      // config projection may already be readable, but a sale cannot be called
-      // sold out until its independently owned supply projection is confirmed.
-      configLoaded: cfg.loaded && (!remoteApiEnabled || genesis.remoteSupplyKnown),
-      marketOpenState: cfg.config.marketOpenState,
-      // Remote mode consumes the J1 server projection. The local mock keeps an
-      // explicit local value; an unavailable remote refresh is already fail-closed
-      // via configLoaded=false and also projects halted=true in the store.
-      halted: remoteApiEnabled ? cfg.config.halted : false,
-      remaining: genesis.totalSlots - genesis.soldSlots,
-      saleStartAt: cfg.config.saleStartAt,
-      now: nowTs.value,
-    }),
-  );
-
-  // 走共享纯函数,与 store 的 acquireSecondary 同一套输入口径(见其定义处的注释)。
-  const secondaryBlock = computed(() =>
-    genesisSecondaryBlock({ loaded: cfg.loaded, marketOpenState: cfg.config.marketOpenState,
-      halted: remoteApiEnabled ? cfg.config.halted : false, now: nowTs.value }),
-  );
+  const { block, secondaryBlock } = useGenesisSaleBlocks(() => nowTs.value);
 
   const marketClosed = computed(() => block.value === "marketClosed");
   const showUrgency = computed(() => genesisShowsUrgency(block.value));

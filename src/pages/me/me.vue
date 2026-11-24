@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { useWeeklyQuestTargetClosed } from "@/composables/use-quest-target-availability";
 import { useMeEntryRead } from "@/composables/use-me-entry-read";
 import { useNow } from "@/composables/use-now";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -180,6 +181,7 @@ const entrySeen = useMeEntrySeen();
 const quest = useQuest();
 const config = useConfig();
 const meClock = useNow(() => entryRead.visible.value);
+const weeklyTargetClosed = useWeeklyQuestTargetClosed(() => meClock.value * 1000);
 const meLocalDay = computed(() => meEntryLocalDay(meClock.value * 1000));
 const latestOrders = ref<SeenOrders | null>(null);
 const placedOrder = ref(false);
@@ -201,7 +203,7 @@ const entryDots = computed(() => {
   const receipts = seen.receipts;
   const inventory = seen.inventory;
   const taskFacts = missionSnapshotRead.value
-    ? meMissionFacts(missionSnapshotRead.value.snapshot, meClock.value * 1000, config.isEnabled("stakingVisible"))
+    ? meMissionFacts(missionSnapshotRead.value.snapshot, meClock.value * 1000, config.isEnabled("stakingVisible"), weeklyTargetClosed)
     : null;
   return {
     orders: entryRead.ready.value && (placedOrder.value || Boolean(orders && latestOrders.value
@@ -436,7 +438,7 @@ watch([() => quest.remoteSnapshotRead, missionSnapshotRead], ([readback, visible
   if (!readback || readback !== visibleReadback) return;
   if (readback !== previous) missionReadFailed.value = false;
   if (entrySeen.entries.missions) return;
-  const facts = meMissionFacts(readback.snapshot, Date.now(), config.isEnabled("stakingVisible"));
+  const facts = meMissionFacts(readback.snapshot, Date.now(), config.isEnabled("stakingVisible"), weeklyTargetClosed);
   entrySeen.record("missions", facts, readback.scope, false);
 });
 
