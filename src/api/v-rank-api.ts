@@ -390,6 +390,8 @@ export function createVRankApi(client: ApiClient, mode: ApiEnvironment = "prod")
       return client.request<RankSalaryReceipt>({
         method: "POST",
         path: "/api/team/rank/salary/claim",
+        // Only the user's explicit submit or resend may dispatch a claim.
+        retryAfterAuth: false,
         idempotencyKey: key,
         body: claim,
         acceptedResponses: SALARY_CLAIM_REJECTIONS,
