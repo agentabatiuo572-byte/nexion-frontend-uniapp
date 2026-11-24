@@ -1253,7 +1253,7 @@ const sectionLabelStyle: CSSProperties = {
 [data-theme="light"] .order-block { box-shadow: var(--v5-glass-shadow); }
 .order-hero__top { display: flex; align-items: center; gap: 12px; }
 .order-hero__text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-.order-hero__title { margin-top: 8px; color: var(--v5-ink); overflow-wrap: break-word; font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
+.order-hero__title { margin-top: 8px; color: var(--v5-ink); overflow-wrap: break-word; text-wrap: balance; font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
 .order-hero__hint { display: flex; align-items: flex-start; gap: 6px; margin-top: 4px; color: var(--v5-ink-3); overflow-wrap: break-word; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .order-hero__hint--warning { color: var(--v5-warning-ink); }
 .order-hero__hint-icon { flex: none; margin-top: 3px; }

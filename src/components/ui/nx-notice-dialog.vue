@@ -45,7 +45,7 @@ watch(() => props.open && props.focusTitle, async (focus) => {
   if (!focus || typeof document === 'undefined') return;
   await nextTick();
   requestAnimationFrame(() => requestAnimationFrame(() => { if (props.open) document.getElementById(`${id}-title`)?.focus(); }));
-});
+}, { immediate: true });
 </script>
 <style scoped>
 .nx-notice-mask { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 24px 23px; box-sizing: border-box; background: var(--v5-bg-color-mask); }

@@ -3,7 +3,7 @@
     <view v-if="!auth.isAuthenticated" class="promotion-flat"><text class="promotion-title">{{ p.signIn }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ p.signIn }}</text></PromotionAction></view>
     <view v-else-if="loading" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
     <!-- The result's exits (查看设备, and 再买一台 via resultBuyAgain) sit in the page's bottom bar (checkout.vue #pageFixed, 04 §4.0). -->
-    <CheckoutResult ref="resultView" v-else-if="order?.paymentStatus==='PAID'" :order-no="order.orderNo" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?.imageUrl ?? undefined" :product-images="resultImages" :amount="resultAmount?.value" :currency="resultAmount?.currency" :saved="bundleSaved" :error="resultError" @devices="viewDevices" @support="contactResultSupport" @order="viewOrder" />
+    <CheckoutResult ref="resultView" v-else-if="order?.paymentStatus==='PAID'" :order-no="order.orderNo" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0] ? items[0].imageUrl ?? getProduct(items[0].productNo)?.imageUrl : undefined" :product-images="resultImages" :amount="resultAmount?.value" :currency="resultAmount?.currency" :saved="bundleSaved" :error="resultError" @devices="viewDevices" @support="contactResultSupport" @order="viewOrder" />
     <template v-else>
       <!-- Original purchase state: a page-floor hint (icon + text, no card, no stripe) above the products: the result, which purchase it is, what not to do. -->
       <view v-if="keepRecoveryTarget" class="checkout-keep-recovery" role="status">
@@ -51,7 +51,7 @@
         </view>
         <view class="checkout-bundle__grid">
           <view v-for="item in items" :key="item.productNo" class="checkout-tile">
-            <view class="checkout-tile__art" aria-hidden="true"><image v-if="item.imageUrl&&!brokenImages.includes(item.productNo)" :src="item.imageUrl" class="checkout-tile__image" mode="aspectFit" @error="brokenImages.push(item.productNo)" /></view>
+            <view class="checkout-tile__art" aria-hidden="true"><image v-if="(item.imageUrl??getProduct(item.productNo)?.imageUrl)&&!brokenImages.includes(item.productNo)" :src="item.imageUrl??getProduct(item.productNo)?.imageUrl" class="checkout-tile__image" mode="aspectFit" @error="brokenImages.push(item.productNo)" /></view>
             <text class="checkout-tile__name">{{ selectedItemName(item) }}</text>
             <CheckoutAmount v-if="displayQuote||order" class="checkout-tile__price" :value="itemSubtotal(item)" currency="USD" />
             <text v-if="order" class="checkout-tile__qty-label checkout-tile__qty-readonly">{{ p.quantity }}<text class="checkout-tile__qty-value">{{ item.quantity }}</text></text>
@@ -1016,7 +1016,8 @@ const bundleTierPct=computed(()=>{
 // Placeholder: a plain bundle (no activity, no event voucher).
 const bundleDiscountOnly=computed(()=>items.value.length>1&&!props.activityId&&!eventVoucherId);
 // Result stage: every model of a bundle on the one base; one model keeps productImage.
-const resultImages=computed(()=>items.value.length>1?items.value.map(item=>item.imageUrl).filter((src):src is string=>!!src):undefined);
+// A receipt read back after payment can carry no image: the catalog image of the same model stands in.
+const resultImages=computed(()=>items.value.length>1?items.value.map(item=>item.imageUrl??getProduct(item.productNo)?.imageUrl).filter((src):src is string=>!!src):undefined);
 // LOGIC (board RsAct): 共节省 only when the order has a bundle discount amount. Placeholder: the receipt's discount on a bundle.
 const bundleSaved=computed(()=>items.value.length>1&&Number(order.value?.discountUsdt)>0?order.value?.discountUsdt:undefined);
 const backDisabled=computed(()=>order.value?.paymentStatus!=='PAID'
@@ -1178,6 +1179,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-item-quantity-value { min-width:24px; text-align:center; font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); font-variant-numeric:tabular-nums; }
 @media(max-width:374px) {
   .checkout-product-line { --checkout-art:104px; --checkout-art-h:66px; --checkout-art-image:112px; }
+  .checkout-tile__qty { column-gap:var(--v5-space-1); }
   .checkout-tile__stepper .checkout-item-quantity-button { width:32px; }
   .checkout-tile__stepper .checkout-item-quantity-button::after { left:-6px; right:-6px; }
 }

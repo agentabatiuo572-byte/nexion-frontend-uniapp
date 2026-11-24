@@ -253,7 +253,7 @@
         <text v-if="promotionCheckout.footer.note || promotionCheckout.trayNotice" class="nx-tray-note w-full" role="status">{{ promotionCheckout.footer.note || promotionCheckout.trayNotice }}</text>
         <view v-if="!promotionCheckout.footer.amountless" class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <!-- The button's name carries the total it pays (the amount beside it is not part of the button). -->
-        <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.amountless ? promotionCheckout.footer.label : promotionCheckout.footer.label + ' · ' + flowCopy.paymentTotal + ' ' + promotionCheckout.footer.amount" @click="promotionCheckout.footer.action"><text>{{ promotionCheckout.footer.label }}</text></NxButton>
+        <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.amountless || promotionCheckout.footer.note || promotionCheckout.footer.amountValue == null ? promotionCheckout.footer.label : promotionCheckout.footer.label + ' · ' + flowCopy.paymentTotal + ' ' + promotionCheckout.footer.amount" @click="promotionCheckout.footer.action"><text>{{ promotionCheckout.footer.label }}</text></NxButton>
       </view>
       <!-- The server allows the original keep payment to continue with its own key: that continuation is the page's one action (03 §3.5.2, 04 §4.0). -->
       <view v-if="promotionRoute ? promotionCheckout?.keepResumeAllowed : keepResumeAllowed" class="checkout-sticky checkout-sticky--single nx-glass-bar">
