@@ -8,7 +8,7 @@
         <HowSection anchor="sources" :title="copy.sources" list>
           <HowRow item :title="copy.direct" :body="copy.directBody" />
           <HowRow item :title="copy.network" :body="copy.networkBody" />
-          <HowRow item :title="copy.device" :body="copy.deviceBody" />
+          <HowRow item :title="copy.device" :body="deviceLevel2On(null) ? copy.deviceBodyL2 : copy.deviceBody" />
         </HowSection>
         <HowSection anchor="settlement" :title="copy.settlement" :body="copy.settlementBody" />
         <HowSection anchor="references" :title="copy.references" :body="copy.referencesBody" />
@@ -36,6 +36,8 @@ import { howContentMode } from '@/lib/team-how-content-mode';
 import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
 import { navBack } from '@/lib/route';
+// LOGIC SEAM: this page reads no direct-referral policy; pass it here once the level-2 rate is wired (lib/device-earning-level2.ts).
+import { deviceLevel2On } from '@/lib/device-earning-level2';
 const t = useT(), locale = useLocaleStore();
 const w = computed(() => t.value.unilevelHowItWorks);
 const copy = computed(() => teamRuleGuideCopy(locale.code));

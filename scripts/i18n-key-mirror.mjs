@@ -107,9 +107,6 @@ const MARK_EXEMPT = {
   "me.networkCardGapVDownlines": { marks: ["s"], locales: ["zh", "vi"] },
   // en `"{n} Genesis seat{s} secured"` 同上(purchase-sheet.vue 传 `s: qty > 1 ? "s" : ""`)。
   "genesis.purchaseSuccess": { marks: ["s"], locales: ["zh", "vi"] },
-  // 我的网络卡升级后权益（team-rank DESIGN 第 13 节定稿）：zh「升级后：…」不点名目标等级，其他语言写「At {r}: …」。
-  "myRank.g2Perks": { marks: ["r"], locales: ["zh"] },
-  "myRank.g2PerksNoSal": { marks: ["r"], locales: ["zh"] },
 };
 
 let failed = false;

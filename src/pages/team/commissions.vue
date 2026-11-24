@@ -399,7 +399,9 @@ const eventMetaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3
 
 const filterOptions = computed(() => [
   { value: "all" as Filter, label: filterCopy.value.all, fullLabel: t.value.commissions.all, count: remoteApiEnabled ? ledger.value?.totalRows : commission.events.length },
+  // The old friend rank-up kind (cultivation) keeps its name on history rows but is offered as a filter only while it has rows.
   ...KIND_ORDER.filter(value => value !== 'vrank_salary' || (remoteApiEnabled ? ledger.value?.aggregate.byKind.vrank_salary !== undefined : byKind.value.vrank_salary.count > 0))
+    .filter(value => value !== 'cultivation' || (byKind.value.cultivation?.count ?? 0) > 0)
     .map(value => ({ value, label: kindFilterLabel(value), fullLabel: t.value.commissions.kind[value], count: byKind.value[value].count })),
 ]);
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });

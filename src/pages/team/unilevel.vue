@@ -18,9 +18,12 @@
         </template>
         <view class="nx-unilevel-filters">
           <GlassSegments :label="t.directReferral.period" v-model="period" :options="periodOptions" layout="equal" surface="glass" selection="flat" />
-          <view class="nx-unilevel-sources" role="group" :aria-label="t.directReferral.source">
-            <view v-for="option in filterOptions" :key="option.value" role="button" tabindex="0" class="nx-unilevel-source nx-unilevel-focus" :class="{ 'nx-unilevel-source--selected': filter === option.value }" :aria-pressed="filter === option.value" @click="filter = option.value" @keydown.enter.prevent="filter = option.value" @keydown.space.prevent="filter = option.value"><text class="nx-unilevel-source__face" :class="{ 'nx-frosted-button': filter === option.value }">{{ option.label }}</text></view>
-          </view>
+          <!-- F2b: the row scrolls only when the options overflow; the selected option is scrolled into view (03 §3.7). -->
+          <scroll-view class="nx-unilevel-sources" scroll-x :show-scrollbar="false" scroll-with-animation :scroll-into-view="`nx-unilevel-src-${filter}`" role="group" :aria-label="t.directReferral.source">
+            <view class="nx-unilevel-sources__row">
+              <view v-for="option in filterOptions" :id="`nx-unilevel-src-${option.value}`" :key="option.value" role="button" tabindex="0" class="nx-unilevel-source nx-unilevel-focus" :class="{ 'nx-unilevel-source--selected': filter === option.value }" :aria-pressed="filter === option.value" @click="filter = option.value" @keydown.enter.prevent="filter = option.value" @keydown.space.prevent="filter = option.value"><text class="nx-unilevel-source__face" :class="{ 'nx-frosted-button': filter === option.value }">{{ option.label }}</text></view>
+            </view>
+          </scroll-view>
         </view>
         <view v-if="(remoteState === 'ready' || remoteState === 'loading') && remoteSnapshot" class="nx-unilevel-ledger">
           <view v-for="day in eventDays" :key="day.key" class="nx-unilevel-day">
@@ -57,7 +60,7 @@
         <!-- Settlement fold (DESIGN F2): the closed title states the conclusion; the three sentences open on tap. -->
         <view role="button" tabindex="0" class="nx-unilevel-focus nx-unilevel-details-toggle" :aria-expanded="showSettlementDetails" @click="showSettlementDetails = !showSettlementDetails" @keydown.enter.prevent="showSettlementDetails = !showSettlementDetails" @keydown.space.prevent="showSettlementDetails = !showSettlementDetails"><text>{{ detailsSummary }}</text><NxIcon :name="showSettlementDetails ? 'minus' : 'plus'" /></view>
         <view v-if="showSettlementDetails" class="nx-unilevel-details">
-          <text class="block">{{ filter === 'device_earning' ? rankCopy.f2DevPays : rankCopy.f2Pays }}</text>
+          <text class="block">{{ filter !== 'device_earning' ? rankCopy.f2Pays : deviceL2On ? rankCopy.f2DevPays : guideCopy.deviceBody }}</text>
           <template v-if="(policyState === 'ready' || policyState === 'loading') && policy">
             <text class="block">{{ ruleDescription }}</text>
           </template>
@@ -74,6 +77,8 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { useVRank } from "@/store/v-rank";
+import { teamRuleGuideCopy } from "@/components/team/team-rule-guide-copy";
+import { deviceLevel2On, deviceLevel2RatePct } from "@/lib/device-earning-level2";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { formatAmount } from "@/lib/amount-display";
@@ -200,9 +205,10 @@ const remoteTotalUSDT = computed(() => totals.value.amountUSDT), remoteTotalNEX 
 // LOGIC SEAMS (DESIGN 5): the per-rank purchase rates (v-ranks purchaseL1Rate / purchaseL2Rate) and the device
 // level-2 rate (direct-referral deviceEarning.level2RatePct) are not parsed yet. Until the logic item fills them,
 // the L1 rate falls back to the rank's directBonus (equal to purchaseL1Rate by contract), the L2 rate shows "—",
-// and the device rule shows the single-level sentence.
+// and the device wording follows the level-2 switch (lib/device-earning-level2.ts).
 const rankPurchaseL2Pct = computed<number | null>(() => null);
-const deviceLevel2RatePct = computed<number | null>(() => null);
+const deviceL2On = computed(() => deviceLevel2On(policy.value));
+const guideCopy = computed(() => teamRuleGuideCopy(locale.code));
 const pctText = (value: number | null | undefined) => value === null || value === undefined || !Number.isFinite(value) ? "—" : `${formatHowNumber(value, dateLocale())}%`;
 const purchaseCoolingDays = computed(() => {
   const p = policy.value;
@@ -222,9 +228,9 @@ const ruleDescription = computed(() => {
     return fmt(rankCopy.value.f2Rule, { r: current ? `V${current.v}` : "—", a: pctText(current ? current.directBonus * 100 : null), b: pctText(rankPurchaseL2Pct.value), d: purchaseCoolingDays.value ?? "—" });
   }
   const device = p.deviceEarning;
-  if (device.enabled && deviceLevel2RatePct.value !== null && deviceLevel2RatePct.value > 0)
-    return fmt(rankCopy.value.f2DevRule, { a: pctText(device.totalRatePct), b: pctText(deviceLevel2RatePct.value), u: formatHowNumber(device.usdtSharePct, dateLocale()), n: formatHowNumber(100 - device.usdtSharePct, dateLocale()), d: device.coolingDays });
-  return device.enabled ? fmt(t.value.directReferral.rule, { rate: formatHowNumber(device.totalRatePct, dateLocale()), usdt: formatHowNumber(device.usdtSharePct, dateLocale()), nex: formatHowNumber(100 - device.usdtSharePct, dateLocale()), days: device.coolingDays }) : t.value.directReferral.disabled;
+  if (!device.enabled) return t.value.directReferral.disabled;
+  const values = { a: pctText(device.totalRatePct), b: pctText(deviceLevel2RatePct(p)), u: formatHowNumber(device.usdtSharePct, dateLocale()), n: formatHowNumber(100 - device.usdtSharePct, dateLocale()), d: device.coolingDays };
+  return fmt(deviceL2On.value ? rankCopy.value.f2DevRule : rankCopy.value.f2DevRuleL1, values);
 });
 // Records grouped by local calendar day, newest group first (events arrive newest first).
 const eventDays = computed(() => {
@@ -304,8 +310,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 .nx-unilevel-filters { display: flex; flex-direction: column; gap: var(--ui-space-inline); }
 /* Source filter = 03 §3.7 secondary filter: open floor, 32px options inside 44px hit areas, one line each; the row
    scrolls sideways only when the options overflow. Selected = shared glass surface + brand text. */
-.nx-unilevel-sources { display: flex; flex-wrap: nowrap; gap: var(--v5-space-2); overflow-x: auto; scrollbar-width: none; }
-.nx-unilevel-sources::-webkit-scrollbar { display: none; }
+.nx-unilevel-sources { width: 100%; white-space: nowrap; }
+.nx-unilevel-sources__row { display: flex; flex-wrap: nowrap; gap: var(--v5-space-2); width: max-content; }
 .nx-unilevel-source { flex: none; min-height: 44px; display: flex; align-items: center; border-radius: 999px; cursor: pointer; }
 .nx-unilevel-source__face { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; white-space: nowrap; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .nx-unilevel-source--selected .nx-unilevel-source__face { color: var(--v5-brand); }

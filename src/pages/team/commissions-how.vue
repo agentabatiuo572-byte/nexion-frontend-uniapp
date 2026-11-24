@@ -27,7 +27,7 @@
             </view>
           </HowSection>
 
-          <HowSection anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="rankCopy.f1DevLead" list>
+          <HowSection anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
             <HowItem :n="1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
             <HowItem :n="2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
             <HowItem :n="3" :title="rankCopy.f1DevI3T" :body="fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays })" />
@@ -120,6 +120,7 @@ import { createDirectReferralApi } from "@/api/direct-referral-api";
 import { buildCommissionsHowContent, createCommissionsHowResource, type CommissionsHowState } from "@/lib/commissions-how-content";
 import { navBack } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
+import { deviceLevel2On, deviceLevel2RatePct } from "@/lib/device-earning-level2";
 import { fmt, dateLocale } from "@/i18n/format";
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { serverLanguage } from "@/i18n";
@@ -191,16 +192,16 @@ const purchaseCoolingDays = computed(() => {
   return days === null ? "—" : days;
 });
 // LOGIC SEAMS (DESIGN 5): v-ranks purchaseL1Rate / purchaseL2Rate and direct-referral deviceEarning.level2RatePct are
-// not parsed yet. L1 uses directBonus (equal to purchaseL1Rate by contract); L2 shows "—"; the device title shows
-// only the friend rate until level2RatePct > 0 arrives (brief item 3).
+// not parsed yet. L1 uses directBonus (equal to purchaseL1Rate by contract); L2 shows "—". The device lead and
+// first item follow the level-2 switch in lib/device-earning-level2.ts.
 const rankPurchaseL2Pct = (_v: number): number | null => null;
-const deviceLevel2RatePct = computed<number | null>(() => null);
+const deviceL2On = computed(() => deviceLevel2On(policy.value));
 const rateRows = computed(() => (state.value.snapshot?.ranks ?? []).filter(rank => rank.visible).sort((a, b) => a.v - b.v)
   .map(rank => ({ v: rank.v, l1: pct(Math.round(rank.directBonus * 1000) / 10), l2: pct(rankPurchaseL2Pct(rank.v)), mine: vrank.remoteReady && rank.v === vrank.myRank })));
 const deviceRateTitle = computed(() => {
   const rule = policy.value?.deviceEarning;
-  const a = pct(rule ? rule.totalRatePct : null), l2 = deviceLevel2RatePct.value;
-  return rule?.enabled && l2 !== null && l2 > 0 ? fmt(rankCopy.value.f1DevI1T, { a, b: pct(l2) }) : `${rankCopy.value.l1} ${a}`;
+  const a = pct(rule ? rule.totalRatePct : null);
+  return deviceL2On.value ? fmt(rankCopy.value.f1DevI1T, { a, b: pct(deviceLevel2RatePct(policy.value)) }) : `${rankCopy.value.l1} ${a}`;
 });
 const deviceSplit = computed(() => {
   const share = policy.value?.deviceEarning.usdtSharePct;
