@@ -42,6 +42,7 @@ export function demoOrderTopupResponse(url, state, locale, now) {
   const match = url.pathname.match(/^\/api\/app\/orders\/([^/]+)\/usdt-topup$/);
   if (!match) return undefined;
   if (scenario === 'order-error') return { status: 503, body: { code: 503, message: 'ORDER_TOPUP_READ_FAILED', data: null } };
+  if (scenario === 'missing') return { status: 404, body: { code: 404, message: 'ORDER_NOT_FOUND', data: null } };
   const orderNo = decodeURIComponent(match[1]);
   const order = demoAccountOrders(new URL(url.origin), locale, state, now).find(row => row.orderNo === orderNo);
   const long = state.contentState === 'long';
@@ -49,17 +50,21 @@ export function demoOrderTopupResponse(url, state, locale, now) {
   const balance = micro({
     covered: long ? '12400000.5' : String(demoWalletUsdt(state)), partial: long ? '501.358024' : '620.5', debt: '-12.123456',
   }[scenario] ?? (long ? '1.234567' : '120.5'));
-  const shortfall = max(0n, due - balance);
+  const paid = scenario === 'paid', closed = ['expired', 'closed'].includes(scenario), pending = !paid && !closed;
+  const blocker = scenario === 'open-intent' ? 'OPEN_INTENT' : scenario === 'review' ? 'NEEDS_REVIEW' : 'NONE';
+  // payable: pending, before the deadline, no blocker; shortfall is "0" whenever the order is not payable.
+  const payable = pending && blocker === 'NONE' && scenario !== 'deadline';
+  const shortfall = payable ? max(0n, due - balance) : 0n;
   const suggested = shortfall === 0n ? 0n : max(micro(MIN), shortfall + micro(FEE));
-  const closed = scenario === 'expired', paid = scenario === 'paid';
   return ok({
     orderNo, network,
-    orderStatus: paid ? 'PAID' : closed ? 'EXPIRED' : 'PENDING_PAYMENT',
-    payable: !paid && !closed && !['open-intent', 'review'].includes(scenario),
-    deadlineAt: new Date(closed ? now - 60000 : order?.expiresAt ?? now + 25 * 60000).toISOString(),
+    state: paid ? 'PAID' : closed ? 'CLOSED' : 'PENDING',
+    canonicalStatus: paid ? 'paid' : scenario === 'expired' ? 'expired' : scenario === 'closed' ? 'cancelled' : 'placed',
+    payable,
+    deadlineAt: !pending ? null : new Date(scenario === 'deadline' ? now - 1000 : order?.expiresAt ?? now + 25 * 60000).toISOString(),
     amountDueUsdt: decimal(due), walletAvailableUsdt: decimal(balance), shortfallUsdt: decimal(shortfall),
     minDepositUsdt: MIN, depositFeeUsdt: FEE, suggestedTransferUsdt: decimal(suggested),
-    blocker: scenario === 'open-intent' ? 'OPEN_INTENT' : scenario === 'review' ? 'NEEDS_REVIEW' : 'NONE',
+    blocker,
     openIntent: scenario === 'open-intent' ? { intentNo: 'PPI-PREVIEW-7001', paymentMethod: 'HDPAY_BANK', paymentAllowed: true } : null,
     reviewReason: scenario === 'review' ? 'BANK_SESSION' : null,
     paidAt: paid ? new Date(now - 5 * 60000).toISOString() : null,

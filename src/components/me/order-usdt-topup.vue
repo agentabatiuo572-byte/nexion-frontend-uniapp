@@ -28,12 +28,19 @@
       <text class="out-state__d">{{ copy.orderError }}</text>
     </view>
 
+    <!-- The deadline has passed and the order is re-read: no transfer or pay entry, the result follows (plan C.3 截止). -->
+    <view v-else-if="view === 'deadline'" class="out-card out-state" role="status">
+      <view class="out-state__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></view>
+      <text class="out-state__t">{{ copy.deadlineTitle }}</text>
+      <text class="out-state__d">{{ copy.deadlineBody }}</text>
+    </view>
+
     <!-- Blocked, cancelled or paid: one result head (03 §3.6.1), no QR, address or pay entry. -->
     <view v-else-if="head" class="out-result">
       <NxResultHead :tone="head.tone" :icon="head.icon" :title="head.title" :description="head.body" />
       <view v-if="view === 'paid' && read" class="out-card out-facts">
         <view class="out-fact"><text class="out-fact__k">{{ copy.paidAmount }}</text><text class="out-fact__v out-fact__v--amt">{{ amt(read.paidAmountUsdt) }}<text class="out-unit">{{ USDT }}</text></text></view>
-        <view class="out-fact"><text class="out-fact__k">{{ copy.paidAt }}</text><text class="out-fact__v tabular-nums">{{ paidAtLabel }}</text></view>
+        <view v-if="read.paidAt" class="out-fact"><text class="out-fact__k">{{ copy.paidAt }}</text><text class="out-fact__v tabular-nums">{{ paidAtLabel }}</text></view>
       </view>
     </view>
 
@@ -116,6 +123,7 @@ import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { isApiRefusal } from "@/api/errors";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { walletBillTimeLabel } from "@/lib/wallet-bill-date";
 import { purchasePaymentCopy, fillCopy as fill } from "@/lib/purchase-payment-copy";
@@ -130,7 +138,7 @@ const USDT = "\u00A0USDT";
 
 /** PLACEHOLDER(B84): BE-05 GET /api/app/orders/{orderNo}/usdt-topup?network= — field names as contract-b84.md. */
 type OrderUsdtTopupRead = {
-  orderNo: string; network: string; orderStatus: string; payable: boolean; deadlineAt: string | null;
+  orderNo: string; network: string; state: "PENDING" | "PAID" | "CLOSED"; canonicalStatus: string; payable: boolean; deadlineAt: string | null;
   amountDueUsdt: string; walletAvailableUsdt: string; shortfallUsdt: string; minDepositUsdt: string; depositFeeUsdt: string;
   suggestedTransferUsdt: string; blocker: "NONE" | "OPEN_INTENT" | "NEEDS_REVIEW";
   openIntent: { intentNo: string; paymentMethod: string; paymentAllowed: boolean } | null;
@@ -138,6 +146,7 @@ type OrderUsdtTopupRead = {
 };
 const read = ref<OrderUsdtTopupRead | null>(null);
 const orderFailed = ref(false);
+const orderMissing = ref(false);
 type AddressView = { state: "ready"; address: string } | { state: "loading" | "preparing" | "paused" | "error"; address: "" };
 const address = ref<AddressView>({ state: "loading", address: "" });
 const latest = ref<string | null>(null);
@@ -148,8 +157,11 @@ async function load() {
   try {
     read.value = await apiClient.request<OrderUsdtTopupRead>({ path: `/api/app/orders/${encodeURIComponent(props.orderNo)}/usdt-topup?network=${props.network}` });
     orderFailed.value = false;
-  } catch {
-    orderFailed.value = true;
+    orderMissing.value = false;
+  } catch (error) {
+    // 404 ORDER_NOT_FOUND is a definite answer (another account's or no such order); other failures recover.
+    orderMissing.value = isApiRefusal(error, 404, "ORDER_NOT_FOUND");
+    orderFailed.value = !orderMissing.value;
   }
   try {
     const snapshot = await cregisDepositApi.address(props.network);
@@ -187,22 +199,26 @@ const closesIn = computed(() => {
 });
 
 const nonZero = (value: string) => /[1-9]/.test(value);
-// Order facts first (plan C.3): paid, closed, blocked, then the balance.
+// Order facts first (plan C.3, contract state): paid, closed, blocked, past the deadline, then the balance.
 const view = computed(() => {
   const r = read.value;
-  if (!r) return orderFailed.value ? "order-error" : "loading";
-  if (r.paidAt) return "paid";
-  if (["CANCELLED", "EXPIRED"].includes(r.orderStatus)) return "expired";
+  if (!r) return orderMissing.value ? "missing" : orderFailed.value ? "order-error" : "loading";
+  if (r.state === "PAID") return "paid";
+  if (r.state === "CLOSED") return "closed";
   if (r.blocker === "OPEN_INTENT") return "open-intent";
   if (r.blocker === "NEEDS_REVIEW") return "review";
-  return r.payable && !nonZero(r.shortfallUsdt) ? "covered" : "waiting";
+  // Pending but no longer payable with no blocker: the deadline has passed and the order is being re-read.
+  if (!r.payable) return "deadline";
+  return nonZero(r.shortfallUsdt) ? "waiting" : "covered";
 });
 const covered = computed(() => view.value === "covered");
 const head = computed(() => {
   const c = copy.value;
   switch (view.value) {
     case "paid": return { tone: "success" as const, icon: undefined, title: c.paidTitle, body: "" };
-    case "expired": return { tone: "neutral" as const, icon: "clock" as const, title: c.expiredTitle, body: c.expiredBody };
+    // Only the order's own canonical status may say it timed out (contract canonicalStatus).
+    case "closed": return { tone: "neutral" as const, icon: read.value?.canonicalStatus === "expired" ? "clock" as const : undefined, title: read.value?.canonicalStatus === "expired" ? c.expiredTitle : c.closedTitle, body: c.expiredBody };
+    case "missing": return { tone: "neutral" as const, icon: "alert" as const, title: c.orderMissingTitle, body: c.orderMissing };
     case "open-intent": return { tone: "warning" as const, icon: "clock" as const, title: c.openIntentTitle, body: c.openIntentBody };
     case "review": return { tone: "warning" as const, icon: "shield" as const, title: c.reviewHoldTitle, body: c.reviewHold };
     default: return null;
@@ -257,7 +273,7 @@ const barAction = computed(() => {
     case "covered": return { label: c.goPay, enabled: true, note: c.payReady, run: () => emit("pay") };
     case "open-intent": return { label: c.openIntent, enabled: true, note: "", run: () => emit("open-intent") };
     case "review": return { label: c.support, enabled: true, note: "", run: () => emit("support") };
-    case "paid": case "expired": return { label: c.viewOrder, enabled: true, note: "", run: () => emit("view-order") };
+    case "paid": case "closed": return { label: c.viewOrder, enabled: true, note: "", run: () => emit("view-order") };
     default: return null;
   }
 });
