@@ -1,6 +1,5 @@
 <template>
-  <!-- LOGIC: hide the whole card when it has no reward rows (decision ④; today a plain bundle shows only the refund note). -->
-  <view v-if="loading || error || receipt?.promotionQuoteId || rewards.length" class="promotion promotion-flat order-rewards">
+  <view v-if="receipt?.rewards?.length || rewards.length" class="promotion promotion-flat order-rewards">
     <text class="promotion-title">{{ t.promotion.orderRewards }}</text><text class="promotion-copy">{{ t.promotion.refundNote }}</text>
     <text v-if="loading" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
     <RewardRows :expected="receipt?.rewards?.filter(row=>row.reward.type==='DISCOUNT_USDT')" :lines="receipt?.items" />
@@ -15,8 +14,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import {ref,watch,onBeforeUnmount} from 'vue';import {useT} from '@/i18n/use-t';import {useApp} from '@/store/app';import {promotionApi,remoteApiEnabled} from '@/api/runtime';import type{PromotionOrder,Reward} from '@/api/promotion-api';import {navTo} from '@/lib/route';import RewardRows from './reward-rows.vue';
 // The order's one pay entry is the detail page's bottom bar (contract P1); this card only reports discounts and rewards.
-// LOGIC: paymentAllowed no longer drives anything here; the logic item can drop it with its binding in order-detail.vue.
-const props=defineProps<{orderNo:string;paymentAllowed:boolean}>();const t=useT(),app=useApp();const receipt=ref<PromotionOrder|null>(null),rewards=ref<Reward[]>([]),error=ref(false),loading=ref(false);let generation=0,alive=true;
+const props=defineProps<{orderNo:string}>();const t=useT(),app=useApp();const receipt=ref<PromotionOrder|null>(null),rewards=ref<Reward[]>([]),error=ref(false),loading=ref(false);let generation=0,alive=true;
 useAutoRecovery({ failed: () => error.value && !loading.value, retry: load });
 async function load(){
   if(!props.orderNo||!remoteApiEnabled||loading.value)return;

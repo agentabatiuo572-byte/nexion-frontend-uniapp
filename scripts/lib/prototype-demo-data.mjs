@@ -1162,7 +1162,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     requireDemoPurchase(state,products,input.items,now);
     // Keep the single-item capacity scenario. Bundles have an inventory placement projection.
     if(items.length===1&&!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
-    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity,items,subtotalUsdt:subtotal,discountUsdt:quoteMoney(0),amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
+    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity,items,subtotalUsdt:subtotal,discountUsdt:quoteMoney(0),promotionDiscountUsdt:quoteMoney(0),amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
     for(const {line,rule} of matches){
       for(const spec of [rule.buyerReward,rule.inviterReward].filter(Boolean)){
         const {disclosure,...reward}=spec;
@@ -1278,7 +1278,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }
     const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number(quoteMoney(subtotal-amount)),amountUsdt:quote?quote.amountUsdt:amount,placedAt:now,
       computePoints:lines.reduce((total,line)=>total+products.find(p=>p.id===line.productNo).computePoints*line.quantity,0),orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
-    if(quote)Object.assign(order,{promotionQuoteId:quote.quoteId,payBy:new Date(now+paymentWindow).toISOString(),items:quote.items.map(l=>({...l,productName:products.find(p=>p.id===l.productNo).name})),rewards:quote.expectedRewards});
+    if(quote)Object.assign(order,{promotionQuoteId:quote.quoteId,promotionDiscountUsdt:quote.promotionDiscountUsdt,payBy:new Date(now+paymentWindow).toISOString(),items:quote.items.map(l=>({...l,productName:products.find(p=>p.id===l.productNo).name})),rewards:quote.expectedRewards});
     Object.assign(order,{paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',expiresAt:now+paymentWindow,paidAt:null,activatedAt:null,targetDeviceId:null,targetDeviceInstanceNo:null});
     if(voucher){
       if(voucher.voucherId==='V-DESIGN')state.voucherUsed=true;

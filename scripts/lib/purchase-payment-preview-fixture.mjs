@@ -247,7 +247,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         // This result compresses the wait through the deadline and confirmation grace.
         const deadline = now - graceEnd(intent.paymentMethod, 0);
         const order = closeUnpaidOrder(intent);
-        if (order) Object.assign(order, {placedAt: deadline - paymentWindow, expiresAt: deadline});
+        if (order) Object.assign(order, {placedAt: deadline - paymentWindow, expiresAt: deadline,
+          ...(order.promotionQuoteId && {payBy: new Date(deadline).toISOString()})});
         return Object.assign(expire(intent, 'PAYMENT_TIMEOUT'), {deadline, expiresAt: new Date(deadline).toISOString(),
           deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(now).toISOString()});
       }

@@ -202,6 +202,10 @@ function scheduleRestore(order: number, run: () => void, drop: () => void): void
 type Layer = { order: number; root: () => HTMLElement | null | undefined; close?: () => void };
 const openLayers: Layer[] = [];
 
+export function hasOpenDialog(): boolean {
+  return !!topLayer();
+}
+
 // #ifdef H5
 // Browser back on H5 answers the top layer first (02.7, 03 §3.5), as Esc does, through the same close callback and so the
 // same guards. Each open layer pushes its own history entry: a copy of the page's router state with a marker, at the
@@ -230,6 +234,14 @@ let forwardFrom: number | null = null;
 const stalePageEntries: { current: unknown; position: unknown }[] = [];
 let appBackAt = 0;
 let browserBackGuarded = false;
+const pageBackHandlers = new Set<() => (() => void) | undefined>();
+let restoredPageBack: (() => void) | undefined;
+
+/** A page can defer a browser back to a dialog. Open it only after returning to the page's history entry. */
+export function registerBrowserPageBack(handler: () => (() => void) | undefined): () => void {
+  pageBackHandlers.add(handler);
+  return () => { pageBackHandlers.delete(handler); };
+}
 const markerOf = (state: unknown): number | null => {
   const marker = (state as { __nxLayer?: unknown } | null)?.__nxLayer;
   return typeof marker === "number" ? marker : null;
@@ -301,6 +313,13 @@ export function installBrowserBackGuard(): void {
     currentPosition = landedPosition;
     currentDepth = landedDepth;
     entrySeq = Math.max(entrySeq, landed ?? 0);
+    if (restoredPageBack) {
+      const answer = restoredPageBack;
+      restoredPageBack = undefined;
+      ev.stopImmediatePropagation();
+      answer();
+      return;
+    }
     if (ignoredPops.length) {
       const expected = ignoredPops.shift();
       ev.stopImmediatePropagation();
@@ -339,7 +358,20 @@ export function installBrowserBackGuard(): void {
     forwardFrom = null;
     // The pop did not start on a live layer entry: an ordinary page step for the router. That includes a forward step off
     // a gone layer entry to a later page (the step above, or the browser's own forward).
-    if (from === null || (gone(from) && crossPage && (landedPosition as number) > (fromPosition as number))) return;
+    if (from === null) {
+      if (crossPage && (landedPosition as number) < (fromPosition as number) && Date.now() - appBackAt >= 1_000) {
+        for (const handler of pageBackHandlers) {
+          const answer = handler();
+          if (!answer) continue;
+          ev.stopImmediatePropagation();
+          restoredPageBack = answer;
+          history.go((fromPosition as number) - (landedPosition as number));
+          break;
+        }
+      }
+      return;
+    }
+    if (gone(from) && crossPage && (landedPosition as number) > (fromPosition as number)) return;
     ev.stopImmediatePropagation();
     // Entries above where the browser landed have been popped (one, for a single back).
     const popped = layerEntries.filter((entry) => landed === null || entry.id > landed);

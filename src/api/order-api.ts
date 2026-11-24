@@ -73,6 +73,7 @@ export interface CanonicalOrder {
   subtotalUsdt: number;
   unitPriceUsdt: number;
   discountUsdt: number;
+  promotionDiscountUsdt?: string;
   amountUsdt: number | string;
   promotionQuoteId?: string;
   paymentMethod: string | null;
@@ -329,6 +330,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     subtotalUsdt: historyNumber(source,"subtotalUsdt"),
     unitPriceUsdt: finiteNumber(source.unitPriceUsdt),
     discountUsdt: historyNumber(source,"discountUsdt"),
+    ...(source.promotionDiscountUsdt != null && { promotionDiscountUsdt: promotionDecimal(source.promotionDiscountUsdt) }),
     amountUsdt: historyAmount(source),
     ...(source.promotionQuoteId ? { promotionQuoteId: nonEmptyString(source.promotionQuoteId) } : {}),
     paymentMethod: nullableString(source.paymentMethod),
@@ -623,6 +625,7 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
         method: "POST",
         path: `/api/orders/${encodeURIComponent(normalized)}/cancel`,
         idempotencyKey,
+        retryAfterAuth: false,
       }));
     },
 

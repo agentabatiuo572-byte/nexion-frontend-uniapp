@@ -116,9 +116,8 @@
           </view>
           <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
           <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
-          <!-- A deduction is not an action: main ink, like the checkout review (01 §1.1.1 #4).
-               LOGIC: say 组合折扣 only when the whole discount is the bundle's own (an activity bundle may add its own); placeholder: any multi-line order. -->
-          <DetailRow v-if="order.discount > 0" :label="(order.lineItems?.length ?? 0) > 1 ? pendingCopy.bundleDiscount : t.orders.discount" :value="discountMoney(order.discount)" />
+          <!-- The label follows the source of the full discount shown in this row. -->
+          <DetailRow v-if="order.discount > 0" :label="bundleDiscountOnly ? pendingCopy.bundleDiscount : t.orders.discount" :value="discountMoney(order.discount)" />
           <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="discountMoney(order.tradeInCredit ?? 0)" brand />
           <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
           <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="discountMoney(order.promoDiscountUSD ?? 0)" brand />
@@ -148,7 +147,7 @@
           <DetailRow v-if="order.refundedAt" :label="t.orders.refundedAt" :value="dt(order.refundedAt)" />
         </view>
 
-        <OrderRewards v-if="remoteApiEnabled && id" :order-no="id" :payment-allowed="order.status === 'placed' && !paymentExpired && !remoteOrderError && !remoteOrderRefreshing" />
+        <OrderRewards v-if="remoteApiEnabled && id" :order-no="id" />
         <view :style="{ height: stickyActionsVisible ? '120px' : '24px' }" />
       </template>
     </view>
@@ -169,20 +168,20 @@
           <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
         </template>
         <template v-else-if="needsRecovery">
-          <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
+          <NxButton v-if="canBuyAgain" variant="secondary" :label="buyAgainLabel" @click="goStore" />
           <NxButton variant="primary" :label="t.orders.copyAndSupport" @click="contactOrderSupport" />
         </template>
         <template v-else-if="order.status === 'activated' || order.status === 'inventory'">
-          <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
+          <NxButton v-if="canBuyAgain" variant="secondary" :label="buyAgainLabel" @click="goStore" />
           <NxButton v-if="order.status === 'activated'" variant="primary" :label="t.uiChrome.viewOnEarn" @click="goEarn"><text>{{ t.uiChrome.viewOnEarn }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
           <NxButton v-else variant="primary" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')"><text>{{ t.myDevices.inventoryTitle }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
         </template>
-        <NxButton v-else-if="canBuyAgain" variant="primary" :label="t.promotion.buyAgain" @click="goStore" />
+        <NxButton v-else-if="canBuyAgain" variant="primary" :label="buyAgainLabel" @click="goStore" />
       </view>
       <NxNoticeDialog :open="cancelBlocked" icon="clock" :title="t.orders.cancelBlockedTitle" :body="t.orders.cancelBlockedBody"
         :primary="t.orders.paymentInProgressContinue" :secondary="t.orders.cancelBlockedOk" @primary="cancelBlocked = false; requestPendingPayment()" @secondary="cancelBlocked = false" />
       <NxNoticeDialog class="pending-order-notice" :open="!!paymentNotice" :title="paymentNotice === 'query' ? pendingCopy.queryFailed : pendingCopy.cannotPay" :body="paymentNoticeReason === pendingCopy.queryFailed ? '' : paymentNoticeReason"
-        :icon="paymentNotice === 'query' ? 'alert' : 'info'" :primary="paymentNotice === 'query' ? pendingCopy.retry : orderAction?.kind === 'cancel' ? recoveryCopy.retryCancel : orderAction || orderCommandUnavailable ? pendingCopy.viewDetails : liveOrder?.status === 'placed' ? pendingCopy.cancelOrder : pendingCopy.viewDetails"
+        :icon="paymentNotice === 'query' ? 'alert' : 'info'" :primary="paymentNotice === 'query' ? pendingCopy.retry : orderAction?.kind === 'cancel' ? recoveryCopy.retryCancel : orderAction || orderCommandUnavailable || liveOrder?.promotionQuoteId ? pendingCopy.viewDetails : liveOrder?.status === 'placed' ? pendingCopy.cancelOrder : pendingCopy.viewDetails"
         :secondary="t.store.coCancel" :busy="pendingPaymentChecking || cancellingOrder || orderCommandQuerying" @primary="runPaymentNoticeAction" @secondary="paymentNotice = ''">
         <text v-if="noticeCancelFailed" class="pending-notice-error" role="alert">{{ pendingCopy.cancelFailed }}</text>
       </NxNoticeDialog>
@@ -200,6 +199,7 @@ import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from "@/lib/checkout-review-amount";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
+import { attributedBundleDiscount } from '@/api/bundle-quote';
 import { ref, computed, watch, nextTick, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -666,10 +666,8 @@ useAutoRecovery({
   retry: () => recoverOrderAction(false),
   repeatMs: 15_000,
 });
-// LOGIC: contract P1 — a wallet-pending activity order (promotionQuoteId, no external payment) needs this bar too: since the
-// rewards card lost its 继续支付原订单 button, the bar is that order's only pay entry.
-const pendingOrderActionsVisible = computed(() => order.value?.status === "placed"
-  && (!order.value.promotionQuoteId || externalPayment.value) && !walletPaymentConfirmed.value);
+const pendingOrderActionsVisible = computed(() => order.value?.status === "placed" && !walletPaymentConfirmed.value
+  && (!order.value.promotionQuoteId || !paymentExpired.value || externalPayment.value));
 // Any state with a next action gets the bottom action bar.
 const stickyActionsVisible = computed(() => !!order.value && (pendingOrderActionsVisible.value || needsRecovery.value
   || order.value.status === 'activated' || order.value.status === 'inventory' || canBuyAgain.value));
@@ -689,6 +687,11 @@ const needsRecovery = computed(() => !!order.value && ['payment_failed','provisi
 const recoveryHint = computed(() => order.value?.status === 'expired' ? t.value.orders.expiredNext : t.value.orders.recoveryNext);
 const canBuyAgain = computed(() => !!order.value && ['activated','inventory','cancelled','expired','refunded'].includes(order.value.status)
   && !payingFromWallet.value && !cancellingOrder.value && !remoteOrderRefreshing.value && !remoteOrderError.value);
+const distinctOrderProducts = computed(() => new Set(order.value?.lineItems?.map(line => line.sku)).size);
+const bundleDiscountOnly = computed(() => !!order.value && Number(order.value.promotionDiscountUsdt) === 0
+  && attributedBundleDiscount(distinctOrderProducts.value, order.value.discount, order.value.promotionDiscountUsdt) !== undefined);
+const buyAgainLabel = computed(() => order.value && commerceOrderIsPaid(order.value) && distinctOrderProducts.value > 1
+  ? pendingCopy.value.buyBundleAgain : t.value.promotion.buyAgain);
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ',');
 }

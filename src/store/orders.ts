@@ -55,6 +55,7 @@ export interface Order {
   subtotal: number;
   unitPrice: number;        // USDT
   discount: number;         // USDT (voucher)
+  promotionDiscountUsdt?: string;
   /** FEAT-DEV02 旧机抵扣(USDT)——仅结算抵减,永不入余额;服务端同事务复算。 */
   tradeInCredit?: number;
   /** 被下架抵扣的旧设备 id(履约与审计追溯用)。 */
@@ -248,6 +249,7 @@ export const useOrders = defineStore("orders", () => {
       subtotal: row.subtotalUsdt,
       unitPrice: row.unitPriceUsdt,
       discount: row.tradeinNo || row.trialSettlement ? 0 : row.discountUsdt,
+      ...(row.promotionDiscountUsdt !== undefined && { promotionDiscountUsdt: row.promotionDiscountUsdt }),
       ...(row.trialSettlement && {
         ...(row.trialSettlement.promoDiscountUsdt > 0 && { promoDiscountUSD: row.trialSettlement.promoDiscountUsdt }),
         ...(row.trialSettlement.offsetUsdt > 0 && { trialOffsetUSD: row.trialSettlement.offsetUsdt }),

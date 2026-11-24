@@ -2,7 +2,7 @@
 <template>
   <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : promotionRoute && promotionCheckout?.orderPending ? t.promotion.pending : auditCopy.review" /></template>
-    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
+    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
       </template>
@@ -278,8 +278,8 @@
          focus opens on the title so Enter does not cancel (03 §3.5). -->
     <NxNoticeDialog :open="leaveKeepOpen" icon="clock" tone="warning" :title="flowCopy.leaveKeepTitle" :body="purchasePaymentCopy(locale.code).keepOrderBody"
       :primary="flowCopy.cancelOrder" primary-tone="danger" :secondary="flowCopy.keepAndBack" focus-title @primary="leaveKeepCancel" @secondary="leaveKeepBack" />
-    <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout" /></view></NxSheet>
-    <NxSheet :open="paymentBlocked !== ''" :title="flowCopy.cannotPay" @close="!checkoutLeaving && (paymentBlocked = '')"><view class="checkout-exit-error"><text>{{ paymentBlocked }}</text><NxButton :label="flowCopy.cancelOrder" :busy="checkoutLeaving" @click="cancelCheckout" /></view></NxSheet>
+    <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout(leaveCancelNeedsReadback)" /></view></NxSheet>
+    <NxSheet :open="paymentBlocked !== ''" :title="flowCopy.cannotPay" @close="!checkoutLeaving && (paymentBlocked = '')"><view class="checkout-exit-error"><text>{{ paymentBlocked }}</text><NxButton :label="flowCopy.cancelOrder" :busy="checkoutLeaving" @click="cancelCheckout()" /></view></NxSheet>
   </AppChassis>
 </template>
 
@@ -381,6 +381,9 @@ import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
 import { uiLocale } from "@/i18n";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
+// #ifdef H5
+import { hasOpenDialog, registerBrowserPageBack } from "@/composables/use-dialog-a11y";
+// #endif
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 
@@ -407,19 +410,9 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 }
 const locale = useLocaleStore();
 const flowCopy = computed(() => checkoutFlowCopy(locale.code));
-// D1 (contract P2). LOGIC: open on the first back (top back, system back, H5 back, Esc) when the page holds a cancellable
-// unpaid original order with no external payment and no unresolved command, before any recover/read; the two handlers only
-// close the dialog until the logic item wires them.
 const leaveKeepOpen = ref(false);
-function leaveKeepCancel() {
-  leaveKeepOpen.value = false;
-  // LOGIC: run the existing cancel (promotion: requestLeave's cancelOrder; ordinary: cancelCheckout), one POST, leave once
-  // the cancel is confirmed, stay on the page with its error otherwise.
-}
-function leaveKeepBack() {
-  leaveKeepOpen.value = false;
-  // LOGIC: leave to the real source without any cancel request; the order stays unpaid.
-}
+let checkoutBackApproved = false;
+let leaveCancelNeedsReadback = false;
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
@@ -487,7 +480,7 @@ const legalCopy = computed(() => ({
   uz: { before: 'Toʻlashdan oldin oʻqing: ', join: ' va ', end: '.' },
 })[uiLocale(locale.code)]);
 const app = useApp();
-const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string}&VoucherEntryContext)|null>(null);
+const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string;fromBundle?:boolean}&VoucherEntryContext)|null>(null);
 const keepCheckoutRecovery = shallowRef<(CheckoutCapacityRecovery & { accountKey: string }) | null>(null);
 const keepCheckoutTarget = computed(() => keepCheckoutRecovery.value?.target ?? null);
 const capacityUnreadableTarget = shallowRef<string | null>(null);
@@ -831,7 +824,7 @@ onLoad(async (options) => {
       const items:PromotionItem[]=o.items ? JSON.parse(o.items.trim().startsWith('%')?decodeURIComponent(o.items):o.items) : o.product ? [{productNo:o.product,quantity:Number(o.quantity??1)}] : [];
       if(!o.orderNo)validatePromotionItems(items);
       const context=voucherEntryContext(o);
-      promotionRoute.value={activityId:context.voucherId?'':o.activityId??'',items,orderNo:o.orderNo,...context};
+      promotionRoute.value={activityId:context.voucherId?'':o.activityId??'',items,orderNo:o.orderNo,fromBundle:o.fromBundle==='1',...context};
     } catch { toast.warn(t.value.promotion.errorNote);void navTo('/store'); }
     checkoutRouteLoaded.value = true;
     return;
@@ -1496,7 +1489,9 @@ function openCheckoutSetup() {
   // #endif
 }
 const checkoutBackHref = computed(() => promotionRoute.value
-  ? promotionStoreHref(promotionRoute.value.activityId,promotionRoute.value)
+  ? promotionRoute.value.orderNo
+    ? '/pages/store/order-detail?id=' + encodeURIComponent(promotionRoute.value.orderNo)
+    : promotionRoute.value.fromBundle ? '/pages/store/bundle' : promotionStoreHref(promotionRoute.value.activityId,promotionRoute.value)
   : product.value ? '/pages/store/detail?id=' + encodeURIComponent(product.value.id) : '/pages/store/store');
 const { imageSrc: checkoutImage, imageError: checkoutImageError } = useProductImage(() => product.value?.imageUrl);
 const voucherDetailsOpen = ref(false);
@@ -2145,9 +2140,51 @@ function releaseSessionOnLeave() {
   }
 }
 
+function canConfirmCheckoutLeave(): boolean {
+  if (checkoutBackApproved || !pageAlive || !pageVisible || !isTopCheckoutPage()
+      || purchasePayment.state.open || paymentSheetOpen.value) return false;
+  if (promotionRoute.value) return promotionCheckout.value?.canConfirmLeave() === true;
+  const created = createdCheckoutOrder.value;
+  if (!created || settledResultReplay.value || created.paymentStatus !== 'PENDING'
+      || confirming || paymentFlowBusy.value || checkoutLeaving.value || pendingCheckoutCreate.value) return false;
+  const original = orders.getById(created.orderNo);
+  if (original && original.status !== 'placed') return false;
+  try {
+    return !readOrderAction(app.accountKey, created.orderNo) && !pendingOrderPayment(app.accountKey, created.orderNo);
+  } catch {
+    return false;
+  }
+}
+
+function leaveCheckout() {
+  checkoutBackApproved = true;
+  promotionCheckout.value?.approveBack();
+  navBack(checkoutBackHref.value);
+}
+
+function leaveKeepBack() {
+  if (!leaveKeepOpen.value) return;
+  leaveKeepOpen.value = false;
+  leaveCheckout();
+}
+
+async function leaveKeepCancel() {
+  if (!leaveKeepOpen.value) return;
+  leaveKeepOpen.value = false;
+  if (!canConfirmCheckoutLeave()) return;
+  if (promotionRoute.value) {
+    if (await promotionCheckout.value?.cancelForLeave()) leaveCheckout();
+  } else {
+    await cancelCheckout(true);
+  }
+}
+
 function requestCheckoutBack() {
-  if (promotionRoute.value) { promotionCheckout.value?.back(); return; }
+  if (purchasePayment.state.open) return;
   if (paymentSheetOpen.value) { closePaymentSheet(); return; }
+  if (leaveKeepOpen.value) { leaveKeepBack(); return; }
+  if (canConfirmCheckoutLeave()) { leaveKeepOpen.value = true; return; }
+  if (promotionRoute.value) { promotionCheckout.value?.back(); return; }
   void cancelCheckout();
 }
 async function retryOriginalCheckout() {
@@ -2182,7 +2219,7 @@ async function retryOriginalCheckout() {
     }
   }
 }
-async function cancelCheckout() {
+async function cancelCheckout(explicitLeave = false) {
   if (checkoutLeaving.value || paymentFlowBusy.value || confirming) return;
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value) {
@@ -2198,7 +2235,11 @@ async function cancelCheckout() {
     const action = readOrderAction(scope.accountKey, created.orderNo);
     // A bank or USDT payment already started cannot be cancelled (ORDER_EXTERNAL_PAYMENT_IN_PROGRESS): back leaves the
     // order as it is, the payment bar keeps it in reach, and an unpaid one closes at its deadline.
-    if (action?.kind === 'pay' && action.paymentMethod === 'EXTERNAL') { navBack(checkoutBackHref.value); return; }
+    if ((action?.kind === 'pay' && action.paymentMethod === 'EXTERNAL') || pendingOrderPayment(scope.accountKey, created.orderNo)) {
+      leaveCheckout();
+      return;
+    }
+    if (explicitLeave && action?.kind === 'pay') return;
     let unseenPaymentKey: string | null = null;
     if (action?.kind === 'pay') {
       const outcome = await readPaymentCommand(apiClient, 'order-pay', action.key);
@@ -2220,6 +2261,8 @@ async function cancelCheckout() {
     if (order.status !== 'cancelled' && order.status !== 'expired') {
       if (order.status !== 'placed') throw new Error('ORIGINAL_ORDER_COMMAND_UNRESOLVED');
       if (unseenPaymentKey) clearOrderAction(scope.accountKey, created.orderNo, unseenPaymentKey, false);
+      // After an ambiguous response, the explicit retry only reads the original until its state is settled.
+      if (explicitLeave && action?.kind === 'cancel') throw new Error('ORDER_CANCELLATION_UNCONFIRMED');
       const cancellation = beginOrderAction(scope.accountKey, 'cancel', created.orderNo, null);
       const cancelled = await orders.cancelOrderRemote(created.orderNo);
       if (!isCurrentCheckoutRoute(scope)) return;
@@ -2229,16 +2272,20 @@ async function cancelCheckout() {
           clearOrderAction(scope.accountKey, created.orderNo, cancellation.key);
           orderId.value = created.orderNo; presentSettledPurchase(false); return;
         }
-        throw new Error('ORDER_CANCELLATION_UNCONFIRMED');
+        if (latest?.status !== 'expired') throw new Error('ORDER_CANCELLATION_UNCONFIRMED');
       }
       clearOrderAction(scope.accountKey, created.orderNo, cancellation.key);
-    } else if (unseenPaymentKey) clearOrderAction(scope.accountKey, created.orderNo, unseenPaymentKey, false);
+    } else {
+      const settledKey = action?.kind === 'cancel' ? action.key : unseenPaymentKey;
+      if (settledKey) clearOrderAction(scope.accountKey, created.orderNo, settledKey, false);
+    }
     forgetCheckoutOrder(scope.accountKey, scope.productNo, created.orderNo);
     retireRemoteOrderKey();
     createdCheckoutOrder.value = null;
-    navBack(checkoutBackHref.value);
+    leaveCheckout();
   } catch {
     leaveError = t.value.orders.resultReadback;
+    leaveCancelNeedsReadback = explicitLeave;
   } finally {
     // Hiding invalidates route writes, but must still release this attempt's UI.
     if (attempt === checkoutLeaveAttempt) {
@@ -3166,10 +3213,23 @@ watch([documentReadVisible, foregroundReadAllowed], ([visible, allowed]) => {
     refreshForegroundCheckout();
   }
 }, { flush: "post" });
-onMounted(() => window.addEventListener("popstate", restoreCheckoutFromHistory));
+let unregisterBrowserBack: (() => void) | undefined;
+function checkoutEscape(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || event.defaultPrevented || event.repeat || hasOpenDialog() || !canConfirmCheckoutLeave()) return;
+  event.preventDefault();
+  leaveKeepOpen.value = true;
+}
+onMounted(() => {
+  window.addEventListener("popstate", restoreCheckoutFromHistory);
+  window.addEventListener("keydown", checkoutEscape);
+  unregisterBrowserBack = registerBrowserPageBack(() => canConfirmCheckoutLeave()
+    ? () => { leaveKeepOpen.value = true; }
+    : undefined);
+});
 // #endif
 
 onShow(() => {
+  checkoutBackApproved = false;
   // #ifdef H5
   // uni-app also calls page onShow when the browser tab becomes visible.
   if (remoteApiEnabled && pageVisible && checkoutHistoryEntry) return;
@@ -3609,6 +3669,8 @@ function cleanup() {
   if (!pageAlive) return;
   // #ifdef H5
   window.removeEventListener("popstate", restoreCheckoutFromHistory);
+  window.removeEventListener("keydown", checkoutEscape);
+  unregisterBrowserBack?.();
   pauseForegroundCheckout();
   // #endif
   stopCheckoutCapacityRelease();

@@ -573,7 +573,7 @@ async function openBundleReview(list: Product[], target: BundleReviewTarget): Pr
       toast.warn(t.value.bundle.checkoutOutcomeUnknown);
       await navTo("/pages/store/orders");
     } else {
-      await navTo(promotionCheckoutHref(items));
+      await navTo(promotionCheckoutHref(items, undefined, { fromBundle: true }));
     }
   }catch{toast.warn(t.value.bundle.checkoutOutcomeUnknown);}
   finally{submitting.value=false;}
