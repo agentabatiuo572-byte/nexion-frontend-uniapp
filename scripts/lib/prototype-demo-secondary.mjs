@@ -289,7 +289,8 @@ export function secondaryDemo(url,state,request,walletBills){
   }
   if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
   if(p==='/api/app/team/insights/commissions'){
-    const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other'];
+    const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other',
+      ...(state.rankPreset&&state.rankPreset!=='follow'?['vrank_salary']:[])];
     if(!Number.isInteger(page)||page<1||!Number.isInteger(pageSize)||pageSize<1||pageSize>100){
       throw Object.assign(new Error('TEAM_COMMISSIONS_PAGE_INVALID'),{status:422});
     }
@@ -329,7 +330,8 @@ export function secondaryDemo(url,state,request,walletBills){
     if(!Number.isInteger(page)||page<1||!Number.isInteger(pageSize)||pageSize<1||pageSize>100)invalid('TEAM_UNILEVEL_PAGE_INVALID');
     const window=demoTeamPeriod(period,now,url.searchParams.get('snapshotAt'));
     const seedAt=state.previewFactsAt??now;
-    const commissionRows=demoCommissionEvents(state,seedAt).filter(row=>row.kind==='unilevel');
+    // Rank presets keep each layer-2 purchase as one dual-currency row, like the v2 purchase rows (DESIGN F2b).
+    const commissionRows=(state.rankPreset&&state.rankPreset!=='follow'?demoCommissionGroups(state,seedAt).map(row=>({currency:'DUAL',...row})):demoCommissionEvents(state,seedAt)).filter(row=>row.kind==='unilevel');
     const purchases=version===2?demoCommissionGroups(state,seedAt)
       .filter(row=>row.kind==='direct_purchase').map(row=>({...row,currency:'DUAL',policyVersion:3,nexUsdtPrice:.128})):[];
     const all=[...commissionRows,...purchases].filter(row=>window.contains(row.ts)).sort((a,b)=>b.ts-a.ts||b.id.localeCompare(a.id))

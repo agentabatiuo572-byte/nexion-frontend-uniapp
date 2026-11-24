@@ -73,7 +73,31 @@ export function demoCommissionGroups(state,at) {
     amountUSDT:legacy?100:120,amountNEX:0,status:legacy?'frozen':'unlocked',
     ts:matchedAt,unlockAt:Math.min(at,matchedAt+7*day),
   };
+  if(state.rankPreset&&state.rankPreset!=='follow')return [...demoRankPresetRewardRows(state,at),binary].sort((a,b)=>b.ts-a.ts);
   return [purchase,device,network,binary].sort((a,b)=>b.ts-a.ts);
+}
+
+// Team-reward rows for the my-rank boards F2 / F2b / F3 and the monthly-reward row (DESIGN F2, 5, 6):
+// friends' purchases (layer 1), friends-of-friends' purchases (layer 2), device earnings on both layers, and one
+// credited monthly reward at the preset rank's salary. Only used while a rank preset is selected.
+function demoRankPresetRewardRows(state,at) {
+  const hour=3600000,v=Number(state.rankPreset.slice(1));
+  const salary=[0,0,20,50,150,500,1500,4000,15000][v]??0;
+  const row=(id,kind,name,layer,h,usdt,uvt,status,extra={})=>({id:'demo-rank-'+id,kind,sourceUserName:name,layer,
+    orderId:'DEMO-RANK-'+id,sourceRef:'DEMO-RANK-'+id,orderAmountUSD:299,amountUSDT:usdt,amountNEX:uvt,status,
+    ts:at-h*hour,unlockAt:status==='cooling'?at+20*day:at-h*hour,...extra});
+  return [
+    row('p1','direct_purchase','Lina',1,1,13.16,2.6,'cooling'),
+    row('p2','direct_purchase','Kai',1,4,6.56,1.3,'unlocked'),
+    row('p3','direct_purchase','Omar',1,6,4.7,0,'unlocked'),
+    row('t1','unilevel','Minh Anh',2,2,6.58,1.3,'cooling'),
+    row('t2','unilevel','Rustam Abdullayev',2,7,3.28,0.66,'unlocked'),
+    row('d1','direct_device_earning','Lina',1,1,0.5,10,'cooling',{sourceDeviceId:'DEMO-LINA-S1'}),
+    row('d2','direct_device_earning','Minh Anh',2,2,0.1,2,'cooling',{sourceDeviceId:'DEMO-MINH-S1'}),
+    row('d3','direct_device_earning','Kai',1,4,1.25,25,'unlocked',{sourceDeviceId:'DEMO-KAI-S1'}),
+    row('d4','direct_device_earning','Rustam Abdullayev',2,7,0.05,1,'unlocked',{sourceDeviceId:'DEMO-RUSTAM-S1'}),
+    ...(salary>0?[row('s1','vrank_salary','V'+v,0,3,salary,0,'unlocked',{orderId:undefined,sourceRef:undefined,orderAmountUSD:undefined})]:[]),
+  ];
 }
 
 export function demoCommissionEvents(state,at) {
