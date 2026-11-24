@@ -447,7 +447,7 @@ const fil: typeof zh = {
   warnNet: 'Magpadala ng USDT sa {network} lang. Hindi na mababawi ang naipadala sa ibang network.', warnMin: 'Hindi bababa sa {min}\u00A0USDT bawat transfer; hindi pa makakredito ang mas mababa. Maaaring maningil ng network fee ang wallet mo.',
   addrPreparingTitle: 'Inihahanda ang deposit address', addrPreparing: 'Lalabas ito nang kusa kapag handa na.', addrPausedTitle: 'Naka-pause ang deposit sa {network}', addrPaused: 'Huwag munang magpadala. Lalabas muli ang address kapag bukas na.',
   addrErrorTitle: 'Hindi ma-load ang deposit address', addrError: 'Awtomatikong sinusubukan muli.', orderErrorTitle: 'Hindi ma-load ang order', orderError: 'Awtomatikong sinusubukan muli. Huwag munang magpadala.',
-  openIntentTitle: 'Isinasagawa ang card payment ng order na ito', openIntentBody: 'Tapusin ito sa orihinal na payment page. Huwag magbayad nang dalawang beses.', openIntent: 'Buksan ang bayad',
+  openIntentTitle: 'May card payment na isinasagawa para sa order na ito', openIntentBody: 'Tapusin ito sa orihinal na payment page. Huwag magbayad nang dalawang beses.', openIntent: 'Buksan ang bayad',
   openIntentUsdtTitle: 'Isinasagawa ang {network} payment ng order na ito',
   reviewHoldTitle: 'Kinukumpirma ang bayad ng order na ito', reviewHold: 'Hindi pa puwedeng magbayad muli hangga’t hindi kumpirmado. Kontakin ang support kung may tanong.',
   expiredTitle: 'Kinansela ang order dahil lumampas sa oras', expiredBody: 'Mananatili sa balance mo ang naipadalang USDT para sa ibang bili.', paidTitle: 'Bayad na ang order', paidAt: 'Oras ng bayad',
