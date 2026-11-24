@@ -79,6 +79,7 @@ import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { useVRank } from "@/store/v-rank";
 import { teamRuleGuideCopy } from "@/components/team/team-rule-guide-copy";
 import { deviceLevel2On, deviceLevel2RatePct } from "@/lib/device-earning-level2";
+import { creditsAtOnce } from "@/lib/reward-cooling";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
@@ -217,7 +218,10 @@ const purchaseCoolingDays = computed(() => {
 });
 const detailsSummary = computed(() => {
   const days = filter.value === "device_earning" ? policy.value?.deviceEarning.coolingDays ?? null : purchaseCoolingDays.value;
-  return days === null ? rankCopy.value.f2Details : fmt(filter.value === "device_earning" ? rankCopy.value.f2DevDetailsSum : rankCopy.value.f2DetailsSum, { d: days });
+  const device = filter.value === "device_earning", copy = rankCopy.value;
+  if (days === null) return copy.f2Details;
+  if (creditsAtOnce(days)) return device ? copy.f2DevDetailsSumNow : copy.f2DetailsSumNow;
+  return fmt(device ? copy.f2DevDetailsSum : copy.f2DetailsSum, { d: days });
 });
 const ruleDescription = computed(() => {
   const p = policy.value;
@@ -225,12 +229,13 @@ const ruleDescription = computed(() => {
   if (filter.value !== "device_earning") {
     if (p.settlementMode === "SEVEN_V2" && (p.purchaseSplitConfigured === false || p.sevenLayerReference?.baseRatePct === null || p.sevenLayerReference?.coolingDays === null)) return t.value.directReferral.purchaseUnconfigured;
     const current = vrank.remoteReady ? vrank.ladder[vrank.myRank] : undefined;
-    return fmt(rankCopy.value.f2Rule, { r: current ? `V${current.v}` : "—", a: pctText(current ? current.directBonus * 100 : null), b: pctText(rankPurchaseL2Pct.value), d: purchaseCoolingDays.value ?? "—" });
+    return fmt(creditsAtOnce(purchaseCoolingDays.value) ? rankCopy.value.f2RuleNow : rankCopy.value.f2Rule, { r: current ? `V${current.v}` : "—", a: pctText(current ? current.directBonus * 100 : null), b: pctText(rankPurchaseL2Pct.value), d: purchaseCoolingDays.value ?? "—" });
   }
   const device = p.deviceEarning;
   if (!device.enabled) return t.value.directReferral.disabled;
   const values = { a: pctText(device.totalRatePct), b: pctText(deviceLevel2RatePct(p)), u: formatHowNumber(device.usdtSharePct, dateLocale()), n: formatHowNumber(100 - device.usdtSharePct, dateLocale()), d: device.coolingDays };
-  return fmt(deviceL2On.value ? rankCopy.value.f2DevRule : rankCopy.value.f2DevRuleL1, values);
+  const now = creditsAtOnce(device.coolingDays);
+  return fmt(deviceL2On.value ? (now ? rankCopy.value.f2DevRuleNow : rankCopy.value.f2DevRule) : (now ? rankCopy.value.f2DevRuleL1Now : rankCopy.value.f2DevRuleL1), values);
 });
 // Records grouped by local calendar day, newest group first (events arrive newest first).
 const eventDays = computed(() => {

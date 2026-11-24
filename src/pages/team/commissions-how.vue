@@ -17,7 +17,7 @@
           <HowSection anchor="friend-purchase" :title="rankCopy.f1Sec" :lead="rankCopy.f1Lead" list>
             <HowItem :n="1" :title="rankCopy.f1I1T" :body="rankCopy.f1I1D" />
             <HowItem :n="2" :title="rankCopy.f1I2T" :body="rankCopy.f1I2D" />
-            <HowItem :n="3" :title="rankCopy.f1I3T" :body="fmt(rankCopy.f1I3D, { d: purchaseCoolingDays })" />
+            <HowItem :n="3" :title="creditsAtOnce(purchaseCoolingDays) ? rankCopy.f1NowT : rankCopy.f1I3T" :body="creditsAtOnce(purchaseCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1I3D, { d: purchaseCoolingDays })" />
           </HowSection>
 
           <HowSection anchor="purchase-rates" :title="rankCopy.f1RatesT" :lead="myRankCode ? fmt(rankCopy.f1RatesLead, { r: myRankCode }) : undefined">
@@ -30,7 +30,7 @@
           <HowSection anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
             <HowItem :n="1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
             <HowItem :n="2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
-            <HowItem :n="3" :title="rankCopy.f1DevI3T" :body="fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays })" />
+            <HowItem :n="3" :title="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowT : rankCopy.f1DevI3T" :body="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays })" />
           </HowSection>
         </template>
 
@@ -121,6 +121,7 @@ import { buildCommissionsHowContent, createCommissionsHowResource, type Commissi
 import { navBack } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { deviceLevel2On, deviceLevel2RatePct } from "@/lib/device-earning-level2";
+import { creditsAtOnce } from "@/lib/reward-cooling";
 import { fmt, dateLocale } from "@/i18n/format";
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { serverLanguage } from "@/i18n";

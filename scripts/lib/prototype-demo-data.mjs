@@ -12,7 +12,7 @@ import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mj
 import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
-import { rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankReviewOptions, rankSalaryOptions } from './prototype-demo-rank-presets.mjs';
+import { rankCoolingOptions, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankReviewOptions, rankSalaryOptions } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
 import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
@@ -154,6 +154,7 @@ export const demoOptions = {
   rankPreset:rankPresetOptions,
   rankSalaryState:rankSalaryOptions,
   rankReviewState:rankReviewOptions,
+  rankCoolingState:rankCoolingOptions,
   repurchaseState:['follow','inside','boundary','outside'].map(value=>[value,value]),
   promotionBuyer:[['returning','购机活动 · 已购账号'],['sponsored-new','购机活动 · 受邀首购买家']],
   promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],

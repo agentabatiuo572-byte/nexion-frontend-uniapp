@@ -19,7 +19,9 @@ export const RANK_RULES=[
 export const rankPresetOptions=[['follow','跟随原演示数据'],...RANK_RULES.map(([v])=>['v'+v,'V'+v+(v===8?'（会员）':v===7?'（冲 V8）':'')])];
 export const rankSalaryOptions=[['present','有月薪（V2 起本月可领）'],['absent','没有 salary 字段（月薪接口未上线）'],['unavailable','月薪读取失败（salary null）']];
 export const rankReviewOptions=[['required','V8 需审核（reviewRequired）'],['off','V8 不带审核标记']];
-export const rankPresetDefaults={rankPreset:'follow',rankSalaryState:'present',rankReviewState:'required'};
+export const rankCoolingOptions=[['normal','好友购买冷却 7 天'],['zero','好友购买不冷却（0 天）']];
+// rankCoolingState zero: the direct-referral purchase cooling is 0 days, for the credited-right-away wording.
+export const rankPresetDefaults={rankPreset:'follow',rankSalaryState:'present',rankReviewState:'required',rankCoolingState:'normal'};
 
 const toward=(current,target)=>current+Math.floor((target-current)*.6);
 
