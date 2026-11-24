@@ -102,7 +102,7 @@
           <view class="trust-block__head"><text class="trust-block__title">{{ center.teamTitle }}</text></view>
           <view class="trust-surface">
             <view v-for="row in verifiedLeadershipRows" :key="row.Name" class="trust-person" role="link" tabindex="0" @click="openHref(row.Url)">
-              <view class="trust-person__avatar"><text>{{ initials(row.Name) }}</text></view>
+              <view class="trust-person__avatar"><text class="nx-avatar-letter">{{ initials(row.Name) }}</text></view>
               <view class="min-w-0" style="flex: 1">
                 <text class="block trust-row__title">{{ row.Name }}</text>
                 <text class="block trust-row__body">{{ row.Role }}</text>
