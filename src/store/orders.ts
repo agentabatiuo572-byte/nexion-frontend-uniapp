@@ -303,7 +303,7 @@ export const useOrders = defineStore("orders", () => {
     }
   }
 
-  async function loadMoreRemote(): Promise<void> {
+  async function loadMoreRemote() {
     if (!remoteApiEnabled || loadingMore.value || !nextCursor.value) return;
     const cursor = nextCursor.value;
     const requestBoundKey = boundKey;
@@ -327,6 +327,7 @@ export const useOrders = defineStore("orders", () => {
         ...canonical.orders.map(fromCanonical).filter((order) => !known.has(order.id)),
       ];
       nextCursor.value = canonical.nextCursor ?? null;
+      return isCurrent;
     } finally {
       if (isCurrent()) loadingMore.value = false;
     }
@@ -366,24 +367,24 @@ export const useOrders = defineStore("orders", () => {
     await Promise.all([...failedOrderReadbacks.value].map(id => reconcileRemoteOrder(id, stillVisible)));
   }
 
-  async function ensureRemoteOrder(id: string): Promise<Order | undefined> {
-    if (!remoteApiEnabled) return getById(id);
-    const requestBoundKey = boundKey;
-    const requestEpoch = boundEpoch;
-    const requestRunScope = captureRuntimeRevision();
-    const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
-      && isCurrentRuntimeRevision(requestRunScope);
-    await refreshRemote();
-    if (!isCurrent()) return undefined;
-    let found = getById(id);
+  /** A null lookup was invalidated or incomplete. Only a current, exhausted lookup confirms absence. */
+  async function lookupRemoteOrder(id: string) {
+    if (!remoteApiEnabled) return { order: getById(id), isCurrent: () => true };
+    let isCurrent = (await refreshRemote())?.isCurrent;
     const visited = new Set<string>();
-    while (!found && nextCursor.value && !visited.has(nextCursor.value)) {
-      visited.add(nextCursor.value);
-      await loadMoreRemote();
-      if (!isCurrent()) return undefined;
-      found = getById(id);
+    while (isCurrent?.()) {
+      const order = getById(id);
+      const cursor = nextCursor.value;
+      if (order || !cursor) return { order, isCurrent };
+      if (visited.has(cursor)) break;
+      visited.add(cursor);
+      isCurrent = await loadMoreRemote();
     }
-    return found;
+    return null;
+  }
+
+  async function ensureRemoteOrder(id: string): Promise<Order | undefined> {
+    return (await lookupRemoteOrder(id))?.order;
   }
 
   async function cancelOrderRemoteResult(id: string): Promise<'cancelled' | 'payment-in-progress' | 'unconfirmed'> {
@@ -653,7 +654,7 @@ export const useOrders = defineStore("orders", () => {
     currentAccountBindingRevision,
     refreshRemote,
     loadMoreRemote,
-    ensureRemoteOrder, reconcileRemoteOrder, failedOrderReadbacks, retryOrderReadbacks,
+    ensureRemoteOrder, lookupRemoteOrder, reconcileRemoteOrder, failedOrderReadbacks, retryOrderReadbacks,
   };
 });
 

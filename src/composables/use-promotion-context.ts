@@ -7,6 +7,7 @@ import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { canPreviewPromotion, createPromotionReadFence, isPromotionActive } from '@/lib/promotion-entry';
 import { litePromotion } from '@/lib/promotion-landing';
+import { isTransientReadFailure } from '@/lib/remote-read-failure';
 
 /** Shared by the existing catalog/detail/bundle surfaces; no qualification calculation. */
 export function usePromotionContext(activityId: Ref<string>, retainPresentation = false) {
@@ -36,8 +37,10 @@ export function usePromotionContext(activityId: Ref<string>, retainPresentation 
       // Lite: phone rules are dropped; a campaign left with nothing for the web is treated as absent.
       activity.value = isPromotionActive(result) ? litePromotion(result) : null;
       status.value = 'ready';
-    } catch {
-      if (visible && fence.current(ticket) && identity === passiveTabReadScope()) { activity.value = null; status.value = 'error'; }
+    } catch (cause) {
+      if (!visible || !fence.current(ticket) || id !== activityId.value || identity !== passiveTabReadScope()) return;
+      if (!isTransientReadFailure(cause)) activity.value = null;
+      status.value = 'error';
     }
   }
   watch(activityId, () => { activity.value = null; void refresh(true); });
@@ -49,6 +52,6 @@ export function usePromotionContext(activityId: Ref<string>, retainPresentation 
   onShow(() => { visible = true; void refresh(true); });
   onHide(() => { visible = false; fence.invalidate(); status.value = 'idle'; if (!retainPresentation) activity.value = null; });
   onBeforeUnmount(() => { visible = false; fence.invalidate(); activity.value = null; });
-  const available = computed(() => !environmentInvalidated && status.value === 'ready' && canPreviewPromotion(activity.value));
+  const available = computed(() => !environmentInvalidated && canPreviewPromotion(activity.value));
   return { activity, status, available, refresh };
 }

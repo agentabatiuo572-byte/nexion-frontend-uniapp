@@ -995,7 +995,7 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
     if ((orderAction.value || orderCommandUnavailable.value) && !externalPayment.value) {
       await recoverOrderAction(false);
       if (!isCurrentDetailScope(scope) || orderCommandUnavailable.value || orderAction.value
-          && !(network && orderAction.value.paymentMethod === 'WALLET' && resumePaymentAllowed.value)) return;
+          && !(orderAction.value.paymentMethod === 'WALLET' && resumePaymentAllowed.value)) return;
       if (!liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
       original = liveOrder.value;
     }
@@ -1117,14 +1117,14 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
   const originalOrder = liveOrder.value;
   const requestOrderNo = liveOrder.value.id;
   const requestAmountUsdt = liveOrder.value.total;
-  const walletOnly = topupDeadline !== undefined;
+  const fromOrderTopup = topupDeadline !== undefined;
   const deadlineAt = topupDeadline ? Date.parse(topupDeadline) : originalOrder.expiresAt;
   const requestItems = liveOrder.value.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
     ?? [{ productNo: liveOrder.value.productId, quantity: liveOrder.value.quantity }];
   const paymentOrderScopeCurrent = () => isCurrentDetailScope(scope) && !orderEnvironmentInvalidated.value;
   function paymentOrderMatches(): boolean {
     const current = liveOrder.value;
-    const cutoff = walletOnly ? deadlineAt : current?.expiresAt;
+    const cutoff = fromOrderTopup ? deadlineAt : current?.expiresAt;
     if (!current || current.id !== requestOrderNo || current.total !== requestAmountUsdt
         || current.status !== 'placed' || cutoff == null || cutoff <= Date.now()) return false;
     const items = current.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
@@ -1140,6 +1140,7 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
     return paymentOrderMatches() ? 'current' : 'changed';
   }
   const receiptScope = app.captureRemoteAccountRequest();
+  const walletOnly = canResumeWalletPayment.value;
   payingFromWallet.value = true;
   paymentSheetOpen.value = false;
   let paymentConfirmed = false;
@@ -1161,8 +1162,8 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
             throw error;
           }
         },
-        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},scopeCurrent:paymentOrderScopeCurrent,checkCurrent:checkPaymentOrder,commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
-          orderNo:requestOrderNo,deadlineAt:deadlineAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')}, walletOnly);
+        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},walletOnly,scopeCurrent:paymentOrderScopeCurrent,checkCurrent:checkPaymentOrder,commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
+          orderNo:requestOrderNo,deadlineAt:deadlineAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')}, fromOrderTopup);
       // A refused payment means this page's order is out of date.
       if (!receipt) { if (isCurrentDetailScope(scope)) void refreshOrder(); return; }
     if (!isCurrentDetailScope(scope)) return;
@@ -1197,7 +1198,7 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
       // the next attempt is a new command, and give the reason, not "confirming".
       const message = asApiError(error).message;
       const rejection = orderPaymentRejection(error, locale.code);
-      const topupChanged = walletOnly && topupNetwork.value && orderTopupPaymentChanged(error);
+      const topupChanged = fromOrderTopup && topupNetwork.value && orderTopupPaymentChanged(error);
       if ((rejection || topupChanged || message === "ORDER_WALLET_INSUFFICIENT") && orderAction.value?.kind === 'pay') {
         clearOrderAction(scope.accountScope.accountKey, requestOrderNo, orderAction.value.key, true);
         orderAction.value = null;

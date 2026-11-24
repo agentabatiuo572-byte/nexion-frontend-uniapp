@@ -25,6 +25,8 @@ export const PAYMENT_BAR_HEIGHT_KEY: InjectionKey<Ref<number>> = Symbol('nx-paym
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
   scopeCurrent?: () => boolean;
+  /** The server allowed resuming an existing wallet command with its original key. */
+  walletOnly?: boolean;
   /** Recheck order facts after any read already in flight. */
   checkCurrent?: () => Promise<PurchaseContextCheck>;
   refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
@@ -74,7 +76,7 @@ function paymentRefusalNotice(cause: ApiError, kind: PurchaseKind): DefinitePaym
     }
   }
 }
-const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
+const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod, walletOnly: false,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', productNo: '', image: '', deadlineAt: null as number | null,
   policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, orderPayUsdtRoute: null as string | null,
   orderTopupNetworks: [] as ExternalPaymentMethod[], notice: '' as PurchaseNotice, cashier: false,
@@ -500,6 +502,7 @@ function schedule(version: number, accountKey: string, failed: boolean) {
     inReview ? REVIEW_POLL_MS : failed ? POLL_BACKOFF[Math.min(pollFailures - 1, POLL_BACKOFF.length - 1)]! : POLL_MS);
 }
 function loadPolicy(): Promise<void> {
+  if (state.walletOnly) return Promise.resolve();
   if (policyRead) return policyRead;
   const request = readPolicy().finally(() => { if (policyRead === request) policyRead = null; });
   policyRead = request;
@@ -534,6 +537,7 @@ async function readPolicy() {
 }
 const orderTopupMethod = (method: PurchaseMethod) => method === 'CREGIS_USDT_BSC' || method === 'CREGIS_USDT_ERC20';
 function available(method: PurchaseMethod) {
+  if (state.walletOnly) return method === 'WALLET';
   if (!canSelectNewUsdtNetwork(method)) return false;
   if (state.kind === 'ORDER_PAY' && method !== 'HDPAY_BANK' && method !== 'WALLET') {
     return !!state.orderNo && state.orderPayUsdtRoute === 'WALLET_TOPUP' && state.orderTopupNetworks.includes(method);
@@ -581,6 +585,7 @@ function acceptQuoteContext(check: PurchaseContextCheck): boolean {
 }
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || state.originalRecovery || state.concluded || !context) return;
+  if (state.walletOnly && method !== 'WALLET') return;
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
   if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; state.retryNotice = ''; }
@@ -943,7 +948,7 @@ function choosePaymentMethodAgain() {
   Object.assign(state, { notice: '', concluded: false, quote: null, deadlineAt: context.deadlineAt ?? null });
   choose('WALLET');
 }
-function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload' | 'orderNo' | 'image' | 'deadlineAt'> & { amount?: number | string }, pending: PendingExternal | null) {
+function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload' | 'orderNo' | 'image' | 'deadlineAt' | 'walletOnly'> & { amount?: number | string }, pending: PendingExternal | null) {
   const accountKey = account();
   accountBindingEpoch = useApp().accountBindingEpoch;
   stopTimers(); requestVersion++; policyVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
@@ -952,7 +957,7 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'payload'
   const productNo = value.kind === 'TRIAL_CONVERT' ? value.payload.productNo : value.payload.targetProductNo;
   Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', productNo: typeof productNo === 'string' ? productNo.trim() : '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null,
-    policy: null, orderPayUsdtRoute: null, orderTopupNetworks: [], notice: '', retryNotice: '', cashier: false,
+    policy: null, walletOnly: value.walletOnly === true, orderPayUsdtRoute: null, orderTopupNetworks: [], notice: '', retryNotice: '', cashier: false,
     pausedPaymentMethod: null, quote: null, intent: null, pending, originalRecovery: null, orderTopupIntent: null,
     loading: false, retrying: false, reading: false, busy: false, canResubmit: false, concluded: false });
 }

@@ -224,13 +224,16 @@ function jumpToSuggestions(){
   const reduce=typeof window!=='undefined'&&window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   if(typeof document!=='undefined'){const target=document.getElementById('bundle-more');target?.scrollIntoView({block:'start',behavior:reduce?'auto':'smooth'});target?.focus({preventScroll:true});}
 }
+function selectedProductUnavailable(id: string) {
+  return (catalogStatus.value === 'ready' && !productFor(id))
+    || (!!scopeId.value && !!activity.value && !activity.value.productNos.includes(id));
+}
 function selectedProductBlock(id: string) {
   if (catalogStatus.value === 'ready') {
     const product = productFor(id);
-    if (!product || !isProductAvailable(product, phase.value) || productOutOfStock(product)) return t.value.store.temporarilyOutOfStock;
+    if (product && (!isProductAvailable(product, phase.value) || productOutOfStock(product))) return t.value.store.temporarilyOutOfStock;
   }
-  if (scopeId.value && activity.value && !activity.value.productNos.includes(id)) return t.value.promotion.noMatchingProducts;
-  return '';
+  return selectedProductUnavailable(id) ? t.value.promotion.noMatchingProducts : '';
 }
 /** Tile tag (03 §3.8 neutral unavailable): one short word on one line; the full reason is in the tray note. */
 function tileTag(id: string) {
@@ -241,7 +244,7 @@ function tileTag(id: string) {
 const selectionBlock = computed(() => selection.value.map(item => selectedProductBlock(item.productNo)).find(Boolean) ?? '');
 const productsReady = computed(() => catalogStatus.value === 'ready' && !selectionBlock.value);
 const canReadQuote=computed(()=>visible.value&&foregroundReadAllowed()&&signedIn.value&&app.accountKey!=='default'
-  &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
+  &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||contextStatus.value==='ready'&&available.value));
 const canContinue=computed(()=>canReadQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE'&&!termsMissing.value);
 const canOpenDevices=computed(()=>visible.value&&signedIn.value&&!selectionBlock.value&&!activityProductsBlock.value&&quoteBlock.value==='capacity');
 useAutoRecovery({
@@ -275,7 +278,11 @@ watch([selection, canReadQuote, quoteStatus, quoteBlock, quoteIneligible], (_, _
 }, { immediate: true });
 function add(productNo:string){if(selection.value.length>=8||totalUnits.value>=100||!suggestions.value.some(product=>product.id===productNo))return;selection.value=[...selection.value,{productNo,quantity:1}];}
 function remove(productNo:string){selection.value=selection.value.filter(item=>item.productNo!==productNo);}
-function changeQuantity(productNo:string,delta:number){const item=selection.value.find(entry=>entry.productNo===productNo);if(!item||item.quantity+delta<1||totalUnits.value+delta>100)return;selection.value=selection.value.map(entry=>entry.productNo===productNo?{...entry,quantity:entry.quantity+delta}:entry);}
+function changeQuantity(productNo:string,delta:number){
+  const item=selection.value.find(entry=>entry.productNo===productNo);
+  if(!item||item.quantity+delta<1||totalUnits.value+delta>100||selectedProductUnavailable(productNo))return;
+  selection.value=selection.value.map(entry=>entry.productNo===productNo?{...entry,quantity:entry.quantity+delta}:entry);
+}
 function clearScope(){invalidate();void navTo(promotionStoreHref());}
 function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(promotionBundleHref(scopeId.value,selection.value)));}
 async function refreshQuote(recheckCapacity=false){

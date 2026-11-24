@@ -2,8 +2,8 @@
 <template>
   <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : promotionRoute && promotionCheckout?.orderPending ? t.promotion.pending : auditCopy.review" /></template>
-    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle"
-      :topup-network="promotionRoute.topupNetwork" :external-order-no="cancelBlockedPayment?.orderNo" :leave-confirmation-open="leaveKeepOpen" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment">
+    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch+':'+promotionCheckoutRevision" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle"
+      :topup-network="promotionRoute.topupNetwork" :external-order-no="cancelBlockedPayment?.orderNo" :leave-confirmation-open="leaveKeepOpen" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment" @restore-routed-order="promotionCheckoutRevision += 1">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
       </template>
@@ -291,6 +291,7 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
@@ -423,7 +424,8 @@ let checkoutBackApproved = false;
 type CheckoutLeaveIntent = 'resume-cancel' | 'cancel' | 'confirmed-leave';
 let checkoutLeaveRetry: CheckoutLeaveIntent = 'cancel';
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
-const originalOrderReadUnavailable = ref(false);
+const originalCheckoutClosed = ref<'expired' | 'cancelled' | 'missing' | null>(null);
+const failedKnownOrderNo = ref<string | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
 const confirmedMissingCreateKey = ref<string | null>(null);
@@ -516,6 +518,7 @@ const keepResumeAllowed = computed(() => {
 const keepRecoveryNotice = computed(() => capacityRecoveryNotice(t.value, keepCheckoutReadError.value, keepRecoveryOperation.value, keepResumeAllowed.value));
 defineExpose({ keepRecoveryOperation, keepRecoveryProduct, keepResumeAllowed, openKeepResume });
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
+const promotionCheckoutRevision = ref(0);
 // The bundle / activity tray as rendered, which the review content clears (04 §4.0).
 const promotionTray=ref<unknown>(null);
 const promotionTrayHeight=useTrayHeight(promotionTray);
@@ -1361,7 +1364,8 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   pendingCheckoutCreate.value = null;
   pendingCreatePointer.value = null;
   foregroundTradeinSignature = null;
-  originalOrderReadUnavailable.value = false;
+  originalCheckoutClosed.value = null;
+  failedKnownOrderNo.value = null;
   confirmedMissingCreateKey.value = null;
   pendingCreateFound.value = false;
   pendingCreateReplayBusy.value = false;
@@ -1651,8 +1655,15 @@ const checkoutCapacityBlocked = computed(() => !hasOriginalCheckout.value
 const checkoutCapacityMessage = computed(() => checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
   : checkoutCapacityTradeinRejection.value ? flowCopy.value[checkoutCapacityTradeinRejection.value] : "");
-const checkoutTrayBlock = computed(() => checkoutOutOfStock.value || originalCheckoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
-  : checkoutEligibilityBlock.value || (checkoutCapacityBlocked.value ? checkoutCapacityMessage.value : ""));
+const checkoutTrayBlock = computed(() => {
+  switch (originalCheckoutClosed.value) {
+    case 'expired': return t.value.orders.statusExpired;
+    case 'cancelled': return t.value.orders.cancelStatus;
+    case 'missing': return t.value.orders.notFound;
+  }
+  return checkoutOutOfStock.value || originalCheckoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
+    : checkoutEligibilityBlock.value || (checkoutCapacityBlocked.value ? checkoutCapacityMessage.value : "");
+});
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
@@ -2170,7 +2181,7 @@ const originalExternalPaying = computed(() => {
 function originalCheckoutAwaitingPayment(): boolean {
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value || created.paymentStatus !== 'PENDING'
-      || pendingCheckoutCreate.value || originalOrderReadUnavailable.value || originalExternalPaying.value) return false;
+      || pendingCheckoutCreate.value || originalCheckoutClosed.value || originalExternalPaying.value) return false;
   if (cancelBlockedPayment.value?.orderNo === created.orderNo) return false;
   const original = orders.getById(created.orderNo);
   if (original && original.status !== 'placed') return false;
@@ -2243,7 +2254,7 @@ function requestCheckoutBack() {
   if (promotionRoute.value) { promotionCheckout.value?.back(); return; }
   if (checkoutLeaving.value || paymentFlowBusy.value || confirming) return;
   const created = createdCheckoutOrder.value;
-  if (created) {
+  if (created && !originalCheckoutClosed.value) {
     try {
       if (readOrderAction(app.accountKey, created.orderNo)?.kind === 'cancel') {
         void cancelCheckout('resume-cancel');
@@ -2808,7 +2819,7 @@ async function submitRemoteOrder(): Promise<void> {
   const walletReceiptScope = app.captureRemoteAccountRequest();
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
-  if (!p || checkoutOutOfStock.value || originalCheckoutOutOfStock.value || (!hasOriginalCheckout.value && purchaseUnavailable.value)) {
+  if (!p || originalCheckoutClosed.value || checkoutOutOfStock.value || originalCheckoutOutOfStock.value || (!hasOriginalCheckout.value && purchaseUnavailable.value)) {
     confirming = false;
     return;
   }
@@ -2922,7 +2933,7 @@ async function submitRemoteOrder(): Promise<void> {
       return;
     }
     canonicalOrderCommitted = true;
-    const paymentCurrent = () => scopeIsCurrent()&&createdCheckoutOrder.value?.orderNo===created.orderNo
+    const paymentCurrent = () => scopeIsCurrent()&&!originalCheckoutClosed.value&&createdCheckoutOrder.value?.orderNo===created.orderNo
       &&createdCheckoutOrder.value.amountUsdt===created.amountUsdt&&reviewedTotal===netPrice.value
       &&(persisted.expiresAt===null || nowTick.value<persisted.expiresAt);
     if (originalCheckoutOutOfStock.value) return;
@@ -3086,6 +3097,16 @@ useAutoRecovery({
   repeatMs: 15_000,
 });
 useAutoRecovery({
+  failed: () => remoteApiEnabled && failedKnownOrderNo.value !== null
+    && createdCheckoutOrder.value?.orderNo === failedKnownOrderNo.value && isTopCheckoutPage()
+    && !settledResultReplay.value && !paymentFlowBusy.value && !checkoutLeaving.value,
+  retry: async () => {
+    const orderNo = failedKnownOrderNo.value;
+    if (orderNo) await refreshKnownCheckoutOrder(captureCheckoutRoute(), orderNo);
+  },
+  repeatMs: 30_000,
+});
+useAutoRecovery({
   // The recovery show hook runs before checkout sets pageVisible for this visit.
   // Saved external payments the user can go back to; the payment layer covers the tray while it is open.
   failed: () => remoteApiEnabled && pageAlive && auth.isAuthenticated
@@ -3149,14 +3170,24 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
 }
 
 async function refreshKnownCheckoutOrder(scope: CheckoutRouteScope, orderNo: string) {
-  let order;
+  const current = () => isCurrentCheckoutRoute(scope) && createdCheckoutOrder.value?.orderNo === orderNo;
+  let lookup;
   try {
-    order = await orders.ensureRemoteOrder(orderNo);
-  } catch {
-    return; // A failed read leaves the last known order in effect.
+    lookup = await orders.lookupRemoteOrder(orderNo);
+  } catch (cause) {
+    // A failed read leaves the last known order in effect.
+    if (current()) failedKnownOrderNo.value = isTransientReadFailure(cause) ? orderNo : null;
+    return;
   }
-  if (!isCurrentCheckoutRoute(scope) || createdCheckoutOrder.value?.orderNo !== orderNo) return;
-  originalOrderReadUnavailable.value = !order;
+  if (!current()) return;
+  if (!lookup?.isCurrent()) {
+    failedKnownOrderNo.value = orderNo;
+    return;
+  }
+  const { order } = lookup;
+  failedKnownOrderNo.value = null;
+  originalCheckoutClosed.value = !order ? 'missing'
+    : order.status === 'expired' || order.status === 'cancelled' ? order.status : null;
   if (order && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status)) {
     orderId.value = orderNo;
     presentSettledPurchase(false);
