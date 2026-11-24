@@ -164,7 +164,7 @@
       <template v-else-if="state.kind === 'tradein' && remoteApiEnabled && purchaseMessage === 'error'">
         <view class="tis-hd"><text :id="titleId" class="tis-title">{{ t.tradein.retireTitle }}</text></view>
         <view class="tis-bd">
-          <view class="tis-status-row tis-status-row--retry">
+          <view class="tis-status-row" :class="{ 'tis-status-row--retry': purchaseStatus === 'error' || purchaseStatus === 'ready' }">
             <view class="tis-status" :class="`tis-status--${(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn')}`" role="status" :aria-busy="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'loading'">
             <svg v-if="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'loading'" class="tis-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".2" /><path d="M21 12a9 9 0 0 0-9-9" /></svg>
             <svg v-else-if="(purchaseStatus === 'loading' || purchaseStatus === 'idle' ? 'loading' : 'warn') === 'warn'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
@@ -2077,7 +2077,8 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 /* Status beside its retry: when the text would be squeezed past two lines the retry drops to the next line, right-aligned (03 §3.6.1). */
 .tis-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--v5-space-1) var(--v5-space-2); }
 .tis-status-row > .tis-status { flex: 1 1 calc(var(--ui-type-description) * 16); }
-/* Eligibility read failed (board B-4b): the row is as tall as the retry's 44px target, which sets its space to the title and to 取消. */
+/* Eligibility read failed (board B-4b): while the retry shows, the row is as tall as its 44px target, which sets its space to
+   the title and to 取消. Still reading (B-4a) keeps the plain status line. */
 .tis-status-row--retry { min-height: 44px; }
 .tis-status-row--retry > .nx-card-recovery-action { align-self: center; }
 /* Retire: the source device and what to pick for it. */
