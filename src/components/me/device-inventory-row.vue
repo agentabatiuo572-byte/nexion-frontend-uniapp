@@ -147,8 +147,8 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import type { CanonicalTradeinConfig, CanonicalTradeinQuote } from "@/api/device-e3-api";
 
-type TradeinLadder = Pick<CanonicalTradeinConfig, "creditRatesPct" | "outputRatioCutsPct">
-  & Pick<CanonicalTradeinQuote, "outputRatioPct" | "creditRatePct">;
+type TradeinLadderConfig = Pick<CanonicalTradeinConfig, "creditRatesPct" | "outputRatioCutsPct">;
+type TradeinLadderQuote = Pick<CanonicalTradeinQuote, "outputRatioPct" | "creditRatePct">;
 
 const t = useT();
 const computeCopy = useComputeV2Copy();
@@ -178,7 +178,8 @@ const props = withDefaults(
     quoteInfoOpen?: boolean;
     tradeinCtaLabel?: string;
     tradeinDisabledText?: string;
-    tradeinLadder?: TradeinLadder;
+    tradeinLadderConfig?: TradeinLadderConfig;
+    tradeinLadderQuote?: TradeinLadderQuote;
   }>(),
   { disabled: false, actionDisabled: false, showAction: true, runtimeConfirmed: true, tasksConfirmed: true, quoteInfoOpen: false },
 );
@@ -220,19 +221,20 @@ const ladderCredit = computed(() => {
   const [int, dec] = formatGroupedAmount(props.tradeinQuoteAmount).split(".");
   return { int, dec: dec === undefined ? "" : `.${dec}` };
 });
-const ladder = computed(() => ladderView(props.tradeinLadder, visibility.hidden));
+const ladder = computed(() => ladderView(props.tradeinLadderConfig, props.tradeinLadderQuote, visibility.hidden));
 /** Cells, current tier, marker position and the screen-reader sentence of the tier table, built from the data (PRD §7.5.4). */
-function ladderView(data: TradeinLadder | undefined, hidden: boolean) {
+function ladderView(config: TradeinLadderConfig | undefined, quote: TradeinLadderQuote | undefined, hidden: boolean) {
   const c = t.value.tradein;
-  const pct = (value: number) => `${Number(value.toFixed(1))}%`;
-  const rates = data?.creditRatesPct ?? [];
-  const cuts = data?.outputRatioCutsPct ?? [];
+  const truncate = (value: number) => Math.trunc(value * 10) / 10;
+  const pct = (value: number) => `${truncate(value)}%`;
+  const rates = config?.creditRatesPct ?? [];
+  const cuts = config?.outputRatioCutsPct ?? [];
   // Rates step down from the first tier; cuts are the boundaries between tiers, so there is one fewer of them.
-  const count = data ? rates.length : 5;
-  const ranges = data ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${Number(cuts[i - 1].toFixed(1))}–${pct(cuts[i])}`)
+  const count = config ? rates.length : 5;
+  const ranges = config ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${truncate(cuts[i - 1])}–${pct(cuts[i])}`)
     : Array.from({ length: count }, () => "—");
-  const output = data && !hidden ? data.outputRatioPct : null;
-  const current = data && !hidden ? rates.indexOf(data.creditRatePct) : -1;
+  const output = hidden ? undefined : quote?.outputRatioPct;
+  const current = quote && !hidden ? rates.indexOf(quote.creditRatePct) : -1;
   // The dot sits inside the current tier in proportion; the open-ended last tier has no upper bound, so it sits at its middle.
   let marker: number | null = null;
   if (output != null && current >= 0) {
@@ -241,12 +243,13 @@ function ladderView(data: TradeinLadder | undefined, hidden: boolean) {
     const within = hi == null ? 0.5 : Math.min(1, Math.max(0, (output - lo) / (hi - lo)));
     marker = Number(((current + within) / count * 100).toFixed(1));
   }
-  const produced = fmt(c.ladderProduced, { pct: hidden ? visibility.mask("—") : output == null ? "—" : pct(output) });
-  const aria = data
+  const outputPct = output == null ? "—" : pct(output);
+  const produced = fmt(c.ladderProduced, { pct: hidden ? visibility.mask("—") : outputPct });
+  const aria = config
     ? [`${c.ladderRateCaption}: ${rates.map((rate, i) => fmt(c.ladderAriaBand, { range: ranges[i], rate: pct(rate) })).join("; ")}.`,
-      output == null || current < 0 ? produced : fmt(c.ladderAriaYou, { pct: pct(output), n: current + 1 })].join(" ")
+      current < 0 ? produced : fmt(c.ladderAriaYou, { pct: outputPct, n: current + 1 })].join(" ")
     : `${c.ladderRateCaption}: —. ${produced}`;
-  return { rates: data ? rates.map(pct) : ranges, ranges, current, marker, produced, aria };
+  return { rates: config ? rates.map(pct) : ranges, ranges, current, marker, produced, aria };
 }
 function onAction() {
   if (!props.showAction || actionDisabled.value) return;

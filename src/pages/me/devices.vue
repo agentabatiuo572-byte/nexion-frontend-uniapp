@@ -489,12 +489,12 @@ useAutoRecovery({
 
 function tradeinStrip(device: Device) {
   const strip = readTradeinStrip(device);
-  if (openedTradeinInfo() !== device.id || !ladderConfig.value) return strip;
-  const quote = tradeinQuote(device.id);
-  if (!quote) return strip;
-  return { ...strip, tradeinLadder: {
-    ...ladderConfig.value, outputRatioPct: quote.outputRatioPct, creditRatePct: quote.creditRatePct,
-  } };
+  if (openedTradeinInfo() !== device.id) return strip;
+  return {
+    ...strip,
+    tradeinLadderConfig: ladderConfig.value ?? undefined,
+    tradeinLadderQuote: tradeinQuote(device.id) ?? undefined,
+  };
 }
 
 function openSlotReplacement(device: Device) {
