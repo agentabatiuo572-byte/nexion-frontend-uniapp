@@ -19,12 +19,14 @@
         <text v-for="(reward,index) in orderRewards" :key="index" class="promotion-bundle__reward-value"><text v-if="index" class="promotion-bundle__reward-sep"> · </text><text class="promotion-bundle__reward-amount">{{ reward.amount }}</text><text class="promotion-bundle__reward-unit" :class="{ 'is-uvt': reward.uvt }">{{ reward.unit }}</text></text>
       </view>
     </view>
-    <view v-if="singleActivityProduct" class="promotion-flat promotion-bundle__single" data-testid="single-activity-guidance"><text class="promotion-copy">{{ commerceCopy(locale.code).singleActivity }}</text><view class="promotion-action primary" role="button" tabindex="0" @click="openSingleProduct" @keydown.enter.prevent="openSingleProduct" @keydown.space.prevent="openSingleProduct"><text>{{ commerceCopy(locale.code).singlePurchase }}</text></view></view>
+    <!-- Only one model of this activity is on sale: the page says so here and its one action, 「查看商品并购买」, sits in
+         the shared bottom bar as a lone floating button (04 §4.0); the page renders it from `single`. -->
+    <view v-if="singleActivityProduct" class="promotion-flat promotion-bundle__single" data-testid="single-activity-guidance"><text class="promotion-copy">{{ commerceCopy(locale.code).singleActivity }}</text></view>
     <template v-else-if="!scopeId||activity">
     <BundleHero :count="selection.length" :tiers="quotedTiers" :items="tiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :addable="suggestions.length > 0" :add-disabled="limitReached" @remove="remove" @add="jumpToSuggestions">
       <template #tile="{ item }">
         <text v-if="levelsFor(item.id)" class="promotion-bundle__tile-note">{{ levelsFor(item.id) }}</text>
-        <NxTag v-if="selectedProductBlock(item.id)" tone="unavailable" :label="selectedProductBlock(item.id)" />
+        <view v-if="selectedProductBlock(item.id)" class="promotion-bundle__tile-status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg><text>{{ selectedProductBlock(item.id) }}</text></view>
         <text v-for="(reward,index) in rewardsFor(item.id)" :key="index" class="promotion-bundle__tile-reward"><text class="promotion-bundle__reward-amount">+{{ reward.amount }}</text><text class="promotion-bundle__reward-unit" :class="{ 'is-uvt': reward.uvt }">{{ reward.unit }}</text></text>
         <view class="promotion-bundle__stepper" role="group" :aria-label="item.name+' · '+t.promotion.quantity">
           <view class="promotion-bundle__step" role="button" :tabindex="quantityOf(item.id)<=1?-1:0" :aria-disabled="quantityOf(item.id)<=1" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.id,-1)" @keydown.enter.prevent="changeQuantity(item.id,-1)" @keydown.space.prevent="changeQuantity(item.id,-1)"><NxIcon name="minus" :size="16" /></view>
@@ -49,6 +51,7 @@
     </view>
     <PromotionTerms v-if="activity" :open="termsOpen" :title="localized(activity.title,locale.code)" :terms="ruleTerms" :rules="firstPurchaseTermsRules(activity.firstPurchaseCondition,locale.code)" :disclosures="promotionDisclosures(activity)" @close="termsOpen=false" />
     <!-- Keeps the last link clear of the page's bottom tray (04 §4.0): an invisible copy of the tray's rows. -->
+    <view v-if="singleActivityProduct" class="bundle-bar-space" aria-hidden="true"><text class="bundle-bar-space__cta bundle-bar-space__cta--wide">{{ commerceCopy(locale.code).singlePurchase }}</text></view>
     <view v-if="footer" class="bundle-bar-space" aria-hidden="true">
       <text v-if="footer.note" class="bundle-bar-space__note">{{ footer.note }}</text>
       <template v-if="footer.signedIn">
@@ -311,7 +314,9 @@ const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity
   devices:canOpenDevices.value,
   continue:continueCheckout,signIn,
 });
-defineExpose({footer});
+// The single-model action for the page's bottom bar (same handler as before).
+const single=computed(()=>singleActivityProduct.value?{label:commerceCopy(locale.code).singlePurchase,open:openSingleProduct}:null);
+defineExpose({footer,single});
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
 function expireQuote(){
   invalidate();
@@ -358,6 +363,10 @@ onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryT
 .promotion-bundle__reward-unit.is-uvt { color: var(--v5-nex-ink); }
 .promotion-bundle__warning { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; color: var(--v5-warning-ink); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
 .promotion-bundle__warning svg { flex: none; margin-top: 1px; }
+/* A chosen model that can no longer be bought: a status line under its meta in the warning ink with an icon
+   (design-rules: anomalies stand out), wrapping like the other tile lines; a pill would wrap in a 131px tile. */
+.promotion-bundle__tile-status { display: flex; align-items: flex-start; gap: 4px; margin-top: 6px; color: var(--v5-warning-ink); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; text-wrap: balance; }
+.promotion-bundle__tile-status svg { flex: none; margin-top: 1px; }
 .promotion-bundle__tile-note { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
 .promotion-bundle__tile-reward { display: block; margin-top: 4px; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
 /* Quantity stepper (board B tile): a flat surface-3 pill, 32 visible, each side 44 wide with a 44 tall hit area; the

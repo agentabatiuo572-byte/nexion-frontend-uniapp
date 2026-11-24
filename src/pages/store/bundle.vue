@@ -53,7 +53,7 @@
         <template #tile="{ item }">
           <text v-if="productById(item.id)?.productType === 'SHARE'" class="bundle-tile-note">{{ t.store.shareYieldDisclaimer }}</text>
           <text v-if="productById(item.id)?.taskLevels.length" class="bundle-tile-note">{{ productTaskLevelsText(t, productById(item.id)?.taskLevels ?? []) }}</text>
-          <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(item.id)" class="bundle-tile-tag" tone="unavailable" :label="t.store.temporarilyOutOfStock" />
+          <view v-if="remoteApiEnabled && eligibilityUnavailable(item.id)" class="bundle-tile-status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg><text>{{ t.store.temporarilyOutOfStock }}</text></view>
           <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(item.id).eligible" class="bundle-tile-note">{{ eligibilityLabel(item.id, t.store.purchaseEligibilityIneligible) }}</text>
         </template>
         <template #rules-end>
@@ -77,6 +77,10 @@
     <!-- Page main action in the shared bottom tray (04 §4.0, 03 §3.1): the total and 已省 in the price slot, one solid
          「去结算」; under two models the reason sits above the button and the button is the tray's flat grey. -->
     <template #pageFixed>
+      <!-- Activity with one model on sale: its one action as a lone floating button (the bar's floating form). -->
+      <view v-if="promotionActivityId && promotionBundle?.single" class="bundle-bar nx-glass-bar">
+        <view class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.single.open" @keydown="activate($event, promotionBundle.single.open)"><text>{{ promotionBundle.single.label }}</text><NxIcon name="arrow-right" :size="20" /></view>
+      </view>
       <view v-if="promotionActivityId && promotionBundle?.footer" class="bundle-bar nx-glass-bar">
         <text v-if="promotionBundle.footer.note" class="nx-tray-note" role="status">{{ promotionBundle.footer.note }}</text>
         <template v-if="promotionBundle.footer.signedIn">
@@ -121,7 +125,6 @@ import AppChassis from "@/components/app-chassis.vue";
 import PromotionBundle from '@/components/promotion/promotion-bundle.vue';
 import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
-import NxTag from "@/components/ui/nx-tag.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
@@ -849,7 +852,9 @@ const catalogStateBodyStyle: CSSProperties = {
 @keyframes bundle-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .bundle-estimate-note { display: block; margin: 8px 18px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .bundle-tile-note { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
-.bundle-tile-tag { align-self: flex-start; margin-top: 6px; }
+/* Out of stock on a chosen model: a warning status line with an icon (design-rules), like the activity bundle. */
+.bundle-tile-status { display: flex; align-items: flex-start; gap: 4px; margin-top: 6px; color: var(--v5-warning-ink); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; text-wrap: balance; }
+.bundle-tile-status svg { flex: none; margin-top: 1px; }
 /* 「全部清空」 is a reverse action (03 §3.1 .nx-reverse-action): quiet ink-3 text, 13/18 400, no container, 44 target. */
 .bundle-clear { position: relative; flex: none; cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
 .bundle-clear::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: -10px; right: -10px; }

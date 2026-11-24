@@ -4,7 +4,7 @@
      Unknown tiers (null) render the degraded card: no stairs, no rate, no "more is cheaper" claim.
      Personal: the account's bundle draft has models, so the card speaks about that draft and its next tier. -->
 <template>
-  <view class="bundle-entry" :class="{ 'bundle-entry--degraded': !steps.length }" data-testid="store-bundle-entry" role="group" :aria-label="cardLabel" @click="open">
+  <view class="bundle-entry" :class="{ 'bundle-entry--degraded': !steps.length, 'bundle-entry--fine': fineRates }" data-testid="store-bundle-entry" role="group" :aria-label="cardLabel" @click="open">
     <view class="bundle-entry__head">
       <view class="bundle-entry__eyebrow">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 13 9 5 9-5" /></svg>
@@ -59,6 +59,8 @@ const props = defineProps<{
 const t = useT();
 
 const steps = computed(() => bundleSteps(props.tiers));
+/** Rates with decimals (E1 allows 0.01 points, e.g. 4.01%) are wider than a 48px bar: the steps then stand further apart. */
+const fineRates = computed(() => steps.value.some((step) => bundlePct(step.pct).includes(".")));
 const maxPct = computed(() => Math.max(...steps.value.map((step) => step.pct), 0) || 1);
 const rising = computed(() => (props.tiers?.length ?? 0) > 1 && steps.value.length === props.tiers?.length);
 const count = computed(() => props.selected.length);
@@ -139,6 +141,9 @@ function open() {
    key number: brand and one step larger (the large discount figure, 10.2 exception pending). */
 .bundle-entry__value { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bundle-entry__minus { margin-right: -.18em; }
+/* The last rate ends at its bar's right edge, so a wide value (「−11.01%」) never runs to the card edge. */
+.bundle-entry__step:last-child .bundle-entry__value { align-self: flex-end; }
+.bundle-entry--fine .bundle-entry__stairs { gap: 12px; }
 .bundle-entry__step.is-top .bundle-entry__value { font-size: 20px; line-height: 24px; color: var(--v5-brand); }
 .bundle-entry__bar { width: 100%; height: max(4px, calc(var(--bundle-stair-max) * var(--bundle-bar))); border-radius: 10px 10px 4px 4px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--v5-ink) 14%, transparent), color-mix(in srgb, var(--v5-ink) 6%, transparent)); }
