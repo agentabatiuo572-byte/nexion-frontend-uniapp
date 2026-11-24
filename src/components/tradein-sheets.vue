@@ -2114,8 +2114,8 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-pair__dst { flex: none; }
 .tis-pair__src-art { flex: none; width: 48px; height: 48px; opacity: .82; }
 .tis-pair__dst-art { flex: none; width: 56px; height: 56px; }
-.tis-pair__src-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
-.tis-pair__dst-name { white-space: nowrap; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); }
+.tis-pair__src-name { min-width: 0; overflow-wrap: break-word; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-pair__dst-name { min-width: 0; overflow-wrap: break-word; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); }
 .tis-pair__arrow { flex: none; margin: 0 4px; color: var(--v5-ink-4); }
 .tis-due { text-align: center; }
 .tis-due__label { display: block; white-space: nowrap; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
@@ -2137,7 +2137,7 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-dlg-pair__side { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); width: 104px; min-width: 0; }
 .tis-dlg-pair__art { width: 44px; height: 44px; }
 .tis-dlg-pair__art--src { opacity: .82; }
-.tis-dlg-pair__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-dlg-pair__name { max-width: 100%; overflow-wrap: break-word; text-align: center; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .tis-dlg-pair__name--dst { font-weight: 500; color: var(--v5-ink); }
 .tis-dlg-pair__arrow { flex: none; margin-top: var(--v5-space-3); color: var(--v5-ink-4); }
 .tis-dlg-due { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); margin-top: var(--v5-space-4); }

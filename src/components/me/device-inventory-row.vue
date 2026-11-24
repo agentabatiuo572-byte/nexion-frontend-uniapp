@@ -225,13 +225,13 @@ const ladder = computed(() => ladderView(props.tradeinLadderConfig, props.tradei
 /** Cells, current tier, marker position and the screen-reader sentence of the tier table, built from the data (PRD §7.5.4). */
 function ladderView(config: TradeinLadderConfig | undefined, quote: TradeinLadderQuote | undefined, hidden: boolean) {
   const c = t.value.tradein;
-  const truncate = (value: number) => Math.trunc(value * 10) / 10;
-  const pct = (value: number) => `${truncate(value)}%`;
+  // Configured rates and cut points as the server set them (up to two decimals).
+  const pct = (value: number) => `${Number(value.toFixed(2))}%`;
   const rates = config?.creditRatesPct ?? [];
   const cuts = config?.outputRatioCutsPct ?? [];
   // Rates step down from the first tier; cuts are the boundaries between tiers, so there is one fewer of them.
   const count = config ? rates.length : 5;
-  const ranges = config ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${truncate(cuts[i - 1])}–${pct(cuts[i])}`)
+  const ranges = config ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${Number(cuts[i - 1].toFixed(2))}–${pct(cuts[i])}`)
     : Array.from({ length: count }, () => "—");
   const output = hidden ? undefined : quote?.outputRatioPct;
   const current = quote && !hidden ? rates.indexOf(quote.creditRatePct) : -1;
@@ -243,7 +243,14 @@ function ladderView(config: TradeinLadderConfig | undefined, quote: TradeinLadde
     const within = hi == null ? 0.5 : Math.min(1, Math.max(0, (output - lo) / (hi - lo)));
     marker = Number(((current + within) / count * 100).toFixed(1));
   }
-  const outputPct = output == null ? "—" : pct(output);
+  // This device's ratio to one decimal; when rounding would reach the next cut it is shown to two decimals rounded down,
+  // so the figure never reads as the next tier.
+  const outputText = (value: number) => {
+    const next = cuts.find((cut) => value < cut);
+    const rounded = Math.round(value * 10) / 10;
+    return `${next !== undefined && rounded >= next ? Math.floor(value * 100) / 100 : rounded}%`;
+  };
+  const outputPct = output == null ? "—" : outputText(output);
   const produced = fmt(c.ladderProduced, { pct: hidden ? visibility.mask("—") : outputPct });
   const aria = config
     ? [`${c.ladderRateCaption}: ${rates.map((rate, i) => fmt(c.ladderAriaBand, { range: ranges[i], rate: pct(rate) })).join("; ")}.`,
