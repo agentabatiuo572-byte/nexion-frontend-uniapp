@@ -1,7 +1,7 @@
 import { demoEarningReceipt, demoReceiptWire } from './prototype-demo-notifications.mjs';
 import { demoReceiptPage, demoReceiptSummary } from './prototype-demo-secondary.mjs';
 import { demoTeamWeek } from './prototype-demo-wallet.mjs';
-import { demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
+import { demoOrderTimedOut, demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
 
 const sources = {
   '/api/orders': 'orders',
@@ -78,7 +78,7 @@ function specimenOrders(payload, fixture) {
       // The list retains the fulfilment status of an order that never paid.
       activationStatus: 'WAITING_PAYMENT', closeReasonCode: 'USER_CANCELLED',
     });
-    else if (fixture.payment === 'expired') Object.assign(pending, demoTimedOutOrder, { expiresAt: placedAt + paymentWindow });
+    else if (fixture.payment === 'expired') Object.assign(pending, demoTimedOutOrder);
     else if (fixture.payment === 'failed') Object.assign(pending, {
       canonicalStatus: 'payment_failed', paymentStatus: 'FAILED', orderStatus: 'PAYMENT_FAILED',
       closeReasonCode: 'PAYMENT_NOT_RECEIVED',
@@ -167,6 +167,16 @@ export function createMeEntryDotsFixture(previewState) {
 
   const serverNow = fixture => Date.now() + fixture.clockOffset;
 
+  function paymentAt(fixture, now) {
+    if (fixture?.payment !== 'placed') return fixture?.payment ?? 'none';
+    const order = {
+      orderNo: paymentOrderNo,
+      canonicalStatus: 'placed',
+      expiresAt: fixture.paymentPlacedAt + paymentWindow,
+    };
+    return demoOrderTimedOut(order, previewState, now) ? 'expired' : 'placed';
+  }
+
   function configure(accountId, update) {
     let fixture = update.reset ? undefined : accounts.get(accountId);
     if (update.weekState !== undefined) refuse(422, 'ME_DOTS_USE_SERVER_TIME');
@@ -182,14 +192,6 @@ export function createMeEntryDotsFixture(previewState) {
     if (update.wave !== undefined && (![0, 1, 2, 3].includes(update.wave) || update.wave < (fixture?.waves.length ?? 0))) {
       refuse(422, 'ME_DOTS_WAVE_INVALID');
     }
-    const placedStates = ['placed', 'paid', 'expired', 'failed'];
-    if (update.payment !== undefined) {
-      if (!['none', ...placedStates].includes(update.payment)) refuse(422, 'ME_DOTS_PAYMENT_INVALID');
-      const current = fixture?.payment ?? 'none';
-      if (update.payment !== current && !(current === 'none' || (current === 'placed' && placedStates.includes(update.payment)))) {
-        refuse(409, 'ME_DOTS_PAYMENT_ALREADY_SETTLED');
-      }
-    }
     if (update.genesisMarket !== undefined && !['open', 'closed'].includes(update.genesisMarket)) {
       refuse(422, 'ME_DOTS_GENESIS_MARKET_INVALID');
     }
@@ -199,6 +201,14 @@ export function createMeEntryDotsFixture(previewState) {
       refuse(422, 'ME_DOTS_SERVER_CLOCK_MUST_ADVANCE');
     }
     const now = requestedNow ?? wallNow + (fixture?.clockOffset ?? 0);
+    const currentPayment = paymentAt(fixture, now);
+    const placedStates = ['placed', 'paid', 'expired', 'failed'];
+    if (update.payment !== undefined) {
+      if (!['none', ...placedStates].includes(update.payment)) refuse(422, 'ME_DOTS_PAYMENT_INVALID');
+      if (update.payment !== currentPayment && !(currentPayment === 'none' || (currentPayment === 'placed' && placedStates.includes(update.payment)))) {
+        refuse(409, 'ME_DOTS_PAYMENT_ALREADY_SETTLED');
+      }
+    }
 
     if (!fixture) {
       fixture = {
@@ -226,6 +236,7 @@ export function createMeEntryDotsFixture(previewState) {
     if (['PENDING', 'COMPLETED', 'CLAIMABLE'].includes(instanceStatus(fixture.dayOne, now))) {
       advanceProgress(fixture.dayOne, update.dayOne);
     }
+    fixture.payment = currentPayment;
     if (update.payment !== undefined) {
       if (fixture.payment === 'none' && update.payment !== 'none') fixture.paymentPlacedAt = now - paymentWindow - 5000;
       fixture.payment = update.payment;
@@ -260,6 +271,7 @@ export function createMeEntryDotsFixture(previewState) {
     let data;
     if (!failed) {
       if (source === 'orders') {
+        fixture.payment = paymentAt(fixture, serverNow(fixture));
         const payload = baseRead(path);
         const rows = specimenOrders(payload, fixture);
         const limit = Number(url.searchParams.get('pageSize') ?? 20);
@@ -342,6 +354,7 @@ export function createMeEntryDotsFixture(previewState) {
     const fixture = accounts.get(accountId);
     if (!fixture || fixture.payment === 'none') refuse(403, 'ORDER_FORBIDDEN');
     if (typeof commandKey !== 'string' || !commandKey.trim()) refuse(422, 'IDEMPOTENCY_KEY_REQUIRED');
+    fixture.payment = paymentAt(fixture, serverNow(fixture));
     const idempotent = fixture.payment === 'cancelled';
     if (!idempotent && fixture.payment !== 'placed') refuse(409, 'ORDER_NOT_CANCELLABLE');
     fixture.payment = 'cancelled';
