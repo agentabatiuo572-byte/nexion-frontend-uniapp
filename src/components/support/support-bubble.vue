@@ -8,7 +8,7 @@
   measured navigation height includes the safe area.
 -->
 <template>
-    <view class="nx-support-bubble" :class="{ 'nx-support-bubble--dimmed': dimmed, 'nx-support-bubble--light': theme.resolved === 'light', 'nx-support-bubble--unread': showUnreadBadge }" :style="lift ? { transform: `translateY(-${lift}px)` } : undefined" role="button" :tabindex="dimmed ? -1 : 0" :aria-hidden="dimmed || undefined" :aria-label="t.coreReview.supportHelp" @click="open" @keydown.enter.prevent="!dimmed && open()" @keydown.space.prevent="!dimmed && open()">
+    <view class="nx-support-bubble" :class="{ 'nx-support-bubble--dimmed': hidden, 'nx-support-bubble--light': theme.resolved === 'light', 'nx-support-bubble--unread': showUnreadBadge }" :style="offset ? { transform: `translateY(-${offset}px)` } : undefined" role="button" :tabindex="hidden ? -1 : 0" :aria-hidden="hidden || undefined" :aria-label="t.coreReview.supportHelp" @click="open" @keydown.enter.prevent="!hidden && open()" @keydown.space.prevent="!hidden && open()">
       <view class="nx-support-motion">
         <view v-if="showUnreadBadge" class="nx-support-beat" aria-hidden="true" />
         <view class="nx-support-btn">
@@ -21,7 +21,8 @@
 
 <script setup lang="ts">
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { useConversations } from "@/store/conversations";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useMessageDrawer } from "@/store/message-drawer";
@@ -31,7 +32,7 @@ import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useTheme } from "@/store/theme";
 
 // lift: how far the shortcut moves up while the floating payment bar sits under it (bar height + 12, set by the chassis).
-defineProps<{ dimmed?: boolean; lift?: number }>();
+const props = defineProps<{ dimmed?: boolean; lift?: number }>();
 
 const t = useT();
 const theme = useTheme();
@@ -47,6 +48,39 @@ const humanUnread = computed(() =>
 const totalUnread = computed(() => humanUnread.value);
 const showUnreadBadge = computed(() => totalUnread.value > 0);
 const unreadLabel = computed(() => formatUnreadBadge(totalUnread.value));
+
+// While the bar lifts it, the shortcut must not cover a benefit CTA, a close button or a key value (02 §2.4); pages mark
+// those .nx-keep-clear. At rest it takes the lowest spot above the bar that keeps 8px clear of every marked target in its
+// column, and stays hidden (as while scrolling) when only the header is left. Without the bar it keeps its usual place.
+const SUPPORT_GAP = 12; // the shortcut's own bottom offset above the navigation (CSS below)
+const KEEP_CLEAR_GAP = 8;
+const avoid = ref(0);
+const blocked = ref(false);
+const offset = computed(() => (props.lift ?? 0) + avoid.value);
+const hidden = computed(() => props.dimmed || blocked.value);
+type Rect = { top: number; bottom: number; left: number; right: number; height: number };
+function settle() {
+  const lift = props.lift ?? 0;
+  if (!lift) { avoid.value = 0; blocked.value = false; return; }
+  if (props.dimmed) return;
+  uni.createSelectorQuery().select('.nx-tabbar-wrap').boundingClientRect().select('.nx-support-bubble').boundingClientRect()
+    .selectAll('.nx-keep-clear').boundingClientRect().select('.nx-header').boundingClientRect()
+    .exec(([wrap, self, targets, header]: [Rect | null, Rect | null, Rect[] | null, Rect | null]) => {
+      if (!wrap || !self || lift !== (props.lift ?? 0) || props.dimmed) return;
+      const base = wrap.top - SUPPORT_GAP - lift;
+      const blockers = (targets ?? []).filter(r => r.height > 0 && r.right > self.left - KEEP_CLEAR_GAP && r.left < self.right + KEEP_CLEAR_GAP);
+      let bottom = base;
+      for (let moved = true; moved;) {
+        moved = false;
+        for (const r of blockers) if (r.top - KEEP_CLEAR_GAP < bottom && r.bottom + KEEP_CLEAR_GAP > bottom - self.height) { bottom = r.top - KEEP_CLEAR_GAP; moved = true; }
+      }
+      blocked.value = bottom - self.height < (header?.bottom ?? 0) + KEEP_CLEAR_GAP;
+      avoid.value = blocked.value ? 0 : Math.round(base - bottom);
+    });
+}
+watch(() => [props.lift, props.dimmed], () => setTimeout(settle, 50), { immediate: true });
+// Benefit cards and values load and animate in after the bar shows; the spot is re-read while the bar lifts the shortcut.
+useVisibleInterval(settle, 1000, () => !!props.lift);
 
 // Human support uses the same full-page center as the bell, opening Service.
 function open() {

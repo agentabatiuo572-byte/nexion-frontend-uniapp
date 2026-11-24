@@ -8,7 +8,7 @@
         <text class="daily-check-in-row__title">{{ ready ? fmt(copy.streak, { n: faucet.signInStreak }) : copy.daily }}</text>
         <text v-if="subtitle" class="daily-check-in-row__meta" :class="{ 'daily-check-in-row__meta--warning': faucet.remoteReadState === 'error' }">{{ subtitle.lead }}<text v-if="subtitle.reward" class="daily-check-in-row__gift-hint">{{ subtitle.reward }}</text>{{ subtitle.tail }}</text>
       </view>
-      <NxButton class="daily-check-in-row__action" :class="{ 'daily-check-in-row__action--checked': canCheckIn && checked }" :variant="!canCheckIn ? 'secondary' : checked ? 'link' : 'brand'" :label="checkInLabel" size="small" :busy="submitting" @click="checkIn">
+      <NxButton class="daily-check-in-row__action nx-keep-clear" :class="{ 'daily-check-in-row__action--checked': canCheckIn && checked }" :variant="!canCheckIn ? 'secondary' : checked ? 'link' : 'brand'" :label="checkInLabel" size="small" :busy="submitting" @click="checkIn">
         <template v-if="canCheckIn && checked">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 5 5 9-10" /></svg>
           <text>{{ checkInLabel }}</text>
