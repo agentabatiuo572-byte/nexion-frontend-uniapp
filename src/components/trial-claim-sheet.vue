@@ -35,7 +35,7 @@
       </template>
 
       <!-- Retrying the user's own claim is a text button beside the reason (03 §3.1, 3.5.2), not a second full-width primary. -->
-      <view v-if="freeTrial.pendingStart || claimError" class="tcs-error" role="alert"><text class="tcs-error-t">{{ claimErrorText }}</text><view v-if="claimRetryable" class="nx-card-recovery-action nx-card-recovery-action--inline tcs-retry" role="button" :tabindex="claimDisabled ? -1 : 0" :aria-label="t.trial.claimRetryCta" :aria-disabled="claimDisabled ? 'true' : 'false'" @click.stop="onClaim" @keydown.enter.stop.prevent="onClaim" @keydown.space.stop.prevent="onClaim"><text>{{ t.trial.claimRetryCta }}</text></view></view>
+      <view v-if="freeTrial.pendingStart || claimError || retryHeld" class="tcs-error" role="alert"><text class="tcs-error-t">{{ retryHeld ? heldReasonText : claimErrorText }}</text><NxButton v-if="showRetry" class="tcs-retry" variant="text" size="small" :label="t.trial.claimRetryCta" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" /></view>
       <!-- A failed read recovers on its own (03 §3.5.2, 04.5): warning icon, the result and the retry line, no button. -->
       <view v-else-if="!activated && !claiming && stateReadFailed" class="tcs-read-state" role="status">
         <view class="tcs-read-state__icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
@@ -45,10 +45,10 @@
 
       <view class="tcs-ctas">
         <template v-if="activated">
-          <view class="tcs-claim" role="button" tabindex="0" :aria-label="copy.viewDevices" @click.stop="goDevices" @keydown.enter.stop.prevent="goDevices" @keydown.space.stop.prevent="goDevices"><text class="tcs-claim-t">{{ copy.viewDevices }}</text></view>
-          <view class="tcs-secondary" role="button" tabindex="0" :aria-label="copy.buyEarly" @click.stop="goTrial" @keydown.enter.stop.prevent="goTrial" @keydown.space.stop.prevent="goTrial"><text>{{ copy.buyEarly }}</text></view>
+          <NxButton variant="primary" :label="copy.viewDevices" @click="goDevices" />
+          <NxButton variant="secondary" :label="copy.buyEarly" @click="goTrial" />
         </template>
-        <view v-else-if="!claimRetryable" class="tcs-claim" :class="{ 'tcs-claim--busy': claimDisabled }" role="button" :tabindex="claimDisabled ? -1 : 0" :aria-label="claimCtaLabel" :aria-disabled="claimDisabled ? 'true' : 'false'" :aria-busy="claiming ? 'true' : 'false'" @click.stop="onClaim" @keydown.enter.stop.prevent="onClaim" @keydown.space.stop.prevent="onClaim"><text class="tcs-claim-t">{{ claimCtaLabel }}</text></view>
+        <NxButton v-else-if="!showRetry" variant="primary" :label="claimCtaLabel" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" />
         <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
       </view>
     </view>
@@ -57,6 +57,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
@@ -103,6 +104,12 @@ const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.display
   : claimError.value && !claimOpensAnotherPage.value);
 const claimDisabled = computed(() => claiming.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
   || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
+// View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
+// so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
+const claimFromRetry = ref(false);
+const heldReasonText = ref("");
+const retryHeld = computed(() => claiming.value && claimFromRetry.value);
+const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
   failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
@@ -163,6 +170,8 @@ async function onClaim() {
   }
   const requestedEpoch = app.accountBindingEpoch;
   const requestedSequence = ++claimSequence;
+  claimFromRetry.value = claimRetryable.value;
+  heldReasonText.value = claimErrorText.value;
   claiming.value = true;
   claimError.value = false;
   claimErrorReason.value = undefined;
@@ -249,17 +258,12 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-read-state__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-warning-ink);background:var(--v5-warning-soft); }
 .tcs-read-state__title { display:block;margin-top:12px;color:var(--v5-ink);font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:break-word; }
 .tcs-read-state__hint { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);overflow-wrap:break-word; }
+.tcs-retry { margin-left:auto;align-self:flex-end;flex-shrink:0; }
 .tcs-ctas { margin-top:20px;display:flex;flex-direction:column;gap:8px; }
-.tcs-claim { box-sizing:border-box;width:100%;min-height:48px;padding:12px 20px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--v5-brand);transition:transform .12s ease; }
-.tcs-claim:active { transform:scale(.98); }
-.tcs-claim--busy { opacity:.5;pointer-events:none; }
-.tcs-retry[aria-disabled="true"] { opacity:.5;pointer-events:none; }
-.tcs-claim-t { font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);color:var(--v5-on-brand);text-align:center;overflow-wrap:break-word; }
-.tcs-secondary { box-sizing:border-box;min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--v5-border);display:flex;align-items:center;justify-content:center;font:500 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-ink);text-align:center;overflow-wrap:break-word; }
 .tcs-dismiss { width:100%;min-height:44px;display:flex;align-items:center;justify-content:center; }
 .tcs-dismiss:active { opacity:.7; }
 .tcs-dismiss-t { font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);color:var(--v5-brand);text-align:center; }
-.tcs-claim:focus-visible,.tcs-secondary:focus-visible,.tcs-close:focus-visible,.tcs-dismiss:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
+.tcs-close:focus-visible,.tcs-dismiss:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 @media(max-width:350px) { .tcs-device-art { width:160px;height:160px; }.tcs-device-name {font-size:17px;}.tcs-title {font-size:16px;} }
-@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-spark-box--success { animation:none; }.tcs-claim { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-spark-box--success { animation:none; } }
 </style>
