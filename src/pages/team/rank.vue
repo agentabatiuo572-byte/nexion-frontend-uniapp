@@ -73,7 +73,7 @@
           <NxSection :title="t.myRank.allRanks" :meta="rankDefs.length ? `V${rankDefs[0].v}–V${rankDefs[rankDefs.length-1].v}` : ''" />
           <!-- 全部等级横条（DESIGN 第 4 节阶梯项、10.1、10.3、10.5）：tablist，一块玻璃选中面滑到被选项；被选徽章按等级强度弹起（V3 起光圈，V7／V8 加星点层）。
                隐藏统计时（Ch）不标「当前」「下一级」，也不写等级名，只留徽章。 -->
-          <scroll-view class="rank-rail" scroll-x :scroll-left="railScroll" scroll-with-animation :show-scrollbar="false">
+          <scroll-view class="rank-rail" scroll-x :scroll-left="railScroll" :scroll-with-animation="!motion.still.value" :show-scrollbar="false">
             <view class="rank-rail__track" role="tablist" :aria-label="t.myRank.allRanks">
               <view class="rank-rail__ind" :class="{ 'is-on': railInd.on }" :style="{ width: railInd.w + 'px', height: railInd.h + 'px', transform: `translateX(${railInd.x}px)` }" aria-hidden="true" />
               <view v-for="r in rankDefs" :id="`rank-tab-${r.v}`" :key="r.v" class="rank-rail__item" :class="[`rank-rail__item--${rowStatus(r.v)}`, { 'is-pop': popRank === r.v }]" :data-t="railTier(r.v)" role="tab" tabindex="0" :aria-selected="expandedRank === r.v ? 'true' : 'false'" :aria-controls="`rank-details-${r.v}`" :aria-label="rankLabel(r.v,locale.code,rankDefs)" @click="selectRank(r.v)" @keydown.enter.prevent="selectRank(r.v)" @keydown.space.prevent="selectRank(r.v)">
@@ -81,6 +81,8 @@
                   <TeamRankEmblem class="rank-rail__emb" :rank="r.v" :size="40" />
                   <view v-if="popRank === r.v && rankTierStyle(r.v).select.ring" class="rank-rail__ring" aria-hidden="true" />
                   <image v-if="popRank === r.v && rankTierStyle(r.v).select.burst" class="rank-rail__burst" :src="railBurst(r.v)" mode="aspectFit" aria-hidden="true" />
+                  <!-- V5 起徽章掠光一次（10.3）：光带平移，带里的亮色副本反向平移，只在点选的这一组里存在。 -->
+                  <view v-if="popRank === r.v && rankTierStyle(r.v).select.sheen" class="rank-rail__glint" aria-hidden="true"><view class="rank-rail__glint-band"><view class="rank-rail__glint-copy"><TeamRankEmblem class="rank-rail__emb" :rank="r.v" :size="40" /></view></view></view>
                 </view>
                 <text v-if="!visibility.hidden" class="rank-rail__v" :class="{ 'rank-rail__v--v8': r.v === 8 }">V{{ r.v }}</text>
                 <text class="rank-rail__s">{{ railLabel(r.v) }}</text>
@@ -88,7 +90,10 @@
             </view>
           </scroll-view>
           <!-- 等级详情卡（E、E2）：状态标签、条件行（名称、当前／门槛、达成勾）、V8 的「另需」、权益行。门槛为 0 的条件不列。 -->
-          <view v-if="detail" :id="`rank-details-${detail.v}`" :key="detail.v" class="rank-detail" :class="{ 'rank-detail--in': detailAnim }" role="tabpanel" :aria-labelledby="`rank-tab-${detail.v}`">
+          <!-- 详情卡切换（10.1）：旧卡淡出上移 6px 120ms（离场时绝对定位，不占高度），新卡从下 8px 淡入 200ms（延迟 80）；减少动态时直接换。 -->
+          <view class="rank-detail-host">
+          <Transition name="rank-detail" :css="detailAnim">
+          <view v-if="detail" :id="`rank-details-${detail.v}`" :key="detail.v" class="rank-detail" role="tabpanel" :aria-labelledby="`rank-tab-${detail.v}`">
             <view class="rank-detail__head">
               <TeamRankEmblem :rank="detail.v" :size="40" />
               <text class="rank-detail__name" :class="{ 'rank-detail__name--v8': detail.v === 8 }">V{{ detail.v }}</text>
@@ -115,9 +120,16 @@
             </view>
             <view v-if="detail.def.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><NxIcon name="chevron-right" :size="16" /></view>
           </view>
-          <!-- 非 V8 用户选中 V8 时，详情卡下接小一号的 V8 专享权益（E2）。 -->
-          <RankV8Perks v-if="detail?.v === 8 && identityKind !== 'v8' && !visibility.hidden" size="small" :title="fmt(t.myRank.perksCap, { r: 'V8' })" :count="fmt(t.myRank.perksCount, { n: v8Perks.length })" :perks="v8Perks" :theme="theme.resolved" />
-          <text v-if="!detail" class="rank-ladder-hint">{{ t.myRank.expandRank }}</text>
+          </Transition>
+          </view>
+          <!-- 详情卡下方的内容：卡片高度变了时按高度差用 transform 滑到新位置（FLIP，280ms），不跳。 -->
+          <view class="rank-ladder-below" :style="{ ...belowStyle, paddingBottom: belowReserve ? belowReserve + 'px' : undefined }">
+            <!-- V0–V6 用户选中 V8 时，详情卡下接小一号的 V8 专享权益（E2），同样淡入；V7 页面上方「升到 V8 后」后已经有这一块，不再重复。 -->
+            <Transition name="rank-fade" :css="detailAnim">
+              <RankV8Perks v-if="detail?.v === 8 && prog.next?.v !== 8 && identityKind !== 'v8' && !visibility.hidden" size="small" :title="fmt(t.myRank.perksCap, { r: 'V8' })" :count="fmt(t.myRank.perksCount, { n: v8Perks.length })" :perks="v8Perks" :theme="theme.resolved" />
+            </Transition>
+            <text v-if="!detail" class="rank-ladder-hint">{{ t.myRank.expandRank }}</text>
+          </view>
         </view>
         </template>
         <EmptyState v-else-if="vState.remoteError" kind="recoverable-error" page :title="t.rank.loadError" :cta-label="t.ui.reload" @cta="retryRank" />
@@ -471,17 +483,43 @@ const railBurst = (v: number) => rankAsset(rankTierStyle(v).select.burst === 'go
 // 一次性点选动画组（≤320ms）：开始新的一组时上一组的类直接移走，动画随之结束（10.4 P10）。减少动态、省电时不播。
 const popRank = ref<VRank | null>(null);
 let popTimer: ReturnType<typeof setTimeout> | undefined;
-function selectRank(v: VRank) {
-  expandedRank.value = v;
-  if (popTimer) clearTimeout(popTimer);
-  popRank.value = null;
-  if (motion.still.value) return;
-  void nextTick(() => {
-    popRank.value = v;
-    popTimer = setTimeout(() => { popRank.value = null; }, rankTierStyle(v).select.ms + 20);
+// 详情卡下方内容的 FLIP（10.1）：切换前后各量一次位置，先按差值反向平移，下一帧 280ms 回到原位；只动 transform。
+const belowStyle = ref<Record<string, string>>({});
+// 卡片变矮时页面不跟着变短：在下方补回差值，否则滚到底时浏览器会在旧卡淡出后把整页往下拽（内容跳一下）。变高时先用掉补的空间。
+const belowReserve = ref(0);
+let flipTimers: ReturnType<typeof setTimeout>[] = [];
+function belowTop(): Promise<{ top: number | null; card: number }> {
+  return new Promise(resolve => {
+    const query = queryScope ? uni.createSelectorQuery().in(queryScope) : uni.createSelectorQuery();
+    query.select('.rank-ladder-below').boundingClientRect();
+    query.select('.rank-detail-host').boundingClientRect();
+    query.exec((res: (UniApp.NodeInfo | null)[]) => resolve({ top: res[0]?.top ?? null, card: res[1]?.height ?? 0 }));
   });
 }
-onUnmounted(() => { if (popTimer) clearTimeout(popTimer); });
+async function selectRank(v: VRank) {
+  if (expandedRank.value === v) return;
+  if (popTimer) clearTimeout(popTimer);
+  flipTimers.forEach(clearTimeout); flipTimers = [];
+  popRank.value = null;
+  belowStyle.value = {};
+  if (motion.still.value) { expandedRank.value = v; return; }
+  const before = await belowTop();
+  // 换卡前先按旧卡高度临时补足下方空间，新卡再矮页面也不会变短（否则滚到底时浏览器立刻把整页往下拽）；量完再换成实际差值。
+  const reserve = belowReserve.value;
+  belowReserve.value = reserve + before.card;
+  expandedRank.value = v;
+  await nextTick();
+  popRank.value = v;
+  popTimer = setTimeout(() => { popRank.value = null; }, rankTierStyle(v).select.ms + 20);
+  const after = await belowTop();
+  const dy = before.top !== null && after.top !== null ? Math.round(before.top - after.top) : 0;
+  belowReserve.value = Math.max(0, reserve + dy);
+  if (!dy) return;
+  belowStyle.value = { transform: `translateY(${dy}px)` };
+  flipTimers.push(setTimeout(() => { belowStyle.value = { transform: 'translateY(0)', transition: 'transform 280ms cubic-bezier(.2,.8,.2,1)' }; }, 16));
+  flipTimers.push(setTimeout(() => { belowStyle.value = {}; }, 320));
+}
+onUnmounted(() => { if (popTimer) clearTimeout(popTimer); flipTimers.forEach(clearTimeout); });
 // 选中面：一块绝对定位的玻璃面按选中项的位置平移（240ms），横条平滑滚到选中项居中。App 逻辑层没有 DOM，用选择器查询量位置。
 const queryScope = inject(CHASSIS_QUERY_SCOPE, null) ?? getCurrentInstance()?.proxy ?? null;
 const railInd = reactive({ x: 0, w: 0, h: 0, on: false });
@@ -673,8 +711,22 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 /* 等级详情卡（第 4 节）：纯色卡；标题行徽章 40＋等级名（卡片标题）＋状态标签；条件行名称 13/20 ink-3、值主文字、达成勾在行尾；权益行高 48。 */
 .rank-detail { margin-top:12px;padding:16px;border-radius:var(--ui-radius-surface);background:var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .rank-detail { box-shadow:inset 0 0 0 1px var(--v5-border),var(--v5-glass-shadow); }
-.rank-detail--in { animation:rank-detail-in 200ms cubic-bezier(.2,.8,.2,1) 80ms backwards; }
-@keyframes rank-detail-in { from { opacity:0;transform:translateY(8px); } }
+/* 切换时由 FLIP 管下方内容，不让浏览器的滚动锚定再挪整页。 */
+.rank-detail-host { position:relative;overflow-anchor:none; }
+.rank-ladder-below { overflow-anchor:none; }
+.rank-detail-enter-from { opacity:0;transform:translateY(8px); }
+.rank-detail-enter-active { transition:opacity 200ms cubic-bezier(.2,.8,.2,1) 80ms,transform 200ms cubic-bezier(.2,.8,.2,1) 80ms; }
+.rank-detail-leave-active { position:absolute;left:0;right:0;top:0;transition:opacity 120ms linear,transform 120ms cubic-bezier(.2,.8,.2,1);pointer-events:none; }
+.rank-detail-leave-to { opacity:0;transform:translateY(-6px); }
+.rank-fade-enter-from { opacity:0;transform:translateY(8px); }
+.rank-fade-enter-active { transition:opacity 200ms cubic-bezier(.2,.8,.2,1) 80ms,transform 200ms cubic-bezier(.2,.8,.2,1) 80ms; }
+.rank-rail__glint { position:absolute;inset:0;border-radius:50%;overflow:hidden;pointer-events:none; }
+.rank-rail__glint-band { position:absolute;top:0;bottom:0;left:0;width:12px;overflow:hidden;transform:translateX(-14px);animation:rank-glint-band 320ms cubic-bezier(.2,.8,.2,1) both; }
+.rank-rail__glint-copy { position:absolute;top:0;left:0;width:40px;height:40px;transform:translateX(14px);animation:rank-glint-copy 320ms cubic-bezier(.2,.8,.2,1) both; }
+/* 副本上的 brightness 是静态的，只有光带和副本平移（10.4 P2）；副本带同一个弹起动画，和原图对齐。 */
+.rank-rail__glint-copy .rank-rail__emb { filter:brightness(1.7) saturate(.8); }
+@keyframes rank-glint-band { from { transform:translateX(-14px); } to { transform:translateX(42px); } }
+@keyframes rank-glint-copy { from { transform:translateX(14px); } to { transform:translateX(-42px); } }
 .rank-detail__head { display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px; }
 .rank-detail__name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-metric);color:var(--v5-ink); }
 .rank-detail__name--v8 { color:#E2BC62; }
@@ -694,5 +746,5 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-gain--detail { min-height:48px; }
 .rank-gain--detail .rank-gain__name { font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3); }
 @media (max-width:374px) { .rank-rail__item { min-width:58px; } }
-@media (prefers-reduced-motion:reduce) { .rank-rail__ind { transition:none; } .rank-detail--in, .rank-rail__item.is-pop .rank-rail__emb { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .rank-rail__ind { transition:none; } .rank-rail__item.is-pop .rank-rail__emb, .rank-rail__glint { animation:none;display:none; } .rank-rail__emb { transition:none; } }
 </style>
