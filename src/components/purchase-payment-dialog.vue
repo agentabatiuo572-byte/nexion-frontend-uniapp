@@ -560,7 +560,8 @@ function moveFocus(delta: number, choose = false) {
   if (choose && next) next.click();
 }
 // The top close ends the payment on the store home; a payment already started asks first (user 2026-11-22).
-function leavePage() { if (received.value) leaveToStore(); else payment.notify('leave'); }
+// A refunded payment has ended: nothing is in progress to warn about.
+function leavePage() { if (received.value || purchaseConclusion(s.intent) === 'refunded') leaveToStore(); else payment.notify('leave'); }
 // The cashier closes before asking to leave the payment.
 // The question opens after the bank page has closed and handed focus back, so the question keeps focus.
 function leaveCashier() { payment.closeCashier(); void nextTick(() => payment.notify('leave')); }
