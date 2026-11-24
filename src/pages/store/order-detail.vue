@@ -63,7 +63,11 @@
               </view>
             </view>
             <view class="order-hero__art" aria-hidden="true">
-              <CatalogMachineImage class="order-hero__image nx-home-art-float" :sku="order.lineItems?.[0]?.sku ?? order.productId" :image-url="heroImage" :scope-key="order.id" />
+              <!-- A bundle shows its first two models standing together: the second behind on the right, the first in front. -->
+              <view v-if="(order.lineItems?.length ?? 0) > 1" class="order-hero__group nx-home-art-float">
+                <CatalogMachineImage v-for="(item, index) in order.lineItems!.slice(0, 2).reverse()" :key="item.sku" class="order-hero__image" :class="index === 0 ? 'order-hero__image--back' : 'order-hero__image--front'" :sku="item.sku" :image-url="item.imageUrl" :scope-key="order.id" />
+              </view>
+              <CatalogMachineImage v-else class="order-hero__image nx-home-art-float" :sku="order.lineItems?.[0]?.sku ?? order.productId" :image-url="heroImage" :scope-key="order.id" />
 
             </view>
           </view>
@@ -102,16 +106,19 @@
           <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
           <view v-if="order.lineItems?.length" class="order-summary__lines">
             <view v-for="item in order.lineItems" :key="item.sku" class="order-summary__line">
+              <view class="order-summary__line-thumb" aria-hidden="true"><CatalogMachineImage class="order-summary__line-image" :sku="item.sku" :image-url="item.imageUrl" :scope-key="order.id" /></view>
               <view class="flex-1 min-w-0">
                 <text class="order-summary__line-name">{{ (item.name) }}</text>
-                <text class="order-summary__line-meta">{{ item.sku }} · {{ item.quantity }} × {{ summaryMoney(item.unitPriceUsdt) }}</text>
+                <text class="order-summary__line-meta">{{ item.quantity }} × {{ lineMoney(item.unitPriceUsdt) }}</text>
               </view>
-              <text class="order-summary__line-amount">{{ summaryMoney(item.lineAmountUsdt) }}</text>
+              <text class="order-summary__line-amount">{{ lineMoney(item.lineAmountUsdt) }}</text>
             </view>
           </view>
           <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
           <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
-          <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="discountMoney(order.discount)" brand />
+          <!-- A deduction is not an action: main ink, like the checkout review (01 §1.1.1 #4).
+               LOGIC: say 组合折扣 only when the whole discount is the bundle's own (an activity bundle may add its own); placeholder: any multi-line order. -->
+          <DetailRow v-if="order.discount > 0" :label="(order.lineItems?.length ?? 0) > 1 ? pendingCopy.bundleDiscount : t.orders.discount" :value="discountMoney(order.discount)" />
           <DetailRow v-if="(order.tradeInCredit ?? 0) > 0" :label="t.tradein.checkoutRowLabel" :value="discountMoney(order.tradeInCredit ?? 0)" brand />
           <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
           <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="discountMoney(order.promoDiscountUSD ?? 0)" brand />
@@ -158,7 +165,8 @@
       <view v-if="order && stickyActionsVisible && !resultShown" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel nx-reverse-action" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
-          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
+          <!-- One verb for paying an open order on every surface (结算页, 外付中, 钱包待付): 继续付款; the name also says the amount. -->
+          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
@@ -658,6 +666,8 @@ useAutoRecovery({
   retry: () => recoverOrderAction(false),
   repeatMs: 15_000,
 });
+// LOGIC: contract P1 — a wallet-pending activity order (promotionQuoteId, no external payment) needs this bar too: since the
+// rewards card lost its 继续支付原订单 button, the bar is that order's only pay entry.
 const pendingOrderActionsVisible = computed(() => order.value?.status === "placed"
   && (!order.value.promotionQuoteId || externalPayment.value) && !walletPaymentConfirmed.value);
 // Any state with a next action gets the bottom action bar.
@@ -814,7 +824,9 @@ const trackSteps = computed(() => {
     const state: TrackState = index === stopAt
       ? (current.status === "payment_failed" || current.status === "provisioning_failed" ? "failed" : "stopped")
       : index < reached ? "done" : index === reached && stopAt < 0 ? "current" : "todo";
-    return { stage, state, label: index === stopAt ? statusLabel(current.status) : statusLabel(stage), segmentDone: false };
+    // The step an unpaid order waits on says what it waits for (待支付), not the 已付款 it has not reached (04 §4.0).
+    return { stage, state, label: index === stopAt ? statusLabel(current.status)
+      : state === "current" && current.status === "placed" ? t.value.promotion.pending : statusLabel(stage), segmentDone: false };
   });
   steps.forEach((step, index) => {
     const next = steps[index + 1];
@@ -1170,6 +1182,11 @@ function summaryMoney(value: number | string, unit = false): string {
   if (!unit) return formatAmount(value);
   return order.value && commerceOrderAmount(order.value).currency === 'USDT' ? usdt(value) : `$${formatAmount(value)}`;
 }
+// Line rows: $ on a dollar order (a currency sign, not a unit); a USDT order keeps bare numbers, its unit said once on the
+// subtotal and total rows (03 §3.6.1).
+function lineMoney(value: number): string {
+  return order.value && commerceOrderAmount(order.value).currency === 'USDT' ? formatAmount(value) : `$${formatAmount(value)}`;
+}
 // Deduction rows read −$50.00 as on checkout (the same formatter); USDT-paid orders keep the unit like their subtotal and total rows.
 function discountMoney(value: number): string {
   return formatCheckoutReviewAmount(value, order.value ? commerceOrderAmount(order.value).currency : 'USD', { discount: true, unit: true });
@@ -1244,6 +1261,11 @@ const sectionLabelStyle: CSSProperties = {
 .order-hero__art::before { content: ""; position: absolute; left: 18px; right: 18px; bottom: 12px; height: 16px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, #000 55%, transparent), transparent); }
 [data-theme="light"] .order-hero__art::before { background: radial-gradient(closest-side, rgba(20,16,8,.16), transparent); }
 .order-hero__image { position: relative; width: 116px; height: 116px; }
+/* Bundle: two models on one floor shadow, the second (back, right) 90 and the first (front, left) 82 inside the 116 box. */
+.order-hero__group { position: absolute; inset: 0; }
+.order-hero__group .order-hero__image { position: absolute; }
+.order-hero__image--back { left: 30px; top: 6px; width: 90px; height: 90px; }
+.order-hero__image--front { left: -6px; top: 34px; width: 82px; height: 82px; }
 .order-hero__icon { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin: 22px; border-radius: 50%; background: color-mix(in srgb, var(--order-tone) 12%, transparent); }
 .order-hero__note { display: block; margin-top: 20px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 /* Buttons sit side by side while their labels fit, otherwise each takes a full row. */
@@ -1293,8 +1315,12 @@ const sectionLabelStyle: CSSProperties = {
 .order-summary__amount :deep(.checkout-amount__symbol) { font-size: 16px; }
 .order-summary__amount :deep(.checkout-amount__unit) { margin-left: 6px; font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
 .order-summary__lines { margin: 4px 0; padding: 8px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
-.order-summary__line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
-.order-summary__line-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--v5-ink); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.order-summary__line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+/* 40px model thumbnail on the inner-block surface; the pedestal image overhangs its box like the catalog art. */
+.order-summary__line-thumb { position: relative; flex: none; width: 40px; height: 40px; overflow: hidden; border-radius: 10px; background: var(--ui-content-surface-2); }
+.order-summary__line-image { position: absolute; left: -5px; top: -7px; width: 50px; height: 50px; }
+/* The row does not open, so a long model name wraps in full instead of ending in an ellipsis (03 §3.6.1). */
+.order-summary__line-name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .order-summary__line-meta { display: block; color: var(--v5-ink-3); font-variant-numeric: tabular-nums; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .order-summary__line-amount { flex: none; color: var(--v5-ink); font-variant-numeric: tabular-nums; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .order-summary__note { display: block; padding: 6px 0; color: var(--v5-ink-3); font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }

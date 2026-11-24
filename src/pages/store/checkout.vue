@@ -1,7 +1,7 @@
 <!-- Checkout review presentation. Transaction quotes, confirmation and recovery remain server-authoritative. -->
 <template>
   <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
-    <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
+    <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : promotionRoute && promotionCheckout?.orderPending ? t.promotion.pending : auditCopy.review" /></template>
     <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
@@ -245,13 +245,15 @@
            tray text button (PRD purchase payment, line 49; 04 §4.0). The bar keeps its place, hidden and untouchable,
            until the presentation completes, so the result reserves its final height from the start. -->
       <view v-if="resultBar && (resultBar.exits.length || promotionBuyAgain)" class="checkout-sticky checkout-sticky--result checkout-result-tray nx-glass-bar" :class="{ 'is-waiting': !resultBar.done }">
-        <NxButton v-if="promotionBuyAgain" data-testid="checkout-buy-again" variant="secondary" :label="t.promotion.buyAgain" @click="promotionCheckout?.startNewPurchase()" />
+        <NxButton v-if="promotionBuyAgain" data-testid="checkout-buy-again" variant="secondary" :label="(promotionRoute?.items.length ?? 0) > 1 ? flowCopy.buyBundleAgain : t.promotion.buyAgain" @click="promotionCheckout?.startNewPurchase()" />
         <NxButton v-for="exit in resultBar.exits" :key="exit.key" :variant="exit.primary ? 'primary' : 'secondary'" :label="exit.label" @click="exit.run()" />
       </view>
       <view v-if="promotionRoute && promotionCheckout?.footer" class="checkout-sticky nx-glass-bar" :class="{ 'checkout-sticky--single': promotionCheckout.footer.amountless }">
-        <text v-if="promotionCheckout.footer.note" class="nx-tray-note w-full" role="status">{{ promotionCheckout.footer.note }}</text>
+        <!-- One note above the button: the bar's own block reason first, else the page's most pressing notice (decision ⑦). -->
+        <text v-if="promotionCheckout.footer.note || promotionCheckout.trayNotice" class="nx-tray-note w-full" role="status">{{ promotionCheckout.footer.note || promotionCheckout.trayNotice }}</text>
         <view v-if="!promotionCheckout.footer.amountless" class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
-        <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
+        <!-- The button's name carries the total it pays (the amount beside it is not part of the button). -->
+        <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.amountless ? promotionCheckout.footer.label : promotionCheckout.footer.label + ' · ' + flowCopy.paymentTotal + ' ' + promotionCheckout.footer.amount" @click="promotionCheckout.footer.action"><text>{{ promotionCheckout.footer.label }}</text></NxButton>
       </view>
       <!-- The server allows the original keep payment to continue with its own key: that continuation is the page's one action (03 §3.5.2, 04 §4.0). -->
       <view v-if="promotionRoute ? promotionCheckout?.keepResumeAllowed : keepResumeAllowed" class="checkout-sticky checkout-sticky--single nx-glass-bar">
@@ -271,6 +273,11 @@
         <NxButton variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
     </template>
+    <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
+         the quiet exit (back, Esc and H5 back all keep, the mask does not close it); cancelling is the explicit danger primary;
+         focus opens on the title so Enter does not cancel (03 §3.5). -->
+    <NxNoticeDialog :open="leaveKeepOpen" icon="clock" tone="warning" :title="flowCopy.leaveKeepTitle" :body="purchasePaymentCopy(locale.code).keepOrderBody"
+      :primary="flowCopy.cancelOrder" primary-tone="danger" :secondary="flowCopy.keepAndBack" focus-title @primary="leaveKeepCancel" @secondary="leaveKeepBack" />
     <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout" /></view></NxSheet>
     <NxSheet :open="paymentBlocked !== ''" :title="flowCopy.cannotPay" @close="!checkoutLeaving && (paymentBlocked = '')"><view class="checkout-exit-error"><text>{{ paymentBlocked }}</text><NxButton :label="flowCopy.cancelOrder" :busy="checkoutLeaving" @click="cancelCheckout" /></view></NxSheet>
   </AppChassis>
@@ -287,6 +294,8 @@ import { ref, reactive, shallowRef, nextTick, computed, watch, provide, onMounte
 import NxButton from "@/components/ui/nx-button.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
@@ -398,6 +407,19 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 }
 const locale = useLocaleStore();
 const flowCopy = computed(() => checkoutFlowCopy(locale.code));
+// D1 (contract P2). LOGIC: open on the first back (top back, system back, H5 back, Esc) when the page holds a cancellable
+// unpaid original order with no external payment and no unresolved command, before any recover/read; the two handlers only
+// close the dialog until the logic item wires them.
+const leaveKeepOpen = ref(false);
+function leaveKeepCancel() {
+  leaveKeepOpen.value = false;
+  // LOGIC: run the existing cancel (promotion: requestLeave's cancelOrder; ordinary: cancelCheckout), one POST, leave once
+  // the cancel is confirmed, stay on the page with its error otherwise.
+}
+function leaveKeepBack() {
+  leaveKeepOpen.value = false;
+  // LOGIC: leave to the real source without any cancel request; the order stays unpaid.
+}
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
