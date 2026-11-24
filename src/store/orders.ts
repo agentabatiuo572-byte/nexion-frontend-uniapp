@@ -20,7 +20,7 @@ import { computed, onScopeDispose, ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
-import { createAccountRowCommit, readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createAccountRowCommit } from "./account-scoped-storage";
 import { beginOrderAction,clearOrderAction,readOrderAction } from '@/lib/order-command-fence';
 import { asApiError,isApiRefusal,isSettledRejection } from '@/api/errors';
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
@@ -104,13 +104,6 @@ export interface CreateOrderInput {
 
 // 旧设备级单键 "nexgrid-orders-v4" 废弃(存量无账号归属,mock 可重建);订单按账号分行。
 const ACCOUNTS_KEY = "nexgrid-orders-accounts-v1"; // { [accountKey]: { orders: Order[] } }
-const HIDDEN_EXPIRED_ORDERS_KEY = "nexgrid-hidden-expired-orders-accounts-v1";
-type HiddenExpiredOrdersRow = { ids: string[] };
-
-function readHiddenExpiredOrders(accountKey: string, throwOnReadError = false): string[] {
-  const ids = readAccountRow<HiddenExpiredOrdersRow>(HIDDEN_EXPIRED_ORDERS_KEY, accountKey, throwOnReadError)?.ids;
-  return Array.isArray(ids) ? ids.filter(id => typeof id === "string") : [];
-}
 
 function genOrderId(): string {
   const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -177,9 +170,7 @@ export const useOrders = defineStore("orders", () => {
   const boundAccountKey = ref("default");
   const boundAccountRevision = ref(0);
   const orders = ref<Order[]>([]);
-  const hiddenExpiredIds = ref(new Set<string>());
-  const visibleOrders = computed(() => orders.value.filter(order => isVisibleUsdtNetwork(order.paymentMethod)
-    && (order.status !== "expired" || !hiddenExpiredIds.value.has(order.id))));
+  const visibleOrders = computed(() => orders.value.filter(order => isVisibleUsdtNetwork(order.paymentMethod)));
   const nextCursor = ref<string | null>(null);
   const loadingMore = ref(false);
   const failedOrderReadbacks = ref(new Set<string>());
@@ -221,7 +212,6 @@ export const useOrders = defineStore("orders", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     boundEpoch += 1;
-    hiddenExpiredIds.value = new Set(readHiddenExpiredOrders(boundKey));
     boundAccountKey.value = boundKey;
     boundAccountRevision.value += 1;
     refreshGeneration += 1;
@@ -613,16 +603,25 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
-  // B81 will replace the local write with the server's order-hide command.
-  function hideExpiredOrder(id: string): boolean {
-    if (getById(id)?.status !== "expired") return false;
+  async function hideExpiredOrder(id: string): Promise<boolean> {
+    if (!remoteApiEnabled || getById(id)?.status !== "expired") return false;
+    const requestEpoch = boundEpoch;
+    const currentAccount = () => boundEpoch === requestEpoch;
     try {
-      const ids = new Set(readHiddenExpiredOrders(boundKey, true));
-      ids.add(id);
-      if (!writeAccountRow(HIDDEN_EXPIRED_ORDERS_KEY, boundKey, { ids: [...ids] })) return false;
-      hiddenExpiredIds.value = ids;
+      await orderApi.hide(id, `order-hide:${id}`);
+      if (!currentAccount()) return false;
+      // A pre-command list response can still contain the expired row. Keep the
+      // current cursor: the server accepts an owned order even after it is hidden.
+      refreshGeneration += 1;
+      loadingMore.value = false;
+      orders.value = orders.value.filter(order => order.id !== id || order.status !== "expired");
+      failedOrderReadbacks.value.delete(id);
       return true;
-    } catch {
+    } catch (error) {
+      if (currentAccount() && isApiRefusal(error, 409, "ORDER_NOT_HIDEABLE")) {
+        // Reconcile the same row and let the existing read recovery retry failures.
+        await reconcileRemoteOrder(id, currentAccount).catch(() => undefined);
+      }
       return false;
     }
   }

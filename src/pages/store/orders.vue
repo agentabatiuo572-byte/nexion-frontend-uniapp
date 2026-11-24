@@ -136,7 +136,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { toast } from "@/store/ui";
 import { dateLocale, fmt } from "@/i18n/format";
-import { commerceOrderAmount, commerceOrderTitle } from "@/lib/commerce-review";
+import { commerceOrderAmount, commerceOrderTitle, commercePaymentCurrency } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { commerceAmount as formatAmount } from "@/lib/commerce-review";
 import { computed, nextTick, ref, watch, onUnmounted, type CSSProperties } from "vue";
@@ -149,7 +149,7 @@ import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import ConversationSwipeRow from "@/components/support/conversation-swipe-row.vue";
-import { hasUnfinishedOrderPayment, isUnfinishedPurchaseRecord, purchaseRecordPayload, refreshPendingPayments, usePurchasePayment } from "@/store/purchase-payment";
+import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isUnfinishedPurchaseRecord, purchaseRecordPayload, refreshPendingPayments, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { GENESIS_MEDIA, getProductMedia } from "@/lib/product-media";
@@ -219,19 +219,22 @@ const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
 const slotCopy = useDeviceSlotReplacementCopy();
 type PaymentRow = ReturnType<typeof payment.records>[number];
 type PaymentCard = { kind: "payment"; key: string; row: PaymentRow; title: string; tag: string; sku?: string; imageUrl?: string; orderNo?: string; kindLabel: string; method: string; startedAt?: number; amount: { value: string | number | null; currency: "USD" | "USDT" } };
-const paymentCards = computed<PaymentCard[]>(() => payment.records().flatMap((row): PaymentCard[] => {
-  // Lookup-only records without a local start time can come from another device.
-  if (!isUnfinishedPurchaseRecord(row) || row.lookupOnly && row.startedAt === undefined) return [];
+const paymentRecords = computed(() => payment.records());
+const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap((row): PaymentCard[] => {
+  if (!isUnfinishedPurchaseRecord(row) || !isOrdersPurchaseRecord(row)) return [];
   const payload = purchaseRecordPayload(row), c = paymentCopy.value;
   const base = { kind: "payment" as const, key: row.commandKey, row, title: row.summary,
-    tag: row.lastStatus === "MANUAL_REVIEW" ? c.confirming : c.waiting,
+    tag: row.lastStatus === "MANUAL_REVIEW" ? c.confirming : row.lastStatus === "FUNDS_CONFIRMED" ? c.received : c.waiting,
     startedAt: Number.isFinite(row.startedAt) ? row.startedAt : undefined };
+  const currency = commercePaymentCurrency(row.paymentMethod);
   if (row.kind === "ORDER_PAY") {
     if (typeof payload.orderNo !== "string") return [];
     // Only a known order that has left placed needs a payment card.
     const order = orders.getById(payload.orderNo);
     if (!order || order.status === "placed") return [];
-    return [{ ...base, sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, orderNo: order.id, kindLabel: "", method: "", amount: commerceOrderAmount(order) }];
+    const amount = commerceOrderAmount(order);
+    return [{ ...base, sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, orderNo: order.id, kindLabel: "", method: "",
+      amount: row.paymentMethod ? { ...amount, currency } : amount }];
   }
   const kindLabel = row.kind === "TRADE_IN" ? t.value.search.routes.tradeIn.label : row.kind === "CAPACITY_REPLACE" ? slotCopy.value.replace
     : row.kind === "CAPACITY_KEEP" ? c.kindCapacityKeep : c.kindTrialConvert;
@@ -241,7 +244,7 @@ const paymentCards = computed<PaymentCard[]>(() => payment.records().flatMap((ro
   const productNo = payload.targetProductNo ?? payload.productNo;
   const sku = typeof productNo === "string" ? productNo : undefined;
   return [{ ...base, sku, imageUrl: getProductMedia(sku)?.src, kindLabel, method,
-    amount: { value: typeof amount === "string" || typeof amount === "number" ? amount : null, currency: "USDT" } }];
+    amount: { value: typeof amount === "string" || typeof amount === "number" ? amount : null, currency } }];
 }));
 type ListCard = OrderListItem | PaymentCard;
 function cardCategory(card: ListCard) {
@@ -261,15 +264,23 @@ function openPaymentCard(card: PaymentCard) { void payment.resume(card.row); }
 const pendingCount = computed(() => orderList.value.filter(order => orderCategory(order) === "pending").length + paymentCards.value.length);
 const swipeOpenId = ref("");
 const deleteTarget = ref<OrderListItem | null>(null);
+const hidingOrderId = ref("");
 function swipeable(order: OrderListItem): boolean {
-  return order.kind === "commerce" && order.status === "expired" && !hasUnfinishedOrderPayment(app.accountKey, order.id);
+  return remoteApiEnabled && order.kind === "commerce" && order.status === "expired" && order.id !== hidingOrderId.value
+    && !hasUnfinishedOrderPayment(app.accountKey, order.id);
 }
-function confirmDeleteExpired() {
+async function confirmDeleteExpired() {
   const id = deleteTarget.value?.id;
   deleteTarget.value = null;
   swipeOpenId.value = "";
   const order = orderList.value.find(item => item.kind === "commerce" && item.id === id);
-  if (order && swipeable(order)) orders.hideExpiredOrder(order.id);
+  if (!order || !swipeable(order) || hidingOrderId.value) return;
+  const epoch = app.accountBindingEpoch;
+  hidingOrderId.value = order.id;
+  const hidden = await orders.hideExpiredOrder(order.id);
+  if (epoch !== app.accountBindingEpoch) return;
+  hidingOrderId.value = "";
+  if (!hidden) toast.error(t.value.security.opFailed);
 }
 // One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
 const tintedPendingId = computed(() => filteredCards.value.find((order): order is CommerceOrderListItem =>
@@ -307,12 +318,23 @@ const orderPanels = computed(() => orderListPanels({
 const ordersReadFailed = ref(false);
 let refreshEpoch = 0;
 let ordersPageActive = true;
-const watchesPayments = () => listShown.value && paymentCards.value.length > 0 && !payment.state.open && foregroundReadAllowed();
+// The server reconciles historical transfers separately, without a fixed
+// acceptance cutoff. Limit the client's expired-intent snapshot reads to a day.
+const latePaymentReadWindow = 24 * 60 * 60_000;
+const orderPaymentReadKeys = computed(() => new Set(paymentRecords.value.filter(row => {
+  if (!isOrdersPurchaseRecord(row)) return false;
+  if (isUnfinishedPurchaseRecord(row)) return true;
+  if (row.kind !== "ORDER_PAY" || row.lastStatus !== "EXPIRED" || !row.intentNo || row.businessDelivered || row.validated) return false;
+  const { orderNo } = purchaseRecordPayload(row);
+  const order = typeof orderNo === "string" ? orders.getById(orderNo) : undefined;
+  return order?.status === "expired" && nowSeconds.value * 1000 < (order.expiresAt ?? order.placedAt + 30 * 60_000) + latePaymentReadWindow;
+}).map(row => row.commandKey)));
+const watchesPayments = () => remoteSessionReady.value && orderPaymentReadKeys.value.size > 0 && !payment.state.open && foregroundReadAllowed();
 useVisibleInterval(() => {
   const accountKey = app.accountKey;
   void nextTick(() => refreshPendingPayments(accountKey,
     () => ordersPageActive && watchesPayments(),
-    row => paymentCards.value.some(card => card.key === row.commandKey)));
+    row => orderPaymentReadKeys.value.has(row.commandKey), true));
 }, 15000, watchesPayments);
 async function refreshOrders() {
   if (!remoteApiEnabled || !remoteSessionReady.value) return;
@@ -399,6 +421,7 @@ onUnmounted(() => {
 watch(() => app.accountBindingEpoch, () => {
   deleteTarget.value = null;
   swipeOpenId.value = "";
+  hidingOrderId.value = "";
   remoteOrdersResolved.value = false;
   if (ordersPageActive) void refreshOrders();
 });

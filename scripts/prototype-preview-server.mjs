@@ -183,8 +183,13 @@ const server=http.createServer(async(req,res)=>{
         if(update.observePayments===true)checkoutFlow.observePayments();
         if(update.delayNextCreate===true)checkoutFlow.delayCreate();
         if('orderListScene' in update)checkoutFlow.selectOrderListScene(update.orderListScene);
-        if(typeof update.observeLateOrderPayment==='string'&&!checkoutFlow.observeLateOrderPayment(update.observeLateOrderPayment))
+        if('failNextHide' in update)checkoutFlow.failNextHide(update.failNextHide);
+        if(typeof update.expireOrderPayment==='string'&&!checkoutFlow.expireOrderPayment(update.expireOrderPayment))
           return sendJson(res,{simulation:true,message:'PREVIEW_AWAITING_ORDER_PAYMENT_REQUIRED'},409);
+        if(typeof update.observeLateOrderPayment==='string'&&!checkoutFlow.observeLateOrderPayment(update.observeLateOrderPayment))
+          return sendJson(res,{simulation:true,message:'PREVIEW_EXPIRED_ORDER_PAYMENT_REQUIRED'},409);
+        if(typeof update.confirmLateOrderPayment==='string'&&!checkoutFlow.confirmLateOrderPayment(update.confirmLateOrderPayment))
+          return sendJson(res,{simulation:true,message:'PREVIEW_LATE_ORDER_PAYMENT_REQUIRED'},409);
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }

@@ -22,7 +22,7 @@ export type PurchasePaymentIntent = {
   networkConfirmFeeUsdt: string; totalUsdt: string; amountVnd: string | null; paymentUrl: string | null;
   address: string | null; expiresAt: string; reason: string | null; receipt: unknown;
   fulfilmentStatus?: 'DELIVERED';
-  paymentAllowed?: boolean; expirationTime?: string;
+  paymentAllowed?: boolean; expirationTime?: string; createdAt?: string;
 } & PurchaseFinancialSnapshot;
 const invalid = () => new ApiError({ kind: 'protocol', message: 'PURCHASE_PAYMENT_RESPONSE_INVALID' });
 const object = (raw: unknown): Record<string, unknown> => {
@@ -95,11 +95,13 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
   if ((raw.status === 'DELIVERED' || raw.fulfilmentStatus === 'DELIVERED') && (!raw.receipt || typeof raw.receipt !== 'object')) throw invalid();
   if (raw.paymentAllowed !== undefined && (typeof raw.paymentAllowed !== 'boolean' || !fields.deadlineAt)) throw invalid();
   const expirationTime = raw.expirationTime === undefined ? undefined : timestamp(raw.expirationTime);
+  const createdAt = raw.createdAt == null ? undefined : timestamp(raw.createdAt);
   if (expirationTime && fields.paymentMethod !== 'HDPAY_BANK') throw invalid();
   return { ...fields, intentNo: text(raw.intentNo), commandKey: text(raw.commandKey), status: raw.status as PurchasePaymentStatus,
     paymentUrl, address, reason: raw.reason == null || typeof raw.reason === 'string' && !raw.reason.trim() ? null : text(raw.reason), receipt: raw.receipt ?? null,
     ...(raw.fulfilmentStatus === 'DELIVERED' ? { fulfilmentStatus: 'DELIVERED' as const } : {}),
     ...(raw.paymentAllowed !== undefined ? { paymentAllowed: raw.paymentAllowed as boolean } : {}),
+    ...(createdAt ? { createdAt } : {}),
     ...(expirationTime ? { expirationTime } : {}) };
 }
 export function createPurchasePaymentApi(client: ApiClient) {

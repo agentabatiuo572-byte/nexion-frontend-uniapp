@@ -22,7 +22,10 @@ export function commerceOrderIsPaid(order: Pick<Order, 'status'>): boolean {
   return ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status);
 }
 export function commercePaidOrderAmount(order: Pick<Order, 'total' | 'paidTotal' | 'paymentMethod'>): { value: Order['total']; currency: 'USD' | 'USDT' } {
-  return { value: order.paidTotal ?? order.total, currency: order.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT' };
+  return { value: order.paidTotal ?? order.total, currency: commercePaymentCurrency(order.paymentMethod) };
+}
+export function commercePaymentCurrency(paymentMethod: string | undefined): 'USD' | 'USDT' {
+  return paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT';
 }
 export function commerceOrderAmount(order: Pick<Order, 'total' | 'paidTotal' | 'paidAt' | 'paymentMethod'>): { value: Order['total']; currency: 'USD' | 'USDT' } {
   return commerceOrderHasPayment(order) ? commercePaidOrderAmount(order) : { value: order.total, currency: 'USD' };

@@ -1,7 +1,7 @@
 // Local frontend acceptance only. Never imported by src or deployed as a payment service.
 import {createHash} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
-import {demoFixture,demoOrderTimedOut,demoTimedOutOrder} from './prototype-demo-data.mjs';
+import {demoFixture,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
@@ -10,7 +10,10 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   pin.state.loggedIn = true;
   const receipts = new Map();
   const orderCreates = new Map();
+  const hiddenOrders = new Set();
+  const hideCommands = new Map();
   let orderListScene;
+  let nextHideFailure;
   const commandKeys = new Intl.Collator("en", {sensitivity:"base"});
   let delayCreate;
   const configureCreateDelay = () => { delayCreate = { scenario: state.scenarioEpoch }; };
@@ -20,7 +23,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     ['/api/app/trade-in/submit', 'trade-in'],
     ['/api/app/trade-in/capacity-replace', 'capacity-replace'],
   ]);
-  const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || tradeinCommands.has(path) || external.handles(path);
+  const hidePath = /^\/api\/(?:app\/)?orders\/([^/]+)\/hide$/;
+  const handles = path => hidePath.test(path) || /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || tradeinCommands.has(path) || external.handles(path);
   // A reset or scenario change starts a fresh account: replayed receipts and payment command receipts belong to the
   // old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
@@ -29,9 +33,57 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     if (epoch !== state.scenarioEpoch) {
       epoch = state.scenarioEpoch; receipts.clear();
       orderCreates.clear();
+      hiddenOrders.clear();
+      hideCommands.clear();
       orderListScene = undefined;
+      nextHideFailure = undefined;
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
+  }
+  const isExpired = order => order.orderStatus === 'EXPIRED' && order.paymentStatus === 'EXPIRED';
+  function orderProjection(url, request) {
+    const page = demoFixture(new URL('/api/orders',url.origin),locale(),state,{...request,method:()=>'GET'});
+    const sample = page.orders.find(order=>order.orderNo==='DEMO-ORDER-006');
+    if (orderListScene === 'only-expired') return {...page,orders:sample ? [sample] : []};
+    if (orderListScene === 'expired-first-page' && sample) {
+      const orders = Array.from({length:22},(_,index)=>{
+        const placedAt = sample.placedAt + index * 60000;
+        return {...sample,...demoTimedOutOrder,orderNo:'DEMO-ORDER-'+String(11+index).padStart(3,'0'),placedAt,expiresAt:placedAt+paymentWindow};
+      });
+      return {...page,orders};
+    }
+    return page;
+  }
+  function readOrders(url, request) {
+    const pageSize = Number(url.searchParams.get('pageSize') ?? 50);
+    const cursor = url.searchParams.get('beforeOrderNo')?.trim();
+    const page = orderProjection(url, request);
+    const ordered = page.orders.sort((left,right)=>right.placedAt-left.placedAt||right.orderNo.localeCompare(left.orderNo));
+    const anchor = cursor === undefined ? -1 : ordered.findIndex(order=>order.orderNo===cursor);
+    if (!Number.isSafeInteger(pageSize) || pageSize<1 || pageSize>100 || cursor === '' || (cursor?.length??0)>100)
+      return {status:422,message:'ORDER_PAGE_INVALID',data:null};
+    const visible = cursor && anchor<0 ? [] : ordered.slice(anchor+1).filter(order=>!hiddenOrders.has(order.orderNo)||!isExpired(order));
+    const orders = visible.slice(0,pageSize);
+    return ok({...page,orders,nextCursor:visible.length>pageSize ? orders.at(-1).orderNo : null});
+  }
+  function hideOrder(url, request, orderNo, owner, key) {
+    if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
+    if (!key?.trim()) return {status:400,message:'IDEMPOTENCY_KEY_REQUIRED',data:null};
+    if (owner!==demoPurchasingAccountId(state)) return {status:403,message:'ORDER_FORBIDDEN',data:null};
+    const order = orderProjection(url, request).orders.find(row=>row.orderNo===orderNo);
+    if (!order) return {status:403,message:'ORDER_FORBIDDEN',data:null};
+    const previous = hideCommands.get(key);
+    if (previous && previous!==orderNo) return {status:409,message:'IDEMPOTENCY_KEY_CONFLICT',data:null};
+    if (!previous && !isExpired(order)) return {status:409,message:'ORDER_NOT_HIDEABLE',data:null};
+    const failure = nextHideFailure;
+    nextHideFailure = undefined;
+    if (failure==='unavailable') return {status:503,message:'ORDER_HIDE_UNAVAILABLE',data:null};
+    hideCommands.set(key,orderNo);
+    hiddenOrders.add(orderNo);
+    // A gateway failure can hide the result even though the order was saved.
+    if (failure==='response-lost') return {status:503,message:'ORDER_HIDE_RESPONSE_UNAVAILABLE',data:null};
+    return ok({orderNo,hidden:true,paymentStatus:'EXPIRED',orderStatus:'EXPIRED',
+      serverCanonical:true,source:'server',sourceEnvironment:'PRODUCTION',runId:''});
   }
   function recoverPendingSingle(owner, product, quantity, voucherId, now) {
     const ownedReceipts = [...orderCreates.values()].filter(entry => entry.owner === owner && entry.receipt?.idSource === 'server');
@@ -65,6 +117,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     const handlesOrder = path === '/api/orders' || path.startsWith('/api/orders/') || path.startsWith('/api/promotion-commands/');
     const headers = request.headers();
+    const hide = path.match(hidePath);
+    if (hide && method === 'POST') return hideOrder(url, request, decodeURIComponent(hide[1]).trim(), previewAccountId(state, headers), key);
     const owner = handlesOrder ? previewAccountId(state, headers) : null;
     if (handlesOrder && path !== '/api/orders/commands' && owner !== demoPurchasingAccountId(state)) {
       if (!owner) return {status:403,message:'USER_SUBJECT_REQUIRED',data:null};
@@ -171,15 +225,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       pin.commands.set(command,{kind,commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt});
       return ok(receipt);
     }
-    if (path === '/api/orders' && method === 'GET') {
-      const page = demoFixture(url,locale(),state,request);
-      if (!orderListScene) return ok(page);
-      const expired = page.orders.filter(order=>order.orderNo==='DEMO-ORDER-006'&&order.canonicalStatus==='expired');
-      if (orderListScene === 'only-expired') return ok({...page,orders:expired});
-      if (url.searchParams.get('beforeOrderNo') === 'unpaid-float-next')
-        return ok({...page,orders:page.orders.filter(order=>order.orderNo!=='DEMO-ORDER-006')});
-      return ok({...page,orders:expired,nextCursor:'unpaid-float-next'});
-    }
+    if (path === '/api/orders' && method === 'GET') return readOrders(url, request);
     if (path === '/api/orders/quote') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/bundle' && method === 'POST') {
       if (receipts.has(path+key)) return receipts.get(path+key);
@@ -225,7 +271,9 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     return ok(demoFixture(url,locale(),state,request));
   }
   return {handles,handle,pin,syncScenario,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
-    observeLateOrderPayment:external.observeLateOrderPayment,
+    expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
+    confirmLateOrderPayment:external.confirmLateOrderPayment,
+    failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},
     selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
     selectPaymentMode:external.selectPaymentMode};
 }

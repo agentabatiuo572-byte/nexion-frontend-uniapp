@@ -101,6 +101,11 @@ function save(pending: PendingExternal, accountKey = state.accountKey) {
   const startedAt = value.records[pending.commandKey]?.startedAt;
   const record = startedAt === undefined ? pending : { ...pending, startedAt };
   if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: record } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
+  if (record.lastStatus !== 'EXPIRED') {
+    const expired = unsavedExpiries.get(accountKey);
+    expired?.delete(record.commandKey);
+    if (expired && !expired.size) unsavedExpiries.delete(accountKey);
+  }
   state.revision++;
 }
 function saveExpiry(accountKey: string, commandKey: string, kind: PurchaseKind, observed?: PendingExternal) {
@@ -203,16 +208,22 @@ function sharedPassiveRead(run: () => Promise<unknown>): Promise<unknown> {
   return passiveRead;
 }
 /** Read the currently displayed payments and project their latest confirmed result. */
-export function refreshPendingPayments(accountKey: string, current: () => boolean, shouldRead: (row: PendingExternal) => boolean = () => true): Promise<unknown> {
+export function refreshPendingPayments(accountKey: string, current: () => boolean, shouldRead: (row: PendingExternal) => boolean = () => true,
+  includeExpiredOrderPayments = false): Promise<unknown> {
   if (!current() || account() !== accountKey || state.open) return passiveRead ?? Promise.resolve();
   const app = useApp();
   const binding = app.accountBindingEpoch;
   const sameAccount = () => app.accountKey === accountKey && app.accountBindingEpoch === binding;
-  const records = pendingPayments().filter(row => row.lastStatus !== 'DELIVERED' && !row.businessDelivered && shouldRead(row));
+  let candidates: PendingExternal[];
+  try { candidates = includeExpiredOrderPayments ? displayRecords() : pendingPayments(); }
+  catch { return Promise.resolve(); }
+  const records = candidates.filter(row => row.lastStatus !== 'DELIVERED' && !row.businessDelivered && shouldRead(row));
   if (!records.length) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(records.map(async pending => {
-    const intent = await readIntent(pending);
+    const expired = pending.lastStatus === 'EXPIRED';
+    const intent = expired && pending.intentNo ? await api.snapshot(pending.intentNo) : await readIntent(pending);
     if (!sameAccount() || !current() || state.open || !shouldRead(pending)) return;
+    if (expired && intent && intent.status !== 'MANUAL_REVIEW') return;
     const orderNo = projectPassivePayment(accountKey, pending, intent);
     if (orderNo) await useOrders().reconcileRemoteOrder(orderNo, () => sameAccount() && foregroundReadAllowed());
   })));
@@ -228,9 +239,10 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   if (!isVisiblePayment(intent)) { hideOriginalPayment(accountKey, pending, intent); return; }
   matches(intent, pending);
   const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
-  if (!businessDelivered && (intent.status === pending.lastStatus || !settled(intent))) return;
+  if (!businessDelivered && (intent.status === pending.lastStatus || !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
   if (intent.status === 'EXPIRED') {
-    saveExpiry(accountKey, pending.commandKey, pending.kind);
+    saveExpiry(accountKey, pending.commandKey, pending.kind, { ...pending, intentNo: intent.intentNo,
+      paymentMethod: intent.paymentMethod, network: intent.network });
   } else {
     if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
     save({ ...pending, intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered }, accountKey);
@@ -603,7 +615,8 @@ async function query() {
         if (intent.kind === 'TRIAL_CONVERT') payload.expectedAmountUsdt = intent.subtotalUsdt;
         else if (intent.businessAmountUsdt) payload.expectedPayableUsdt = intent.businessAmountUsdt;
         const original = { ...recovery, fingerprint: JSON.stringify([recovery.kind, payload]),
-          commandKey: intent.commandKey, paymentQuoteId: intent.paymentQuoteId, lookupOnly: true };
+          commandKey: intent.commandKey, paymentQuoteId: intent.paymentQuoteId, lookupOnly: true,
+          startedAt: intent.createdAt ? Date.parse(intent.createdAt) : undefined };
         if (context) {
           const caller = activeChoice;
           context = null;
@@ -919,6 +932,12 @@ export function purchaseRecordPayload(row: PendingExternal): Record<string, unkn
 export function isUnfinishedPurchaseRecord(row: PendingExternal): boolean {
   return !row.validated && !row.businessDelivered && !row.quotaRefusal
     && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'DELIVERED';
+}
+
+/** Read-only ORDER_PAY discovery belongs to order detail. Non-order intents
+ * with an original number can also be recovered explicitly from checkout. */
+export function isOrdersPurchaseRecord(row: PendingExternal): boolean {
+  return !row.lookupOnly || row.startedAt !== undefined || row.kind !== 'ORDER_PAY' && !!row.intentNo;
 }
 
 /** An order with a known unfinished payment cannot be hidden, even during confirmation. */
