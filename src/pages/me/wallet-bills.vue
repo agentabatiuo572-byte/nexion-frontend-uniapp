@@ -159,7 +159,6 @@ import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bil
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useDataVisibility } from "@/store/data-visibility";
-import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { fundsServerEnabled, sessionVault } from "@/api/runtime";
@@ -195,7 +194,6 @@ onLoad(options => {
   const presetAsset = String(options?.asset ?? query.get("asset") ?? "");
   if (presetAsset === "USDT" || presetAsset === "UVT") asset.value = presetAsset;
 });
-const deposits = useDeposits();
 const remoteSessionReady = computed(() => binarySessionReady({
   remote: fundsServerEnabled,
   authenticated: auth.isAuthenticated,
@@ -360,9 +358,6 @@ function billMemo(b: Bill): string {
   return resolveWalletBillMemo(b, t.value.bills.memo as Record<string, string>, courseTitles.value);
 }
 function toggleSourceRef(id: string) { sourceRefOpen.value = sourceRefOpen.value === id ? "" : id; }
-function decimalLabel(exact: string | undefined, fallback: number, symbol: Bill['symbol']): string {
-  return formatWalletBillDecimal(exact, fallback, symbol, dateLocale());
-}
 function isDebit(b: Bill): boolean {
   return b.amountExact === undefined ? b.amount < 0 : b.amountExact.startsWith("-");
 }
@@ -370,7 +365,7 @@ function runningBalanceLabel(b: Bill): string {
   return `${t.value.bills.runningBalance} ${formatWalletBillBalance(b.balanceAfterExact, b.balanceAfter!, b.symbol, dateLocale())}`;
 }
 function fmtAmount(b: Bill): string {
-  return decimalLabel(b.amountExact, b.amount, b.symbol);
+  return formatWalletBillDecimal(b.amountExact, b.amount, b.symbol, dateLocale(), b.chainTopup);
 }
 function fmtTime(ts: number): string {
   return walletBillTimeLabel(ts, dateLocale());
@@ -378,28 +373,13 @@ function fmtTime(ts: number): string {
 function fmtClock(ts: number): string {
   return walletBillClockLabel(ts);
 }
-function billHash(b: Bill): string {
-  // 冲正分录的 ref 带 `-REV` 后缀(与原扣款分录分开幂等键,见 marketplace / stake-sheet 等)。
-  // **有意不剥掉**:两行并排时,同号会让用户分不清哪行是扣、哪行是退;带后缀反而清楚,
-  // 而且抄给客服时能直接定位到冲正那条。参考号是标识不是文案,与 `DP-20260804-0001` 同类。
-  return b.ref || b.id;
-}
 function billAria(b: Bill): string {
   // 用 billMemo(渲染时翻译)而不是写入时冻结语言的 raw memo —— 切语言后读屏不再旧语直出
   return [typeLabel(b.type), billMemo(b), b.ref].filter(Boolean).join(" ");
 }
-/**
- * 🔴 账单行按条目性质分流(2026-08-02 走查 P0 + 证伪修订):
- *  - withdraw(含同单号的 NEX 燃烧行)→ 提现追踪页:单据真状态机,审核中的单不再被 tx 页
- *    恒定的「已确认」编造;NEX 行点开看所属提现单,不再被按 hash 编成一笔链上交易;
- *  - topup 链上 → tx 页带真实参数,优先按 ref 反查入金记录(毛额/真实确认数/收款地址,
- *    与 deposit-usdt-pane.goRecord 同口径);记录缺失(种子)退回 network 字段/memo 正则;
- *  - 其余(奖励/成就/兑换/购买/质押/历史验证返还)不是链上转账,没有「交易详情」可看 →
- *    打开本页的账单详情弹层,只展示这条账单自己的字段,不编造交易。
- */
 function billClickable(b: Bill): boolean {
   if (b.type === "withdraw") return !!b.ref;
-  if (b.type === "topup") return txParamsForTopup(b) !== null;
+  if (b.chainTopup) return true;
   return false;
 }
 const detail = ref<Bill | null>(null);
@@ -414,35 +394,7 @@ function goBill(b: Bill) {
     if (b.ref) navTo(`/pages/me/wallet-withdraw-tracking?id=${b.ref}`);
     return;
   }
-  if (b.type === "topup") {
-    const p = txParamsForTopup(b);
-    if (p) navTo(`/pages/tx/hash?${p.toString()}`);
-    return;
-  }
-  // 其余类型由 openBill 打开详情弹层;这里只是兜底防线
-}
-/** topup 行的 tx 页真实参数;拼不出真实网络就返回 null —— 宁可不可点,不让 tx 页编数。 */
-function txParamsForTopup(b: Bill): URLSearchParams | null {
-  const p = new URLSearchParams({ hash: billHash(b) });
-  const rec = deposits.records.find((r) => (r.txHash ?? r.depositId) === b.ref);
-  const recNet = rec ? CHAIN_NET_SHORT[rec.channel] : undefined;
-  if (rec && recNet) {
-    // 与 goRecord 同口径:金额 = 链上转账毛额(gross),确认数 = 真实值(修「56 confirmations」同类编造)
-    p.set("amount", rec.grossAmountUsdt.toFixed(2));
-    p.set("net", recNet);
-    p.set("confs", String(rec.confirmations ?? 0));
-    if (rec.address) p.set("to", rec.address);
-    p.set("age", String(Math.max(1, Math.round((mockServerNow() - b.ts) / 60_000))));
-    return p;
-  }
-  // 存量兜底(种子行等无入金记录):网络取字段或 memo 正则,金额用账单额(与本行自洽)
-  const net = b.network ?? billNetwork(b);
-  if (!net) return null;
-  if (b.symbol === "USDT") p.set("amount", Math.abs(b.amount).toFixed(2));
-  p.set("net", net);
-  // 时敏路径统一走 mockServerNow 单时源(server-time.ts 约定;直用 Date.now 接后端换时源不跟)
-  p.set("age", String(Math.max(1, Math.round((mockServerNow() - b.ts) / 60_000))));
-  return p;
+  if (b.chainTopup) void navTo(`/pages/tx/hash?src=deposit&billId=${encodeURIComponent(b.id)}`);
 }
 
 /**

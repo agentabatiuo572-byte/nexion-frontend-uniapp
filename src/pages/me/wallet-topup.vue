@@ -8,7 +8,15 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/me" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
+      <SubPageHeader back="/pages/me/me" :title="orderNet ? payCopy.topupFor : t.wallet.addFunds" :subtitle="orderNet ? undefined : t.wallet.topUp" />
+
+      <!-- An ordinary order paid with USDT (plan C.2): the network is fixed by the payment sheet, so no channel switch or bank pane. -->
+      <template v-if="orderNet">
+        <OrderUsdtTopup ref="orderPane" :order-no="orderNet.orderNo" :network="orderNet.network" :name="orderNet.name" :visible="topupVisible"
+          @pay="payOrder" @open-intent="openIntent" @view-order="openOrder" @support="openSupport" @disabled="returnToOrder" />
+        <view class="topup-order-clear" />
+      </template>
+      <template v-else>
 
       <!-- Topping up for a purchase, with a return action when an existing order is covered. -->
       <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': topupCovered }" role="status">
@@ -37,10 +45,16 @@
       <DepositBankPane v-else-if="seg === 'bank'" ref="bankPane" />
       <TopupCardForm v-else @change-channel="seg = 'crypto'" />
       <view v-if="orderFunded || bankAction" style="height: 120px" />
+      </template>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30): back to the order once it is covered, otherwise the bank pane's create action. -->
     <template #pageFixed>
-      <view v-if="orderFunded" class="topup-sticky nx-glass-bar"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
+      <!-- One primary per state; a disabled one carries its reason above it (03 §3.1, 04.0). -->
+      <view v-if="orderBar" class="topup-sticky nx-glass-bar" :class="{ 'topup-sticky--note': orderBar.note }">
+        <text v-if="orderBar.note" class="nx-tray-note">{{ orderBar.note }}</text>
+        <NxButton class="topup-sticky__btn" variant="primary" :label="orderBar.label" :disabled="!orderBar.enabled" @click="orderBar.run()" />
+      </view>
+      <view v-else-if="orderFunded" class="topup-sticky nx-glass-bar"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
       <view v-else-if="bankAction" class="topup-sticky nx-glass-bar">
         <NxButton v-if="bankSecondary" :class="['topup-sticky__btn', bankSecondary.className]" variant="secondary" :label="bankSecondary.label" @click="bankSecondary.run()" />
         <NxButton :class="['topup-sticky__btn', bankAction.className]" variant="primary" :label="bankAction.label" :disabled="!bankAction.enabled" @click="bankAction.run()">
@@ -57,7 +71,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, type CSSProperties, computed, watch } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { takeNavigationQuery, navTo } from "@/lib/route";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useApp } from "@/store/app";
@@ -70,6 +84,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
+import OrderUsdtTopup from "@/components/me/order-usdt-topup.vue";
 import { useT } from "@/i18n/use-t";
 import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
@@ -77,6 +92,8 @@ import { useFx } from "@/store/fx";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { findResumablePaymentIntent } from "@/lib/hosted-payment";
+import { orderTopupNetwork, type OrderTopupIntent, type OrderTopupNetwork } from "@/api/purchase-payment-api";
+import { replaceWithOrder, usePurchasePayment } from "@/store/purchase-payment";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
@@ -85,6 +102,12 @@ const segments = remoteApiEnabled ? SEGMENTS.filter((item) => item.id !== "card"
 const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
 onLoad((query) => {
   const pending = new URLSearchParams(takeNavigationQuery('/pages/me/wallet-topup'));
+  const network = orderTopupNetwork(query?.network ?? pending.get('network'));
+  const orderNoForNet = query?.orderNo ?? pending.get('orderNo');
+  if (orderNoForNet && network) {
+    orderNet.value = { orderNo: orderNoForNet, network, name: query?.name ?? pending.get('name') ?? '' };
+    return;
+  }
   const channel = query?.channel ?? pending.get('channel');
   const allowed = visibleSegments.value.find(item => item.id === channel);
   if (allowed) seg.value = allowed.id;
@@ -101,6 +124,26 @@ onLoad((query) => {
   }
 });
 const app = useApp();
+const orderNet = ref<{ orderNo: string; network: OrderTopupNetwork; name: string } | null>(null);
+const topupVisible = ref(false);
+onShow(() => { topupVisible.value = true; });
+onHide(() => { topupVisible.value = false; });
+const orderPane = ref<InstanceType<typeof OrderUsdtTopup> | null>(null);
+const orderBar = computed(() => orderNet.value ? orderPane.value?.barAction ?? null : null);
+let navigatingOrder = false;
+function orderHref() { return `/pages/store/order-detail?id=${encodeURIComponent(orderNet.value!.orderNo)}`; }
+async function payOrder() {
+  if (!orderNet.value || navigatingOrder) return;
+  navigatingOrder = true;
+  try { await navTo(`${orderHref()}&pay=1&topupNetwork=${orderNet.value.network}`); }
+  finally { navigatingOrder = false; }
+}
+function openIntent(intent: OrderTopupIntent) {
+  if (orderNet.value) usePurchasePayment().openOrderTopupIntent(orderNet.value.orderNo, orderNet.value.name, intent);
+}
+function openOrder() { if (orderNet.value) void navTo(orderHref()); }
+function returnToOrder() { if (orderNet.value) void replaceWithOrder(orderHref()); }
+function openSupport() { void navTo('/pages/support/messages'); }
 const payCopy = computed(() => purchasePaymentCopy(locale.code));
 const orderTopup = ref<{ orderNo: string | null; amount: number; shortfall: number | null; name: string; deadlineAt: number | null } | null>(null);
 const topupNow = ref(Date.now());
@@ -242,6 +285,8 @@ const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
 .topup-order__cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-2); color: var(--v5-warning); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .topup-sticky { position: absolute; z-index: 36; display: flex; }
 .topup-sticky__btn { display: flex; flex: 1 1 0; }
+.topup-sticky--note { flex-direction: column; align-items: stretch; }
+.topup-order-clear { height: calc(var(--nx-tray-clearance) + 40px); }
 .topup-sticky__label { display: inline-flex; align-items: center; gap: 8px; }
 .topup-sticky__spin { width: 16px; height: 16px; flex: none; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: spin 1s linear infinite; }
 .topup-seg { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }

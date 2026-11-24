@@ -95,6 +95,66 @@ export function demoTeamWeek(at) {
 export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
   ?{depositId:'CR-77',grossAmountUsdt:50.123456,creditedUsdt:50,createdAt:state.previewFactsAt}:null;
 
+export const demoChainDepositFee = '0.123456';
+export const demoChainDepositMinimum = '50';
+
+export function demoChainDepositAddress(state, network, allocate = false) {
+  const existing = state.chainDepositAddresses?.[network]
+    ?? state.chainDepositEvents?.find(row => row.network === network)?.address;
+  if (existing) return existing;
+  if (!allocate && !demoCreditedDeposits(state).some(row => row.deposit?.network === network)) return null;
+  const addresses = state.chainDepositAddresses ??= {};
+  return addresses[network] = '0x' + (network === 'ERC20' ? '2' : '1').repeat(40);
+}
+
+function demoCreditedDeposits(state) {
+  const original = demoCreditedDeposit(state);
+  if (!original) return [];
+  const deposit = (network, marker, grossAmountUsdt, creditedUsdt) => ({ network, txHash: '0x' + marker.repeat(64),
+    grossAmountUsdt, feeUsdt: demoChainDepositFee, creditedUsdt });
+  const history = [{ ...original, deposit: deposit('BEP20', 'a', '50.123456', '50') }];
+  if (state.billRefsState !== 'b84-deposit') return history;
+  return [
+    ...history,
+    { depositId: 'CR-80', createdAt: original.createdAt - 500, deposit: deposit('BEP20', 'c', '50.234567', '50.111111'), creditedUsdt: 50.111111 },
+    { depositId: 'CR-78', createdAt: original.createdAt - 1000, deposit: deposit('ERC20', 'b', '62.345678', '62.222222'), creditedUsdt: 62.222222 },
+    { depositId: 'CR-79', createdAt: original.createdAt - 2000, deposit: null, creditedUsdt: 73.333333 },
+    { depositId: 'CR-81', createdAt: original.createdAt - 3000, creditedUsdt: 84.444444 },
+  ];
+}
+
+export function demoChainDeposits(state) {
+  const history = demoCreditedDeposits(state).filter(row => row.deposit).map(({ depositId, createdAt, deposit }) => ({
+    depositId, createdAt, creditedAt: createdAt, network: deposit.network, txHash: deposit.txHash,
+    address: demoChainDepositAddress(state, deposit.network, true), confirmations: 15, requiredConfirmations: 15, status: 'CREDITED',
+    grossAmountUsdt: Number(deposit.grossAmountUsdt), grossAmountUsdtExact: deposit.grossAmountUsdt,
+    creditedUsdt: Number(deposit.creditedUsdt), creditedUsdtExact: deposit.creditedUsdt,
+  }));
+  return [...(state.chainDepositEvents ?? [])].reverse().concat(history);
+}
+
+export function recordDemoChainDeposit(state, { network, grossAmountUsdt, creditedUsdt, createdAt }) {
+  const events = state.chainDepositEvents ??= [];
+  const sequence = events.length + 1, depositId = 'CR-' + (1000 + sequence);
+  const txHash = '0x' + sequence.toString(16).padStart(64, '0');
+  const credited = Number(creditedUsdt) > 0;
+  const event = {
+    depositId, network, txHash, address: demoChainDepositAddress(state, network, true), createdAt,
+    grossAmountUsdt: Number(grossAmountUsdt), grossAmountUsdtExact: grossAmountUsdt,
+    creditedUsdt: Number(creditedUsdt), creditedUsdtExact: creditedUsdt,
+    confirmations: 15, requiredConfirmations: 15, status: credited ? 'CREDITED' : 'DUST_HOLD',
+    creditedAt: credited ? createdAt : null,
+  };
+  events.push(event);
+  if (!credited) return event;
+  postDemoWalletEntries(state, {
+    bizNo: depositId, bizType: 'CHAIN_TOPUP', asset: 'USDT', direction: 'IN', category: 'topup', at: createdAt,
+    amount: Number(creditedUsdt), amountExact: creditedUsdt, network,
+    deposit: { network, txHash, grossAmountUsdt, feeUsdt: demoChainDepositFee, creditedUsdt },
+  });
+  return event;
+}
+
 export function demoTeamPeriod(period,now,snapshotAt) {
   const end=snapshotAt?.trim()?Date.parse(snapshotAt):now;
   if(!Number.isFinite(end)||end>now+5000){
@@ -247,10 +307,10 @@ export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
   if(demoHasOpeningMilestone(state))openingMilestones.add(1);
   for(const {result} of state.milestoneClaimReceipts??[])if(result)openingMilestones.delete(result.milestoneId);
   const checkIns=openingCheckIns(state).filter(row=>!posted.has('DAILY:900001:'+row.checkInDate));
-  const deposit=demoCreditedDeposit(state);
+  const chainDeposits=demoCreditedDeposits(state);
   const seeds=!demoHasEarningsHistory(state)?[]:[
     ['COMPUTE_EARNING','UVT','IN',15,'earn',seedAt],
-    ...(deposit?[['CHAIN_TOPUP','USDT','IN',deposit.creditedUsdt,'topup',deposit.createdAt,'SUCCESS',deposit.depositId]]:[]),
+    ...chainDeposits.map(deposit=>['CHAIN_TOPUP','USDT','IN',deposit.creditedUsdt,'topup',deposit.createdAt,'SUCCESS',deposit.depositId]),
     ['REFERRAL_REWARD','UVT','IN',10,'bonus',seedAt-day,'SUCCESS',
       state.walletLegacySeed?undefined:'REF-000000000000000000000001:INVITER'],
     ['DEVICE_PURCHASE','USDT','OUT',1299,'purchase',seedAt-2*day],
@@ -276,6 +336,12 @@ export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo])=>({
     id:`seed:${asset}:${bizNo??`${bizType}:${direction}:${amount}`}`,bizNo:bizNo??`DEMO-${bizType}-${amount}`,bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
+  for (const row of seeds.filter(row => row.bizType === 'CHAIN_TOPUP')) {
+    const original = chainDeposits.find(entry => entry.depositId === row.bizNo);
+    row.deposit = original.deposit;
+    row.amountExact = original.deposit?.creditedUsdt ?? String(original.creditedUsdt);
+    if (original.deposit) row.network = original.deposit.network;
+  }
   const history=demoDeletionHistory(state);
   const swap=history?.swap;
   const stake=demoDeletionStake(state);

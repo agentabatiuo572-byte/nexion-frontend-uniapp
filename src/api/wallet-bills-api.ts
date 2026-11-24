@@ -1,10 +1,12 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { orderTopupNetwork, type OrderTopupNetwork } from "./purchase-payment-api";
 
 export type WalletBillAsset = "USDT" | "UVT";
 export type WalletBillDirection = "IN" | "OUT";
 export type WalletBillStatus = "SUCCESS" | "PENDING" | "FAILED";
 export type WalletBillCategory = "earn" | "refer" | "bonus" | "topup" | "withdraw" | "purchase" | "refund" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "clawback" | "other";
+export type WalletBillDeposit = { network: OrderTopupNetwork; txHash: string; grossAmountUsdt: string; feeUsdt: string; creditedUsdt: string };
 
 export interface WalletBillRow {
   id: string;
@@ -27,6 +29,7 @@ export interface WalletBillRow {
   paymentMethod?: string;
   /** A server-approved identifier that is safe to show or route from an App bill. */
   publicReference?: string;
+  deposit?: WalletBillDeposit | null;
 }
 
 export interface WalletBillsSnapshot {
@@ -89,6 +92,18 @@ function exactMoney(value: unknown, legacy: unknown, parsed: number, signed = fa
   return value;
 }
 
+function depositDetail(value: unknown, rowNetwork: string | undefined): WalletBillDeposit | null {
+  if (value === null) return null;
+  const row = object(value);
+  if (!row) return invalid();
+  if (["network", "txHash", "grossAmountUsdt", "feeUsdt", "creditedUsdt"].some(key => row[key] == null)) return null;
+  const network = orderTopupNetwork(row.network);
+  if (!network || rowNetwork !== undefined && network !== rowNetwork
+      || typeof row.txHash !== "string" || !/^0x[0-9a-f]{64}$/i.test(row.txHash)) return invalid();
+  const decimal = (amount: unknown) => typeof amount === "string" && /^\d+(?:\.\d+)?$/.test(amount) ? amount : invalid();
+  return { network, txHash: row.txHash, grossAmountUsdt: decimal(row.grossAmountUsdt), feeUsdt: decimal(row.feeUsdt), creditedUsdt: decimal(row.creditedUsdt) };
+}
+
 function bill(value: unknown): WalletBillRow {
   const row = object(value);
   const id = text(row?.id);
@@ -108,6 +123,8 @@ function bill(value: unknown): WalletBillRow {
       || !Number.isFinite(createdAt)) return invalid();
   // Refund identifiers must reach the strict consumer guard without whitespace normalization.
   const orderRefund = bizType.toUpperCase() === "ORDER_REFUND";
+  const network = optionalText(row.network);
+  if (Object.hasOwn(row, "deposit") && (bizType !== "CHAIN_TOPUP" || asset !== "USDT" || direction !== "IN")) return invalid();
   return {
     id,
     bizNo: orderRefund && typeof row.bizNo === "string" ? row.bizNo : bizNo,
@@ -123,7 +140,8 @@ function bill(value: unknown): WalletBillRow {
     createdAt,
     category: category(row.category),
     presentationCode: optionalText(row.presentationCode),
-    network: optionalText(row.network),
+    network,
+    ...(Object.hasOwn(row, "deposit") ? { deposit: depositDetail(row.deposit, network) } : {}),
     paymentMethod: optionalText(row.paymentMethod),
     publicReference: orderRefund && typeof row.publicReference === "string" ? row.publicReference : optionalText(row.publicReference),
   };

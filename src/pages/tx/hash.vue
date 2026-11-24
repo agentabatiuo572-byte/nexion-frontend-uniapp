@@ -7,9 +7,31 @@
 <template>
   <AppChassis active="me">
     <view style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/wallet-bills" />
+      <SubPageHeader back="/pages/me/wallet-bills" :title="depositMode ? w.depositTitle : undefined" />
 
-      <view v-if="remoteApiEnabled" class="nx-glass-card mx-4" data-testid="tx-detail-hold" :style="holdStyle">
+      <!-- A USDT top-up opened from Bills (plan C.4): the original deposit's network, hash and amounts; without the original
+           record one line says the details are unavailable, never the ledger number in place of a hash. -->
+      <view v-if="depositMode" class="tx-dep">
+        <NxResultHead v-if="deposit" tone="success" :title="t.topupChrome.depositCredited" :live="false">
+          <text class="tx-dep__amt">+{{ depositAmount(deposit.creditedUsdt) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text>
+        </NxResultHead>
+        <view class="tx-dep__card">
+          <template v-if="deposit">
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.network }}</text><text class="tx-dep__v">{{ deposit.network === "ERC20" ? payCopy.erc20 : payCopy.bep20 }}</text></view>
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.grossAmount }}</text><text class="tx-dep__v tx-dep__num">{{ depositAmount(deposit.grossAmountUsdt) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text></view>
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.depositFee }}</text><text class="tx-dep__v tx-dep__num">{{ depositAmount(deposit.feeUsdt) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text></view>
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.creditedAmount }}</text><text class="tx-dep__v tx-dep__num">{{ depositAmount(deposit.creditedUsdt) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text></view>
+            <view class="tx-dep__hash">
+              <text class="tx-dep__k">{{ recoveryCopy.txHashLabel }}</text>
+              <NxCodeValue class="tx-dep__code" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
+              <view class="tx-hash-copy"><NxButton variant="text" size="small" :label="copyButtonText" @click="copyHash" /></view>
+            </view>
+          </template>
+          <text v-else class="tx-dep__na">{{ w.detailUnavailableTitle }}</text>
+        </view>
+      </view>
+
+      <view v-else-if="remoteApiEnabled" class="nx-glass-card mx-4" data-testid="tx-detail-hold" :style="holdStyle">
         <text class="block" :style="holdTitleStyle">{{ hash ? w.detailUnavailableTitle : hashProvided ? recoveryCopy.txInvalidTitle : recoveryCopy.txMissingTitle }}</text>
         <text class="block" :style="holdBodyStyle">{{ hash ? w.detailUnavailableBody : hashProvided ? recoveryCopy.txInvalidBody : recoveryCopy.txMissingBody }}</text>
         <view v-if="hash" style="margin-top: 16px">
@@ -80,15 +102,23 @@ import Row from "@/components/tx/tx-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
-import { remoteApiEnabled } from "@/api/runtime";
-import { navTo } from "@/lib/route";
+import { fundsServerEnabled, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { useBills } from "@/store/bills";
+import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady } from "@/lib/binary-session-ready";
+import { navTo, takeNavigationQuery } from "@/lib/route";
 import { validatedTransactionHash } from "@/lib/transaction-hash-input";
 import { useEntryRecoveryCopy } from "@/i18n/entry-recovery";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
+import { formatGroupedAmount } from "@/lib/amount-display";
+import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
+import { useLocaleStore } from "@/store/locale";
 
 const t = useT();
 const recoveryCopy = useEntryRecoveryCopy();
 const w = computed(() => t.value.tx);
-const hash = ref("");
+const queryHash = ref("");
 const hashProvided = ref(false);
 const copyBusy = ref(false);
 let copyVersion = 0;
@@ -107,14 +137,40 @@ const qConfs = ref<number | null>(null);
 const qNet = ref<string | null>(null);
 const qTo = ref<string | null>(null);
 const qAgeMin = ref<number | null>(null);
+const app = useApp();
+const auth = useAuth();
+const bills = useBills();
+const depositMode = ref(false);
+const billId = ref("");
+const billAccountKey = ref("");
+const billAccountEpoch = ref(-1);
+const depositBill = computed(() => {
+  if (!depositMode.value || app.accountKey !== billAccountKey.value || app.accountBindingEpoch !== billAccountEpoch.value
+      || !binarySessionReady({ remote: fundsServerEnabled, authenticated: auth.isAuthenticated, accountId: auth.accountId,
+        appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null })) return;
+  return bills.findChainTopup(billAccountKey.value, billId.value);
+});
+const deposit = computed(() => depositBill.value?.deposit ?? null);
+const hash = computed(() => depositMode.value ? deposit.value?.txHash ?? "" : queryHash.value);
+const locale = useLocaleStore();
+const payCopy = computed(() => purchasePaymentCopy(locale.code));
+const depositAmount = (value: string) => formatGroupedAmount(value, "full");
 
 onLoad((options) => {
   copyVersion += 1;
   copyState.value = "idle";
   copyBusy.value = false;
   if (copyResetTimer) clearTimeout(copyResetTimer);
+  const pending = new URLSearchParams(takeNavigationQuery("/pages/tx/hash"));
+  depositMode.value = (options?.src ?? pending.get("src")) === "deposit";
+  if (depositMode.value) {
+    billAccountKey.value = app.accountKey;
+    billAccountEpoch.value = app.accountBindingEpoch;
+    billId.value = options?.billId ?? pending.get("billId") ?? "";
+    return;
+  }
   hashProvided.value = typeof options?.hash === "string" && !!options.hash.trim();
-  hash.value = validatedTransactionHash(options?.hash);
+  queryHash.value = validatedTransactionHash(options?.hash);
   const amt = String(options?.amount ?? "");
   qAmount.value = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(amt) && Number(amt) > 0 ? amt : null;
   const confs = parseInt(String(options?.confs ?? ""), 10);
@@ -123,6 +179,7 @@ onLoad((options) => {
   qTo.value = typeof options?.to === "string" && options.to.length >= 10 ? options.to : null;
   const age = parseInt(String(options?.age ?? ""), 10);
   qAgeMin.value = Number.isFinite(age) && age >= 0 ? Math.max(1, age) : null;
+
 });
 
 function hashSeed(h: string): number {
@@ -288,6 +345,20 @@ const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-typ
 .tx-hash-copy { display: flex; justify-content: flex-end; margin-top: 4px; }
 /* The way on from this card is its footer action into the next page (03 §3.1 P-67), not a private chip. */
 .tx-bills-footer { margin-top: 12px; }
+/* Top-up detail: result head (03 §3.6.1) with the credited amount, then one solid facts card (1.1.2). */
+.tx-dep { padding: var(--v5-space-2) var(--v5-space-4) 0; }
+.tx-dep__amt { display: block; margin-top: var(--v5-space-3); color: var(--v5-success-ink); font: 500 var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tx-dep__unit { color: var(--v5-ink-3); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; }
+.tx-dep__card { margin-top: var(--v5-space-6); padding: var(--v5-space-1) var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+[data-theme="light"] .tx-dep__card { box-shadow: var(--v5-glass-shadow); }
+.tx-dep__row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--v5-space-1) var(--v5-space-3); padding: var(--v5-space-3) 0; }
+.tx-dep__row + .tx-dep__row, .tx-dep__na + .tx-dep__row, .tx-dep__row + .tx-dep__hash { border-top: 1px solid var(--v5-border); }
+.tx-dep__k { display: block; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight, 400) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.tx-dep__v { margin-left: auto; color: var(--v5-ink); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); white-space: nowrap; }
+.tx-dep__num { font-family: var(--font-amount); font-variant-numeric: tabular-nums; }
+.tx-dep__na { display: block; padding: var(--v5-space-3) 0; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.tx-dep__hash { padding: var(--v5-space-3) 0 var(--v5-space-1); }
+.tx-dep__code { margin-top: var(--v5-space-1); color: var(--v5-ink); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); user-select: text; }
 [role="button"][aria-disabled="true"] { opacity: 0.5; }
 [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>

@@ -3,7 +3,7 @@
   <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : promotionRoute && promotionCheckout?.orderPending ? t.promotion.pending : auditCopy.review" /></template>
     <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle"
-      :external-order-no="cancelBlockedPayment?.orderNo" :leave-confirmation-open="leaveKeepOpen" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment">
+      :topup-network="promotionRoute.topupNetwork" :external-order-no="cancelBlockedPayment?.orderNo" :leave-confirmation-open="leaveKeepOpen" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
       </template>
@@ -314,6 +314,7 @@ import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
 import { documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
+import { orderTopupNetwork, type OrderTopupNetwork } from '@/api/purchase-payment-api';
 import { capacityPaymentKind, readCapacityPending } from '@/lib/capacity-command-recovery';
 import { checkoutCreateBlock, checkoutQuoteBlock, validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
 import { takeNavigationQuery } from '@/lib/route';
@@ -489,7 +490,7 @@ const legalCopy = computed(() => ({
   uz: { before: 'Toʻlashdan oldin oʻqing: ', join: ' va ', end: '.' },
 })[uiLocale(locale.code)]);
 const app = useApp();
-const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string;fromBundle?:boolean}&VoucherEntryContext)|null>(null);
+const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string;fromBundle?:boolean;topupNetwork?:OrderTopupNetwork}&VoucherEntryContext)|null>(null);
 const keepCheckoutRecovery = shallowRef<(CheckoutCapacityRecovery & { accountKey: string }) | null>(null);
 const keepCheckoutTarget = computed(() => keepCheckoutRecovery.value?.target ?? null);
 const capacityUnreadableTarget = shallowRef<string | null>(null);
@@ -845,7 +846,8 @@ onLoad(async (options) => {
       const items:PromotionItem[]=o.items ? JSON.parse(o.items.trim().startsWith('%')?decodeURIComponent(o.items):o.items) : o.product ? [{productNo:o.product,quantity:Number(o.quantity??1)}] : [];
       if(!o.orderNo)validatePromotionItems(items);
       const context=voucherEntryContext(o);
-      promotionRoute.value={activityId:context.voucherId?'':o.activityId??'',items,orderNo:o.orderNo,fromBundle:o.fromBundle==='1',...context};
+      promotionRoute.value={activityId:context.voucherId?'':o.activityId??'',items,orderNo:o.orderNo,fromBundle:o.fromBundle==='1',
+        topupNetwork:o.orderNo ? orderTopupNetwork(o.topupNetwork) ?? undefined : undefined,...context};
     } catch { toast.warn(t.value.promotion.errorNote);void navTo('/store'); }
     checkoutRouteLoaded.value = true;
     return;
