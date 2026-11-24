@@ -5,6 +5,19 @@
     <!-- The result's exits (查看设备, and 再买一台 via resultBuyAgain) sit in the page's bottom bar (checkout.vue #pageFixed, 04 §4.0). -->
     <CheckoutResult ref="resultView" v-else-if="order?.paymentStatus==='PAID'" :order-no="order.orderNo" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0] ? items[0].imageUrl ?? getProduct(items[0].productNo)?.imageUrl : undefined" :product-images="resultImages" :amount="resultExactAmount??resultAmount?.value" :currency="resultAmount?.currency" :amount-precision="resultExactAmount?'full':undefined" :saved="bundleDiscount" :error="resultError" @devices="viewDevices" @support="contactResultSupport" @order="viewOrder" />
     <template v-else>
+      <!-- Another order of this account is in progress, and the page shows it instead of the order this checkout was opened
+           for (the account's open payment comes first). The same page-floor hint as the original purchase state below: what
+           the page shows, what it means for the original order, and the way back to that order (03 §3.9 text link). -->
+      <view v-if="otherOrderShown" class="checkout-other-order" data-testid="checkout-other-order">
+        <view class="checkout-keep-recovery" role="status">
+          <svg class="checkout-keep-recovery__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+          <view class="promotion-grow">
+            <text class="checkout-keep-recovery__title">{{ flowCopy.otherOrderTitle }}</text>
+            <text>{{ flowCopy.otherOrderBody }}</text>
+          </view>
+        </view>
+        <view class="checkout-order-link checkout-other-order__link" role="link" tabindex="0" @click="viewRoutedOrder" @keydown.enter.prevent="viewRoutedOrder"><text class="nx-after-chevron">{{ flowCopy.viewOriginalOrder }}</text></view>
+      </view>
       <!-- Original purchase state: a page-floor hint (icon + text, no card, no stripe) above the products: the result, which purchase it is, what not to do. -->
       <view v-if="keepRecoveryTarget" class="checkout-keep-recovery" role="status">
         <svg class="checkout-keep-recovery__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><template v-if="keepRecoveryReadError"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></template><template v-else><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></template></svg>
@@ -14,19 +27,8 @@
           <text>{{ keepRecoveryNotice.note }}</text>
         </view>
       </view>
-      <!-- P4: an external payment for this order is under way on this device. The page says so and what not to do; no
-           button, and no pointer to the floating bar (it may be closed or show another payment). -->
-      <view v-if="externalPaying" class="checkout-paying" role="status" data-testid="checkout-paying">
-        <view class="checkout-paying__icon" aria-hidden="true"><NxIcon name="clock" :size="18" /></view>
-        <view class="promotion-grow">
-          <text class="checkout-paying__title">{{ flowCopy.payingTitle }}</text>
-          <text class="checkout-paying__body">{{ flowCopy.payingBody }}</text>
-          <view class="checkout-paying__foot">
-            <view class="checkout-order-no"><text class="checkout-order-no__label">{{ p.orderNo }}</text><NxCodeValue class="checkout-order-no__code" :value="order!.orderNo" :label="p.orderNo" :copyable="false" /></view>
-            <view class="checkout-order-link" role="link" tabindex="0" @click="viewOrder" @keydown.enter.prevent="viewOrder"><text class="nx-after-chevron">{{ p.viewOrder }}</text></view>
-          </view>
-        </view>
-      </view>
+      <!-- P4: an external payment for this order is under way on this device (shared card; no button, no tray). -->
+      <CheckoutPaying v-if="externalPaying" :order-no="order!.orderNo" @view="viewOrder" />
       <view v-else-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
       <!-- The original order's state line on the page floor, above the products (board CkPend): time left in the warning
            colour (or the state of a closed order), the way to the order, and its number. -->
@@ -41,7 +43,7 @@
         </view>
         <view class="checkout-order-no"><text class="checkout-order-no__label">{{ p.orderNo }}</text><NxCodeValue class="checkout-order-no__code" :value="order.orderNo" :label="p.orderNo" :copyable="false" /></view>
       </view>
-      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
+      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!quoteBlock&&!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="props.orderNo ? recover() : loadQuote()"><text>{{ t.empty.errorCta }}</text></view></view>
       <!-- Two or more models: one card, 已选 N 款 with the tier tag, and a two-column grid of model tiles (board CkNew):
            device art, name, line price, then 数量 with the stepper, or 数量 N once the order exists. One model keeps the row below. -->
       <view v-if="items.length>1" class="checkout-bundle" role="group" :aria-label="fmt(flowCopy.bundleSelected,{n:items.length})">
@@ -161,6 +163,7 @@ import { firstPurchaseTermsRules } from '@/lib/promotion-landing';
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import CheckoutPaying from "@/components/checkout/CheckoutPaying.vue";
 import { landingCopy } from '@/i18n/promotion-landing';
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
@@ -206,6 +209,7 @@ import { confirmOrderTopupPayment, hasUsdt, orderTopupHref, orderTopupPayable, o
 import { onPurchaseRecordReleased, unfinishedOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { attributedBundleDiscount } from '@/api/bundle-quote';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
+import { isTransientReadFailure } from '@/lib/remote-read-failure';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { openOrderAdvisorChat } from '@/lib/advisor-chat-route';
 import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-review';
@@ -216,6 +220,7 @@ const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string
 const emit=defineEmits<{
   (event:'cancel-blocked',orderNo:string,summary:string):void;
   (event:'resume-external'):void;
+  (event:'restore-routed-order'):void;
 }>();
 function formatDiscount(value: Parameters<typeof formatAmount>[0]): string {
   return formatCheckoutReviewAmount(value, 'USD', { discount: true });
@@ -261,6 +266,12 @@ const session=new PromotionCheckoutSession({api:promotionApi,isExternalPaymentRe
 const stopReleaseWatch=onPurchaseRecordReleased((accountKey,key)=>{if(accountKey===account&&current()&&session.releaseExternalPayment(key))revision.value++;});
 const quotePresentation=shallowRef<{key:string;quote:Quote}|null>(null);
 const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.value;return session.record.pending||session.record.order||(freshQuoteReady.value&&quotePresentation.value?.key===quotePresentationKey())?session.record.quote:null;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
+const routedOrderNo = computed(() => props.orderNo ?? null);
+const presentedOrderNo = computed(() => order.value?.orderNo ?? null);
+// Only while the shown order is still open: once it is paid, cancelled or expired the hint's "in progress" no longer holds.
+const otherOrderShown = computed(() => !!routedOrderNo.value && !!presentedOrderNo.value && routedOrderNo.value !== presentedOrderNo.value
+  && order.value?.paymentStatus === 'PENDING');
+function viewRoutedOrder(){if(routedOrderNo.value)void navTo('/pages/store/order-detail?id='+encodeURIComponent(routedOrderNo.value));}
 // Display memory never enters the executable session; refresh still invalidates that quote.
 const displayQuote=computed(()=>current()&&visible.value&&auth.isAuthenticated ? quote.value??(quotePresentation.value?.key===quotePresentationKey()?quotePresentation.value.quote:null):null);
 function quotePresentationKey(){return JSON.stringify([app.accountKey,app.accountBindingEpoch,auth.isAuthenticated,props.activityId,selection.value,eventVoucherId,props.upgradeActivityId??'',manualVoucher()?['manual',voucherId.value]:['auto'],locale.code]);}
@@ -302,6 +313,16 @@ const busy=computed(()=>writeBusy.value||quoteRead.value!==null);
 const createBlock=ref<CheckoutCreateBlock|null>(null);
 const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
 const paymentSheetOpen=ref(false),paymentConfirming=ref(false),leaving=ref(false);
+const shouldRestoreRoutedOrder = computed(() => {
+  void revision.value;
+  const requested = routedOrderNo.value;
+  return openedOriginal && !!requested && requested !== presentedOrderNo.value && !session.record.pending
+    && current() && visible.value && !leaving.value;
+});
+// Re-enter the requested order through the same read path as initial entry.
+watch(shouldRestoreRoutedOrder, restore => {
+  if (restore) emit('restore-routed-order');
+}, { flush: 'sync' });
 const paymentEntryChecking=ref(false);
 const eventVoucherId=props.voucherId?.trim()??'';
 const ordinaryMultiItemEntry = !openedOriginal && !props.orderNo && !props.activityId && !eventVoucherId
@@ -736,6 +757,8 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
   let rejection='',paymentDestination='',paymentReplace=false,topupChanged=false;paymentLeaveApproved=false;
   try{
     await run(async()=>{
+      const pending = session.record.pending;
+      const walletOnly = session.retryOriginal && pending?.operation === 'payOrder' && pending.paymentMethod !== 'EXTERNAL';
       await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,precision:topup?'full':undefined,
         details:expectedOrder.items?.map(item=>({name:item.productName,quantity:item.quantity}))},
         async authorization=>{
@@ -754,7 +777,7 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
             throw cause;
           }
         },
-        paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
+        paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},walletOnly,orderNo,deadlineAt:Date.parse(payBy!),
           navigate:(href,replace)=>{paymentDestination=href;paymentReplace=!!replace;paymentLeaveApproved=routeLeavesPurchase(href);},
           reorder:()=>{
             const fromOrdinaryBundle=props.fromBundle&&!openedOriginal&&!props.orderNo&&!props.activityId
@@ -790,7 +813,7 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
 }
 let recoveryReadGeneration=-1;
 function recover(foreground=false):Promise<boolean>{
-  if(!current()||!visible.value||busy.value)return Promise.resolve(false);
+  if(!current()||!visible.value||busy.value||shouldRestoreRoutedOrder.value)return Promise.resolve(false);
   if(recoveryRead.value){
     // Back can arrive while the foreground read is checking this same order.
     if(recoveryReadGeneration===readGeneration)return recoveryRead.value;
@@ -807,16 +830,24 @@ async function readCheckout(foreground=false):Promise<boolean>{
   recoveryGeneration=generation;
   const operation=session.record.pending?.operation;
   const recoveringCreation=operation==='createOrder'||operation==='createBundle';
+  const routedOrderToRead = !session.record.order && !session.record.pending ? props.orderNo : undefined;
   const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
     &&!session.record.pending&&!unknown.value&&!recoveryReadFailed.value;
   try{
-    if(!clockOnly)await session.recover();
+    if(routedOrderToRead){
+      const receipt=await promotionApi.findOrder(routedOrderToRead);
+      if(!readCurrent(generation))return false;
+      if(!receipt)throw new Error('ORIGINAL_ORDER_NOT_FOUND');
+      session.resume(receipt);
+      error.value='';
+    }else if(!clockOnly)await session.recover();
     if(!readCurrent(generation))return false;
     if(recoveringCreation&&session.confirmed&&!session.record.pending&&session.record.order){
       error.value='';activityConflict.value=false;
     }else if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
+    if(shouldRestoreRoutedOrder.value)return false;
     if(reopenPaidOnEntry.value){
       if(!session.confirmed||session.record.pending)return false;
       if(order.value?.paymentStatus==='PAID'&&canStartNew.value){
@@ -832,12 +863,8 @@ async function readCheckout(foreground=false):Promise<boolean>{
       readCheckoutPromotion(reward.activityId,generation,reward.version);
     const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
     // If recovery was part of Back, let that navigation finish.
-    if (!foreground && openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
-      && (!props.orderNo || props.orderNo !== order.value?.orderNo)) {
-      const requestedHref = props.orderNo
-        ? '/pages/store/checkout?orderNo=' + encodeURIComponent(props.orderNo)
-        : promotionCheckoutHref(props.items, props.activityId, props);
-      return await navReplace(requestedHref);
+    if (!foreground && openedOriginal && !props.orderNo && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded) {
+      return await navReplace(promotionCheckoutHref(props.items, props.activityId, props));
     }
     const reopenPurchase = ordinaryMultiItemEntry && canStartNew.value && !session.record.quote?.activityId
       && !order.value?.rewards?.length && unpaidOrderEnded;
@@ -850,9 +877,17 @@ async function readCheckout(foreground=false):Promise<boolean>{
     await loadOrderClock();
     if(!readCurrent(generation))return false;
     if(order.value?.paymentStatus==='PAID')await readActivation();
-    else if(!clockOnly&&!foreground)await refreshWallet(true,true);
+    else if(!clockOnly&&(!foreground||routedOrderToRead))await refreshWallet(true,true);
     return readCurrent(generation)&&!unknown.value;
-  }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
+  }catch(cause){
+    if(readCurrent(generation)){
+      const missingRoutedOrder = routedOrderToRead && !session.record.order;
+      if(missingRoutedOrder)error.value=p.value.error;
+      recoveryReadFailed.value=!missingRoutedOrder||isTransientReadFailure(cause)
+        ||(cause instanceof ApiError&&cause.kind==='protocol');
+    }
+    return false;
+  }
   finally{recoveryGeneration=null;}
 }
 const conversations=useConversations();
@@ -1026,6 +1061,7 @@ function refreshForegroundReview():boolean{
       if(session.record.pending||session.record.order)void recover(true);
       return true;
     }
+    if(props.orderNo&&recoveryReadFailed.value&&!session.record.order)void recover(true);
     if(session.record.pending||session.record.order||props.orderNo)return true;
     // The checkout host automatically reads any original command found here.
     if(!recoverKeepBeforeNewPurchase())void loadQuote(true,true);
@@ -1050,7 +1086,8 @@ function show(){
   startWalletTimer();
   if(!disposeGuard)disposeGuard=registerCheckoutLeaveGuard(allowAuxiliaryNavigation);
   if(busy.value){refreshOnIdle=true;return;}
-  if(session.record.pending||session.record.order)void recover();else if(!props.orderNo){void refreshWallet(true);if(!quoteBlock.value||recheckCapacity)void loadQuote(recheckCapacity);}
+  if(session.record.pending||session.record.order||(props.orderNo&&auth.isAuthenticated))void recover();
+  else if(!props.orderNo){void refreshWallet(true);if(!quoteBlock.value||recheckCapacity)void loadQuote(recheckCapacity);}
 }
 watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible.value&&current())show();}});
 const footer = computed(() => {
@@ -1113,7 +1150,7 @@ const resultView=ref<InstanceType<typeof CheckoutResult>|null>(null);
 // 再买一台 waits for a settled result (PRD purchase payment, line 49); the page puts it in the bar beside 查看设备. A failure
 // offers support instead, and a delivery to inventory has only its own two exits (替换一台在线设备, 稍后再说).
 const resultBuyAgain=computed(()=>!openedOriginal&&!props.orderNo&&props.items.length>0&&canStartNew.value&&resultState.value==='activated');
-defineExpose({back,approveBack,canConfirmLeave,cancelForLeave,hide,show,footer,trayNotice,orderPending,resultView,resultBuyAgain,startNewPurchase,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,keepRecoveryReadError,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
+defineExpose({back,approveBack,canConfirmLeave,cancelForLeave,hide,show,footer,trayNotice,orderPending,routedOrderNo,presentedOrderNo,resultView,resultBuyAgain,startNewPurchase,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,keepRecoveryReadError,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{
@@ -1130,13 +1167,7 @@ onMounted(async()=>{
   if(auth.isAuthenticated)catalogRefresh=refreshProductCatalog(true).catch(()=>false);
   try {
     if(auth.isAuthenticated){
-      if(props.orderNo&&!session.record.order&&!session.record.pending){
-        const receipt=await promotionApi.findOrder(props.orderNo);if(!current())return;
-        if(!receipt)throw new Error('ORIGINAL_ORDER_NOT_FOUND');
-        session.resume(receipt);
-        revision.value++;
-      }
-      if(session.record.pending||session.record.order)await recover();else await Promise.all([loadQuote(),refreshWallet(true)]);
+      if(props.orderNo||session.record.pending||session.record.order)await recover();else await Promise.all([loadQuote(),refreshWallet(true)]);
     }
   }catch{if(current())error.value=p.value.error;}finally{if(current())loading.value=false;}
 });
@@ -1157,7 +1188,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 /* Original purchase state: title in the main ink, order line and note in the description role (01 §1.1.1 pairing 2, 10.1); no query button (03 §3.5.2). */
 .checkout-keep-recovery { display:flex; align-items:flex-start; gap:var(--v5-space-2); }
 .checkout-keep-recovery__icon { flex:none; margin-top:1px; color:var(--v5-warning-ink); }
-.checkout-keep-recovery text { display:block; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap:pretty; }
+.checkout-keep-recovery text { display:block; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .checkout-keep-recovery .checkout-keep-recovery__title { margin-bottom:var(--v5-space-1); color:var(--v5-ink); font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 /* Rhythm (01 §1.3): cards 12 apart, a titled section 32 below what precedes it (24 at ≤374). */
 .promotion-main { gap:var(--ui-space-card-gap); }
@@ -1171,7 +1202,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .promotion-tray-space--measured { padding:0; }
 .promotion-tray-space__note { display:block; font:var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:break-word; text-wrap:pretty; }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
-[data-theme="light"] .checkout-group, [data-theme="light"] .checkout-bundle, [data-theme="light"] .checkout-paying { box-shadow:var(--v5-glass-shadow); }
+[data-theme="light"] .checkout-group, [data-theme="light"] .checkout-bundle { box-shadow:var(--v5-glass-shadow); }
 .checkout-section { min-width:0; margin-top:calc(var(--ui-space-section-gap) - var(--ui-space-card-gap)); }
 .checkout-section-heading { display:block; margin-bottom:var(--v5-space-3); color:var(--v5-ink); font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
 /* Original order state line on the page floor (board CkPend): warning time or closed state, the order link, the number. */
@@ -1186,13 +1217,8 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-order-no { display:flex; align-items:baseline; gap:var(--v5-space-1); min-width:0; margin-top:6px; color:var(--v5-ink-3); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .checkout-order-no__label { flex:none; }
 .checkout-order-no .checkout-order-no__code { color:var(--v5-ink-2); font-size:var(--ui-type-meta); line-height:var(--ui-type-meta-lh); }
-/* P4 (board CkExt): a solid card, warning clock in a 14% circle, the result, what not to do, then the order and its link. */
-.checkout-paying { display:flex; align-items:flex-start; gap:var(--v5-space-3); padding:var(--ui-space-inset); border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
-.checkout-paying__icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
-.checkout-paying__title { display:block; color:var(--v5-ink); font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.checkout-paying__body { display:block; margin-top:var(--v5-space-1); color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap:pretty; }
-.checkout-paying__foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--v5-space-1) var(--v5-space-3); margin-top:10px; }
-.checkout-paying__foot .checkout-order-no { margin-top:0; }
+/* The other order's hint: the link sits under the hint's text, past the 18px icon and its 8px gap. */
+.checkout-other-order__link { margin:var(--v5-space-1) 0 0 26px; }
 /* Bundle card (board CkNew): solid card, 已选 N 款 + tier tag, two-column grid of model tiles on the inner surface. */
 .checkout-bundle { min-width:0; padding:var(--ui-space-inset); border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
 .checkout-bundle__head { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); }

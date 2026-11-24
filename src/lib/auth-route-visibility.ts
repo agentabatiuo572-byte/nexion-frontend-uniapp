@@ -25,9 +25,22 @@ const PUBLIC_ROUTES: Record<string, true> = {
   "pages/me/risk-disclosure": true,
 };
 
+// 信任资料允许访客阅读，也属于已登录用户的业务页面。
+const PUBLIC_READING_ROUTES: Record<string, true> = {
+  "pages/trust/trust": true,
+  "pages/trust/document": true,
+  "pages/trust/whitepaper": true,
+  "pages/trust/nex": true,
+};
+
+export function isPublicReadingRoute(route?: string | null): boolean {
+  return PUBLIC_READING_ROUTES[normalizeRoute(route)] === true;
+}
+
 /** Only routes that can safely render without an authenticated account. */
 export function isPublicAuthRoute(route?: string | null): boolean {
   const normalized = normalizeRoute(route);
   return isStaticReviewRoute(normalized)
-    || PUBLIC_ROUTES[normalized] === true;
+    || PUBLIC_ROUTES[normalized] === true
+    || PUBLIC_READING_ROUTES[normalized] === true;
 }

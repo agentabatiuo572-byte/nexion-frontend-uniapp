@@ -124,7 +124,8 @@ function bill(value: unknown): WalletBillRow {
   // Refund identifiers must reach the strict consumer guard without whitespace normalization.
   const orderRefund = bizType.toUpperCase() === "ORDER_REFUND";
   const network = optionalText(row.network);
-  if (Object.hasOwn(row, "deposit") && (bizType !== "CHAIN_TOPUP" || asset !== "USDT" || direction !== "IN")) return invalid();
+  const hasDeposit = Object.prototype.hasOwnProperty.call(row, "deposit");
+  if (hasDeposit && (bizType !== "CHAIN_TOPUP" || asset !== "USDT" || direction !== "IN")) return invalid();
   return {
     id,
     bizNo: orderRefund && typeof row.bizNo === "string" ? row.bizNo : bizNo,
@@ -141,7 +142,7 @@ function bill(value: unknown): WalletBillRow {
     category: category(row.category),
     presentationCode: optionalText(row.presentationCode),
     network,
-    ...(Object.hasOwn(row, "deposit") ? { deposit: depositDetail(row.deposit, network) } : {}),
+    ...(hasDeposit ? { deposit: depositDetail(row.deposit, network) } : {}),
     paymentMethod: optionalText(row.paymentMethod),
     publicReference: orderRefund && typeof row.publicReference === "string" ? row.publicReference : optionalText(row.publicReference),
   };

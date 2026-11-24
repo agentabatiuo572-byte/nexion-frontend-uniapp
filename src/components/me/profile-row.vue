@@ -9,7 +9,7 @@
   <view class="flex items-center active:opacity-90" style="gap: 14px; padding: 4px 0" data-me-action="profile" role="button" tabindex="0" :aria-label="t.me.profile" @click="goProfile" @keydown.enter.prevent="goProfile" @keydown.space.prevent="goProfile">
     <view class="grid place-items-center shrink-0 overflow-hidden" :style="avatarStyle">
       <image v-if="profile.avatarUrl && !avatarFailed" :key="profile.avatarRevision" :src="profile.avatarUrl" mode="aspectFill" style="width: 56px; height: 56px" aria-hidden="true" @error="avatarFailed = true" />
-      <text v-else :style="avatarTextStyle">{{ initial }}</text>
+      <text v-else class="nx-avatar-letter" :style="avatarTextStyle">{{ initial }}</text>
     </view>
     <view class="flex-1 min-w-0">
       <text class="block truncate" :style="nameStyle">{{ name }}</text>
@@ -67,9 +67,7 @@ const avatarStyle: CSSProperties = {
   background: "var(--v5-brand)",
 };
 const avatarTextStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "20px",
+  fontSize: "34px",
   color: "var(--v5-on-brand)",
 };
 const nameStyle: CSSProperties = {

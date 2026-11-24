@@ -23,7 +23,7 @@
           <view class="relative">
             <view class="grid place-items-center overflow-hidden" :style="avatarStyle">
               <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" style="width: 64px; height: 64px" />
-              <text v-else :style="avatarTextStyle">{{ initial }}</text>
+              <text v-else class="nx-avatar-letter" :style="avatarTextStyle">{{ initial }}</text>
             </view>
             <view
               class="grid place-items-center active:opacity-80"
@@ -613,9 +613,7 @@ const avatarStyle: CSSProperties = {
   background: "var(--v5-brand)",
 };
 const avatarTextStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "26px",
+  fontSize: "38px",
   color: "var(--v5-on-brand)",
 };
 const regenBtnStyle: CSSProperties = {

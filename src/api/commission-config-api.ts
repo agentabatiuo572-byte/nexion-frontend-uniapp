@@ -157,7 +157,6 @@ function parse(value: unknown, mode: ApiEnvironment): CanonicalCommissionConfig 
     unilevelPaused[layer] = value;
   }
   if (Object.keys(pausedSource).length !== 7) return invalid();
-  if (Math.abs(unilevelUsdt[1] - 0.1) > 0.0000001) return invalid();
   const totalPct = Object.values(unilevelUsdt).reduce((sum, rate) => sum + rate, 0) * 100;
   if (totalPct > 25.000001) return invalid();
   const influenceClampMin = number(source.influenceClampMin, 1, 5);

@@ -16,7 +16,7 @@
     <view class="bundle-hero__grid">
       <view v-for="item in items" :key="item.id" class="bundle-hero__tile" :class="{ 'nx-viz-pop': popped.has(item.id) }">
         <CatalogMachineImage class="bundle-hero__image" :sku="item.id" :image-url="item.imageUrl" scope-key="bundle-tile" />
-        <view class="bundle-hero__remove nx-reverse-action" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: item.name })" @click.stop="emit('remove', item.id)" @keydown.enter.prevent="emit('remove', item.id)" @keydown.space.prevent="emit('remove', item.id)"><text>{{ t.promotion.removeSelection }}</text></view>
+        <view class="bundle-hero__remove nx-reverse-action" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: item.label ?? item.name })" @click.stop="emit('remove', item.id)" @keydown.enter.prevent="emit('remove', item.id)" @keydown.space.prevent="emit('remove', item.id)"><text>{{ t.promotion.removeSelection }}</text></view>
         <text class="bundle-hero__name">{{ item.name }}</text>
         <text class="bundle-hero__meta bundle-hero__price">{{ priceText(item.price) }}</text>
         <text class="bundle-hero__meta">{{ t.bundle.estimateShort }} <text class="bundle-hero__estimate">{{ item.estimate }}</text></text>
@@ -49,7 +49,8 @@ import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import type { BundleDiscountTier } from "@/store/cart";
 
-export interface BundleTile { id: string; name: string; imageUrl?: string | null; price: number | null; estimate: string }
+/** label: the name screen readers use for the tile's actions when the visible name is a placeholder (a model no longer sold). */
+export interface BundleTile { id: string; name: string; label?: string; imageUrl?: string | null; price: number | null; estimate: string }
 const props = defineProps<{
   /** Models selected (one per model; several units of one model still count once). */
   count: number;

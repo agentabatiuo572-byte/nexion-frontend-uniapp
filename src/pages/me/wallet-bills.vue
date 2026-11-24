@@ -1,7 +1,7 @@
 <!--
   Wallet Bills — bills & income statistics (P-33). Asset switch (USDT / UVT),
   this month's earnings with today / this week / all-time from the home
-  earnings periods, filters (all / income / spending / rewards), day-grouped
+  earnings periods, filters (all / income / spending), day-grouped
   ledger rows from the server pager, and a detail sheet for rows that have no
   page of their own (withdrawals open tracking, on-chain top-ups open the tx
   page). Wrapped in <AppChassis active="me">.
@@ -181,8 +181,8 @@ const locatingReceipt = ref(false);
 let lookupGeneration = 0;
 const visible = ref(false);
 
-type Tab = "all" | "in" | "out" | "reward";
-const TABS: Tab[] = ["all", "in", "out", "reward"];
+type Tab = "all" | "in" | "out";
+const TABS: Tab[] = ["all", "in", "out"];
 const tab = ref<Tab>("all");
 const asset = ref<"USDT" | "UVT">("USDT");
 onLoad(options => {
@@ -206,12 +206,11 @@ const remoteSessionReady = computed(() => binarySessionReady({
 const activePager = computed(() => ledgerBizNo.value ? billsStore.getLedger() : billsStore.getLedger({
   asset: asset.value,
   ...(tab.value === "in" ? { direction: "IN" as const } : tab.value === "out" ? { direction: "OUT" as const } : {}),
-  ...(tab.value === "reward" ? { category: "REWARD" as const } : {}),
 }));
 // 空态描述跟筛选走(zentao #220)。「支出」筛到空时不能复用收入口径的
 // 「每一笔充值和到账都会记在这里」—— 充值/到账是进账,与当前筛选自相矛盾。
 const emptyDesc = computed(() => ledgerBizNo.value ? t.value.promotion.unknown : tab.value === "out" ? t.value.empty.billsOutDesc
-  : tab.value === "in" || tab.value === "reward" ? t.value.empty.billsInDesc
+  : tab.value === "in" ? t.value.empty.billsInDesc
     : t.value.empty.billsDesc);
 const scrollAnchor = ref<unknown>(null);
 
@@ -314,7 +313,6 @@ function typeColor(type: BillType): string {
 // 结论:两个方向都漏 = 这条路线本身不成立,给 Bill 加个「动没动余额」的字段也只堵一半。
 // 判据回到本工程自己的规矩:**指不出单源的数字,要么接单源,要么别显示**。
 // mock 期 balanceAfter 恒为 undefined → 这一列不渲染;接上真后端自动出现,零改动。
-const REWARD_TYPES: BillType[] = ["refer", "bonus", "achievement"];
 // Rows repeat their unit only when the list mixes assets (a receipt lookup across the ledger).
 const listUnit = computed(() => { const units = new Set(filtered.value.map((b) => b.symbol)); return units.size === 1 ? platformDisplayText([...units][0]) : ""; });
 const filtered = computed<Bill[]>(() => {
@@ -323,7 +321,6 @@ const filtered = computed<Bill[]>(() => {
   const ofAsset = billsStore.bills.filter(b => b.symbol === asset.value && isVisibleUsdtNetwork(b.network ?? billNetwork(b)));
   if (tab.value === "all") return ofAsset;
   if (tab.value === "in") return ofAsset.filter((b) => b.amount > 0);
-  if (tab.value === "reward") return ofAsset.filter((b) => REWARD_TYPES.includes(b.type));
   return ofAsset.filter((b) => b.amount < 0);
 });
 
@@ -410,7 +407,6 @@ function billNetwork(b: Bill): string | null {
 function tabLabel(tb: Tab): string {
   if (tb === "all") return t.value.bills.tabAll;
   if (tb === "in") return t.value.bills.tabIn;
-  if (tb === "reward") return t.value.bills.tabReward;
   return t.value.bills.tabOut;
 }
 /** 筛选单选组的左右方向键:移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。 */
@@ -457,7 +453,7 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-overview__stat { display:flex;flex-direction:column;gap:var(--v5-space-1);min-width:0; }
 .bills-overview__stat-label { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-overview__stat-value { overflow:hidden;font-size:15px;font-weight:500;line-height:20px;text-overflow:ellipsis;white-space:nowrap; }
-/* Chips keep one line; when four labels do not fit (long languages at 320) the row scrolls sideways. */
+/* Chips keep one line; when the labels do not fit (long languages at 320) the row scrolls sideways. */
 .bills-filters { display:flex;gap:var(--v5-space-1);margin:-6px 0 10px;padding:6px 16px;overflow-x:auto;scrollbar-width:none; }
 .bills-filters::-webkit-scrollbar { display:none; }
 .bills-filter { display:inline-flex;flex-shrink:0;white-space:nowrap;align-items:center;justify-content:center;height:32px;padding:0 12px;border-radius:999px;font:500 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer; }

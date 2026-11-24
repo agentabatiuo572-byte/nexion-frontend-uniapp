@@ -893,8 +893,12 @@ if grep -rqE 'WELCOME_GIFT_USDT|WELCOME_GIFT_NEX' src/ 2>/dev/null; then
 else
   ok "SPEC-7 no local gift amount constants (config-derived)"
 fi
-sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '\{usd\}( |\\u00A0)USDT \+ \{nex\}( |\\u00A0)UVT'
-sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '\{usd\}( |\\u00A0)USDT \+ \{nex\}( |\\u00A0)UVT'
+sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '^[[:space:]]*claimCta: "[^"]*\{gift\}[^"]*"'
+sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '^[[:space:]]*claimCta: "[^"]*\{gift\}[^"]*"'
+sentinel_present "SPEC-7 gift copy formats configured amounts" src/pages/ref/code.vue 'formatAmount\(giftUsdt\.value, "full"\).*formatAmount\(giftNex\.value, "full"\)'
+sentinel_present "SPEC-7 gift copy includes positive USDT" src/pages/ref/code.vue 'if \(giftUsdt\.value > 0\) parts\.push\(.*label: "\$" \+ usdt'
+sentinel_present "SPEC-7 gift copy includes positive UVT" src/pages/ref/code.vue 'if \(giftNex\.value > 0\) parts\.push\(.*label: nex \+ "\\u00A0UVT"'
+sentinel_present "SPEC-7 gift copy inserts amount labels into CTA" src/pages/ref/code.vue 'fmt\(t\.value\.ref\.claimCta, \{ gift: giftParts\.value\.map\(\(part\) => part\.label\)\.join\(" \+ "\) \}\)'
 sentinel_present "SPEC-7 settle reads live cluster (R5)" src/store/app.ts 'evaluateAccountCluster\(accountKey\.value\)'
 sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEarnings'
 # 【z1 判决 C · 假绿清理】原「settle journals ×2」「settle applies release engine」三门
