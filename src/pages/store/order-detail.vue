@@ -37,7 +37,7 @@
       <view v-else-if="resultOrder && resultShown" class="order-payment-result" data-testid="trial-purchase-result">
         <!-- The trial purchase's 「… 已在 … 开始运行」 takes the product line's place once the head reaches 设备已激活, and 共节省
              sits beside the paid amount (board A). Its exits are in the bottom bar below (#pageFixed). -->
-        <CheckoutResult ref="paymentResult" :order-no="resultOrder.id" :state="paymentResultState" :delivery="resultOrder.deviceDelivery ?? paymentResultReceipt?.deviceDelivery" :inventory-fallback-device-id="resultOrder.status === 'inventory' ? resultOrder.deviceId : undefined" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" :complete-line="showTrialResult && paymentResultState === 'activated' ? resultRunningText : undefined" :saved="showTrialResult && orderSaved > 0 ? orderSaved : undefined" @devices="goDevices" @support="contactOrderSupport" @order="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false">
+        <CheckoutResult ref="paymentResult" :order-no="resultOrder.id" :state="paymentResultState" :delivery="resultOrder.deviceDelivery ?? paymentResultReceipt?.deviceDelivery" :inventory-fallback-device-id="resultOrder.status === 'inventory' ? resultOrder.deviceId : undefined" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="resultExactAmount ?? paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :amount-precision="resultExactAmount ? 'full' : undefined" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" :complete-line="showTrialResult && paymentResultState === 'activated' ? resultRunningText : undefined" :saved="showTrialResult && orderSaved > 0 ? orderSaved : undefined" @devices="goDevices" @support="contactOrderSupport" @order="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false">
         <!-- Credited trial rewards: the one tinted card of the screen, amber for rewards (01 §1.1.2). -->
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit nx-tint" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -536,6 +536,10 @@ const paymentResultAmount = computed<{ value: Order['total']; currency: 'USD' | 
     currency: receipt.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT',
   };
 });
+// The order top-up path pays the exact amount due from the wallet, while paidTotalUsdt is two places by contract (B18):
+// its result shows the amount the user confirmed and authorized, every digit (contract-b84 paidAmountUsdt). Display only.
+const topupPaid = ref<{ orderNo: string; amount: string } | null>(null);
+const resultExactAmount = computed(() => topupPaid.value && topupPaid.value.orderNo === resultOrder.value?.id ? topupPaid.value.amount : undefined);
 // Same branch as the template's result view: the header drops back and retitles only while that view is on screen.
 const resultShown = computed(() => !showRemoteOrderLoading.value && !showOrderNotFound.value && !!resultOrder.value
   && (showTrialResult.value || paymentResultVisible.value || (showInventoryResult.value && resultOrder.value.status === "inventory")));
@@ -1140,7 +1144,7 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
   paymentSheetOpen.value = false;
   let paymentConfirmed = false;
   try {
-      const receipt = await executeSelectedPurchase({amount:topupAmount ?? requestAmountUsdt,currency:'USDT',summary:liveOrder.value?.productName??t.value.store.coConfirmPurchase},
+      const receipt = await executeSelectedPurchase({amount:topupAmount ?? requestAmountUsdt,currency:'USDT',summary:liveOrder.value?.productName??t.value.store.coConfirmPurchase,precision:topupAmount === undefined ? undefined : 'full'},
         async authorization=>{
           if (!paymentOrderCurrent()) {
             if (isCurrentDetailScope(scope)) { paymentNoticeReason.value = recoveryCopy.value.changed; paymentNotice.value = 'query'; }
@@ -1166,6 +1170,7 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
       throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");
     }
     paymentConfirmed = true;
+    topupPaid.value = topupAmount === undefined ? null : { orderNo: requestOrderNo, amount: topupAmount };
     paymentResultOrder.value = originalOrder;
     confirmedPaymentReceipt.value = receipt;
     paymentResultVisible.value = true;

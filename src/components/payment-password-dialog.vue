@@ -15,7 +15,7 @@
         <text v-if="ui.notice" class="payment-pin-note" role="status">{{ t.paymentPin[ui.notice] }}</text>
         <view v-if="ui.context" class="payment-pin-summary">
           <text class="payment-pin-summary__name">{{ ui.context.summary }}</text>
-          <view class="payment-pin-summary__amount"><text>{{ t.paymentPin.due }}</text><CheckoutAmount v-if="ui.context.currency === 'USD' || ui.context.currency === 'USDT'" :value="ui.context.amount" :currency="ui.context.currency" /><text v-else>{{ formatGroupedAmount(ui.context.amount) }} <text class="payment-pin-note">{{ ui.context.currency }}</text></text></view>
+          <view class="payment-pin-summary__amount"><text class="payment-pin-summary__label">{{ t.paymentPin.due }}</text><CheckoutAmount v-if="ui.context.currency === 'USD' || ui.context.currency === 'USDT'" :value="ui.context.amount" :currency="ui.context.currency" :precision="ui.context.precision" /><text v-else>{{ formatGroupedAmount(ui.context.amount) }} <text class="payment-pin-note">{{ ui.context.currency }}</text></text></view>
           <view v-if="ui.context.details?.length" class="payment-pin-link" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded">{{ expanded ? t.paymentPin.hideDetails : t.paymentPin.details }}</view>
           <view v-if="expanded" class="payment-pin-details"><view v-for="(item, index) in ui.context.details" :key="index"><text>{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template><template v-if="item.amount !== undefined"> · {{ formatGroupedAmount(item.amount) }}</template></text></view></view>
         </view>
@@ -138,6 +138,8 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-summary { padding: var(--v5-space-3) 0; margin-bottom: var(--v5-space-1); border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
 .payment-pin-summary__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-type-list-subtitle); }
 .payment-pin-summary__amount { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--v5-space-2); margin-top:var(--v5-space-2); font-weight:500; font-size:var(--ui-type-card-title); }
+/* Field name and value (01 §1.1.1): the label is secondary ink at regular weight, the amount stays main ink. */
+.payment-pin-summary__label { color:var(--v5-ink-3); font-weight:400; }
 .payment-pin-details { font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: break-word; }
 .payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--ui-space-row-y); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); }
 .payment-pin-primary.nx-button { padding:0; background:none; }
