@@ -252,6 +252,7 @@ import { openCheckoutCapacityProgressKey, ownsCheckoutCapacityPaymentKey, showsC
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { landFocusOnPage, useDialogA11y } from '@/composables/use-dialog-a11y';
 import { CHASSIS_QUERY_SCOPE } from '@/composables/use-loops-in-view';
+import { useStickyCTA } from '@/store/sticky-cta-bar';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxNoticeDialog from '@/components/ui/nx-notice-dialog.vue';
 import NxResultHead from '@/components/ui/nx-result-head.vue';
@@ -318,7 +319,8 @@ const barBottom = ref<number | null>(null);
 // mounts its own host, so this holds once per page; a bar that hides and comes back on the same page keeps its spot (and
 // stays tappable).
 const placed = ref(false);
-let placeTries = 0;
+let placeSince: number | null = null;
+let placeRetry: ReturnType<typeof setTimeout> | undefined;
 // The page's chassis lifts its floating support shortcut above the bar by the height measured here (user 2026-11-24).
 const sharedBarHeight = inject(PAYMENT_BAR_HEIGHT_KEY, null);
 // Pages without the chassis (sign-in, support chat) have no scope; uni then searches its current page.
@@ -327,17 +329,24 @@ function placeBar() {
   (chassisScope ? uni.createSelectorQuery().in(chassisScope) : uni.createSelectorQuery()).selectAll('.nx-tabbar-pill, .nx-glass-bar').boundingClientRect(found => {
     const tops = (Array.isArray(found) ? found : [found]).filter(rect => rect && (rect.height ?? 0) > 0).map(rect => rect.top as number);
     barBottom.value = tops.length ? Math.max(0, uni.getSystemInfoSync().windowHeight - Math.min(...tops) + 12) : null;
-    // A tray can render a few frames after the page: until the pill or a tray is found, look again shortly, and only
-    // after about 600ms take the default spot (a page with neither).
+    // A tray can render after the page: until the pill or a tray is found, one retry chain looks again every 100ms, and
+    // only after about 1.5s takes the default spot (a page with neither).
     if (placed.value) return;
-    if (tops.length || ++placeTries >= 6) placed.value = true;
-    else setTimeout(placeBar, 100);
+    clearTimeout(placeRetry);
+    placeSince ??= Date.now();
+    if (tops.length || Date.now() - placeSince >= 1500) placed.value = true;
+    else placeRetry = setTimeout(placeBar, 100);
   }).select('.purchase-payment-resume').boundingClientRect(bar => {
     const height = !Array.isArray(bar) && bar?.height ? Math.round(bar.height) : 0;
     if (sharedBarHeight) sharedBarHeight.value = barShown.value ? height : 0;
   }).exec();
 }
 watch(barShown, shown => { if (!shown && sharedBarHeight) sharedBarHeight.value = 0; });
+// The product page's tray is the chassis's sticky CTA, shown once the product has loaded, which on a slow load is after
+// the bar placed itself. When it comes or goes, the bar hides in that same render and shows again once it has measured
+// the new tray (BUG-604).
+const stickyCta = useStickyCTA();
+watch(() => !!stickyCta.cta, () => { placed.value = false; placeSince = null; void nextTick(placeBar); });
 // ✕ removes the control that had focus. A keyboard or assistive activation (click without a pointer) lands focus on the
 // page heading (03 §3.5, BUG-563); a pointer tap leaves focus alone, so the page never scrolls to a heading under the finger.
 function closeBar(event: Event) {
@@ -345,7 +354,7 @@ function closeBar(event: Event) {
   payment.dismissResume(pending.value);
   if (event.type === 'keydown' || (event as MouseEvent).detail === 0) landFocusOnPage();
 }
-onUnmounted(() => { if (sharedBarHeight) sharedBarHeight.value = 0; });
+onUnmounted(() => { clearTimeout(placeRetry); if (sharedBarHeight) sharedBarHeight.value = 0; });
 watch(() => barShown.value && s.revision, shown => { if (shown !== false) setTimeout(placeBar, 50); }, { immediate: true });
 useVisibleInterval(placeBar, 2000, () => barShown.value);
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
