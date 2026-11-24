@@ -14,7 +14,8 @@ const GAP = 12;
  * H5: the fixed page does not shrink with the keyboard and is no taller than the screen, so nothing scrolls. While an
  * input inside `form` is focused and the keyboard is up, `inset` (a spacer after the form) makes the page as much
  * taller as the keyboard hides, and the page scrolls the button to 12px above the keyboard on focus, on keyboard
- * changes and on `layout` changes. The spacer goes when the keyboard does, so the closed page is unchanged.
+ * changes (the visual viewport resizing or panning) and on `layout` changes. With no keyboard nothing scrolls, and the
+ * spacer goes when the keyboard does, so the closed page is unchanged.
  */
 export function useKeyboardPrimaryReach(options: {
   root: string;
@@ -56,13 +57,13 @@ export function useKeyboardPrimaryReach(options: {
     const viewport = window.visualViewport;
     if (!viewport) return;
     const hidden = Math.max(0, Math.round(document.documentElement.clientHeight - viewport.offsetTop - viewport.height));
-    if (!hidden) inset.value = 0;
+    if (!hidden) { inset.value = 0; return; }
     const field = document.activeElement;
     if (!(field instanceof HTMLInputElement)) return;
     const form = field.closest<HTMLElement>(options.form);
     const scroller = form?.closest<HTMLElement>(options.root);
     if (!form || !scroller) return;
-    if (hidden) inset.value = hidden;
+    inset.value = hidden;
     void nextTick(() => {
       const button = form.querySelector(options.primary)?.getBoundingClientRect();
       if (!button) return;
@@ -76,11 +77,13 @@ export function useKeyboardPrimaryReach(options: {
   document.addEventListener("focusin", reach);
   window.addEventListener("resize", reach);
   viewport?.addEventListener("resize", reach);
+  viewport?.addEventListener("scroll", reach);
   watch(options.layout, reach, { flush: "post" });
   onScopeDispose(() => {
     document.removeEventListener("focusin", reach);
     window.removeEventListener("resize", reach);
     viewport?.removeEventListener("resize", reach);
+    viewport?.removeEventListener("scroll", reach);
   });
   // #endif
   return { spacing, inset };
