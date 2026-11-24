@@ -525,6 +525,24 @@ function pageWaitLandings(): (() => Element | null | undefined)[] {
   return list;
 }
 
+/** A control that held focus went away with no layer left to hand it back (the floating payment bar closed, the
+ *  payment page left for the store): once `ready` (the destination page shows), focus lost to the page root lands on
+ *  the page's heading or title, one in view first (03 §3.5). Gives up after 3 s, or once something visible has focus. */
+export function landFocusOnPage(ready: () => boolean = () => true): void {
+  if (typeof document === "undefined") return;
+  const inView = (el: Element | null | undefined) => { if (!el) return null; const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight ? el : null; };
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    if (document.hidden || tries > 60) { clearInterval(timer); return; }
+    if (!ready()) return;
+    if (canTake(document.activeElement)) { clearInterval(timer); return; }
+    const landings = pageWaitLandings();
+    const landing = focusFirst([...landings.map((next) => () => inView(next())), ...landings]);
+    if (landing) { clearInterval(timer); settleOnLanding(landing); }
+  }, 50);
+}
+
 /**
  * 弹层的键盘可用性:焦点移入 → Tab 只在层内循环 → Esc 关闭 → 关闭后焦点归还。
  *
