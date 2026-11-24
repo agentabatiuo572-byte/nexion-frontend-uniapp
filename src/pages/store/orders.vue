@@ -250,7 +250,7 @@ const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap(
       : row.hiddenOrder && { sku: row.hiddenOrder.sku, imageUrl: row.hiddenOrder.imageUrl, amount: { value: row.hiddenOrder.total, currency: "USD" as const } };
     if (!details) return [];
     // A resumed original payment has no local start time; it sorts and dates by its order.
-    return [{ ...base, ...details, startedAt: base.startedAt ?? order?.placedAt, orderNo: payload.orderNo, kindLabel: "", method: "",
+    return [{ ...base, ...details, startedAt: base.startedAt ?? order?.placedAt ?? row.hiddenOrder?.placedAt, orderNo: payload.orderNo, kindLabel: "", method: "",
       amount: row.paymentMethod ? { ...details.amount, currency } : details.amount }];
   }
   const kindLabel = row.kind === "TRADE_IN" ? t.value.search.routes.tradeIn.label : row.kind === "CAPACITY_REPLACE" ? slotCopy.value.replace
