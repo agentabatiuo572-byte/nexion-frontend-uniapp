@@ -17,7 +17,9 @@
           </template>
         </view>
       </NxSection>
-      <NxSection :title="t.me.myNetwork">
+      <NxSection :title="t.me.myNetwork" :action="t.myRank.g2Link" @action="navTo('/pages/team/team')">
+        <!-- G2 / G2a: rank progress card above the four network entries (DESIGN G2; placement is a NEEDS DECISION item). -->
+        <NetworkCard />
         <view class="me-shortcut-grid me-network-grid">
           <view v-for="item in networkItems" :key="item.key" class="me-shortcut me-network-item" :data-quick-key="item.key" role="button" tabindex="0" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
             <NxIconTile :tone="tileTone(item.tone)" size="m"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg></NxIconTile>
@@ -75,6 +77,7 @@ import NxListRow from "@/components/ui/nx-list-row.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import ProfileRow from "@/components/me/profile-row.vue";
 import WalletCard from "@/components/me/wallet-card.vue";
+import NetworkCard from "@/components/me/network-card.vue";
 import WalletOverview from "@/components/me/wallet-overview.vue";
 import { useCommission } from "@/store/commission";
 

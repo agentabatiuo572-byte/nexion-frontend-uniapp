@@ -19,7 +19,7 @@
         <view class="nx-unilevel-filters">
           <GlassSegments :label="t.directReferral.period" v-model="period" :options="periodOptions" layout="equal" surface="glass" selection="flat" />
           <view class="nx-unilevel-sources" role="group" :aria-label="t.directReferral.source">
-            <view v-for="option in filterOptions" :key="option.value" role="button" tabindex="0" class="nx-unilevel-source nx-unilevel-focus" :class="{ 'nx-unilevel-source--selected': filter === option.value }" :aria-pressed="filter === option.value" @click="filter = option.value" @keydown.enter.prevent="filter = option.value" @keydown.space.prevent="filter = option.value"><text>{{ option.label }}</text></view>
+            <view v-for="option in filterOptions" :key="option.value" role="button" tabindex="0" class="nx-unilevel-source nx-unilevel-focus" :class="{ 'nx-unilevel-source--selected': filter === option.value }" :aria-pressed="filter === option.value" @click="filter = option.value" @keydown.enter.prevent="filter = option.value" @keydown.space.prevent="filter = option.value"><text class="nx-unilevel-source__face" :class="{ 'nx-frosted-button': filter === option.value }">{{ option.label }}</text></view>
           </view>
         </view>
         <view v-if="(remoteState === 'ready' || remoteState === 'loading') && remoteSnapshot" class="nx-unilevel-ledger">
@@ -27,15 +27,17 @@
             <text class="nx-unilevel-day-label">{{ day.label }}</text>
             <view class="nx-unilevel-day-card">
             <view v-for="event in day.events" :key="event.id" class="nx-direct-event">
+                <!-- F2 / F2b / F3 (DESIGN F2): icon tile | name and source · time | USDT line, UVT line when above 0, status as plain text under the amount. -->
                 <view class="nx-unilevel-record-head">
-                  <view class="nx-unilevel-icon" :class="`nx-unilevel-icon--${filter}`" aria-hidden="true"><svg v-if="filter === 'device_earning'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></view>
+                  <NxIconTile :tone="filter === 'device_earning' ? 'device' : 'sky'" size="s"><svg v-if="filter === 'device_earning'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M19 8v6M22 11h-6" /></svg></NxIconTile>
                   <view class="nx-unilevel-record-copy">
-                    <view class="nx-unilevel-member-line"><text class="nx-unilevel-member">{{ event.sourceUserName }}</text><template v-if="event.status !== 'unlocked' || ('statusUSDT' in event && event.statusUSDT !== event.statusNEX)"><NxTag v-for="tag in statusTags(event)" :key="tag.key" wrap :tone="tag.tone">{{ tag.text }}</NxTag></template></view>
-                    <text class="nx-unilevel-source-label">{{ recordSource(event) }} · {{ recordTime(event.ts) }}</text>
+                    <text class="nx-unilevel-member">{{ event.sourceUserName }}</text>
+                    <text class="nx-unilevel-source-label">{{ recordSource(event) }}</text>
                   </view>
                   <view class="nx-unilevel-record-amounts">
-                    <text class="nx-direct-amount nx-unilevel-currency-row">{{ visibility.mask((event.amountUSDT > 0 ? '+' : '') + '$' + formatAmount(event.amountUSDT)) }}</text>
-                    <text class="nx-direct-amount nx-unilevel-uvt">{{ visibility.mask((event.amountNEX > 0 ? '+' : '') + formatAmount(event.amountNEX)) }} UVT</text>
+                    <text class="nx-direct-amount nx-unilevel-currency-row">{{ visibility.mask((event.amountUSDT > 0 ? '+' : '') + formatAmount(event.amountUSDT)) }}<text class="nx-unilevel-unit">{{ '\u00A0' }}USDT</text></text>
+                    <text v-if="event.amountNEX > 0" class="nx-direct-amount nx-unilevel-uvt">{{ visibility.mask('+' + formatAmount(event.amountNEX)) }}{{ '\u00A0' }}UVT</text>
+                    <text v-for="tag in statusTags(event)" :key="tag.key" class="nx-unilevel-status" :class="`nx-unilevel-status--${tag.tone}`">{{ tag.text }}</text>
                   </view>
                 </view>
                 <text v-if="event.status === 'recovery_pending'" class="nx-unilevel-recovery nx-direct-amount">{{ fmt(auditCopy.pendingRecovery, { usdt: '$' + amount(event.recoveryPendingUSDT), uvt: amount(event.recoveryPendingNEX) }) }}</text>
@@ -52,13 +54,14 @@
           <text v-if="!policy.configured" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.directReferral.unconfigured }}</text>
           <text v-else-if="policy.nexUsdtPrice === null" style="font-size: 12px; color: var(--v5-warning)">{{ t.directReferral.priceUnavailable }}</text>
         </view>
-        <view role="button" tabindex="0" class="nx-unilevel-focus nx-unilevel-details-toggle" :aria-expanded="showSettlementDetails" @click="showSettlementDetails = !showSettlementDetails" @keydown.enter.prevent="showSettlementDetails = !showSettlementDetails" @keydown.space.prevent="showSettlementDetails = !showSettlementDetails"><text>{{ auditCopy.settlementDetails }}</text><NxIcon :name="showSettlementDetails ? 'minus' : 'plus'" /></view>
+        <!-- Settlement fold (DESIGN F2): the closed title states the conclusion; the three sentences open on tap. -->
+        <view role="button" tabindex="0" class="nx-unilevel-focus nx-unilevel-details-toggle" :aria-expanded="showSettlementDetails" @click="showSettlementDetails = !showSettlementDetails" @keydown.enter.prevent="showSettlementDetails = !showSettlementDetails" @keydown.space.prevent="showSettlementDetails = !showSettlementDetails"><text>{{ detailsSummary }}</text><NxIcon :name="showSettlementDetails ? 'minus' : 'plus'" /></view>
         <view v-if="showSettlementDetails" class="nx-unilevel-details">
-          <text class="block">{{ t.directReferral.netHint }}</text>
-          <text v-if="filter === 'device_earning'" class="block">{{ t.directReferral.platformPays }}</text>
+          <text class="block">{{ filter === 'device_earning' ? rankCopy.f2DevPays : rankCopy.f2Pays }}</text>
           <template v-if="(policyState === 'ready' || policyState === 'loading') && policy">
             <text class="block">{{ ruleDescription }}</text>
           </template>
+          <text class="block">{{ rankCopy.f2Net }}</text>
         </view>
         </template>
       </view>
@@ -69,7 +72,8 @@
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
-import NxTag from "@/components/ui/nx-tag.vue";
+import NxIconTile from "@/components/ui/nx-icon-tile.vue";
+import { useVRank } from "@/store/v-rank";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { formatAmount } from "@/lib/amount-display";
@@ -86,7 +90,6 @@ import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { useDataVisibility } from "@/store/data-visibility";
 import { networkReauditCopy } from "@/i18n/network-reaudit";
-import { teamRuleGuideCopy } from "@/components/team/team-rule-guide-copy";
 import { fmt, dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
@@ -106,6 +109,8 @@ const visibility = useDataVisibility();
 const logicCopy = computed(() => teamLogicCopy(locale.code));
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const showSettlementDetails = ref(false);
+const rankCopy = computed(() => t.value.myRank);
+const vrank = useVRank();
 const readEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
 let environmentInvalidated = false;
 watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
@@ -192,16 +197,34 @@ const totals = computed(() => {
   return snapshot.split.deviceEarning;
 });
 const remoteTotalUSDT = computed(() => totals.value.amountUSDT), remoteTotalNEX = computed(() => totals.value.amountNEX), remoteGroupCount = computed(() => totals.value.count);
+// LOGIC SEAMS (DESIGN 5): the per-rank purchase rates (v-ranks purchaseL1Rate / purchaseL2Rate) and the device
+// level-2 rate (direct-referral deviceEarning.level2RatePct) are not parsed yet. Until the logic item fills them,
+// the L1 rate falls back to the rank's directBonus (equal to purchaseL1Rate by contract), the L2 rate shows "—",
+// and the device rule shows the single-level sentence.
+const rankPurchaseL2Pct = computed<number | null>(() => null);
+const deviceLevel2RatePct = computed<number | null>(() => null);
+const pctText = (value: number | null | undefined) => value === null || value === undefined || !Number.isFinite(value) ? "—" : `${formatHowNumber(value, dateLocale())}%`;
+const purchaseCoolingDays = computed(() => {
+  const p = policy.value;
+  if (!p) return null;
+  return p.settlementMode === "SEVEN_V2" ? p.sevenLayerReference?.coolingDays ?? null : p.purchase.coolingDays;
+});
+const detailsSummary = computed(() => {
+  const days = filter.value === "device_earning" ? policy.value?.deviceEarning.coolingDays ?? null : purchaseCoolingDays.value;
+  return days === null ? rankCopy.value.f2Details : fmt(filter.value === "device_earning" ? rankCopy.value.f2DevDetailsSum : rankCopy.value.f2DetailsSum, { d: days });
+});
 const ruleDescription = computed(() => {
   const p = policy.value;
   if (!p) return "";
-  if (filter.value === "extended") return teamRuleGuideCopy(locale.code).networkRule;
-  const rule = filter.value === "device_earning" ? p.deviceEarning : p.purchase;
-  if (p.settlementMode === "SEVEN_V2" && filter.value === "direct" && (p.purchaseSplitConfigured === false || p.sevenLayerReference?.baseRatePct === null || p.sevenLayerReference?.coolingDays === null)) return t.value.directReferral.purchaseUnconfigured;
-  if (p.settlementMode === "SEVEN_V2" && filter.value === "direct") return p.purchaseSplit?.enabled
-    ? fmt(t.value.directReferral.purchaseSplitRule, { usdt: formatHowNumber(p.purchaseSplit.usdtSharePct, dateLocale()), nex: formatHowNumber(100 - p.purchaseSplit.usdtSharePct, dateLocale()) })
-    : t.value.directReferral.originalPurchaseRule;
-  return rule.enabled ? fmt(t.value.directReferral.rule, { rate: formatHowNumber(rule.totalRatePct, dateLocale()), usdt: formatHowNumber(rule.usdtSharePct, dateLocale()), nex: formatHowNumber(100 - rule.usdtSharePct, dateLocale()), days: rule.coolingDays }) : t.value.directReferral.disabled;
+  if (filter.value !== "device_earning") {
+    if (p.settlementMode === "SEVEN_V2" && (p.purchaseSplitConfigured === false || p.sevenLayerReference?.baseRatePct === null || p.sevenLayerReference?.coolingDays === null)) return t.value.directReferral.purchaseUnconfigured;
+    const current = vrank.remoteReady ? vrank.ladder[vrank.myRank] : undefined;
+    return fmt(rankCopy.value.f2Rule, { r: current ? `V${current.v}` : "—", a: pctText(current ? current.directBonus * 100 : null), b: pctText(rankPurchaseL2Pct.value), d: purchaseCoolingDays.value ?? "—" });
+  }
+  const device = p.deviceEarning;
+  if (device.enabled && deviceLevel2RatePct.value !== null && deviceLevel2RatePct.value > 0)
+    return fmt(rankCopy.value.f2DevRule, { a: pctText(device.totalRatePct), b: pctText(deviceLevel2RatePct.value), u: formatHowNumber(device.usdtSharePct, dateLocale()), n: formatHowNumber(100 - device.usdtSharePct, dateLocale()), d: device.coolingDays });
+  return device.enabled ? fmt(t.value.directReferral.rule, { rate: formatHowNumber(device.totalRatePct, dateLocale()), usdt: formatHowNumber(device.usdtSharePct, dateLocale()), nex: formatHowNumber(100 - device.usdtSharePct, dateLocale()), days: device.coolingDays }) : t.value.directReferral.disabled;
 });
 // Records grouped by local calendar day, newest group first (events arrive newest first).
 const eventDays = computed(() => {
@@ -220,18 +243,20 @@ const eventDays = computed(() => {
 });
 const periodOptions = computed(() => (["today", "week", "month", "all"] as const).map(value => ({ value, label: t.value.unilevel.periods[value] })));
 const filterOptions = computed(() => [
-  { value: "direct", label: t.value.directReferral.purchase },
-  { value: "extended", label: t.value.directReferral.networkPurchase },
-  { value: "device_earning", label: t.value.directReferral.deviceEarning },
+  { value: "direct", label: rankCopy.value.chipBuy },
+  { value: "extended", label: rankCopy.value.chipTeam },
+  { value: "device_earning", label: rankCopy.value.chipDev },
 ] as const);
 function amount(value: number | null | undefined) { return visibility.mask(formatAmount(value)); }
 const totalAmountParts = computed(() => amount(remoteTotalUSDT.value).split('.'));
 function wideAmount(value: number) { return amount(value).length > 12; }
 function recordTime(ts: number) { return ts > 0 ? new Date(ts).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }) : logicCopy.value.dateUnavailable; }
+// Source line: friend layer for purchases ("好友 · 14:32"), "好友的好友购买" for layer 2, device layers by name.
 function recordSource(event: DirectReferralEvent | TeamUnilevelEvent) {
-  const copy = t.value.directReferral;
-  if (filter.value === 'device_earning') return event.layer === 2 ? copy.friendOfFriend : copy.deviceEarning;
-  return filter.value === 'direct' ? copy.purchase : copy.networkPurchase;
+  const copy = rankCopy.value, time = recordTime(event.ts);
+  if (filter.value === 'device_earning') return fmt(event.layer === 2 ? copy.f2DevL2 : copy.f2DevL1, { t: time });
+  if (filter.value === 'direct') return `${copy.l1} · ${time}`;
+  return event.layer === 2 ? fmt(copy.f2L2, { t: time }) : `${t.value.directReferral.networkPurchase} · ${time}`;
 }
 // One tag per status, so each carries its own colour (03 §3.8); USDT and UVT get a tag each when they differ.
 function statusTags(event: DirectReferralEvent | TeamUnilevelEvent) {
@@ -248,8 +273,8 @@ function statusTone(status: DirectReferralEvent["status"]) {
     : "warning" as const;
 }
 function statusLabel(event: DirectReferralEvent | TeamUnilevelEvent, status = event.status) {
-  if (status === "cooling") return fmt(t.value.commissions.coolingTag, { n: Math.max(0, Math.ceil((event.unlockAt - Date.now()) / 86400000)) });
-  return status === "unlocked" ? t.value.commissions.readyTag
+  if (status === "cooling") return rankCopy.value.cooling;
+  return status === "unlocked" ? rankCopy.value.credited
     : status === "waiting_calculation" ? t.value.directReferral.waitingCalculation
     : status === "withdrawn" ? t.value.commissions.withdrawnTag
     : status === "frozen" ? t.value.commissions.frozenTag
@@ -277,29 +302,37 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 .nx-royalty-totals-large > view:first-child > text { font-size: 26px !important; line-height: 34px; }
 
 .nx-unilevel-filters { display: flex; flex-direction: column; gap: var(--ui-space-inline); }
-.nx-unilevel-sources { display: flex; flex-wrap: wrap; gap: var(--v5-space-1); }
-.nx-unilevel-source { min-height: 44px; display: flex; align-items: center; max-width: 100%; padding: 0 var(--v5-space-3); border-radius: 999px; color: var(--v5-ink-3); font-size: 13px; line-height: 18px; font-weight: 500; cursor: pointer; }
-.nx-unilevel-source--selected { color: var(--v5-ink); background: color-mix(in srgb, var(--v5-ink) 10%, transparent); }
+/* Source filter = 03 §3.7 secondary filter: open floor, 32px options inside 44px hit areas, one line each; the row
+   scrolls sideways only when the options overflow. Selected = shared glass surface + brand text. */
+.nx-unilevel-sources { display: flex; flex-wrap: nowrap; gap: var(--v5-space-2); overflow-x: auto; scrollbar-width: none; }
+.nx-unilevel-sources::-webkit-scrollbar { display: none; }
+.nx-unilevel-source { flex: none; min-height: 44px; display: flex; align-items: center; border-radius: 999px; cursor: pointer; }
+.nx-unilevel-source__face { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; white-space: nowrap; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
+.nx-unilevel-source--selected .nx-unilevel-source__face { color: var(--v5-brand); }
 .nx-unilevel-ledger { display: flex; flex-direction: column; gap: var(--ui-space-inset); }
 .nx-unilevel-day { display: flex; flex-direction: column; gap: var(--v5-space-2); }
-.nx-unilevel-day-label { padding: 0 var(--v5-space-1); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-4); }
-.nx-unilevel-day-card { padding: 0 var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.nx-unilevel-day-label { padding: 0 var(--v5-space-1); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.nx-unilevel-day-card { padding: 4px var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+:global([data-theme="light"]) .nx-unilevel-day-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .nx-direct-event { padding: 12px 0; }
 .nx-direct-event + .nx-direct-event { border-top: 1px solid var(--v5-border); }
-.nx-unilevel-record-head { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: var(--ui-space-inline); align-items: center; }
-.nx-unilevel-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
-.nx-unilevel-icon--extended { color: var(--ui-device-ink); background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); }
-.nx-unilevel-icon--device_earning { color: var(--v5-nex); background: color-mix(in srgb, var(--v5-nex) 16%, transparent); }
-.nx-unilevel-record-copy { min-width: 0; }
-.nx-unilevel-member-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--v5-space-1) 6px; }
-.nx-unilevel-member { min-width: 0; color: var(--v5-ink); font: var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5); overflow-wrap: break-word; }
-.nx-unilevel-record-amounts { min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
-.nx-unilevel-currency-row { display: block; font: 500 15px/20px var(--font-metric); color: var(--v5-brand); }
-.nx-unilevel-uvt { display: block; margin-top: 2px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); }
-.nx-unilevel-source-label { display: block; margin-top: 2px; color: var(--v5-ink-3); font-size: 12px; line-height: 18px; }
+/* Record row (DESIGN F2, 03 §3.6.1, 03.8): content-row title 500, subtitle ink-3, amount right with its unit,
+   UVT under it when above 0, status as 12/16 text in the 03.8 colour (cooling warning, credited success). */
+.nx-unilevel-record-head { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.nx-unilevel-record-copy { display: flex; flex-direction: column; min-width: 0; }
+.nx-unilevel-member { min-width: 0; color: var(--v5-ink); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
+.nx-unilevel-record-amounts { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.nx-unilevel-currency-row { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
+.nx-unilevel-unit { font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.nx-unilevel-uvt { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); white-space: nowrap; }
+.nx-unilevel-status { display: block; font: 400 12px/16px var(--font-v5); white-space: nowrap; }
+.nx-unilevel-status--warning { color: var(--v5-warning-ink); }
+.nx-unilevel-status--success { color: var(--v5-success-ink); }
+.nx-unilevel-status--neutral { color: var(--v5-ink-3); }
+.nx-unilevel-status--danger { color: var(--v5-danger); }
+.nx-unilevel-source-label { display: block; margin-top: 2px; color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
 .nx-unilevel-recovery { display: block; margin: var(--v5-space-2) 0 0 48px; color: var(--v5-ink-2); font-size: 12px; line-height: 1.6; }
 .nx-unilevel-focus:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.nx-unilevel-details-toggle { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 12px; }
-.nx-unilevel-details { color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; overflow-wrap: break-word; }
-.nx-unilevel-details > text { margin-bottom: var(--v5-space-2); }
+.nx-unilevel-details-toggle { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-2); font: 500 13px/18px var(--font-v5); }
+.nx-unilevel-details { display: flex; flex-direction: column; gap: 6px; margin-top: -8px; color: var(--v5-ink-3); font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 </style>

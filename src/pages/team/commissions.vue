@@ -69,7 +69,7 @@
           </view>
         </view>
 
-        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text class="commission-filter-summary__value">${{ visibility.mask(formatAmount(byKind[filter].usdt)) }} · {{ visibility.mask(formatAmount(byKind[filter].nex)) }} UVT</text></view>
+        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text class="commission-filter-summary__value">{{ visibility.mask(formatAmount(byKind[filter].usdt)) }}&nbsp;USDT · {{ visibility.mask(formatAmount(byKind[filter].nex)) }}&nbsp;UVT</text></view>
 
         <EmptyState v-if="filtered.length === 0 && !hasMoreEvents" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
         <view v-if="filtered.length > 0" class="commission-days">
@@ -96,8 +96,8 @@
               <view class="text-right" style="max-width: 48%; overflow-wrap: break-word">
                 <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>
                 <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'uvt')">{{ commissionNexLabel(e) }}</text>
-                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
-                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success-ink)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
+                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ t.myRank.cooling }}</text>
+                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success-ink)', marginTop: '2px' }">{{ t.myRank.credited }}</text>
                 <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
                 <text v-else-if="e.status === 'frozen'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ t.commissions.frozenTag }}</text>
                 <text v-else-if="e.status === 'reversed'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-danger)', marginTop: '2px' }">{{ t.commissions.reversedTag }}</text>
@@ -213,7 +213,8 @@ const KIND: Record<CommissionKind, KindSpec> = {
   cultivation: { color: "var(--v5-brand)", paths: ["M7 20h10", "M10 20c5.5-2.5.8-6.4 3-10", "M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z", "M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"] },
   leadership: { color: "var(--v5-nex)", paths: ["m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14"] },
   promotion: { color: "var(--v5-brand-2)", paths: ["M12 3v18M5 10l7-7 7 7"] },
-  vrank_salary: GENERIC_REWARD_ICON,
+  // Monthly reward (DESIGN 第 9 节 glyph-salary): amber, the reward hue (01 §1.1.2).
+  vrank_salary: { color: "var(--v5-warning)", paths: ["M6.5 5h11a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z", "M3.5 10h17M8 3v4M16 3v4", "M12 13a2 2 0 1 0 0 4 2 2 0 1 0 0-4z"] },
   other: GENERIC_REWARD_ICON,
   genesis: { color: "var(--v5-warning)", paths: ["M6 3h12l4 6-10 13L2 9z", "M11 3 8 9l4 13 4-13-3-6", "M2 9h20"] },
 };
@@ -323,20 +324,17 @@ function eventCodes(e: CommissionEvent): { label: string; value: string }[] {
   if (e.sourceDeviceId) codes.push({ label: `${t.value.directReferral.device}:`, value: e.sourceDeviceId });
   return codes;
 }
-function coolingTag(e: CommissionEvent): string {
-  const days = Math.max(0, Math.ceil((e.unlockAt - Date.now()) / 86400000));
-  return fmt(t.value.commissions.coolingTag, { n: days });
-}
 
+// DESIGN 11.2-12: team reward rows write the currency as USDT, not $.
 function commissionAmountLabel(e: CommissionEvent): string {
-  const amount = `$${visibility.mask(formatAmount(e.amountUSDT))}`;
+  const amount = `${visibility.mask(formatAmount(e.amountUSDT))}\u00A0USDT`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;
 }
 
 function commissionNexLabel(e: CommissionEvent): string {
-  const amount = `${visibility.mask(formatAmount(e.amountNEX))} UVT`;
+  const amount = `${visibility.mask(formatAmount(e.amountNEX))}\u00A0UVT`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;

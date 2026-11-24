@@ -1,210 +1,116 @@
 <!--
-  NetworkCard — ported from me/page.tsx NetworkCard.
-  V-rank ladder progress toward the next rank: aspiration star anchor + "Toward V{n}
-  {title} · {gap}" line + perk-unlock line + scroll-grow progress bar (≥80% =
-  warning "hot" state). Max-rank reached → collapses to a single dignity row.
-  Reads useVRank + nextRankGap; published rank names follow the active locale.
-  Taps through to /team (not yet ported → nav fail:()=>{}).
+  NetworkCard (DESIGN G2 / G2a): the profile 我的网络 card. Next-rank badge | "toward Vn · hardest gap +N" line,
+  the two perks you get at Vn, one shared .nx-progress with the average next-rank progress | chevron.
+  The whole card opens the my-rank page. The section title lives in the page's NxSection.
 -->
 <template>
-  <view>
-    <SectionHeader :title="t.me.myNetwork" link="/pages/team/team" :link-label="t.me.team" />
-
-    <!-- Max-rank end state -->
-    <view v-if="vrank.remoteReady && !gap.next" class="nx-glass-card block active:opacity-90" :style="maxCardStyle" @click="goTeam">
-      <view :style="maxIconStyle" :aria-label="maxRankLine">
-        <NxIcon name="check" :size="20" />
+  <view v-if="vrank.remoteReady && !next" class="nx-network-card nx-network-card--top" role="link" tabindex="0" :aria-label="maxRankLine" @click="goRank" @keydown.enter.prevent="goRank" @keydown.space.prevent="goRank">
+    <TeamRankEmblem v-if="!visibility.hidden" :rank="vrank.myRank" :size="48" />
+    <text class="nx-network-card__line">{{ maxRankLine }}</text>
+    <view class="nx-network-card__chev" aria-hidden="true"><NxIcon name="chevron-right" /></view>
+  </view>
+  <view v-else-if="vrank.remoteReady && next" class="nx-network-card" role="link" tabindex="0" :aria-label="ariaLabel" @click="goRank" @keydown.enter.prevent="goRank" @keydown.space.prevent="goRank">
+    <TeamRankEmblem v-if="!visibility.hidden" :rank="next.v" :size="48" />
+    <view class="nx-network-card__copy">
+      <text class="nx-network-card__line"><text class="nx-network-card__nowrap">{{ fmt(copy.g2Toward, { r: `V${next.v}` }) }}</text><template v-if="gapLine"><text class="nx-network-card__dot"> · </text><text>{{ visibility.mask(gapLine) }}</text><text v-if="moreCount > 0" class="nx-network-card__more"> {{ visibility.mask(fmt(copy.g2More, { n: moreCount })) }}</text></template></text>
+      <text v-if="perkClauses.length" class="nx-network-card__perk"><text v-for="(clause, i) in perkClauses" :key="i" class="nx-network-card__clause">{{ clause }}</text></text>
+      <view class="nx-network-card__prog">
+        <view ref="elRef" class="nx-progress" :aria-valuenow="visibility.hidden || !progressKnown ? undefined : inView === false ? 0 : pct"><view class="nx-progress__fill" :style="barStyle" /></view>
+        <text class="nx-network-card__pct">{{ visibility.mask(progressKnown ? `${pct}%` : '—') }}</text>
       </view>
-      <view style="flex: 1; min-width: 0">
-        <text class="block" style="font-family: var(--font-v5); font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight); color: var(--v5-ink)">{{ maxRankLine }}</text>
-      </view>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="m9 18 6-6-6-6" /></svg>
     </view>
-
-    <!-- In-progress state -->
-    <view v-else-if="vrank.remoteReady" class="nx-glass-card block active:opacity-90" :style="cardStyle" @click="goTeam">
-      <!-- Aspiration hero anchor(实物奖已删) -->
-      <view :style="prizeHeroStyle" :aria-label="towardLine">
-        <text style="font-size: 26px">{{ prizeHeroIcon }}</text>
-      </view>
-
-      <view style="flex: 1; min-width: 0">
-        <!-- Line 1: toward V{n} · gap -->
-        <view style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); line-height: 1.25">
-          <text>{{ towardLine }}</text>
-          <template v-if="gapLine">
-            <text style="color: var(--v5-ink-4); font-weight: 400"> · </text>
-            <text :style="{ color: gap.primaryGap ? 'var(--v5-brand-2)' : 'var(--v5-success)' }">{{ gapLine }}</text>
-            <text v-if="moreCount > 0" style="color: var(--v5-ink-4); font-weight: 400; font-size: var(--ui-type-list-subtitle)"> {{ moreCountLabel }}</text>
-          </template>
-        </view>
-
-        <!-- Line 2: perk unlocks -->
-        <text v-if="perkLine" class="block truncate" :style="perkLineStyle">{{ perkLine }}</text>
-
-        <!-- Line 3: progress bar + % -->
-        <view class="flex items-center" style="gap: 8px; margin-top: 8px">
-          <view ref="elRef" class="overflow-hidden" style="flex: 1; height: 6px; border-radius: 3px; background: var(--v5-surface-3)">
-            <view :style="barFillStyle" />
-          </view>
-          <text class="font-mono-tabular tabular-nums" :style="pctStyle">{{ gap.progressKnown ? `${pctInt}%` : '—' }}</text>
-        </view>
-      </view>
-
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="m9 18 6-6-6-6" /></svg>
-    </view>
-    <text v-else>—</text>
+    <view class="nx-network-card__chev" aria-hidden="true"><NxIcon name="chevron-right" /></view>
   </view>
 </template>
 
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
+import TeamRankEmblem from "@/components/team/team-rank-emblem.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
-import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
-import { useVRank, nextRankGap, type PrimaryGap, type PerkUnlock } from "@/store/v-rank";
+import { useDataVisibility } from "@/store/data-visibility";
+import { useVRank, nextRankGap } from "@/store/v-rank";
+import { teamRankProgress } from "@/lib/team-rank-progress";
 import { rankTitle } from "@/lib/v-rank-copy";
-import { computePointsCopy, formatComputePoints } from "@/i18n/compute-points";
+import { formatComputePoints } from "@/i18n/compute-points";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
 const vrank = useVRank();
 const locale = useLocaleStore();
+const visibility = useDataVisibility();
 const { elRef, inView } = useScrollGrowProgress();
+const copy = computed(() => t.value.myRank);
 
-const myRank = computed(() => vrank.myRank);
 const gap = computed(() => nextRankGap(vrank, vrank.ladder));
+// DESIGN 2.2: the same requirement rows as the team-page card (next rank plus unmet earlier ranks).
+// LOGIC SEAM: the shared "还差 N 项" counter (and V7→V8 「审核中」) is wired by the logic item.
+const requirements = computed(() => teamRankProgress({
+  myRank: vrank.myRank, selfComputePoints: vrank.selfComputePoints, directRefs: vrank.directRefs,
+  teamComputePoints: vrank.teamComputePoints, vDownlineCounts: vrank.vDownlineCounts,
+}, vrank.ladder));
+const next = computed(() => gap.value.next);
+const progressKnown = computed(() => gap.value.progressKnown);
+const pct = computed(() => Math.round(gap.value.progressPct * 100));
+const moreCount = computed(() => Math.max(0, requirements.value.missing.length - 1));
+const maxRankLine = computed(() => fmt(t.value.me.networkCardMaxRank, { title: rankTitle(vrank.myRank, locale.code, vrank.ladder) }));
 
-// 头衔的中英取舍收在 lib/v-rank-copy(主人 2026-08-17 拍板 V3 = 舰长;此前三处各写一份判断,
-// 中文界面出现「舰长 / 队长 / Captain」三种写法)
-const titleOf = (v: number): string => vrank.remoteReady ? rankTitle(v, locale.code, vrank.ladder) : "—";
+// First line names the hardest unmet condition (lowest share of its target).
+const gapLine = computed(() => {
+  if (!progressKnown.value) return "";
+  const worst = [...requirements.value.missing].sort((a, b) => a.current! / a.required - b.current! / b.required)[0];
+  if (!worst) return "";
+  const left = worst.required - worst.current!;
+  if (worst.kind === "vDownlines") return fmt(copy.value.g2GapLead, { n: left, r: `V${worst.vLevel}` });
+  if (worst.kind === "directRefs") return fmt(copy.value.rowInviteSub, { a: left });
+  return fmt(worst.kind === "selfComputePoints" ? copy.value.rowStoreSub : copy.value.rowTeamSub, { n: formatComputePoints(left, locale.code) });
+});
 
-// ── Max-rank end state ──(实物奖已删 → 用通用「已达成」图标作 dignity 锚点)
-const maxRankLine = computed(() => fmt(t.value.me.networkCardMaxRank, { title: titleOf(myRank.value) }));
+// LOGIC SEAM (DESIGN 12.0): `hasSalaryData` = /api/team/rank carries a `salary` field; `nextSalaryUsdt` =
+// /api/config/v-ranks ranks[next].monthlySalaryUsdt. Neither is parsed yet (v-rank-api rankRow / rank state),
+// so the card shows g2PerksNoSal until the logic item fills these two values.
+const hasSalaryData = computed<boolean>(() => false);
+const nextSalaryUsdt = computed<number | null>(() => null);
+const nextUvt = computed(() => next.value?.rewards.find(reward => reward.type === "UVT")?.amount ?? 0);
+const perkText = computed(() => {
+  const n = next.value;
+  if (!n) return "";
+  const r = `V${n.v}`, b = `${formatAmount(nextUvt.value)}\u00A0UVT`;
+  if (hasSalaryData.value && nextSalaryUsdt.value !== null && nextSalaryUsdt.value > 0)
+    return fmt(copy.value.g2Perks, { r, a: `${formatAmount(nextSalaryUsdt.value)}\u00A0USDT`, b });
+  return fmt(copy.value.g2PerksNoSal, { r, b, p: `${formatAmount(Math.round(n.directBonus * 1000) / 10)}%` });
+});
+// DESIGN 11.2-14: the line breaks only between clauses, so each clause keeps its separator and stays whole.
+const perkClauses = computed(() => perkText.value ? perkText.value.split(/(?<=[，,、；;])\s*/).map(part => part.trim()).filter(Boolean) : []);
+const ariaLabel = computed(() => [fmt(copy.value.g2Toward, { r: `V${next.value?.v ?? ""}` }), visibility.mask(gapLine.value), perkText.value].filter(Boolean).join(" · "));
 
-// ── In-progress derived values ──
-const nextV = computed(() => gap.value.next?.v ?? 0);
-const progressPct = computed(() => gap.value.progressKnown ? gap.value.progressPct : 0);
-const pctInt = computed(() => Math.round(progressPct.value * 100));
-const isHot = computed(() => progressPct.value >= 0.8);
-
-// 实物奖已删 → hero 用通用「冲刺」星标锚点(语义由 toward 行 + perk 行承载)
-const prizeHeroIcon = "★";
-
-const towardLine = computed(() =>
-  fmt(t.value.me.networkCardToward, { v: nextV.value, title: titleOf(nextV.value) }),
-);
-
-function formatPrimaryGap(g: PrimaryGap): string {
-  switch (g.kind) {
-    case "selfComputePoints":
-    case "teamComputePoints":
-      if (g.remaining === undefined) return computePointsCopy(locale.code).conditionsPending;
-      return (g.kind === "selfComputePoints" ? computePointsCopy(locale.code).needSelf : computePointsCopy(locale.code).needTeam)
-        .replace("{n}", formatComputePoints(g.remaining, locale.code));
-    case "directRefs":
-      return fmt(t.value.me.networkCardGapDirectRefs, {
-        n: g.remaining,
-        label: g.remaining === 1 ? t.value.me.networkCardInviteWord : t.value.me.networkCardInvitesWord,
-      });
-    case "vDownlines":
-      return fmt(t.value.me.networkCardGapVDownlines, {
-        n: g.remaining,
-        v: g.vLevel,
-        s: g.remaining === 1 ? "" : "s",
-      });
-  }
-}
-
-function formatPerk(u: PerkUnlock): string {
-  switch (u.kind) {
-    case "peerBonusUnlock":
-      return fmt(t.value.me.networkCardUnlockPeerBonus, { rate: Math.round(u.rate * 100) });
-    case "leadershipUnlock":
-      return t.value.me.networkCardUnlockLeadership;
-    case "cultivationJump":
-      return fmt(t.value.me.networkCardUnlockCultivation, { to: formatAmount(u.to) });
-    case "directBonusUp":
-      return fmt(t.value.me.networkCardUnlockDirectBonus, { to: Math.round(u.to * 100) });
-    case "unilevelDepthUp":
-      return fmt(t.value.me.networkCardUnlockDepth, { n: u.to - u.from });
-  }
-}
-
-const gapLine = computed(() =>
-  !gap.value.progressKnown ? computePointsCopy(locale.code).conditionsPending : gap.value.primaryGap ? formatPrimaryGap(gap.value.primaryGap) : t.value.me.networkCardServerEligible,
-);
-const moreCount = computed(() => Math.max(0, gap.value.unmetCount - 1));
-const moreCountLabel = computed(() => fmt(t.value.me.networkCardMoreCount, { n: moreCount.value }));
-const perkLine = computed(() =>
-  gap.value.topUnlocks.map(formatPerk).join(t.value.me.networkCardUnlocksJoin),
-);
-
-function goTeam() {
-  navTo("/pages/team/team");
-}
-
-// ── styles ──
-const maxCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  padding: "14px 18px",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-};
-const maxIconStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "999px",
-  background: "color-mix(in oklab, var(--v5-success) 22%, transparent)",
-  display: "grid",
-  placeItems: "center",
-  flexShrink: 0,
-};
-const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  padding: "16px 18px",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
-  display: "flex",
-  alignItems: "center",
-  gap: "14px",
-};
-const prizeHeroStyle: CSSProperties = {
-  width: "56px",
-  height: "56px",
-  borderRadius: "999px",
-  background: "color-mix(in oklab, var(--v5-success) 14%, transparent)",
-  display: "grid",
-  placeItems: "center",
-  flexShrink: 0,
-};
-const perkLineStyle: CSSProperties = {
-  marginTop: "4px",
-  fontSize: "var(--ui-type-list-subtitle)",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.3,
-  whiteSpace: "nowrap",
-};
-const barFillStyle = computed<CSSProperties>(() => ({
-  height: "100%",
-  width: `${inView.value ? pctInt.value : 0}%`,
-  background: isHot.value
-    ? "linear-gradient(90deg, var(--v5-warning) 0%, var(--v5-warning) 100%)"
-    : "linear-gradient(90deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%)",
-  transition: inView.value ? PROGRESS_GROW_TRANSITION : "none",
-  willChange: "width",
-}));
-const pctStyle = computed<CSSProperties>(() => ({
-  fontSize: "12px",
-  color: isHot.value ? "var(--v5-warning)" : "var(--v5-brand)",
-  minWidth: "30px",
-  textAlign: "right",
+const barStyle = computed<CSSProperties>(() => ({
+  width: `${inView.value === false || visibility.hidden || !progressKnown.value ? 0 : pct.value}%`,
+  transition: inView.value === false ? "none" : PROGRESS_GROW_TRANSITION,
 }));
 
-
+function goRank() { navTo("/pages/team/rank"); }
 </script>
+
+<style scoped>
+/* DESIGN G2: solid content card (01 §1.1.2), badge | copy | chevron laid out across the width (04.0). */
+.nx-network-card { display: flex; align-items: center; gap: 14px; min-width: 0; box-sizing: border-box; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); color: var(--v5-ink); cursor: pointer; }
+:global([data-theme="light"]) .nx-network-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+.nx-network-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.nx-network-card__copy { flex: 1; min-width: 0; }
+.nx-network-card__line { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.nx-network-card--top .nx-network-card__line { flex: 1; min-width: 0; }
+.nx-network-card__nowrap { white-space: nowrap; }
+.nx-network-card__dot { color: var(--v5-ink-4); }
+.nx-network-card__more { font-weight: 400; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); white-space: nowrap; }
+.nx-network-card__perk { display: block; margin-top: 4px; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.nx-network-card__clause { display: inline-block; max-width: 100%; margin-right: .25em; }
+.nx-network-card__prog { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.nx-network-card__prog .nx-progress { flex: 1; }
+.nx-network-card__pct { flex: none; font: 500 12px/16px var(--font-metric); color: var(--v5-ink-2); font-variant-numeric: tabular-nums; }
+.nx-network-card__chev { display: grid; flex: none; font-size: 16px; color: var(--v5-ink-4); }
+</style>
