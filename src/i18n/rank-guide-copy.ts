@@ -4,7 +4,7 @@ const copy = {
   zh: {
     pageTitle: '等级说明',
     headline: '你的晋级路径',
-    intro: '满足条件即可升级，等级越高，奖励越多。',
+    intro: '满足条件即可升级（V8 另需推荐信和官方审核），等级越高，奖励越多。',
     ladder: '等级一览',
     authority: '以平台最新公布的规则为准。',
     overview: '什么是等级', overviewHint: '等级由什么决定',
@@ -19,7 +19,7 @@ const copy = {
   en: {
     pageTitle: 'Rank guide',
     headline: 'Your path to the next rank',
-    intro: 'Meet the requirements to move up. Higher ranks earn more rewards.',
+    intro: 'Meet the requirements to move up (V8 also needs a recommendation from another V8 and an official review). Higher ranks earn more rewards.',
     ladder: 'Ranks at a glance',
     authority: 'The latest published rules apply.',
     overview: 'What ranks are', overviewHint: 'What decides your rank',
@@ -34,7 +34,7 @@ const copy = {
   vi: {
     pageTitle: 'Hướng dẫn hạng',
     headline: 'Lộ trình thăng hạng',
-    intro: 'Đáp ứng điều kiện để lên hạng. Hạng càng cao, thưởng càng nhiều.',
+    intro: 'Đáp ứng điều kiện để lên hạng (V8 cần thêm thư giới thiệu từ một V8 khác và xét duyệt chính thức). Hạng càng cao, thưởng càng nhiều.',
     ladder: 'Các hạng',
     authority: 'Áp dụng theo quy tắc mới nhất do nền tảng công bố.',
     overview: 'Hạng là gì', overviewHint: 'Yếu tố quyết định hạng của bạn',
@@ -49,7 +49,7 @@ const copy = {
   id: {
     pageTitle: 'Panduan peringkat',
     headline: 'Menuju peringkat berikutnya',
-    intro: 'Penuhi syaratnya untuk naik. Makin tinggi peringkat, makin banyak hadiah.',
+    intro: 'Penuhi syaratnya untuk naik (V8 juga perlu surat rekomendasi dari V8 lain dan peninjauan resmi). Makin tinggi peringkat, makin banyak hadiah.',
     ladder: 'Sekilas peringkat',
     authority: 'Mengikuti aturan terbaru yang diumumkan platform.',
     overview: 'Apa itu peringkat', overviewHint: 'Yang menentukan peringkat Anda',
@@ -64,7 +64,7 @@ const copy = {
   ms: {
     pageTitle: 'Panduan pangkat',
     headline: 'Laluan ke pangkat seterusnya',
-    intro: 'Penuhi syarat untuk naik. Pangkat lebih tinggi mendapat lebih banyak ganjaran.',
+    intro: 'Penuhi syarat untuk naik (V8 juga memerlukan surat sokongan daripada V8 lain dan semakan rasmi). Pangkat lebih tinggi mendapat lebih banyak ganjaran.',
     ladder: 'Pangkat sepintas lalu',
     authority: 'Peraturan terkini yang diterbitkan terpakai.',
     overview: 'Apa itu pangkat', overviewHint: 'Apa yang menentukan pangkat anda',
@@ -79,7 +79,7 @@ const copy = {
   fil: {
     pageTitle: 'Gabay sa rank',
     headline: 'Paano umakyat sa susunod na rank',
-    intro: 'Tugunan ang requirement para umakyat. Mas maraming reward sa mas mataas na rank.',
+    intro: 'Tugunan ang requirement para umakyat (sa V8, kailangan din ng rekomendasyon mula sa ibang V8 at opisyal na review). Mas maraming reward sa mas mataas na rank.',
     ladder: 'Mga rank sa isang tingin',
     authority: 'Ang pinakabagong inilathalang patakaran ang masusunod.',
     overview: 'Ano ang rank', overviewHint: 'Ano ang nagtatakda ng rank mo',
@@ -94,7 +94,7 @@ const copy = {
   ru: {
     pageTitle: 'О рангах',
     headline: 'Ваш путь к следующему рангу',
-    intro: 'Выполните условия для повышения ранга. На высоких рангах доступны более крупные награды.',
+    intro: 'Выполните условия для повышения ранга (для V8 также нужны рекомендация от другого V8 и официальная проверка). На высоких рангах доступны более крупные награды.',
     ladder: 'Ранги кратко',
     authority: 'Действуют последние опубликованные правила.',
     overview: 'Что такое ранги', overviewHint: 'От чего зависит ранг',
@@ -109,7 +109,7 @@ const copy = {
   kk: {
     pageTitle: 'Дәреже нұсқаулығы',
     headline: 'Келесі дәрежеге жолыңыз',
-    intro: 'Талаптарды орындап, дәрежеңізді көтеріңіз. Дәреже жоғары болса, сыйақы көп.',
+    intro: 'Талаптарды орындап, дәрежеңізді көтеріңіз (V8 үшін басқа V8 мүшесінің ұсыным хаты мен ресми тексеру де қажет). Дәреже жоғары болса, сыйақы көп.',
     ladder: 'Дәрежелерге шолу',
     authority: 'Соңғы жарияланған ережелер қолданылады.',
     overview: 'Дәреже деген не', overviewHint: 'Дәрежеңізді не анықтайды',
@@ -124,7 +124,7 @@ const copy = {
   uz: {
     pageTitle: 'Darajalar haqida',
     headline: 'Keyingi darajaga yoʻlingiz',
-    intro: 'Shartlarni bajarib, darajangizni oshiring. Yuqori darajalarda mukofot koʻproq.',
+    intro: 'Shartlarni bajarib, darajangizni oshiring (V8 uchun boshqa V8 tavsiyanomasi va rasmiy tekshiruv ham kerak). Yuqori darajalarda mukofot koʻproq.',
     ladder: 'Darajalar qisqacha',
     authority: 'Platformaning soʻnggi eʼlon qilingan qoidalari amal qiladi.',
     overview: 'Daraja nima', overviewHint: 'Darajangizni nima belgilaydi',

@@ -157,7 +157,7 @@ const openTip = sharedRef<number | null>(null);
 .nx-hint-tip__line + .nx-hint-tip__line { margin-top: 4px; }
 .nx-hint-tip__catcher { position: fixed; inset: 0; z-index: 9499; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .nx-hint-tip__bubble { -webkit-backdrop-filter: none; backdrop-filter: none; background: #26272c; }
+  .nx-hint-tip__bubble { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--v5-toast-solid); }
 }
 @media (forced-colors: active) {
   .nx-hint-tip__bubble { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }

@@ -1,5 +1,5 @@
 <template>
-  <NativeSvg class="nx-icon" :width="dimension" :height="dimension" viewBox="0 0 24 24" :fill="shape.fill ? 'currentColor' : 'none'" :stroke="shape.fill ? 'none' : 'currentColor'" :stroke-width="shape.stroke ?? 2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  <NativeSvg class="nx-icon" :width="dimension" :height="dimension" viewBox="0 0 24 24" :fill="shape.fill ? 'currentColor' : 'none'" :stroke="shape.fill ? 'none' : 'currentColor'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
     <path v-for="d in shape.d" :key="d" :d="d" />
   </NativeSvg>
 </template>
@@ -36,19 +36,23 @@ const ICONS = {
   send: { d: ["M20.5 3.5 10.6 13.4", "M20.5 3.5 14.3 20.5l-3.7-7.1-7.1-3.7z"] },
   bag: { d: ["M5.2 8h13.6l-1.1 11.1a2 2 0 0 1-2 1.9H8.3a2 2 0 0 1-2-1.9z", "M9 10.5V7a3 3 0 0 1 6 0v3.5"] },
   gift: { d: ["M4.5 11.5h15V19a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z", "M3.5 7.5h17v4h-17z", "M12 7.5V21", "M12 7.5C10.8 4.6 8.9 3.4 7.6 3.9c-1.5.6-.9 3.6 4.4 3.6z", "M12 7.5c1.2-2.9 3.1-4.1 4.4-3.6 1.5.6.9 3.6-4.4 3.6z"] },
-  // 提示气泡的图标（03 §3.5.1）：中性说明 i、警示感叹号；线宽 1.9 同画板。
-  "hint-info": { d: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z", "M12 11v5.5", "M12.6 7.6a.6.6 0 1 1-1.2 0 .6.6 0 0 1 1.2 0z"], stroke: 1.9 },
-  "hint-warn": { d: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z", "M12 7v6", "M12.6 16.6a.6.6 0 1 1-1.2 0 .6.6 0 0 1 1.2 0z"], stroke: 1.9 },
-  // 我的等级权益和条件的图形（team-rank DESIGN 第 9 节 glyph-*.svg，线宽 1.8 同原图），由 NxIconTile 着色。
-  "rank-rate-l1": { d: ["M12.2 8a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0z", "M3.5 19c.6-3 2.8-4.8 5.5-4.8 1.3 0 2.4.4 3.3 1", "m15.5 19.5 5-7.5", "M17.3 13a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z", "M21.3 18.6a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z"], stroke: 1.8 },
-  "rank-rate-l2": { d: ["M10.1 9a2.6 2.6 0 1 1-5.2 0 2.6 2.6 0 0 1 5.2 0z", "M3 18.5c.5-2.6 2.2-4 4.5-4", "M15.1 6.5a2.6 2.6 0 1 1-5.2 0 2.6 2.6 0 0 1 5.2 0z", "M9 14.2c.9-1.4 2.1-2.2 3.5-2.2", "m15.5 19.5 5-7.5", "M17.3 13a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z", "M21.3 18.6a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z"], stroke: 1.8 },
-  "rank-uvt": { d: ["m12 3 8 4.5v9L12 21l-8-4.5v-9z", "M9 8.5v4a3 3 0 0 0 6 0v-4"], stroke: 1.8 },
-  "rank-salary": { d: ["M6.5 5h11a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z", "M3.5 10h17M8 3v4M16 3v4", "M14 15a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"], stroke: 1.8 },
-  "rank-letter": { d: ["M5.5 5.5h13A2.5 2.5 0 0 1 21 8v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16V8a2.5 2.5 0 0 1 2.5-2.5z", "m4 7 8 6 8-6"], stroke: 1.8 },
-  "rank-review": { d: ["M12 3 5 6v5.5c0 4.2 2.9 7.8 7 9.5 4.1-1.7 7-5.3 7-9.5V6z", "m8.8 12.2 2.3 2.3 4.3-4.6"], stroke: 1.8 },
-} as const satisfies Record<string, { d: readonly string[]; fill?: boolean; stroke?: number }>;
+  // 提示气泡的图标（03 §3.5.1）：中性说明 i、警示感叹号。
+  "hint-info": { d: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z", "M12 11v5.5", "M12.6 7.6a.6.6 0 1 1-1.2 0 .6.6 0 0 1 1.2 0z"] },
+  "hint-warn": { d: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z", "M12 7v6", "M12.6 16.6a.6.6 0 1 1-1.2 0 .6.6 0 0 1 1.2 0z"] },
+  // 「加快晋级」行：邀请好友、查看好友等级、团队算力明细。
+  "user-plus": { d: ["M12.5 8a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0z", "M2.5 20a6.5 6.5 0 0 1 13 0", "M19 8v6", "M16 11h6"] },
+  users: { d: ["M12.2 8a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0z", "M3.5 19c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8", "M15.5 5.2a3.2 3.2 0 0 1 0 5.6", "M17.5 14.6c1.6.6 2.7 2.2 3 4.4"] },
+  "bar-chart": { d: ["M4 19V9", "M10 19V5", "M16 19v-7", "M22 19H2"] },
+  // 我的等级权益和条件的图形（team-rank DESIGN 第 9 节 glyph-*.svg），由 NxIconTile 着色；线宽和其他图标一样是 2（01 §1.3 线宽一致）。
+  "rank-rate-l1": { d: ["M12.2 8a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0z", "M3.5 19c.6-3 2.8-4.8 5.5-4.8 1.3 0 2.4.4 3.3 1", "m15.5 19.5 5-7.5", "M17.3 13a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z", "M21.3 18.6a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z"] },
+  "rank-rate-l2": { d: ["M10.1 9a2.6 2.6 0 1 1-5.2 0 2.6 2.6 0 0 1 5.2 0z", "M3 18.5c.5-2.6 2.2-4 4.5-4", "M15.1 6.5a2.6 2.6 0 1 1-5.2 0 2.6 2.6 0 0 1 5.2 0z", "M9 14.2c.9-1.4 2.1-2.2 3.5-2.2", "m15.5 19.5 5-7.5", "M17.3 13a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z", "M21.3 18.6a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0z"] },
+  "rank-uvt": { d: ["m12 3 8 4.5v9L12 21l-8-4.5v-9z", "M9 8.5v4a3 3 0 0 0 6 0v-4"] },
+  "rank-salary": { d: ["M6.5 5h11a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z", "M3.5 10h17M8 3v4M16 3v4", "M14 15a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"] },
+  "rank-letter": { d: ["M5.5 5.5h13A2.5 2.5 0 0 1 21 8v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16V8a2.5 2.5 0 0 1 2.5-2.5z", "m4 7 8 6 8-6"] },
+  "rank-review": { d: ["M12 3 5 6v5.5c0 4.2 2.9 7.8 7 9.5 4.1-1.7 7-5.3 7-9.5V6z", "m8.8 12.2 2.3 2.3 4.3-4.6"] },
+} as const satisfies Record<string, { d: readonly string[]; fill?: boolean }>;
 export type NxIconName = keyof typeof ICONS;
 const props = defineProps<{ name: NxIconName; size?: number }>();
-const shape = computed<{ d: readonly string[]; fill?: boolean; stroke?: number }>(() => ICONS[props.name]);
+const shape = computed<{ d: readonly string[]; fill?: boolean }>(() => ICONS[props.name]);
 const dimension = computed(() => props.size ? String(props.size) : "1em");
 </script>
