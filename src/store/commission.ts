@@ -31,6 +31,7 @@ export type CommissionKind =
   | "leadership"
   | "genesis"
   | "promotion"
+  | "vrank_salary"
   | "other";
 
 export type CommissionStatus = "waiting_calculation" | "cooling" | "unlocked" | "withdrawn" | "frozen" | "reversed" | "rejected" | "recovery_pending" | "simulated";
@@ -40,7 +41,7 @@ export interface CommissionEvent {
   kind: CommissionKind;
   sourceUserId?: string;
   sourceUserName: string;
-  layer?: number;             // 仅 unilevel
+  layer?: number;
   orderId?: string;
   orderAmountUSD?: number;
   sourceRef?: string;
@@ -540,10 +541,10 @@ export const useCommission = defineStore("commission", () => {
   }
 
   function byKind(): Record<CommissionKind, { usdt: number; nex: number; count: number }> {
-    const kinds: CommissionKind[] = ["direct_purchase", "direct_device_earning", "unilevel", "binary", "peer", "cultivation", "leadership", "genesis", "promotion", "other"];
+    const kinds: CommissionKind[] = ["direct_purchase", "direct_device_earning", "unilevel", "binary", "peer", "cultivation", "leadership", "genesis", "promotion", "vrank_salary", "other"];
     const out = {} as Record<CommissionKind, { usdt: number; nex: number; count: number }>;
     for (const k of kinds) out[k] = { usdt: 0, nex: 0, count: 0 };
-    if (remoteApiEnabled) return eventsEvidence.value?.aggregate.byKind ?? out;
+    if (remoteApiEnabled) return { ...out, ...eventsEvidence.value?.aggregate.byKind };
     for (const e of events.value) {
       out[e.kind].usdt += e.amountUSDT;
       out[e.kind].nex += e.amountNEX;

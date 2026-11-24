@@ -31,7 +31,7 @@
                   <view class="nx-unilevel-icon" :class="`nx-unilevel-icon--${filter}`" aria-hidden="true"><svg v-if="filter === 'device_earning'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></view>
                   <view class="nx-unilevel-record-copy">
                     <view class="nx-unilevel-member-line"><text class="nx-unilevel-member">{{ event.sourceUserName }}</text><template v-if="event.status !== 'unlocked' || ('statusUSDT' in event && event.statusUSDT !== event.statusNEX)"><NxTag v-for="tag in statusTags(event)" :key="tag.key" wrap :tone="tag.tone">{{ tag.text }}</NxTag></template></view>
-                    <text class="nx-unilevel-source-label">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : filter === 'direct' ? t.directReferral.purchase : t.directReferral.networkPurchase }} · {{ recordTime(event.ts) }}</text>
+                    <text class="nx-unilevel-source-label">{{ recordSource(event) }} · {{ recordTime(event.ts) }}</text>
                   </view>
                   <view class="nx-unilevel-record-amounts">
                     <text class="nx-direct-amount nx-unilevel-currency-row">{{ visibility.mask((event.amountUSDT > 0 ? '+' : '') + '$' + formatAmount(event.amountUSDT)) }}</text>
@@ -228,6 +228,11 @@ function amount(value: number | null | undefined) { return visibility.mask(forma
 const totalAmountParts = computed(() => amount(remoteTotalUSDT.value).split('.'));
 function wideAmount(value: number) { return amount(value).length > 12; }
 function recordTime(ts: number) { return ts > 0 ? new Date(ts).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }) : logicCopy.value.dateUnavailable; }
+function recordSource(event: DirectReferralEvent | TeamUnilevelEvent) {
+  const copy = t.value.directReferral;
+  if (filter.value === 'device_earning') return event.layer === 2 ? copy.friendOfFriend : copy.deviceEarning;
+  return filter.value === 'direct' ? copy.purchase : copy.networkPurchase;
+}
 // One tag per status, so each carries its own colour (03 §3.8); USDT and UVT get a tag each when they differ.
 function statusTags(event: DirectReferralEvent | TeamUnilevelEvent) {
   const { statusUSDT, statusNEX } = event as TeamUnilevelEvent;

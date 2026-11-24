@@ -69,7 +69,7 @@
           </view>
         </view>
 
-        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text class="commission-filter-summary__value">${{ visibility.mask(formatAmount(byKind[filter].usdt)) }} · {{ visibility.mask(formatAmount(byKind[filter].nex)) }} UVT</text></view>
+        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text class="commission-filter-summary__value">${{ visibility.mask(formatAmount(byKind[filter]?.usdt)) }} · {{ visibility.mask(formatAmount(byKind[filter]?.nex)) }} UVT</text></view>
 
         <EmptyState v-if="filtered.length === 0 && !hasMoreEvents" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
         <view v-if="filtered.length > 0" class="commission-days">
@@ -191,15 +191,19 @@ type Filter = "all" | CommissionKind;
 const filter = ref<Filter>("all");
 const filterOpen = ref(false);
 const filterCopy = computed(() => commissionFilterCopy(locale.code));
-const selectedFilterLabel = computed(() => filter.value === 'all' ? filterCopy.value.all : filterCopy.value.kinds[filter.value]);
+const selectedFilterLabel = computed(() => filter.value === 'all' ? filterCopy.value.all : kindFilterLabel(filter.value));
 function selectFilter(value: Filter) { filter.value = value; filterOpen.value = false; }
+function kindFilterLabel(kind: CommissionKind) {
+  return kind === 'vrank_salary' ? t.value.commissions.kind.vrank_salary : filterCopy.value.kinds[kind];
+}
 
-const KIND_ORDER: CommissionKind[] = ["direct_purchase", "direct_device_earning", "unilevel", "binary", "peer", "cultivation", "leadership", "genesis", "promotion", "other"];
+const KIND_ORDER: CommissionKind[] = ["direct_purchase", "direct_device_earning", "unilevel", "binary", "peer", "cultivation", "leadership", "genesis", "promotion", "vrank_salary", "other"];
 
 interface KindSpec {
   color: string;
   paths: string[];
 }
+const GENERIC_REWARD_ICON: KindSpec = { color: "var(--v5-ink-2)", paths: ["M4 4h16v16H4z", "M8 12h8"] };
 const KIND: Record<CommissionKind, KindSpec> = {
   direct_purchase: { color: "var(--v5-brand)", paths: ["M3 3h2l3 12h11l2-8H6", "M9 20h.01M18 20h.01"] },
   direct_device_earning: { color: "var(--v5-nex)", paths: ["M4 3h16v14H4z", "M8 21h8M12 17v4"] },
@@ -209,7 +213,8 @@ const KIND: Record<CommissionKind, KindSpec> = {
   cultivation: { color: "var(--v5-brand)", paths: ["M7 20h10", "M10 20c5.5-2.5.8-6.4 3-10", "M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z", "M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"] },
   leadership: { color: "var(--v5-nex)", paths: ["m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14"] },
   promotion: { color: "var(--v5-brand-2)", paths: ["M12 3v18M5 10l7-7 7 7"] },
-  other: { color: "var(--v5-ink-2)", paths: ["M4 4h16v16H4z", "M8 12h8"] },
+  vrank_salary: GENERIC_REWARD_ICON,
+  other: GENERIC_REWARD_ICON,
   genesis: { color: "var(--v5-warning)", paths: ["M6 3h12l4 6-10 13L2 9z", "M11 3 8 9l4 13 4-13-3-6", "M2 9h20"] },
 };
 
@@ -358,7 +363,8 @@ function go(url: string) {
 // Reward summary cards double as filter controls: name them with the kind label
 // + current amount/count so a screen reader hears what the tile selects.
 function kindCardLabel(k: CommissionKind): string {
-  return `${t.value.commissions.kind[k]} · ${visibility.mask(formatAmount(byKind.value[k].usdt))} · ${visibility.mask(byKind.value[k].count)} ${t.value.commissions.events}`;
+  const bucket = byKind.value[k];
+  return `${t.value.commissions.kind[k]} · ${visibility.mask(formatAmount(bucket?.usdt))} · ${visibility.mask(bucket?.count ?? '—')} ${t.value.commissions.events}`;
 }
 
 function activateLoadMore(event: KeyboardEvent) {
@@ -396,7 +402,8 @@ const eventMetaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3
 
 const filterOptions = computed(() => [
   { value: "all" as Filter, label: filterCopy.value.all, fullLabel: t.value.commissions.all, count: remoteApiEnabled ? ledger.value?.totalRows : commission.events.length },
-  ...KIND_ORDER.map(value => ({ value, label: filterCopy.value.kinds[value], fullLabel: t.value.commissions.kind[value], count: byKind.value[value].count })),
+  ...KIND_ORDER.filter(value => value !== 'vrank_salary' || (remoteApiEnabled ? ledger.value?.aggregate.byKind.vrank_salary !== undefined : (byKind.value.vrank_salary?.count ?? 0) > 0))
+    .map(value => ({ value, label: kindFilterLabel(value), fullLabel: t.value.commissions.kind[value], count: byKind.value[value]?.count })),
 ]);
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
 </script>
