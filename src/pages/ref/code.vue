@@ -324,10 +324,10 @@ function goTerms() {
   font-family: var(--font-v5);
   text-align: left;
 }
-:global(:root[data-theme="light"]) .rf {
+:global(:root[data-theme="light"] .rf) {
   --rf-tk-line: color-mix(in srgb, var(--v5-ink) 20%, transparent);
   --rf-glass: linear-gradient(140deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.36) 46%, rgba(255, 255, 255, 0.52));
-  --rf-glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.6), inset 0 -18px 30px -22px rgba(73, 94, 125, 0.2);
+  --rf-glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.6), inset 0 -18px 30px -22px color-mix(in srgb, var(--v5-ink-3) 24%, transparent);
   --rf-grain: 0.24;
   --rf-a1: color-mix(in srgb, var(--v5-brand) 42%, transparent);
   --rf-a3: color-mix(in srgb, var(--v5-nex) 42%, transparent);
