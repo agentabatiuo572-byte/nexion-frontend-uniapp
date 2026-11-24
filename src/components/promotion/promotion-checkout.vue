@@ -929,7 +929,8 @@ function canConfirmLeave():boolean{
     &&original.orderNo!==props.externalOrderNo&&!pendingOrderPayment(account,original.orderNo)&&current()&&visible.value&&!writeBusy.value
     &&!paymentConfirming.value&&!paymentEntryChecking.value&&!leaving.value;
 }
-async function requestLeave(explicitCancel=false):Promise<boolean>{
+async function requestLeave(intent:'back'|'route'|'cancel'):Promise<boolean>{
+  const explicitCancel=intent==='cancel';
   if(nativeBackApproved||paymentLeaveApproved)return true;
   if(order.value?.paymentStatus==='PAID')return current()&&visible.value;
   // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
@@ -937,6 +938,10 @@ async function requestLeave(explicitCancel=false):Promise<boolean>{
   if((pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)
     ||(order.value&&(order.value.orderNo===props.externalOrderNo||pendingOrderPayment(account,order.value.orderNo))))return !explicitCancel&&!writeBusy.value&&!paymentConfirming.value;
   if(!current()||!visible.value||writeBusy.value||paymentConfirming.value||paymentEntryChecking.value||leaving.value)return false;
+  if(!explicitCancel&&!pending&&session.record.order?.paymentStatus==='PENDING'){
+    // A browser navigation already in the route guard keeps the order. A page back can wait for D1.
+    return intent==='route';
+  }
   if(!session.record.order&&!session.record.pending)return true;
   leaving.value=true;paymentSheetOpen.value=false;
   try{
@@ -964,14 +969,14 @@ function routeLeavesPurchase(path:string):boolean{
   return /\/(?:pages\/)?store(?:\/store|\/detail|\/bundle)?(?:\?|$)/.test(path);
 }
 // #ifdef H5
-onBeforeRouteLeave(to=>routeLeavesPurchase(to.path)?requestLeave():allowAuxiliaryNavigation());
+onBeforeRouteLeave(to=>routeLeavesPurchase(to.path)?requestLeave('route'):allowAuxiliaryNavigation());
 // #endif
 let nativeBackApproved=false;
 function approveBack(){nativeBackApproved=true;}
-function cancelForLeave(){return canConfirmLeave()?requestLeave(true):Promise.resolve(false);}
+function cancelForLeave(){return canConfirmLeave()?requestLeave('cancel'):Promise.resolve(false);}
 function back():boolean{
   if(nativeBackApproved){nativeBackApproved=false;return false;}
-  void requestLeave().then(ok=>{if(ok&&current()){nativeBackApproved=true;navBack('/store');}});
+  void requestLeave('back').then(ok=>{if(ok&&current()){nativeBackApproved=true;navBack('/store');}});
   return true;
 }
 let foregroundPaymentSignature:string|undefined;

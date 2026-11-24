@@ -282,8 +282,8 @@
       <NxNoticeDialog :open="cancelBlockedOpen" icon="clock" :title="t.orders.cancelBlockedTitle" :body="t.orders.cancelBlockedBody"
         :primary="t.orders.paymentInProgressContinue" :secondary="t.orders.cancelBlockedOk" @primary="resumeBlockedPayment" @secondary="cancelBlockedOpen = false" />
     </template>
-    <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout(leaveCancelNeedsReadback)" /></view></NxSheet>
-    <NxSheet :open="paymentBlocked !== ''" :title="flowCopy.cannotPay" @close="!checkoutLeaving && (paymentBlocked = '')"><view class="checkout-exit-error"><text>{{ paymentBlocked }}</text><NxButton :label="flowCopy.cancelOrder" :busy="checkoutLeaving" @click="cancelCheckout()" /></view></NxSheet>
+    <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout(checkoutLeaveRetry)" /></view></NxSheet>
+    <NxSheet :open="paymentBlocked !== ''" :title="flowCopy.cannotPay" @close="!checkoutLeaving && (paymentBlocked = '')"><view class="checkout-exit-error"><text>{{ paymentBlocked }}</text><NxButton :label="flowCopy.cancelOrder" :busy="checkoutLeaving" @click="cancelCheckout('cancel')" /></view></NxSheet>
   </AppChassis>
 </template>
 
@@ -419,7 +419,8 @@ const leaveKeepOpen = ref(false);
 const cancelBlockedOpen = ref(false);
 const cancelBlockedPayment = shallowRef<{ orderNo: string; summary: string } | null>(null);
 let checkoutBackApproved = false;
-let leaveCancelNeedsReadback = false;
+type CheckoutLeaveIntent = 'back' | 'cancel' | 'confirmed-leave';
+let checkoutLeaveRetry: CheckoutLeaveIntent = 'cancel';
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
@@ -2234,7 +2235,7 @@ async function leaveKeepCancel() {
   if (promotionRoute.value) {
     if (await promotionCheckout.value?.cancelForLeave()) leaveCheckout();
   } else {
-    await cancelCheckout(true);
+    await cancelCheckout('confirmed-leave');
   }
 }
 
@@ -2244,7 +2245,7 @@ function requestCheckoutBack() {
   if (leaveKeepOpen.value) { leaveKeepBack(); return; }
   if (canConfirmCheckoutLeave()) { leaveKeepOpen.value = true; return; }
   if (promotionRoute.value) { promotionCheckout.value?.back(); return; }
-  void cancelCheckout();
+  void cancelCheckout('back');
 }
 async function retryOriginalCheckout() {
   if (serverOrderRecovery.value || checkoutLeaving.value) return;
@@ -2278,7 +2279,8 @@ async function retryOriginalCheckout() {
     }
   }
 }
-async function cancelCheckout(explicitLeave = false) {
+async function cancelCheckout(intent: CheckoutLeaveIntent) {
+  const explicitLeave = intent === 'confirmed-leave';
   if (checkoutLeaving.value || paymentFlowBusy.value || confirming) return;
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value) {
@@ -2299,6 +2301,8 @@ async function cancelCheckout(explicitLeave = false) {
       leaveCheckout();
       return;
     }
+    // Only an existing command needs reconciliation on back. A fresh cancellation needs an explicit choice.
+    if (intent === 'back' && !action && !pendingCheckoutCreate.value && created.paymentStatus === 'PENDING') return;
     if (explicitLeave && action?.kind === 'pay') return;
     let unseenPaymentKey: string | null = null;
     if (action?.kind === 'pay') {
@@ -2356,7 +2360,7 @@ async function cancelCheckout(explicitLeave = false) {
     leaveCheckout();
   } catch {
     leaveError = t.value.orders.resultReadback;
-    leaveCancelNeedsReadback = explicitLeave;
+    checkoutLeaveRetry = intent;
   } finally {
     // Hiding invalidates route writes, but must still release this attempt's UI.
     if (attempt === checkoutLeaveAttempt) {
