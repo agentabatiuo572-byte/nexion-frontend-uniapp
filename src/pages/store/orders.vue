@@ -16,10 +16,17 @@
         <text :style="{ color: 'var(--v5-ink-3)', fontSize: '12px', lineHeight: '1.5' }">{{ t.store.catalogLoadingTitle }}</text>
       </view>
 
-      <view v-if="orderPanels.showSourceOutage && !orderList.length" class="mx-4 rounded-2xl" :style="remoteErrorStyle"><text style="color:var(--v5-ink-3)">—</text></view>
+      <view v-if="orderPanels.showSourceOutage && !orderList.length && !wholeOrdersPageUnavailable" class="mx-4 rounded-2xl" :style="remoteErrorStyle"><text style="color:var(--v5-ink-3)">—</text></view>
 
       <!-- An empty claim requires every order source to have loaded successfully. -->
-      <EmptyState v-if="orderPanels.mainPresentation === 'empty' && !paymentCards.length && !hasMoreOrders" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
+      <EmptyState
+        v-if="wholeOrdersPageUnavailable || orderPanels.mainPresentation === 'empty' && !paymentCards.length && !hasMoreOrders"
+        :kind="wholeOrdersPageUnavailable ? 'recoverable-error' : 'empty-list'" :page="wholeOrdersPageUnavailable"
+        :title="wholeOrdersPageUnavailable ? t.orders.refreshFailed : t.empty.ordersTitle"
+        :desc="wholeOrdersPageUnavailable ? undefined : t.empty.ordersDesc"
+        :cta-label="wholeOrdersPageUnavailable ? t.ui.reload : t.empty.ordersCta"
+        @cta="wholeOrdersPageUnavailable ? retryOrders() : goStore()"
+      />
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
@@ -324,6 +331,8 @@ const orderPanels = computed(() => orderListPanels({
   availability: remoteOrderAvailability.value,
   orderCount: orderList.value.length,
 }));
+const wholeOrdersPageUnavailable = computed(() => orderPanels.value.mainPresentation === "unavailable"
+  && !orderList.value.length && !paymentCards.value.length && !hasMoreOrders.value);
 const ordersReadFailed = ref(false);
 let refreshEpoch = 0;
 const ordersPageActive = ref(true);
@@ -393,7 +402,7 @@ async function refreshOrders() {
     entrySeen.record("orders", latestMeOrders(shownPage.visible), seenRead.scope, true);
   }
 }
-useAutoRecovery({
+const { retry: retryOrders } = useAutoRecovery({
   failed: () => remoteApiEnabled && !remoteOrdersRefreshing.value && (ordersReadFailed.value || orders.failedOrderReadbacks.size > 0),
   retry: () => ordersReadFailed.value ? refreshOrders() : orders.retryOrderReadbacks(() => ordersPageActive.value && foregroundReadAllowed()),
 });

@@ -31,7 +31,7 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
 export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
-  intentNo?: string; lookupOnly?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
+  intentNo?: string; lookupOnly?: boolean; resumedOnThisDevice?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
   orderDeadlineAt?: number; hiddenOrder?: { sku: string; imageUrl?: string; total: Order['total'] };
   lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
@@ -101,6 +101,7 @@ function save(pending: PendingExternal, accountKey = state.accountKey) {
   const value = rows(accountKey);
   const previous = value.records[pending.commandKey];
   const record = { ...pending, startedAt: previous?.startedAt ?? pending.startedAt,
+    resumedOnThisDevice: pending.resumedOnThisDevice ?? previous?.resumedOnThisDevice,
     orderDeadlineAt: pending.orderDeadlineAt ?? previous?.orderDeadlineAt,
     hiddenOrder: pending.hiddenOrder ?? previous?.hiddenOrder };
   if (!writeAccountRow(TABLE, accountKey, { records: { ...value.records, [pending.commandKey]: record } })) throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
@@ -188,7 +189,8 @@ function pendingPayments() {
   try {
     const records = displayRecords();
     state.pendingReadError = false;
-    return records.filter(row => row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+    return records.filter(row => !isOrderPaymentDiscoveryOnly(row) && row.lastStatus !== 'EXPIRED'
+      && !(row.lastStatus === 'DELIVERED' && row.validated));
   } catch {
     state.pendingReadError = true;
     return [];
@@ -300,6 +302,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   const known = { ...pending, paymentMethod: intent.paymentMethod, network: intent.network,
     orderDeadlineAt: pending.kind === 'ORDER_PAY' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined,
     intentNo: intent.intentNo, lastStatus: intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
+  if (isOrderPaymentDiscoveryOnly(pending)) known.resumedOnThisDevice = true;
   delete known.quotaRefusal;
   if (known.businessDelivered) {
     const payload = JSON.parse(known.fingerprint)[1] as Record<string, unknown>;
@@ -941,10 +944,14 @@ export function isUnfinishedPurchaseRecord(row: PendingExternal): boolean {
     && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'DELIVERED';
 }
 
-/** Read-only ORDER_PAY discovery belongs to order detail. Non-order intents
- * with an original number can also be recovered explicitly from checkout. */
+function isOrderPaymentDiscoveryOnly(row: PendingExternal): boolean {
+  return row.kind === 'ORDER_PAY' && !!row.lookupOnly && row.startedAt === undefined && row.resumedOnThisDevice !== true;
+}
+
+/** A discovered order payment belongs to order detail until it is opened here. */
 export function isOrdersPurchaseRecord(row: PendingExternal): boolean {
-  return !row.lookupOnly || row.startedAt !== undefined || row.kind !== 'ORDER_PAY' && !!row.intentNo;
+  if (row.kind === 'ORDER_PAY') return !isOrderPaymentDiscoveryOnly(row);
+  return !row.lookupOnly || row.startedAt !== undefined || !!row.intentNo;
 }
 
 export function orderPaymentDeadline(row: PendingExternal, order?: Pick<Order, 'expiresAt' | 'placedAt'>): number | undefined {
@@ -975,7 +982,7 @@ export function hasUnfinishedOrderPayment(accountKey: string, orderNo: string): 
   state.revision;
   try {
     const expired = unsavedExpiries.get(accountKey);
-    return Object.values(rows(accountKey).records).some(row => row.kind === 'ORDER_PAY'
+    return Object.values(rows(accountKey).records).some(row => row.kind === 'ORDER_PAY' && !isOrderPaymentDiscoveryOnly(row)
       && isUnfinishedPurchaseRecord(row) && expired?.get(row.commandKey) !== row.kind
       && purchaseRecordPayload(row).orderNo === orderNo);
   } catch {
