@@ -92,7 +92,8 @@
           <text class="block">{{ orderAction?.kind==='cancel' ? recoveryCopy.cancelPending : recoveryCopy.paymentPending }}</text>
           <view class="flex flex-wrap gap-2 mt-3">
             <NxButton v-if="orderAction?.kind==='cancel'" variant="secondary" size="small" :label="recoveryCopy.retryCancel" :disabled="orderCommandQuerying || cancellingOrder" @click="recoverOrderAction(true)" />
-            <NxButton v-if="orderAction?.kind==='pay' && resumePaymentAllowed && canPayFromWallet" size="small" :label="recoveryCopy.resume" :disabled="orderCommandQuerying || payingFromWallet" @click="handleWalletPayment" />
+            <!-- // LOGIC: The tray now handles this same-key recovery. The visual pass can remove this button and keep the status text. -->
+            <NxButton v-if="canResumeWalletPayment" size="small" :label="recoveryCopy.resume" :disabled="orderCommandQuerying || payingFromWallet" @click="handleWalletPayment" />
           </view>
         </view>
 
@@ -165,7 +166,7 @@
         <template v-if="pendingOrderActionsVisible">
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel nx-reverse-action" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
           <!-- One verb for paying an open order on every surface (结算页, 外付中, 钱包待付): 继续付款; the name also says the amount. -->
-          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
+          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment(false, 'tray')"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="buyAgainLabel" @click="goStore" />
@@ -680,6 +681,8 @@ const canPayFromWallet = computed(() => remoteApiEnabled
   // An external payment already underway resumes its own intent; it never debits the wallet again.
   && (!orderAction.value || (orderAction.value.kind==='pay'&&(resumePaymentAllowed.value||externalPayment.value)))
   && !walletRefreshing.value && !paymentExpired.value);
+const canResumeWalletPayment = computed(() => orderAction.value?.kind === 'pay' && resumePaymentAllowed.value
+  && canPayFromWallet.value && !externalPayment.value && !refusedPayment.value);
 const isProvisioning = computed(() => order.value?.status === "provisioning");
 // Orders that closed without completing; their close reason is shown when the backend sent one.
 const CLOSED_STATUSES: OrderStatus[] = ['cancelled', 'expired', 'payment_failed', 'provisioning_failed', 'chargeback'];
@@ -932,12 +935,16 @@ async function offerWalletTopup(requiredUsdt: number): Promise<void> {
 }
 
 /** Re-read the original order and its eligibility before the payment sheet opens; the server rechecks everything at pay. */
-async function requestPendingPayment(originalJustRead = false): Promise<void> {
+async function requestPendingPayment(originalJustRead = false, source?: 'tray'): Promise<void> {
   // A background read of the original command must not swallow this tap.
   if (orderCommandReading.value) await new Promise<void>(resolve => {
     const stop = watch(orderCommandReading, reading => { if (!reading) { stop(); resolve(); } });
   });
   if (!remoteApiEnabled || !detailVisible || pendingPaymentChecking.value || payingFromWallet.value || cancellingOrder.value || orderCommandQuerying.value || orderCommandReading.value) return;
+  if (source === 'tray' && canResumeWalletPayment.value) {
+    await handleWalletPayment();
+    return;
+  }
   const scope = captureDetailScope();
   if (originalJustRead && pendingPaymentIntentAccount && pendingPaymentIntentAccount !== scope.accountScope.accountKey) {
     autoPayRequested.value = false;
