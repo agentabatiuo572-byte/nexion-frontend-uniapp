@@ -42,6 +42,7 @@ type EligibilityRetry = 'rejectEligibilityUnavailable';
 export type PurchaseNotice = '' | 'keepOrder' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'refunded' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'originalUnavailable' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | 'rejectCapacityPurchaseRetired' | DefinitePaymentNotice;
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
+const REVIEW_POLL_MS = 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
 // Another payment for this purchase is still open, perhaps from another device: say so rather than asking to review the order.
 const ORDER_REFUSALS: Record<string, PurchaseNotice> = { ORDER_PAYMENT_EXPIRED: 'orderExpired', ORDER_NOT_PAYABLE: 'orderClosed', ORDER_NOT_FOUND: 'orderMissing', PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED: 'existing' };
@@ -302,7 +303,11 @@ export async function readCheckoutCapacityPayment(accountKey: string, kind: 'CAP
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
 }
-/** The outcome an intent has reached that ends the payment here; a failed bank attempt reports EXPIRED with its own reason. */
+function paymentReadFinished() {
+  const intent = state.intent;
+  return state.concluded || intent?.status === 'EXPIRED' || intent?.status === 'DELIVERED' || intent?.refundStatus === 'REFUNDED';
+}
+/** The outcome shown on the payment page; a failed bank attempt reports EXPIRED with its own reason. */
 export function purchaseConclusion(intent: PurchasePaymentIntent | null): PurchaseNotice {
   if (intent?.status === 'EXPIRED') return intent.reason === 'PAYMENT_FAILED' ? 'bankFailed' : 'timeout';
   // A manual refund still reaches user clients as MANUAL_REVIEW; refundStatus says it has ended (BUG-690).
@@ -335,6 +340,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
       toast.error(known.businessDelivered ? getT().errors.billMissingTitle : getT().errors.txNotSavedTitle);
     }
   }
+  const previousConclusion = purchaseConclusion(state.intent);
   state.pending = known; state.intent = intent; state.method = intent.paymentMethod;
   if (intent.deadlineAt) state.deadlineAt = Date.parse(intent.deadlineAt);
   if (intent.status === 'DELIVERED') {
@@ -344,16 +350,19 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (!purchasePaymentTiming(intent, Date.now(), state.deadlineAt).canPay) state.cashier = false;
   else if (openCashierOnReady && intent.paymentUrl) { openCashierOnReady = false; state.cashier = true; }
   const conclusion = purchaseConclusion(intent);
-  const orderNo = known.kind === 'ORDER_PAY' ? purchaseRecordPayload(known).orderNo : undefined;
-  if (conclusion === 'refunded' && typeof orderNo === 'string') {
+  if (!conclusion || conclusion === previousConclusion) return;
+  if (conclusion === 'refunded') {
+    const orderNo = known.kind === 'ORDER_PAY' ? purchaseRecordPayload(known).orderNo : undefined;
+    // A refund without an order has nothing to choose: the page itself states it and its close leaves (03 §3.5.1).
+    if (typeof orderNo !== 'string') {
+      if (['review', 'late', 'delivery', 'leave'].includes(state.notice)) state.notice = '';
+      return;
+    }
     // The refund closes the order on the server; refresh it so an order page under this layer stops showing it unpaid.
     const accountKey = state.accountKey;
     void useOrders().reconcileRemoteOrder(orderNo, () => account() === accountKey && foregroundReadAllowed()).catch(() => undefined);
   }
-  // A refund without an order has nothing to choose: the page itself states it and its close leaves (03 §3.5.1).
-  if (conclusion && !(conclusion === 'refunded' && typeof orderNo !== 'string')) state.notice = conclusion;
-  // An open "payment still in progress" question no longer applies once the payment is refunded.
-  else if (conclusion === 'refunded' && state.notice === 'leave') state.notice = '';
+  state.notice = conclusion;
 }
 /** The server holds no payment for this command: release it and its fences. Only the user may start another one, from the order. */
 function releaseMissingPayment(pending: PendingExternal, accountKey: string, orderNo: string) {
@@ -470,14 +479,15 @@ async function openConditions() {
     closeAndNavigate(`/pages/store/detail?id=${encodeURIComponent(productNo)}`);
   } else finish(null);
 }
-/** Reads continue on their own: every 5 s while the payment is open, backing off after failures, paused in the background. */
+/** Reads pause in the background. Manual review uses a fixed interval, including after failures. */
 function schedule(version: number, accountKey: string, failed: boolean) {
-  pollFailures = failed ? pollFailures + 1 : 0;
+  const inReview = state.intent?.status === 'MANUAL_REVIEW';
+  pollFailures = failed && !inReview ? pollFailures + 1 : 0;
   clearTimeout(pollTimer); pollTimer = undefined;
   if (paused || !appReadOnline.value || !owns(version, accountKey)
-      || !(state.pending || state.originalRecovery) || settled(state.intent) || state.concluded) return;
+      || !(state.pending || state.originalRecovery) || paymentReadFinished()) return;
   pollTimer = setTimeout(() => { if (owns(version, accountKey)) void query(); },
-    failed ? POLL_BACKOFF[Math.min(pollFailures - 1, POLL_BACKOFF.length - 1)]! : POLL_MS);
+    inReview ? REVIEW_POLL_MS : failed ? POLL_BACKOFF[Math.min(pollFailures - 1, POLL_BACKOFF.length - 1)]! : POLL_MS);
 }
 async function loadPolicy() {
   const accountKey = state.accountKey;
@@ -621,7 +631,7 @@ async function query() {
   const pending = state.pending;
   const recovery = state.originalRecovery;
   if (!appReadOnline.value || !(pending || recovery)
-      || state.busy || state.reading || state.concluded || settled(state.intent)) return;
+      || state.busy || state.reading || paymentReadFinished()) return;
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false;
   state.reading = true;
