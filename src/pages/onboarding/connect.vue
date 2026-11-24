@@ -189,7 +189,8 @@ async function collectCalibrationSignals() {
   return collectDeviceSignals();
 }
 import { requireCryptoUuid } from "@/lib/secure-command-id";
-import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
+import { phoneRecoveryCredential } from "@/lib/phone-recovery-credential";
 import type { OnboardingCalibration, PhoneActivationVersions } from "@/api/onboarding-calibration-api";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
@@ -605,7 +606,9 @@ async function activate() {
         command.submitted = true;
         activationOutcome.value = "unconfirmed";
         try {
-          activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey, command.versions);
+          const credential = phoneRecoveryCredential(apiRuntimeConfig.baseUrl, requestScope.accountKey);
+          activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey,
+            command.versions, credential);
           if (!scopeIsCurrent(requestScope)) return;
           if (!acceptCurrentCanonical(requestScope, activated)) {
             throw new ApiError({ kind: "protocol", message: "ONBOARDING_CALIBRATION_SCOPE_INVALID" });

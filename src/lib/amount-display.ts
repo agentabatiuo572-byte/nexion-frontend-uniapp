@@ -3,6 +3,13 @@ export function formatGroupedAmount(value: number | string | null | undefined, p
   const fixed = formatAmount(value, precision), [whole, fraction] = fixed.split('.');
   return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction === undefined ? '' : '.' + fraction);
 }
+/** One line per asset that was actually credited, USDT first; a zero credit still reads "0 USDT". Display only. */
+export function creditedAmounts(usdt: number | string | null | undefined, uvt: number | string | null | undefined) {
+  const lines = ([[usdt, "USDT"], [uvt, "UVT"]] as const)
+    .filter(([value]) => /[1-9]/.test(formatAmount(value, "full")))
+    .map(([value, unit]) => ({ sign: "+", value: formatGroupedAmount(value, "full"), unit }));
+  return lines.length ? lines : [{ sign: "", value: "0", unit: "USDT" as const }];
+}
 export function formatAmount(value: number | string | null | undefined, precision: 2 | 4 | 6 | "full" = 2): string {
   if (typeof value === "number" && !Number.isFinite(value)) return "-";
   const match = String(value ?? "").trim().match(/^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);

@@ -82,9 +82,10 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { computed, inject, onMounted, ref, type CSSProperties } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import type { CanonicalQuest } from "@/api/quest-api";
+import { WEEKLY_QUEST_PAGE_READ_SETTLED } from "@/lib/weekly-quest-page-read";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useConfig } from "@/store/config";
 import { useT } from "@/i18n/use-t";
@@ -96,7 +97,7 @@ import { toast } from "@/store/ui";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
-import { questTargetBusiness, unclaimableBusinessQuests, type QuestTargetAvailability } from "@/lib/quest-business-availability";
+import { isWeeklyQuestTargetClosed } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 
@@ -106,6 +107,7 @@ const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
+const pageReadSettled = inject(WEEKLY_QUEST_PAGE_READ_SETTLED, null);
 const weeklyReadFailed = ref(false);
 async function refreshWeekly() {
   const epoch = useApp().accountBindingEpoch;
@@ -113,20 +115,23 @@ async function refreshWeekly() {
   const ready = await wq.refresh();
   if (epoch !== useApp().accountBindingEpoch) return;
   weeklyReadFailed.value = !ready && !!wq.error && !wq.claimErrorQuestCode;
-  mounted.value = true;
+  ownReadSettled.value = true;
 }
-useAutoRecovery({ failed: () => remoteApiEnabled && weeklyReadFailed.value && !wq.loading && !wq.claimErrorQuestCode, retry: refreshWeekly });
-const mounted = ref(false);
+const ownReadSettled = ref(false);
+const mounted = computed(() => pageReadSettled?.value ?? ownReadSettled.value);
 const nowTick = useNow();
 
-const weeklyQuestVisibility = createPageVisibilityRefresh(() => {
-  void refreshWeekly();
-});
-bindPageVisibilityRefresh(weeklyQuestVisibility, {
-  mounted: (callback) => onMounted(callback),
-  shown: (callback) => onShow(callback),
-  hidden: (callback) => onHide(callback),
-});
+if (!pageReadSettled) {
+  useAutoRecovery({ failed: () => remoteApiEnabled && weeklyReadFailed.value && !wq.loading && !wq.claimErrorQuestCode, retry: refreshWeekly });
+  const weeklyQuestVisibility = createPageVisibilityRefresh(() => {
+    void refreshWeekly();
+  });
+  bindPageVisibilityRefresh(weeklyQuestVisibility, {
+    mounted: (callback) => onMounted(callback),
+    shown: (callback) => onShow(callback),
+    hidden: (callback) => onHide(callback),
+  });
+}
 
 const tier2Quests = computed<CanonicalQuest[]>(() => mounted.value
   ? wq.tier2Quests.filter((q) => stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(q.actionRoute)) : []);
@@ -193,19 +198,11 @@ const { block: genesisBlock, secondaryBlock: genesisSecondaryBlock } = useGenesi
 const targetAvailability = useQuestTargetAvailability();
 
 function targetClosed(q: CanonicalQuest): boolean {
-  const domain = questTargetBusiness(q);
-  if (domain === null) return false;
-  const closed: QuestTargetAvailability = {
-    genesisBlocked: domain === "genesis"
-      // 二级挂单承接的是他人存量,售罄档仍然可逛 —— 与闸完全同源。
-      ? (q.actionRoute.startsWith("/pages/genesis/marketplace")
-        ? genesisSecondaryBlock.value !== null
-        : genesisBlockIsKnownUnavailable(genesisBlock.value))
-      : false,
-    stakingClosed: targetAvailability.value.stakingClosed,
-    exchangeClosed: targetAvailability.value.exchangeClosed,
-  };
-  return unclaimableBusinessQuests([{ ...q, status: "PENDING" }], closed).length > 0;
+  return isWeeklyQuestTargetClosed(
+    q,
+    { ...targetAvailability.value, genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value) },
+    genesisSecondaryBlock.value !== null,
+  );
 }
 
 /** 过期与「目标业务停摆」都是不可点:一处判据,渲染点只用它。 */

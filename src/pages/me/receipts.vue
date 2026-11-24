@@ -57,17 +57,20 @@
               :style="rowStyle(0)"
               role="button"
               tabindex="0"
+              :aria-label="computeRowLabel(r)"
               @click.stop="openRemoteComputeReceipt(r)"
 
               @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate font-mono-code" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
-                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
+                <!-- The shown number, middle-ellipsized with its last 6 kept (03 §3.6.1); the row's label carries it whole. -->
+                <NxCodeValue :value="r.displayReceiptNo || r.receiptNo" label="" :copyable="false" :style="rowTitleStyle" />
+                <text class="block" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word" :style="rowSubStyle">{{ receiptLine(computeTaskLine(r)) }}</text>
               </view>
-              <view class="text-right shrink-0 min-w-0" style="margin-left: 8px; max-width: 42%">
-                <text class="block truncate tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 'full')} UVT` : `+$${formatAmount(r.rewardUsdt, 'full')}` }}</text>
-                <text class="block truncate" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
+              <!-- Each credited asset on its own line, same figure role as the message row (04.5, 10.1). -->
+              <view class="text-right shrink-0" style="margin-left: 8px">
+                <text v-for="amount in creditedAmounts(r.rewardUsdt, r.rewardNex)" :key="amount.unit" class="block" :style="computeAmountStyle">{{ amount.sign }}{{ amount.value }}&nbsp;<text :style="computeUnitStyle">{{ amount.unit }}</text></text>
+                <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
           </template>
@@ -154,7 +157,7 @@
 
     </view>
     <template #pageFixed>
-      <ReceiptModal :receipt="open" @close="open = null" />
+      <ReceiptModal :receipt="open" :title="remoteReceiptsMode ? earningCopy.receiptTitle : undefined" :state="linkedReceiptDetail?.state ?? 'ready'" @close="closeReceiptDetail" />
     </template>
   </AppChassis>
 </template>
@@ -163,11 +166,12 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { displayTimestamp, formatDisplayDate, formatDisplayTime } from "@/lib/display-date";
 import { receiptLine } from "@/lib/receipt-line";
-import { formatAmount } from "@/lib/amount-display";
+import { creditedAmounts, formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ReceiptCatIcon from "@/components/me/receipt-cat-icon.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
@@ -176,16 +180,25 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { workloadLabel } from "@/lib/workload-label";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
-import { shortenHex } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { ApiError } from "@/api/errors";
 import { remoteApiEnabled, sessionVault, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
+import { earningCreditCopy } from "@/i18n/earning-credit";
+import { uiLocale } from "@/i18n";
+import { useLocaleStore } from "@/store/locale";
 import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
 import { useApp } from "@/store/app";
+import { takeNavigationQuery } from "@/lib/route";
 
 import { presentVietQrReceipt } from "@/lib/vietqr-receipt-presentation";
+import { appReadForeground, documentReadVisible } from "@/lib/foreground-read";
+import { useMeEntryRead } from "@/composables/use-me-entry-read";
+import { latestMeReceipt } from "@/lib/me-entry-facts";
+import { rememberMeReceiptSummary } from "@/lib/me-receipt-summary";
+import { useMeEntrySeen } from "@/store/me-entry-seen";
 import { createReceiptsPageRequestFence } from "./receipts-page-request-fence";
 import { canLoadRemoteComputeMore } from "./receipts-page-pagination";
 
@@ -198,6 +211,9 @@ const PAGE_SIZE = 10;
 
 const t = useT();
 const computeCopy = useComputeV2Copy();
+const locale = useLocaleStore();
+// One receipt opened on this page is titled with the page's own name (收益凭证), whatever its execution mode.
+const earningCopy = computed(() => earningCreditCopy[uiLocale(locale.code)]);
 const app = useApp();
 const depositsStore = useDeposits();
 const receiptsPageFence = createReceiptsPageRequestFence(
@@ -253,7 +269,11 @@ const remoteReceiptEmptyHint = computed(() => remoteReceiptKind.value === "compu
 const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
 const open = ref<Receipt | CanonicalComputeReceipt | null>(null);
+type LinkedReceiptDetail = { receiptNo: string; state: "loading" | "failed" | "unavailable" };
+const linkedReceiptDetail = ref<LinkedReceiptDetail | null>(null);
 let receiptRequestEpoch = 0;
+let linkedReceiptNo: string | null = null;
+const initialAccountEpoch = app.accountBindingEpoch;
 const visibleCount = ref(PAGE_SIZE);
 watch(tab, () => { visibleCount.value = PAGE_SIZE; });
 
@@ -279,14 +299,34 @@ function remoteReceiptAmountStyle(receipt: ServerReceiptListItem): CSSProperties
   };
 }
 
+const receiptPageVisible = ref(false);
+const receiptEntryRead = useMeEntryRead(() => receiptPageVisible.value);
+const entrySeen = useMeEntrySeen();
+let pendingReceiptSeen: (() => void) | null = null;
 let receiptPageRequestEpoch = 0;
+
+function confirmVisibleReceiptList(): void {
+  if (open.value || linkedReceiptDetail.value || linkedReceiptNo || remoteComputeInitialLoading.value
+    || remoteReceiptKind.value !== "compute") return;
+  const confirm = pendingReceiptSeen;
+  pendingReceiptSeen = null;
+  confirm?.();
+}
+
+watch([open, linkedReceiptDetail], confirmVisibleReceiptList, { flush: "post" });
+watch([appReadForeground, documentReadVisible], ([foreground, visible]) => {
+  if (!foreground || !visible) pendingReceiptSeen = null;
+});
+
 async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor: string | null = null): Promise<void> {
   if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
   const requestEpoch = ++receiptPageRequestEpoch;
   const requestScope = receiptsPageFence.capture("compute");
   const expectedAccountKey = app.accountKey;
   const expectedBindingEpoch = app.accountBindingEpoch;
+  const seenRead = !append ? receiptEntryRead.capture("receipts") : null;
   if (!append) {
+    pendingReceiptSeen = null;
     remoteComputeInitialLoading.value = true;
     remoteComputeReceiptNextOffset.value = null;
     remoteComputeReceiptNextCursor.value = null;
@@ -309,6 +349,15 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor
     remoteComputeReceiptNextOffset.value = page.nextOffset;
     remoteComputeReceiptNextCursor.value = page.nextCursor;
     remoteComputeReceiptStatus.value = "ready";
+    if (seenRead?.current()) {
+      const latestAt = latestMeReceipt(page.items);
+      rememberMeReceiptSummary(latestAt);
+      pendingReceiptSeen = () => {
+        if (seenRead.current() && receiptsPageFence.isCurrent(requestScope)) {
+          entrySeen.record("receipts", latestAt, seenRead.scope, true);
+        }
+      };
+    }
   } catch {
     if (requestEpoch === receiptPageRequestEpoch
       && receiptsPageFence.isCurrent(requestScope)
@@ -324,7 +373,11 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor
       && expectedAccountKey === app.accountKey
       && expectedBindingEpoch === app.accountBindingEpoch) {
         remoteComputeReceiptLoading.value = false;
-        if (!append) remoteComputeInitialLoading.value = false;
+        if (!append) {
+          remoteComputeInitialLoading.value = false;
+          await nextTick();
+          confirmVisibleReceiptList();
+        }
       }
   }
 }
@@ -383,6 +436,12 @@ useAutoRecovery({
     && (remoteReceiptKind.value !== "compute" || !failedComputeReceiptRequest.value?.append),
   retry: retryRemoteReceipts,
 });
+useAutoRecovery({
+  active: () => linkedReceiptDetail.value !== null,
+  failed: () => linkedReceiptDetail.value?.state === "failed",
+  retry: readLinkedReceipt,
+  repeatMs: 30_000,
+});
 
 function loadSelectedRemoteReceipts(): void {
   // After an H5 reload the session is restored after the page shows; the account watch reads once it is bound.
@@ -411,43 +470,74 @@ function moveRemoteReceiptKind(index: number, delta: number): void {
   });
 }
 
-async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
+function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): Promise<void> {
+  return readRemoteComputeReceipt(task.receiptNo);
+}
+
+function closeReceiptDetail(): void {
+  receiptRequestEpoch += 1;
+  linkedReceiptDetail.value = null;
+  open.value = null;
+}
+
+async function readRemoteComputeReceipt(receiptNo: string, linked?: LinkedReceiptDetail): Promise<void> {
   if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
   const requestEpoch = ++receiptRequestEpoch;
   const requestScope = receiptsPageFence.capture("detail");
-  const expectedAccountKey = app.accountKey;
-  const expectedBindingEpoch = app.accountBindingEpoch;
+  const isCurrent = () => requestEpoch === receiptRequestEpoch && receiptsPageFence.isCurrent(requestScope);
   try {
-    const detail = await taskAssignmentApi.receipt(task.receiptNo);
-    if (requestEpoch === receiptRequestEpoch
-      && receiptsPageFence.isCurrent(requestScope)
-      && expectedAccountKey === app.accountKey
-      && expectedBindingEpoch === app.accountBindingEpoch) open.value = detail;
-  } catch {
-    if (requestEpoch === receiptRequestEpoch
-      && receiptsPageFence.isCurrent(requestScope)
-      && expectedAccountKey === app.accountKey
-      && expectedBindingEpoch === app.accountBindingEpoch) {
+    const detail = await taskAssignmentApi.receipt(receiptNo);
+    if (!isCurrent()) return;
+    open.value = detail;
+    if (linked) linkedReceiptDetail.value = null;
+  } catch (cause) {
+    if (!isCurrent()) return;
+    if (!linked) {
       toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
+      return;
     }
+    const status = cause instanceof ApiError ? (cause.kind === "business" ? cause.code : cause.status) : undefined;
+    linked.state = status === 404 || status === 403 ? "unavailable" : "failed";
+    if (linked.state === "failed") throw cause;
   }
+}
+
+async function readLinkedReceipt(): Promise<void> {
+  const linked = linkedReceiptDetail.value;
+  if (linked) await readRemoteComputeReceipt(linked.receiptNo, linked);
+}
+
+function openLinkedReceipt(): void {
+  if (!linkedReceiptNo || !remoteReceiptsMode || !receiptsPageFence.isVisible()
+    || app.accountKey === "default" || !sessionVault.read()) return;
+  linkedReceiptDetail.value = { receiptNo: linkedReceiptNo, state: "loading" };
+  linkedReceiptNo = null;
+  void readLinkedReceipt().catch(() => { /* The failed state starts shared read recovery. */ });
 }
 
 watch(
   () => [app.accountKey, app.accountBindingEpoch] as const,
-  () => {
+  ([accountKey, epoch], previous) => {
     if (!remoteReceiptsMode) return;
+    // A cold H5 entry can load before the first authenticated binding.
+    if (previous && !(previous[0] === "default" && accountKey !== "default" && epoch === initialAccountEpoch + 1)) {
+      linkedReceiptNo = null;
+    }
     invalidateRemoteReceiptsPage();
     remoteComputeReceiptItems.value = [];
     remoteComputeReceiptNextOffset.value = null;
     remoteComputeReceiptNextCursor.value = null;
-    if (receiptsPageFence.isVisible()) refreshRemoteReceiptsPage();
+    if (receiptsPageFence.isVisible()) {
+      refreshRemoteReceiptsPage();
+      openLinkedReceipt();
+    }
   },
   { immediate: true },
 );
 
 function invalidateRemoteReceiptsPage(): void {
-  receiptRequestEpoch += 1;
+  pendingReceiptSeen = null;
+  closeReceiptDetail();
   receiptPageRequestEpoch += 1;
   receiptsPageFence.invalidate();
   remoteComputeMoreLoading.value = false;
@@ -456,7 +546,6 @@ function invalidateRemoteReceiptsPage(): void {
   remoteComputeInitialLoading.value = false;
   remoteComputeReceiptStatus.value = remoteReceiptsMode ? "loading" : "ready";
   failedComputeReceiptRequest.value = null;
-  open.value = null;
   depositsStore.invalidateRemoteVietQrReceiptReads();
 }
 
@@ -465,23 +554,32 @@ function refreshRemoteReceiptsPage(): void {
 }
 
 onLoad((options) => {
-  remoteReceiptKind.value = options?.kind === "deposit" ? "deposit" : "compute";
+  const pending = new URLSearchParams(takeNavigationQuery("/pages/me/receipts"));
+  linkedReceiptNo = (options?.receiptNo ?? pending.get("receiptNo"))?.trim() || null;
+  remoteReceiptKind.value = !linkedReceiptNo && (options?.kind ?? pending.get("kind")) === "deposit" ? "deposit" : "compute";
+  openLinkedReceipt();
 });
 
 onShow(() => {
   if (!remoteReceiptsMode) return;
   receiptsPageFence.show();
+  receiptPageVisible.value = true;
   loadSelectedRemoteReceipts();
+  openLinkedReceipt();
 });
 
 onHide(() => {
   if (!remoteReceiptsMode) return;
+  receiptPageVisible.value = false;
+  linkedReceiptNo = null;
   receiptsPageFence.hide();
   invalidateRemoteReceiptsPage();
 });
 
 onUnmounted(() => {
   if (!remoteReceiptsMode) return;
+  receiptPageVisible.value = false;
+  linkedReceiptNo = null;
   receiptsPageFence.hide();
   invalidateRemoteReceiptsPage();
 });
@@ -574,6 +672,15 @@ function copySig(r: Receipt) {
 
 function rowAmount(r: Receipt): string {
   return r.category === "KY" ? formatAmount(r.netPaid) : `+${formatAmount(r.netPaid)}`;
+}
+function computeTaskLine(r: CanonicalComputeReceiptSummary): string {
+  // The page is already 收益凭证, so a compute row shows only its model (no second name for the same receipt).
+  return r.executionMode === "SIMULATED" ? (r.taskName || computeCopy.value.taskReceipt) : r.model;
+}
+// The row shows a shortened receipt number and clamps the job line to two lines (the detail shows both in full);
+// screen readers get the full text (03 §3.6.1).
+function computeRowLabel(r: CanonicalComputeReceiptSummary): string {
+  return [r.displayReceiptNo || r.receiptNo, computeTaskLine(r), ...creditedAmounts(r.rewardUsdt, r.rewardNex).map(a => `${a.sign}${a.value}\u00a0${a.unit}`), shortDate(r.completedAt)].join(", ");
 }
 function shortDate(ts: number | string): string {
   const timestamp = displayTimestamp(ts);
@@ -671,7 +778,16 @@ function rowAmountStyle(r: Receipt): CSSProperties {
     color: "var(--v5-brand)",
   };
 }
-const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
+const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
+// Compute receipt amounts: card figure in Montserrat and the success colour, unit as the auxiliary figure (10.1).
+const computeAmountStyle: CSSProperties = {
+  whiteSpace: "nowrap", color: "var(--v5-success-ink)", fontFamily: "var(--font-amount)", fontVariantNumeric: "tabular-nums",
+  fontSize: "var(--ui-type-card-figure)", lineHeight: "var(--ui-type-card-figure-lh)", fontWeight: "var(--ui-type-card-figure-weight)" as CSSProperties["fontWeight"],
+};
+const computeUnitStyle: CSSProperties = {
+  whiteSpace: "nowrap", color: "var(--v5-ink-3)", fontFamily: "var(--font-v5)",
+  fontSize: "var(--ui-type-meta)", lineHeight: "var(--ui-type-meta-lh)", fontWeight: "var(--ui-type-meta-weight)" as CSSProperties["fontWeight"],
+};
 const remoteAmountStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "13px",

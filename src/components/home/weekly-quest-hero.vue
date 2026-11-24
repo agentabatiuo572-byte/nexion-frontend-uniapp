@@ -55,14 +55,15 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
-import { computed, onMounted, watch, type CSSProperties } from "vue";
+import { computed, inject, onMounted, watch, type CSSProperties } from "vue";
 import type { CanonicalQuest } from "@/api/quest-api";
+import { WEEKLY_QUEST_PAGE_READ_SETTLED } from "@/lib/weekly-quest-page-read";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useConfig } from "@/store/config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
-import { questTargetBusiness, unclaimableBusinessQuests, questBusinessContractViolation, type QuestTargetAvailability } from "@/lib/quest-business-availability";
+import { isWeeklyQuestTargetClosed, unclaimableBusinessQuests, questBusinessContractViolation } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -79,6 +80,7 @@ const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
+const pageReadSettled = inject(WEEKLY_QUEST_PAGE_READ_SETTLED, null);
 const nowTick = useNow();
 
 // 🔴 观测闸,**不是过滤器**——为什么客户端不过滤,见 lib/quest-genesis-tripwire.ts 顶部。
@@ -111,7 +113,7 @@ watch(
 );
 
 onMounted(() => {
-  void wq.refresh();
+  if (!pageReadSettled) void wq.refresh();
 });
 
 const quest = computed<CanonicalQuest | null>(() => wq.tier1Quests.find((q) =>
@@ -161,14 +163,13 @@ const periodText = computed(() => {
  */
 const questTargetClosed = computed(() => {
   const q = quest.value;
-  if (!q || questTargetBusiness(q) === null) return false;
-  const availability: QuestTargetAvailability = {
+  if (!q) return false;
+  return isWeeklyQuestTargetClosed(q, {
     // 「还不知道」不等于「已经关了」:configUnavailable 属前者,不能停 CTA。
     genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value),
     stakingClosed: targetAvailability.value.stakingClosed,
     exchangeClosed: targetAvailability.value.exchangeClosed,
-  };
-  return unclaimableBusinessQuests([{ ...q, status: "PENDING" }], availability).length > 0;
+  }, false);
 });
 
 function onCta() {

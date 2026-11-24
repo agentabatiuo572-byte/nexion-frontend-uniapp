@@ -1144,7 +1144,7 @@ function checkQuestRoute() {
     // In formal server mode, task identity, completion facts and reward state
     // all come from the backend. A route visit only triggers a fresh readback;
     // the legacy task-code table below is never consulted.
-    void runPassiveTabRead("quest", () => useQuest().refreshRemote(), undefined, () => useQuest().remoteStatus === "ready");
+    void useQuest().ensureRemote();
     return;
   }
   const id = questIdForRoute(route);

@@ -31,6 +31,7 @@ import { useCart } from "@/store/cart";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { useProfile } from "@/store/profile";
 import { useSecurity } from "@/store/security";
+import { useMeEntrySeen } from "@/store/me-entry-seen";
 import { useRewardsSeen } from "@/store/rewards-seen";
 import { useSponsorship } from "@/store/sponsorship";
 import { useConversations } from "@/store/conversations";
@@ -117,8 +118,9 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useCards().bindAccount(accountKey);
   useNexFaucet().bindAccount(accountKey);
   usePayoutAddress().bindAccount(accountKey);
-  useQuest().bindAccount(accountKey);
-  useWeeklyQuest().bindAccount(accountKey);
+  const quest = useQuest();
+  quest.bindAccount(accountKey);
+  useWeeklyQuest().bindAccount(accountKey, quest);
   useReferralReward().bindAccount(accountKey);
   useNetwork().bindAccount(accountKey);
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
@@ -143,4 +145,5 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useConversations().bindAccount(accountKey);
   // rewards-seen 读 bills(已在上方先重绑)派生红点,故放最后。
   useRewardsSeen().bindAccount(accountKey);
+  useMeEntrySeen().bindAccount(accountKey);
 }

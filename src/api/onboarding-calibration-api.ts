@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import type { PhoneRecoveryCredential } from "@/lib/phone-recovery-credential";
 
 export type OnboardingCalibrationEnvironment = "PRODUCTION";
 export type PhoneActivationStatus = "CALIBRATED" | "ACTIVE" | "DEFERRED";
@@ -118,10 +119,12 @@ export interface OnboardingCalibrationApi {
   activationEligibility(): Promise<PhoneActivationEligibility>;
   activationFailed(idempotencyKey: string): Promise<boolean>;
   phoneLogin(deviceId: string): Promise<string>;
+  recoverPhone(deviceId: string, credential: PhoneRecoveryCredential): Promise<"BOUND" | "RESTORED" | "UNAVAILABLE">;
   bindingStatus(): Promise<boolean>;
   calibrate(deviceId: string, signals: CalibrationRequestSignals, expectedRevision: number, idempotencyKey: string): Promise<OnboardingCalibration>;
   result(deviceId: string): Promise<OnboardingCalibration>;
-  activate(deviceId: string, expectedRevision: number, idempotencyKey: string, versions: PhoneActivationVersions): Promise<OnboardingCalibration>;
+  activate(deviceId: string, expectedRevision: number, idempotencyKey: string, versions: PhoneActivationVersions,
+    credential?: PhoneRecoveryCredential | null): Promise<OnboardingCalibration>;
   defer(deviceId: string, expectedRevision: number, idempotencyKey: string, initialOnly?: boolean): Promise<OnboardingCalibration>;
 }
 
@@ -323,6 +326,14 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
           || typeof response.hasBinding !== "boolean") return invalid();
       return response.hasBinding;
     },
+    async recoverPhone(deviceId, credential) {
+      const result = record(await client.request({
+        method: "POST", path: "/api/onboarding/phone-installation/recovery",
+        body: { deviceId, recoveryKey: credential.key, ...(credential.platform === "android" ? { platform: "android" } : {}) },
+      }));
+      if (result.status !== "BOUND" && result.status !== "RESTORED" && result.status !== "UNAVAILABLE") return invalid();
+      return result.status;
+    },
     async phoneLogin(deviceId) {
       const response = record(await client.request({
         method: "POST", path: "/api/onboarding/phone-installation/login", body: { deviceId: text(deviceId) },
@@ -349,7 +360,7 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
       });
       return parseOnboardingCalibration(response, environment);
     },
-    async activate(deviceId, expectedRevision, idempotencyKey, versions) {
+    async activate(deviceId, expectedRevision, idempotencyKey, versions, credential) {
       const normalizedDeviceId = text(deviceId);
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         throw new ApiError({ kind: "configuration", message: "ONBOARDING_REVISION_INVALID" });
@@ -359,8 +370,10 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
           || typeof versions.replacementConfirmed !== "boolean") {
         throw new ApiError({ kind: "configuration", message: "PHONE_ACTIVATION_VERSIONS_REQUIRED" });
       }
+      const credentialHeader = credential?.platform === "android" ? "X-UVEL-Android-Recovery-Key" : "X-UVEL-IOS-Recovery-Key";
       const response = await client.request({
         method: "POST", path: "/api/onboarding/calibrate/activate", idempotencyKey: key(idempotencyKey),
+        ...(credential ? { headers: { [credentialHeader]: credential.key } } : {}),
         body: { deviceId: normalizedDeviceId, expectedRevision,
           expectedBindingVersion: versions.expectedBindingVersion, expectedPolicyVersion: versions.expectedPolicyVersion,
           replacementConfirmed: versions.replacementConfirmed,

@@ -41,7 +41,8 @@ export function pushNotificationId(value: unknown): string | null {
 
 // Explicit read-only entry points. No payment/activation commands or arbitrary query keys.
 const ROUTES: Record<string, readonly string[]> = {
-  "/pages/me/notifications": [],
+  "/pages/me/notifications": ["section", "filter"],
+  "/pages/me/receipts": ["receiptNo"],
   "/pages/me/app-update": [],
   "/pages/me/security": [],
   "/pages/me/wallet-bills": [],
@@ -57,14 +58,38 @@ export function safePushRoute(value: unknown): value is string {
   const [path, query, extra] = value.split("?");
   const keys = Object.prototype.hasOwnProperty.call(ROUTES, path) ? ROUTES[path] : undefined;
   if (!keys || extra !== undefined) return false;
-  if (!query) return path !== "/pages/me/wallet-withdraw-tracking";
+  if (!query) return path !== "/pages/me/wallet-withdraw-tracking" && path !== "/pages/me/receipts";
   const seen = new Set<string>();
-  return query.split("&").every(pair => {
+  const valid = query.split("&").every(pair => {
     const [key, val, overflow] = pair.split("=");
     if (!keys.includes(key) || seen.has(key) || !val || overflow !== undefined || !/^[A-Za-z0-9_-]{1,128}$/.test(val)) return false;
     if (path === "/pages/me/wallet-withdraw-tracking" && !/^WD-[A-Z0-9]{1,93}$/.test(val)) return false;
+    if (path === "/pages/me/receipts" && !/^CTR-[A-Za-z0-9_-]{1,120}$/.test(val)) return false;
+    if (path === "/pages/me/notifications" && val !== (key === "section" ? "notifications" : "finance")) return false;
     seen.add(key); return true;
   });
+  return valid && (path !== "/pages/me/notifications" || seen.size === keys.length);
+}
+
+const PUSH_CAPABILITIES = ["earning_push_v1"] as const;
+
+function deviceTimeZone(platform: NativePushPort["platform"]): string | undefined {
+  // #ifdef APP-PLUS
+  if (platform === "android" && typeof plus !== "undefined") {
+    try {
+      const zone = plus.android.invoke("java.util.TimeZone", "getDefault");
+      const id = plus.android.invoke(zone, "getID");
+      if (typeof id === "string" && id && !/^GMT[+-]/.test(id)) return id;
+    } catch { /* Fall back to the JavaScript runtime's time zone. */ }
+  }
+  // #endif
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Intl also accepts fixed offsets, but the server needs a named zone.
+    if (!timeZone || /^[+-]/.test(timeZone)) return undefined;
+    Intl.DateTimeFormat(undefined, { timeZone });
+    return timeZone;
+  } catch { return undefined; }
 }
 
 export function createNativePushController(client: ApiClient, vault: SessionVault, port: NativePushPort) {
@@ -149,14 +174,16 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
       const native = await port.token();
       if (!validNativePushToken(native, port.platform) || !current(snapshot, captured)) return;
       const clientId = native.token, provider = native.provider;
-      const key = JSON.stringify([snapshot.user.userId, snapshot.sessionChainId, id, provider, clientId, permission]);
+      const timeZone = deviceTimeZone(port.platform);
+      const capabilities = PUSH_CAPABILITIES;
+      const key = JSON.stringify([snapshot.user.userId, snapshot.sessionChainId, id, provider, clientId, permission, timeZone, capabilities]);
       if (key === registered) { port.registrationUnavailable?.(false); return; }
       // Persist proof before the first request so a lost response can be retried.
       const token = port.bindingToken();
       await authenticatedRequest({ path: `/api/me/push-installations/${encodeURIComponent(id)}`, method: "PUT",
         headers: { "X-Push-Binding-Token": token },
         body: { clientId, provider, platform: port.platform, permission, appVersion: port.appVersion,
-          appBuild: port.appBuild, apnsTopic: port.apnsTopic } }, snapshot, captured);
+          appBuild: port.appBuild, apnsTopic: port.apnsTopic, capabilities, ...(timeZone ? { timeZone } : {}) } }, snapshot, captured);
       if (current(snapshot, captured)) {
         registered = key;
         if (tokenRevision === capturedTokenRevision) port.registrationUnavailable?.(false);

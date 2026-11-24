@@ -356,7 +356,7 @@ const hintStyle: CSSProperties = {
 .reward-tile--uvt { box-shadow:var(--v5-glass-shadow); }
 .reward-tile--uvt::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 210deg,transparent 0 45%,color-mix(in srgb,var(--v5-warning) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
 .reward-tile--voucher .reward-tile__amount { font-family:var(--font-amount); }
-.reward-tile--promotion .reward-arrow { color:var(--v5-ink-4); }.reward-tile--promotion .reward-arrow svg { width:16px; height:16px; }
+.reward-tile--promotion .reward-arrow { color:var(--v5-ink-4); }.reward-tile--promotion .reward-arrow svg, .reward-tile--promotion .reward-arrow .nx-native-svg { width:16px; height:16px; }
 .reward-tile--usdt .reward-tile__amount { margin-top:6px; }.reward-tile--usdt .reward-tile__desc { margin-top:4px; }
 
 

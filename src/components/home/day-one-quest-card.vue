@@ -182,7 +182,7 @@ const locale = useLocaleStore();
 const nowTick = useNow();
 const { elRef, inView } = useScrollGrowProgress();
 const quest = useQuest();
-useAutoRecovery({ failed: () => remoteApiEnabled && props.active && quest.remoteStatus === "error", retry: () => quest.refreshRemote() });
+useAutoRecovery({ failed: () => remoteApiEnabled && !props.missionLayout && props.active && quest.remoteStatus === "error", retry: () => quest.refreshRemote() });
 const app = useApp();
 const stakingDisplay = useConfig();
 const mockReward = 500;

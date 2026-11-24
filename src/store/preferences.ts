@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { notificationPreferencesApi, remoteApiEnabled } from "@/api/runtime";
+import type { EarningPush, NotificationPreferences } from "@/api/notification-preferences-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { accountErrorMessageKey, type AccountErrorMessageKey } from "@/lib/account-error-message";
 
@@ -30,6 +31,7 @@ export function isMandatoryNotifKind(k: NotifKind): boolean {
 }
 
 type NotifPrefs = Record<NotifKind, boolean>;
+type RemotePreferenceKey = keyof NotificationPreferences;
 
 const STORAGE_KEY = "nexgrid-preferences-v1";
 
@@ -71,6 +73,7 @@ export const usePreferences = defineStore("preferences", () => {
   const init = hydrate();
   const soundEnabled = ref<boolean>(init.soundEnabled);
   const notifPrefs = ref<NotifPrefs>(init.notifPrefs);
+  const earningPush = ref<EarningPush>();
   const loading = ref(false);
   const remoteReady = ref(!remoteApiEnabled);
   const readError = ref<AccountErrorMessageKey | null>(null);
@@ -79,11 +82,11 @@ export const usePreferences = defineStore("preferences", () => {
   const readFailedWithoutData = computed(() => !!readError.value && !remoteReady.value);
   const remoteAccountEpoch = createRemoteAccountEpoch("default");
   let generation = 0;
-  let canonicalNotifPrefs = init.notifPrefs;
+  let canonicalNotifPrefs: NotificationPreferences = init.notifPrefs;
   let mutationTail: Promise<void> = Promise.resolve();
   let nextMutationId = 0;
-  const pendingNotifMutations = new Map<NotifKind, { id: number; value: boolean }>();
-  const failedNotifMutations = new Map<NotifKind, AccountErrorMessageKey>();
+  const pendingNotifMutations = new Map<RemotePreferenceKey, { id: number; patch: Partial<NotificationPreferences> }>();
+  const failedNotifMutations = new Map<RemotePreferenceKey, AccountErrorMessageKey>();
   let nextReadRequestId = 0;
   let activeReadRequestId = 0;
 
@@ -108,13 +111,15 @@ export const usePreferences = defineStore("preferences", () => {
 
   function applyVisibleNotifPrefs() {
     const visible = { ...canonicalNotifPrefs };
-    for (const [kind, pending] of pendingNotifMutations) visible[kind] = pending.value;
+    for (const pending of pendingNotifMutations.values()) Object.assign(visible, pending.patch);
     // Remote mandatory delivery is enforced by the server. Retain its confirmed
     // value on failure rather than disguising legacy false data as a successful write.
     if (!remoteApiEnabled) {
       for (const kind of MANDATORY_NOTIF_KINDS) visible[kind] = true;
     }
-    notifPrefs.value = visible;
+    const { earningPush: visibleEarningPush, ...visibleNotifPrefs } = visible;
+    notifPrefs.value = visibleNotifPrefs;
+    earningPush.value = visibleEarningPush;
   }
 
   function syncMutationError() {
@@ -136,12 +141,20 @@ export const usePreferences = defineStore("preferences", () => {
       persist();
       return "saved";
     }
+    return saveRemoteNotifPreference(k, !notifPrefs.value[k]);
+  }
 
+  async function setEarningPush(value: EarningPush): Promise<"saved" | "failed" | "superseded"> {
+    if (!remoteApiEnabled || earningPush.value === undefined || earningPush.value === value) return "superseded";
+    return saveRemoteNotifPreference("earningPush", value);
+  }
+
+  function saveRemoteNotifPreference<K extends RemotePreferenceKey>(k: K, value: NonNullable<NotificationPreferences[K]>) {
     const request = remoteAccountEpoch.snapshot();
     const mutationId = ++nextMutationId;
-    const value = !notifPrefs.value[k];
+    const patch = { [k]: value };
     generation += 1;
-    pendingNotifMutations.set(k, { id: mutationId, value });
+    pendingNotifMutations.set(k, { id: mutationId, patch });
     failedNotifMutations.delete(k);
     applyVisibleNotifPrefs();
     syncMutationError();
@@ -153,7 +166,7 @@ export const usePreferences = defineStore("preferences", () => {
     const run = async (): Promise<"saved" | "failed" | "superseded"> => {
       if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
       try {
-        const canonical = await notificationPreferencesApi.patch({ [k]: value });
+        const canonical = await notificationPreferencesApi.patch(patch);
         if (!remoteAccountEpoch.isCurrent(request)) return "superseded";
         generation += 1;
         canonicalNotifPrefs = canonical;
@@ -223,5 +236,5 @@ export const usePreferences = defineStore("preferences", () => {
     notifPrefs.value = local.notifPrefs;
   }
 
-  return { soundEnabled, notifPrefs, loading, remoteReady, error, readError, mutationError, readFailedWithoutData, toggleSound, toggleNotifKind, bindAccount, refreshRemote };
+  return { soundEnabled, notifPrefs, earningPush, loading, remoteReady, error, readError, mutationError, readFailedWithoutData, toggleSound, toggleNotifKind, setEarningPush, bindAccount, refreshRemote };
 });

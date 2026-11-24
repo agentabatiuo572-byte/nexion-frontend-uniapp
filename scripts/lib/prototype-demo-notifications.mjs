@@ -1,3 +1,142 @@
+import { createHash } from 'node:crypto';
+import { previewCapacity } from './design-review-fixture.mjs';
+
+const s1 = 'STELLARBOX-S1', pro = 'STELLARBOX-PRO', rack = 'STELLARRACK-P1';
+const minute = 60_000, day = 24 * 60 * minute, storageOffset = 8 * 60 * minute;
+const earningSamples = [
+  { id: 1001, sku: s1, taskClass: 'SP', minutesAgo: 90, actionMissing: true, read: true },
+  { id: 1002, sku: s1, taskClass: 'IG', minutesAgo: 80, receiptStatus: 404 },
+  { id: 1003, sku: s1, taskClass: 'FT', minutesAgo: 70, receiptFailures: 2 },
+  { id: 1004, sku: s1, taskClass: 'SP', minutesAgo: 53, read: true },
+  { id: 1005, sku: s1, taskClass: 'EM', minutesAgo: 48, modelRate: [0.0025, 0.002708], durationSec: 5, read: true },
+  { id: 1006, sku: pro, taskClass: 'LL', minutesAgo: 29 },
+  { id: 1007, sku: s1, taskClass: 'VG', minutesAgo: 16, modelRate: [1, 1.1], durationSec: 900 },
+  { id: 1008, sku: s1, taskClass: 'IG', minutesAgo: 3 },
+  { id: 1009, sku: rack, taskClass: 'VG', minutesAgo: 1 },
+  { id: 1010, sku: pro, taskClass: 'LL', minutesAgo: 0 },
+];
+const taskNames = { IG: 'Image Generation', VG: 'Video Generation', LL: 'LLM Inference',
+  EM: 'Embedding', SP: 'Speech Processing', FT: 'Fine-tuning' };
+const earningModel = taskClass => taskClass === 'EM' ? 'BGE-M3' : 'Wan 2.1';
+const roundReward = amount => Number(amount.toFixed(6));
+
+// Monthly pacing uses purchase anniversaries in the storage zone, with days clamped at month end.
+function purchaseCycle(device, completedAt) {
+  const anchor = new Date(device.purchasedAt + storageOffset);
+  const completed = new Date(completedAt + storageOffset);
+  const month = index => {
+    const anniversary = new Date(anchor);
+    anniversary.setUTCDate(1);
+    anniversary.setUTCMonth(anchor.getUTCMonth() + index);
+    const days = new Date(Date.UTC(anniversary.getUTCFullYear(), anniversary.getUTCMonth() + 1, 0)).getUTCDate();
+    anniversary.setUTCDate(Math.min(anchor.getUTCDate(), days));
+    return anniversary.getTime() - storageOffset;
+  };
+  let index = (completed.getUTCFullYear() - anchor.getUTCFullYear()) * 12 + completed.getUTCMonth() - anchor.getUTCMonth();
+  if (month(index) > completedAt) index--;
+  return { start: month(index), seconds: (month(index + 1) - month(index)) / 1000 };
+}
+
+export function demoEarningReceipts(state) {
+  if (state.fleetState !== 'earning-credit' || state.dataState === 'empty' || state.accountDeletionState === 'clear') return [];
+  const midnightUtc = Math.floor(state.previewFactsAt / day) * day;
+  // Keep the fixture's sequence on one UTC date, even when the preview starts just after midnight.
+  const anchor = state.previewFactsAt - midnightUtc < 92 * minute ? midnightUtc - minute : state.previewFactsAt;
+  const dailyCredits = new Set();
+  return earningSamples.flatMap(({ sku, modelRate, minutesAgo, durationSec = 300, ...sample }) => {
+    const device = state.fleetSeed?.find(row => row.productCode === sku);
+    if (!device) return [];
+    const { dailyUvt, monthlyUsdt, capacitySchedule } = device.earningPurchase;
+    const postedAt = anchor - minutesAgo * minute;
+    const completedAt = postedAt - (modelRate ? 0 : minute);
+    const startedAt = completedAt - durationSec * 1000;
+    const capacity = at => previewCapacity(device, capacitySchedule, at).capacityPct / 100;
+    const cycle = purchaseCycle(device, completedAt);
+    // Frozen preview pacing quote: equal pool base rate per second, effective pace 0.95
+    // (day weight × cycle factor × controller correction), with the nominal inside the allocation band.
+    const baseUsdt = modelRate
+      ? (modelRate[0] + modelRate[1]) / 2 * capacity(startedAt)
+      : monthlyUsdt * capacity(cycle.start) * durationSec * 0.95 / cycle.seconds;
+    const rewardUsdt = roundReward(baseUsdt);
+    const dailyKey = `CLOUD_SHARE_DAILY:${device.id}:${new Date(completedAt).toISOString().slice(0, 10)}`;
+    let rewardNex = 0;
+    if (!dailyCredits.has(dailyKey)) {
+      rewardNex = roundReward(dailyUvt * capacity(completedAt));
+      if (rewardNex > 0) dailyCredits.add(dailyKey);
+    }
+    return [{ ...sample, device, modelReceipt: Boolean(modelRate), receiptNo: `CTR-DEMO-EARN-${sample.id}`,
+      taskNo: `${modelRate ? 'CTA' : 'SIM'}-DEMO-EARN-${sample.id}`, dailyKey, startedAt, completedAt, durationSec,
+      rewardUsdt, rewardNex, settledAt: rewardUsdt > 0 || rewardNex > 0 ? postedAt : null }];
+  });
+}
+
+export function demoVisibleEarningReceipts(state) {
+  return demoEarningReceipts(state).filter(sample => sample.receiptStatus !== 404);
+}
+
+export function demoWithEarningReceiptTasks(state, tasks) {
+  if (state.fleetState !== 'earning-credit') return tasks;
+  const samples = demoVisibleEarningReceipts(state);
+  // These samples are canonical CREDITED receipts. A zero-reward receipt still counts as a completed job.
+  return [...tasks, ...samples.map(sample => ({
+    taskNo: sample.taskNo, deviceId: sample.device.id, client: 'UVEL',
+    model: sample.modelReceipt ? earningModel(sample.taskClass) : taskNames[sample.taskClass],
+    amount: sample.rewardUsdt, nex: sample.rewardNex, completedAt: sample.completedAt,
+  }))];
+}
+
+export function demoReceiptTodayByDevice(tasks, now) {
+  const start = Math.floor((now + storageOffset) / day) * day - storageOffset;
+  const totals = new Map();
+  for (const task of tasks) {
+    if (task.completedAt < start || task.completedAt >= start + day) continue;
+    const total = totals.get(task.deviceId) ?? { todayEarningsUsdt: 0, todayEarningsNex: 0 };
+    total.todayEarningsUsdt += task.amount;
+    total.todayEarningsNex += task.nex ?? 0;
+    totals.set(task.deviceId, total);
+  }
+  return totals;
+}
+
+export function demoEarningCredits(state) {
+  return demoEarningReceipts(state).filter(sample => sample.settledAt !== null);
+}
+
+export function demoEarningBillRefs(state) {
+  return demoEarningCredits(state).flatMap(({ taskNo, dailyKey, rewardUsdt, rewardNex, settledAt }) => [
+    ...(rewardUsdt > 0 ? [[taskNo, 'USDT', 'IN', rewardUsdt, 'COMPUTE_TASK_REWARD', 'bonus', settledAt]] : []),
+    ...(rewardNex > 0 ? [[dailyKey, 'UVT', 'IN', rewardNex, 'COMPUTE_TASK_REWARD', 'bonus', settledAt]] : []),
+  ]);
+}
+
+// DTO serialization comes after sorting and hashing the preview's internal epoch values.
+export function demoReceiptWire(receipt, state) {
+  if (state.fleetState !== 'earning-credit') return receipt;
+  const date = at => at == null ? null : new Date(at + storageOffset).toISOString().slice(0, 19).replace('T', ' ');
+  return { ...receipt, rewardUsdt: Number(receipt.rewardUsdt), rewardNex: Number(receipt.rewardNex),
+    completedAt: date(receipt.completedAt), settledAt: date(receipt.settledAt),
+    ...('startedAt' in receipt && { startedAt: date(receipt.startedAt) }) };
+}
+
+export function demoEarningReceipt(sample, detail = false) {
+  const { device, id, taskNo, taskClass, receiptNo, startedAt, completedAt, settledAt, modelReceipt,
+    rewardUsdt, rewardNex, durationSec } = sample;
+  const hash = createHash('sha256').update(receiptNo).digest('hex');
+  return {
+    source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true,
+    receiptNo, displayReceiptNo: `UVEL-RC-${id.toString(36).toUpperCase().padStart(6, '0')}`,
+    taskNo, taskClass, taskId: `demo-earn-${id}`, taskName: taskNames[taskClass],
+    model: modelReceipt ? earningModel(taskClass) : '', client: 'UVEL',
+    deviceId: device.id, deviceInstanceNo: device.instanceNo, deviceName: device.name,
+    deviceType: device.deviceType ?? 'BOX', deviceGpu: device.gpuModel ?? '', vramTotalGb: device.vramTotalGb,
+    rewardUsdt, rewardNex, earningStatus: 'CREDITED', settledAt, postingTimeVerified: settledAt !== null,
+    completedAt, startedAt, durationSec,
+    executionMode: modelReceipt ? 'MODEL' : 'SIMULATED', proofKind: modelReceipt ? 'MODEL_EXECUTION' : 'TASK_RECEIPT',
+    modelExecuted: modelReceipt, proofHash: modelReceipt ? hash : null,
+    ...(detail && { receiptHash: modelReceipt ? null : hash }),
+  };
+}
+
 // Isolated preview records; routes resolve to the same fixture's orders/devices.
 export function demoNotifications(locale, state, now, device, order) {
   // Payment text shows two decimals (decimal HALF_UP), like the App's payment copy; the order keeps full precision.
@@ -14,7 +153,7 @@ export function demoNotifications(locale, state, now, device, order) {
     date.setHours(hour, 0, 0, 0);
     return date.getTime();
   };
-  const rows = [
+  let rows = [
     // fleetState=none has no device to announce.
     ...(device ? [{ id: 901, kind: 'device', title: text('设备已开始运行', 'Device is running', 'Thiết bị đang chạy'),
       body: text(`设备 ${device.instanceNo} 已上线，可查看运行状态与收益。`, `Device ${device.instanceNo} is online. View its status and earnings.`, `Thiết bị ${device.instanceNo} đã trực tuyến. Xem trạng thái và thu nhập.`),
@@ -32,6 +171,26 @@ export function demoNotifications(locale, state, now, device, order) {
       body: text('本次服务维护已完成，消息与订单查询已恢复。\n如页面仍显示维护前的内容，请返回后重新打开；尚未完成的操作请先查看当前状态再继续。', 'Maintenance is complete. Messages and order lookups are available again.\nIf a page still shows earlier information, reopen it. Check the current status of unfinished actions before continuing.', 'Bảo trì đã hoàn tất. Tin nhắn và tra cứu đơn hàng đã hoạt động lại.\nNếu trang vẫn hiển thị nội dung cũ, hãy mở lại. Kiểm tra trạng thái thao tác chưa hoàn tất trước khi tiếp tục.'),
       ctaHref: '', createdAt: at(0) },
   ];
+  if (state.fleetState === 'earning-credit') {
+    const credits = demoEarningCredits(state).map(sample => ({
+      id: sample.id, kind: 'earning_credited', priority: 'low',
+      title: text('收益到账', 'Earnings credited', 'Đã nhận thu nhập'),
+      body: text('查看这笔收益的凭证。', 'View the receipt for these earnings.', 'Xem biên nhận thu nhập này.'),
+      ctaHref: `/pages/me/receipts?receiptNo=${sample.receiptNo}`, createdAt: sample.settledAt,
+      readAt: sample.read ? sample.settledAt + 60_000 : null,
+      earning: { receiptNo: sample.receiptNo, usdt: sample.rewardUsdt > 0 ? String(sample.rewardUsdt) : null,
+        uvt: sample.rewardNex > 0 ? String(sample.rewardNex) : null,
+        deviceName: sample.device.name, taskClass: sample.taskClass },
+    }));
+    const summaries = [999].map((id, index) => ({
+      id, kind: 'NOVA_DAILYSUMMARY', priority: 'low',
+      title: text('今日收益总结', 'Today’s earnings summary', 'Tổng kết thu nhập hôm nay'),
+      body: text('查看今天的任务和收益进度', 'View today’s tasks and earnings', 'Xem tiến độ nhiệm vụ và thu nhập hôm nay'),
+      ctaHref: '/earn', createdAt: state.previewFactsAt - (index + 1) * 86_400_000,
+      readAt: state.previewFactsAt,
+    }));
+    rows = [...credits, ...rows.filter(row => row.id === 905), ...summaries];
+  }
   // Both paging modes use the same older notices so the failed cursor can be retried.
   if (state.notificationPageState === 'paginated' || state.notificationPageState === 'error') {
     const latest = at(4);
@@ -46,14 +205,14 @@ export function demoNotifications(locale, state, now, device, order) {
     }
   }
   return rows.filter(row => !state.clearedNotificationIds?.includes(row.id)).map(row => ({
-    ...row, priority: row.id === 903 ? 'high' : 'normal',
+    ...row, priority: row.priority ?? (row.id === 903 ? 'high' : 'normal'),
     ctaLabel: row.ctaHref ? text('查看详情', 'View details', 'Xem chi tiết') : '',
-    readAt: row.readAt ?? (state.read || state.readIds?.includes(row.id) || row.id >= 904 ? now : null),
+    readAt: row.readAt ?? (state.read || state.readIds?.includes(row.id) || row.id === 904 || row.id === 905 ? now : null),
   })).sort((a, b) => b.id - a.id);
 }
 
 
-export function demoNotificationPage(rows, params) {
+export function demoNotificationPage(rows, params, { includeActionableUnread }) {
   const rawCursor = params.get('cursor')?.trim();
   const cursor = rawCursor ? Number(rawCursor) : null;
   if (cursor !== null && (!/^\d+$/.test(rawCursor) || !Number.isSafeInteger(cursor) || cursor <= 0)) {
@@ -65,13 +224,19 @@ export function demoNotificationPage(rows, params) {
     throw Object.assign(new Error('NOTIFICATION_LIMIT_INVALID'), { status: 400 });
   }
   const limit = Math.max(1, Math.min(requestedLimit, 100));
-  const remaining = cursor === null ? rows : rows.filter(row => row.id < cursor);
+  const category = params.get('category');
+  const categories = { order: 'finance', earning_credited: 'finance', device: 'device', NOVA_DAILYSUMMARY: 'device',
+    reward: 'rewards', marketing: 'rewards', system: 'system' };
+  const remaining = rows.filter(row => (cursor === null || row.id < cursor)
+    && (!category || category === 'all' || categories[row.kind] === category));
   const items = remaining.slice(0, limit);
   const unread = rows.filter(row => row.readAt === null);
   return {
     items,
     nextCursor: remaining.length > limit ? String(items.at(-1).id) : null,
     unread: unread.length,
-    actionableUnread: unread.filter(row => row.kind !== 'marketing').length,
+    ...(includeActionableUnread && {
+      actionableUnread: unread.filter(row => row.kind !== 'marketing' && row.kind !== 'earning_credited').length,
+    }),
   };
 }

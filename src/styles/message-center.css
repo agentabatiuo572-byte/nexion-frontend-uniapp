@@ -24,7 +24,7 @@
 .message-center .message-summary-recovery { display: flex; justify-content: center; }
 .message-center .message-summary-recovery .message-button { width: 100%; padding: 0; color: var(--v5-brand); background: none; border: 0; box-shadow: none; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); }
 @media (max-width:350px) { .message-center .message-heading-row { gap: 6px; } .message-center .message-title { font-size: 24px; line-height: 32px; } }
-.message-center .message-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); flex-shrink: 0; }
+.message-center .message-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ui-unread-dot); flex-shrink: 0; }
 .message-center .message-primary-inner { padding-top: 4px; }
 .message-center .message-filters { flex-shrink: 0; margin: 12px 0 0; }
 .message-center .notification-feed { padding-top: 2px; }

@@ -19,6 +19,7 @@
             <text class="push-settings-action">{{ nativePushPermission === 'unknown' ? pushCopy.enable : pushCopy.settings }}</text>
             <view class="push-settings-chevron" aria-hidden="true"><NxIcon name="chevron-right" /></view>
           </view>
+          <EarningPushSetting />
         </view>
         <text v-if="pushSettingsFailed" class="block mx-1" :style="footerStyle" role="alert">{{ pushCopy.settingsFailed }}</text>
         <view v-if="nativePushRegistrationUnavailable" class="mx-1" role="status" aria-live="polite">
@@ -82,6 +83,9 @@ import { computed, onUnmounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
+// #ifdef APP-PLUS
+import EarningPushSetting from "@/components/me/earning-push-setting.vue";
+// #endif
 import { useT } from "@/i18n/use-t";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
 import { onHide, onShow } from "@dcloudio/uni-app";
@@ -196,6 +200,7 @@ const footerStyle: CSSProperties = {
 .push-settings-row:active { opacity: .75; }
 .push-settings-icon { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; background: var(--v5-surface-2); color: var(--v5-brand); }
 .push-settings-status { flex: 1; min-width: 0; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
-.push-settings-action { max-width: 48%; font-size: var(--ui-type-list-subtitle); color: var(--v5-brand); text-align: right; }
+/* A short action stays on one line; the status beside it wraps instead (design-rules: short buttons never fold). */
+.push-settings-action { flex-shrink: 0; font-size: var(--ui-type-list-subtitle); color: var(--v5-brand); text-align: right; white-space: nowrap; }
 .push-settings-chevron { flex-shrink: 0; color: var(--v5-ink-4); }
 </style>

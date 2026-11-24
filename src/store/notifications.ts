@@ -4,11 +4,12 @@ import { computed, ref } from "vue";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { notificationPreferenceKind, notificationCategory, type NotificationCategory } from "@/lib/notification-category";
 import { notificationApi, remoteApiEnabled } from "@/api/runtime";
+import { ApiError } from "@/api/errors";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { nexGridBrandText } from "@/lib/brand-copy";
-import type { NotificationFilter } from "@/api/notification-api";
+import type { NotificationEarning, NotificationFilter } from "@/api/notification-api";
 
 export type NotifKind = "commission" | "team" | "staking" | "market" | "genesis" | "system";
 export type NotifPriority = "critical" | "high" | "normal" | "low";
@@ -24,11 +25,26 @@ export interface Notification {
   ctaHref?: string;
   ts: number;
   readAt: number | null;
+  earning?: NotificationEarning;
 }
 export interface PushInput { id?: string; kind: NotifKind; priority?: NotifPriority; title: string; body?: string; ctaLabel?: string; ctaHref?: string; }
 
 const KEY = "nexgrid-notifications-accounts-v1";
 const knownKind = notificationPreferenceKind;
+export const EARNING_NOTIFICATION_REMOVED = "EARNING_NOTIFICATION_REMOVED";
+
+function matchesEarningReceiptRoute(route: string, receiptNo: string): boolean {
+  const match = /^\/pages\/me\/receipts\?receiptNo=([^&#]+)$/.exec(route);
+  if (!match) return false;
+  try { return decodeURIComponent(match[1].replace(/\+/g, " ")) === receiptNo; }
+  catch { return false; }
+}
+
+function notificationCursorId(cursor: string | null, unbounded: number): number {
+  if (cursor === null) return unbounded;
+  const id = Number(cursor);
+  return /^\d+$/.test(cursor) && Number.isSafeInteger(id) && id > 0 ? id : NaN;
+}
 function hydrate(accountKey: string): Notification[] {
   const rows = readAccountRow<{ items?: Notification[] }>(KEY, accountKey)?.items ?? [];
   // 历史通知按原文显示，品牌修正在发布源完成。
@@ -55,6 +71,8 @@ export const useNotifications = defineStore("notifications", () => {
   const items = computed({ get: () => remoteApiEnabled ? pageState.value.items : localItems.value,
     set: (value: Notification[]) => { if (remoteApiEnabled) pageState.value.items = value; else localItems.value = value; } });
   const unread = ref(items.value.filter((item) => !item.readAt).length);
+  const lastRemoteUnread = ref<number | null>(null);
+  const earningsReadConfirmed = computed(() => lastRemoteUnread.value === 0);
   const actionableUnread = ref<number | null>(null);
   const unreadByKind = ref<Record<string, number> | null>(null);
   const unreadByCategoryExact = computed(() => !remoteApiEnabled || unread.value === 0 || unreadByKind.value !== null);
@@ -95,15 +113,29 @@ export const useNotifications = defineStore("notifications", () => {
     writeAccountRow(KEY, boundKey, { items: items.value });
   }
   function recount() { unread.value = items.value.filter((item) => !item.readAt).length; }
-  function appendRemote(page: Awaited<ReturnType<typeof notificationApi.page>>, head: boolean) {
+  function removeCachedEarnings(remove: (id: string) => boolean) {
+    for (const key of ["all", "finance"] as const) {
+      const cached = pages.value[key];
+      cached.items = cached.items.filter(item => item.rawKind !== "earning_credited" || !remove(item.id));
+    }
+  }
+  function appendRemote(page: Awaited<ReturnType<typeof notificationApi.page>>, requestedCategory: NotificationFilter, requestedCursor: string | null) {
+    const head = requestedCursor === null;
     const next = page.items.map((item) => {
       return {
         id: String(item.id), kind: knownKind(item.kind), rawKind: item.kind, priority: item.priority, title: item.title,
         body: item.body || undefined, ctaLabel: item.ctaLabel || undefined, ctaHref: item.ctaHref || undefined,
         ts: item.createdAt, readAt: item.readAt,
+        ...(item.earning && { earning: item.earning }),
       };
     });
     const ids = new Set(next.map(item => item.id));
+    if (requestedCategory === "all" || requestedCategory === "finance") {
+      const lower = notificationCursorId(page.nextCursor, -Infinity);
+      const upper = notificationCursorId(requestedCursor, Infinity);
+      // Only a successful read of a category that includes earnings can prove absence.
+      removeCachedEarnings(id => Number(id) >= lower && Number(id) < upper && !ids.has(id));
+    }
     const updated = new Map(next.map(item => [item.id, item]));
     for (const cached of Object.values(pages.value)) {
       if (cached !== pageState.value) cached.items = cached.items.map(item => updated.get(item.id) ?? item);
@@ -122,6 +154,7 @@ export const useNotifications = defineStore("notifications", () => {
         .sort((a, b) => Number(b.id) - Number(a.id));
     }
     unread.value = page.unread;
+    lastRemoteUnread.value = page.unread;
     actionableUnread.value = page.actionableUnread ?? null;
     unreadByKind.value = page.unreadByKind ? { ...page.unreadByKind } : null;
     if (!head || !pageState.value.historyLoaded || !page.nextCursor || !overlaps) nextCursor.value = page.nextCursor;
@@ -156,7 +189,7 @@ export const useNotifications = defineStore("notifications", () => {
     try {
       const page = await notificationApi.page(undefined, undefined, requestedCategory);
       if (!isCurrent()) return false;
-      appendRemote(page, true);
+      appendRemote(page, requestedCategory, null);
       if (!isCurrent()) return false;
       hasRemoteSnapshot.value = true;
       pageState.value.readError = null;
@@ -193,7 +226,7 @@ export const useNotifications = defineStore("notifications", () => {
         pageState.value.pageError = "NOTIFICATION_PAGE_CURSOR_OVERLAP";
         return false;
       }
-      appendRemote(page, false);
+      appendRemote(page, requestedCategory, requestedCursor);
       return true;
     }
     catch (cause) {
@@ -222,7 +255,7 @@ export const useNotifications = defineStore("notifications", () => {
       invalidateReads();
       category.value = value;
     }
-    if (remoteApiEnabled && !hasRemoteSnapshot.value && !loading.value) await refreshRemote();
+    if (remoteApiEnabled && boundKey !== "default" && !hasRemoteSnapshot.value && !loading.value) await refreshRemote();
   }
   function enqueueRemoteMutation<T>(request: RemoteAccountRequest, operation: () => Promise<T>): Promise<T | undefined> {
     const queue = mutations;
@@ -248,6 +281,7 @@ export const useNotifications = defineStore("notifications", () => {
     refreshGeneration += 1;
     mutations = { pending: 0, tail: Promise.resolve() };
     unreadByKind.value = null;
+    lastRemoteUnread.value = null;
     actionableUnread.value = null;
     hasRemoteSnapshot.value = false;
     if (remoteApiEnabled) {
@@ -278,7 +312,7 @@ export const useNotifications = defineStore("notifications", () => {
     }
     // A successful acknowledgement may be an idempotent replay after another
     // device read this row. Never subtract from an authoritative group locally.
-    if (unreadByKind.value !== null) return;
+    if (unreadByKind.value !== null || item.rawKind === "earning_credited") return;
     unread.value = Math.max(0, unread.value - 1);
   }
   async function markRead(id: string, request: RemoteAccountRequest = remoteAccountEpoch.snapshot(), fromAction = false) {
@@ -369,7 +403,7 @@ export const useNotifications = defineStore("notifications", () => {
     }
     items.value = items.value.filter((item) => !item.readAt); recount(); persist();
   }
-  async function recordRemoteAction(id: string, action: "cta" | "swipe_conversion"): Promise<string | null> {
+  async function recordRemoteAction(id: string, action: "cta" | "swipe_conversion", earningReceiptNo?: string): Promise<string | null> {
     if (!remoteApiEnabled) return null;
     const numericId = Number(id);
     if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
@@ -377,9 +411,19 @@ export const useNotifications = defineStore("notifications", () => {
     const cancellation = cancelGeneration;
     const receipt = await enqueueRemoteMutation(request, async () => {
       try {
-        return await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
+        const result = await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
+        if (earningReceiptNo && !matchesEarningReceiptRoute(result.route, earningReceiptNo)) {
+          throw new ApiError({ kind: "protocol", message: "NOTIFICATION_ACTION_RESPONSE_MISMATCH" });
+        }
+        return result;
       } catch (cause) {
-        if (!remoteAccountEpoch.isCurrent(request) || cancellation !== cancelGeneration) return;
+        if (!remoteAccountEpoch.isCurrent(request)) return;
+        if (earningReceiptNo && cause instanceof ApiError && cause.message === "NOTIFICATION_NOT_FOUND") {
+          removeCachedEarnings(cachedId => cachedId === id);
+          if (cancellation === cancelGeneration) commandError.value = EARNING_NOTIFICATION_REMOVED;
+          return false as const;
+        }
+        if (cancellation !== cancelGeneration) return;
         commandError.value = cause instanceof Error ? cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
         return false as const;
       }
@@ -395,9 +439,9 @@ export const useNotifications = defineStore("notifications", () => {
     return receipt.route;
   }
 
-  async function recordCta(id: string) { return recordRemoteAction(id, "cta"); }
-  async function recordSwipeConversion(id: string) { return recordRemoteAction(id, "swipe_conversion"); }
+  async function recordCta(id: string, earningReceiptNo?: string) { return recordRemoteAction(id, "cta", earningReceiptNo); }
+  async function recordSwipeConversion(id: string, earningReceiptNo?: string) { return recordRemoteAction(id, "swipe_conversion", earningReceiptNo); }
   function clearAll() { if (remoteApiEnabled) { void refreshRemote(); return; } items.value = []; recount(); persist(); }
   function removeOne(id: string) { if (remoteApiEnabled) return; items.value = items.value.filter((item) => item.id !== id); recount(); persist(); }
-  return { items, category, unread, actionableUnread, unreadByKind, unreadByCategory, unreadByCategoryExact, loading, loadingMore, readError, pageError, commandError, readFailedWithoutData, hasRemoteSnapshot, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, selectCategory, loadMoreRemote, recordCta, recordSwipeConversion };
+  return { items, category, unread, earningsReadConfirmed, actionableUnread, unreadByKind, unreadByCategory, unreadByCategoryExact, loading, loadingMore, readError, pageError, commandError, readFailedWithoutData, hasRemoteSnapshot, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, selectCategory, loadMoreRemote, recordCta, recordSwipeConversion };
 });

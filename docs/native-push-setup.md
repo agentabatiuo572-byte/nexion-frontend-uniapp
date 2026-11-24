@@ -40,6 +40,13 @@
 
 FCM 服务账号所属项目必须与客户端和目标项目一致；APNs 私钥、环境、topic 必须与签名包匹配。健康检查中的 `CONFIGURED` 只证明本地配置可解析，不证明网络、供应商受理或手机送达。
 
+## 收益推送（B79）
+
+- 日报和 30 分钟多笔提醒点开后进入资金通知 `/pages/me/notifications?section=notifications&filter=finance`。两个参数必须同时出现且取值固定；原有无参数入口仍可用。
+- 首笔、实时单笔和 30 分钟单笔提醒点开后进入收益凭证，例如 `/pages/me/receipts?receiptNo=CTR-123`。客户端只接受一个 `receiptNo`，格式须匹配 `^CTR-[A-Za-z0-9_-]{1,120}$`。两条深链均由当前会话向后端 resolve 获取，凭证归属由后端校验。
+- App 的 `PUT /api/me/push-installations/{id}` 增加 `capabilities: ["earning_push_v1"]` 和设备的 IANA `timeZone`（例如 `Asia/Ho_Chi_Minh`）。取不到有效时区时省略 `timeZone`。App 回前台时沿用现有同步流程，时区或能力变化会重新登记。
+- B79 交付前，旧后端忽略这两个字段，现有推送照常工作，收益推送尚不会发送。
+
 ## 首次启用顺序
 
 以下为运维执行步骤，不是默认开生产的指令；先保留开关与数据库回执，确认目标业务环境和获准安装。

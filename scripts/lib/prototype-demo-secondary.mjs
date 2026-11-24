@@ -4,11 +4,25 @@ import { createHash } from 'node:crypto';
 import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
+import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire, demoVisibleEarningReceipts } from './prototype-demo-notifications.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
+
+// AppComputeReceiptSummaryView is the wire shape for a receipt list item.
+export function demoReceiptSummary({
+  receiptNo, taskNo, taskClass, model, client, rewardUsdt, rewardNex, earningStatus, completedAt,
+  taskName = null, executionMode = 'MODEL', proofKind = 'MODEL_EXECUTION', modelExecuted = true,
+  displayReceiptNo = null, settledAt = null,
+}) {
+  return {
+    receiptNo, taskNo, taskClass, model, client, rewardUsdt, rewardNex, earningStatus, completedAt,
+    taskName, executionMode, proofKind, modelExecuted, displayReceiptNo, settledAt,
+  };
+}
+
 // Receipt cursors retain the issuance cutoff while ordering by completion.
-export function demoReceiptPage(params, receipts) {
+export function demoReceiptPage(params, receipts, state) {
   const offset=Number(params.get('offset')??0),limit=Number(params.get('limit')??20);
   const cursor=params.get('cursor')?.trim();
   const invalid=(message)=>{throw Object.assign(new Error(message),{status:422});};
@@ -32,7 +46,7 @@ export function demoReceiptPage(params, receipts) {
     if(!boundary||!highWater||issuance(boundary,highWater)<0)invalid('TASK_RECEIPT_CURSOR_INVALID');
     eligible=rows.filter(row=>issuance(row,highWater)>=0&&ordering(row,boundary)>0);
   }
-  const items=eligible.slice(0,limit),more=eligible.length>limit;
+  const items=eligible.slice(0,limit).map(receipt=>demoReceiptWire(receipt,state)),more=eligible.length>limit;
   return {...proof,items,nextOffset:more?offset+limit:null,
     nextCursor:more?Buffer.from(JSON.stringify([items.at(-1).receiptNo,highWater.receiptNo])).toString('base64url'):null};
 }
@@ -204,8 +218,15 @@ export function secondaryDemo(url,state,request,walletBills){
   if(p==='/api/payout-addresses')return {...proof,addresses:[],serverNowEpochMs:now,changeCooldownDays:30,effectiveDelayHours:24,inFlightWithdrawalBlocked:true};
   if(p==='/api/me/notification-preferences'){
     state.notificationPreferences??={commission:true,team:true,staking:true,market:true,genesis:true,system:true};
-    if(request.method()==='PATCH')Object.assign(state.notificationPreferences,request.postDataJSON(),{system:true});
-    return state.notificationPreferences;
+    if(state.fleetState==='earning-credit')state.notificationPreferences.earningPush??='DAILY';
+    if(request.method()==='PATCH'){
+      const patch=request.postDataJSON();
+      if('earningPush' in patch&&!['REALTIME','HALF_HOURLY','DAILY','OFF'].includes(patch.earningPush))
+        throw Object.assign(new Error('NOTIFICATION_PREFERENCES_PATCH_INVALID'),{status:400});
+      Object.assign(state.notificationPreferences,patch,{system:true});
+    }
+    const {earningPush,...preferences}=state.notificationPreferences;
+    return state.fleetState==='earning-credit'?{...preferences,earningPush}:preferences;
   }
   if(p==='/api/withdrawals/bank/config')return {enabled:true,banks:[],bankCodeRequired:false,bindingOtpRequired:!empty,bankSelection:'ACCOUNT_ROUTED',bankRoutingVerified:true,payType:'BANKQR',unresolvedIntent:null,beneficiary:empty?null:{bankCode:'',bankName:'ACCOUNT_ROUTED',maskedAccount:'••••4242',effectiveAt:iso,nextChangeAt:iso,beneficiaryNo:'DEMO-BANK-1',canWithdraw:true,bankRoutingVerified:true},policy:{version:1,minAmountUsd:10,maxAmountUsd:10000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:100},capacity:{maxWithdrawableUsdt:facts.maxWithdrawableUsdt,dailyRemainingCount:facts.dailyRemainingCount,dailyLimitCount:facts.dailyLimitCount,dailyCountResetAt:new Date(facts.dailyCountResetAt).toISOString(),withdrawalEnabled:true}};
   if(p==='/api/payment-methods')return {serverCanonical:true,cards:empty?[]:[{tokenId:'9001',version:1,brand:'visa',last4:'4242',expiry:'12/30',holder:'ALEX DEMO',status:'BOUND',isDefault:true,boundAt:iso,source:'mock',sandbox:true,providerCanonical:false}]};
@@ -219,6 +240,19 @@ export function secondaryDemo(url,state,request,walletBills){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
+    const earningReceipts=demoEarningReceipts(state);
+    const credit=earningReceipts.find(sample=>sample.receiptNo===p.split('/').pop());
+    if(credit){
+      if(credit.receiptFailures){
+        if(!state.earningReceiptAttempts||state.earningReceiptAttempts.epoch!==state.scenarioEpoch)
+          state.earningReceiptAttempts={epoch:state.scenarioEpoch,counts:{}};
+        const counts=state.earningReceiptAttempts.counts;
+        counts[credit.receiptNo]=(counts[credit.receiptNo]??0)+1;
+        if(counts[credit.receiptNo]<=credit.receiptFailures)
+          throw Object.assign(new Error('TASK_RECEIPT_UNAVAILABLE'),{status:503});
+      }
+      if(credit.receiptStatus!==404)return demoReceiptWire(demoEarningReceipt(credit,true),state);
+    }
     const tasks=demoSettledTasks(state,state.previewFactsAt??now);
     const items=tasks.map((task,i)=>({...proof,
       receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,
@@ -229,16 +263,19 @@ export function secondaryDemo(url,state,request,walletBills){
       ...(task.simulation&&{displayReceiptNo:'UVEL-RC-'+task.receiptId.toString(36).toUpperCase().padStart(6,'0'),
         postingTimeVerified:task.postedAt!=null}),
       proofHash:task.simulation?null:String(i+1).repeat(64)}));
-    if(p==='/api/tasks/receipts')return demoReceiptPage(url.searchParams,items);
+    if(p==='/api/tasks/receipts'){
+      const receipts=[...items,...demoVisibleEarningReceipts(state).map(sample=>demoEarningReceipt(sample))];
+      return demoReceiptPage(url.searchParams,state.fleetState==='earning-credit'?receipts.map(demoReceiptSummary):receipts,state);
+    }
     const index=items.findIndex(r=>r.receiptNo===p.split('/').pop());
     if(index<0)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     const receipt=items[index],task=tasks[index];
-    if(!task.simulation)return receipt;
+    if(!task.simulation)return demoReceiptWire(receipt,state);
     const receiptHash=createHash('sha256').update(['UVEL:TASK_RECEIPT:1',receipt.receiptNo,receipt.taskNo,
       state.authUser?.userId??900001,receipt.deviceId,receipt.taskId,task.configVersion,
       new Date(receipt.startedAt).toISOString(),new Date(receipt.completedAt).toISOString(),
       receipt.rewardUsdt,receipt.rewardNex].join('|')).digest('hex');
-    return {...receipt,receiptHash};
+    return demoReceiptWire({...receipt,receiptHash},state);
   }
   if(p==='/api/earnings/release-status'){
     const entries=walletBills().filter(row=>row.status==='SUCCESS'&&row.direction==='IN'
