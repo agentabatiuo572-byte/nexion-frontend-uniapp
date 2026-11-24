@@ -13,6 +13,8 @@ export interface PaymentPasswordContext {
   currency: string;
   summary: string;
   details?: { name: string; quantity?: number; amount?: number | string }[];
+  /** Display only: 'full' shows every digit of amount (the order top-up path); otherwise two places. */
+  precision?: 'full';
 }
 type Stage = "loading" | "read-error" | "setup" | "confirm" | "pay" | "recovery" | "reset" | "reset-confirm" | "pending";
 type ErrorKey = "" | "readFailed" | "failed" | "mismatch" | "simple" | "incorrect" | "locked" | "versionChanged" | "recoveryUnavailable" | "codeInvalid" | "proofExpired" | "samePassword";

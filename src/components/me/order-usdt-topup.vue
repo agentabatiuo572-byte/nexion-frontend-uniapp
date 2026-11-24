@@ -52,7 +52,8 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
         </view>
-        <text v-if="!covered" class="out-hero__note">{{ minimumFloor ? fill(copy.suggestMinNote, { min: amt(read.minDepositUsdt) }) : fill(copy.suggestNote, { fee: amt(read.depositFeeUsdt) }) }}</text>
+        <text v-if="!covered" class="out-hero__note">{{ fill(copy.suggestNote, { fee: amt(read.depositFeeUsdt) }) }}</text>
+        <text v-if="!covered && minimumFloor" class="out-hero__note">{{ fill(copy.suggestMinNote, { min: amt(read.minDepositUsdt) }) }}</text>
 
         <view class="out-gauge">
           <view v-if="!covered" class="out-gauge__scale"><text class="out-gauge__k">{{ copy.dueLabel }}</text><text class="out-num">{{ amt(read.amountDueUsdt) }}<text class="out-unit">{{ USDT }}</text></text></view>
@@ -308,7 +309,7 @@ const view = computed(() => {
   return hasUsdt(r.shortfallUsdt) ? "waiting" : "covered";
 });
 const covered = computed(() => view.value === "covered");
-// The suggestion was raised to the minimum deposit (shortfall + fee is below it): say so instead of the fee line.
+// The suggestion was raised to the minimum deposit (shortfall + fee is below it): say so under the fee line.
 const minimumFloor = computed(() => {
   const r = read.value;
   if (!r || !hasUsdt(r.shortfallUsdt)) return false;
@@ -345,7 +346,9 @@ const head = computed(() => {
     case "open-intent": {
       const method = read.value?.openIntent?.paymentMethod;
       const usdt = method === "CREGIS_USDT_BSC" ? c.bep20 : method === "CREGIS_USDT_ERC20" ? c.erc20 : method === "CREGIS_USDT_TRC20" ? c.trc20 : "";
-      return { tone: "warning" as const, icon: "clock" as const, title: usdt ? fill(c.openIntentUsdtTitle, { network: usdt }) : c.openIntentTitle, body: c.openIntentBody };
+      // paymentAllowed=false: the original payment can only be viewed, so the line and the button say view, not finish.
+      return { tone: "warning" as const, icon: "clock" as const, title: usdt ? fill(c.openIntentUsdtTitle, { network: usdt }) : c.openIntentTitle,
+        body: read.value?.openIntent?.paymentAllowed ? c.openIntentBody : c.openIntentViewBody };
     }
     // Both review reasons share one neutral line: it neither assumes a payment was made nor names the internal reason (review F05).
     case "review": return { tone: "warning" as const, icon: "alert" as const, title: c.reviewHoldTitle, body: c.reviewHold };
@@ -417,7 +420,7 @@ const barAction = computed(() => {
   switch (view.value) {
     case "waiting": return { label: c.goPay, enabled: false, note: c.payWhenEnough, run: () => {} };
     case "covered": return { label: c.goPay, enabled: true, note: c.payReady, run: pay };
-    case "open-intent": return { label: c.openIntent, enabled: true, note: "", run: openIntent };
+    case "open-intent": return { label: read.value?.openIntent?.paymentAllowed ? c.openIntent : c.openIntentView, enabled: true, note: "", run: openIntent };
     case "review": return { label: c.support, enabled: true, note: "", run: () => emit("support") };
     case "paid": case "closed": return { label: c.viewOrder, enabled: true, note: "", run: () => emit("view-order") };
     default: return null;
@@ -455,7 +458,7 @@ defineExpose({ barAction });
 .out-copy { flex: none; display: grid; place-items: center; width: 44px; height: 44px; color: var(--v5-ink-2); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .out-copy:active { opacity: .6; }
 .out-copy:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -4px; border-radius: var(--v5-radius-s); }
-.out-hero__note { display: block; margin-top: var(--v5-space-1); color: var(--v5-ink-3); text-align: center; text-wrap: pretty; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
+.out-hero__note { display: block; margin-top: var(--v5-space-1); color: var(--v5-ink-3); text-align: center; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
 
 /* Balance → amount due: the filled part is the balance, the open end is what is still needed (04.0 主视觉). */
 .out-gauge { margin-top: var(--v5-space-4); padding-top: var(--v5-space-4); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }

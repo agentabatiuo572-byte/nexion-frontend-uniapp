@@ -3,7 +3,7 @@
     <view v-if="!auth.isAuthenticated" class="promotion-flat"><text class="promotion-title">{{ p.signIn }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ p.signIn }}</text></PromotionAction></view>
     <view v-else-if="loading || reopenPaidOnEntry" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
     <!-- The result's exits (查看设备, and 再买一台 via resultBuyAgain) sit in the page's bottom bar (checkout.vue #pageFixed, 04 §4.0). -->
-    <CheckoutResult ref="resultView" v-else-if="order?.paymentStatus==='PAID'" :order-no="order.orderNo" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0] ? items[0].imageUrl ?? getProduct(items[0].productNo)?.imageUrl : undefined" :product-images="resultImages" :amount="resultAmount?.value" :currency="resultAmount?.currency" :saved="bundleDiscount" :error="resultError" @devices="viewDevices" @support="contactResultSupport" @order="viewOrder" />
+    <CheckoutResult ref="resultView" v-else-if="order?.paymentStatus==='PAID'" :order-no="order.orderNo" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0] ? items[0].imageUrl ?? getProduct(items[0].productNo)?.imageUrl : undefined" :product-images="resultImages" :amount="resultExactAmount??resultAmount?.value" :currency="resultAmount?.currency" :amount-precision="resultExactAmount?'full':undefined" :saved="bundleDiscount" :error="resultError" @devices="viewDevices" @support="contactResultSupport" @order="viewOrder" />
     <template v-else>
       <!-- Original purchase state: a page-floor hint (icon + text, no card, no stripe) above the products: the result, which purchase it is, what not to do. -->
       <view v-if="keepRecoveryTarget" class="checkout-keep-recovery" role="status">
@@ -277,6 +277,10 @@ const resultAmount = computed(() => {
     currency: receipt.paymentMethod === 'HDPAY_BANK' ? 'USD' as const : 'USDT' as const,
   };
 });
+// The order top-up path pays the exact amount due from the wallet, while paidTotalUsdt is two places by contract (B18):
+// its result shows the amount the user confirmed and authorized, every digit (contract-b84 paidAmountUsdt). Display only.
+const topupPaid=ref<{orderNo:string;amount:string}|null>(null);
+const resultExactAmount=computed(()=>topupPaid.value&&topupPaid.value.orderNo===order.value?.orderNo?topupPaid.value.amount:undefined);
 let resultGeneration=0;
 watch(()=>order.value?.orderNo,()=>{
   resultGeneration++;resultReading.value=false;resultState.value='processing';resultError.value='';
@@ -732,12 +736,13 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
   let rejection='',paymentDestination='',paymentReplace=false,topupChanged=false;paymentLeaveApproved=false;
   try{
     await run(async()=>{
-      await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,
+      await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,precision:topup?'full':undefined,
         details:expectedOrder.items?.map(item=>({name:item.productName,quantity:item.quantity}))},
         async authorization=>{
           try{
             updateClock();if(!paymentCurrent())return;
             await session.pay(authorization);
+            topupPaid.value=topup?{orderNo,amount:topup.amountDueUsdt}:null;
           }
           catch(cause){
             const failure=asApiError(cause);

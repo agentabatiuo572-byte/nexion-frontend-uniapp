@@ -47,7 +47,7 @@
            its final state, so the name is said once (PRD 59). -->
       <text v-if="productLine" class="checkout-result__product">{{ productLine }}</text>
       <view v-if="showPaidAmount || saved !== undefined" class="checkout-result__stats">
-        <view v-if="showPaidAmount" class="checkout-result__stat"><text class="checkout-result__label">{{ copy.paidAmount }}</text><CheckoutAmount class="checkout-result__amount" :value="amount" :currency="currency ?? 'USDT'" /></view>
+        <view v-if="showPaidAmount" class="checkout-result__stat"><text class="checkout-result__label">{{ copy.paidAmount }}</text><CheckoutAmount class="checkout-result__amount" :value="amount" :currency="currency ?? 'USDT'" :precision="amountPrecision" /></view>
         <view v-if="saved !== undefined" class="checkout-result__stat"><text class="checkout-result__label">{{ trialCopy.resultSaved }}</text><CheckoutAmount class="checkout-result__amount" :value="saved" :currency="currency ?? 'USDT'" /></view>
       </view>
     </view>
@@ -73,7 +73,7 @@ import { useTrialPurchaseCopy } from '@/i18n/trial-purchase';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import CheckoutAmount from './CheckoutAmount.vue';
 // 'failed' is a server-confirmed provisioning failure (order PAID + PROVISIONING_FAILED); 'error' is only a read-back that has not succeeded yet.
-const props = defineProps<{ orderNo: string | null; state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; productImages?: string[]; amount?: string | number; delivery?: OrderDeviceDelivery; inventoryFallbackDeviceId?: string; currency?: 'USD' | 'USDT'; error?: string; completeLine?: string; saved?: string | number }>();
+const props = defineProps<{ orderNo: string | null; state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; productImages?: string[]; amount?: string | number; delivery?: OrderDeviceDelivery; inventoryFallbackDeviceId?: string; currency?: 'USD' | 'USDT'; error?: string; completeLine?: string; saved?: string | number; amountPrecision?: 'full' }>();
 // order: 查看订单 on a provisioning failure (PRD purchase payment, line 72). A host without an order view leaves it unwired.
 const emit = defineEmits<{ (event: 'devices'): void; (event: 'support'): void; (event: 'order'): void }>();
 const app = useApp();
