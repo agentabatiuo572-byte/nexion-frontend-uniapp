@@ -97,7 +97,7 @@ import { toast } from "@/store/ui";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
-import { questTargetBusiness, unclaimableBusinessQuests, type QuestTargetAvailability } from "@/lib/quest-business-availability";
+import { isWeeklyQuestTargetClosed } from "@/lib/quest-business-availability";
 import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 
@@ -198,19 +198,11 @@ const { block: genesisBlock, secondaryBlock: genesisSecondaryBlock } = useGenesi
 const targetAvailability = useQuestTargetAvailability();
 
 function targetClosed(q: CanonicalQuest): boolean {
-  const domain = questTargetBusiness(q);
-  if (domain === null) return false;
-  const closed: QuestTargetAvailability = {
-    genesisBlocked: domain === "genesis"
-      // 二级挂单承接的是他人存量,售罄档仍然可逛 —— 与闸完全同源。
-      ? (q.actionRoute.startsWith("/pages/genesis/marketplace")
-        ? genesisSecondaryBlock.value !== null
-        : genesisBlockIsKnownUnavailable(genesisBlock.value))
-      : false,
-    stakingClosed: targetAvailability.value.stakingClosed,
-    exchangeClosed: targetAvailability.value.exchangeClosed,
-  };
-  return unclaimableBusinessQuests([{ ...q, status: "PENDING" }], closed).length > 0;
+  return isWeeklyQuestTargetClosed(
+    q,
+    { ...targetAvailability.value, genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value) },
+    genesisSecondaryBlock.value !== null,
+  );
 }
 
 /** 过期与「目标业务停摆」都是不可点:一处判据,渲染点只用它。 */

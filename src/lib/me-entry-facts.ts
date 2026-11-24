@@ -1,4 +1,4 @@
-import type { QuestSnapshot } from "@/api/quest-api";
+import type { CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
 import type { CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
 import type { SeenMissions, SeenOrders } from "@/store/me-entry-seen";
 import type { Order } from "@/store/orders";
@@ -21,7 +21,12 @@ export function hasNewMeOrders(current: SeenOrders, seen: SeenOrders): boolean {
 
 type MissionSnapshot = Pick<QuestSnapshot, "quests" | "dayOneRequiredTaskCount" | "dayOneSnapshotStatus">;
 
-export function meMissionFacts(snapshot: MissionSnapshot, now: number, stakingVisible: boolean): SeenMissions {
+export function meMissionFacts(
+  snapshot: MissionSnapshot,
+  now: number,
+  stakingVisible: boolean,
+  weeklyTargetClosed: (quest: CanonicalQuest) => boolean,
+): SeenMissions {
   const shown = snapshot.quests.filter(row => stakingVisible || !isStakingVisibilityRoute(row.actionRoute));
   const weekHero = shown.find(row => row.layer === "WEEKLY_T1" && isCurrentQuest(row, now));
   const actionable = shown.filter(row => (row.layer !== "WEEKLY_T1" || row === weekHero) && isActionableQuest(row, now));
@@ -31,7 +36,10 @@ export function meMissionFacts(snapshot: MissionSnapshot, now: number, stakingVi
     const dayOne = snapshot.quests.find(row => row.layer === "DAY_ONE" && isActionableQuest(row, now));
     if (dayOne) claimable.push(JSON.stringify([dayOne.instanceKey]));
   }
-  return { participating: actionable.filter(row => row.status === "PENDING").map(identity), claimable };
+  const participating = actionable
+    .filter(row => row.status === "PENDING" && (row.layer === "DAY_ONE" || !weeklyTargetClosed(row)))
+    .map(identity);
+  return { participating, claimable };
 }
 
 export function latestMeReceipt(items: readonly CanonicalComputeReceiptSummary[]): number | null {

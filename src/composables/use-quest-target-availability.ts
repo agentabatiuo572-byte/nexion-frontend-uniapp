@@ -3,7 +3,10 @@ import { exchangeApi, remoteApiEnabled, stakingApi } from "@/api/runtime";
 import type { StakingPool } from "@/api/staking-api";
 import { useStaking } from "@/store/staking";
 import { canOpenStakingPool, type StakingConfigState } from "@/lib/staking-canonical";
-import type { QuestTargetAvailability } from "@/lib/quest-business-availability";
+import { isWeeklyQuestTargetClosed, type QuestTargetAvailability } from "@/lib/quest-business-availability";
+import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
+import { useGenesisSaleBlocks } from "./use-genesis-sale-gate";
+import type { CanonicalQuest } from "@/api/quest-api";
 import { STAKING_TERMS } from "@/store/staking";
 
 /**
@@ -18,11 +21,11 @@ import { STAKING_TERMS } from "@/store/staking";
  *             进页面拉一次,失败算「不知道」;
  *   · 创世 —— 由调用方从 useGenesisSaleGate 传入(那里已是唯一派生出口)。
  */
-export function useQuestTargetAvailability() {
+const exchangeClosed = ref(false);
+const remotePools = ref<StakingPool[] | null>(null);
+
+export function useQuestTargetAvailability(readOnMount = true) {
   const staking = useStaking();
-  const exchangeClosed = ref(false);
-  /** 公开只读的方案目录读取结果。`null` = 还没读到(含读失败)= 不知道。 */
-  const remotePools = ref<StakingPool[] | null>(null);
 
   /**
    * 🔴 任务面自己读「现在还有没有档位可售」(zentao #127/#155)。
@@ -37,7 +40,7 @@ export function useQuestTargetAvailability() {
    * 与兑换那一路(caps)同形:进页面拉一次,失败算「不知道」(fail open)。
    */
   onMounted(() => {
-    if (!remoteApiEnabled) return;
+    if (!readOnMount || !remoteApiEnabled) return;
     void stakingApi.fetchStakingPools().then((pools) => {
       remotePools.value = pools;
     }).catch(() => {
@@ -50,7 +53,7 @@ export function useQuestTargetAvailability() {
   // 任务面本来就要为「有没有兑换任务」决定措辞,少一个"先问再拉"的两段状态,
   // 也避免首帧里兑换任务先按不可用渲染、下一 tick 才变灰。
   onMounted(() => {
-    if (!remoteApiEnabled) return;
+    if (!readOnMount || !remoteApiEnabled) return;
     void exchangeApi.fetchCaps().then((caps) => {
       exchangeClosed.value = caps.swapEnabled === false;
     }).catch(() => {
@@ -61,7 +64,7 @@ export function useQuestTargetAvailability() {
 
   const stakingClosed = computed(() => {
     // 本地 mock 模式仍按既有读数判(没有远程目录可读)。
-    const pools = remoteApiEnabled ? remotePools.value : staking.pools;
+    const pools = remoteApiEnabled ? remotePools.value ?? (staking.remoteReady ? staking.pools : null) : staking.pools;
     // Only a successfully read catalogue can prove there is nothing on sale.
     if (!pools) return false;
     const state: StakingConfigState = {
@@ -79,4 +82,15 @@ export function useQuestTargetAvailability() {
     stakingClosed: stakingClosed.value,
     exchangeClosed: exchangeClosed.value,
   }));
+}
+
+/** Me and Missions compare the same gates as the cards using already-read data. */
+export function useWeeklyQuestTargetClosed(now: () => number) {
+  const availability = useQuestTargetAvailability(false);
+  const { block, secondaryBlock } = useGenesisSaleBlocks(now);
+  return (quest: Pick<CanonicalQuest, "layer" | "actionRoute">): boolean => isWeeklyQuestTargetClosed(
+    quest,
+    { ...availability.value, genesisBlocked: genesisBlockIsKnownUnavailable(block.value) },
+    secondaryBlock.value !== null,
+  );
 }

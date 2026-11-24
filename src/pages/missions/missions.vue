@@ -49,6 +49,7 @@ import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { useApp } from "@/store/app";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useWeeklyQuestTargetClosed } from "@/composables/use-quest-target-availability";
 import { useMeEntryRead } from "@/composables/use-me-entry-read";
 import { meMissionFacts } from "@/lib/me-entry-facts";
 import { useConfig } from "@/store/config";
@@ -85,6 +86,7 @@ const missionReadSettled = ref(!remoteApiEnabled);
 provide(WEEKLY_QUEST_PAGE_READ_SETTLED, missionReadSettled);
 const entrySeen = useMeEntrySeen();
 const config = useConfig();
+const weeklyTargetClosed = useWeeklyQuestTargetClosed(Date.now);
 async function refreshMissionTasks(force = false) {
   const read = missionRead.capture("missions");
   if (!read.current()) return;
@@ -95,7 +97,7 @@ async function refreshMissionTasks(force = false) {
   missionReadSettled.value = true;
   missionReadFailed.value = !success;
   if (success && snapshot && quest.remoteSnapshot === snapshot) {
-    const facts = meMissionFacts(snapshot, Date.now(), config.isEnabled("stakingVisible"));
+    const facts = meMissionFacts(snapshot, Date.now(), config.isEnabled("stakingVisible"), weeklyTargetClosed);
     entrySeen.record("missions", facts, read.scope, true);
   }
 }

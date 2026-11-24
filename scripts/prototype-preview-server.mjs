@@ -331,9 +331,17 @@ const server=http.createServer(async(req,res)=>{
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
       if(req.method==='GET'){
-        const data=await meEntryDots.read(url,previewAccountId(state,req.headers),path=>
+        const accountId=url.pathname==='/api/genesis/state'
+          ? previewSelectedAccountId(state) : previewAccountId(state,req.headers);
+        const data=await meEntryDots.read(url,accountId,path=>
           fixtureFor(new URL(path,url.origin),{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>({})}));
         if(data!==undefined)return sendJson(res,{code:0,message:'OK',data});
+      }
+      if(req.method==='POST'&&meEntryDots.handlesCancel(url.pathname)){
+        for await(const chunk of req) { /* Drain the command body before checking scenario ownership. */ }
+        if(staleWrite())return refuseStale();
+        const data=meEntryDots.cancelOrder(previewAccountId(state,req.headers),req.headers['idempotency-key']);
+        return sendJson(res,{code:0,message:'OK',data});
       }
       if(checkoutFlow?.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
@@ -391,7 +399,7 @@ const server=http.createServer(async(req,res)=>{
       let body='';for await(const chunk of req)body+=chunk;
       if(staleWrite())return refuseStale();
       if(req.method==='POST'&&meEntryDots.handlesClaim(url.pathname)){
-        const data=meEntryDots.claim(previewAccountId(state,req.headers),JSON.parse(body||'{}'),req.headers['idempotency-key']);
+        const data=meEntryDots.claim(url.pathname,previewAccountId(state,req.headers),JSON.parse(body||'{}'),req.headers['idempotency-key']);
         return sendJson(res,{code:0,message:'OK',data});
       }
       const delayedEvent=beginDelayedDemoH4EventCommand(url,req.method,state,req.headers,Date.now());
